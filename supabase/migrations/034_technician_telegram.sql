@@ -9,7 +9,7 @@ ALTER TABLE technicians ADD COLUMN IF NOT EXISTS telegram_id TEXT;
 -- Update the seed data technician with Telegram ID (if known)
 -- The actual Telegram ID needs to be set manually after the technician
 -- sends a message to the bot (Telegram IDs are numeric strings)
-COMMENT ON COLUMN technicians.telegram_id IS 'Telegram user ID for work order notifications via Clawd bot';
+COMMENT ON COLUMN technicians.telegram_id IS 'Telegram user ID for work order notifications via Sentry bot';
 
 -- =====================================================
 -- Update the helper function to include telegram_id

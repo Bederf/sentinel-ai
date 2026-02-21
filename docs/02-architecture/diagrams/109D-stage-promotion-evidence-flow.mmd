@@ -1,0 +1,11 @@
+flowchart TD
+    A[Scheduler tick] --> B[Collect monitoring + commissioning + quality gate]
+    B --> C[Evaluate entry thresholds]
+    C -->|Fail| D[Hold stage and record entry failures]
+    C -->|Pass| E[Start/continue candidate dwell timer]
+    E --> F{Min dwell met?}
+    F -->|No| G[Hold with promotion_dwell reason]
+    F -->|Yes| H{Re-promotion stability window met?}
+    H -->|No| I[Hold with repromotion_stability reason]
+    H -->|Yes| J[Decision: would_promote]
+    J --> K[Persist promoted stage and clear timers]

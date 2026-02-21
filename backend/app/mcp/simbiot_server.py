@@ -16,6 +16,7 @@ from typing import Optional, Dict, List, Any
 import logging
 import json
 import re
+import uuid
 from pathlib import Path
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -35,7 +36,7 @@ ALERTS_FILE = DATA_DIR / "alerts.json"
 def _load_sites() -> List[Dict[str, Any]]:
     """Load sites from JSON file."""
     try:
-        with open(SITES_FILE, 'r') as f:
+        with open(SITES_FILE, "r") as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Failed to load sites: {e}")
@@ -45,7 +46,7 @@ def _load_sites() -> List[Dict[str, Any]]:
 def _load_devices() -> List[Dict[str, Any]]:
     """Load devices from JSON file."""
     try:
-        with open(DEVICES_FILE, 'r') as f:
+        with open(DEVICES_FILE, "r") as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Failed to load devices: {e}")
@@ -55,7 +56,7 @@ def _load_devices() -> List[Dict[str, Any]]:
 def _load_alerts() -> List[Dict[str, Any]]:
     """Load alerts from JSON file."""
     try:
-        with open(ALERTS_FILE, 'r') as f:
+        with open(ALERTS_FILE, "r") as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Failed to load alerts: {e}")
@@ -86,21 +87,15 @@ def _calculate_building_health(devices: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     avg_health = sum(health_scores) / len(health_scores) if health_scores else 100
 
-    return {
-        "health_score": round(avg_health, 1),
-        "critical_alarms": critical_count,
-        "warnings": warning_count
-    }
+    return {"health_score": round(avg_health, 1), "critical_alarms": critical_count, "warnings": warning_count}
 
 
 # ============================================================================
 # MCP Tool Functions
 # ============================================================================
 
-async def get_buildings_tool(
-    status_filter: str = "all",
-    region: Optional[str] = None
-) -> Dict[str, Any]:
+
+async def get_buildings_tool(status_filter: str = "all", region: Optional[str] = None) -> Dict[str, Any]:
     """
     List buildings with status summary.
 
@@ -146,7 +141,7 @@ async def get_buildings_tool(
             "critical_alarms": health_metrics["critical_alarms"],
             "warnings": health_metrics["warnings"],
             "control_enabled": site.get("control_enabled", False),
-            "optimization_enabled": site.get("optimization_enabled", False)
+            "optimization_enabled": site.get("optimization_enabled", False),
         }
 
         # Apply region filter
@@ -163,17 +158,11 @@ async def get_buildings_tool(
 
         buildings.append(building)
 
-    return {
-        "buildings": buildings,
-        "total": len(sites),
-        "filtered": len(buildings)
-    }
+    return {"buildings": buildings, "total": len(sites), "filtered": len(buildings)}
 
 
 async def get_assets_tool(
-    building_id: str,
-    asset_type: Optional[str] = None,
-    criticality: Optional[str] = None
+    building_id: str, asset_type: Optional[str] = None, criticality: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     List assets for a building.
@@ -226,7 +215,7 @@ async def get_assets_tool(
                 "floor": location.get("floor"),
                 "zone": location.get("zone"),
                 "room": location.get("room"),
-                "description": location.get("description")
+                "description": location.get("description"),
             },
             "manufacturer": equipment.get("manufacturer"),
             "model": equipment.get("model"),
@@ -234,7 +223,7 @@ async def get_assets_tool(
             "status": safety_status,
             "active_alarms": active_alarms,
             "critical": metadata.get("critical", False),
-            "safety_note": metadata.get("safety_note")
+            "safety_note": metadata.get("safety_note"),
         }
 
         # Apply asset_type filter
@@ -247,17 +236,10 @@ async def get_assets_tool(
 
         assets.append(asset)
 
-    return {
-        "assets": assets,
-        "building_id": building_id,
-        "total": len(assets)
-    }
+    return {"assets": assets, "building_id": building_id, "total": len(assets)}
 
 
-async def get_asset_detail_tool(
-    asset_id: str,
-    include: Optional[List[str]] = None
-) -> Dict[str, Any]:
+async def get_asset_detail_tool(asset_id: str, include: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     Get comprehensive asset details.
 
@@ -315,7 +297,7 @@ async def get_asset_detail_tool(
             "equipment": equipment,
             "health_score": health_score,
             "safety_status": safety_status,
-            "safety_note": metadata.get("safety_note")
+            "safety_note": metadata.get("safety_note"),
         }
     }
 
@@ -328,7 +310,7 @@ async def get_asset_detail_tool(
                 "unit": point_data.get("unit", ""),
                 "description": point_data.get("description"),
                 "writable": point_data.get("writable", False),
-                "point_type": point_data.get("point_type")
+                "point_type": point_data.get("point_type"),
             }
         result["current_readings"] = readings
 
@@ -339,10 +321,14 @@ async def get_asset_detail_tool(
             "safety_status": safety_status,
             "factors": [
                 {"name": "Safety Status", "score": health_score, "weight": 0.4},
-                {"name": "Equipment Age", "score": 85 if equipment.get("installation_year", 2020) > 2015 else 65, "weight": 0.2},
+                {
+                    "name": "Equipment Age",
+                    "score": 85 if equipment.get("installation_year", 2020) > 2015 else 65,
+                    "weight": 0.2,
+                },
                 {"name": "Maintenance Status", "score": 90, "weight": 0.2},
-                {"name": "Performance", "score": 95, "weight": 0.2}
-            ]
+                {"name": "Performance", "score": 95, "weight": 0.2},
+            ],
         }
 
     # Include recent alarms
@@ -350,28 +336,29 @@ async def get_asset_detail_tool(
         # Mock recent alarms based on safety status
         alarms = []
         if safety_status == "warning":
-            alarms.append({
-                "timestamp": datetime.now().isoformat(),
-                "severity": "warning",
-                "message": metadata.get("safety_note", "Warning condition detected"),
-                "acknowledged": False
-            })
+            alarms.append(
+                {
+                    "timestamp": datetime.now().isoformat(),
+                    "severity": "warning",
+                    "message": metadata.get("safety_note", "Warning condition detected"),
+                    "acknowledged": False,
+                }
+            )
         elif safety_status == "critical" or safety_status == "alarm":
-            alarms.append({
-                "timestamp": datetime.now().isoformat(),
-                "severity": "critical",
-                "message": metadata.get("safety_note", "Critical condition detected"),
-                "acknowledged": False
-            })
+            alarms.append(
+                {
+                    "timestamp": datetime.now().isoformat(),
+                    "severity": "critical",
+                    "message": metadata.get("safety_note", "Critical condition detected"),
+                    "acknowledged": False,
+                }
+            )
         result["recent_alarms"] = alarms
 
     return result
 
 
-async def get_devices_tool(
-    site_id: Optional[str] = None,
-    device_type: Optional[str] = None
-) -> Dict[str, Any]:
+async def get_devices_tool(site_id: Optional[str] = None, device_type: Optional[str] = None) -> Dict[str, Any]:
     """
     List BMS devices.
 
@@ -401,22 +388,20 @@ async def get_devices_tool(
                 if device_type and device.device_type.value != device_type:
                     continue
 
-                device_list.append({
-                    "id": device.id,
-                    "name": device.name,
-                    "type": device.device_type.value,
-                    "hvac_type": getattr(device, 'hvac_type', None),
-                    "protocol": device.protocol.value,
-                    "status": device.status.value if device.status else "unknown",
-                    "site_id": device.site_id,
-                    "point_count": len(device.points) if device.points else 0
-                })
+                device_list.append(
+                    {
+                        "id": device.id,
+                        "name": device.name,
+                        "type": device.device_type.value,
+                        "hvac_type": getattr(device, "hvac_type", None),
+                        "protocol": device.protocol.value,
+                        "status": device.status.value if device.status else "unknown",
+                        "site_id": device.site_id,
+                        "point_count": len(device.points) if device.points else 0,
+                    }
+                )
 
-            return {
-                "devices": device_list,
-                "total": len(device_list),
-                "source": "device_manager"
-            }
+            return {"devices": device_list, "total": len(device_list), "source": "device_manager"}
     except Exception as e:
         logger.warning(f"Device manager not available, falling back to JSON: {e}")
 
@@ -431,28 +416,23 @@ async def get_devices_tool(
         if device_type and device.get("device_type") != device_type:
             continue
 
-        device_list.append({
-            "id": device.get("id"),
-            "name": device.get("name"),
-            "type": device.get("device_type"),
-            "hvac_type": device.get("hvac_type"),
-            "protocol": device.get("protocol"),
-            "status": device.get("metadata", {}).get("safety_status", "unknown"),
-            "site_id": device.get("site_id"),
-            "point_count": len(device.get("points", {}))
-        })
+        device_list.append(
+            {
+                "id": device.get("id"),
+                "name": device.get("name"),
+                "type": device.get("device_type"),
+                "hvac_type": device.get("hvac_type"),
+                "protocol": device.get("protocol"),
+                "status": device.get("metadata", {}).get("safety_status", "unknown"),
+                "site_id": device.get("site_id"),
+                "point_count": len(device.get("points", {})),
+            }
+        )
 
-    return {
-        "devices": device_list,
-        "total": len(device_list),
-        "source": "json_file"
-    }
+    return {"devices": device_list, "total": len(device_list), "source": "json_file"}
 
 
-async def read_device_point_tool(
-    device_id: str,
-    point_name: str
-) -> Dict[str, Any]:
+async def read_device_point_tool(device_id: str, point_name: str) -> Dict[str, Any]:
     """
     Read a device point value.
 
@@ -479,10 +459,12 @@ async def read_device_point_tool(
                 "value": device_value.value,
                 "unit": device_value.unit or "",
                 "quality": device_value.quality or "good",
-                "timestamp": device_value.timestamp.isoformat() if device_value.timestamp else datetime.now().isoformat(),
+                "timestamp": device_value.timestamp.isoformat()
+                if device_value.timestamp
+                else datetime.now().isoformat(),
                 "device_id": device_id,
                 "point_name": point_name,
-                "source": "device_manager"
+                "source": "device_manager",
             }
     except Exception as e:
         logger.warning(f"Device manager read failed, falling back to JSON: {e}")
@@ -502,25 +484,19 @@ async def read_device_point_tool(
                     "timestamp": datetime.now().isoformat(),
                     "device_id": device_id,
                     "point_name": point_name,
-                    "source": "json_file"
+                    "source": "json_file",
                 }
             else:
                 return {
                     "error": f"Point {point_name} not found on device {device_id}",
-                    "available_points": list(points.keys())
+                    "available_points": list(points.keys()),
                 }
 
-    return {
-        "error": f"Device {device_id} not found"
-    }
+    return {"error": f"Device {device_id} not found"}
 
 
 async def write_device_point_tool(
-    device_id: str,
-    point_name: str,
-    value: Any,
-    priority: int = 8,
-    user: str = "mcp_tool"
+    device_id: str, point_name: str, value: Any, priority: int = 8, user: str = "mcp_tool"
 ) -> Dict[str, Any]:
     """
     Write a device point value (SAFETY CRITICAL).
@@ -555,11 +531,7 @@ async def write_device_point_tool(
         # Try device_manager first (includes safety validation)
         if device_manager._initialized:
             success = await device_manager.write_device_value(
-                device_id,
-                point_name,
-                value,
-                priority=priority,
-                user=user
+                device_id, point_name, value, priority=priority, user=user
             )
 
             # Read new value to confirm
@@ -578,9 +550,9 @@ async def write_device_point_tool(
                 "safety_validation": {
                     "validated": True,
                     "allowed": success,
-                    "message": "Write validated through device_manager safety engine"
+                    "message": "Write validated through device_manager safety engine",
                 },
-                "source": "device_manager"
+                "source": "device_manager",
             }
     except ValueError as e:
         # Safety violation or validation error
@@ -591,12 +563,8 @@ async def write_device_point_tool(
             "device_id": device_id,
             "point_name": point_name,
             "error": str(e),
-            "safety_validation": {
-                "validated": True,
-                "allowed": False,
-                "message": str(e)
-            },
-            "source": "device_manager"
+            "safety_validation": {"validated": True, "allowed": False, "message": str(e)},
+            "source": "device_manager",
         }
     except Exception as e:
         logger.warning(f"Device manager write failed: {e}")
@@ -609,12 +577,8 @@ async def write_device_point_tool(
         "device_id": device_id,
         "point_name": point_name,
         "error": "Device manager not available. Cannot perform write without safety validation.",
-        "safety_validation": {
-            "validated": False,
-            "allowed": False,
-            "message": "Safety validation unavailable"
-        },
-        "source": "fallback_blocked"
+        "safety_validation": {"validated": False, "allowed": False, "message": "Safety validation unavailable"},
+        "source": "fallback_blocked",
     }
 
 
@@ -625,7 +589,7 @@ async def get_alarms_tool(
     state: str = "all",
     from_time: Optional[str] = None,
     to_time: Optional[str] = None,
-    limit: int = 50
+    limit: int = 50,
 ) -> Dict[str, Any]:
     """
     Get alarms with filtering.
@@ -654,12 +618,12 @@ async def get_alarms_tool(
     to_dt = None
     if from_time:
         try:
-            from_dt = datetime.fromisoformat(from_time.replace('Z', '+00:00'))
+            from_dt = datetime.fromisoformat(from_time.replace("Z", "+00:00"))
         except ValueError:
             pass
     if to_time:
         try:
-            to_dt = datetime.fromisoformat(to_time.replace('Z', '+00:00'))
+            to_dt = datetime.fromisoformat(to_time.replace("Z", "+00:00"))
         except ValueError:
             pass
 
@@ -690,7 +654,7 @@ async def get_alarms_tool(
         alert_time = alert.get("created_at")
         if alert_time:
             try:
-                alert_dt = datetime.fromisoformat(alert_time.replace('Z', '+00:00'))
+                alert_dt = datetime.fromisoformat(alert_time.replace("Z", "+00:00"))
                 if from_dt and alert_dt < from_dt:
                     continue
                 if to_dt and alert_dt > to_dt:
@@ -713,7 +677,7 @@ async def get_alarms_tool(
             "category": alert.get("category"),
             "site_id": alert.get("site_id"),
             "estimated_cost_zar": alert.get("estimated_cost_zar"),
-            "potential_damage_zar": alert.get("potential_damage_zar")
+            "potential_damage_zar": alert.get("potential_damage_zar"),
         }
         filtered_alarms.append(alarm)
 
@@ -723,18 +687,10 @@ async def get_alarms_tool(
     total = len(filtered_alarms)
     limited_alarms = filtered_alarms[:limit]
 
-    return {
-        "alarms": limited_alarms,
-        "total": total,
-        "filtered": len(limited_alarms)
-    }
+    return {"alarms": limited_alarms, "total": total, "filtered": len(limited_alarms)}
 
 
-async def search_alarms_tool(
-    query: str,
-    building_id: Optional[str] = None,
-    limit: int = 20
-) -> Dict[str, Any]:
+async def search_alarms_tool(query: str, building_id: Optional[str] = None, limit: int = 20) -> Dict[str, Any]:
     """
     Natural language alarm search with pattern analysis.
 
@@ -767,7 +723,7 @@ async def search_alarms_tool(
         "vibration": ["vibration", "bearing", "motor"],
         "maintenance": ["maintenance", "service", "overdue"],
         "hvac": ["hvac", "cooling", "heating", "ventilation"],
-        "electrical": ["electrical", "power", "voltage", "current"]
+        "electrical": ["electrical", "power", "voltage", "current"],
     }
 
     # Parse query for keywords
@@ -840,7 +796,7 @@ async def search_alarms_tool(
         for a in asset_alerts:
             if a.get("created_at"):
                 try:
-                    dt = datetime.fromisoformat(a["created_at"].replace('Z', '+00:00'))
+                    dt = datetime.fromisoformat(a["created_at"].replace("Z", "+00:00"))
                     dates.append(dt.strftime("%Y-%m-%d"))
                 except ValueError:
                     pass
@@ -854,7 +810,7 @@ async def search_alarms_tool(
                 try:
                     date_objs = [datetime.strptime(d, "%Y-%m-%d") for d in dates[:5]]
                     if len(date_objs) >= 2:
-                        intervals = [(date_objs[i] - date_objs[i+1]).days for i in range(len(date_objs)-1)]
+                        intervals = [(date_objs[i] - date_objs[i + 1]).days for i in range(len(date_objs) - 1)]
                         avg_interval = sum(intervals) / len(intervals) if intervals else 0
                         if avg_interval > 0:
                             pattern = f"Recurring every {int(avg_interval)} days"
@@ -874,8 +830,8 @@ async def search_alarms_tool(
             "latest_alarm": {
                 "title": asset_alerts[0].get("title"),
                 "severity": asset_alerts[0].get("severity"),
-                "timestamp": asset_alerts[0].get("created_at")
-            }
+                "timestamp": asset_alerts[0].get("created_at"),
+            },
         }
         results.append(result)
 
@@ -887,7 +843,7 @@ async def search_alarms_tool(
         "results": results[:limit],
         "keywords_matched": list(set(matched_keywords)),
         "total_matches": len(matched_alerts),
-        "assets_affected": len(results)
+        "assets_affected": len(results),
     }
 
 
@@ -896,7 +852,7 @@ async def get_trends_tool(
     parameter: str,
     from_time: Optional[str] = None,
     to_time: Optional[str] = None,
-    interval: str = "1hour"
+    interval: str = "1hour",
 ) -> Dict[str, Any]:
     """
     Get historical trend data for an asset parameter.
@@ -921,7 +877,7 @@ async def get_trends_tool(
     # Parse time range
     if to_time:
         try:
-            end_dt = datetime.fromisoformat(to_time.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(to_time.replace("Z", "+00:00"))
         except ValueError:
             end_dt = datetime.now()
     else:
@@ -929,20 +885,14 @@ async def get_trends_tool(
 
     if from_time:
         try:
-            start_dt = datetime.fromisoformat(from_time.replace('Z', '+00:00'))
+            start_dt = datetime.fromisoformat(from_time.replace("Z", "+00:00"))
         except ValueError:
             start_dt = end_dt - timedelta(hours=24)
     else:
         start_dt = end_dt - timedelta(hours=24)
 
     # Determine interval in minutes
-    interval_minutes = {
-        "1min": 1,
-        "5min": 5,
-        "15min": 15,
-        "1hour": 60,
-        "1day": 1440
-    }.get(interval, 60)
+    interval_minutes = {"1min": 1, "5min": 5, "15min": 15, "1hour": 60, "1day": 1440}.get(interval, 60)
 
     # Get base value from device
     devices = _load_devices()
@@ -962,11 +912,12 @@ async def get_trends_tool(
         return {
             "error": f"Parameter {parameter} not found for asset {asset_id}",
             "asset_id": asset_id,
-            "parameter": parameter
+            "parameter": parameter,
         }
 
     # Generate synthetic trend data based on base value
     import random
+
     random.seed(hash(f"{asset_id}{parameter}"))  # Reproducible randomness
 
     data_points = []
@@ -997,11 +948,7 @@ async def get_trends_tool(
         if random.random() < 0.02:  # 2% chance of questionable data
             quality = "questionable"
 
-        data_points.append({
-            "timestamp": current_time.isoformat(),
-            "value": value,
-            "quality": quality
-        })
+        data_points.append({"timestamp": current_time.isoformat(), "value": value, "quality": quality})
 
         current_time += timedelta(minutes=interval_minutes)
 
@@ -1011,7 +958,7 @@ async def get_trends_tool(
         "min": round(min(numeric_values), 2) if numeric_values else None,
         "max": round(max(numeric_values), 2) if numeric_values else None,
         "avg": round(sum(numeric_values) / len(numeric_values), 2) if numeric_values else None,
-        "count": len(data_points)
+        "count": len(data_points),
     }
 
     return {
@@ -1022,14 +969,11 @@ async def get_trends_tool(
         "interval": interval,
         "from_time": start_dt.isoformat(),
         "to_time": end_dt.isoformat(),
-        "statistics": statistics
+        "statistics": statistics,
     }
 
 
-async def get_health_score_tool(
-    asset_id: Optional[str] = None,
-    building_id: Optional[str] = None
-) -> Dict[str, Any]:
+async def get_health_score_tool(asset_id: Optional[str] = None, building_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Get health score breakdown for an asset or building.
 
@@ -1048,9 +992,7 @@ async def get_health_score_tool(
         - factors: Contributing factors
     """
     if not asset_id and not building_id:
-        return {
-            "error": "Either asset_id or building_id is required"
-        }
+        return {"error": "Either asset_id or building_id is required"}
 
     devices = _load_devices()
     alerts = _load_alerts()
@@ -1091,12 +1033,9 @@ async def get_health_score_tool(
         asset_alarms = [a for a in alerts if a.get("equipment_id") == asset_id]
         alarm_penalty = min(30, len(asset_alarms) * 10)
 
-        overall_score = round((
-            base_health * 0.4 +
-            age_score * 0.2 +
-            maintenance_score * 0.2 +
-            performance_score * 0.2
-        ) - alarm_penalty)
+        overall_score = round(
+            (base_health * 0.4 + age_score * 0.2 + maintenance_score * 0.2 + performance_score * 0.2) - alarm_penalty
+        )
 
         overall_score = max(0, min(100, overall_score))
 
@@ -1124,14 +1063,14 @@ async def get_health_score_tool(
                 "safety_status": {"score": base_health, "weight": 0.4},
                 "equipment_age": {"score": round(age_score), "weight": 0.2, "years": age_years},
                 "maintenance": {"score": maintenance_score, "weight": 0.2},
-                "performance": {"score": performance_score, "weight": 0.2}
+                "performance": {"score": performance_score, "weight": 0.2},
             },
             "active_alarms": len(asset_alarms),
             "factors": [
                 f"Safety status: {safety_status}",
                 f"Equipment age: {age_years} years",
-                f"Active alarms: {len(asset_alarms)}"
-            ]
+                f"Active alarms: {len(asset_alarms)}",
+            ],
         }
 
     else:
@@ -1183,23 +1122,20 @@ async def get_health_score_tool(
                 "device_count": len(building_devices),
                 "healthy_devices": len([s for s in device_scores if s >= 80]),
                 "warning_devices": warning_count,
-                "critical_devices": critical_count
+                "critical_devices": critical_count,
             },
             "active_alarms": len(building_alarms),
             "factors": [
                 f"Total devices: {len(building_devices)}",
                 f"Critical devices: {critical_count}",
                 f"Warning devices: {warning_count}",
-                f"Active alarms: {len(building_alarms)}"
-            ]
+                f"Active alarms: {len(building_alarms)}",
+            ],
         }
 
 
 async def get_work_orders_tool(
-    building_id: Optional[str] = None,
-    asset_id: Optional[str] = None,
-    status: str = "all",
-    limit: int = 50
+    building_id: Optional[str] = None, asset_id: Optional[str] = None, status: str = "all", limit: int = 50
 ) -> Dict[str, Any]:
     """
     Get work orders.
@@ -1220,6 +1156,7 @@ async def get_work_orders_tool(
     # Try to load work orders from the work orders API storage
     try:
         from app.api.work_orders import _technician_work_orders
+
         technician_wos = list(_technician_work_orders.values())
     except ImportError:
         technician_wos = []
@@ -1227,6 +1164,7 @@ async def get_work_orders_tool(
     # Load from CSV data
     try:
         from app.services.csv_loader import WorkOrderData
+
         csv_work_orders = WorkOrderData.load()
     except Exception:
         csv_work_orders = []
@@ -1246,21 +1184,23 @@ async def get_work_orders_tool(
         if status == "completed" and wo.get("status") not in ["complete", "completed"]:
             continue
 
-        work_orders.append({
-            "wo_number": wo.get("id"),
-            "date": wo.get("created_at").isoformat() if wo.get("created_at") else None,
-            "type": "technician",
-            "asset_id": wo.get("equipment_id"),
-            "site_id": wo.get("site_id"),
-            "description": wo.get("fault_description"),
-            "diagnosis": wo.get("diagnosis"),
-            "status": wo.get("status"),
-            "priority": wo.get("priority"),
-            "technician_notes": wo.get("technician_notes"),
-            "parts_needed": wo.get("parts_needed", []),
-            "resolution": wo.get("resolution"),
-            "source": "technician_chat"
-        })
+        work_orders.append(
+            {
+                "wo_number": wo.get("id"),
+                "date": wo.get("created_at").isoformat() if wo.get("created_at") else None,
+                "type": "technician",
+                "asset_id": wo.get("equipment_id"),
+                "site_id": wo.get("site_id"),
+                "description": wo.get("fault_description"),
+                "diagnosis": wo.get("diagnosis"),
+                "status": wo.get("status"),
+                "priority": wo.get("priority"),
+                "technician_notes": wo.get("technician_notes"),
+                "parts_needed": wo.get("parts_needed", []),
+                "resolution": wo.get("resolution"),
+                "source": "technician_chat",
+            }
+        )
 
     # Add CSV work orders
     for wo in csv_work_orders:
@@ -1274,35 +1214,34 @@ async def get_work_orders_tool(
         if status == "completed" and not wo.get("completed_date"):
             continue
 
-        work_orders.append({
-            "wo_number": wo.get("work_order_id"),
-            "date": wo.get("reported_date").isoformat() if wo.get("reported_date") else None,
-            "type": wo.get("type"),
-            "asset_id": wo.get("asset_id"),
-            "asset_tag": wo.get("asset_tag"),
-            "site_id": wo.get("site_id"),
-            "site_name": wo.get("site_name"),
-            "description": wo.get("description"),
-            "fault_code": wo.get("fault_code"),
-            "status": "completed" if wo.get("completed_date") else "open",
-            "priority": wo.get("priority"),
-            "category": wo.get("category"),
-            "technician_name": wo.get("technician_name"),
-            "technician_notes": wo.get("technician_notes"),
-            "resolution": wo.get("resolution"),
-            "total_cost": wo.get("total_cost"),
-            "sla_met": wo.get("sla_met"),
-            "repeat_call": wo.get("repeat_call"),
-            "source": "cafm"
-        })
+        work_orders.append(
+            {
+                "wo_number": wo.get("work_order_id"),
+                "date": wo.get("reported_date").isoformat() if wo.get("reported_date") else None,
+                "type": wo.get("type"),
+                "asset_id": wo.get("asset_id"),
+                "asset_tag": wo.get("asset_tag"),
+                "site_id": wo.get("site_id"),
+                "site_name": wo.get("site_name"),
+                "description": wo.get("description"),
+                "fault_code": wo.get("fault_code"),
+                "status": "completed" if wo.get("completed_date") else "open",
+                "priority": wo.get("priority"),
+                "category": wo.get("category"),
+                "technician_name": wo.get("technician_name"),
+                "technician_notes": wo.get("technician_notes"),
+                "resolution": wo.get("resolution"),
+                "total_cost": wo.get("total_cost"),
+                "sla_met": wo.get("sla_met"),
+                "repeat_call": wo.get("repeat_call"),
+                "source": "cafm",
+            }
+        )
 
     # Sort by date (most recent first)
     work_orders.sort(key=lambda x: x.get("date") or "", reverse=True)
 
-    return {
-        "work_orders": work_orders[:limit],
-        "total": len(work_orders)
-    }
+    return {"work_orders": work_orders[:limit], "total": len(work_orders)}
 
 
 async def create_work_order_tool(
@@ -1311,7 +1250,7 @@ async def create_work_order_tool(
     description: str,
     priority: str = "medium",
     suggested_parts: Optional[List[str]] = None,
-    user: str = "mcp_tool"
+    user: str = "mcp_tool",
 ) -> Dict[str, Any]:
     """
     Create a work order (SAFETY CRITICAL - includes audit logging).
@@ -1364,6 +1303,7 @@ async def create_work_order_tool(
     # Store in technician work orders
     try:
         from app.api.work_orders import _technician_work_orders
+
         _technician_work_orders[wo_number] = work_order
     except ImportError:
         logger.warning("Could not import work order storage - work order created but not persisted")
@@ -1373,6 +1313,7 @@ async def create_work_order_tool(
 
     try:
         from app.services.audit_logger import audit_logger
+
         await audit_logger.log_action(
             action_type="work_order_create",
             user=user,
@@ -1383,8 +1324,8 @@ async def create_work_order_tool(
                 "asset_id": asset_id,
                 "description": description,
                 "priority": priority,
-                "suggested_parts": suggested_parts
-            }
+                "suggested_parts": suggested_parts,
+            },
         )
     except Exception as e:
         logger.warning(f"Could not log to audit logger: {e}")
@@ -1399,7 +1340,7 @@ async def create_work_order_tool(
         "priority": priority,
         "suggested_parts": suggested_parts or [],
         "audit_id": audit_id,
-        "message": f"Work order {wo_number} created successfully"
+        "message": f"Work order {wo_number} created successfully",
     }
 
 
@@ -1412,7 +1353,7 @@ async def get_contracts_tool(
     building_id: Optional[str] = None,
     organization_code: Optional[str] = None,
     status: Optional[str] = None,
-    include_sla: bool = False
+    include_sla: bool = False,
 ) -> Dict[str, Any]:
     """
     Get contracts with optional filters.
@@ -1482,10 +1423,7 @@ async def get_contracts_tool(
 
             contracts.append(summary)
 
-    return {
-        "contracts": contracts,
-        "total": len(contracts)
-    }
+    return {"contracts": contracts, "total": len(contracts)}
 
 
 async def add_building_contract_tool(
@@ -1498,7 +1436,7 @@ async def add_building_contract_tool(
     end_date: str,
     sla_terms: Optional[List[Dict[str, Any]]] = None,
     budget: Optional[Dict[str, Any]] = None,
-    condition_assessment: Optional[Dict[str, Any]] = None
+    condition_assessment: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Create a detailed contract for a building.
@@ -1527,10 +1465,7 @@ async def add_building_contract_tool(
     building_path = buildings_path / building_code
 
     if not building_path.exists():
-        return {
-            "success": False,
-            "error": f"Building '{building_code}' not found"
-        }
+        return {"success": False, "error": f"Building '{building_code}' not found"}
 
     # Generate contract code
     year = start_date[:4] if start_date else str(datetime.now().year)
@@ -1546,7 +1481,7 @@ async def add_building_contract_tool(
             "tier": "enterprise",
             "primary_contact_name": "",
             "primary_contact_email": "",
-            "primary_contact_phone": ""
+            "primary_contact_phone": "",
         },
         "contract": {
             "type": contract_type,
@@ -1557,7 +1492,7 @@ async def add_building_contract_tool(
             "monthly_fee_zar": monthly_fee_zar,
             "pricing_basis": "fixed_monthly",
             "payment_terms": "30 days net",
-            "billing_cycle_days": 30
+            "billing_cycle_days": 30,
         },
         "sla_terms": sla_terms or [],
         "budget": budget or {},
@@ -1568,8 +1503,8 @@ async def add_building_contract_tool(
             "ytd_overhead_zar": 0,
             "ytd_penalties_zar": 0,
             "gross_margin_percent": 0,
-            "net_margin_percent": 0
-        }
+            "net_margin_percent": 0,
+        },
     }
 
     # Write contract.json
@@ -1602,14 +1537,12 @@ async def add_building_contract_tool(
         "success": True,
         "contract_code": contract_code,
         "building_code": building_code,
-        "message": f"Contract created for building {building_code}"
+        "message": f"Contract created for building {building_code}",
     }
 
 
 async def get_contract_profitability_tool(
-    building_code: Optional[str] = None,
-    year: Optional[int] = None,
-    month: Optional[int] = None
+    building_code: Optional[str] = None, year: Optional[int] = None, month: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Get contract profitability snapshot.
@@ -1679,7 +1612,7 @@ async def get_contract_profitability_tool(
                 "gross_margin_percent": gross_margin,
                 "net_margin_percent": net_margin,
                 "at_risk": is_at_risk,
-                "year": target_year
+                "year": target_year,
             }
 
             profitability.append(entry)
@@ -1688,9 +1621,7 @@ async def get_contract_profitability_tool(
             if is_at_risk:
                 at_risk += 1
 
-    portfolio_margin = round(
-        ((total_revenue - total_costs) / total_revenue * 100) if total_revenue > 0 else 0, 1
-    )
+    portfolio_margin = round(((total_revenue - total_costs) / total_revenue * 100) if total_revenue > 0 else 0, 1)
 
     return {
         "profitability": profitability,
@@ -1699,8 +1630,8 @@ async def get_contract_profitability_tool(
             "total_costs_zar": total_costs,
             "portfolio_margin_percent": portfolio_margin,
             "total_contracts": len(profitability),
-            "at_risk_contracts": at_risk
-        }
+            "at_risk_contracts": at_risk,
+        },
     }
 
 
@@ -1708,13 +1639,14 @@ async def get_contract_profitability_tool(
 # Municipal Billing Tools (Phase 49)
 # ============================================================================
 
+
 async def process_municipal_bill_tool(
     building_id: str,
     pdf_file_path: str,
     municipality: str,
     utility_type: str,
     account_number: str,
-    tariff_type: Optional[str] = None
+    tariff_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Process South African municipal utility bill PDF.
@@ -1740,10 +1672,7 @@ async def process_municipal_bill_tool(
     # Validate PDF exists
     pdf_path = Path(pdf_file_path)
     if not pdf_path.exists():
-        return {
-            "error": "file_not_found",
-            "message": f"PDF file not found: {pdf_file_path}"
-        }
+        return {"error": "file_not_found", "message": f"PDF file not found: {pdf_file_path}"}
 
     try:
         # Extract data from PDF
@@ -1752,6 +1681,7 @@ async def process_municipal_bill_tool(
 
         # Get or create municipal account
         from app.database.repositories.municipal_invoice_repository import MunicipalInvoiceRepository
+
         repo = MunicipalInvoiceRepository()
 
         account = repo.get_or_create_account(
@@ -1759,7 +1689,7 @@ async def process_municipal_bill_tool(
             municipality=municipality,
             utility_type=utility_type,
             account_number=account_number,
-            tariff_type=tariff_type
+            tariff_type=tariff_type,
         )
 
         if not account:
@@ -1767,7 +1697,7 @@ async def process_municipal_bill_tool(
             return {
                 "error": "account_creation_failed",
                 "message": f"Failed to create municipal account for {building_id}",
-                "extracted_data": extracted_data
+                "extracted_data": extracted_data,
             }
 
         # Create invoice record
@@ -1786,7 +1716,7 @@ async def process_municipal_bill_tool(
             "base_amount_zar": extracted_data.get("base_amount_zar"),
             "ocr_confidence": extracted_data.get("confidence", 0.0),
             "raw_text": extracted_data.get("raw_text", "")[:5000],  # Truncate to 5000 chars
-            "pdf_file_path": str(pdf_path)
+            "pdf_file_path": str(pdf_path),
         }
 
         invoice = repo.create_invoice(invoice_payload)
@@ -1796,6 +1726,7 @@ async def process_municipal_bill_tool(
         if utility_type == "electricity" and invoice:
             try:
                 from app.database.repositories.building_repository import BuildingRepository
+
                 building_repo = BuildingRepository()
 
                 # Extract NMD and demand charge from bill
@@ -1807,9 +1738,10 @@ async def process_municipal_bill_tool(
                     # Update building with real NMD from bill
                     building_update = {
                         "nmd_limit_kva": float(extracted_nmd_kva),
-                        "demand_charge_per_kva": 155.50,  # City Power default
+                        "demand_charge_per_kva": 395.48,  # City Power LPU-TOU 2025/26 verified
                         "electricity_provider": municipality,
-                        "bill_last_uploaded_at": invoice.get("created_at") or str(__import__('datetime').datetime.utcnow().isoformat()),
+                        "bill_last_uploaded_at": invoice.get("created_at")
+                        or str(__import__("datetime").datetime.utcnow().isoformat()),
                         "bill_document_path": str(pdf_path),
                         "nmd_extracted_from_bill": True,
                     }
@@ -1843,7 +1775,7 @@ async def process_municipal_bill_tool(
             "nmd_extracted_kva": extracted_data.get("demand_kva"),  # PHASE 081: Show extracted NMD
             "nmd_updated": True if extracted_data.get("demand_kva") else False,  # PHASE 081: Confirm update
             "status": "processed",
-            "confidence": extracted_data.get("confidence", 0.0)
+            "confidence": extracted_data.get("confidence", 0.0),
         }
 
     except Exception as exc:
@@ -1852,14 +1784,12 @@ async def process_municipal_bill_tool(
             "error": "processing_failed",
             "message": f"Failed to process PDF: {str(exc)}",
             "building_id": building_id,
-            "pdf_file": pdf_file_path
+            "pdf_file": pdf_file_path,
         }
 
 
 async def get_utility_costs_tool(
-    building_id: str,
-    period_start: Optional[str] = None,
-    period_end: Optional[str] = None
+    building_id: str, period_start: Optional[str] = None, period_end: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Get utility cost analysis for a building from municipal bills.
@@ -1899,7 +1829,7 @@ async def get_utility_costs_tool(
 
         invoices = repo.list_invoices(
             site_id=building_id,
-            limit=1000  # Large limit to get all invoices for period
+            limit=1000,  # Large limit to get all invoices for period
         )
 
         # Filter by period
@@ -1922,9 +1852,7 @@ async def get_utility_costs_tool(
         )
 
         water_total = sum(
-            float(inv.get("total_amount_zar") or 0)
-            for inv in filtered_invoices
-            if inv.get("utility_type") == "water"
+            float(inv.get("total_amount_zar") or 0) for inv in filtered_invoices if inv.get("utility_type") == "water"
         )
 
         total_zar = electricity_total + water_total
@@ -1942,8 +1870,10 @@ async def get_utility_costs_tool(
             "electricity_invoice_count": electricity_count,
             "water_invoice_count": water_count,
             "total_invoice_count": len(filtered_invoices),
-            "average_electricity_cost_zar": round(electricity_total / electricity_count, 2) if electricity_count > 0 else 0,
-            "average_water_cost_zar": round(water_total / water_count, 2) if water_count > 0 else 0
+            "average_electricity_cost_zar": round(electricity_total / electricity_count, 2)
+            if electricity_count > 0
+            else 0,
+            "average_water_cost_zar": round(water_total / water_count, 2) if water_count > 0 else 0,
         }
 
     except Exception as exc:
@@ -1951,13 +1881,14 @@ async def get_utility_costs_tool(
         return {
             "error": "query_failed",
             "message": f"Failed to query utility costs: {str(exc)}",
-            "building_id": building_id
+            "building_id": building_id,
         }
 
 
 # ============================================================================
 # Building Management Tools (for onboarding)
 # ============================================================================
+
 
 async def list_managed_buildings_tool() -> Dict[str, Any]:
     """List all managed buildings."""
@@ -2024,12 +1955,13 @@ async def create_building_tool(
         "address": address,
         "timezone": "Africa/Johannesburg",
         "floors": floors or [],
-        "features": features or {
+        "features": features
+        or {
             "hvac": True,
             "dali": False,
             "desk_diagnosis": True,
         },
-        "metadata": {}
+        "metadata": {},
     }
 
     # Add contract fields to building data if provided
@@ -2047,8 +1979,10 @@ async def create_building_tool(
     # 1. Try to write to Supabase first
     try:
         from app.config.settings import settings
+
         if settings.supabase_url and settings.supabase_service_role_key:
             from app.database.repositories import BuildingRepository
+
             repo = BuildingRepository()
 
             # Check if building already exists in Supabase
@@ -2098,7 +2032,7 @@ async def create_building_tool(
                 "tier": "standard",
                 "primary_contact_name": "",
                 "primary_contact_email": "",
-                "primary_contact_phone": ""
+                "primary_contact_phone": "",
             },
             "contract": {
                 "type": "full_maintenance",
@@ -2109,7 +2043,7 @@ async def create_building_tool(
                 "monthly_fee_zar": monthly_fee_zar,
                 "pricing_basis": "fixed_monthly",
                 "payment_terms": "30 days net",
-                "billing_cycle_days": 30
+                "billing_cycle_days": 30,
             },
             "sla_terms": [],
             "budget": {},
@@ -2120,8 +2054,8 @@ async def create_building_tool(
                 "ytd_overhead_zar": 0,
                 "ytd_penalties_zar": 0,
                 "gross_margin_percent": 0,
-                "net_margin_percent": 0
-            }
+                "net_margin_percent": 0,
+            },
         }
         with open(building_path / "contract.json", "w") as f:
             json.dump(contract_data, f, indent=2)
@@ -2139,8 +2073,8 @@ async def create_building_tool(
         "next_steps": [
             "Add desks to the building",
             "Add HVAC zones to the building",
-            f"Call activate_building with building_id='{building_id}'"
-        ]
+            f"Call activate_building with building_id='{building_id}'",
+        ],
     }
     if contract_created:
         result["contract_created"] = True
@@ -2236,6 +2170,7 @@ async def get_building_config_tool(building_id: str) -> Dict[str, Any]:
 # AI-Assisted Onboarding Tools
 # ============================================================================
 
+
 async def add_building_zones_tool(
     building_id: str,
     zones: List[Dict[str, Any]],
@@ -2304,8 +2239,10 @@ async def add_building_zones_tool(
     # 1. Try to write to Supabase first
     try:
         from app.config.settings import settings
+
         if settings.supabase_url and settings.supabase_service_role_key:
             from app.database.repositories import HVACZoneRepository
+
             repo = HVACZoneRepository()
 
             # Get building UUID
@@ -2448,8 +2385,10 @@ async def add_building_desks_tool(
     # 1. Try to write to Supabase first
     try:
         from app.config.settings import settings
+
         if settings.supabase_url and settings.supabase_service_role_key:
             from app.database.repositories import DeskRepository
+
             repo = DeskRepository()
 
             # Get building UUID
@@ -2473,7 +2412,9 @@ async def add_building_desks_tool(
                         "floor": desk.get("floor", ""),
                         "window_facing": desk.get("orientation"),
                         "near_diffuser": bool(desk.get("near_diffuser")),
-                        "diffuser_id": desk.get("near_diffuser") if isinstance(desk.get("near_diffuser"), str) else None,
+                        "diffuser_id": desk.get("near_diffuser")
+                        if isinstance(desk.get("near_diffuser"), str)
+                        else None,
                         "near_printer": desk.get("near_printer", False),
                         "near_kitchen": desk.get("near_kitchen", False),
                         "luminaire_ids": desk.get("luminaire_ids") or [],
@@ -2663,10 +2604,14 @@ async def import_point_list_tool(
     # Normalize vendor name
     vendor = (bms_vendor or "auto").lower()
     vendor_aliases = {
-        "siemens": "desigo", "desigo_cc": "desigo",
-        "jci": "metasys", "johnson": "metasys", "johnson_controls": "metasys",
+        "siemens": "desigo",
+        "desigo_cc": "desigo",
+        "jci": "metasys",
+        "johnson": "metasys",
+        "johnson_controls": "metasys",
         "honeywell": "ebi",
-        "schneider": "ecostruxure", "struxureware": "ecostruxure",
+        "schneider": "ecostruxure",
+        "struxureware": "ecostruxure",
         "tridium": "niagara",
     }
     vendor = vendor_aliases.get(vendor, vendor)
@@ -2711,7 +2656,7 @@ async def import_point_list_tool(
             # Find the device part (usually contains AHU, FCU, etc.)
             for i, part in enumerate(parts):
                 if re.search(r"(AHU|FCU|VAV|CH|CT)", part, re.I):
-                    return part, "/".join(parts[i+1:])
+                    return part, "/".join(parts[i + 1 :])
             # Fallback: second-to-last is device
             return parts[-2], parts[-1]
         return parts[0], "/".join(parts[1:]) if len(parts) > 1 else ""
@@ -2723,7 +2668,7 @@ async def import_point_list_tool(
             # Find device part (usually after BACnet or Drivers)
             for i, part in enumerate(parts):
                 if re.search(r"(AHU|FCU|VAV|CH|CT|Chiller)", part, re.I):
-                    return part, "/".join(parts[i+1:])
+                    return part, "/".join(parts[i + 1 :])
             # Fallback: last two parts
             return parts[-2], parts[-1]
         return point_name, ""
@@ -2908,7 +2853,10 @@ async def import_point_list_tool(
         },
         "devices": generated_devices,
         "zones": inferred_zones,
-        "message": f"Parsed {len(point_list)} points ({vendor} format) into {len(generated_devices)} devices and {len(inferred_zones)} zones",
+        "message": (
+            f"Parsed {len(point_list)} points ({vendor} format) "
+            f"into {len(generated_devices)} devices and {len(inferred_zones)} zones"
+        ),
         "next_steps": [
             "Review the generated devices and zones",
             "Call add_building_devices to save devices",
@@ -2919,8 +2867,9 @@ async def import_point_list_tool(
 
     # Count by device type
     for d in generated_devices:
-        result["analysis"]["device_types"][d["device_type"]] = \
+        result["analysis"]["device_types"][d["device_type"]] = (
             result["analysis"]["device_types"].get(d["device_type"], 0) + 1
+        )
 
     logger.info(f"Imported point list for {building_id}: {len(point_list)} points -> {len(generated_devices)} devices")
 
@@ -2960,10 +2909,10 @@ async def import_controller_list_tool(
     # Generate controller devices
     generated_controllers = []
     for idx, ctrl in enumerate(controllers):
-        name = ctrl.get("name", f"Controller-{idx+1}")
+        name = ctrl.get("name", f"Controller-{idx + 1}")
 
         device = {
-            "device_id": f"{site_code}-{building_id[:3]}-ctrl-{idx+1:03d}",
+            "device_id": f"{site_code}-{building_id[:3]}-ctrl-{idx + 1:03d}",
             "device_type": "controller",
             "name": name,
             "location": ctrl.get("area_served", building_id),
@@ -2998,10 +2947,10 @@ async def import_controller_list_tool(
     }
 
 
-
 # ============================================================================
 # DALI Discovery Tool (Tridonic Gateway Support)
 # ============================================================================
+
 
 async def discover_tridonic_gateway_tool(
     building_id: str,
@@ -3064,7 +3013,7 @@ async def discover_tridonic_gateway_tool(
     }
 
     # Extract site code from building_id (e.g., "site-002" -> "S002")
-    match = re.match(r'^site-(\d+)', building_id, re.IGNORECASE)
+    match = re.match(r"^site-(\d+)", building_id, re.IGNORECASE)
     if match:
         site_num = match.group(1).zfill(3)
         site_code = f"S{site_num}"
@@ -3074,11 +3023,7 @@ async def discover_tridonic_gateway_tool(
     try:
         # Initialize discovery service
         service = DALIDiscoveryService(
-            gateway_ip=gateway_ip,
-            gateway_type=gateway_type,
-            username=username,
-            password=password,
-            timeout=10.0
+            gateway_ip=gateway_ip, gateway_type=gateway_type, username=username, password=password, timeout=10.0
         )
 
         # Query gateway info
@@ -3097,23 +3042,22 @@ async def discover_tridonic_gateway_tool(
                     "online": True,
                     "simulated": True,
                 }
-                gateway_info = type('obj', (object,), {
-                    'dali_lines': 2,
-                    'online': True,
-                    'manufacturer': 'Tridonic',
-                    'model': 'Scenecom'
-                })()
+                gateway_info = type(
+                    "obj", (object,), {"dali_lines": 2, "online": True, "manufacturer": "Tridonic", "model": "Scenecom"}
+                )()
                 # Generate simulated device list
                 simulated_devices = []
                 for line in range(1, 3):
                     for addr in range(1, 13):  # 12 devices per line
                         device_type = "led_panel" if addr <= 8 else "emergency"
-                        simulated_devices.append({
-                            "line": line,
-                            "address": addr,
-                            "device_type": 6 if device_type == "led_panel" else 1,
-                            "device_type_name": "LED Module" if device_type == "led_panel" else "Emergency",
-                        })
+                        simulated_devices.append(
+                            {
+                                "line": line,
+                                "address": addr,
+                                "device_type": 6 if device_type == "led_panel" else 1,
+                                "device_type_name": "LED Module" if device_type == "led_panel" else "Emergency",
+                            }
+                        )
             else:
                 result["error"] = f"DALI gateway at {gateway_ip} is offline or unreachable"
                 result["next_steps"] = [
@@ -3250,142 +3194,854 @@ ASSET_METRIC_TEMPLATES = {
     "generator": {
         "category": "Electrical/Mechanical",
         "metrics": [
-            {"metric_id": "gen_voltage_ll", "name": "Line-Line Voltage", "unit": "V", "data_source": "bms_sensor", "point_pattern": ["voltage_ll", "volt_ll"], "normal_range": [380, 420], "warning_range": [370, 430], "critical_range": [360, 440], "weight": 0.15},
-            {"metric_id": "gen_voltage_ln", "name": "Line-Neutral Voltage", "unit": "V", "data_source": "bms_sensor", "point_pattern": ["voltage_ln", "volt_ln"], "normal_range": [220, 240], "warning_range": [215, 245], "critical_range": [210, 250], "weight": 0.10},
-            {"metric_id": "gen_frequency", "name": "Frequency", "unit": "Hz", "data_source": "bms_sensor", "point_pattern": ["frequency", "hz"], "normal_range": [49.5, 50.5], "warning_range": [49.0, 51.0], "critical_range": [48.0, 52.0], "weight": 0.15},
-            {"metric_id": "gen_coolant_temp", "name": "Coolant Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["coolant_temp", "engine_temp"], "normal_range": [70, 95], "warning_range": [95, 105], "critical_range": [105, 115], "weight": 0.12},
-            {"metric_id": "gen_oil_pressure", "name": "Oil Pressure", "unit": "bar", "data_source": "bms_sensor", "point_pattern": ["oil_pressure", "oil_press"], "normal_range": [3.5, 6.0], "warning_range": [2.5, 3.5], "critical_range": [1.5, 2.5], "weight": 0.12},
-            {"metric_id": "gen_engine_hours", "name": "Engine Hours", "unit": "h", "data_source": "bms_sensor", "point_pattern": ["runtime", "hours"], "normal_range": [0, 500], "warning_range": [500, 1000], "critical_range": [1000, 2000], "weight": 0.10},
-            {"metric_id": "gen_battery_voltage", "name": "Battery Voltage", "unit": "V", "data_source": "bms_sensor", "point_pattern": ["battery_volt", "batt_v"], "normal_range": [12.6, 13.8], "warning_range": [12.0, 12.6], "critical_range": [11.5, 12.0], "weight": 0.08},
-            {"metric_id": "gen_fuel_level", "name": "Fuel Level", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["fuel_level", "fuel_lvl"], "normal_range": [50, 100], "warning_range": [25, 50], "critical_range": [10, 25], "weight": 0.08},
-            {"metric_id": "gen_sound_level", "name": "Sound Level", "unit": "dBA", "data_source": "mobile_phone", "measurement_type": "audio", "normal_range": [70, 90], "warning_range": [90, 100], "critical_range": [100, 110], "weight": 0.05, "sampling_notes": "Record 10s at 1m from engine enclosure"},
-            {"metric_id": "gen_vibration_rms", "name": "Vibration RMS", "unit": "mm/s", "data_source": "mobile_phone", "measurement_type": "accelerometer", "normal_range": [0, 2.0], "warning_range": [2.0, 4.5], "critical_range": [4.5, 7.0], "weight": 0.05, "sampling_notes": "Phone mounted on engine block, 10s sample"},
+            {
+                "metric_id": "gen_voltage_ll",
+                "name": "Line-Line Voltage",
+                "unit": "V",
+                "data_source": "bms_sensor",
+                "point_pattern": ["voltage_ll", "volt_ll"],
+                "normal_range": [380, 420],
+                "warning_range": [370, 430],
+                "critical_range": [360, 440],
+                "weight": 0.15,
+            },
+            {
+                "metric_id": "gen_voltage_ln",
+                "name": "Line-Neutral Voltage",
+                "unit": "V",
+                "data_source": "bms_sensor",
+                "point_pattern": ["voltage_ln", "volt_ln"],
+                "normal_range": [220, 240],
+                "warning_range": [215, 245],
+                "critical_range": [210, 250],
+                "weight": 0.10,
+            },
+            {
+                "metric_id": "gen_frequency",
+                "name": "Frequency",
+                "unit": "Hz",
+                "data_source": "bms_sensor",
+                "point_pattern": ["frequency", "hz"],
+                "normal_range": [49.5, 50.5],
+                "warning_range": [49.0, 51.0],
+                "critical_range": [48.0, 52.0],
+                "weight": 0.15,
+            },
+            {
+                "metric_id": "gen_coolant_temp",
+                "name": "Coolant Temperature",
+                "unit": "°C",
+                "data_source": "bms_sensor",
+                "point_pattern": ["coolant_temp", "engine_temp"],
+                "normal_range": [70, 95],
+                "warning_range": [95, 105],
+                "critical_range": [105, 115],
+                "weight": 0.12,
+            },
+            {
+                "metric_id": "gen_oil_pressure",
+                "name": "Oil Pressure",
+                "unit": "bar",
+                "data_source": "bms_sensor",
+                "point_pattern": ["oil_pressure", "oil_press"],
+                "normal_range": [3.5, 6.0],
+                "warning_range": [2.5, 3.5],
+                "critical_range": [1.5, 2.5],
+                "weight": 0.12,
+            },
+            {
+                "metric_id": "gen_engine_hours",
+                "name": "Engine Hours",
+                "unit": "h",
+                "data_source": "bms_sensor",
+                "point_pattern": ["runtime", "hours"],
+                "normal_range": [0, 500],
+                "warning_range": [500, 1000],
+                "critical_range": [1000, 2000],
+                "weight": 0.10,
+            },
+            {
+                "metric_id": "gen_battery_voltage",
+                "name": "Battery Voltage",
+                "unit": "V",
+                "data_source": "bms_sensor",
+                "point_pattern": ["battery_volt", "batt_v"],
+                "normal_range": [12.6, 13.8],
+                "warning_range": [12.0, 12.6],
+                "critical_range": [11.5, 12.0],
+                "weight": 0.08,
+            },
+            {
+                "metric_id": "gen_fuel_level",
+                "name": "Fuel Level",
+                "unit": "%",
+                "data_source": "bms_sensor",
+                "point_pattern": ["fuel_level", "fuel_lvl"],
+                "normal_range": [50, 100],
+                "warning_range": [25, 50],
+                "critical_range": [10, 25],
+                "weight": 0.08,
+            },
+            {
+                "metric_id": "gen_sound_level",
+                "name": "Sound Level",
+                "unit": "dBA",
+                "data_source": "mobile_phone",
+                "measurement_type": "audio",
+                "normal_range": [70, 90],
+                "warning_range": [90, 100],
+                "critical_range": [100, 110],
+                "weight": 0.05,
+                "sampling_notes": "Record 10s at 1m from engine enclosure",
+            },
+            {
+                "metric_id": "gen_vibration_rms",
+                "name": "Vibration RMS",
+                "unit": "mm/s",
+                "data_source": "mobile_phone",
+                "measurement_type": "accelerometer",
+                "normal_range": [0, 2.0],
+                "warning_range": [2.0, 4.5],
+                "critical_range": [4.5, 7.0],
+                "weight": 0.05,
+                "sampling_notes": "Phone mounted on engine block, 10s sample",
+            },
         ],
         "manual_inspections": [
-            {"inspection_id": "gen_oil_analysis", "name": "Oil Analysis", "frequency_days": 90, "parameters": ["viscosity", "particles", "water", "metals"]},
-            {"inspection_id": "gen_fuel_filter", "name": "Fuel Filter Condition", "frequency_days": 180, "parameters": ["visual_inspection", "restriction_check"]},
-            {"inspection_id": "gen_belts_hoses", "name": "Belts and Hoses", "frequency_days": 60, "parameters": ["wear", "cracks", "tension"]},
-            {"inspection_id": "gen_exhaust", "name": "Exhaust System", "frequency_days": 365, "parameters": ["leaks", "mounting", "insulation"]},
-        ]
+            {
+                "inspection_id": "gen_oil_analysis",
+                "name": "Oil Analysis",
+                "frequency_days": 90,
+                "parameters": ["viscosity", "particles", "water", "metals"],
+            },
+            {
+                "inspection_id": "gen_fuel_filter",
+                "name": "Fuel Filter Condition",
+                "frequency_days": 180,
+                "parameters": ["visual_inspection", "restriction_check"],
+            },
+            {
+                "inspection_id": "gen_belts_hoses",
+                "name": "Belts and Hoses",
+                "frequency_days": 60,
+                "parameters": ["wear", "cracks", "tension"],
+            },
+            {
+                "inspection_id": "gen_exhaust",
+                "name": "Exhaust System",
+                "frequency_days": 365,
+                "parameters": ["leaks", "mounting", "insulation"],
+            },
+        ],
     },
     "chiller": {
         "category": "HVAC/Refrigeration",
         "metrics": [
-            {"metric_id": "chill_suction_press", "name": "Suction Pressure", "unit": "bar", "data_source": "bms_sensor", "point_pattern": ["suction", "low_side"], "normal_range": [3.5, 5.5], "warning_range": [2.5, 3.5], "critical_range": [1.5, 2.5], "weight": 0.15},
-            {"metric_id": "chill_discharge_press", "name": "Discharge Pressure", "unit": "bar", "data_source": "bms_sensor", "point_pattern": ["discharge", "high_side"], "normal_range": [12, 18], "warning_range": [18, 22], "critical_range": [22, 26], "weight": 0.15},
-            {"metric_id": "chill_superheat", "name": "Superheat", "unit": "K", "data_source": "bms_sensor", "point_pattern": ["superheat", "sh"], "normal_range": [4, 8], "warning_range": [2, 4], "critical_range": [0, 2], "weight": 0.10},
-            {"metric_id": "chill_subcooling", "name": "Subcooling", "unit": "K", "data_source": "bms_sensor", "point_pattern": ["subcool", "sc"], "normal_range": [3, 7], "warning_range": [1, 3], "critical_range": [0, 1], "weight": 0.10},
-            {"metric_id": "chill_chw_supply_temp", "name": "CHW Supply Temp", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["chw_supply", "chws"], "normal_range": [6, 8], "warning_range": [8, 12], "critical_range": [12, 15], "weight": 0.12},
-            {"metric_id": "chill_chw_return_temp", "name": "CHW Return Temp", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["chw_return", "chwr"], "normal_range": [11, 14], "warning_range": [14, 18], "critical_range": [18, 22], "weight": 0.10},
-            {"metric_id": "chill_motor_current", "name": "Compressor Motor Current", "unit": "A", "data_source": "bms_sensor", "point_pattern": ["motor_current", "current"], "normal_range": [0, 150], "warning_range": [150, 180], "critical_range": [180, 200], "weight": 0.12},
-            {"metric_id": "chill_oil_temp", "name": "Oil Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["oil_temp"], "normal_range": [45, 65], "warning_range": [65, 75], "critical_range": [75, 85], "weight": 0.08},
-            {"metric_id": "chill_sound_compressor", "name": "Compressor Sound", "unit": "dBA", "data_source": "mobile_phone", "measurement_type": "audio", "normal_range": [65, 85], "warning_range": [85, 95], "critical_range": [95, 105], "weight": 0.05, "sampling_notes": "Record 10s at 1m from compressor"},
-            {"metric_id": "chill_vibration_compressor", "name": "Compressor Vibration", "unit": "mm/s", "data_source": "mobile_phone", "measurement_type": "accelerometer", "normal_range": [0, 1.8], "warning_range": [1.8, 4.0], "critical_range": [4.0, 6.5], "weight": 0.03, "sampling_notes": "Phone on compressor housing, 10s sample"},
+            {
+                "metric_id": "chill_suction_press",
+                "name": "Suction Pressure",
+                "unit": "bar",
+                "data_source": "bms_sensor",
+                "point_pattern": ["suction", "low_side"],
+                "normal_range": [3.5, 5.5],
+                "warning_range": [2.5, 3.5],
+                "critical_range": [1.5, 2.5],
+                "weight": 0.15,
+            },
+            {
+                "metric_id": "chill_discharge_press",
+                "name": "Discharge Pressure",
+                "unit": "bar",
+                "data_source": "bms_sensor",
+                "point_pattern": ["discharge", "high_side"],
+                "normal_range": [12, 18],
+                "warning_range": [18, 22],
+                "critical_range": [22, 26],
+                "weight": 0.15,
+            },
+            {
+                "metric_id": "chill_superheat",
+                "name": "Superheat",
+                "unit": "K",
+                "data_source": "bms_sensor",
+                "point_pattern": ["superheat", "sh"],
+                "normal_range": [4, 8],
+                "warning_range": [2, 4],
+                "critical_range": [0, 2],
+                "weight": 0.10,
+            },
+            {
+                "metric_id": "chill_subcooling",
+                "name": "Subcooling",
+                "unit": "K",
+                "data_source": "bms_sensor",
+                "point_pattern": ["subcool", "sc"],
+                "normal_range": [3, 7],
+                "warning_range": [1, 3],
+                "critical_range": [0, 1],
+                "weight": 0.10,
+            },
+            {
+                "metric_id": "chill_chw_supply_temp",
+                "name": "CHW Supply Temp",
+                "unit": "°C",
+                "data_source": "bms_sensor",
+                "point_pattern": ["chw_supply", "chws"],
+                "normal_range": [6, 8],
+                "warning_range": [8, 12],
+                "critical_range": [12, 15],
+                "weight": 0.12,
+            },
+            {
+                "metric_id": "chill_chw_return_temp",
+                "name": "CHW Return Temp",
+                "unit": "°C",
+                "data_source": "bms_sensor",
+                "point_pattern": ["chw_return", "chwr"],
+                "normal_range": [11, 14],
+                "warning_range": [14, 18],
+                "critical_range": [18, 22],
+                "weight": 0.10,
+            },
+            {
+                "metric_id": "chill_motor_current",
+                "name": "Compressor Motor Current",
+                "unit": "A",
+                "data_source": "bms_sensor",
+                "point_pattern": ["motor_current", "current"],
+                "normal_range": [0, 150],
+                "warning_range": [150, 180],
+                "critical_range": [180, 200],
+                "weight": 0.12,
+            },
+            {
+                "metric_id": "chill_oil_temp",
+                "name": "Oil Temperature",
+                "unit": "°C",
+                "data_source": "bms_sensor",
+                "point_pattern": ["oil_temp"],
+                "normal_range": [45, 65],
+                "warning_range": [65, 75],
+                "critical_range": [75, 85],
+                "weight": 0.08,
+            },
+            {
+                "metric_id": "chill_sound_compressor",
+                "name": "Compressor Sound",
+                "unit": "dBA",
+                "data_source": "mobile_phone",
+                "measurement_type": "audio",
+                "normal_range": [65, 85],
+                "warning_range": [85, 95],
+                "critical_range": [95, 105],
+                "weight": 0.05,
+                "sampling_notes": "Record 10s at 1m from compressor",
+            },
+            {
+                "metric_id": "chill_vibration_compressor",
+                "name": "Compressor Vibration",
+                "unit": "mm/s",
+                "data_source": "mobile_phone",
+                "measurement_type": "accelerometer",
+                "normal_range": [0, 1.8],
+                "warning_range": [1.8, 4.0],
+                "critical_range": [4.0, 6.5],
+                "weight": 0.03,
+                "sampling_notes": "Phone on compressor housing, 10s sample",
+            },
         ],
         "manual_inspections": [
-            {"inspection_id": "chill_refrigerant_leak", "name": "Refrigerant Leak Check", "frequency_days": 180, "parameters": ["visual_inspection", "electronic_leak_detector"]},
-            {"inspection_id": "chill_belt_condition", "name": "Belt Condition (if open drive)", "frequency_days": 90, "parameters": ["tension", "wear", "cracks"]},
-            {"inspection_id": "chill_electrical_connections", "name": "Electrical Connections", "frequency_days": 365, "parameters": ["tightness", "discoloration", "torque"]},
-            {"inspection_id": "chill_condenser_coils", "name": "Condenser Coil Condition", "frequency_days": 60, "parameters": ["cleanliness", "fins", "airflow"]},
-        ]
+            {
+                "inspection_id": "chill_refrigerant_leak",
+                "name": "Refrigerant Leak Check",
+                "frequency_days": 180,
+                "parameters": ["visual_inspection", "electronic_leak_detector"],
+            },
+            {
+                "inspection_id": "chill_belt_condition",
+                "name": "Belt Condition (if open drive)",
+                "frequency_days": 90,
+                "parameters": ["tension", "wear", "cracks"],
+            },
+            {
+                "inspection_id": "chill_electrical_connections",
+                "name": "Electrical Connections",
+                "frequency_days": 365,
+                "parameters": ["tightness", "discoloration", "torque"],
+            },
+            {
+                "inspection_id": "chill_condenser_coils",
+                "name": "Condenser Coil Condition",
+                "frequency_days": 60,
+                "parameters": ["cleanliness", "fins", "airflow"],
+            },
+        ],
     },
     "ahu": {
         "category": "HVAC/Air Handling",
         "metrics": [
-            {"metric_id": "ahu_supply_air_temp", "name": "Supply Air Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["supply_temp", "sat", "discharge_temp"], "normal_range": [12, 16], "warning_range": [10, 12], "critical_range": [8, 10], "weight": 0.15},
-            {"metric_id": "ahu_return_air_temp", "name": "Return Air Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["return_temp", "rat"], "normal_range": [22, 26], "warning_range": [26, 30], "critical_range": [30, 35], "weight": 0.12},
-            {"metric_id": "ahu_mixed_air_temp", "name": "Mixed Air Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["mixed_temp", "mat"], "normal_range": [14, 20], "warning_range": [10, 14], "critical_range": [6, 10], "weight": 0.10},
-            {"metric_id": "ahu_static_pressure", "name": "Static Pressure", "unit": "Pa", "data_source": "bms_sensor", "point_pattern": ["static_press", "sp"], "normal_range": [200, 500], "warning_range": [100, 200], "critical_range": [50, 100], "weight": 0.12},
-            {"metric_id": "ahu_filter_dp", "name": "Filter Differential Pressure", "unit": "Pa", "data_source": "bms_sensor", "point_pattern": ["filter_dp", "filter_pressure"], "normal_range": [50, 125], "warning_range": [125, 200], "critical_range": [200, 250], "weight": 0.12},
-            {"metric_id": "ahu_fan_current", "name": "Fan Motor Current", "unit": "A", "data_source": "bms_sensor", "point_pattern": ["fan_current", "fan_amps"], "normal_range": [0, 25], "warning_range": [25, 30], "critical_range": [30, 35], "weight": 0.10},
-            {"metric_id": "ahu_outside_air_damper", "name": "Outside Air Damper", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["oa_damper", "economizer"], "normal_range": [10, 100], "warning_range": [0, 10], "critical_range": [0, 5], "weight": 0.08},
-            {"metric_id": "ahu_sound_fan", "name": "Fan Sound Level", "unit": "dBA", "data_source": "mobile_phone", "measurement_type": "audio", "normal_range": [55, 75], "warning_range": [75, 85], "critical_range": [85, 95], "weight": 0.10, "sampling_notes": "Record 10s at 2m from fan inlet"},
-            {"metric_id": "ahu_vibration_belt", "name": "Belt/Motor Vibration", "unit": "mm/s", "data_source": "mobile_phone", "measurement_type": "accelerometer", "normal_range": [0, 2.5], "warning_range": [2.5, 5.0], "critical_range": [5.0, 8.0], "weight": 0.11, "sampling_notes": "Phone on motor housing, 10s sample"},
+            {
+                "metric_id": "ahu_supply_air_temp",
+                "name": "Supply Air Temperature",
+                "unit": "°C",
+                "data_source": "bms_sensor",
+                "point_pattern": ["supply_temp", "sat", "discharge_temp"],
+                "normal_range": [12, 16],
+                "warning_range": [10, 12],
+                "critical_range": [8, 10],
+                "weight": 0.15,
+            },
+            {
+                "metric_id": "ahu_return_air_temp",
+                "name": "Return Air Temperature",
+                "unit": "°C",
+                "data_source": "bms_sensor",
+                "point_pattern": ["return_temp", "rat"],
+                "normal_range": [22, 26],
+                "warning_range": [26, 30],
+                "critical_range": [30, 35],
+                "weight": 0.12,
+            },
+            {
+                "metric_id": "ahu_mixed_air_temp",
+                "name": "Mixed Air Temperature",
+                "unit": "°C",
+                "data_source": "bms_sensor",
+                "point_pattern": ["mixed_temp", "mat"],
+                "normal_range": [14, 20],
+                "warning_range": [10, 14],
+                "critical_range": [6, 10],
+                "weight": 0.10,
+            },
+            {
+                "metric_id": "ahu_static_pressure",
+                "name": "Static Pressure",
+                "unit": "Pa",
+                "data_source": "bms_sensor",
+                "point_pattern": ["static_press", "sp"],
+                "normal_range": [200, 500],
+                "warning_range": [100, 200],
+                "critical_range": [50, 100],
+                "weight": 0.12,
+            },
+            {
+                "metric_id": "ahu_filter_dp",
+                "name": "Filter Differential Pressure",
+                "unit": "Pa",
+                "data_source": "bms_sensor",
+                "point_pattern": ["filter_dp", "filter_pressure"],
+                "normal_range": [50, 125],
+                "warning_range": [125, 200],
+                "critical_range": [200, 250],
+                "weight": 0.12,
+            },
+            {
+                "metric_id": "ahu_fan_current",
+                "name": "Fan Motor Current",
+                "unit": "A",
+                "data_source": "bms_sensor",
+                "point_pattern": ["fan_current", "fan_amps"],
+                "normal_range": [0, 25],
+                "warning_range": [25, 30],
+                "critical_range": [30, 35],
+                "weight": 0.10,
+            },
+            {
+                "metric_id": "ahu_outside_air_damper",
+                "name": "Outside Air Damper",
+                "unit": "%",
+                "data_source": "bms_sensor",
+                "point_pattern": ["oa_damper", "economizer"],
+                "normal_range": [10, 100],
+                "warning_range": [0, 10],
+                "critical_range": [0, 5],
+                "weight": 0.08,
+            },
+            {
+                "metric_id": "ahu_sound_fan",
+                "name": "Fan Sound Level",
+                "unit": "dBA",
+                "data_source": "mobile_phone",
+                "measurement_type": "audio",
+                "normal_range": [55, 75],
+                "warning_range": [75, 85],
+                "critical_range": [85, 95],
+                "weight": 0.10,
+                "sampling_notes": "Record 10s at 2m from fan inlet",
+            },
+            {
+                "metric_id": "ahu_vibration_belt",
+                "name": "Belt/Motor Vibration",
+                "unit": "mm/s",
+                "data_source": "mobile_phone",
+                "measurement_type": "accelerometer",
+                "normal_range": [0, 2.5],
+                "warning_range": [2.5, 5.0],
+                "critical_range": [5.0, 8.0],
+                "weight": 0.11,
+                "sampling_notes": "Phone on motor housing, 10s sample",
+            },
         ],
         "manual_inspections": [
-            {"inspection_id": "ahu_belt_condition", "name": "Belt Condition", "frequency_days": 60, "parameters": ["tension", "wear", "cracks", "alignment"]},
-            {"inspection_id": "ahu_bearing_lubrication", "name": "Bearing Lubrication", "frequency_days": 180, "parameters": ["grease_level", "grease_condition"]},
-            {"inspection_id": "ahu_coil_cleanliness", "name": "Coil Cleanliness", "frequency_days": 90, "parameters": ["heating_coil", "cooling_coil", "fins"]},
-            {"inspection_id": "ahu_damper_operation", "name": "Damper Operation", "frequency_days": 365, "parameters": ["oa_damper", "exhaust_damper", "linkage"]},
-        ]
+            {
+                "inspection_id": "ahu_belt_condition",
+                "name": "Belt Condition",
+                "frequency_days": 60,
+                "parameters": ["tension", "wear", "cracks", "alignment"],
+            },
+            {
+                "inspection_id": "ahu_bearing_lubrication",
+                "name": "Bearing Lubrication",
+                "frequency_days": 180,
+                "parameters": ["grease_level", "grease_condition"],
+            },
+            {
+                "inspection_id": "ahu_coil_cleanliness",
+                "name": "Coil Cleanliness",
+                "frequency_days": 90,
+                "parameters": ["heating_coil", "cooling_coil", "fins"],
+            },
+            {
+                "inspection_id": "ahu_damper_operation",
+                "name": "Damper Operation",
+                "frequency_days": 365,
+                "parameters": ["oa_damper", "exhaust_damper", "linkage"],
+            },
+        ],
     },
     "fcu": {
         "category": "HVAC/Fan Coil",
         "metrics": [
-            {"metric_id": "fcu_coil_temp", "name": "Coil Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["coil_temp", "leaving_water"], "normal_range": [6, 12], "warning_range": [12, 18], "critical_range": [18, 25], "weight": 0.20},
-            {"metric_id": "fcu_fan_speed", "name": "Fan Speed", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["fan_speed", "speed"], "normal_range": [0, 100], "warning_range": [80, 100], "critical_range": [100, 100], "weight": 0.15},
-            {"metric_id": "fcu_valve_position", "name": "Control Valve Position", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["valve_pos", "control_valve"], "normal_range": [0, 100], "warning_range": [90, 100], "critical_range": [100, 100], "weight": 0.15},
-            {"metric_id": "fcu_room_temp", "name": "Room Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["room_temp", "space_temp"], "normal_range": [20, 24], "warning_range": [24, 27], "critical_range": [27, 30], "weight": 0.20},
-            {"metric_id": "fcu_motor_current", "name": "Motor Current", "unit": "A", "data_source": "bms_sensor", "point_pattern": ["motor_current"], "normal_range": [0, 3.5], "warning_range": [3.5, 4.5], "critical_range": [4.5, 5.5], "weight": 0.15},
-            {"metric_id": "fcu_sound_fan", "name": "Fan Sound", "unit": "dBA", "data_source": "mobile_phone", "measurement_type": "audio", "normal_range": [35, 50], "warning_range": [50, 65], "critical_range": [65, 75], "weight": 0.10, "sampling_notes": "Record 10s at 1m from FCU"},
-            {"metric_id": "fcu_vibration_motor", "name": "Motor Vibration", "unit": "mm/s", "data_source": "mobile_phone", "measurement_type": "accelerometer", "normal_range": [0, 2.0], "warning_range": [2.0, 4.5], "critical_range": [4.5, 7.0], "weight": 0.05, "sampling_notes": "Phone on motor housing, 10s sample"},
+            {
+                "metric_id": "fcu_coil_temp",
+                "name": "Coil Temperature",
+                "unit": "°C",
+                "data_source": "bms_sensor",
+                "point_pattern": ["coil_temp", "leaving_water"],
+                "normal_range": [6, 12],
+                "warning_range": [12, 18],
+                "critical_range": [18, 25],
+                "weight": 0.20,
+            },
+            {
+                "metric_id": "fcu_fan_speed",
+                "name": "Fan Speed",
+                "unit": "%",
+                "data_source": "bms_sensor",
+                "point_pattern": ["fan_speed", "speed"],
+                "normal_range": [0, 100],
+                "warning_range": [80, 100],
+                "critical_range": [100, 100],
+                "weight": 0.15,
+            },
+            {
+                "metric_id": "fcu_valve_position",
+                "name": "Control Valve Position",
+                "unit": "%",
+                "data_source": "bms_sensor",
+                "point_pattern": ["valve_pos", "control_valve"],
+                "normal_range": [0, 100],
+                "warning_range": [90, 100],
+                "critical_range": [100, 100],
+                "weight": 0.15,
+            },
+            {
+                "metric_id": "fcu_room_temp",
+                "name": "Room Temperature",
+                "unit": "°C",
+                "data_source": "bms_sensor",
+                "point_pattern": ["room_temp", "space_temp"],
+                "normal_range": [20, 24],
+                "warning_range": [24, 27],
+                "critical_range": [27, 30],
+                "weight": 0.20,
+            },
+            {
+                "metric_id": "fcu_motor_current",
+                "name": "Motor Current",
+                "unit": "A",
+                "data_source": "bms_sensor",
+                "point_pattern": ["motor_current"],
+                "normal_range": [0, 3.5],
+                "warning_range": [3.5, 4.5],
+                "critical_range": [4.5, 5.5],
+                "weight": 0.15,
+            },
+            {
+                "metric_id": "fcu_sound_fan",
+                "name": "Fan Sound",
+                "unit": "dBA",
+                "data_source": "mobile_phone",
+                "measurement_type": "audio",
+                "normal_range": [35, 50],
+                "warning_range": [50, 65],
+                "critical_range": [65, 75],
+                "weight": 0.10,
+                "sampling_notes": "Record 10s at 1m from FCU",
+            },
+            {
+                "metric_id": "fcu_vibration_motor",
+                "name": "Motor Vibration",
+                "unit": "mm/s",
+                "data_source": "mobile_phone",
+                "measurement_type": "accelerometer",
+                "normal_range": [0, 2.0],
+                "warning_range": [2.0, 4.5],
+                "critical_range": [4.5, 7.0],
+                "weight": 0.05,
+                "sampling_notes": "Phone on motor housing, 10s sample",
+            },
         ],
         "manual_inspections": [
-            {"inspection_id": "fcu_filter_condition", "name": "Filter Condition", "frequency_days": 90, "parameters": ["cleanliness", "pressure_drop"]},
-            {"inspection_id": "fcu_condensate_tray", "name": "Condensate Tray", "frequency_days": 60, "parameters": ["cleanliness", "drainage", "leaks"]},
-            {"inspection_id": "fcu_fan_motor", "name": "Fan Motor", "frequency_days": 365, "parameters": ["bearings", "capacitor", "wiring"]},
-        ]
+            {
+                "inspection_id": "fcu_filter_condition",
+                "name": "Filter Condition",
+                "frequency_days": 90,
+                "parameters": ["cleanliness", "pressure_drop"],
+            },
+            {
+                "inspection_id": "fcu_condensate_tray",
+                "name": "Condensate Tray",
+                "frequency_days": 60,
+                "parameters": ["cleanliness", "drainage", "leaks"],
+            },
+            {
+                "inspection_id": "fcu_fan_motor",
+                "name": "Fan Motor",
+                "frequency_days": 365,
+                "parameters": ["bearings", "capacitor", "wiring"],
+            },
+        ],
     },
     "ups": {
         "category": "Electrical/Power",
         "metrics": [
-            {"metric_id": "ups_battery_voltage", "name": "Battery Voltage", "unit": "V", "data_source": "bms_sensor", "point_pattern": ["batt_volt", "battery_voltage"], "normal_range": [12.0, 13.8], "warning_range": [11.0, 12.0], "critical_range": [10.0, 11.0], "weight": 0.20},
-            {"metric_id": "ups_load_percent", "name": "Load Percentage", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["load", "load_percent"], "normal_range": [20, 80], "warning_range": [80, 95], "critical_range": [95, 100], "weight": 0.15},
-            {"metric_id": "ups_battery_temp", "name": "Battery Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["batt_temp"], "normal_range": [20, 25], "warning_range": [25, 30], "critical_range": [30, 35], "weight": 0.15},
-            {"metric_id": "ups_runtime_remaining", "name": "Runtime Remaining", "unit": "min", "data_source": "bms_sensor", "point_pattern": ["runtime", "battery_runtime"], "normal_range": [30, 120], "warning_range": [15, 30], "critical_range": [5, 15], "weight": 0.20},
-            {"metric_id": "ups_output_frequency", "name": "Output Frequency", "unit": "Hz", "data_source": "bms_sensor", "point_pattern": ["output_freq"], "normal_range": [49.5, 50.5], "warning_range": [49.0, 49.5], "critical_range": [48.5, 49.0], "weight": 0.10},
-            {"metric_id": "ups_battery_impedance", "name": "Battery Impedance", "unit": "mΩ", "data_source": "manual", "measurement_type": "battery_tester", "normal_range": [10, 30], "warning_range": [30, 50], "critical_range": [50, 80], "weight": 0.20, "sampling_notes": "Measured with battery impedance tester"},
+            {
+                "metric_id": "ups_battery_voltage",
+                "name": "Battery Voltage",
+                "unit": "V",
+                "data_source": "bms_sensor",
+                "point_pattern": ["batt_volt", "battery_voltage"],
+                "normal_range": [12.0, 13.8],
+                "warning_range": [11.0, 12.0],
+                "critical_range": [10.0, 11.0],
+                "weight": 0.20,
+            },
+            {
+                "metric_id": "ups_load_percent",
+                "name": "Load Percentage",
+                "unit": "%",
+                "data_source": "bms_sensor",
+                "point_pattern": ["load", "load_percent"],
+                "normal_range": [20, 80],
+                "warning_range": [80, 95],
+                "critical_range": [95, 100],
+                "weight": 0.15,
+            },
+            {
+                "metric_id": "ups_battery_temp",
+                "name": "Battery Temperature",
+                "unit": "°C",
+                "data_source": "bms_sensor",
+                "point_pattern": ["batt_temp"],
+                "normal_range": [20, 25],
+                "warning_range": [25, 30],
+                "critical_range": [30, 35],
+                "weight": 0.15,
+            },
+            {
+                "metric_id": "ups_runtime_remaining",
+                "name": "Runtime Remaining",
+                "unit": "min",
+                "data_source": "bms_sensor",
+                "point_pattern": ["runtime", "battery_runtime"],
+                "normal_range": [30, 120],
+                "warning_range": [15, 30],
+                "critical_range": [5, 15],
+                "weight": 0.20,
+            },
+            {
+                "metric_id": "ups_output_frequency",
+                "name": "Output Frequency",
+                "unit": "Hz",
+                "data_source": "bms_sensor",
+                "point_pattern": ["output_freq"],
+                "normal_range": [49.5, 50.5],
+                "warning_range": [49.0, 49.5],
+                "critical_range": [48.5, 49.0],
+                "weight": 0.10,
+            },
+            {
+                "metric_id": "ups_battery_impedance",
+                "name": "Battery Impedance",
+                "unit": "mΩ",
+                "data_source": "manual",
+                "measurement_type": "battery_tester",
+                "normal_range": [10, 30],
+                "warning_range": [30, 50],
+                "critical_range": [50, 80],
+                "weight": 0.20,
+                "sampling_notes": "Measured with battery impedance tester",
+            },
         ],
         "manual_inspections": [
-            {"inspection_id": "ups_battery_visual", "name": "Battery Visual Inspection", "frequency_days": 30, "parameters": ["swelling", "leaks", "corrosion", "terminals"]},
-            {"inspection_id": "ups_fan_operation", "name": "Fan Operation", "frequency_days": 90, "parameters": ["noise", "vibration", "airflow"]},
-            {"inspection_id": "ups_capacitors", "name": "DC Capacitors", "frequency_days": 365, "parameters": ["bulging", "leaks", "ESR"]},
-        ]
+            {
+                "inspection_id": "ups_battery_visual",
+                "name": "Battery Visual Inspection",
+                "frequency_days": 30,
+                "parameters": ["swelling", "leaks", "corrosion", "terminals"],
+            },
+            {
+                "inspection_id": "ups_fan_operation",
+                "name": "Fan Operation",
+                "frequency_days": 90,
+                "parameters": ["noise", "vibration", "airflow"],
+            },
+            {
+                "inspection_id": "ups_capacitors",
+                "name": "DC Capacitors",
+                "frequency_days": 365,
+                "parameters": ["bulging", "leaks", "ESR"],
+            },
+        ],
     },
     "transformer": {
         "category": "Electrical/Power",
         "metrics": [
-            {"metric_id": "tx_winding_temp", "name": "Winding Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["winding_temp", "hw_temp"], "normal_range": [40, 80], "warning_range": [80, 100], "critical_range": [100, 120], "weight": 0.25},
-            {"metric_id": "tx_oil_temp", "name": "Oil Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["oil_temp", "tot"], "normal_range": [30, 70], "warning_range": [70, 90], "critical_range": [90, 110], "weight": 0.25},
-            {"metric_id": "tx_load_percent", "name": "Load Percentage", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["load"], "normal_range": [30, 80], "warning_range": [80, 100], "critical_range": [100, 115], "weight": 0.20},
-            {"metric_id": "tx_tap_position", "name": "Tap Changer Position", "unit": "", "data_source": "bms_sensor", "point_pattern": ["tap", "oltc"], "normal_range": [-5, 5], "warning_range": [-10, -5], "critical_range": [-15, -10], "weight": 0.10},
-            {"metric_id": "tx_gas_analysis", "name": "DGA (Dissolved Gas Analysis)", "unit": "ppm", "data_source": "manual", "measurement_type": "oil_sample", "normal_range": [0, 100], "warning_range": [100, 500], "critical_range": [500, 1000], "weight": 0.20, "sampling_notes": "Annual oil sample lab analysis"},
+            {
+                "metric_id": "tx_winding_temp",
+                "name": "Winding Temperature",
+                "unit": "°C",
+                "data_source": "bms_sensor",
+                "point_pattern": ["winding_temp", "hw_temp"],
+                "normal_range": [40, 80],
+                "warning_range": [80, 100],
+                "critical_range": [100, 120],
+                "weight": 0.25,
+            },
+            {
+                "metric_id": "tx_oil_temp",
+                "name": "Oil Temperature",
+                "unit": "°C",
+                "data_source": "bms_sensor",
+                "point_pattern": ["oil_temp", "tot"],
+                "normal_range": [30, 70],
+                "warning_range": [70, 90],
+                "critical_range": [90, 110],
+                "weight": 0.25,
+            },
+            {
+                "metric_id": "tx_load_percent",
+                "name": "Load Percentage",
+                "unit": "%",
+                "data_source": "bms_sensor",
+                "point_pattern": ["load"],
+                "normal_range": [30, 80],
+                "warning_range": [80, 100],
+                "critical_range": [100, 115],
+                "weight": 0.20,
+            },
+            {
+                "metric_id": "tx_tap_position",
+                "name": "Tap Changer Position",
+                "unit": "",
+                "data_source": "bms_sensor",
+                "point_pattern": ["tap", "oltc"],
+                "normal_range": [-5, 5],
+                "warning_range": [-10, -5],
+                "critical_range": [-15, -10],
+                "weight": 0.10,
+            },
+            {
+                "metric_id": "tx_gas_analysis",
+                "name": "DGA (Dissolved Gas Analysis)",
+                "unit": "ppm",
+                "data_source": "manual",
+                "measurement_type": "oil_sample",
+                "normal_range": [0, 100],
+                "warning_range": [100, 500],
+                "critical_range": [500, 1000],
+                "weight": 0.20,
+                "sampling_notes": "Annual oil sample lab analysis",
+            },
         ],
         "manual_inspections": [
-            {"inspection_id": "tx_oil_quality", "name": "Oil Quality Test", "frequency_days": 365, "parameters": ["dielectric_strength", "acidity", "moisture", "DGA"]},
-            {"inspection_id": "tx_bushings", "name": "Bushings Inspection", "frequency_days": 365, "parameters": ["oil_level", "leaks", "tan_delta"]},
-            {"inspection_id": "tx_oltc_mechanism", "name": "OLTC Mechanism", "frequency_days": 365, "parameters": ["operation_count", "oil_quality", "mechanical_binding"]},
-        ]
+            {
+                "inspection_id": "tx_oil_quality",
+                "name": "Oil Quality Test",
+                "frequency_days": 365,
+                "parameters": ["dielectric_strength", "acidity", "moisture", "DGA"],
+            },
+            {
+                "inspection_id": "tx_bushings",
+                "name": "Bushings Inspection",
+                "frequency_days": 365,
+                "parameters": ["oil_level", "leaks", "tan_delta"],
+            },
+            {
+                "inspection_id": "tx_oltc_mechanism",
+                "name": "OLTC Mechanism",
+                "frequency_days": 365,
+                "parameters": ["operation_count", "oil_quality", "mechanical_binding"],
+            },
+        ],
     },
     "vav": {
         "category": "HVAC/Air Distribution",
         "metrics": [
-            {"metric_id": "vairflow", "name": "Airflow", "unit": "L/s", "data_source": "bms_sensor", "point_pattern": ["airflow", "flow"], "normal_range": [50, 200], "warning_range": [30, 50], "critical_range": [10, 30], "weight": 0.30},
-            {"metric_id": "vdamper_position", "name": "Damper Position", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["damper", "position"], "normal_range": [10, 100], "warning_range": [0, 10], "critical_range": [0, 5], "weight": 0.20},
-            {"metric_id": "vreheat_valve", "name": "Reheat Valve Position", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["reheat", "heating_valve"], "normal_range": [0, 100], "warning_range": [80, 100], "critical_range": [95, 100], "weight": 0.20},
-            {"metric_id": "vroom_temp", "name": "Room Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["room_temp"], "normal_range": [20, 24], "warning_range": [24, 27], "critical_range": [27, 30], "weight": 0.30},
+            {
+                "metric_id": "vairflow",
+                "name": "Airflow",
+                "unit": "L/s",
+                "data_source": "bms_sensor",
+                "point_pattern": ["airflow", "flow"],
+                "normal_range": [50, 200],
+                "warning_range": [30, 50],
+                "critical_range": [10, 30],
+                "weight": 0.30,
+            },
+            {
+                "metric_id": "vdamper_position",
+                "name": "Damper Position",
+                "unit": "%",
+                "data_source": "bms_sensor",
+                "point_pattern": ["damper", "position"],
+                "normal_range": [10, 100],
+                "warning_range": [0, 10],
+                "critical_range": [0, 5],
+                "weight": 0.20,
+            },
+            {
+                "metric_id": "vreheat_valve",
+                "name": "Reheat Valve Position",
+                "unit": "%",
+                "data_source": "bms_sensor",
+                "point_pattern": ["reheat", "heating_valve"],
+                "normal_range": [0, 100],
+                "warning_range": [80, 100],
+                "critical_range": [95, 100],
+                "weight": 0.20,
+            },
+            {
+                "metric_id": "vroom_temp",
+                "name": "Room Temperature",
+                "unit": "°C",
+                "data_source": "bms_sensor",
+                "point_pattern": ["room_temp"],
+                "normal_range": [20, 24],
+                "warning_range": [24, 27],
+                "critical_range": [27, 30],
+                "weight": 0.30,
+            },
         ],
         "manual_inspections": [
-            {"inspection_id": "vactuator", "name": "Damper Actuator", "frequency_days": 365, "parameters": ["calibration", "linkage", "noise"]},
-            {"inspection_id": "vflow_sensor", "name": "Airflow Sensor", "frequency_days": 365, "parameters": ["calibration", "cleanliness"]},
-        ]
+            {
+                "inspection_id": "vactuator",
+                "name": "Damper Actuator",
+                "frequency_days": 365,
+                "parameters": ["calibration", "linkage", "noise"],
+            },
+            {
+                "inspection_id": "vflow_sensor",
+                "name": "Airflow Sensor",
+                "frequency_days": 365,
+                "parameters": ["calibration", "cleanliness"],
+            },
+        ],
     },
     "cooling_tower": {
         "category": "HVAC/Heat Rejection",
         "metrics": [
-            {"metric_id": "ct_basin_temp", "name": "Basin Temperature", "unit": "°C", "data_source": "bms_sensor", "point_pattern": ["basin_temp"], "normal_range": [20, 32], "warning_range": [32, 40], "critical_range": [40, 50], "weight": 0.25},
-            {"metric_id": "ct_fan_speed", "name": "Fan Speed", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["fan_speed"], "normal_range": [0, 100], "warning_range": [80, 100], "critical_range": [100, 100], "weight": 0.20},
-            {"metric_id": "ct_water_level", "name": "Water Level", "unit": "%", "data_source": "bms_sensor", "point_pattern": ["water_level"], "normal_range": [50, 80], "warning_range": [30, 50], "critical_range": [10, 30], "weight": 0.20},
-            {"metric_id": "ct_fan_current", "name": "Fan Motor Current", "unit": "A", "data_source": "bms_sensor", "point_pattern": ["fan_current"], "normal_range": [0, 30], "warning_range": [30, 40], "critical_range": [40, 50], "weight": 0.15},
-            {"metric_id": "ct_sound_fan", "name": "Fan Sound Level", "unit": "dBA", "data_source": "mobile_phone", "measurement_type": "audio", "normal_range": [65, 85], "warning_range": [85, 95], "critical_range": [95, 105], "weight": 0.15, "sampling_notes": "Record 10s at 5m from tower"},
-            {"metric_id": "ct_vibration_fan", "name": "Fan Vibration", "unit": "mm/s", "data_source": "mobile_phone", "measurement_type": "accelerometer", "normal_range": [0, 3.0], "warning_range": [3.0, 6.0], "critical_range": [6.0, 10], "weight": 0.05, "sampling_notes": "Phone on fan motor, 10s sample"},
+            {
+                "metric_id": "ct_basin_temp",
+                "name": "Basin Temperature",
+                "unit": "°C",
+                "data_source": "bms_sensor",
+                "point_pattern": ["basin_temp"],
+                "normal_range": [20, 32],
+                "warning_range": [32, 40],
+                "critical_range": [40, 50],
+                "weight": 0.25,
+            },
+            {
+                "metric_id": "ct_fan_speed",
+                "name": "Fan Speed",
+                "unit": "%",
+                "data_source": "bms_sensor",
+                "point_pattern": ["fan_speed"],
+                "normal_range": [0, 100],
+                "warning_range": [80, 100],
+                "critical_range": [100, 100],
+                "weight": 0.20,
+            },
+            {
+                "metric_id": "ct_water_level",
+                "name": "Water Level",
+                "unit": "%",
+                "data_source": "bms_sensor",
+                "point_pattern": ["water_level"],
+                "normal_range": [50, 80],
+                "warning_range": [30, 50],
+                "critical_range": [10, 30],
+                "weight": 0.20,
+            },
+            {
+                "metric_id": "ct_fan_current",
+                "name": "Fan Motor Current",
+                "unit": "A",
+                "data_source": "bms_sensor",
+                "point_pattern": ["fan_current"],
+                "normal_range": [0, 30],
+                "warning_range": [30, 40],
+                "critical_range": [40, 50],
+                "weight": 0.15,
+            },
+            {
+                "metric_id": "ct_sound_fan",
+                "name": "Fan Sound Level",
+                "unit": "dBA",
+                "data_source": "mobile_phone",
+                "measurement_type": "audio",
+                "normal_range": [65, 85],
+                "warning_range": [85, 95],
+                "critical_range": [95, 105],
+                "weight": 0.15,
+                "sampling_notes": "Record 10s at 5m from tower",
+            },
+            {
+                "metric_id": "ct_vibration_fan",
+                "name": "Fan Vibration",
+                "unit": "mm/s",
+                "data_source": "mobile_phone",
+                "measurement_type": "accelerometer",
+                "normal_range": [0, 3.0],
+                "warning_range": [3.0, 6.0],
+                "critical_range": [6.0, 10],
+                "weight": 0.05,
+                "sampling_notes": "Phone on fan motor, 10s sample",
+            },
         ],
         "manual_inspections": [
-            {"inspection_id": "ct_fill_condition", "name": "Fill Condition", "frequency_days": 180, "parameters": ["cleanliness", "degradation", "biofouling"]},
-            {"inspection_id": "ct_nozzles", "name": "Distribution Nozzles", "frequency_days": 90, "parameters": ["blockage", "wear", "spray_pattern"]},
-            {"inspection_id": "ct_drift_eliminator", "name": "Drift Eliminator", "frequency_days": 365, "parameters": ["cleanliness", "damage"]},
-        ]
-    }
+            {
+                "inspection_id": "ct_fill_condition",
+                "name": "Fill Condition",
+                "frequency_days": 180,
+                "parameters": ["cleanliness", "degradation", "biofouling"],
+            },
+            {
+                "inspection_id": "ct_nozzles",
+                "name": "Distribution Nozzles",
+                "frequency_days": 90,
+                "parameters": ["blockage", "wear", "spray_pattern"],
+            },
+            {
+                "inspection_id": "ct_drift_eliminator",
+                "name": "Drift Eliminator",
+                "frequency_days": 365,
+                "parameters": ["cleanliness", "damage"],
+            },
+        ],
+    },
 }
 
 
@@ -3470,7 +4126,10 @@ async def get_asset_metrics_template_tool(
         "metric_templates": templates,
         "total_metrics": sum(len(t.get("metrics", [])) for t in templates.values()),
         "total_inspections": sum(len(t.get("manual_inspections", [])) for t in templates.values()),
-        "message": f"Generated {len(templates)} equipment type templates with {sum(len(t.get('metrics', [])) for t in templates.values())} metrics",
+        "message": (
+            f"Generated {len(templates)} equipment type templates with "
+            f"{sum(len(t.get('metrics', [])) for t in templates.values())} metrics"
+        ),
         "next_steps": [
             "Review the generated metric templates",
             "Configure thresholds and weights as needed",
@@ -3561,15 +4220,17 @@ async def configure_asset_metrics_tool(
                 # Merge template with user config
                 configured_metric = {**metric}
                 if user_config.get("enabled", True):
-                    configured_metric.update({
-                        "normal_range": user_config.get("normal_range", metric["normal_range"]),
-                        "warning_range": user_config.get("warning_range", metric["warning_range"]),
-                        "critical_range": user_config.get("critical_range", metric["critical_range"]),
-                        "weight": user_config.get("weight", metric.get("weight", 0.1)),
-                        "measurement_interval_days": user_config.get("measurement_interval_days", 7),
-                        "custom_threshold": user_config.get("custom_threshold"),
-                        "configured_at": datetime.now().isoformat(),
-                    })
+                    configured_metric.update(
+                        {
+                            "normal_range": user_config.get("normal_range", metric["normal_range"]),
+                            "warning_range": user_config.get("warning_range", metric["warning_range"]),
+                            "critical_range": user_config.get("critical_range", metric["critical_range"]),
+                            "weight": user_config.get("weight", metric.get("weight", 0.1)),
+                            "measurement_interval_days": user_config.get("measurement_interval_days", 7),
+                            "custom_threshold": user_config.get("custom_threshold"),
+                            "configured_at": datetime.now().isoformat(),
+                        }
+                    )
                     configured_metrics[eq_type]["metrics"].append(configured_metric)
                     total_enabled += 1
 
@@ -3581,11 +4242,13 @@ async def configure_asset_metrics_tool(
 
                 configured_inspection = {**inspection}
                 if user_config.get("enabled", True):
-                    configured_inspection.update({
-                        "frequency_days": user_config.get("frequency_days", inspection["frequency_days"]),
-                        "assigned_to": user_config.get("assigned_to", "TBD"),
-                        "configured_at": datetime.now().isoformat(),
-                    })
+                    configured_inspection.update(
+                        {
+                            "frequency_days": user_config.get("frequency_days", inspection["frequency_days"]),
+                            "assigned_to": user_config.get("assigned_to", "TBD"),
+                            "configured_at": datetime.now().isoformat(),
+                        }
+                    )
                     configured_metrics[eq_type]["manual_inspections"].append(configured_inspection)
 
     # Save to file if requested
@@ -3626,6 +4289,7 @@ async def get_solar_overview_tool(site_id: str = "site-002") -> Dict[str, Any]:
 
     try:
         from app.services.solar_ingestion_service import get_solar_ingestion_service
+
         svc = get_solar_ingestion_service()
         overview = await svc.get_site_overview(site_id)
         if not overview:
@@ -3646,6 +4310,7 @@ async def get_bess_status_tool(site_id: str = "site-002") -> Dict[str, Any]:
 
     try:
         from app.services.solar_ingestion_service import get_solar_ingestion_service
+
         svc = get_solar_ingestion_service()
         bess = await svc.get_bess_status(site_id)
         if not bess:
@@ -3654,6 +4319,7 @@ async def get_bess_status_tool(site_id: str = "site-002") -> Dict[str, Any]:
         # Add dispatch info
         try:
             from app.services.solar_dispatch_service import get_solar_dispatch_service
+
             dispatch = get_solar_dispatch_service()
             status = dispatch.get_dispatch_status(site_id)
             if status:
@@ -3676,6 +4342,7 @@ async def get_solar_savings_tool(
     """
     try:
         from app.services.solar_financial_service import get_solar_financial_service
+
         svc = get_solar_financial_service()
         summary = svc.get_financial_summary(site_id, period=period)
         return summary.to_dict()
@@ -3694,6 +4361,7 @@ async def get_solar_forecast_tool(
     """
     try:
         from app.services.solar_forecast_service import get_solar_forecast_service
+
         svc = get_solar_forecast_service()
         forecast = svc.get_forecast(site_id, hours_ahead=hours)
         return forecast.to_dict()
@@ -3712,6 +4380,7 @@ async def get_solar_diagnostics_tool(site_id: str = "site-002") -> Dict[str, Any
 
     try:
         from app.services.solar_performance_service import get_solar_performance_service
+
         perf = get_solar_performance_service()
         report = await perf.get_diagnostic_summary(site_id)
         result = report.to_dict() if report else {"issues": []}
@@ -3719,6 +4388,7 @@ async def get_solar_diagnostics_tool(site_id: str = "site-002") -> Dict[str, Any
         # Add maintenance recommendations
         try:
             from app.services.solar_maintenance_service import get_solar_maintenance_service
+
             maint = get_solar_maintenance_service()
             recs = await maint.evaluate_maintenance_needs(site_id)
             result["maintenance_recommendations"] = [r.to_dict() for r in recs[:5]]
@@ -3739,249 +4409,234 @@ async def get_solar_diagnostics_tool(site_id: str = "site-002") -> Dict[str, Any
 MCP_TOOLS = [
     {
         "name": "get_buildings",
-        "description": "List buildings with status summary. Returns building information including health scores, asset counts, and alarm status. Supports filtering by status (all/critical/warning/healthy) and region.",
+        "description": (
+            "List buildings with status summary. Returns building information including health scores, "
+            "asset counts, and alarm status. Supports filtering by status (all/critical/warning/healthy) and region."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "status_filter": {
                     "type": "string",
                     "enum": ["all", "critical", "warning", "healthy"],
-                    "description": "Filter buildings by status - all (default), critical (has critical alarms), warning (has warnings), healthy (no issues)"
+                    "description": (
+                        "Filter buildings by status - all (default), critical (has critical alarms), "
+                        "warning (has warnings), healthy (no issues)"
+                    ),
                 },
                 "region": {
                     "type": "string",
-                    "description": "Filter by region (e.g., Gauteng, Western Cape, KwaZulu-Natal)"
-                }
+                    "description": "Filter by region (e.g., Gauteng, Western Cape, KwaZulu-Natal)",
+                },
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "get_assets",
-        "description": "List assets for a building. Returns all BMS-connected assets (HVAC equipment, lighting, security) for a specific building with health scores and alarm status.",
+        "description": (
+            "List assets for a building. Returns all BMS-connected assets (HVAC equipment, lighting, security) "
+            "for a specific building with health scores and alarm status."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Building/site ID (e.g., site-001)"
-                },
+                "building_id": {"type": "string", "description": "Building/site ID (e.g., site-001)"},
                 "asset_type": {
                     "type": "string",
-                    "description": "Filter by asset type (AHU, Chiller, FCU, VAV, zone_controller, chw_system)"
+                    "description": "Filter by asset type (AHU, Chiller, FCU, VAV, zone_controller, chw_system)",
                 },
                 "criticality": {
                     "type": "string",
                     "enum": ["critical", "all"],
-                    "description": "Filter by criticality level - critical (only critical assets) or all (default)"
-                }
+                    "description": "Filter by criticality level - critical (only critical assets) or all (default)",
+                },
             },
-            "required": ["building_id"]
-        }
+            "required": ["building_id"],
+        },
     },
     {
         "name": "get_asset_detail",
-        "description": "Get comprehensive asset details including current readings, health breakdown, and recent alarms. Use this for detailed equipment analysis and troubleshooting.",
+        "description": (
+            "Get comprehensive asset details including current readings, health breakdown, and recent alarms. "
+            "Use this for detailed equipment analysis and troubleshooting."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "asset_id": {
-                    "type": "string",
-                    "description": "Asset/device ID (e.g., S001-CHILLER-B1-001)"
-                },
+                "asset_id": {"type": "string", "description": "Asset/device ID (e.g., S001-CHILLER-B1-001)"},
                 "include": {
                     "type": "array",
-                    "items": {
-                        "type": "string",
-                        "enum": ["health_breakdown", "recent_alarms", "current_readings"]
-                    },
-                    "description": "Sections to include in response (default: current_readings)"
-                }
+                    "items": {"type": "string", "enum": ["health_breakdown", "recent_alarms", "current_readings"]},
+                    "description": "Sections to include in response (default: current_readings)",
+                },
             },
-            "required": ["asset_id"]
-        }
+            "required": ["asset_id"],
+        },
     },
     {
         "name": "get_devices",
-        "description": "List BMS devices with protocol and connection status. Use this for device discovery and inventory queries.",
+        "description": (
+            "List BMS devices with protocol and connection status. "
+            "Use this for device discovery and inventory queries."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "site_id": {
-                    "type": "string",
-                    "description": "Filter by site ID"
-                },
+                "site_id": {"type": "string", "description": "Filter by site ID"},
                 "device_type": {
                     "type": "string",
                     "enum": ["hvac", "lighting", "security", "fire_safety"],
-                    "description": "Filter by device type"
-                }
+                    "description": "Filter by device type",
+                },
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "read_device_point",
-        "description": "Read a device point value from the BMS. Returns current value, unit, quality, and timestamp. Use this for real-time equipment monitoring.",
+        "description": (
+            "Read a device point value from the BMS. Returns current value, unit, quality, and timestamp. "
+            "Use this for real-time equipment monitoring."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "device_id": {
-                    "type": "string",
-                    "description": "Device ID (e.g., S001-CHILLER-B1-001)"
-                },
+                "device_id": {"type": "string", "description": "Device ID (e.g., S001-CHILLER-B1-001)"},
                 "point_name": {
                     "type": "string",
-                    "description": "Point name to read (e.g., chw_supply_temp, fan_status)"
-                }
+                    "description": "Point name to read (e.g., chw_supply_temp, fan_status)",
+                },
             },
-            "required": ["device_id", "point_name"]
-        }
+            "required": ["device_id", "point_name"],
+        },
     },
     {
         "name": "write_device_point",
-        "description": "Write a value to a device point (SAFETY CRITICAL). Includes safety validation and audit logging. Use for control actions like adjusting setpoints or switching equipment on/off.",
+        "description": (
+            "Write a value to a device point (SAFETY CRITICAL). Includes safety validation and audit logging. "
+            "Use for control actions like adjusting setpoints or switching equipment on/off."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "device_id": {
-                    "type": "string",
-                    "description": "Device ID (e.g., S001-CHILLER-B1-001)"
-                },
-                "point_name": {
-                    "type": "string",
-                    "description": "Point name to write (e.g., chw_supply_temp_setpoint)"
-                },
-                "value": {
-                    "description": "Value to write (type depends on point - number, boolean, or string)"
-                },
+                "device_id": {"type": "string", "description": "Device ID (e.g., S001-CHILLER-B1-001)"},
+                "point_name": {"type": "string", "description": "Point name to write (e.g., chw_supply_temp_setpoint)"},
+                "value": {"description": "Value to write (type depends on point - number, boolean, or string)"},
                 "priority": {
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 16,
-                    "description": "BACnet priority level (1-16, default 8)"
-                }
+                    "description": "BACnet priority level (1-16, default 8)",
+                },
             },
-            "required": ["device_id", "point_name", "value"]
-        }
+            "required": ["device_id", "point_name", "value"],
+        },
     },
     {
         "name": "get_alarms",
-        "description": "Get alarms with filtering. Returns alarm history with support for filtering by building, asset, severity, state, and time range.",
+        "description": (
+            "Get alarms with filtering. Returns alarm history with support for filtering by building, "
+            "asset, severity, state, and time range."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Filter by building/site ID"
-                },
-                "asset_id": {
-                    "type": "string",
-                    "description": "Filter by asset/equipment ID"
-                },
+                "building_id": {"type": "string", "description": "Filter by building/site ID"},
+                "asset_id": {"type": "string", "description": "Filter by asset/equipment ID"},
                 "severity": {
                     "type": "array",
-                    "items": {
-                        "type": "string",
-                        "enum": ["critical", "warning", "info"]
-                    },
-                    "description": "Filter by severity levels"
+                    "items": {"type": "string", "enum": ["critical", "warning", "info"]},
+                    "description": "Filter by severity levels",
                 },
                 "state": {
                     "type": "string",
                     "enum": ["active", "acknowledged", "cleared", "all"],
-                    "description": "Filter by alarm state (default: all)"
+                    "description": "Filter by alarm state (default: all)",
                 },
-                "from_time": {
-                    "type": "string",
-                    "description": "Start time in ISO format (e.g., 2026-01-01T00:00:00)"
-                },
-                "to_time": {
-                    "type": "string",
-                    "description": "End time in ISO format"
-                },
+                "from_time": {"type": "string", "description": "Start time in ISO format (e.g., 2026-01-01T00:00:00)"},
+                "to_time": {"type": "string", "description": "End time in ISO format"},
                 "limit": {
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 500,
-                    "description": "Maximum alarms to return (default: 50)"
-                }
+                    "description": "Maximum alarms to return (default: 50)",
+                },
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "search_alarms",
-        "description": "Natural language alarm search with pattern analysis. Parses queries to find relevant alarms and identify recurring patterns. Use this for investigating equipment issues.",
+        "description": (
+            "Natural language alarm search with pattern analysis. Parses queries to find relevant alarms "
+            "and identify recurring patterns. Use this for investigating equipment issues."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "Natural language search query (e.g., 'chiller alarms', 'temperature issues last week')"
+                    "description": (
+                        "Natural language search query " "(e.g., 'chiller alarms', 'temperature issues last week')"
+                    ),
                 },
-                "building_id": {
-                    "type": "string",
-                    "description": "Optional building/site ID filter"
-                },
+                "building_id": {"type": "string", "description": "Optional building/site ID filter"},
                 "limit": {
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 100,
-                    "description": "Maximum results (default: 20)"
-                }
+                    "description": "Maximum results (default: 20)",
+                },
             },
-            "required": ["query"]
-        }
+            "required": ["query"],
+        },
     },
     {
         "name": "get_trends",
-        "description": "Get historical trend data for an asset parameter. Returns time-series data points with statistics. Use for analyzing equipment performance over time.",
+        "description": (
+            "Get historical trend data for an asset parameter. Returns time-series data points with statistics. "
+            "Use for analyzing equipment performance over time."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "asset_id": {
-                    "type": "string",
-                    "description": "Asset/device ID (e.g., S001-CHILLER-B1-001)"
-                },
+                "asset_id": {"type": "string", "description": "Asset/device ID (e.g., S001-CHILLER-B1-001)"},
                 "parameter": {
                     "type": "string",
-                    "description": "Parameter name to get trends for (e.g., chw_supply_temp, fan_speed)"
+                    "description": "Parameter name to get trends for (e.g., chw_supply_temp, fan_speed)",
                 },
-                "from_time": {
-                    "type": "string",
-                    "description": "Start time in ISO format (default: 24 hours ago)"
-                },
-                "to_time": {
-                    "type": "string",
-                    "description": "End time in ISO format (default: now)"
-                },
+                "from_time": {"type": "string", "description": "Start time in ISO format (default: 24 hours ago)"},
+                "to_time": {"type": "string", "description": "End time in ISO format (default: now)"},
                 "interval": {
                     "type": "string",
                     "enum": ["1min", "5min", "15min", "1hour", "1day"],
-                    "description": "Data interval (default: 1hour)"
-                }
+                    "description": "Data interval (default: 1hour)",
+                },
             },
-            "required": ["asset_id", "parameter"]
-        }
+            "required": ["asset_id", "parameter"],
+        },
     },
     {
         "name": "get_health_score",
-        "description": "Get health score breakdown for an asset or building. Returns overall score, status, breakdown by category, and contributing factors.",
+        "description": (
+            "Get health score breakdown for an asset or building. Returns overall score, status, "
+            "breakdown by category, and contributing factors."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "asset_id": {
                     "type": "string",
-                    "description": "Asset/device ID (provide either asset_id or building_id)"
+                    "description": "Asset/device ID (provide either asset_id or building_id)",
                 },
                 "building_id": {
                     "type": "string",
-                    "description": "Building/site ID (provide either asset_id or building_id)"
-                }
+                    "description": "Building/site ID (provide either asset_id or building_id)",
+                },
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "get_work_orders",
@@ -3989,117 +4644,107 @@ MCP_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Filter by building/site ID"
-                },
-                "asset_id": {
-                    "type": "string",
-                    "description": "Filter by asset ID"
-                },
+                "building_id": {"type": "string", "description": "Filter by building/site ID"},
+                "asset_id": {"type": "string", "description": "Filter by asset ID"},
                 "status": {
                     "type": "string",
                     "enum": ["open", "completed", "all"],
-                    "description": "Filter by status (default: all)"
+                    "description": "Filter by status (default: all)",
                 },
                 "limit": {
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 200,
-                    "description": "Maximum work orders to return (default: 50)"
-                }
+                    "description": "Maximum work orders to return (default: 50)",
+                },
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "create_work_order",
-        "description": "Create a work order (SAFETY CRITICAL). Includes audit logging. Use for creating work orders from AI diagnosis or chat requests.",
+        "description": (
+            "Create a work order (SAFETY CRITICAL). Includes audit logging. "
+            "Use for creating work orders from AI diagnosis or chat requests."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Building/site ID"
-                },
-                "asset_id": {
-                    "type": "string",
-                    "description": "Asset/device ID"
-                },
-                "description": {
-                    "type": "string",
-                    "description": "Fault description"
-                },
+                "building_id": {"type": "string", "description": "Building/site ID"},
+                "asset_id": {"type": "string", "description": "Asset/device ID"},
+                "description": {"type": "string", "description": "Fault description"},
                 "priority": {
                     "type": "string",
                     "enum": ["low", "medium", "high", "critical"],
-                    "description": "Priority level (default: medium)"
+                    "description": "Priority level (default: medium)",
                 },
                 "suggested_parts": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "List of suggested parts for the repair"
-                }
+                    "description": "List of suggested parts for the repair",
+                },
             },
-            "required": ["building_id", "asset_id", "description"]
-        }
+            "required": ["building_id", "asset_id", "description"],
+        },
     },
     # Building Management Tools (for onboarding new buildings)
     {
         "name": "list_managed_buildings",
-        "description": "List all managed buildings (active and inactive). Use this to see what buildings are configured in the system.",
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
+        "description": (
+            "List all managed buildings (active and inactive). "
+            "Use this to see what buildings are configured in the system."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
         "name": "create_building",
-        "description": "Create a new building configuration. Creates the building folder structure and config files. Building is NOT activated by default.",
+        "description": (
+            "Create a new building configuration. Creates the building folder structure and config files. "
+            "Building is NOT activated by default."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "building_id": {
                     "type": "string",
-                    "description": "Unique building ID (lowercase, no spaces, e.g., 'sandton', 'gateway-centre')"
+                    "description": "Unique building ID (lowercase, no spaces, e.g., 'sandton', 'gateway-centre')",
                 },
-                "name": {
-                    "type": "string",
-                    "description": "Building display name (e.g., 'Sandton Office Park')"
-                },
-                "address": {
-                    "type": "string",
-                    "description": "Building address"
-                },
+                "name": {"type": "string", "description": "Building display name (e.g., 'Sandton Office Park')"},
+                "address": {"type": "string", "description": "Building address"},
                 "floors": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "List of floor identifiers (e.g., ['L1', 'L2', 'L3'])"
+                    "description": "List of floor identifiers (e.g., ['L1', 'L2', 'L3'])",
                 },
                 "features": {
                     "type": "object",
-                    "description": "Features to enable: {hvac: true, dali: false, desk_diagnosis: true}"
+                    "description": "Features to enable: {hvac: true, dali: false, desk_diagnosis: true}",
                 },
                 "client_name": {
                     "type": "string",
-                    "description": "Optional client/organization name for auto-creating a basic contract"
+                    "description": "Optional client/organization name for auto-creating a basic contract",
                 },
                 "monthly_fee_zar": {
                     "type": "number",
-                    "description": "Optional monthly fee in ZAR (requires client_name, contract_start, contract_end)"
+                    "description": "Optional monthly fee in ZAR (requires client_name, contract_start, contract_end)",
                 },
                 "contract_start": {
                     "type": "string",
-                    "description": "Optional contract start date YYYY-MM-DD (requires client_name, monthly_fee_zar, contract_end)"
+                    "description": (
+                        "Optional contract start date YYYY-MM-DD "
+                        "(requires client_name, monthly_fee_zar, contract_end)"
+                    ),
                 },
                 "contract_end": {
                     "type": "string",
-                    "description": "Optional contract end date YYYY-MM-DD (requires client_name, monthly_fee_zar, contract_start)"
-                }
+                    "description": (
+                        "Optional contract end date YYYY-MM-DD "
+                        "(requires client_name, monthly_fee_zar, contract_start)"
+                    ),
+                },
             },
-            "required": ["building_id", "name"]
-        }
+            "required": ["building_id", "name"],
+        },
     },
     {
         "name": "activate_building",
@@ -4107,43 +4752,32 @@ MCP_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Building ID to activate"
-                },
-                "set_default": {
-                    "type": "boolean",
-                    "description": "Set as the default building (default: false)"
-                }
+                "building_id": {"type": "string", "description": "Building ID to activate"},
+                "set_default": {"type": "boolean", "description": "Set as the default building (default: false)"},
             },
-            "required": ["building_id"]
-        }
+            "required": ["building_id"],
+        },
     },
     {
         "name": "get_building_config",
         "description": "Get a building's configuration including desks, zones, and features.",
         "input_schema": {
             "type": "object",
-            "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Building ID to get config for"
-                }
-            },
-            "required": ["building_id"]
-        }
+            "properties": {"building_id": {"type": "string", "description": "Building ID to get config for"}},
+            "required": ["building_id"],
+        },
     },
     # AI-Assisted Onboarding Tools (for ingesting BMS export data)
     {
         "name": "add_building_zones",
-        "description": "Add HVAC zones to a building with equipment mappings (FCU, VAV, AHU). Use after importing point list or when manually configuring zones.",
+        "description": (
+            "Add HVAC zones to a building with equipment mappings (FCU, VAV, AHU). "
+            "Use after importing point list or when manually configuring zones."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Building ID to add zones to"
-                },
+                "building_id": {"type": "string", "description": "Building ID to add zones to"},
                 "zones": {
                     "type": "array",
                     "items": {
@@ -4155,26 +4789,26 @@ MCP_TOOLS = [
                             "vav_id": {"type": "string", "description": "VAV box device ID (optional)"},
                             "ahu_id": {"type": "string", "description": "Air Handling Unit device ID"},
                             "setpoint": {"type": "number", "description": "Temperature setpoint (default 22.0)"},
-                            "desk_range": {"type": "string", "description": "Desk range served (e.g., '201-206')"}
+                            "desk_range": {"type": "string", "description": "Desk range served (e.g., '201-206')"},
                         },
-                        "required": ["zone_id"]
+                        "required": ["zone_id"],
                     },
-                    "description": "Array of zone definitions with equipment mappings"
-                }
+                    "description": "Array of zone definitions with equipment mappings",
+                },
             },
-            "required": ["building_id", "zones"]
-        }
+            "required": ["building_id", "zones"],
+        },
     },
     {
         "name": "add_building_desks",
-        "description": "Add desks to a building with zone mappings, DALI lighting, and environmental context. Enables desk-to-zone comfort diagnosis with solar/HVAC/lighting integration.",
+        "description": (
+            "Add desks to a building with zone mappings, DALI lighting, and environmental context. "
+            "Enables desk-to-zone comfort diagnosis with solar/HVAC/lighting integration."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Building ID to add desks to"
-                },
+                "building_id": {"type": "string", "description": "Building ID to add desks to"},
                 "desks": {
                     "type": "array",
                     "items": {
@@ -4184,113 +4818,163 @@ MCP_TOOLS = [
                             "zone_id": {"type": "string", "description": "HVAC zone the desk belongs to"},
                             "floor": {"type": "string", "description": "Floor identifier (e.g., 'Level 12')"},
                             "near_window": {"type": "boolean", "description": "Near exterior window (solar heat gain)"},
-                            "orientation": {"type": "string", "enum": ["N", "S", "E", "W", "NE", "NW", "SE", "SW"], "description": "Window orientation for solar analysis (Southern Hemisphere: N=most sun)"},
-                            "near_diffuser": {"type": "string", "description": "Supply air diffuser ID if under one (draft issues)"},
+                            "orientation": {
+                                "type": "string",
+                                "enum": ["N", "S", "E", "W", "NE", "NW", "SE", "SW"],
+                                "description": (
+                                    "Window orientation for solar analysis " "(Southern Hemisphere: N=most sun)"
+                                ),
+                            },
+                            "near_diffuser": {
+                                "type": "string",
+                                "description": "Supply air diffuser ID if under one (draft issues)",
+                            },
                             "near_printer": {"type": "boolean", "description": "Near heat source (printer/copier)"},
                             "department": {"type": "string", "description": "Department/team"},
                             "occupant": {"type": "string", "description": "Occupant name"},
                             "x_coord": {"type": "number", "description": "Floor plan X coordinate"},
                             "y_coord": {"type": "number", "description": "Floor plan Y coordinate"},
-                            "dali_zone": {"type": "string", "description": "DALI lighting zone (often matches HVAC zone)"},
-                            "sensor_id": {"type": "string", "description": "DALI PIR occupancy sensor ID (e.g., 'PIR-L12-N-001')"},
-                            "luminaire_ids": {"type": "array", "items": {"type": "string"}, "description": "Luminaire IDs serving this desk"},
-                            "dali_controller": {"type": "string", "description": "Tridonic Scenecom controller ID (e.g., 'DALI-L12-01')"}
+                            "dali_zone": {
+                                "type": "string",
+                                "description": "DALI lighting zone (often matches HVAC zone)",
+                            },
+                            "sensor_id": {
+                                "type": "string",
+                                "description": "DALI PIR occupancy sensor ID (e.g., 'PIR-L12-N-001')",
+                            },
+                            "luminaire_ids": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Luminaire IDs serving this desk",
+                            },
+                            "dali_controller": {
+                                "type": "string",
+                                "description": "Tridonic Scenecom controller ID (e.g., 'DALI-L12-01')",
+                            },
                         },
-                        "required": ["desk_id"]
+                        "required": ["desk_id"],
                     },
-                    "description": "Array of desk definitions with HVAC and DALI context"
-                }
+                    "description": "Array of desk definitions with HVAC and DALI context",
+                },
             },
-            "required": ["building_id", "desks"]
-        }
+            "required": ["building_id", "desks"],
+        },
     },
     {
         "name": "add_building_devices",
-        "description": "Add BMS devices (chillers, AHUs, FCUs, VAVs, etc.) to the system. Devices are added to mock_devices.json.",
+        "description": (
+            "Add BMS devices (chillers, AHUs, FCUs, VAVs, etc.) to the system. "
+            "Devices are added to mock_devices.json."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Building ID to add devices to"
-                },
+                "building_id": {"type": "string", "description": "Building ID to add devices to"},
                 "site_code": {
                     "type": "string",
-                    "description": "Site code for device ID generation (default: first 3 chars of building_id)"
+                    "description": "Site code for device ID generation (default: first 3 chars of building_id)",
                 },
                 "devices": {
                     "type": "array",
                     "items": {
                         "type": "object",
                         "properties": {
-                            "device_id": {"type": "string", "description": "Device ID (auto-generated if not provided)"},
-                            "device_type": {"type": "string", "description": "Type: chiller, ahu, fcu, vav, pump, meter, controller"},
+                            "device_id": {
+                                "type": "string",
+                                "description": "Device ID (auto-generated if not provided)",
+                            },
+                            "device_type": {
+                                "type": "string",
+                                "description": "Type: chiller, ahu, fcu, vav, pump, meter, controller",
+                            },
                             "name": {"type": "string", "description": "Display name"},
                             "location": {"type": "string", "description": "Location description"},
                             "protocol": {"type": "string", "description": "Protocol: bacnet, modbus, mock"},
                             "points": {"type": "object", "description": "Point name to value mappings"},
-                            "metadata": {"type": "object", "description": "Additional metadata"}
+                            "metadata": {"type": "object", "description": "Additional metadata"},
                         },
-                        "required": ["device_type"]
+                        "required": ["device_type"],
                     },
-                    "description": "Array of device definitions"
-                }
+                    "description": "Array of device definitions",
+                },
             },
-            "required": ["building_id", "devices"]
-        }
+            "required": ["building_id", "devices"],
+        },
     },
     {
         "name": "import_point_list",
-        "description": "AI-assisted onboarding: Import BACnet point list and auto-generate device/zone structure. Supports multiple BMS vendors with different naming conventions. Auto-detects vendor if not specified.",
+        "description": (
+            "AI-assisted onboarding: Import BACnet point list and auto-generate device/zone structure. "
+            "Supports multiple BMS vendors with different naming conventions. Auto-detects vendor if not specified."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Building ID to import points for"
-                },
+                "building_id": {"type": "string", "description": "Building ID to import points for"},
                 "site_code": {
                     "type": "string",
-                    "description": "Site code for device ID generation (default: first 3 chars of building_id)"
+                    "description": "Site code for device ID generation (default: first 3 chars of building_id)",
                 },
                 "bms_vendor": {
                     "type": "string",
-                    "enum": ["auto", "desigo", "siemens", "metasys", "jci", "ebi", "honeywell", "ecostruxure", "schneider", "niagara", "tridium", "trend"],
-                    "description": "BMS vendor for naming pattern hints: desigo/siemens, metasys/jci, ebi/honeywell, ecostruxure/schneider, niagara/tridium, trend. Default: auto-detect"
+                    "enum": [
+                        "auto",
+                        "desigo",
+                        "siemens",
+                        "metasys",
+                        "jci",
+                        "ebi",
+                        "honeywell",
+                        "ecostruxure",
+                        "schneider",
+                        "niagara",
+                        "tridium",
+                        "trend",
+                    ],
+                    "description": (
+                        "BMS vendor for naming pattern hints: desigo/siemens, metasys/jci, "
+                        "ebi/honeywell, ecostruxure/schneider, niagara/tridium, trend. Default: auto-detect"
+                    ),
                 },
                 "point_list": {
                     "type": "array",
                     "items": {
                         "type": "object",
                         "properties": {
-                            "point_name": {"type": "string", "description": "BACnet object name (e.g., 'AHU-L12-01.SupplyAirTemp')"},
-                            "object_type": {"type": "string", "description": "BACnet object type (e.g., 'Analog Input', 'Binary Output')"},
+                            "point_name": {
+                                "type": "string",
+                                "description": "BACnet object name (e.g., 'AHU-L12-01.SupplyAirTemp')",
+                            },
+                            "object_type": {
+                                "type": "string",
+                                "description": "BACnet object type (e.g., 'Analog Input', 'Binary Output')",
+                            },
                             "instance": {"type": "integer", "description": "BACnet object instance number"},
                             "description": {"type": "string", "description": "Point description"},
                             "units": {"type": "string", "description": "Engineering units"},
-                            "value": {"description": "Current value (number, boolean, or string)"}
+                            "value": {"description": "Current value (number, boolean, or string)"},
                         },
-                        "required": ["point_name"]
+                        "required": ["point_name"],
                     },
-                    "description": "Array of BACnet points from BMS export"
-                }
+                    "description": "Array of BACnet points from BMS export",
+                },
             },
-            "required": ["building_id", "point_list"]
-        }
+            "required": ["building_id", "point_list"],
+        },
     },
     {
         "name": "import_controller_list",
-        "description": "Import BMS controller information (PXC, DDC controllers) and create device structure. Use alongside import_point_list for complete onboarding.",
+        "description": (
+            "Import BMS controller information (PXC, DDC controllers) and create device structure. "
+            "Use alongside import_point_list for complete onboarding."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Building ID to import controllers for"
-                },
+                "building_id": {"type": "string", "description": "Building ID to import controllers for"},
                 "site_code": {
                     "type": "string",
-                    "description": "Site code for device ID generation (default: first 3 chars of building_id)"
+                    "description": "Site code for device ID generation (default: first 3 chars of building_id)",
                 },
                 "controllers": {
                     "type": "array",
@@ -4302,88 +4986,95 @@ MCP_TOOLS = [
                             "bacnet_device_id": {"type": "integer", "description": "BACnet device instance"},
                             "area_served": {"type": "string", "description": "Area served (e.g., 'Level 12 North')"},
                             "controller_type": {"type": "string", "description": "Type: PXC, PXA, DDC"},
-                            "equipment": {"type": "array", "items": {"type": "string"}, "description": "Equipment names controlled"}
+                            "equipment": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Equipment names controlled",
+                            },
                         },
-                        "required": ["name"]
+                        "required": ["name"],
                     },
-                    "description": "Array of controller definitions"
-                }
+                    "description": "Array of controller definitions",
+                },
             },
-            "required": ["building_id", "controllers"]
-        }
+            "required": ["building_id", "controllers"],
+        },
     },
     {
         "name": "discover_tridonic_gateway",
-        "description": "Discover Tridonic DALI gateway and enumerate all lighting devices. Queries gateway for system info and discovers all luminaires, sensors, and controllers across DALI lines. Generates equipment codes following v2.0 naming convention. This is a READ-ONLY discovery tool for commissioning engineers to review before bulk import. Use during building onboarding when Tridonic DALI-2 lighting is present.",
+        "description": (
+            "Discover Tridonic DALI gateway and enumerate all lighting devices. Queries gateway for system "
+            "info and discovers all luminaires, sensors, and controllers across DALI lines. Generates equipment "
+            "codes following v2.0 naming convention. This is a READ-ONLY discovery tool for commissioning "
+            "engineers to review before bulk import. Use during building onboarding when Tridonic DALI-2 "
+            "lighting is present."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Building/site ID (e.g., 'site-002')"
-                },
-                "gateway_ip": {
-                    "type": "string",
-                    "description": "IP address of DALI gateway (e.g., '192.168.10.50')"
-                },
+                "building_id": {"type": "string", "description": "Building/site ID (e.g., 'site-002')"},
+                "gateway_ip": {"type": "string", "description": "IP address of DALI gateway (e.g., '192.168.10.50')"},
                 "gateway_type": {
                     "type": "string",
                     "enum": ["tridonic", "philips", "helvar", "generic"],
                     "description": "DALI gateway manufacturer/type",
-                    "default": "tridonic"
+                    "default": "tridonic",
                 },
-                "username": {
-                    "type": "string",
-                    "description": "Optional HTTP Basic Auth username for gateway API"
-                },
-                "password": {
-                    "type": "string",
-                    "description": "Optional HTTP Basic Auth password for gateway API"
-                },
+                "username": {"type": "string", "description": "Optional HTTP Basic Auth username for gateway API"},
+                "password": {"type": "string", "description": "Optional HTTP Basic Auth password for gateway API"},
                 "use_simulated": {
                     "type": "boolean",
                     "description": "Use simulated data if gateway unreachable (for testing)",
-                    "default": False
-                }
+                    "default": False,
+                },
             },
-            "required": ["building_id", "gateway_ip"]
-        }
+            "required": ["building_id", "gateway_ip"],
+        },
     },
     {
         "name": "get_asset_metrics_template",
-        "description": "Get asset metric templates for AI/ML predictive maintenance during building onboarding. Returns metric templates based on equipment types present in the building. Engineers can review and configure thresholds, weights, and data sources (BMS sensor, mobile phone, manual) before activation.",
+        "description": (
+            "Get asset metric templates for AI/ML predictive maintenance during building onboarding. Returns "
+            "metric templates based on equipment types present in the building. Engineers can review and "
+            "configure thresholds, weights, and data sources (BMS sensor, mobile phone, manual) before activation."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Building/site ID to get metric templates for"
-                },
+                "building_id": {"type": "string", "description": "Building/site ID to get metric templates for"},
                 "equipment_types": {
                     "type": "array",
                     "items": {
                         "type": "string",
-                        "enum": ["generator", "chiller", "ahu", "fcu", "ups", "transformer", "vav", "cooling_tower"]
+                        "enum": ["generator", "chiller", "ahu", "fcu", "ups", "transformer", "vav", "cooling_tower"],
                     },
-                    "description": "Optional list of equipment types to filter. If not provided, will auto-detect from building's devices and zones"
-                }
+                    "description": (
+                        "Optional list of equipment types to filter. "
+                        "If not provided, will auto-detect from building's devices and zones"
+                    ),
+                },
             },
-            "required": ["building_id"]
-        }
+            "required": ["building_id"],
+        },
     },
     {
         "name": "configure_asset_metrics",
-        "description": "Configure asset metrics for AI/ML predictive maintenance after building onboarding. Engineers can customize thresholds (normal/warning/critical), health score weights, measurement intervals, and specify which metrics use mobile phone vs BMS sensors. Saves configuration to building's asset_metrics.json file.",
+        "description": (
+            "Configure asset metrics for AI/ML predictive maintenance after building onboarding. Engineers can "
+            "customize thresholds (normal/warning/critical), health score weights, measurement intervals, and "
+            "specify which metrics use mobile phone vs BMS sensors. Saves configuration to building's "
+            "asset_metrics.json file."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Building/site ID to configure metrics for"
-                },
+                "building_id": {"type": "string", "description": "Building/site ID to configure metrics for"},
                 "metric_config": {
                     "type": "object",
-                    "description": "Configuration dictionary with equipment_types as keys, containing 'metrics' and 'manual_inspections' with custom thresholds, weights, and intervals",
+                    "description": (
+                        "Configuration dictionary with equipment_types as keys, containing 'metrics' "
+                        "and 'manual_inspections' with custom thresholds, weights, and intervals"
+                    ),
                     "additionalProperties": {
                         "type": "object",
                         "properties": {
@@ -4393,14 +5084,32 @@ MCP_TOOLS = [
                                     "type": "object",
                                     "properties": {
                                         "enabled": {"type": "boolean", "description": "Enable this metric"},
-                                        "normal_range": {"type": "array", "items": {"type": "number"}, "description": "[min, max] normal range"},
-                                        "warning_range": {"type": "array", "items": {"type": "number"}, "description": "[min, max] warning range"},
-                                        "critical_range": {"type": "array", "items": {"type": "number"}, "description": "[min, max] critical range"},
+                                        "normal_range": {
+                                            "type": "array",
+                                            "items": {"type": "number"},
+                                            "description": "[min, max] normal range",
+                                        },
+                                        "warning_range": {
+                                            "type": "array",
+                                            "items": {"type": "number"},
+                                            "description": "[min, max] warning range",
+                                        },
+                                        "critical_range": {
+                                            "type": "array",
+                                            "items": {"type": "number"},
+                                            "description": "[min, max] critical range",
+                                        },
                                         "weight": {"type": "number", "description": "Health score weight (0-1)"},
-                                        "measurement_interval_days": {"type": "integer", "description": "Days between measurements"},
-                                        "custom_threshold": {"type": "string", "description": "Custom threshold override"}
-                                    }
-                                }
+                                        "measurement_interval_days": {
+                                            "type": "integer",
+                                            "description": "Days between measurements",
+                                        },
+                                        "custom_threshold": {
+                                            "type": "string",
+                                            "description": "Custom threshold override",
+                                        },
+                                    },
+                                },
                             },
                             "manual_inspections": {
                                 "type": "object",
@@ -4409,276 +5118,278 @@ MCP_TOOLS = [
                                     "properties": {
                                         "enabled": {"type": "boolean"},
                                         "frequency_days": {"type": "integer"},
-                                        "assigned_to": {"type": "string"}
-                                    }
-                                }
-                            }
-                        }
-                    }
+                                        "assigned_to": {"type": "string"},
+                                    },
+                                },
+                            },
+                        },
+                    },
                 },
                 "save_to_file": {
                     "type": "boolean",
-                    "description": "Save configuration to building's asset_metrics.json file (default: true)"
-                }
+                    "description": "Save configuration to building's asset_metrics.json file (default: true)",
+                },
             },
-            "required": ["building_id", "metric_config"]
-        }
+            "required": ["building_id", "metric_config"],
+        },
     },
     # Solar MCP Tools (34-09)
     {
         "name": "get_solar_overview",
-        "description": "Get solar site overview including current generation (kW), daily yield (kWh), BESS State of Charge, grid import/export, performance ratio, and estimated savings today. Use this when someone asks about solar generation, how much power the panels are producing, or the solar dashboard.",
+        "description": (
+            "Get solar site overview including current generation (kW), daily yield (kWh), BESS State of "
+            "Charge, grid import/export, performance ratio, and estimated savings today. Use this when someone "
+            "asks about solar generation, how much power the panels are producing, or the solar dashboard."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "site_id": {
-                    "type": "string",
-                    "description": "Solar site ID (default: site-002)",
-                    "default": "site-002"
-                }
+                "site_id": {"type": "string", "description": "Solar site ID (default: site-002)", "default": "site-002"}
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "get_bess_status",
-        "description": "Get BESS (Battery Energy Storage System) status including State of Charge (SOC), current mode (charging/discharging/idle), health, power flow, cycle count, and dispatch schedule. Use this when someone asks about the battery level, battery status, BESS, or energy storage.",
+        "description": (
+            "Get BESS (Battery Energy Storage System) status including State of Charge (SOC), current mode "
+            "(charging/discharging/idle), health, power flow, cycle count, and dispatch schedule. Use this when "
+            "someone asks about the battery level, battery status, BESS, or energy storage."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "site_id": {
-                    "type": "string",
-                    "description": "Solar site ID (default: site-002)",
-                    "default": "site-002"
-                }
+                "site_id": {"type": "string", "description": "Solar site ID (default: site-002)", "default": "site-002"}
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "get_solar_savings",
-        "description": "Get financial savings summary from solar and BESS optimisation. Returns monthly breakdown of arbitrage savings, demand charge savings, self-consumption value, diesel avoidance, total savings, ROI, and carbon offset. Use this when someone asks how much money solar has saved, financial performance, or ROI.",
+        "description": (
+            "Get financial savings summary from solar and BESS optimisation. Returns monthly breakdown of "
+            "arbitrage savings, demand charge savings, self-consumption value, diesel avoidance, total savings, "
+            "ROI, and carbon offset. Use this when someone asks how much money solar has saved, financial "
+            "performance, or ROI."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "site_id": {
                     "type": "string",
                     "description": "Solar site ID (default: site-002)",
-                    "default": "site-002"
+                    "default": "site-002",
                 },
                 "period": {
                     "type": "string",
                     "description": "Period: ytd (year-to-date, default) or month",
                     "default": "ytd",
-                    "enum": ["ytd", "month"]
-                }
+                    "enum": ["ytd", "month"],
+                },
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "get_solar_forecast",
-        "description": "Get solar generation forecast for the next 24 hours with confidence bands. Returns hourly predicted generation in kW using an ensemble model (persistence + clear-sky + historical + ML). Use this when someone asks about tomorrow's generation forecast, expected solar output, or generation predictions.",
+        "description": (
+            "Get solar generation forecast for the next 24 hours with confidence bands. Returns hourly "
+            "predicted generation in kW using an ensemble model (persistence + clear-sky + historical + ML). "
+            "Use this when someone asks about tomorrow's generation forecast, expected solar output, or "
+            "generation predictions."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "site_id": {
                     "type": "string",
                     "description": "Solar site ID (default: site-002)",
-                    "default": "site-002"
+                    "default": "site-002",
                 },
                 "hours": {
                     "type": "integer",
                     "description": "Forecast horizon in hours (default: 24, max: 72)",
-                    "default": 24
-                }
+                    "default": 24,
+                },
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "get_solar_diagnostics",
-        "description": "Get solar diagnostics with top issues, underperforming equipment, and maintenance recommendations. Returns prioritised issues with severity, cost impact, probable cause, recommended action, and upcoming maintenance needs. Use this when someone asks which inverters are underperforming, solar problems, or maintenance needs.",
+        "description": (
+            "Get solar diagnostics with top issues, underperforming equipment, and maintenance recommendations. "
+            "Returns prioritised issues with severity, cost impact, probable cause, recommended action, and "
+            "upcoming maintenance needs. Use this when someone asks which inverters are underperforming, solar "
+            "problems, or maintenance needs."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "site_id": {
-                    "type": "string",
-                    "description": "Solar site ID (default: site-002)",
-                    "default": "site-002"
-                }
+                "site_id": {"type": "string", "description": "Solar site ID (default: site-002)", "default": "site-002"}
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     # Contract Management tools (Phase 48-02)
     {
         "name": "get_contracts",
-        "description": "Get contracts for managed buildings. Returns contract details including organization, type, fees, and dates. Optionally includes SLA terms. Use this when someone asks about contracts, SLAs, client agreements, or 'what is our SLA for building X'.",
+        "description": (
+            "Get contracts for managed buildings. Returns contract details including organization, type, fees, "
+            "and dates. Optionally includes SLA terms. Use this when someone asks about contracts, SLAs, client "
+            "agreements, or 'what is our SLA for building X'."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Filter by building/site ID (e.g., site-002)"
-                },
+                "building_id": {"type": "string", "description": "Filter by building/site ID (e.g., site-002)"},
                 "organization_code": {
                     "type": "string",
-                    "description": "Filter by organization code (e.g., ORG-SITE-002)"
+                    "description": "Filter by organization code (e.g., ORG-SITE-002)",
                 },
                 "status": {
                     "type": "string",
                     "enum": ["active", "expired", "draft"],
-                    "description": "Filter by contract status"
+                    "description": "Filter by contract status",
                 },
                 "include_sla": {
                     "type": "boolean",
                     "description": "Include SLA terms in response (default: false)",
-                    "default": False
-                }
+                    "default": False,
+                },
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "add_building_contract",
-        "description": "Create a detailed contract for a building. Writes contract data and updates building configuration with contract fields. Use this during building onboarding to set up commercial agreements.",
+        "description": (
+            "Create a detailed contract for a building. Writes contract data and updates building "
+            "configuration with contract fields. Use this during building onboarding to set up "
+            "commercial agreements."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_code": {
-                    "type": "string",
-                    "description": "Building/site ID (e.g., site-002)"
-                },
+                "building_code": {"type": "string", "description": "Building/site ID (e.g., site-002)"},
                 "organization_name": {
                     "type": "string",
-                    "description": "Client organization name (e.g., SITE-002 Commercial Property)"
+                    "description": "Client organization name (e.g., SITE-002 Commercial Property)",
                 },
-                "organization_code": {
-                    "type": "string",
-                    "description": "Organization code (e.g., ORG-SITE-002)"
-                },
+                "organization_code": {"type": "string", "description": "Organization code (e.g., ORG-SITE-002)"},
                 "contract_type": {
                     "type": "string",
                     "enum": ["full_maintenance", "preventive_only", "ad_hoc", "consulting"],
-                    "description": "Type of maintenance contract"
+                    "description": "Type of maintenance contract",
                 },
-                "monthly_fee_zar": {
-                    "type": "number",
-                    "description": "Monthly contract fee in ZAR"
-                },
-                "start_date": {
-                    "type": "string",
-                    "description": "Contract start date (YYYY-MM-DD)"
-                },
-                "end_date": {
-                    "type": "string",
-                    "description": "Contract end date (YYYY-MM-DD)"
-                },
+                "monthly_fee_zar": {"type": "number", "description": "Monthly contract fee in ZAR"},
+                "start_date": {"type": "string", "description": "Contract start date (YYYY-MM-DD)"},
+                "end_date": {"type": "string", "description": "Contract end date (YYYY-MM-DD)"},
                 "sla_terms": {
                     "type": "array",
                     "description": "Optional SLA terms array with metric_type, target_value, penalty details",
-                    "items": {"type": "object"}
+                    "items": {"type": "object"},
                 },
                 "budget": {
                     "type": "object",
-                    "description": "Optional budget breakdown (monthly_total_zar, breakdown, equipment_type_budgets)"
+                    "description": "Optional budget breakdown (monthly_total_zar, breakdown, equipment_type_budgets)",
                 },
                 "condition_assessment": {
                     "type": "object",
-                    "description": "Optional condition assessment (overall_score, mechanical/electrical/structural scores)"
-                }
+                    "description": (
+                        "Optional condition assessment " "(overall_score, mechanical/electrical/structural scores)"
+                    ),
+                },
             },
-            "required": ["building_code", "organization_name", "organization_code", "contract_type", "monthly_fee_zar", "start_date", "end_date"]
-        }
+            "required": [
+                "building_code",
+                "organization_name",
+                "organization_code",
+                "contract_type",
+                "monthly_fee_zar",
+                "start_date",
+                "end_date",
+            ],
+        },
     },
     {
         "name": "get_contract_profitability",
-        "description": "Get contract profitability snapshot for one or all buildings. Returns revenue, costs, margins, and at-risk flags. Use this when someone asks about contract profitability, margins, financial performance, or 'how profitable is building X'.",
+        "description": (
+            "Get contract profitability snapshot for one or all buildings. Returns revenue, costs, margins, "
+            "and at-risk flags. Use this when someone asks about contract profitability, margins, financial "
+            "performance, or 'how profitable is building X'."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "building_code": {
                     "type": "string",
-                    "description": "Filter by building/site ID (all buildings if not specified)"
+                    "description": "Filter by building/site ID (all buildings if not specified)",
                 },
-                "year": {
-                    "type": "integer",
-                    "description": "Filter by year (default: current year)"
-                },
-                "month": {
-                    "type": "integer",
-                    "description": "Filter by month (optional)"
-                }
+                "year": {"type": "integer", "description": "Filter by year (default: current year)"},
+                "month": {"type": "integer", "description": "Filter by month (optional)"},
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     # Municipal Billing tools (Phase 49)
     {
         "name": "process_municipal_bill",
-        "description": "Process South African municipal utility bill PDF (Johannesburg, Cape Town, Ekurhuleni, eThekwini) for building cost tracking. Extracts invoice data, consumption, and amounts from PDF using PyMuPDF/pdfplumber with OCR fallback. Use this during building onboarding to establish cost baselines or monthly to track utility costs.",
+        "description": (
+            "Process South African municipal utility bill PDF (Johannesburg, Cape Town, Ekurhuleni, eThekwini) "
+            "for building cost tracking. Extracts invoice data, consumption, and amounts from PDF using "
+            "PyMuPDF/pdfplumber with OCR fallback. Use this during building onboarding to establish cost "
+            "baselines or monthly to track utility costs."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Building/site ID (e.g., site-002)"
-                },
-                "pdf_file_path": {
-                    "type": "string",
-                    "description": "Absolute path to PDF file"
-                },
+                "building_id": {"type": "string", "description": "Building/site ID (e.g., site-002)"},
+                "pdf_file_path": {"type": "string", "description": "Absolute path to PDF file"},
                 "municipality": {
                     "type": "string",
-                    "description": "Municipality name (e.g., city_of_johannesburg, city_of_cape_town, ekurhuleni, ethekwini)"
+                    "description": (
+                        "Municipality name " "(e.g., city_of_johannesburg, city_of_cape_town, ekurhuleni, ethekwini)"
+                    ),
                 },
-                "utility_type": {
-                    "type": "string",
-                    "enum": ["electricity", "water"],
-                    "description": "Utility type"
-                },
-                "account_number": {
-                    "type": "string",
-                    "description": "Municipal account number"
-                },
+                "utility_type": {"type": "string", "enum": ["electricity", "water"], "description": "Utility type"},
+                "account_number": {"type": "string", "description": "Municipal account number"},
                 "tariff_type": {
                     "type": "string",
                     "description": "Optional tariff type (residential/commercial/industrial)",
-                    "enum": ["residential", "commercial", "industrial"]
-                }
+                    "enum": ["residential", "commercial", "industrial"],
+                },
             },
-            "required": ["building_id", "pdf_file_path", "municipality", "utility_type", "account_number"]
-        }
+            "required": ["building_id", "pdf_file_path", "municipality", "utility_type", "account_number"],
+        },
     },
     {
         "name": "get_utility_costs",
-        "description": "Get utility cost analysis for a building from processed municipal bills. Returns electricity and water costs with totals and averages for specified period. Use this when someone asks about utility costs, municipal bills, electricity/water expenses, or 'what are our utility costs for building X'.",
+        "description": (
+            "Get utility cost analysis for a building from processed municipal bills. Returns electricity and "
+            "water costs with totals and averages for specified period. Use this when someone asks about utility "
+            "costs, municipal bills, electricity/water expenses, or 'what are our utility costs for building X'."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
-                    "type": "string",
-                    "description": "Building/site ID (e.g., site-002)"
-                },
+                "building_id": {"type": "string", "description": "Building/site ID (e.g., site-002)"},
                 "period_start": {
                     "type": "string",
-                    "description": "Period start ISO date (default: current month start)"
+                    "description": "Period start ISO date (default: current month start)",
                 },
-                "period_end": {
-                    "type": "string",
-                    "description": "Period end ISO date (default: current month end)"
-                }
+                "period_end": {"type": "string", "description": "Period end ISO date (default: current month end)"},
             },
-            "required": ["building_id"]
-        }
-    }
+            "required": ["building_id"],
+        },
+    },
 ]
 
 
 # ============================================================================
 # MCP Server Class
 # ============================================================================
+
 
 class SIMBIOTMCPServer:
     """
@@ -4691,7 +5402,9 @@ class SIMBIOTMCPServer:
         server = SIMBIOTMCPServer()
         tools = server.list_tools()  # Get available tools
         result = await server.call_tool("get_buildings")
-        result = await server.call_tool("read_device_point", device_id="S001-CHILLER-B1-001", point_name="chw_supply_temp")
+        result = await server.call_tool(
+            "read_device_point", device_id="S001-CHILLER-B1-001", point_name="chw_supply_temp"
+        )
     """
 
     def __init__(self):

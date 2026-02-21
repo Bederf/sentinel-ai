@@ -233,10 +233,10 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
             </div>
             <div>
               <span className="font-medium text-sm block" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                Smart Lighting Occupancy
+                Occupancy Signals
               </span>
               <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                {daliStats.total_sensors} sensors • {daliStats.total_luminaires} luminaires
+                {daliStats.total_sensors} occupancy sensors • {daliStats.total_luminaires} luminaires
               </span>
             </div>
           </div>
@@ -247,7 +247,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
               color: "var(--color-sentinel-blue)",
             }}
           >
-            DALI-2
+            Lighting protocol
           </span>
         </div>
 
@@ -367,10 +367,10 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
             </div>
             <div>
               <h2 className="font-medium text-base mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                Smart Lighting Occupancy
+                Occupancy Signals
               </h2>
               <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                {daliStats.total_sensors} DALI-2 sensors • {daliStats.total_luminaires} luminaires
+                {daliStats.total_sensors} occupancy sensors • {daliStats.total_luminaires} luminaires
               </p>
             </div>
           </div>

@@ -618,6 +618,7 @@ async def get_live_dali_data(
         return {
             "site_id": site_id,
             "data_source": "live",
+            "source_type": "lighting_protocol",
             "timestamp": datetime.now().isoformat(),
             "error": str(e),
             "summary": {

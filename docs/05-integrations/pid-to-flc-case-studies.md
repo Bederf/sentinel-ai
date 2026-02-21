@@ -520,7 +520,7 @@ Based on South African case studies, FLC migration delivers:
 4. **Extended equipment life** (50-100% longer component life)
 5. **Improved occupant comfort** (80-95% reduction in complaints)
 
-**For SENTINEL deployments**, Clawd Bot can use these case studies to justify FLC recommendations to facility managers, with confidence in projected savings and payback timelines specific to South African climate and energy costs.
+**For SENTINEL deployments**, Sentry Bot can use these case studies to justify FLC recommendations to facility managers, with confidence in projected savings and payback timelines specific to South African climate and energy costs.
 
 ---
 

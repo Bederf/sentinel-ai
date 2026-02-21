@@ -30,7 +30,7 @@ This policy applies to all users of SENTINEL systems, including:
 - **Operators** monitoring and managing SENTINEL for facilities management clients
 - **Client-side users** accessing the SENTINEL web interface, API endpoints, or conversational interfaces
 - **Contractors and third parties** engaged to work on or with SENTINEL systems
-- **Bot integrations** (Clawd Telegram bot, WhatsApp Business API handlers)
+- **Bot integrations** (Sentry Telegram bot, WhatsApp Business API handlers)
 
 This policy covers all SENTINEL-related activities regardless of location, device, or time of day.
 
@@ -254,7 +254,7 @@ SENTINEL permits the use of personal devices (laptops, mobile phones) for SENTIN
 
 ### 9.2 Mobile Devices
 
-Mobile devices used to access SENTINEL (including the Clawd Telegram bot or SENTINEL web interface) shall:
+Mobile devices used to access SENTINEL (including the Sentry Telegram bot or SENTINEL web interface) shall:
 
 - Have PIN, biometric, or password lock enabled
 - Have current OS and app updates installed

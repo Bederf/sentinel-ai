@@ -2,9 +2,9 @@
 title: "OEM-Specific Checklist Generation"
 type: "guide"
 status: "approved"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-02-06"
-updated: "2026-02-06"
+updated: "2026-02-21"
 author: "Sentinel Development Team"
 tags: ["inspection", "checklist", "oem", "ai-generation", "maintenance", "technician"]
 domain: "bms"
@@ -19,7 +19,7 @@ AI-generated inspection and maintenance checklists tailored to specific equipmen
 
 ## Overview
 
-Technicians need equipment-specific inspection checklists when assigned work orders via the Clawd Telegram bot. Previously, only 7 generic templates existed covering basic equipment types. This feature generates manufacturer-specific checklists (e.g., Carrier 30HXC vs York YCAL chillers have different tolerances, service intervals, and required tools).
+Technicians need equipment-specific inspection checklists when assigned work orders via the Sentry Telegram bot. Previously, only 7 generic templates existed covering basic equipment types. This feature generates manufacturer-specific checklists (e.g., Carrier 30HXC vs York YCAL chillers have different tolerances, service intervals, and required tools).
 
 ### Key Capabilities
 
@@ -29,6 +29,19 @@ Technicians need equipment-specific inspection checklists when assigned work ord
 - **Idempotent Generation**: Checks for existing OEM templates before generating, avoiding duplicate Claude API calls
 - **Demo Mode**: Pre-built demo templates returned without API calls when `DEMO_MODE=true`
 - **Client-Editable**: Generated templates are defaults; clients can customize items, tolerances, and tools
+
+## Site-002 rollout scope
+
+Phase rollout for Site-002 is major-equipment-first.
+
+- Full OEM-guided inspection generation is required for Tier A assets:
+  - `CHILLER, CHWP, CWP, CT, BOILER, AHU, GEN, UPS, ATS, MSB, INCOMER`
+- Tier B (`FCU, VAV, DALI_CONTROLLER, METER`) uses guided-lite by default and upgrades to full only on escalation conditions.
+- Tier C assets remain on generic templates.
+
+Primary operational KPI:
+
+- `% Tier A assets with discovered manufacturer+model populated`
 
 ## Architecture
 
@@ -50,7 +63,7 @@ Equipment Ingestion (SIMBIOT)
              ▼
   ┌──────────────────────┐
   │ ChecklistService      │  ← Supabase-first, JSON fallback
-  │   (updated)           │     Serves templates to Clawd + API
+  │   (updated)           │     Serves templates to Sentry + API
   └──────────────────────┘
 ```
 
@@ -153,10 +166,10 @@ Each checklist item follows the established schema from Phase 55:
 7. Return stored templates
 ```
 
-### Lookup Flow (Clawd Bot)
+### Lookup Flow (Sentry Bot)
 ```
 1. Technician assigned work order for S002-CHILLER-B1-001
-2. Clawd requests checklist: GET /api/sentry/inspection-checklist/chiller
+2. Sentry requests checklist: GET /api/sentry/inspection-checklist/chiller
 3. ChecklistService.get_template_for_inspection("chiller", "routine")
 4. Try Supabase → OEM template found (Carrier 30HXC) → return
 5. If not found → fall back to generic JSON chiller_weekly template

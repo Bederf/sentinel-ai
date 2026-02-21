@@ -10,13 +10,14 @@ import { Card, Title, Text, Badge, Flex, Grid } from '@tremor/react';
 import { useModules } from '../../contexts/ModuleHooks';
 import { MODULE_COLORS } from '../../lib/moduleRegistry';
 import type { ModuleType, ModuleDefinition } from '../../lib/moduleRegistry';
+import { MANDATORY_MODULES } from '../../lib/mandatoryModules';
 import {
   Wind, Zap, Lock, Lightbulb, Sun, Droplets, Flame, KeyRound,
   Brain, Leaf, FileText, Gamepad2, Package, Plug, Link2, Bell
 } from 'lucide-react';
 import { ModuleDependencyWarning } from './ModuleDependencyWarning';
 
-const NON_DEACTIVATABLE_MODULES: ModuleType[] = ['hvac', 'energy'];
+const NON_DEACTIVATABLE_MODULES: ModuleType[] = MANDATORY_MODULES;
 
 interface ModuleSelectorProps {
   onModuleActivated?: (moduleType: ModuleType) => void;
@@ -56,6 +57,7 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
       // Building system add-ons
       lighting: [],
       fire: [],
+      access: [],
       security: [],
       solar: [],
       sustainability: [],
@@ -241,6 +243,7 @@ const MODULE_ICONS: Record<ModuleType, React.ComponentType<any>> = {
   solar: Sun,
   water: Droplets,
   fire: Flame,
+  access: KeyRound,
   ml: Brain,
   sustainability: Leaf,
   contracts: FileText,

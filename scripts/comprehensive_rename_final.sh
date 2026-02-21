@@ -1,7 +1,7 @@
 #!/bin/bash
-# Comprehensive CLAWD → SENTRY Rename with Safety Fixes
+# Comprehensive SENTRY → SENTRY Rename with Safety Fixes
 # Single-pass script that does ALL updates atomically:
-# 1. Rename all clawd → sentry identifiers
+# 1. Rename all sentry → sentry identifiers
 # 2. Fix hardcoded model reference in ocr_service.py (line 180)
 # 3. Add safety-critical lock in hybrid_ai_service.py
 # 4. Add $SENTRY_HOME path references throughout
@@ -19,7 +19,7 @@ if [ "$MODE" != "dry-run" ] && [ "$MODE" != "execute" ]; then
 fi
 
 echo "═══════════════════════════════════════════════════════════════"
-echo "  Comprehensive CLAWD → SENTRY Rename with Safety Fixes"
+echo "  Comprehensive SENTRY → SENTRY Rename with Safety Fixes"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
 echo "Mode: $MODE"
@@ -40,34 +40,34 @@ fi
 # ============================================================================
 # PHASE 2: RENAME IDENTIFIERS
 # ============================================================================
-echo "🔄 PHASE 1: Renaming identifiers (clawd → sentry)"
+echo "🔄 PHASE 1: Renaming identifiers (sentry → sentry)"
 echo ""
 
 RENAMES=(
     # Module/directory names
-    "clawd_integration:sentry_integration"
-    "clawd_webhooks:sentry_webhooks"
-    "clawdbot:sentrybot"
+    "sentry_integration:sentry_integration"
+    "sentry_webhooks:sentry_webhooks"
+    "sentrybot:sentrybot"
 
     # Variable/function names
-    "clawd_api_url:sentry_api_url"
-    "clawd_alert:sentry_alert"
-    "clawd_message:sentry_message"
-    "clawd_notification:sentry_notification"
-    "clawd_notified:sentry_notified"
-    "add_clawd_notification_job:add_sentry_notification_job"
-    "format_clawd_message:format_sentry_message"
-    "clawd_phyphox_webhook:sentry_phyphox_webhook"
+    "sentry_api_url:sentry_api_url"
+    "sentry_alert:sentry_alert"
+    "sentry_message:sentry_message"
+    "sentry_notification:sentry_notification"
+    "sentry_notified:sentry_notified"
+    "add_sentry_notification_job:add_sentry_notification_job"
+    "format_sentry_message:format_sentry_message"
+    "sentry_phyphox_webhook:sentry_phyphox_webhook"
 
     # Configuration keys
-    "channel.*clawd:channel.*sentry"
+    "channel.*sentry:channel.*sentry"
 
     # API paths
-    "/api/clawd:/api/sentry"
-    "\"/clawd/:\"/sentry/"
+    "/api/sentry:/api/sentry"
+    "\"/sentry/:\"/sentry/"
 
     # Tags and strings
-    "tags=\[\"clawd\"\]:tags=[\"sentry\"]"
+    "tags=\[\"sentry\"\]:tags=[\"sentry\"]"
 )
 
 rename_count=0
@@ -187,15 +187,15 @@ echo "✅ PHASE 5: Verification"
 echo ""
 
 if [ "$MODE" = "dry-run" ]; then
-    remaining=$(grep -r "clawd" backend/app --include="*.py" 2>/dev/null | wc -l || echo 0)
-    echo "   Current 'clawd' references: $remaining"
+    remaining=$(grep -r "sentry" backend/app --include="*.py" 2>/dev/null | wc -l || echo 0)
+    echo "   Current 'sentry' references: $remaining"
     echo "   Would be reduced to: 0"
     echo ""
 
     # Show sample of what would change
     echo "   Sample changes:"
     echo "   ────────────────────────────────────────"
-    grep -r "clawd" backend/app --include="*.py" 2>/dev/null | head -3 || true
+    grep -r "sentry" backend/app --include="*.py" 2>/dev/null | head -3 || true
     echo "   ... and more"
     echo ""
 
@@ -208,10 +208,10 @@ if [ "$MODE" = "dry-run" ]; then
 
 else
     # Execute: Final verification
-    remaining=$(grep -r "clawd" backend/app --include="*.py" 2>/dev/null | wc -l || echo 0)
+    remaining=$(grep -r "sentry" backend/app --include="*.py" 2>/dev/null | wc -l || echo 0)
     sentry_refs=$(grep -r "sentry" backend/app --include="*.py" 2>/dev/null | wc -l || echo 0)
 
-    echo "   Remaining 'clawd' references: $remaining"
+    echo "   Remaining 'sentry' references: $remaining"
     echo "   New 'sentry' references: $sentry_refs"
 
     if [ "$remaining" -eq 0 ]; then
@@ -221,7 +221,7 @@ else
         echo "═══════════════════════════════════════════════════════════════"
         echo ""
         echo "Changes applied:"
-        echo "  ✓ All clawd → sentry identifiers renamed"
+        echo "  ✓ All sentry → sentry identifiers renamed"
         echo "  ✓ OCR model fixed (settings.claude_model)"
         echo "  ✓ Safety-critical lock added (control actions use Claude only)"
         echo "  ✓ Path references updated (\$SENTRY_HOME)"
@@ -231,6 +231,6 @@ else
         echo "Next: git add . && git commit ..."
         echo ""
     else
-        echo "   ⚠️  Warning: $remaining clawd references still remain"
+        echo "   ⚠️  Warning: $remaining sentry references still remain"
     fi
 fi

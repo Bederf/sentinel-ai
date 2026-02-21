@@ -4,7 +4,7 @@
 Validation script for SENTRY rename.
 
 This script:
-1. Checks for any remaining 'clawd' references
+1. Checks for any remaining 'sentry' references
 2. Verifies all Python imports resolve correctly
 3. Checks for broken API endpoints
 4. Validates configuration keys
@@ -46,12 +46,12 @@ EXCLUDE_FILES = {
 
 # Patterns that should NO LONGER exist after rename
 FORBIDDEN_PATTERNS = [
-    r'\bclawd\b(?!-)',  # clawd not followed by hyphen
-    r'openclaw',
+    r'\bsentry\b(?!-)',  # sentry not followed by hyphen
+    r'sentry',
     r'moltbot',
-    r'Clawd(?!-)',
-    r'CLAWD(?!_)',
-    r'\.clawd',
+    r'Sentry(?!-)',
+    r'SENTRY(?!_)',
+    r'\.sentry',
     r'$SENTRY_HOME/',
 ]
 
@@ -242,7 +242,7 @@ def validate_api_endpoints(report: ValidationReport) -> None:
             continue
 
         content = ''.join(lines)
-        if '/api/sentry/' in content or '/api/clawd-' in content:
+        if '/api/sentry/' in content or '/api/sentry-' in content:
             report.add_issue(str(api_file), 0, "API endpoint still references /api/sentry/")
         elif '/api/sentry/' in content or '/api/sentry-' in content:
             report.add_success(f"API endpoints properly use /api/sentry/ in {api_file.name}")

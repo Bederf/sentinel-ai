@@ -41,7 +41,7 @@ Technicians use the phyphox app on their smartphones to record vibration and aud
 
 ### PhyphoxHandler
 
-**File:** `backend/app/services/clawd_integration/phyphox_handler.py`
+**File:** `backend/app/services/sentry_integration/phyphox_handler.py`
 
 Ingests phyphox data in multiple formats:
 - **Screenshot analysis** — Claude Vision extracts values from phyphox app screenshots

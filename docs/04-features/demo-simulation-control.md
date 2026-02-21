@@ -90,7 +90,7 @@ When equipment transitions to warning:
 
 1. **Supabase Update** - Equipment health_score and status updated
 2. **Alert Created** - Stored in `alerts` table with severity, message, equipment_id
-3. **Telegram Notification** - Sent via Clawd bot to FM team chat
+3. **Telegram Notification** - Sent via Sentry bot to FM team chat
 4. **Prediction Generated** - Stored in `predictions` table for Risk Intelligence card
 5. **Dashboard Updates** - Risk Intelligence card shows highest risk equipment
 
@@ -115,14 +115,14 @@ curl -X POST "http://localhost:9095/api/simulation/demo/reset-to-healthy?site_co
 For Telegram notifications to work:
 
 ```bash
-CLAWD_BOT_TOKEN=<telegram-bot-token>
-CLAWD_FM_CHAT_ID=<telegram-chat-id>
+SENTRY_BOT_TOKEN=<telegram-bot-token>
+SENTRY_FM_CHAT_ID=<telegram-chat-id>
 ```
 
 If not configured, notifications are logged to console instead.
 
 ## Related Documentation
 
-- [Clawd Integration](../CLAWD_INTEGRATION.md)
+- [Sentry Integration](../SENTRY_INTEGRATION.md)
 - [Alert System](./alerts-system.md)
 - [Health Scoring System](./health-scoring-system.md)

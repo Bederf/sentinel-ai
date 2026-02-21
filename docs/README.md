@@ -4,7 +4,7 @@ type: "guide"
 status: "approved"
 version: "1.0.0"
 created: "2026-01-30"
-updated: "2026-02-19"
+updated: "2026-02-21"
 author: "Sentinel Development Team"
 tags: ["documentation", "overview"]
 domain: "general"
@@ -54,6 +54,8 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Contract Management API](03-api-reference/contracts-api.md) - Organizations, contracts, SLA terms, equipment assignments, budgets, condition assessments (Phase 48)
 - [Risk-Based Pricing API](03-api-reference/pricing-api.md) - Quote calculations, SLA tier pricing, risk buffers (Phase 52)
 - [Recommendations API](03-api-reference/recommendations-api.md) - Profile-based recommendations, approval workflow, outcome tracking, rejection learning (Phase 72)
+- **[Asset Health API](03-api-reference/asset-health-api.md)** - Combined equipment health scores + baseline status + deviation tracking per site/equipment (Phase 109A)
+- [System Health API](03-api-reference/system-health-api.md) - Unified health snapshots, diagnostics, and system error logs
 
 ### ✨ Features
 
@@ -83,6 +85,9 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Repair Effectiveness & ML Feedback Loop](04-features/46-repair-effectiveness-ml-feedback.md)** - Post-repair validation, ML feedback, follow-up scheduling, cost-benefit analysis (Phase 57)
 - **[Phases 44-46-54 Integration: Complete Asset Management Workflow](04-features/44-46-54-integration-workflow.md)** - Unified workflow integrating baseline capture, multi-source comparison, inspection, and repair validation (Phases 44, 45, 46, 54)
 - **[Service Feedback System](04-features/service-feedback-system.md)** - Equipment-type specific feedback from technicians with health score updates
+- **[109A: Asset Health Baseline Recording](04-features/109A-asset-health-baseline.md)** - Unified health score + baseline status + deviation view per equipment, auto-capture on onboarding (Phase 109A)
+- **[109C: Site-002 Deterministic Mode Policy (Dry-Run)](04-features/109C-site-002-mode-policy-dry-run.md)** - Deterministic onboarding stage thresholds with dwell windows, fail-closed logic, and anti-flap stability (Phase 109C)
+- **[109D: Operational Flows Pack](04-features/109D-operational-flows-index.md)** - Fail-closed, promotion evidence, provenance breach, supervised rollback, maintenance closure, and ML retraining readiness flows
 
 #### Remote Operations
 - **[Remote Operations](04-features/remote-operations.md)** - Remote monitoring, command execution, and smart dispatch with task bundling (Phase 59)
@@ -161,7 +166,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Tool Use Best Practices](12-development/tool-use-best-practices.md) - Development workflow
 
 ### 🔧 Operations
-- **[Monitoring Stack](09-operations/monitoring-stack.md)** - Loki + Promtail + Grafana deployment, config management, scrape jobs, dashboard provisioning
+- **[Monitoring Stack](10-operations/monitoring-stack.md)** - Loki + Promtail + Grafana deployment, config management, scrape jobs, dashboard provisioning
 
 ### 🩺 Troubleshooting
 - [ML Model Health](05-troubleshooting/ml-model-health.md) - ML model issues

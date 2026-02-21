@@ -174,10 +174,10 @@ def format_for_telegram(
     history: Optional[dict] = None,
 ) -> str:
     """
-    Format diagnosis for Telegram (Clawd/Sentry bot).
+    Format diagnosis for Telegram (Sentry/Sentry bot).
 
     Uses Telegram markdown: *bold*, `code`, simple structure.
-    Matches existing Clawd formatting patterns.
+    Matches existing Sentry formatting patterns.
     """
     desk = diagnosis.desk
     zone = diagnosis.zone

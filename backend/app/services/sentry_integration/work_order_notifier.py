@@ -1011,6 +1011,51 @@ class WorkOrderNotifier:
             "next_prompt": next_prompt,
         }
 
+    async def complete_service_record(self, service_record_code: str, force: bool = True) -> Dict[str, Any]:
+        """Complete a service record and trigger health restoration/closure flow."""
+        filters = {"code": service_record_code}
+        records = await self.repository.list(filters)
+        if not records:
+            return {"error": "Service record not found", "service_record_code": service_record_code}
+
+        service_record = records[0]
+        if service_record.get("status") == ServiceStatus.COMPLETE.value:
+            return {
+                "success": True,
+                "service_record_code": service_record_code,
+                "status": ServiceStatus.COMPLETE.value,
+                "already_complete": True,
+            }
+
+        equipment = await self.repository.get_equipment_by_id(service_record["equipment_id"])
+        if not equipment:
+            return {"error": "Equipment not found", "equipment_id": service_record["equipment_id"]}
+
+        equipment_type = equipment.get("type", "unknown")
+        validation = self.template_service.validate_collected_items(
+            equipment_type,
+            service_record["service_type"],
+            service_record.get("items_collected", []),
+        )
+
+        if not validation["is_complete"] and not force:
+            return {
+                "error": "incomplete_data_collection",
+                "service_record_code": service_record_code,
+                "missing_items": validation["missing_items"],
+                "completion_percentage": validation["completion_percentage"],
+            }
+
+        await self._complete_service_record_and_restore_equipment(service_record)
+        return {
+            "success": True,
+            "service_record_code": service_record_code,
+            "status": ServiceStatus.COMPLETE.value,
+            "forced": (not validation["is_complete"]) and force,
+            "completion_percentage": validation["completion_percentage"],
+            "missing_items": validation["missing_items"],
+        }
+
 
 # Global instance
 work_order_notifier = WorkOrderNotifier()

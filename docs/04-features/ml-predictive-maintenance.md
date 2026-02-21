@@ -302,7 +302,7 @@ Automatic Action:
   ✅ Work Order created (WO-2026-0234)
   ✅ Assigned to HVAC technician
   ✅ Scheduled for tomorrow morning
-  ✅ Technician receives Clawd notification
+  ✅ Technician receives Sentry notification
 ```
 
 **Manual trigger** if you want to create work order for lower-confidence predictions:

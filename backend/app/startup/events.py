@@ -155,6 +155,14 @@ async def startup_event(app: FastAPI) -> None:
     # Updates last_sync_at on all active log sources so System Health dashboard stays fresh
     scheduler_service.add_integration_sync_job(interval_seconds=900)  # 15 minutes
 
+    # Site-002 deterministic mode policy dry-run (runs every 5 minutes)
+    # Observability only: evaluates stage thresholds and logs would-promote/demote actions
+    try:
+        scheduler_service.add_site_mode_policy_dry_run_job(interval_seconds=300, site_id="site-002")
+        _logger.info("✅ Site mode policy dry-run initialized for site-002")
+    except Exception as e:
+        _logger.warning(f"⚠️ Site mode policy dry-run initialization failed: {e}")
+
     # Start demand-aware coordinator (runs every 5 minutes)
     # Phase 081: Cross-module peak demand management
     # Monitors NMD headroom and coordinates HVAC + BESS + energy actions for shaving
@@ -242,65 +250,72 @@ async def startup_event(app: FastAPI) -> None:
     # Queries for any tasks marked as 'running' and resumes from checkpoint
     async def recover_crashed_simulations():
         """
-        Recover any simulations that were running when server crashed.
-        Deserializes state from database and resumes from checkpoint.
+        Recover simulations that were running when server crashed/restarted.
+        Tasks with a valid checkpoint are re-queued for the queue processor.
+        Tasks running >48 hours wall-clock with no checkpoint are marked failed.
         """
         try:
+            from datetime import datetime as dt
+            from datetime import timedelta
+
             from app.database.supabase_client import Supabase
 
             client = Supabase.instance()
 
             # Query for any crashed tasks (status='running')
-            response = (
-                await client.table("lifecycle_simulation_tasks")
-                .select("*")
-                .eq("status", "running")
-                .eq("simulation_type", "lifecycle")
-                .execute()
-            )
+            response = client.table("lifecycle_simulation_tasks").select("*").eq("status", "running").execute()
 
             if not response.data:
-                _logger.info("✅ No crashed simulations to recover")
+                _logger.info("No crashed simulations to recover")
                 return
 
-            _logger.info(f"🔄 Found {len(response.data)} crashed simulation(s) to recover...")
+            _logger.info(f"Found {len(response.data)} crashed simulation(s) to recover...")
 
-            # Recover each crashed simulation
+            # Age guard: tasks running >48 hours with no checkpoint are stale
+            max_age = timedelta(hours=48)
+            now = dt.utcnow()
+
             for task in response.data:
                 task_id = str(task["task_id"])
-                state_snapshot = task.get("state_snapshot", {})
+                state_snapshot = task.get("state_snapshot")
+                created_at = task.get("created_at", "")
+
+                # Parse created_at for age check
+                try:
+                    task_age = now - dt.fromisoformat(created_at.replace("Z", "+00:00").replace("+00:00", ""))
+                except Exception:
+                    task_age = max_age  # If we can't parse, treat as old
 
                 if not state_snapshot:
-                    _logger.warning(f"⚠️ Task {task_id} has no state snapshot - cannot recover")
-                    # Mark as failed since we can't resume
-                    await (
-                        client.table("lifecycle_simulation_tasks")
-                        .update({"status": "failed", "error_message": "No checkpoint state available for recovery"})
-                        .eq("task_id", task_id)
-                        .execute()
-                    )
+                    if task_age > max_age:
+                        _logger.warning(f"Task {task_id} has no checkpoint and is >{max_age} old — marking failed")
+                        try:
+                            client.table("lifecycle_simulation_tasks").update(
+                                {"status": "failed", "error_message": "Stale: no checkpoint after 48h"}
+                            ).eq("task_id", task_id).execute()
+                        except Exception as e:
+                            _logger.error(f"Failed to mark stale task {task_id}: {e}")
+                    else:
+                        _logger.warning(f"Task {task_id} has no checkpoint — marking failed")
+                        try:
+                            client.table("lifecycle_simulation_tasks").update(
+                                {"status": "failed", "error_message": "No checkpoint state available for recovery"}
+                            ).eq("task_id", task_id).execute()
+                        except Exception as e:
+                            _logger.error(f"Failed to mark task {task_id}: {e}")
                     continue
 
                 try:
-                    # Mark task as "queued" so queue processor will resume it
-                    # Queue processor will deserialize state and continue from checkpoint
-                    await (
-                        client.table("lifecycle_simulation_tasks")
-                        .update({"status": "queued", "error_message": None})
-                        .eq("task_id", task_id)
-                        .execute()
-                    )
+                    # Re-queue for the queue processor to resume from checkpoint
+                    client.table("lifecycle_simulation_tasks").update({"status": "queued", "error_message": None}).eq(
+                        "task_id", task_id
+                    ).execute()
 
-                    # Extract checkpoint details for logging
-                    simulated_time = state_snapshot.get("simulated_time", "unknown")
                     days_simulated = state_snapshot.get("days_simulated", 0)
-
-                    _logger.info(
-                        f"✅ Queued recovery for task {task_id}: day {days_simulated}/365, time {simulated_time}"
-                    )
-
+                    simulated_time = state_snapshot.get("simulated_time", "unknown")
+                    _logger.info(f"Queued recovery for task {task_id}: day {days_simulated}/365, time {simulated_time}")
                 except Exception as e:
-                    _logger.error(f"❌ Failed to queue recovery for task {task_id}: {e}")
+                    _logger.error(f"Failed to queue recovery for task {task_id}: {e}")
 
         except Exception as e:
             _logger.error(f"Crash recovery initialization failed: {e}")
@@ -368,20 +383,18 @@ async def startup_event(app: FastAPI) -> None:
         except Exception as e:
             _logger.error(f"⚠️ Failed to deactivate simulations on startup: {e}")
 
-    # Run deactivation on startup
+    # Run crash recovery on startup (replaces old deactivate_all_simulations)
+    # Re-queues simulations that have valid checkpoints, fails those without
     if not testing_mode:
         try:
-            await deactivate_all_simulations()
+            await recover_crashed_simulations()
         except Exception as e:
-            _logger.error(f"Error during simulation deactivation: {e}")
-
-    # Run crash recovery on startup - DISABLED to prevent auto-start of simulations
-    # if not testing_mode:
-    #     import asyncio
-    #     try:
-    #         await recover_crashed_simulations()
-    #     except Exception as e:
-    #         _logger.error(f"Error during crash recovery: {e}")
+            _logger.error(f"Error during crash recovery: {e}")
+            # Fallback: deactivate everything if recovery itself fails
+            try:
+                await deactivate_all_simulations()
+            except Exception as e2:
+                _logger.error(f"Fallback deactivation also failed: {e2}")
 
     # Start simulation queue processor job - Phase 094 ENABLED
     # Phase 083: Process queued lifecycle simulations from database
@@ -491,6 +504,23 @@ async def shutdown_event(app: FastAPI) -> None:
     sentry_auth = get_sentry_auth_service()
     if sentry_auth:
         await sentry_auth.stop_background_refresh()
+
+    # Save checkpoints for all active simulations before stopping
+    try:
+        from app.services.simulation_orchestrator import get_all_active_simulations
+
+        active_sims = get_all_active_simulations()
+        if active_sims:
+            _logger.info(f"Saving checkpoints for {len(active_sims)} active simulation(s)...")
+            for task_id, orchestrator in active_sims.items():
+                try:
+                    if orchestrator.running:
+                        await orchestrator.save_checkpoint()
+                        _logger.info(f"Checkpoint saved for task {task_id} (day {orchestrator.days_simulated})")
+                except Exception as cp_err:
+                    _logger.error(f"Failed to save checkpoint for {task_id}: {cp_err}")
+    except Exception as e:
+        _logger.error(f"Error saving simulation checkpoints on shutdown: {e}")
 
     scheduler_service.stop()
     await health_simulation_service.stop()

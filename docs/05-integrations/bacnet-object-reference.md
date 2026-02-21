@@ -15,7 +15,7 @@ estimated_read_time: 35
 
 # BACnet Object Type Reference & SENTINEL Taxonomy Mapping
 
-Complete mapping of BACnet standard object types to SENTINEL equipment taxonomy. Used by Clawd Bot to classify discovered points and determine which equipment types can be monitored.
+Complete mapping of BACnet standard object types to SENTINEL equipment taxonomy. Used by Sentry Bot to classify discovered points and determine which equipment types can be monitored.
 
 ---
 
@@ -288,9 +288,9 @@ Signature 3: Response to Load Change
 └─ FLC: Gradual correction (±0.2°C), 2-min settle time
 ```
 
-### Clawd Bot Analysis Algorithm
+### Sentry Bot Analysis Algorithm
 ```python
-# Pseudocode for Clawd Bot FLC detection
+# Pseudocode for Sentry Bot FLC detection
 
 def detect_controller_type(trend_data):
     """
@@ -355,7 +355,7 @@ Priority Array:       0-16 levels for control precedence
 
 ### SENTINEL Required Properties
 
-For Clawd Bot to generate accurate recommendations:
+For Sentry Bot to generate accurate recommendations:
 
 ```
 sensor_accuracy:      ±0.5°C (for temperature points)
@@ -462,7 +462,7 @@ BACnet Discovery Flow:
         │  points: [{name, type, units}]} │
         └──────────────────────────────────┘
 
-Result: Equipment points ready for Clawd Bot analysis
+Result: Equipment points ready for Sentry Bot analysis
 ```
 
 ---

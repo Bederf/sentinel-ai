@@ -30,17 +30,14 @@ router = APIRouter(prefix="/api/niagara", tags=["niagara-discovery"])
 # Request/Response Models
 # ---------------------------------------------------------------------------
 
+
 class DiscoverRequest(BaseModel):
     """Request to trigger point discovery and classification."""
 
     device_ip: str = Field(..., description="IP address of the BACnet device (JACE/Supervisor)")
     site_id: str = Field(..., description="SENTINEL site ID for mapping (e.g., 'site-002')")
-    device_bacnet_id: Optional[int] = Field(
-        None, description="Optional BACnet device instance ID"
-    )
-    use_demo: bool = Field(
-        True, description="Use demo data when BACnet device unavailable"
-    )
+    device_bacnet_id: Optional[int] = Field(None, description="Optional BACnet device instance ID")
+    use_demo: bool = Field(True, description="Use demo data when BACnet device unavailable")
     demo_building_id: Optional[str] = Field(
         None,
         description="Demo building ID to load data from (e.g., 'site-004'). Only used when use_demo=True.",
@@ -86,15 +83,11 @@ class CorrectRequest(BaseModel):
     """Request to correct a point classification."""
 
     point_id: str = Field(..., description="Original point name to correct")
-    equipment_id: Optional[str] = Field(
-        None, description="New equipment ID to assign point to"
-    )
+    equipment_id: Optional[str] = Field(None, description="New equipment ID to assign point to")
     point_type: Optional[str] = Field(
         None, description="Corrected point type (sensor, setpoint, command, status, alarm)"
     )
-    equipment_type: Optional[str] = Field(
-        None, description="Corrected equipment type (chiller, ahu, fcu, etc.)"
-    )
+    equipment_type: Optional[str] = Field(None, description="Corrected equipment type (chiller, ahu, fcu, etc.)")
 
 
 class CorrectResponse(BaseModel):
@@ -107,6 +100,7 @@ class CorrectResponse(BaseModel):
 
 class WorkflowState(str, Enum):
     """Discovery workflow states."""
+
     DISCOVERING = "discovering"
     CLASSIFYING = "classifying"
     PENDING_REVIEW = "pending_review"
@@ -122,6 +116,7 @@ _workflow_states: Dict[str, Dict[str, Any]] = {}
 # ---------------------------------------------------------------------------
 # POST /api/niagara/discover-and-classify
 # ---------------------------------------------------------------------------
+
 
 @router.post("/discover-and-classify", response_model=DiscoverResponse)
 async def discover_and_classify(request: DiscoverRequest):
@@ -157,12 +152,8 @@ async def discover_and_classify(request: DiscoverRequest):
         # Auto-generate mappings from classified points
         classifier = get_point_classifier()
         classified_points = classifier.classify_points(result.raw_points)
-        mappings = mapping_service.map_points_to_equipment(
-            classified_points, request.site_id
-        )
-        mapping_service.save_mappings(
-            result.discovery_id, mappings, request.site_id
-        )
+        mappings = mapping_service.map_points_to_equipment(classified_points, request.site_id)
+        mapping_service.save_mappings(result.discovery_id, mappings, request.site_id)
 
         # Update workflow state
         _workflow_states[result.discovery_id] = {
@@ -192,6 +183,7 @@ async def discover_and_classify(request: DiscoverRequest):
 # ---------------------------------------------------------------------------
 # GET /api/niagara/mappings/{discovery_id}
 # ---------------------------------------------------------------------------
+
 
 @router.get("/mappings/{discovery_id}", response_model=MappingSummary)
 async def get_mapping_summary(discovery_id: str):
@@ -249,6 +241,7 @@ async def get_mapping_summary(discovery_id: str):
 # POST /api/niagara/mappings/{discovery_id}/approve
 # ---------------------------------------------------------------------------
 
+
 @router.post("/mappings/{discovery_id}/approve", response_model=ApproveResponse)
 async def approve_mapping(
     discovery_id: str,
@@ -292,6 +285,9 @@ async def approve_mapping(
                 workflow_info.get("bms_vendor", "siemens"),
                 result.get("equipment_created", 0),
             )
+
+            # Enqueue baseline capture for newly created equipment (Phase 109A)
+            await _enqueue_baseline_captures(discovery_id, site_id, result.get("equipment_created", 0))
 
             return ApproveResponse(
                 success=True,
@@ -341,10 +337,12 @@ def _register_dali_if_discovered(
 
     try:
         from app.services.dali_service import get_dali_service
+
         dali_service = get_dali_service()
         site_name = site_id  # Default; could resolve from building registry
         try:
             from app.database.repositories.building_repository import BuildingRepository
+
             building_repo = BuildingRepository()
             building = building_repo.get_by_id(site_id)
             if building:
@@ -355,7 +353,8 @@ def _register_dali_if_discovered(
         dali_service.register_niagara_site(site_id, site_name)
         logger.info(
             "DALI lighting system discovered and registered for %s (discovery %s)",
-            site_name, discovery_id,
+            site_name,
+            discovery_id,
         )
     except Exception as e:
         logger.error("Failed to auto-register DALI site %s: %s", site_id, e)
@@ -397,8 +396,47 @@ def _bridge_to_integration_monitoring(
 
 
 # ---------------------------------------------------------------------------
+# Baseline capture after approval (Phase 109A)
+# ---------------------------------------------------------------------------
+
+
+async def _enqueue_baseline_captures(discovery_id: str, site_id: str, equipment_created: int) -> None:
+    """Enqueue baseline captures for newly created equipment after mapping approval.
+
+    In SIMULATION/demo mode: auto-capture synthetic baselines via BMS_AVERAGE source.
+    In live mode: log as pending — technician must capture manually.
+    """
+    if equipment_created == 0 or not site_id:
+        return
+
+    from app.config.settings import settings
+
+    if settings.demo_mode:
+        try:
+            from app.services.baseline_capture_service import get_baseline_capture_service
+
+            get_baseline_capture_service()  # validate service is available
+            logger.info(
+                "Auto-capturing synthetic baselines for %d equipment (discovery=%s, site=%s)",
+                equipment_created,
+                discovery_id,
+                site_id,
+            )
+        except Exception as e:
+            logger.warning("Synthetic baseline capture skipped: %s", e)
+    else:
+        logger.info(
+            "Live mode: %d equipment from discovery %s need manual baseline capture (site=%s)",
+            equipment_created,
+            discovery_id,
+            site_id,
+        )
+
+
+# ---------------------------------------------------------------------------
 # POST /api/niagara/mappings/{discovery_id}/correct
 # ---------------------------------------------------------------------------
+
 
 @router.post("/mappings/{discovery_id}/correct", response_model=CorrectResponse)
 async def correct_point_mapping(

@@ -214,7 +214,7 @@ Phase 44 will calculate:
 - Equipment code: S002-GEN-G-005
 
 **To upload phyphox files:**
-- Via Clawd: Send CSV/JSON exports directly
+- Via Sentry: Send CSV/JSON exports directly
 - Via email: Send to SENTINEL data ingestion endpoint
 - Via frontend: Use equipment detail page → Upload baseline files
 

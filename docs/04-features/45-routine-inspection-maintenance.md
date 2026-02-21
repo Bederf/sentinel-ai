@@ -744,7 +744,7 @@ POST /api/inspection/export-to-cmms
 }
 ```
 
-### Clawd Bot Notifications
+### Sentry Bot Notifications
 
 Technician can trigger notifications:
 

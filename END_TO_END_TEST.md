@@ -230,10 +230,10 @@ Temperature reading: 32°C (HIGH)
 
 ✅ **Key**: Command `/inspect_S002_CHILLER_B1_001` must be present
 
-#### 4.2 If Clawd Configured
+#### 4.2 If Sentry Configured
 ```bash
-# Check Clawd logs for alert sent
-tail -f /var/log/clawd/clawd.log | grep "S002-CHILLER"
+# Check Sentry logs for alert sent
+tail -f /var/log/sentry/sentry.log | grep "S002-CHILLER"
 # Should show: "Message sent to FM team"
 ```
 

@@ -59,7 +59,7 @@ graph TB
 
     subgraph Actions
         Dashboard[Dashboard Alerts]
-        Clawd[Clawd Bot Notifications]
+        Sentry[Sentry Bot Notifications]
         WorkOrders[Auto Work Orders]
         Email[Email Reports]
     end
@@ -81,7 +81,7 @@ graph TB
     Optimize --> Recommend
 
     Recommend --> Dashboard
-    Recommend --> Clawd
+    Recommend --> Sentry
     Recommend --> WorkOrders
     Recommend --> Email
 ```
@@ -473,11 +473,11 @@ AI Confidence: 91%
 
 ### 8:00 AM - Morning Brief
 1. AI analyzes overnight activity
-2. Generates morning report via Clawd bot
+2. Generates morning report via Sentry bot
 3. Lists overnight recommendations (if any)
 4. Provides equipment status summary
 
-**Example Clawd Message:**
+**Example Sentry Message:**
 ```
 🤖 SENTINEL Morning Brief - Sandton Tower
 
@@ -541,7 +541,7 @@ AI generates daily report including:
 
 ## Integration Points
 
-### Clawd Telegram Bot Integration
+### Sentry Telegram Bot Integration
 
 AI sends real-time alerts to facility managers:
 

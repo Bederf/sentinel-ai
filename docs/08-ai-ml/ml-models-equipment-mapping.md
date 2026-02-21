@@ -671,9 +671,9 @@ When oil_pressure declining trend:
 
 ---
 
-## Clawd Bot Integration: Model Selection Algorithm
+## Sentry Bot Integration: Model Selection Algorithm
 
-When Clawd Bot discovers new equipment, it selects appropriate models:
+When Sentry Bot discovers new equipment, it selects appropriate models:
 
 ```python
 def select_models_for_equipment(equipment_type, manufacturer, model):

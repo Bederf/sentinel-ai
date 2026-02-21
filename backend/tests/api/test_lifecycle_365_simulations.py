@@ -31,7 +31,7 @@ class MockEvent:
         self.timestamp = datetime.now()
         self.event_type = Mock(value=event_dict.get("event_type", "unknown"))
         self.equipment_id = event_dict.get("equipment_id", "mock-equipment")
-        self.message = event_dict.get("description", "")
+        self.description = event_dict.get("description", "")
         self.simulated_hour = event_dict.get("simulated_hour", 0)
         self.details = event_dict.get("details", {})
 
@@ -195,6 +195,12 @@ def mock_supabase_for_lifecycle():
     mock_orchestrator.events = [MockEvent(event) for event in daily_events]  # Convert to MockEvent objects
     mock_orchestrator.active_faults = {}
     mock_orchestrator.pending_repairs = {}
+    # Speed control attributes required by SimulationStatusResponse
+    mock_orchestrator.speed_multiplier = 60.0
+    mock_orchestrator.seconds_per_simulated_hour = 60.0
+    # Prevent Mock auto-chaining from producing invalid Pydantic values
+    mock_orchestrator.building_schedule = None
+    mock_orchestrator._get_sentinel_status = lambda: {"tier1_auto": 0, "tier2_logged": 0, "tier3_escalated": 0}
 
     # Mock the scenario
     mock_scenario = Mock()
@@ -352,7 +358,7 @@ class TestHourlyEventProcessing:
         task_id = response.json()["task_id"]
 
         # Wait for simulation to complete
-        await asyncio.sleep(32)
+        await asyncio.sleep(2)
 
         # Get full event timeline
         status_response = await async_client.get(f"/api/lifecycle/status/{task_id}")
@@ -385,7 +391,7 @@ class TestHourlyEventProcessing:
         assert response.status_code == 200
         task_id = response.json()["task_id"]
 
-        await asyncio.sleep(32)
+        await asyncio.sleep(2)
 
         status_response = await async_client.get(f"/api/lifecycle/status/{task_id}")
         assert status_response.status_code == 200
@@ -432,7 +438,7 @@ class TestSeasonalVariations:
         assert response.status_code == 200
         task_id = response.json()["task_id"]
 
-        await asyncio.sleep(32)
+        await asyncio.sleep(2)
 
         # Poll status to get weather data
         status_response = await async_client.get(f"/api/lifecycle/status/{task_id}")
@@ -460,7 +466,7 @@ class TestSeasonalVariations:
         assert response.status_code == 200
         task_id = response.json()["task_id"]
 
-        await asyncio.sleep(32)
+        await asyncio.sleep(2)
 
         status_response = await async_client.get(f"/api/lifecycle/status/{task_id}")
         assert status_response.status_code == 200
@@ -499,7 +505,7 @@ class TestSeasonalVariations:
         assert response.status_code == 200
         task_id = response.json()["task_id"]
 
-        await asyncio.sleep(32)
+        await asyncio.sleep(2)
 
         status_response = await async_client.get(f"/api/lifecycle/status/{task_id}")
         assert status_response.status_code == 200
@@ -545,7 +551,7 @@ class TestAIRecommendations:
         assert response.status_code == 200
         task_id = response.json()["task_id"]
 
-        await asyncio.sleep(32)
+        await asyncio.sleep(2)
 
         status_response = await async_client.get(f"/api/lifecycle/status/{task_id}")
         assert status_response.status_code == 200
@@ -585,7 +591,7 @@ class TestAIRecommendations:
         assert response.status_code == 200
         task_id = response.json()["task_id"]
 
-        await asyncio.sleep(32)
+        await asyncio.sleep(2)
 
         status_response = await async_client.get(f"/api/lifecycle/status/{task_id}")
         assert status_response.status_code == 200
@@ -603,9 +609,9 @@ class TestAIRecommendations:
         details = first_event.get("details", {})
 
         # Check for recommendation structure
-        assert "recommendations" in details or "confidence" in details, (
-            f"Missing recommendation data in event: {details}"
-        )
+        assert (
+            "recommendations" in details or "confidence" in details
+        ), f"Missing recommendation data in event: {details}"
 
     @pytest.mark.asyncio
     async def test_daily_recommendation_count(self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]):
@@ -622,7 +628,7 @@ class TestAIRecommendations:
         assert response.status_code == 200
         task_id = response.json()["task_id"]
 
-        await asyncio.sleep(32)
+        await asyncio.sleep(2)
 
         status_response = await async_client.get(f"/api/lifecycle/status/{task_id}")
         assert status_response.status_code == 200
@@ -638,9 +644,9 @@ class TestAIRecommendations:
         if days_elapsed > 0:
             avg_recommendations_per_day = optimization_event_count / days_elapsed
             # Allow some variance (2.5-3.5 recommendations per day)
-            assert 2.5 <= avg_recommendations_per_day <= 3.5, (
-                f"Expected ~3 recommendations/day, got {avg_recommendations_per_day:.2f}"
-            )
+            assert (
+                2.5 <= avg_recommendations_per_day <= 3.5
+            ), f"Expected ~3 recommendations/day, got {avg_recommendations_per_day:.2f}"
 
 
 # ============================================================================
@@ -669,7 +675,7 @@ class TestCheckpointRecovery:
         assert response.status_code == 200
         task_id = response.json()["task_id"]
 
-        await asyncio.sleep(32)
+        await asyncio.sleep(2)
 
         status_response = await async_client.get(f"/api/lifecycle/status/{task_id}")
         assert status_response.status_code == 200
@@ -683,9 +689,9 @@ class TestCheckpointRecovery:
         if days_elapsed > 0:
             expected_checkpoints = int(days_elapsed * 4)
             # Allow some variance
-            assert checkpoint_count >= expected_checkpoints * 0.8, (
-                f"Expected ~{expected_checkpoints} checkpoints, got {checkpoint_count}"
-            )
+            assert (
+                checkpoint_count >= expected_checkpoints * 0.8
+            ), f"Expected ~{expected_checkpoints} checkpoints, got {checkpoint_count}"
 
     @pytest.mark.asyncio
     async def test_pause_resume_preserves_state(self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]):
@@ -759,7 +765,7 @@ class TestProgressTracking:
 
         # Check progress multiple times
         for _ in range(5):
-            await asyncio.sleep(6)
+            await asyncio.sleep(1)
 
             status_response = await async_client.get(f"/api/lifecycle/status/{task_id}")
             assert status_response.status_code == 200
@@ -791,7 +797,7 @@ class TestProgressTracking:
         task_id = response.json()["task_id"]
 
         # Wait for simulation to complete
-        await asyncio.sleep(32)
+        await asyncio.sleep(2)
 
         status_response = await async_client.get(f"/api/lifecycle/status/{task_id}")
         assert status_response.status_code == 200
@@ -831,7 +837,7 @@ class TestGrantHVACAIScenario:
         assert response.status_code == 200
         task_id = response.json()["task_id"]
 
-        await asyncio.sleep(32)
+        await asyncio.sleep(2)
 
         status_response = await async_client.get(f"/api/lifecycle/status/{task_id}")
         assert status_response.status_code == 200
@@ -865,7 +871,7 @@ class TestGrantHVACAIScenario:
         assert response.status_code == 200
         task_id = response.json()["task_id"]
 
-        await asyncio.sleep(32)
+        await asyncio.sleep(2)
 
         status_response = await async_client.get(f"/api/lifecycle/status/{task_id}")
         assert status_response.status_code == 200
@@ -904,7 +910,7 @@ class TestGrantSolarBESSScenario:
         assert response.status_code == 200
         task_id = response.json()["task_id"]
 
-        await asyncio.sleep(32)
+        await asyncio.sleep(2)
 
         status_response = await async_client.get(f"/api/lifecycle/status/{task_id}")
         assert status_response.status_code == 200
@@ -956,7 +962,7 @@ class TestSimulationStress:
         task_id = response.json()["task_id"]
 
         # Wait for completion
-        await asyncio.sleep(32)
+        await asyncio.sleep(2)
 
         elapsed = time.time() - start_time
 
@@ -1003,7 +1009,7 @@ class TestSimulationStress:
         solar_task_id = solar_response.json()["task_id"]
 
         # Wait for both to complete
-        await asyncio.sleep(12)
+        await asyncio.sleep(2)
 
         # Both should have made progress
         hvac_status = await async_client.get(f"/api/lifecycle/status/{hvac_task_id}")
@@ -1058,9 +1064,10 @@ class TestSimulationErrorHandling:
         )
 
         # FastAPI returns 422 for validation errors (not 400)
-        assert response.status_code in (400, 422), (
-            f"Expected 400/422 for invalid start hour, got {response.status_code}"
-        )
+        assert response.status_code in (
+            400,
+            422,
+        ), f"Expected 400/422 for invalid start hour, got {response.status_code}"
 
     @pytest.mark.asyncio
     async def test_status_for_nonexistent_task(self, async_client: AsyncClient):

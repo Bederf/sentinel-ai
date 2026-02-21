@@ -12,6 +12,67 @@ SENTINEL's SIMBIOT device abstraction layer autodetects **~60% of BMS integratio
 
 ---
 
+## Site-002 deterministic stage gates (Phase 109C dry-run)
+
+Site-002 onboarding now includes deterministic stage evaluation with explicit promotion and demotion thresholds:
+
+`commissioning -> shadow_live -> supervised -> automatic`
+
+Important: this phase is currently **dry-run only**. It logs `would_promote` and `would_demote` decisions without executing control changes.
+
+### Promotion and demotion criteria
+
+| Transition | Minimum dwell | Promotion criteria | Demotion criteria |
+|-----------|---|---|---|
+| `commissioning -> shadow_live` | 0h | all commissioning gates pass, truth check present, consecutive pass days >= 2 | n/a |
+| `shadow_live -> supervised` | 12h | freshness <= 2h, match coverage >= 95%, error rate <= 1%, no file/manual sources, quality gate pass/warn | demote to `commissioning` after 2h sustained violation of shadow exit thresholds |
+| `supervised -> automatic` | 24h | freshness <= 0.5h, match coverage >= 98%, error rate <= 0.5%, conflicts 24h = 0, no file/manual sources, quality gate pass | demote to `shadow_live` after 1h sustained violation of supervised exit thresholds |
+
+### Automatic stage fail-closed
+
+When in `automatic`, any fail of freshness, coverage, provenance, conflict, or quality-gate thresholds triggers immediate dry-run outcome:
+
+- Decision: `would_fail_closed_demote`
+- Target stage: `supervised`
+- Write action: `stop_writes`
+
+### Anti-flap rule
+
+After any demotion, promotion is blocked for 24 hours (`repromotion_stability_hours = 24`).
+
+---
+
+## Site-002 guided inspection policy (major equipment only)
+
+Guided inspection generation is intentionally scoped to major plant first. This reduces onboarding risk and avoids over-instrumenting low-impact endpoints.
+
+### Tier policy
+
+| Tier | Included in full guided inspection | Rule |
+|---|---|---|
+| Tier A | Yes | `type` in `CHILLER, CHWP, CWP, CT, BOILER, AHU, GEN, UPS, ATS, MSB, INCOMER` |
+| Tier B | Conditional | `type` in `FCU, VAV, DALI_CONTROLLER, METER` and (`health_score <= 70` or `>= 2` warning/critical transitions in 30 days) |
+| Tier C | No | All other endpoints/sensors/luminaires/low-impact assets |
+
+### Overrides
+
+- Force include: life-safety assets, backup power chain, whole-floor comfort assets, or any `criticality=high` asset.
+- Force exclude: telemetry-only/virtual/software-only points and single endpoint sensors/luminaires.
+
+### Site-002 default Tier A prefixes
+
+- `S002-CHILLER-`, `S002-CHWP-`, `S002-CWP-`, `S002-CT-`, `S002-BOILER-`
+- `S002-AHU-`, `S002-GEN-`, `S002-UPS-`, `S002-ATS-`, `S002-MSB-`, `S002-INCOMER-`
+
+### Onboarding acceptance criteria for this policy
+
+- 100% of Tier A assets are present in Supabase equipment inventory.
+- Tier A assets have discovered technical identity populated: `manufacturer` and `model`.
+- Tier A work orders generate guided inspection instructions and technician evidence prompts.
+- Tier B/C assets do not block commissioning if guided inspection metadata is incomplete.
+
+---
+
 ## Scorecard: Automation vs. Consultant Input
 
 | Category | Item | Auto-Detected | Consultant Input | Effort | Notes |
@@ -443,10 +504,11 @@ Account Manager: ________________    Date: ________________
 - **Troubleshooting**: `docs/05-integrations/simbiot-troubleshooting.md`
 - **Equipment Naming v2.0**: `docs/02-architecture/naming-conventions.md`
 - **Digital Twin Feature**: `docs/04-features/DIGITAL_TWIN_REAL_DATA_INTEGRATION.md`
+- **Deterministic Stage Policy (Site-002)**: `docs/04-features/109C-site-002-mode-policy-dry-run.md`
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** 2026-02-10  
+**Document Version:** 1.1  
+**Last Updated:** 2026-02-21  
 **Audience:** BMS Consultants, Facility Managers, Sales Team  
 **Status:** Ready for Production Use

@@ -321,7 +321,7 @@ Five SENTINEL-specific alerting rules are provisioned in Grafana via `/opt/aimth
 
 **Notification channels:**
 - Grafana built-in alerting log (default)
-- Extensible to: Email, Webhook, Telegram (Clawd bot integration)
+- Extensible to: Email, Webhook, Telegram (Sentry bot integration)
 
 ## Daily Security Log Review Procedure
 

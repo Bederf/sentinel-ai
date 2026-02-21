@@ -22,7 +22,7 @@ Phase 59 delivers remote building operations capabilities: monitoring, command e
 ```
                     +-------------------+
                     |   Telegram/WhatsApp|
-                    |   Bot (Clawd)     |
+                    |   Bot (Sentry)     |
                     +--------+----------+
                              |
                     +--------v----------+

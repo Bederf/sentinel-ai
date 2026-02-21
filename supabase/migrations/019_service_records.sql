@@ -1,6 +1,6 @@
 -- =====================================================
 -- Migration 019: Service Records Schema
--- For ML engineer knowledge capture via Clawd bot
+-- For ML engineer knowledge capture via Sentry bot
 -- =====================================================
 
 -- Service records (one per service visit)

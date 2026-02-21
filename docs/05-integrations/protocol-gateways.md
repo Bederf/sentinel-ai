@@ -193,7 +193,7 @@ CoolMaster BACnet Configuration:
   COV Subscribe: Yes (enabled by default)
   Historical Logging: 7 days (optional upgrade)
 
-Data Point Mapping (for Clawd Bot):
+Data Point Mapping (for Sentry Bot):
   Map outdoor unit capacity to SENTINEL "compressor_output_pct"
   Map zone setpoint to SENTINEL "space_temp_setpoint"
   Map zone actual temp to SENTINEL "space_temp_actual"
@@ -378,15 +378,15 @@ Budget considerations:
 3. Gateway exposes BACnet/Modbus to SENTINEL
 4. SIMBIOT discovery scans gateway (as if gateway = controller)
 5. SENTINEL imports all points from gateway
-6. Clawd Bot analyzes trend data to detect control algorithm type
+6. Sentry Bot analyzes trend data to detect control algorithm type
 7. Recommendations generated based on equipment type
 ```
 
-### Clawd Bot Integration Template
+### Sentry Bot Integration Template
 When a client has a proprietary protocol:
 
 ```
-Clawd Bot Response:
+Sentry Bot Response:
 "I detected your [Mitsubishi VRF / CAREL chiller / KNX lighting]
 system on the network. These use a proprietary protocol that SENTINEL
 doesn't directly support. I recommend a [CoolMaster / IntesisBox]

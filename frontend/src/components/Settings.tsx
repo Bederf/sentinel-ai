@@ -11,6 +11,7 @@ import { NotificationChannelsSettings } from "./NotificationChannelsSettings";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { useModules } from "../contexts/ModuleHooks";
 import type { ModuleType } from "../lib/moduleRegistry";
+import { MANDATORY_MODULES } from "../lib/mandatoryModules";
 
 interface SettingsProps {
   onError?: (error: string) => void;
@@ -24,16 +25,23 @@ interface FeatureToggleCard {
   note?: string;
 }
 
-const BASE_PACK_LOCKED_MODULES: ModuleType[] = ["hvac", "energy"];
+const BASE_PACK_LOCKED_MODULES: ModuleType[] = MANDATORY_MODULES;
 
 const FEATURE_TOGGLE_CARDS: FeatureToggleCard[] = [
+  { id: "kpi-dashboard", label: "KPI Dashboard", moduleType: "kpi", description: "Portfolio and site KPI scorecards.", note: "Base pack module (always on)" },
+  { id: "hvac-monitoring", label: "HVAC Monitoring", moduleType: "hvac", description: "HVAC telemetry, comfort analytics, and equipment status.", note: "Base pack module (always on)" },
+  { id: "integration-health", label: "Integration Health", moduleType: "integrations", description: "Data quality, ingestion status, and integration diagnostics.", note: "Base pack module (always on)" },
   { id: "building-controls", label: "Building Controls", moduleType: "control", description: "Core control dashboard and automation orchestration." },
   { id: "ai-recommendations", label: "AI Recommendations", moduleType: "energy", description: "Core AI recommendation feed used across base dashboards.", note: "Base pack module (linked to Energy Centre)" },
   { id: "asset-workflow", label: "Asset Workflow", moduleType: "assets", description: "Lifecycle, maintenance workflows, and asset tracking." },
   { id: "simbiot", label: "SIMBIOT", moduleType: "simbiot", description: "Integration setup and onboarding tools, including Solar setup flow." },
   { id: "tech-chat", label: "Tech Chat", moduleType: "notifications", description: "Technician chat workflows and messaging-assisted diagnostics." },
+  { id: "maintenance", label: "Maintenance", moduleType: "maintenance", description: "Preventive schedules, work orders, and service execution tracking." },
+  { id: "digital-twin", label: "Digital Twin", moduleType: "digital_twin", description: "3D/2D spatial context for assets and telemetry overlays." },
   { id: "loadshedding", label: "Loadshedding", moduleType: "solar", description: "Loadshedding planning and response workflows.", note: "Linked to Solar & BESS module" },
   { id: "occupancy", label: "Occupancy", moduleType: "lighting", description: "Occupancy and lighting behavior controls." },
+  { id: "fire-safety", label: "Fire Safety", moduleType: "fire", description: "Fire alarm and life-safety status monitoring." },
+  { id: "access-control", label: "Access Control", moduleType: "access", description: "Door events, badge activity, and access anomaly views." },
   { id: "security", label: "Security", moduleType: "security", description: "Access and security monitoring pages." },
   { id: "solar-bess", label: "Solar & BESS", moduleType: "solar", description: "Solar PV and battery storage monitoring." },
   { id: "water", label: "Water", moduleType: "water", description: "Water usage analytics and anomaly monitoring." },
@@ -401,13 +409,13 @@ export function Settings({ onError }: SettingsProps) {
                       </div>
                       <button
                         onClick={() => void handleFeatureToggle(card)}
-                        disabled={loadingCard || locked || !canManageFeatureAccess}
+                        disabled={loadingCard || locked || (!canManageFeatureAccess && !(isDemoUser && settingsPageUnlocked))}
                         className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
                         style={{
                           background: active ? "var(--color-sentinel-green)" : "var(--color-sentinel-bg-hover)",
                           border: `1px solid ${active ? "var(--color-sentinel-green)" : "var(--glass-border)"}`,
-                          cursor: loadingCard || locked || !canManageFeatureAccess ? "not-allowed" : "pointer",
-                          opacity: loadingCard || locked || !canManageFeatureAccess ? 0.6 : 1,
+                          cursor: loadingCard || locked || (!canManageFeatureAccess && !(isDemoUser && settingsPageUnlocked)) ? "not-allowed" : "pointer",
+                          opacity: loadingCard || locked || (!canManageFeatureAccess && !(isDemoUser && settingsPageUnlocked)) ? 0.6 : 1,
                         }}
                         aria-label={`Toggle ${card.label}`}
                         type="button"
@@ -432,9 +440,11 @@ export function Settings({ onError }: SettingsProps) {
               <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 Solar Setup is managed in the SIMBIOT flow. Module management is handled on this Settings page.
               </p>
-              {!canManageFeatureAccess && (
+              {!canManageFeatureAccess && !(isDemoUser && settingsPageUnlocked) && (
                 <p className="text-xs mt-2" style={{ color: "var(--color-sentinel-amber)" }}>
-                  You have read-only access. Contact an administrator to request module changes.
+                  {isDemoUser
+                    ? "Unlock settings at the top of the page to toggle modules."
+                    : "You have read-only access. Contact an administrator to request module changes."}
                 </p>
               )}
             </div>
@@ -755,9 +765,8 @@ function NotificationSettingsPanel({
     }
   })();
 
-  // Extract technician ID from local storage (for now, use email as ID)
-  // In production, this would come from user context
-  const technicianId = currentUserEmail.split("@")[0] || "technician";
+  // Pass email — backend resolves to technician UUID via email lookup
+  const technicianId = currentUserEmail || "technician";
 
   return (
     <div className="glass-panel overflow-hidden">

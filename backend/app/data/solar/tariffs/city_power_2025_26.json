@@ -1,0 +1,102 @@
+{
+  "utility": "City Power Johannesburg",
+  "tariff_name": "LPU-TOU (Large Power User - Time of Use)",
+  "effective_date": "2025-07-01",
+  "expiry_date": "2026-06-30",
+  "currency": "ZAR",
+  "vat_rate_pct": 15,
+  "vat_inclusive": false,
+  "source": "Actual City Power invoice Dec 2025 (Account 557671650). Summer/low-demand rates verified. Winter/high-demand rates estimated using NERSA-approved TOU ratios — replace with actual winter bill when available.",
+  "sseg_feed_in": {
+    "rate_c_kwh": 78.5,
+    "max_export_kw": 946,
+    "nrs_097_required": true,
+    "category": "B",
+    "note": "SSEG feed-in rate to be confirmed with City Power SSEG application"
+  },
+  "energy_charge_c_kwh": {
+    "summer": {
+      "peak": 295.39,
+      "standard": 222.39,
+      "off_peak": 170.95,
+      "_verified": true,
+      "_source": "Invoice reading 2025/10/26-2025/11/25"
+    },
+    "winter": {
+      "peak": 827.09,
+      "standard": 289.11,
+      "off_peak": 188.05,
+      "_verified": false,
+      "_note": "Estimated: peak ×2.8, std ×1.3, off-peak ×1.1 from summer. Replace with actual winter bill."
+    }
+  },
+  "network_charge_c_kwh": {
+    "summer": {
+      "peak": 6.0,
+      "standard": 6.0,
+      "off_peak": 6.0
+    },
+    "winter": {
+      "peak": 6.0,
+      "standard": 6.0,
+      "off_peak": 6.0
+    },
+    "_note": "City Power applies a flat 6 c/kWh network surcharge to all kWh consumed regardless of TOU period."
+  },
+  "demand_charge_r_kva": {
+    "summer": 395.48,
+    "winter": 395.48,
+    "_note": "Verified from Dec 2025 bill. Winter rate may differ — update from actual winter bill."
+  },
+  "service_charge_r_month": 11658.08,
+  "reactive_energy_surcharge_c_kvarh": 42.43,
+  "time_bands": {
+    "summer": {
+      "months": [9, 10, 11, 12, 1, 2, 3, 4, 5],
+      "peak": [
+        {"start": "07:00", "end": "10:00"},
+        {"start": "18:00", "end": "20:00"}
+      ],
+      "standard": [
+        {"start": "06:00", "end": "07:00"},
+        {"start": "10:00", "end": "18:00"},
+        {"start": "20:00", "end": "22:00"}
+      ],
+      "off_peak": [
+        {"start": "22:00", "end": "06:00"}
+      ]
+    },
+    "winter": {
+      "months": [6, 7, 8],
+      "peak": [
+        {"start": "06:00", "end": "09:00"},
+        {"start": "17:00", "end": "19:00"}
+      ],
+      "standard": [
+        {"start": "09:00", "end": "17:00"},
+        {"start": "19:00", "end": "22:00"}
+      ],
+      "off_peak": [
+        {"start": "22:00", "end": "06:00"}
+      ]
+    }
+  },
+  "reference_bill": {
+    "account_number": "557671650",
+    "billing_period": "2025/12",
+    "reading_period": "2025/10/26 to 2025/11/25",
+    "days": 31,
+    "meter_number": "94965880",
+    "consumption_kwh": {
+      "peak": 148220.1,
+      "standard": 301567.4,
+      "off_peak": 318031.6,
+      "total": 767819.1
+    },
+    "reactive_kvarh": 233615.3,
+    "demand_kva": 2559.2,
+    "total_electricity_incl_vat": 3131892.80,
+    "daily_avg_kwh": 24768.359,
+    "_note": "Reference property bill (Fairland TS, 143,691 m²), NOT site-002. Site-002 is much smaller."
+  }
+}

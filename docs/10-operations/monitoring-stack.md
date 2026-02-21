@@ -71,6 +71,47 @@ docker logs promtail --tail 50
 docker logs grafana --tail 50
 ```
 
+## Application Policy Dry-Run Monitoring (Site-002)
+
+Phase 109C adds an application-level scheduler job that evaluates deterministic onboarding stage thresholds every 5 minutes.
+
+| Item | Value |
+|------|-------|
+| Scheduler job ID | `site_mode_policy_dry_run_site-002` |
+| Interval | 300 seconds |
+| Scope | Site-002 onboarding stages |
+| Mode | Dry-run only (no control enforcement) |
+| State file | `backend/app/data/policies/site-002-mode-policy-state.json` |
+| Policy file | `backend/app/data/policies/site-002-mode-policy.json` |
+
+### Expected startup log
+
+`✅ Site mode policy dry-run initialized for site-002`
+
+### Decision log patterns
+
+- `Site mode policy dry-run hold: ...`
+- `Site mode policy dry-run decision: site=site-002 decision=would_promote ...`
+- `Site mode policy dry-run decision: site=site-002 decision=would_demote ...`
+- `Site mode policy dry-run decision: site=site-002 decision=would_fail_closed_demote ... write_action=stop_writes`
+
+### Manual evaluator check
+
+```bash
+cd /opt/bms-intelligence/backend
+python3 - <<'PY'
+import asyncio
+from app.services.site_mode_policy_service import SiteModePolicyService
+
+async def main():
+    svc = SiteModePolicyService()
+    result = await svc.evaluate_site("site-002")
+    print(result["decision"], result["state_before"], "->", result["state_after"])
+
+asyncio.run(main())
+PY
+```
+
 ## Promtail Scrape Jobs
 
 The deployed Promtail config has these SENTINEL-specific scrape jobs:

@@ -438,7 +438,7 @@ Assigns to technician
 ```
 Technician completes work order
   ↓
-Submits service feedback (via Clawd)
+Submits service feedback (via Sentry)
   ↓
 Health score updated
   ↓

@@ -6,7 +6,7 @@ version: "1.0.0"
 created: "2026-02-10"
 updated: "2026-02-10"
 author: "SENTINEL Development Team"
-tags: ["rag", "documentation", "index", "flc", "integration", "clawd-bot"]
+tags: ["rag", "documentation", "index", "flc", "integration", "sentry-bot"]
 domain: "documentation"
 audience: ["developers", "integrators", "operations"]
 complexity: "beginner"
@@ -14,7 +14,7 @@ complexity: "beginner"
 
 # RAG Documentation Index: FLC/Controller Integration Advice
 
-This index documents all RAG (Retrieval-Augmented Generation) knowledge base resources available to Clawd Bot for providing controller integration guidance. These documents were created to support the FLC/Controller Integration Advice Templates.
+This index documents all RAG (Retrieval-Augmented Generation) knowledge base resources available to Sentry Bot for providing controller integration guidance. These documents were created to support the FLC/Controller Integration Advice Templates.
 
 ---
 
@@ -39,12 +39,12 @@ All documents are organized in `/docs/07-integrations/` and `/docs/08-ai-ml/` fo
 - Mitsubishi Electric / Toshiba VRF
 - CAREL Refrigeration Equipment FLC
 - Data point naming conventions
-- Integration flowchart for Clawd Bot
+- Integration flowchart for Sentry Bot
 
-**Usage by Clawd Bot:**
+**Usage by Sentry Bot:**
 ```
 Client: "What FLC controller do you recommend for my Siemens system?"
-Clawd Bot retrieves: Manufacturer Integration Guides
+Sentry Bot retrieves: Manufacturer Integration Guides
 Response: "Your existing Siemens infrastructure can be upgraded with..."
 ```
 
@@ -62,10 +62,10 @@ Response: "Your existing Siemens infrastructure can be upgraded with..."
 - Pricing and ROI by gateway type
 - Gateway selection flowchart for different scenarios
 
-**Usage by Clawd Bot:**
+**Usage by Sentry Bot:**
 ```
 Client: "My VRF system uses Mitsubishi's proprietary protocol. Can SENTINEL connect?"
-Clawd Bot retrieves: Protocol Gateways
+Sentry Bot retrieves: Protocol Gateways
 Response: "Yes, with a CoolAutomation gateway. Here's what's involved..."
 ```
 
@@ -81,16 +81,16 @@ Response: "Yes, with a CoolAutomation gateway. Here's what's involved..."
   - AHU: 10 control + monitoring points
   - FCU/VAV: 8 zone control points
 - FLC detection signature points (trend analysis)
-- Clawd Bot FLC detection algorithm (pseudocode)
+- Sentry Bot FLC detection algorithm (pseudocode)
 - BACnet property mapping and SENTINEL requirements
 - Modbus equivalent mapping (for gateway devices)
 - Standard point naming conventions
 - Common integration issues and solutions
 
-**Usage by Clawd Bot:**
+**Usage by Sentry Bot:**
 ```
 During equipment discovery:
-SIMBIOT discovers BACnet device → Clawd Bot consults this reference
+SIMBIOT discovers BACnet device → Sentry Bot consults this reference
 "AHU discovered with 7/10 required points. Missing: filter_pressure_delta, outdoor_air_percent"
 ```
 
@@ -113,10 +113,10 @@ SIMBIOT discovers BACnet device → Clawd Bot consults this reference
 - Quick reference decision tree
 - Recommended further reading and contacts
 
-**Usage by Clawd Bot:**
+**Usage by Sentry Bot:**
 ```
 Client: "Can you explain why FLC is better than PID for my chiller?"
-Clawd Bot retrieves: FLC Theory & Best Practices
+Sentry Bot retrieves: FLC Theory & Best Practices
 Response: "FLC adapts to your chiller's non-linear efficiency curve.
 Here's why: [technical explanation with comparison graphs]"
 ```
@@ -150,10 +150,10 @@ Here's why: [technical explanation with comparison graphs]"
 - **Facility manager recommendations:** When to migrate, vendor recommendations
 - **Financial justification templates** for board presentations
 
-**Usage by Clawd Bot:**
+**Usage by Sentry Bot:**
 ```
 Facility manager: "What's the ROI if we retrofit FLC for our chiller?"
-Clawd Bot retrieves: PID-to-FLC Migration Cases
+Sentry Bot retrieves: PID-to-FLC Migration Cases
 Response: "Similar buildings in Johannesburg saw 15% energy savings
 and 0.71-year payback. Your building's profile suggests [comparable figures]..."
 ```
@@ -178,9 +178,9 @@ and 0.71-year payback. Your building's profile suggests [comparable figures]..."
 - Autoencoder anomaly detection thresholds
 - Performance summary table (sensitivity, specificity)
 - Continuous improvement and retraining schedule
-- Model selection algorithm for Clawd Bot
+- Model selection algorithm for Sentry Bot
 
-**Usage by Clawd Bot:**
+**Usage by Sentry Bot:**
 ```
 After equipment discovery:
 "Based on your chiller type and operating data, I'm applying our
@@ -222,7 +222,7 @@ Vector dimensions: 384
 Embedding model: Sentence Transformers all-MiniLM-L6-v2
 Supported search: Semantic similarity (not keyword-based)
 
-Example queries Clawd Bot can now answer:
+Example queries Sentry Bot can now answer:
   - "What FLC brands work with Siemens controllers?"
   - "How do I integrate a Daikin VRF system?"
   - "What's the expected payback for FLC retrofit in South Africa?"
@@ -232,7 +232,7 @@ Example queries Clawd Bot can now answer:
 
 ---
 
-## Clawd Bot Template Usage
+## Sentry Bot Template Usage
 
 The FLC/Controller Integration Advice Templates (v1.0) now have complete RAG support:
 
@@ -262,7 +262,7 @@ Uses: Manufacturer Integration Guides + Fault Code Database
 
 ---
 
-## Search Examples for Clawd Bot
+## Search Examples for Sentry Bot
 
 ```
 Semantic Search Query          | Documents Retrieved
@@ -283,7 +283,7 @@ Semantic Search Query          | Documents Retrieved
 
 ```
                          ┌─────────────────────────┐
-                         │   Clawd Bot            │
+                         │   Sentry Bot            │
                          │ (Advice Templates v1.0)│
                          └────────────┬────────────┘
                                       │

@@ -1,6 +1,8 @@
 """Application settings and configuration."""
 
-from pydantic import ConfigDict, field_validator, Field
+from enum import StrEnum
+
+from pydantic import ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -12,6 +14,14 @@ def _parse_csv_list(value):
     if isinstance(value, str):
         return [item.strip() for item in value.split(",") if item.strip()]
     return value
+
+
+class IngestionMode(StrEnum):
+    """Authoritative ingestion data provenance mode."""
+
+    SIMULATION = "simulation"
+    SHADOW_LIVE = "shadow_live"
+    LIVE_CONTROL = "live_control"
 
 
 class Settings(BaseSettings):
@@ -46,12 +56,19 @@ class Settings(BaseSettings):
     claude_model: str = "claude-sonnet-4-20250514"
     claude_max_tokens: int = 4096
 
+    # ElevenLabs TTS (Voice Chat)
+    elevenlabs_api_key: str = ""
+    elevenlabs_voice_id: str = "21m00Tcm4TlvDq8ikWAM"  # Rachel
+    elevenlabs_model_id: str = "eleven_monolingual_v1"
+    elevenlabs_tts_enabled: bool = False
+
     # Environment (development, staging, production)
     environment: str = "development"
 
     # Demo mode for pre-seeded responses
     demo_mode: bool = False
     demo_allowed_origins: list[str] = []
+    ingestion_mode: str = "simulation"  # env: INGESTION_MODE
 
     # Encryption at rest (Phase 1b FSR Compliance - Cryptography)
     encryption_enabled: bool = True
@@ -155,6 +172,21 @@ class Settings(BaseSettings):
     optimization_tier2_min: float = 0.60  # Below this -> tier1_advisory, above -> tier2_approval
     optimization_tier3_min: float = 0.85  # Above this -> tier3_auto_execute
     optimization_fcu_confidence_cap: float = 0.45  # FCU actions capped at this confidence
+
+    @property
+    def resolved_ingestion_mode(self) -> IngestionMode:
+        """Resolve ingestion mode with DEMO override and safe fallback."""
+        if self.demo_mode:
+            return IngestionMode.SIMULATION
+        try:
+            return IngestionMode(self.ingestion_mode)
+        except ValueError:
+            return IngestionMode.SIMULATION
+
+    @property
+    def is_live_mode(self) -> bool:
+        """True when running in live-read modes."""
+        return self.resolved_ingestion_mode in (IngestionMode.SHADOW_LIVE, IngestionMode.LIVE_CONTROL)
 
     @property
     def recommendation_interval(self) -> int:

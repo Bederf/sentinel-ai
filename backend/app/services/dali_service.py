@@ -840,6 +840,7 @@ class DALIService:
                 zones_list.append(
                     {
                         "zone_id": zone_id,
+                        "source_type": "lighting_protocol",
                         "occupancy_percent": occupancy_pct,
                         "avg_brightness_level": avg_brightness,
                         "total_sensors": len(sensors),
@@ -855,6 +856,7 @@ class DALIService:
             return {
                 "site_id": site_id,
                 "data_source": "live",
+                "source_type": "lighting_protocol",
                 "timestamp": datetime.now().isoformat(),
                 "summary": {
                     "total_zones": len(zones_list),
@@ -878,6 +880,7 @@ class DALIService:
             return {
                 "site_id": site_id,
                 "data_source": "live",
+                "source_type": "lighting_protocol",
                 "timestamp": datetime.now().isoformat(),
                 "error": str(e),
                 "summary": {},

@@ -50,11 +50,26 @@ class ComfortComplaintHandler:
             from app.database.repositories.desk_repository import DeskRepository
             from app.database.repositories.zone_repository import ZoneRepository
 
+            # Build building UUID -> code lookup
+            building_code_map = {}
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                client = get_supabase_client()
+                bld_resp = client.table("buildings").select("id, code").execute()
+                if bld_resp.data:
+                    building_code_map = {b["id"]: b["code"] for b in bld_resp.data}
+            except Exception:
+                pass
+
             # Load desks from Supabase
             desk_repo = DeskRepository()
             all_desks = desk_repo.get_all()
             if all_desks:
                 for d in all_desks:
+                    # Populate building field from UUID lookup
+                    if not d.get("building") and d.get("building_id"):
+                        d["building"] = building_code_map.get(d["building_id"], "")
                     desk = Desk.from_dict(d)
                     self._desks[desk.desk_id] = desk
                     # Create normalized ID mappings for flexible lookup
@@ -63,14 +78,36 @@ class ComfortComplaintHandler:
             else:
                 logger.warning("No desks found in Supabase")
 
-            # Load zones from Supabase
+            # Load zones from Supabase (zones table has equipment refs)
             zone_repo = ZoneRepository()
             all_zones = zone_repo.get_all()
+
+            # Also fetch live readings from hvac_zones table
+            live_readings = {}
+            try:
+                hvac_resp = (
+                    client.table("hvac_zones")
+                    .select("zone_id, current_temp, setpoint, status, current_humidity, current_co2")
+                    .execute()
+                )
+                if hvac_resp.data:
+                    live_readings = {r["zone_id"]: r for r in hvac_resp.data}
+            except Exception:
+                pass
+
             if all_zones:
                 for z in all_zones:
+                    # Merge live readings from hvac_zones into zone data
+                    live = live_readings.get(z.get("zone_id", ""), {})
+                    if live.get("current_temp") is not None:
+                        z["current_temp"] = live["current_temp"]
+                    if live.get("setpoint") is not None:
+                        z["setpoint"] = live["setpoint"]
+                    if live.get("status"):
+                        z["status"] = live["status"]
                     zone = HVACZone.from_dict(z)
                     self._zones[zone.zone_id] = zone
-                logger.info(f"Loaded {len(self._zones)} zones from Supabase")
+                logger.info(f"Loaded {len(self._zones)} zones from Supabase ({len(live_readings)} with live readings)")
             else:
                 logger.warning("No zones found in Supabase")
 
@@ -338,6 +375,17 @@ class ComfortComplaintHandler:
                 enhanced_root_cause = f"Heat source detected - desk is near printer/copier. {enhanced_root_cause}"
                 enhanced_suggestions.insert(0, f"Increase VAV {zone.vav_id} airflow to dissipate printer heat")
                 enhanced_suggestions.insert(1, f"Lower FCU {zone.fcu_id} setpoint by 1°C")
+
+        # Near window + too_cold = cold radiant loss / drafts
+        if desk.near_window and complaint_type == "too_cold":
+            orientation = (desk.orientation or "").upper()
+            if "window" not in enhanced_root_cause.lower():
+                enhanced_root_cause = (
+                    f"Cold radiant loss from nearby {orientation}-facing window. {enhanced_root_cause}"
+                )
+                enhanced_suggestions.insert(0, "Check window seals for drafts")
+                enhanced_suggestions.insert(1, f"Raise FCU {zone.fcu_id} setpoint by 1°C (current: {zone.setpoint}°C)")
+                enhanced_confidence = "medium"
 
         # Check if zone has fault
         needs_dispatch = zone.status == "fault"

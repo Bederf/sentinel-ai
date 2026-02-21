@@ -81,11 +81,11 @@ Response: `WO-2026-0042` created and ready for notification
 ```
 Technician: "done" or "completed"
 ↓
-Clawd: "Great! Let's collect the data. Send the gauge readings."
+Sentry: "Great! Let's collect the data. Send the gauge readings."
 ```
 
 **Step 3: Interactive data submission via Telegram**
-- Clawd prompts for each data item based on equipment type
+- Sentry prompts for each data item based on equipment type
 - Technician submits via Telegram:
   - Text: Gauge readings, observations
   - Files: Phyphox CSV (vibration), WAV (audio), photos (JPEG/PNG)
@@ -98,7 +98,7 @@ Clawd: "Great! Let's collect the data. Send the gauge readings."
 
 **Step 4: Progress tracking**
 ```
-Clawd: "✓ RPM recorded, ✓ Oil pressure recorded, ✓ Vibration file received
+Sentry: "✓ RPM recorded, ✓ Oil pressure recorded, ✓ Vibration file received
         Missing: 2 audio files, 5 photos
         Progress: 65% complete
         Send next audio file..."
@@ -106,12 +106,12 @@ Clawd: "✓ RPM recorded, ✓ Oil pressure recorded, ✓ Vibration file received
 
 **Step 5: Completion**
 ```
-Clawd: "All data collected! Service record complete.
+Sentry: "All data collected! Service record complete.
         SENTINEL is analyzing... Check dashboard tomorrow
         for Phase 44 cost-benefit analysis."
 ```
 
-## Clawd Bot API Endpoints
+## Sentry Bot API Endpoints
 
 **Send work order notification:**
 ```python
@@ -265,9 +265,9 @@ engine work is not required TODAY.
 ## Related Files
 
 **Backend:**
-- Sentry integration: `backend/app/services/clawd_integration/`
+- Sentry integration: `backend/app/services/sentry_integration/`
 - Work order API: `backend/app/api/work_orders.py`
-- Sentry webhooks: `backend/app/api/clawd_webhooks.py`
+- Sentry webhooks: `backend/app/api/sentry_webhooks.py`
 - Service record repository: `backend/app/database/repositories/service_record_repository.py`
 - OCR service: `backend/app/services/ocr_service.py`
 

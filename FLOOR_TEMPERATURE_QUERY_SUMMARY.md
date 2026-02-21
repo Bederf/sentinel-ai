@@ -1,6 +1,6 @@
 # Floor Temperature Query Implementation — COMPLETE
 
-**Status:** ✅ Phase 1 Complete (Web Chat) | ⏳ Phase 2 Ready (Clawd Bot)  
+**Status:** ✅ Phase 1 Complete (Web Chat) | ⏳ Phase 2 Ready (Sentry Bot)  
 **Date:** 2026-02-17
 
 ---
@@ -37,11 +37,11 @@ Modified: `/opt/bms-intelligence/backend/app/services/chat_tools.py`
 
 ---
 
-### Phase 2: Clawd Bot ⏳ READY FOR IMPLEMENTATION
+### Phase 2: Sentry Bot ⏳ READY FOR IMPLEMENTATION
 
 **Implementation guide created:** `SENTRY_BOT_FLOOR_TEMP_IMPLEMENTATION.md`
 
-**What needs to be done in `$SENTRY_HOME/tools/clawd_ai_bridge.py`:**
+**What needs to be done in `$SENTRY_HOME/tools/sentry_ai_bridge.py`:**
 
 1. Add floor detection patterns and helper functions:
    - `FLOOR_TEMP_PATTERNS` list with 6 regex patterns
@@ -100,7 +100,7 @@ Modified: `/opt/bms-intelligence/backend/app/services/chat_tools.py`
 **Claude:** [Calls get_floor_temperatures() with no floor filter]
 **Response:** [Returns all 5 zones across 3 floors with status indicators]
 
-### Clawd Bot Examples (After Phase 2)
+### Sentry Bot Examples (After Phase 2)
 
 **User (Telegram):** "what is the temperature on floor 1?"
 **Bot:** [Detects floor temp query → calls handler → formats response]
@@ -124,7 +124,7 @@ Modified: `/opt/bms-intelligence/backend/app/services/chat_tools.py`
    - Expected: Returns L2 zones only
 6. [ ] Backend logs show no errors
 
-### Clawd Bot Tests (After Phase 2)
+### Sentry Bot Tests (After Phase 2)
 
 1. [ ] Send via Telegram: *"what is the temperature on floor 1?"*
 2. [ ] Send: *"floor 2 temp"*
@@ -141,7 +141,7 @@ Modified: `/opt/bms-intelligence/backend/app/services/chat_tools.py`
 | `/opt/bms-intelligence/backend/app/services/chat_tools.py` | Modified (3 additions) | ✅ COMPLETE |
 | `/opt/bms-intelligence/SENTRY_BOT_FLOOR_TEMP_IMPLEMENTATION.md` | Created (implementation guide) | ✅ COMPLETE |
 | `/opt/bms-intelligence/FLOOR_TEMPERATURE_QUERY_SUMMARY.md` | This file | ✅ COMPLETE |
-| `$SENTRY_HOME/tools/clawd_ai_bridge.py` | Needs manual implementation | ⏳ READY |
+| `$SENTRY_HOME/tools/sentry_ai_bridge.py` | Needs manual implementation | ⏳ READY |
 
 ---
 
@@ -149,7 +149,7 @@ Modified: `/opt/bms-intelligence/backend/app/services/chat_tools.py`
 
 1. **Tool reuses existing data files**
    - Web Chat: Uses `hvac_zones.json` (works offline, no Supabase required)
-   - Clawd Bot: Uses `get_zone_temperatures()` which queries Supabase
+   - Sentry Bot: Uses `get_zone_temperatures()` which queries Supabase
 
 2. **Optional floor filtering**
    - Both implementations support `floor` parameter for filtering
@@ -158,9 +158,9 @@ Modified: `/opt/bms-intelligence/backend/app/services/chat_tools.py`
 
 3. **Fallback pattern maintained**
    - Web Chat: Direct JSON file read (already has fallback)
-   - Clawd Bot: Supabase → cached data fallback (existing bms_query.py pattern)
+   - Sentry Bot: Supabase → cached data fallback (existing bms_query.py pattern)
 
-4. **Pattern matching (Clawd only)**
+4. **Pattern matching (Sentry only)**
    - 6 regex patterns cover most natural language variations
    - Case-insensitive matching
    - Detects floor level extraction for filtering
@@ -175,8 +175,8 @@ Modified: `/opt/bms-intelligence/backend/app/services/chat_tools.py`
 - No database migrations needed
 - Works immediately with existing hvac_zones.json
 
-### For Clawd Bot (Phase 2 - When Ready)
-- Sentry bot service restart required after clawd_ai_bridge.py changes
+### For Sentry Bot (Phase 2 - When Ready)
+- Sentry bot service restart required after sentry_ai_bridge.py changes
 - No dependencies on Web Chat changes
 - Uses existing bms_query.py functions (no new Supabase queries)
 - Falls back to local data if Supabase unavailable

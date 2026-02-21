@@ -408,7 +408,7 @@ Get current maintenance recommendations with priority.
 
 ### POST `/api/solar/sites/{site_id}/maintenance/generate-work-orders`
 
-Create work orders from urgent/soon recommendations. Uses existing work order service with Clawd notification.
+Create work orders from urgent/soon recommendations. Uses existing work order service with Sentry notification.
 
 ## Financial Reporting (34-09)
 

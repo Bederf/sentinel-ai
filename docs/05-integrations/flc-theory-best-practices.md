@@ -15,7 +15,7 @@ estimated_read_time: 40
 
 # Fuzzy Logic Control (FLC) Theory & Best Practices
 
-Technical guide to Fuzzy Logic Control principles, South African HVAC applications, comparison to PID, and performance optimization. For use by Clawd Bot in recommending FLC upgrades and technicians when tuning existing systems.
+Technical guide to Fuzzy Logic Control principles, South African HVAC applications, comparison to PID, and performance optimization. For use by Sentry Bot in recommending FLC upgrades and technicians when tuning existing systems.
 
 ---
 
@@ -372,7 +372,7 @@ Actuator replacements per year  | 1-2        | 0.1      | ↓ 85%
 
 ### FLC Health Check
 
-When Clawd Bot detects FLC degradation:
+When Sentry Bot detects FLC degradation:
 
 ```
 Checklist for Technicians:
@@ -391,14 +391,14 @@ Checklist for Technicians:
 
 □ Energy Consumption Not Improving?
   → Issue: Setpoint set incorrectly, FLC rules not optimal
-  → Action: Review Clawd Bot recommendation, adjust tuning
+  → Action: Review Sentry Bot recommendation, adjust tuning
 
 □ Intermittent Alarms?
   → Issue: Communication dropout, FLC logic fault
   → Action: Check network, restart controller if needed
 ```
 
-### Trend Data Analysis for Clawd Bot
+### Trend Data Analysis for Sentry Bot
 
 SENTINEL monitors these signals continuously:
 
@@ -526,7 +526,7 @@ Timeline?
 3. **Extended equipment life** (90% less actuator cycling)
 4. **Improved comfort** (92% fewer complaints)
 
-SENTINEL's Clawd Bot can recommend FLC retrofits based on trend data analysis, and monitor FLC health continuously. For South African facilities, FLC is particularly valuable due to climate variability and equipment aging patterns.
+SENTINEL's Sentry Bot can recommend FLC retrofits based on trend data analysis, and monitor FLC health continuously. For South African facilities, FLC is particularly valuable due to climate variability and equipment aging patterns.
 
 ---
 

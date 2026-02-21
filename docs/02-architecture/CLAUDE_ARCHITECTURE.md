@@ -12,7 +12,7 @@ Complete system architecture for SENTINEL BMS Intelligence Platform.
 - **Frontend:** React + TypeScript (Vite) | Tremor UI + Tailwind | React Query v5
 - **Scale:** 70+ API endpoints, 31 MCP tools, 3 buildings, 542+ equipment
 - **Multi-Protocol:** BACnet, Modbus, DALI, OPC-UA, Telegram
-- **Automation:** PostgreSQL triggers + APScheduler + Clawd webhook integration
+- **Automation:** PostgreSQL triggers + APScheduler + Sentry webhook integration
 
 ---
 
@@ -236,7 +236,7 @@ Work order auto-created
 Service record created
   ↓ (Background job every 30s)
 Technician assigned by specialty
-  ↓ (Clawd bot webhook)
+  ↓ (Sentry bot webhook)
 Telegram notification sent
   ↓ (Technician replies)
 Service feedback submitted

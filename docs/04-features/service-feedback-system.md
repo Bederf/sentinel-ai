@@ -19,7 +19,7 @@ Equipment-type specific feedback collection from technicians after completing wo
 
 ## Overview
 
-After a technician completes a work order, they submit feedback through the Clawd Telegram bot. The feedback includes:
+After a technician completes a work order, they submit feedback through the Sentry Telegram bot. The feedback includes:
 
 - Sensor readings (vibration, temperature, pressure, etc.)
 - Photos of equipment condition
@@ -55,7 +55,7 @@ Each equipment type has a specific feedback template defining which inputs are r
           │                    │                    │
           ▼                    ▼                    ▼
 ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
-│  Equipment       │  │  ML Training     │  │  Clawd Bot       │
+│  Equipment       │  │  ML Training     │  │  Sentry Bot       │
 │  Health Update   │  │  Data Store      │  │  Notification    │
 └──────────────────┘  └──────────────────┘  └──────────────────┘
 ```
@@ -306,9 +306,9 @@ curl -X POST http://localhost:9095/api/service-feedback/session/{id}/complete \
 }
 ```
 
-## Clawd Bot Integration
+## Sentry Bot Integration
 
-The Clawd Telegram bot guides technicians through feedback submission:
+The Sentry Telegram bot guides technicians through feedback submission:
 
 ```
 Bot: Work order WO-2024-001234 marked complete.
@@ -352,7 +352,7 @@ Bot: ✅ Feedback complete!
 ## Related Documentation
 
 - [Health Scoring System](./health-scoring-system.md) - Health calculation
-- [Clawd Integration](../CLAWD_INTEGRATION.md) - Telegram bot
+- [Sentry Integration](../SENTRY_INTEGRATION.md) - Telegram bot
 - [Asset Lifecycle State Machine](../05-integrations/asset-lifecycle-state-machine.md) - Workflow states
 - [Lifecycle Simulation](./lifecycle-simulation.md) - 24-hour simulation
 - [Repair Effectiveness & ML Feedback](./46-repair-effectiveness-ml-feedback.md) - Post-repair validation

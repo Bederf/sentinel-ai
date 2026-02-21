@@ -274,9 +274,9 @@ CAREL pCO Controller
 
 ---
 
-## Data Point Naming Convention for Clawd Bot
+## Data Point Naming Convention for Sentry Bot
 
-When Clawd Bot recommends an FLC or discusses controller tuning, reference these standard point names:
+When Sentry Bot recommends an FLC or discusses controller tuning, reference these standard point names:
 
 ```
 Chiller FLC:
@@ -310,7 +310,7 @@ Generic FLC Signal Detection:
 
 ---
 
-## Integration Flowchart for Clawd Bot
+## Integration Flowchart for Sentry Bot
 
 ```
 Client equipment identified
@@ -337,7 +337,7 @@ Client equipment identified
 3. **FLC Detection**: Analyze trend data for control algorithm type
 4. **Recommendation**: Suggest integration path + any gateway requirements
 5. **Implementation**: Deploy gateway (if needed) + map points to SENTINEL taxonomy
-6. **Validation**: Verify FLC data points are visible in Clawd Bot recommendations
+6. **Validation**: Verify FLC data points are visible in Sentry Bot recommendations
 
 ---
 

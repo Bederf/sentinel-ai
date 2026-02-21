@@ -1,4 +1,4 @@
-# Clawd Desk Skill Update Summary
+# Sentry Desk Skill Update Summary
 
 ## 📋 Changes Made
 
@@ -69,7 +69,7 @@ To execute equipment changes:
 
 ## 📝 Output Comparison
 
-### Before (Clawd 1.0):
+### Before (Sentry 1.0):
 ```
 Desk 34 - Too Cold
 
@@ -84,7 +84,7 @@ Actions:
 ⚠️ Problem: "VAV damper" doesn't exist in this building!
 ```
 
-### After (Clawd 1.1):
+### After (Sentry 1.1):
 ```
 Desk 34 - Too Cold
 
@@ -195,6 +195,6 @@ Future enhancements could include:
 
 ---
 
-**Version:** Clawd Desk Skill v1.1  
+**Version:** Sentry Desk Skill v1.1  
 **Updated:** 2024-01-31  
 **Status:** ✅ In production - actively used by field technicians

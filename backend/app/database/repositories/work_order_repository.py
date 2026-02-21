@@ -42,9 +42,12 @@ class WorkOrderRepository:
             building_id = work_order.get("building_id")
 
             if not equipment_id and work_order.get("equipment_code"):
-                eq_result = self.client.table("equipment").select(
-                    "id, building_id"
-                ).eq("code", work_order["equipment_code"]).execute()
+                eq_result = (
+                    self.client.table("equipment")
+                    .select("id, building_id")
+                    .eq("code", work_order["equipment_code"])
+                    .execute()
+                )
 
                 if eq_result.data and len(eq_result.data) > 0:
                     equipment_id = eq_result.data[0]["id"]
@@ -88,9 +91,12 @@ class WorkOrderRepository:
             return None
 
         try:
-            result = self.client.table("work_orders").select(
-                "*, equipment(code, name, type), buildings(code, name)"
-            ).eq("id", work_order_id).execute()
+            result = (
+                self.client.table("work_orders")
+                .select("*, equipment(code, name, type), buildings(code, name)")
+                .eq("id", work_order_id)
+                .execute()
+            )
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
@@ -100,15 +106,22 @@ class WorkOrderRepository:
             logger.error(f"Error getting work order {work_order_id}: {e}")
             return None
 
+    async def get_work_order_by_id(self, work_order_id: str) -> Optional[Dict[str, Any]]:
+        """Backward-compatible alias for get_work_order()."""
+        return await self.get_work_order(work_order_id)
+
     async def get_work_order_by_code(self, code: str) -> Optional[Dict[str, Any]]:
         """Get a work order by its code (e.g., WO-2026-0001)."""
         if not self.client:
             return None
 
         try:
-            result = self.client.table("work_orders").select(
-                "*, equipment(code, name, type), buildings(code, name)"
-            ).eq("code", code).execute()
+            result = (
+                self.client.table("work_orders")
+                .select("*, equipment(code, name, type), buildings(code, name)")
+                .eq("code", code)
+                .execute()
+            )
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
@@ -119,19 +132,20 @@ class WorkOrderRepository:
             return None
 
     async def get_work_orders_for_equipment(
-        self,
-        equipment_id: str,
-        status: Optional[str] = None,
-        limit: int = 10
+        self, equipment_id: str, status: Optional[str] = None, limit: int = 10
     ) -> List[Dict[str, Any]]:
         """Get work orders for a specific equipment."""
         if not self.client:
             return []
 
         try:
-            query = self.client.table("work_orders").select("*").eq(
-                "equipment_id", equipment_id
-            ).order("created_at", desc=True).limit(limit)
+            query = (
+                self.client.table("work_orders")
+                .select("*")
+                .eq("equipment_id", equipment_id)
+                .order("created_at", desc=True)
+                .limit(limit)
+            )
 
             if status:
                 query = query.eq("status", status)
@@ -143,19 +157,13 @@ class WorkOrderRepository:
             logger.error(f"Error getting work orders for equipment {equipment_id}: {e}")
             return []
 
-    async def update_work_order(
-        self,
-        work_order_id: str,
-        updates: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    async def update_work_order(self, work_order_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a work order."""
         if not self.client:
             return None
 
         try:
-            result = self.client.table("work_orders").update(
-                updates
-            ).eq("id", work_order_id).execute()
+            result = self.client.table("work_orders").update(updates).eq("id", work_order_id).execute()
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
@@ -171,16 +179,20 @@ class WorkOrderRepository:
         start_date: Optional[datetime | date] = None,
         end_date: Optional[datetime | date] = None,
         status: Optional[str] = None,
-        limit: int = 500
+        limit: int = 500,
     ) -> List[Dict[str, Any]]:
         """Get work orders for a list of equipment IDs with optional date filter."""
         if not self.client or not equipment_ids:
             return []
 
         try:
-            query = self.client.table("work_orders").select("*").in_(
-                "equipment_id", equipment_ids
-            ).order("completed_at", desc=True).limit(limit)
+            query = (
+                self.client.table("work_orders")
+                .select("*")
+                .in_("equipment_id", equipment_ids)
+                .order("completed_at", desc=True)
+                .limit(limit)
+            )
 
             if status:
                 query = query.eq("status", status)
@@ -199,11 +211,7 @@ class WorkOrderRepository:
             logger.error(f"Error getting work orders for equipment list: {e}")
             return []
 
-    async def get_all_work_orders(
-        self,
-        limit: int = 100,
-        status: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    async def get_all_work_orders(self, limit: int = 100, status: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all work orders with optional status filter.
 
         Args:
@@ -228,6 +236,36 @@ class WorkOrderRepository:
         except Exception as e:
             logger.error(f"Error getting all work orders: {e}")
             return []
+
+    async def get_work_orders_by_source(
+        self,
+        source: str,
+        limit: int = 200,
+    ) -> List[Dict[str, Any]]:
+        """Get work orders created by a logical source.
+
+        Current supported source values:
+        - technician: records created by technician chat workflows
+        """
+        source_normalized = (source or "").strip().lower()
+        if not source_normalized:
+            return []
+
+        orders = await self.get_all_work_orders(limit=limit)
+
+        if source_normalized == "technician":
+            filtered: List[Dict[str, Any]] = []
+            for order in orders:
+                created_by = str(order.get("created_by") or "").lower()
+                title = str(order.get("title") or "").lower()
+                if created_by.startswith("technician:") or created_by == "technician_chat":
+                    filtered.append(order)
+                    continue
+                if title.startswith("technician:"):
+                    filtered.append(order)
+            return filtered
+
+        return [o for o in orders if str(o.get("created_by") or "").lower() == source_normalized]
 
 
 # Singleton instance

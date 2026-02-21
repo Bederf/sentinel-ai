@@ -8,12 +8,12 @@ date: 2026-02-01
 
 ## Overview
 
-3-stage OCR pipeline for processing service sheet photos submitted via Clawd. Uses Claude Vision API for extraction, validates against equipment-specific templates, and enables technician corrections with full audit trail. All extracted data feeds into the ML training dataset.
+3-stage OCR pipeline for processing service sheet photos submitted via Sentry. Uses Claude Vision API for extraction, validates against equipment-specific templates, and enables technician corrections with full audit trail. All extracted data feeds into the ML training dataset.
 
 ## Architecture
 
 ```
-Technician uploads service sheet photo (via Clawd Telegram)
+Technician uploads service sheet photo (via Sentry Telegram)
     ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │  STAGE 1: Claude Vision OCR                                     │
@@ -34,7 +34,7 @@ Technician uploads service sheet photo (via Clawd Telegram)
     ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │  STAGE 3: AI Enhancement + Correction Flow                      │
-│  - If validation issues: prompt tech for corrections via Clawd  │
+│  - If validation issues: prompt tech for corrections via Sentry  │
 │  - AI fills in missing fields from context                      │
 │  - Track corrections with audit trail                           │
 │  - Status: stage2_complete → completed/needs_review             │
@@ -101,11 +101,11 @@ class OCRService:
 
 ### ✅ OCR Correction Handler
 
-**Handler** (`backend/app/services/clawd_integration/ocr_correction_handler.py` - 235 lines):
+**Handler** (`backend/app/services/sentry_integration/ocr_correction_handler.py` - 235 lines):
 
 ```python
 class OCRCorrectionHandler:
-    """Handles technician corrections for OCR-extracted data via Clawd."""
+    """Handles technician corrections for OCR-extracted data via Sentry."""
 
     async def start_correction_flow(
         self,
@@ -170,9 +170,9 @@ POST /api/ocr/correction/{service_record_id}/cancel
   - Cancels correction session, returns partial data
 ```
 
-### ✅ Clawd Webhook Integration
+### ✅ Sentry Webhook Integration
 
-**Endpoints** (`backend/app/api/clawd_webhooks.py`):
+**Endpoints** (`backend/app/api/sentry_webhooks.py`):
 
 ```bash
 # Service sheet photo upload from Telegram
@@ -192,7 +192,7 @@ GET /api/sentry/ocr/status/{service_record_id}
 
 ## Data Flow
 
-### 1. Photo Upload (via Clawd)
+### 1. Photo Upload (via Sentry)
 
 ```
 Technician sends service sheet photo in Telegram
@@ -268,7 +268,7 @@ for item in template["required_items"]:
 ```
 API returns needs_review status
     ↓
-Clawd shows: "⚠️ Battery voltage not detected. Please type the value:"
+Sentry shows: "⚠️ Battery voltage not detected. Please type the value:"
     ↓
 Technician replies: "24.5"
     ↓
@@ -432,10 +432,10 @@ curl -X POST http://localhost:9095/api/ocr/correction/SR-2026-TEST \
   -F "correction=24.5"
 ```
 
-### Clawd Integration Test
+### Sentry Integration Test
 
 ```bash
-# Simulate Clawd photo upload
+# Simulate Sentry photo upload
 curl -X POST http://localhost:9095/api/sentry/ocr/process-service-sheet \
   -H "Content-Type: application/json" \
   -d '{
@@ -459,12 +459,12 @@ curl -X POST http://localhost:9095/api/sentry/ocr/process-service-sheet \
 
 **Created:**
 - `backend/app/services/ocr_service.py` - 3-stage OCR pipeline (472 lines)
-- `backend/app/services/clawd_integration/ocr_correction_handler.py` - Correction flow (235 lines)
+- `backend/app/services/sentry_integration/ocr_correction_handler.py` - Correction flow (235 lines)
 - `backend/app/api/ocr.py` - REST API endpoints (256 lines)
 
 **Modified:**
 - `backend/app/main.py` - Added OCR router
-- `backend/app/api/clawd_webhooks.py` - Added OCR webhook endpoints
+- `backend/app/api/sentry_webhooks.py` - Added OCR webhook endpoints
 
 **Dependencies:**
 - `backend/app/data/ml_data_templates.json` - Equipment templates (23 types)

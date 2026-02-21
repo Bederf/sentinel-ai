@@ -1,0 +1,12 @@
+flowchart TD
+    A[Live stage active] --> B[Detect file/manual source]
+    B --> C[Raise critical provenance alert]
+    C --> D[Start or continue violation timer]
+    D --> E{Stage == automatic?}
+    E -->|Yes| F[Immediate fail-closed demote to supervised]
+    E -->|No| G{Exit violation dwell met?}
+    G -->|No| H[Hold with breach violation reason]
+    G -->|Yes| I[Demote per stage policy]
+    F --> J[Containment + source remediation]
+    I --> J
+    J --> K[Requalify through thresholds and dwell windows]

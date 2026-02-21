@@ -64,7 +64,7 @@ echo "Alert Created: $ALERT_ID"
 {
   "id": "alert-uuid",
   "status": "active",
-  "clawd_notified": false,
+  "sentry_notified": false,
   "message": "Alert created..."
 }
 ```

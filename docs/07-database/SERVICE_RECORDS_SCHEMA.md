@@ -388,7 +388,7 @@ s3://sentinel-storage/service-records/SR-2026-ABC123/GEN5_BASELINE_PHOTO_FUEL_SY
 
 ### Backend Services
 - **WorkOrderNotifier:** Creates service records and sends notifications
-- **ClawdWebhook:** Receives Telegram uploads, stores attachments
+- **SentryWebhook:** Receives Telegram uploads, stores attachments
 - **OCRService:** Processes service sheet photos, extracts gauge readings
 - **AudioAnalysis:** FFT analysis of phyphox recordings for cavitation/knock detection
 - **SensorAnalysis:** Analyzes vibration patterns for bearing wear, governor hunting

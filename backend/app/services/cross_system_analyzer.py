@@ -17,20 +17,22 @@ import asyncio
 
 from app.services.dali_service import get_dali_service
 from app.services.building_loader import get_building_loader
+from app.models.dali import ZoneOccupancy, ZoneLighting
 
 logger = logging.getLogger(__name__)
-from app.models.dali import ZoneOccupancy, ZoneLighting
 
 
 def _get_device_manager():
     """Lazy import to avoid circular dependency."""
     from app.services.device_abstraction import device_manager
+
     return device_manager
 
 
 @dataclass
 class ComfortDiagnosis:
     """Result of comfort analysis combining HVAC + Lighting data"""
+
     zone_id: str
     zone_name: str
     complaint_type: str  # 'too_hot', 'too_cold', 'too_dark', etc.
@@ -161,12 +163,12 @@ class CrossSystemAnalyzer:
         if point is None:
             return None
         # Handle both DevicePoint objects and dicts
-        if hasattr(point, 'value'):
+        if hasattr(point, "value"):
             return point.value
-        elif hasattr(point, 'default_value'):
+        elif hasattr(point, "default_value"):
             return point.default_value
         elif isinstance(point, dict):
-            return point.get('value') or point.get('default_value')
+            return point.get("value") or point.get("default_value")
         return None
 
     def _analyze_vav(self, vav_data: Dict, complaint_type: str) -> str:
@@ -211,10 +213,7 @@ class CrossSystemAnalyzer:
         return f"VAV operating normally: damper {damper:.0f}%, airflow {airflow:.0f} L/s, discharge {discharge:.1f}°C"
 
     def analyze_comfort_complaint(
-        self,
-        zone_id: str,
-        complaint_type: str = "too_hot",
-        desk_id: Optional[str] = None
+        self, zone_id: str, complaint_type: str = "too_hot", desk_id: Optional[str] = None
     ) -> ComfortDiagnosis:
         """
         Analyze a comfort complaint using HVAC + Lighting + Occupancy data.
@@ -240,7 +239,7 @@ class CrossSystemAnalyzer:
                     "desk_id": desk_id,
                     "desk_sensor": desk_sensor.sensor_id,
                     "desk_occupied": desk_sensor.occupancy,
-                    "desk_lux": desk_sensor.lux_level
+                    "desk_lux": desk_sensor.lux_level,
                 }
 
         # Analyze HVAC
@@ -282,7 +281,7 @@ class CrossSystemAnalyzer:
             root_cause=root_cause,
             confidence=confidence,
             suggestions=suggestions,
-            **desk_data
+            **desk_data,
         )
 
     def _analyze_hvac(self, hvac: Dict, complaint_type: str) -> str:
@@ -313,20 +312,22 @@ class CrossSystemAnalyzer:
         return f"Zone at {temp}C (setpoint {setpoint}C), status: {status}"
 
     def _analyze_lighting(
-        self,
-        occupancy: Optional[ZoneOccupancy],
-        lighting: Optional[ZoneLighting],
-        complaint_type: str,
-        desk_data: Dict
+        self, occupancy: Optional[ZoneOccupancy], lighting: Optional[ZoneLighting], complaint_type: str, desk_data: Dict
     ) -> str:
         """Analyze lighting/occupancy contribution"""
         parts = []
 
         if occupancy:
-            parts.append(f"Zone occupancy: {occupancy.occupancy_percent:.0f}% ({occupancy.occupied_sensors}/{occupancy.total_sensors} sensors)")
+            parts.append(
+                f"Zone occupancy: {occupancy.occupancy_percent:.0f}%"
+                f" ({occupancy.occupied_sensors}"
+                f"/{occupancy.total_sensors} sensors)"
+            )
 
             if occupancy.max_lux_level > 800:
-                parts.append(f"HIGH DAYLIGHT detected ({occupancy.max_lux_level:.0f} lux max) - possible solar heat gain")
+                parts.append(
+                    f"HIGH DAYLIGHT detected ({occupancy.max_lux_level:.0f} lux max) - possible solar heat gain"
+                )
             elif occupancy.avg_lux_level > 500:
                 parts.append(f"Moderate daylight ({occupancy.avg_lux_level:.0f} lux avg)")
             else:
@@ -350,7 +351,7 @@ class CrossSystemAnalyzer:
         lighting: Optional[ZoneLighting],
         complaint_type: str,
         desk_data: Dict,
-        vav_data: Dict = None
+        vav_data: Dict = None,
     ) -> tuple[str, str, List[str]]:
         """Determine most likely root cause and suggestions (includes VAV analysis)"""
 
@@ -362,7 +363,7 @@ class CrossSystemAnalyzer:
             return (
                 "HVAC equipment fault - FCU not operating correctly",
                 "high",
-                ["Create maintenance job for FCU inspection", "Check BMS alarms for fault codes"]
+                ["Create maintenance job for FCU inspection", "Check BMS alarms for fault codes"],
             )
 
         # ==========================================
@@ -384,8 +385,8 @@ class CrossSystemAnalyzer:
                     [
                         f"Dispatch technician to inspect VAV {vav_data.get('vav_id')} actuator",
                         "Check BMS alarms for damper position feedback",
-                        "Temporarily override damper to 50% if safe"
-                    ]
+                        "Temporarily override damper to 50% if safe",
+                    ],
                 )
             elif complaint_type == "too_cold" and discharge and discharge < 16:
                 return (
@@ -395,8 +396,8 @@ class CrossSystemAnalyzer:
                     [
                         f"Dispatch technician to inspect VAV {vav_data.get('vav_id')} actuator",
                         "Override damper to reduce airflow",
-                        "Check reheat valve operation"
-                    ]
+                        "Check reheat valve operation",
+                    ],
                 )
 
         # Reheat valve not responding (too cold with reheat at 0%)
@@ -409,8 +410,8 @@ class CrossSystemAnalyzer:
                     [
                         f"Check reheat coil valve actuator on VAV {vav_data.get('vav_id')}",
                         "Verify hot water supply to reheat coil",
-                        "Check BMS heating demand signal"
-                    ]
+                        "Check BMS heating demand signal",
+                    ],
                 )
 
         # Reheat fighting cooling (too hot with reheat active)
@@ -422,8 +423,8 @@ class CrossSystemAnalyzer:
                 [
                     f"Close reheat valve on VAV {vav_data.get('vav_id')}",
                     "Review BMS control sequence for deadband settings",
-                    "Check zone temperature sensor calibration"
-                ]
+                    "Check zone temperature sensor calibration",
+                ],
             )
 
         # Airflow mismatch (VAV not delivering requested airflow)
@@ -438,8 +439,8 @@ class CrossSystemAnalyzer:
                     [
                         "Check VAV pressure sensor calibration",
                         "Verify damper actuator operation",
-                        "Review AHU static pressure"
-                    ]
+                        "Review AHU static pressure",
+                    ],
                 )
 
         # Solar heat gain scenario (the hero demo case)
@@ -450,16 +451,25 @@ class CrossSystemAnalyzer:
             # High daylight = solar heat gain likely
             if hvac["temp"] <= hvac["setpoint"] + 0.5:
                 # HVAC is fine, solar is the issue
-                cause = "Solar heat gain from windows. HVAC is working correctly but direct sunlight is warming your location."
+                cause = (
+                    "Solar heat gain from windows. HVAC is working correctly"
+                    " but direct sunlight is warming your location."
+                )
                 confidence = "high"
                 suggestions = []
 
                 # Suggest dimming lights to reduce heat load (actual DALI control)
                 if lighting and lighting.avg_dim_level > 50:
-                    suggestions.append(f"Dim zone lighting from {lighting.avg_dim_level:.0f}% to 30% to reduce heat load")
+                    suggestions.append(
+                        f"Dim zone lighting from {lighting.avg_dim_level:.0f}% to 30% to reduce heat load"
+                    )
 
                 # Suggest FCU setpoint adjustment (actual HVAC control)
-                suggestions.append(f"Boost FCU cooling: lower setpoint from {hvac['setpoint']}°C to {hvac['setpoint'] - 2}°C for 2 hours")
+                suggestions.append(
+                    f"Boost FCU cooling: lower setpoint from"
+                    f" {hvac['setpoint']}°C to"
+                    f" {hvac['setpoint'] - 2}°C for 2 hours"
+                )
 
                 # Suggest VAV adjustment with specific data if available
                 if damper is not None:
@@ -471,7 +481,11 @@ class CrossSystemAnalyzer:
                     suggestions.append("Increase VAV airflow to desk area")
 
                 if occupancy and occupancy.occupancy_percent < 30:
-                    suggestions.append("Note: Zone is only {:.0f}% occupied - less internal heat load".format(occupancy.occupancy_percent))
+                    suggestions.append(
+                        "Note: Zone is only {:.0f}% occupied - less internal heat load".format(
+                            occupancy.occupancy_percent
+                        )
+                    )
                 return (cause, confidence, suggestions)
 
         # Low occupancy with high cooling demand
@@ -482,10 +496,13 @@ class CrossSystemAnalyzer:
             else:
                 low_occ_suggestions.insert(0, "Check VAV box positions in unoccupied areas")
             return (
-                "Low zone occupancy ({:.0f}%) means less internal heat load, but may also indicate poor air circulation in unoccupied areas".format(
-                    occupancy.occupancy_percent),
+                (
+                    "Low zone occupancy ({:.0f}%) means less internal heat"
+                    " load, but may also indicate poor air circulation in"
+                    " unoccupied areas"
+                ).format(occupancy.occupancy_percent),
                 "medium",
-                low_occ_suggestions
+                low_occ_suggestions,
             )
 
         # Generic HVAC issue
@@ -493,18 +510,22 @@ class CrossSystemAnalyzer:
             hvac_suggestions = [
                 "Check chilled water supply temperature",
                 "Verify FCU fan speed and valve position",
-                "Review zone load vs equipment capacity"
+                "Review zone load vs equipment capacity",
             ]
             # Add VAV-specific context if available
             if damper is not None and airflow is not None:
-                hvac_suggestions.insert(0, f"VAV status: damper {damper:.0f}%, airflow {airflow:.0f} L/s, discharge {discharge:.1f}°C")
+                hvac_suggestions.insert(
+                    0, f"VAV status: damper {damper:.0f}%, airflow {airflow:.0f} L/s, discharge {discharge:.1f}°C"
+                )
             return (
-                f"Zone temperature ({hvac['temp']}C) exceeds setpoint ({hvac['setpoint']}C). HVAC may be undersized or have reduced capacity.",
+                f"Zone temperature ({hvac['temp']}C) exceeds setpoint"
+                f" ({hvac['setpoint']}C). HVAC may be undersized or have"
+                " reduced capacity.",
                 "medium",
-                hvac_suggestions
+                hvac_suggestions,
             )
 
-        # Default - suggest actions on actual BMS assets
+        # Default - suggest actions on actual BMS assets, complaint-type-aware
         default_suggestions = []
 
         # Include VAV status summary if available
@@ -514,15 +535,31 @@ class CrossSystemAnalyzer:
                 f"airflow {airflow:.0f} L/s" + (f", discharge {discharge:.1f}°C" if discharge else "")
             )
 
-        if lighting and lighting.avg_dim_level > 60:
-            default_suggestions.append(f"Reduce zone lighting from {lighting.avg_dim_level:.0f}% to 50%")
-        default_suggestions.append(f"Lower FCU setpoint by 1°C (current: {hvac['setpoint']}°C)")
-        default_suggestions.append("Dispatch technician to check for localized heat sources")
+        if complaint_type in ("too_hot", "hot"):
+            if lighting and lighting.avg_dim_level > 60:
+                default_suggestions.append(f"Reduce zone lighting from {lighting.avg_dim_level:.0f}% to 50%")
+            default_suggestions.append(f"Lower FCU setpoint by 1°C (current: {hvac['setpoint']}°C)")
+            default_suggestions.append("Dispatch technician to check for localized heat sources")
+        elif complaint_type in ("too_cold", "cold"):
+            default_suggestions.append(f"Raise FCU setpoint by 1°C (current: {hvac['setpoint']}°C)")
+            default_suggestions.append("Check for drafts near windows or doors")
+            default_suggestions.append("Dispatch technician to verify heating valve operation")
+        elif complaint_type in ("stuffy", "air_quality"):
+            default_suggestions.append("Check AHU outside air damper position")
+            default_suggestions.append("Verify CO2 sensor calibration in zone")
+            default_suggestions.append("Increase fresh air supply via VAV")
+        elif complaint_type in ("drafty", "draft"):
+            default_suggestions.append("Check VAV airflow — may be too high for zone")
+            default_suggestions.append("Inspect diffuser direction and deflectors")
+            default_suggestions.append("Check window seals for air leaks")
+        else:
+            default_suggestions.append(f"Review FCU setpoint (current: {hvac['setpoint']}°C)")
+            default_suggestions.append("Dispatch technician for on-site investigation")
 
         return (
             "No clear equipment issue detected. May be localized discomfort or perception.",
             "low",
-            default_suggestions
+            default_suggestions,
         )
 
     def get_zone_context_for_chat(self, zone_id: str) -> str:
@@ -534,7 +571,11 @@ class CrossSystemAnalyzer:
         lines = [f"## Zone: {zone_id}"]
 
         if hvac:
-            lines.append(f"**HVAC:** {hvac.get('temp', 'N/A')}C (setpoint {hvac.get('setpoint', 'N/A')}C), status: {hvac.get('status', 'unknown')}")
+            lines.append(
+                f"**HVAC:** {hvac.get('temp', 'N/A')}C"
+                f" (setpoint {hvac.get('setpoint', 'N/A')}C),"
+                f" status: {hvac.get('status', 'unknown')}"
+            )
 
             # Include VAV data from Desigo simulation
             vav_id = hvac.get("vav")
@@ -557,7 +598,11 @@ class CrossSystemAnalyzer:
                     lines.append(f"**VAV:** {' | '.join(vav_parts)}")
 
         if occupancy:
-            lines.append(f"**Occupancy:** {occupancy.occupancy_percent:.0f}% ({occupancy.occupied_sensors}/{occupancy.total_sensors} sensors)")
+            lines.append(
+                f"**Occupancy:** {occupancy.occupancy_percent:.0f}%"
+                f" ({occupancy.occupied_sensors}"
+                f"/{occupancy.total_sensors} sensors)"
+            )
             lines.append(f"**Daylight:** {occupancy.avg_lux_level:.0f} lux avg, {occupancy.max_lux_level:.0f} lux max")
 
         if lighting:
@@ -570,6 +615,7 @@ class CrossSystemAnalyzer:
 
 # Singleton
 _analyzer: Optional[CrossSystemAnalyzer] = None
+
 
 def get_cross_system_analyzer() -> CrossSystemAnalyzer:
     global _analyzer

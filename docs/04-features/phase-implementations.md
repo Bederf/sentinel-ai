@@ -4,7 +4,7 @@ type: "reference"
 status: "approved"
 version: "1.0.0"
 created: "2026-02-18"
-updated: "2026-02-18"
+updated: "2026-02-21"
 tags: ["phases", "features", "implementation", "delivery", "roadmap"]
 related: ["system-overview.md", "../02-architecture/README.md"]
 domain: "general"
@@ -20,6 +20,48 @@ Consolidated documentation of completed and in-progress phases, including implem
 ## Phase overview
 
 All phases organized by number with implementation status, completion date, and key deliverables.
+
+### Phase 109C: Site-002 deterministic mode policy dry-run
+
+**Status:** ✅ Complete (dry-run scaffolding) | **Date:** 2026-02-21
+
+**Achievement:** Added deterministic stage policy evaluation for Site-002 onboarding flow (`commissioning -> shadow_live -> supervised -> automatic`) without enabling enforcement writes.
+
+**Key deliverables:**
+- Site policy JSON with explicit entry/exit thresholds, dwell windows, and anti-flap stability
+- Hard fail-closed definition for automatic stage (immediate demote + stop-writes decision)
+- Dry-run evaluator service consuming monitoring snapshot KPIs
+- Scheduler integration (5-minute cadence) with decision logging only
+- Persisted dry-run state file for deterministic promotion/demotion decisions
+
+**Key files:**
+- `backend/app/data/policies/site-002-mode-policy.json`
+- `backend/app/services/site_mode_policy_service.py`
+- `backend/app/services/background_scheduler.py`
+- `backend/app/startup/events.py`
+- `backend/tests/services/test_site_mode_policy_service.py`
+
+**Safety note:** No control enforcement or ingestion-mode mutation in this phase. All outputs are advisory (`would_promote`, `would_demote`, `would_fail_closed_demote`).
+
+---
+
+### Phase 109D: Operational flow pack
+
+**Status:** ✅ Complete (documentation) | **Date:** 2026-02-21
+
+**Achievement:** Added six deterministic operational flow runbooks and matching architecture diagram sources to standardize promotion, demotion, supervised approvals, maintenance loop closure, and ML retraining readiness.
+
+**Key deliverables:**
+- Fail-closed demotion flow
+- Stage promotion evidence flow
+- Data provenance breach containment flow
+- Operator override and rollback flow
+- Maintenance closed-loop flow
+- ML feedback and training-readiness flow
+
+**Index doc:** `docs/04-features/109D-operational-flows-index.md`
+
+---
 
 ### Phase 088: Frontend module gating
 

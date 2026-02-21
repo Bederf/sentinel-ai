@@ -6,6 +6,7 @@ import type {
   DeviceStatus,
   DeviceCondition,
 } from "./types";
+import { authorizedFetch } from "../api";
 
 /**
  * Batch aggregators for device data
@@ -85,9 +86,14 @@ async function processSolarOverviewQueue() {
       if (cached && Date.now() - cached.timestamp < 2000) {
         resolve(cached.data);
       } else {
-        // Fetch from API
-        const { fetchSolarOverview } = await import("@/lib/solarApi");
-        const data = await fetchSolarOverview(siteId);
+        // Fetch directly from API (NOT via fetchSolarOverview to avoid circular dependency)
+        const normalizedId = siteId === "sandton" ? "site-002" : siteId;
+        const API_BASE_URL = (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) || "";
+        const res = await authorizedFetch(`${API_BASE_URL}/api/solar/sites/${normalizedId}/overview`, {}, true);
+        if (!res.ok) {
+          throw { message: res.statusText, status: res.status };
+        }
+        const data = await res.json();
         solarOverviewCache.set(siteId, { data, timestamp: Date.now() });
         resolve(data);
       }

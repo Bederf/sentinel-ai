@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Briefcase, Clock, CheckCircle, AlertCircle, Package } from 'lucide-react'
 import type { ReactElement } from 'react'
+import { authorizedFetch } from '../lib/api/client'
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
 interface Order {
   id: string
@@ -37,7 +40,7 @@ export default function TechnicianPortal(): ReactElement {
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/technician/dashboard')
+      const response = await authorizedFetch(`${API_BASE_URL}/api/technician/dashboard`)
       if (!response.ok) {
         throw new Error('Failed to load dashboard')
       }

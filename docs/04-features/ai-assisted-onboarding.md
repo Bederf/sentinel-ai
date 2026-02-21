@@ -4,7 +4,7 @@ type: "guide"
 status: "approved"
 version: "2.0.0"
 created: "2026-01-31"
-updated: "2026-02-03"
+updated: "2026-02-21"
 author: "SENTINEL Development Team"
 tags: ["onboarding", "bms", "import", "mcp", "ai", "desigo", "metasys", "ebi"]
 domain: "general"
@@ -16,6 +16,8 @@ estimated_read_time: 20
 # AI-Assisted Building Onboarding
 
 Complete guide for onboarding new buildings into SENTINEL using the SIMBIOT MCP tools. This covers the full workflow from creating a building to configuring predictive maintenance metrics.
+
+For deterministic stage progression on Site-002 (`commissioning -> shadow_live -> supervised -> automatic`), see [Phase 109C: Site-002 deterministic mode policy dry-run](109C-site-002-mode-policy-dry-run.md).
 
 ## Overview
 

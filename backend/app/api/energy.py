@@ -68,22 +68,112 @@ def load_equipment() -> list[dict]:
             equipment.append(
                 {
                     "id": eq.get("id"),
+                    "code": eq.get("code"),
                     "site_id": building.get("code"),  # Use building code instead of UUID
                     "type": eq.get("type"),
                     "name": eq.get("name"),
                     "manufacturer": eq.get("manufacturer"),
                     "model": eq.get("model"),
-                    "capacity": eq.get("capacity") or eq.get("rated_capacity") or "10kW",
+                    "capacity": eq.get("capacity") or eq.get("rated_capacity") or "",
                 }
             )
 
     return equipment
 
 
-# Equipment types for energy categorization
-HVAC_TYPES = {"ahu", "chiller", "cooling_tower", "crac", "split_unit", "fcu", "vrf"}
-LIGHTING_TYPES = {"lighting", "emergency_lighting"}
-# Everything else is "other"
+# Equipment types for energy categorization (all lowercase for case-insensitive matching)
+HVAC_TYPES = {
+    "ahu",
+    "chiller",
+    "cooling_tower",
+    "crac",
+    "split_unit",
+    "fcu",
+    "vrf",
+    "vav",
+    "ct",
+    "pump",
+    "boiler",
+    "cold",
+    "split",
+    "compressor",
+}
+LIGHTING_TYPES = {
+    "lighting",
+    "emergency_lighting",
+    "luminaire",
+    "dali_luminaire",
+    "dali_controller",
+    "dali",
+    "lum",
+    "led",
+}
+ELECTRICAL_TYPES = {
+    "ups",
+    "gen",
+    "generator",
+    "ats",
+    "tx",
+    "msb",
+    "mtr",
+    "meter",
+    "pfc",
+    "fdr",
+    "mv",
+    "db",
+    "bess",
+    "inv",
+}
+# Everything else (LIFT, JACE, FIRE, ACC, CCTV, ZONE, controller, unknown) is "other"
+
+# Realistic default capacities (kW) per equipment type when DB has no value
+DEFAULT_CAPACITY_KW = {
+    # HVAC
+    "chiller": 350,
+    "ahu": 30,
+    "fcu": 3,
+    "vav": 1.5,
+    "ct": 15,
+    "pump": 7.5,
+    "crac": 25,
+    "split": 5,
+    "split_unit": 5,
+    "vrf": 15,
+    "boiler": 50,
+    "cooling_tower": 15,
+    "cold": 5,
+    "compressor": 20,
+    # Lighting (per fixture, NOT per controller)
+    "luminaire": 0.04,
+    "dali_luminaire": 0.04,
+    "dali_controller": 0.5,
+    "dali": 0.5,
+    "lum": 0.04,
+    "led": 0.03,
+    "lighting": 0.04,
+    "emergency_lighting": 0.01,
+    # Electrical
+    "ups": 20,
+    "gen": 100,
+    "generator": 100,
+    "ats": 0.5,
+    "tx": 0.5,
+    "msb": 0.5,
+    "mtr": 0.1,
+    "meter": 0.1,
+    "bess": 100,
+    "inv": 5,
+    "pfc": 1,
+    "fdr": 0.5,
+    "mv": 0.5,
+    "db": 0.5,
+    # Other
+    "lift": 15,
+    "fire": 0.5,
+    "jace": 0.1,
+    "controller": 0.1,
+    "zone": 0,
+}
 
 
 class EnergyDataPoint(BaseModel):
@@ -409,30 +499,45 @@ def generate_energy_data(
 
             # Calculate base energy by equipment type
             hvac_base = 0.0
+            lighting_base_equip = 0.0
             other_base = 0.0
 
             for eq in site_equipment:
                 eq_type = eq.get("type", "").lower()
-                # Extract capacity number (e.g., "60kW" -> 60)
-                capacity_str = eq.get("capacity", "10kW")
+                # Also try extracting type from equipment code (e.g. S002-VAV-L1-A -> vav)
+                eq_code = eq.get("code", "")
+                if eq_type in ("unknown", "") and eq_code:
+                    parts = eq_code.split("-")
+                    if len(parts) >= 2:
+                        eq_type = parts[1].lower()
+                # Extract capacity: use DB value if numeric, else type-specific default
+                capacity_str = eq.get("capacity") or ""
+                default_cap = DEFAULT_CAPACITY_KW.get(eq_type, 10.0)
                 try:
-                    capacity = float("".join(c for c in capacity_str if c.isdigit() or c == ".") or "10")
-                except ValueError:
-                    capacity = 10.0
+                    import re
+
+                    cap_match = re.search(r"(\d+\.?\d*)", capacity_str)
+                    capacity = float(cap_match.group(1)) if cap_match else default_cap
+                except (ValueError, AttributeError):
+                    capacity = default_cap
 
                 if eq_type in HVAC_TYPES:
                     # HVAC runs ~8-12 hours per day at 60-80% load
                     hvac_base += capacity * 10 * 0.7  # kWh/day estimate
                 elif eq_type in LIGHTING_TYPES:
-                    # Lighting accounted separately
-                    pass
+                    # Lighting: accounted via sqm below, but add per-fixture contribution
+                    lighting_base_equip += capacity * 8 * 0.4  # 8h/day at 40% avg
+                elif eq_type in ELECTRICAL_TYPES:
+                    # Electrical (UPS, generators, meters) - mostly standby
+                    other_base += capacity * 1.5 * 0.15  # Low utilization
                 else:
-                    # Other equipment (UPS, generators, etc.) - standby + occasional use
-                    other_base += capacity * 2 * 0.3  # Lower utilization
+                    # Other equipment (lifts, fire, access, controllers)
+                    other_base += capacity * 2 * 0.1  # Minimal continuous draw
 
-            # Lighting estimate based on site sqm (~10W/sqm * 10 hours)
+            # Lighting: use equipment-based estimate if available, else sqm fallback
             sqm = site.get("sqm", 1000)
-            lighting_base = sqm * 0.01 * 10  # kWh/day
+            lighting_base_sqm = sqm * 0.01 * 10  # kWh/day (~10W/sqm * 10h)
+            lighting_base = max(lighting_base_equip, lighting_base_sqm)
 
             # Add daily variation (weekday vs weekend, seasonal)
             day_of_week = current_date.weekday()

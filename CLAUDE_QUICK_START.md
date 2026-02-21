@@ -217,7 +217,7 @@ supabase/
 
 docs/
   ├── 02-architecture/      # System design docs
-  └── 05-integration/       # Integration guides (Clawd, SIMBIOT, etc.)
+  └── 05-integration/       # Integration guides (Sentry, SIMBIOT, etc.)
 ```
 
 ## Session Memory

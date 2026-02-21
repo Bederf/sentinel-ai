@@ -1498,12 +1498,9 @@ class BackgroundSchedulerService:
                 # FRESH START PATH: Initialize new simulation
                 await orchestrator.start(scenario=scenario, duration_minutes=duration_minutes)
 
-            # For persistent simulations (no checkpoint restart), start task and keep running
-            # The simulation now loops continuously (365 days → reset → repeat)
-            # until manually stopped/cleared by user
+            # For persistent simulations, start task and attach a completion watcher
             if orchestrator._task:
-                # Don't await - let it run in background indefinitely
-                logger.info(f"🔄 Simulation task {task_id} started - Running in persistent loop mode (365 days × ∞)")
+                logger.info(f"🔄 Simulation task {task_id} started - running in background")
                 # Mark as running in database
                 try:
                     supabase.table("lifecycle_simulation_tasks").update(
@@ -1513,31 +1510,60 @@ class BackgroundSchedulerService:
                             "days_completed": 0,
                         }
                     ).eq("task_id", task_id).execute()
-                    logger.info(f"📊 Task {task_id} marked as running in persistent loop mode")
+                    logger.info(f"📊 Task {task_id} marked as running")
                 except Exception as db_error:
                     logger.error(f"Failed to update task status to running: {db_error}")
 
-                # Return immediately - don't wait for completion
-                # Simulation runs in background indefinitely
+                # Fire-and-forget completion watcher: awaits the simulation task,
+                # then unregisters on success or writes failure status on error.
+                # This replaces the old finally-block unregister which fired too early.
+                async def _watch_completion(sim_task_id: str, sim_async_task: asyncio.Task):
+                    try:
+                        await sim_async_task
+                        logger.info(f"✅ Simulation task {sim_task_id} finished normally")
+                    except asyncio.CancelledError:
+                        logger.info(f"Simulation task {sim_task_id} was cancelled")
+                    except Exception as sim_err:
+                        logger.error(f"❌ Simulation task {sim_task_id} failed: {sim_err}")
+                        try:
+                            from app.database.supabase_client import Supabase
+                            from datetime import datetime as dt
+
+                            client = Supabase.instance()
+                            client.table("lifecycle_simulation_tasks").update(
+                                {
+                                    "status": "failed",
+                                    "error_message": str(sim_err)[:500],
+                                    "completed_at": dt.now().isoformat(),
+                                }
+                            ).eq("task_id", sim_task_id).execute()
+                        except Exception as db_err:
+                            logger.error(f"Failed to write failure status: {db_err}")
+                    finally:
+                        unregister_simulation(sim_task_id)
+
+                asyncio.create_task(_watch_completion(task_id, orchestrator._task))
+
+                # Return immediately — watcher handles cleanup
                 return
 
         except Exception as e:
-            logger.error(f"❌ Simulation task {task_id} failed: {e}")
+            logger.error(f"❌ Simulation task {task_id} failed during setup: {e}")
 
             # Mark as failed with error message
             try:
                 supabase.table("lifecycle_simulation_tasks").update(
                     {
                         "status": "failed",
-                        "error_message": str(e)[:500],  # Truncate long errors
-                        "completed_at": "now()",
+                        "error_message": str(e)[:500],
+                        "completed_at": datetime.now().isoformat(),
                     }
                 ).eq("task_id", task_id).execute()
             except Exception as db_error:
                 logger.error(f"Failed to update task status in DB: {db_error}")
 
-        finally:
-            # Always unregister from active simulations
+            # Only unregister on setup failure (not on normal return —
+            # the completion watcher handles that)
             unregister_simulation(task_id)
 
     def add_integration_sync_job(self, interval_seconds: int = 900):
@@ -1600,6 +1626,66 @@ class BackgroundSchedulerService:
 
         except Exception as e:
             logger.error(f"Failed to run integration sync: {e}")
+
+    def add_site_mode_policy_dry_run_job(self, interval_seconds: int = 300, site_id: str = "site-002"):
+        """Add periodic dry-run evaluation for deterministic site onboarding policy."""
+        job_id = f"site_mode_policy_dry_run_{site_id}"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info(f"Removed existing site mode policy dry-run job ({site_id})")
+
+        self.scheduler.add_job(
+            func=self._run_site_mode_policy_dry_run,
+            args=[site_id],
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name=f"Site Mode Policy Dry Run ({site_id})",
+            replace_existing=True,
+        )
+        logger.info(f"Added site mode policy dry-run job for {site_id} with {interval_seconds}s interval")
+
+    def _run_site_mode_policy_dry_run(self, site_id: str):
+        """Sync wrapper: evaluate site mode policy on main loop and log result."""
+        try:
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._run_site_mode_policy_dry_run_async(site_id),
+                    self._main_loop,
+                )
+                result = future.result(timeout=120)
+            else:
+                result = asyncio.run(self._run_site_mode_policy_dry_run_async(site_id))
+
+            decision = result.get("decision", "hold")
+            state_before = result.get("state_before")
+            state_after = result.get("state_after")
+            reasons = result.get("reasons", [])
+            if decision == "hold":
+                logger.debug(
+                    "Site mode policy dry-run hold: site=%s stage=%s reasons=%s",
+                    site_id,
+                    state_before,
+                    reasons,
+                )
+            else:
+                logger.info(
+                    "Site mode policy dry-run decision: site=%s decision=%s %s->%s reasons=%s write_action=%s",
+                    site_id,
+                    decision,
+                    state_before,
+                    state_after,
+                    reasons,
+                    result.get("write_action", "none"),
+                )
+        except Exception as e:
+            logger.error(f"Failed site mode policy dry-run for {site_id}: {e}", exc_info=True)
+
+    async def _run_site_mode_policy_dry_run_async(self, site_id: str) -> dict:
+        """Async implementation for site mode policy dry-run."""
+        from app.services.site_mode_policy_service import SiteModePolicyService
+
+        service = SiteModePolicyService()
+        return await service.evaluate_site(site_id)
 
 
 # Global scheduler instance

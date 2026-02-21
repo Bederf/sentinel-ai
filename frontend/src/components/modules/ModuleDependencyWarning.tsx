@@ -27,6 +27,7 @@ const DEPENDENT_MODULES: Record<ModuleType, ModuleType[]> = {
   // Building system add-ons
   lighting: [],
   fire: [],
+  access: [],
   security: [],
   solar: [],
   sustainability: [],

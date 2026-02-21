@@ -355,7 +355,7 @@ POST /api/baselines/equipment/{equipment_id}/capture
 ### Post-Collection (5 minutes)
 
 - [ ] Export all phyphox recordings as CSV or JSON
-- [ ] Upload files to SENTINEL via Clawd or email
+- [ ] Upload files to SENTINEL via Sentry or email
 - [ ] Attach manual readings form
 - [ ] **Send to:** [SENTINEL email/API endpoint]
 - [ ] Confirm receipt

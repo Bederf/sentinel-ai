@@ -1259,6 +1259,26 @@ export const api = {
    */
   streamChat,
 
+  /**
+   * Convert text to speech audio via ElevenLabs TTS
+   * Returns MP3 audio blob for playback
+   */
+  async textToSpeech(text: string): Promise<Blob> {
+    const token = localStorage.getItem("sentinel_token");
+    const response = await fetch(`${API_BASE_URL}/api/chat/tts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok) {
+      throw new Error(`TTS API error: ${response.status} ${response.statusText}`);
+    }
+    return response.blob();
+  },
+
   // ============= Dashboard API Methods =============
 
   /**
@@ -3723,7 +3743,7 @@ export interface WorkOrderResponse {
 }
 
 export async function createWorkOrder(params: CreateWorkOrderParams): Promise<WorkOrderResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/work-orders/technician`, {
+  const response = await authorizedFetch(`/api/work-orders/technician`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

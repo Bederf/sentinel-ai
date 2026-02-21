@@ -63,7 +63,7 @@ The lifecycle simulation compresses 24 simulated hours into 2-24 real minutes, a
          ▼                    ▼                    ▼
 ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
 │  AI Optimizer   │  │  Alert Service  │  │ Service Feedback│
-│  (recommendations)│  │  (Clawd notify) │  │  (health update)│
+│  (recommendations)│  │  (Sentry notify) │  │  (health update)│
 └─────────────────┘  └─────────────────┘  └─────────────────┘
 ```
 
@@ -275,7 +275,7 @@ curl http://localhost:9095/api/lifecycle/status | jq
 
 ### Alert Service
 - Fault injection creates alerts in Supabase
-- Clawd notifications sent to FM team chat
+- Sentry notifications sent to FM team chat
 - Alerts appear in dashboard bell icon
 
 ### Predictions

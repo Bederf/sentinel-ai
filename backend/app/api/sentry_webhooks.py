@@ -16,7 +16,7 @@ Manager control additions:
 import base64
 import logging
 import httpx
-from fastapi import APIRouter, HTTPException, status, Header, Request
+from fastapi import APIRouter, HTTPException, status, Header, Request, Query
 
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
@@ -36,6 +36,7 @@ RESET_BLOCKED_TYPES = {"FIRE", "GEN"}
 
 class EquipmentResetRequest(BaseModel):
     """Request to remotely reset equipment fault status."""
+
     equipment_code: str = Field(..., description="Equipment code (e.g., S002-FCU-L1-A)")
     user_id: str = Field(..., description="User initiating the reset")
     reason: Optional[str] = Field(None, description="Reason for reset")
@@ -78,7 +79,7 @@ async def handle_work_order_response(
             "telegram_user_id": data["telegram_user_id"],
             "message_type": data["message_type"],
             "content": data.get("content"),
-        }
+        },
     )
 
     if "error" in result:
@@ -131,8 +132,13 @@ async def notify_technician_of_work_order(
 
     # Required fields
     required_fields = [
-        "work_order_id", "equipment_id", "building_id",
-        "equipment_name", "service_type", "technician_id", "technician_name"
+        "work_order_id",
+        "equipment_id",
+        "building_id",
+        "equipment_name",
+        "service_type",
+        "technician_id",
+        "technician_name",
     ]
     for field in required_fields:
         if field not in data:
@@ -147,31 +153,36 @@ async def notify_technician_of_work_order(
     return {
         "success": True,
         "message": "Work order notification sent successfully",
-        "service_record_code": result.get("service_record_code")
+        "service_record_code": result.get("service_record_code"),
     }
 
 
 @router.post("/work-order/complete/{service_record_code}", status_code=status.HTTP_200_OK)
-async def mark_service_record_complete(service_record_code: str):
+async def mark_service_record_complete(
+    service_record_code: str,
+    force: bool = Query(True, description="Allow completion even if some evidence items are missing"),
+):
     """Mark service record as complete manually.
 
     Called when technician confirms completion via Sentry.
     """
-    # Find service record
-    result = await work_order_notifier.get_collection_status(service_record_code)
-
+    result = await work_order_notifier.complete_service_record(service_record_code, force=force)
     if "error" in result:
-        raise HTTPException(status_code=404, detail=result["error"])
-
-    # TODO: Trigger ML processing pipeline
-    # - Process OCR for service sheets
-    # - Analyze audio recordings
-    # - Quality scoring
-    # - Store in training dataset
+        error_code = result.get("error")
+        if error_code in ("Service record not found", "Equipment not found"):
+            raise HTTPException(status_code=404, detail=error_code)
+        if error_code == "incomplete_data_collection":
+            raise HTTPException(status_code=400, detail=result)
+        raise HTTPException(status_code=500, detail=error_code)
 
     return {
         "success": True,
         "service_record_code": service_record_code,
+        "status": result.get("status"),
+        "forced": result.get("forced", False),
+        "already_complete": result.get("already_complete", False),
+        "completion_percentage": result.get("completion_percentage"),
+        "missing_items": result.get("missing_items", []),
         "ml_processing_initiated": True,
     }
 
@@ -179,6 +190,7 @@ async def mark_service_record_complete(service_record_code: str):
 # ============================================================================
 # Manager Controls: Remote Equipment Reset
 # ============================================================================
+
 
 @router.post("/equipment/reset", status_code=status.HTTP_200_OK)
 async def reset_equipment_fault(
@@ -214,7 +226,7 @@ async def reset_equipment_fault(
             "success": False,
             "blocked": True,
             "reason": f"{eq_type} equipment cannot be remotely reset for safety reasons. "
-                      f"Create a work order instead.",
+            f"Create a work order instead.",
             "equipment_code": equipment_code,
         }
 
@@ -272,7 +284,8 @@ async def reset_equipment_fault(
                 "blocked": False,
                 "reason": "Fault reset executed successfully",
                 "equipment_code": equipment_code,
-                "equipment_name": reset_data.get("equipment_name") or (equipment_info or {}).get("name", equipment_code),
+                "equipment_name": reset_data.get("equipment_name")
+                or (equipment_info or {}).get("name", equipment_code),
                 "previous_health": previous_health,
                 "new_health": new_health or 85,
                 "predictions_resolved": reset_data.get("predictions_resolved", 0),
@@ -301,8 +314,10 @@ async def reset_equipment_fault(
 # Phase 41-02: OCR Processing for Service Sheet Photos
 # ============================================================================
 
+
 class ServiceSheetUpload(BaseModel):
     """Request for service sheet photo upload with OCR processing."""
+
     service_record_id: str = Field(..., description="Service record ID")
     equipment_id: str = Field(..., description="Equipment ID")
     service_type: str = Field(..., description="Service type (minor/major/breakdown)")
@@ -313,6 +328,7 @@ class ServiceSheetUpload(BaseModel):
 
 class CorrectionResponse(BaseModel):
     """Request for submitting OCR correction."""
+
     service_record_id: str = Field(..., description="Service record ID")
     correction: str = Field(..., description="Corrected value")
 
@@ -361,15 +377,13 @@ async def process_service_sheet_ocr(
             equipment_id=data.equipment_id,
             service_type=data.service_type,
             service_record_id=data.service_record_id,
-            media_type=data.media_type
+            media_type=data.media_type,
         )
 
         # If needs review, start correction flow
         if result["status"] == "needs_review":
             correction_prompt = await correction_handler.start_correction_flow(
-                data.service_record_id,
-                result,
-                data.telegram_user_id
+                data.service_record_id, result, data.telegram_user_id
             )
             result["correction_prompt"] = correction_prompt
 
@@ -404,15 +418,9 @@ async def submit_ocr_correction(
     correction_handler = get_ocr_correction_handler()
 
     if not correction_handler.has_pending_correction(data.service_record_id):
-        raise HTTPException(
-            status_code=404,
-            detail="No pending correction session for this service record"
-        )
+        raise HTTPException(status_code=404, detail="No pending correction session for this service record")
 
-    result = await correction_handler.process_correction_response(
-        data.service_record_id,
-        data.correction
-    )
+    result = await correction_handler.process_correction_response(data.service_record_id, data.correction)
 
     return result
 
@@ -436,10 +444,7 @@ async def get_ocr_correction_status(service_record_id: str):
 
     # Check correction status
     if correction_handler.has_pending_correction(service_record_id):
-        return {
-            "status": "needs_review",
-            **correction_handler.get_correction_status(service_record_id)
-        }
+        return {"status": "needs_review", **correction_handler.get_correction_status(service_record_id)}
 
     return {"status": "unknown", "message": "No active OCR session"}
 
@@ -476,23 +481,22 @@ async def get_pending_work_orders(
         # Format for Sentry bot
         formatted_orders = []
         for sr in pending:
-            formatted_orders.append({
-                "service_record_code": sr.get("code"),
-                "service_record_id": sr.get("id"),
-                "technician_id": sr.get("technician_id"),
-                "technician_name": sr.get("technician_name"),
-                "equipment_id": sr.get("equipment_id"),
-                "building_id": sr.get("building_id"),
-                "service_type": sr.get("service_type"),
-                "created_at": sr.get("created_at")
-            })
+            formatted_orders.append(
+                {
+                    "service_record_code": sr.get("code"),
+                    "service_record_id": sr.get("id"),
+                    "technician_id": sr.get("technician_id"),
+                    "technician_name": sr.get("technician_name"),
+                    "equipment_id": sr.get("equipment_id"),
+                    "building_id": sr.get("building_id"),
+                    "service_type": sr.get("service_type"),
+                    "created_at": sr.get("created_at"),
+                }
+            )
 
         logger.info(f"Sentry bot querying: {len(formatted_orders)} pending work orders")
 
-        return {
-            "pending_count": len(formatted_orders),
-            "work_orders": formatted_orders
-        }
+        return {"pending_count": len(formatted_orders), "work_orders": formatted_orders}
 
     except Exception as e:
         logger.error(f"Error fetching pending work orders: {e}")
@@ -520,11 +524,7 @@ async def process_pending_sentry_notifications(
         # Get all pending notifications
         pending = await service_repo.list(filters={"status": "notified"})
         if not pending:
-            return {
-                "success": True,
-                "processed": 0,
-                "message": "No pending notifications"
-            }
+            return {"success": True, "processed": 0, "message": "No pending notifications"}
 
         pending_codes = [sr.get("code") for sr in pending if sr.get("code")]
         message = f"Pending notifications waiting for Sentry delivery: {len(pending_codes)}"
@@ -542,16 +542,13 @@ async def process_pending_sentry_notifications(
 
     except Exception as e:
         logger.error(f"Error processing pending notifications: {e}", exc_info=True)
-        return {
-            "success": False,
-            "error": str(e),
-            "processed": 0
-        }
+        return {"success": False, "error": str(e), "processed": 0}
 
 
 # ============================================================================
 # Inspection Checklist for Telegram
 # ============================================================================
+
 
 @router.get("/inspection-checklist/{equipment_type}", status_code=status.HTTP_200_OK)
 async def get_inspection_checklist_for_telegram(equipment_type: str):

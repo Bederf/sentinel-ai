@@ -30,7 +30,7 @@ This policy applies to all custom-developed software components of the SENTINEL 
 | **MCP Server** | Python (SIMBIOT) | 23 tools for building management via dual transport |
 | **BMS Connectors** | Python | BACnet/IP, Modbus TCP, DALI-2 protocol adapters |
 | **Integration Bridge** | Python | MRI Evolution CAFM connector, log parsers, point matchers |
-| **Telegram/WhatsApp Bots** | Python (Clawd) | Conversational interface for technician queries |
+| **Telegram/WhatsApp Bots** | Python (Sentry) | Conversational interface for technician queries |
 
 This policy does **not** apply to third-party commercial off-the-shelf (COTS) software or managed services (Cloudflare, Supabase, Anthropic Claude API), which are covered by the Third-Party Security Management Policy.
 

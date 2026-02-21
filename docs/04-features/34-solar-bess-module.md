@@ -126,7 +126,7 @@ Condition-based maintenance scheduling, financial reporting, and conversational 
 - Panel cleaning: soiling loss estimate from PR decline
 - Inverter service: runtime hours (>15,000h), fault count, thermal events
 - BESS maintenance: cycle count milestones, cell imbalance trends
-- Work order auto-generation via existing Clawd workflow
+- Work order auto-generation via existing Sentry workflow
 
 **Financial Reporting:**
 - Monthly savings breakdown: arbitrage + demand charge + self-consumption + diesel avoidance
@@ -136,7 +136,7 @@ Condition-based maintenance scheduling, financial reporting, and conversational 
 
 **Chat Integration:**
 - 5 MCP tools: `get_solar_overview`, `get_bess_status`, `get_solar_savings`, `get_solar_forecast`, `get_solar_diagnostics`
-- 4 chat tools registered in `chat_tools.py` for conversational queries via Clawd
+- 4 chat tools registered in `chat_tools.py` for conversational queries via Sentry
 
 ## API Endpoints
 

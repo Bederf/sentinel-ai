@@ -1,0 +1,261 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "SIMBIOT MCP Server security monitoring: rate limit hits, auth failures, tool errors, concurrency saturation, and manifest drift.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "MCP Security Overview (1h)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"MCP rate limit|MCP auth failure|MCP manifest drift\" [1h])",
+          "legendFormat": "MCP Security Events (1h)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Rate Limit Hits / min",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"MCP rate limit\" [1m])",
+          "legendFormat": "Rate Limit Hits",
+          "refId": "A"
+        }
+      ],
+      "alert": {
+        "name": "MCP Rate Limit Alarm",
+        "conditions": [
+          {
+            "evaluator": { "params": [10], "type": "gt" },
+            "operator": { "type": "and" },
+            "query": { "params": ["A", "5m", "now"] },
+            "reducer": { "params": [], "type": "avg" },
+            "type": "query"
+          }
+        ],
+        "frequency": "1m",
+        "for": "5m",
+        "message": "MCP rate limit hits exceed 10/min for 5 minutes — possible abuse or misconfigured client.",
+        "noDataState": "no_data",
+        "executionErrorState": "alerting"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "fillOpacity": 20 },
+          "color": { "mode": "palette-classic" }
+        }
+      }
+    },
+    {
+      "title": "Auth Failures / min",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"MCP auth failure|invalid MCP token|Invalid MCP authentication\" [1m])",
+          "legendFormat": "Auth Failures",
+          "refId": "A"
+        }
+      ],
+      "alert": {
+        "name": "MCP Auth Failure Alarm",
+        "conditions": [
+          {
+            "evaluator": { "params": [5], "type": "gt" },
+            "operator": { "type": "and" },
+            "query": { "params": ["A", "5m", "now"] },
+            "reducer": { "params": [], "type": "avg" },
+            "type": "query"
+          }
+        ],
+        "frequency": "1m",
+        "for": "5m",
+        "message": "MCP auth failures exceed 5/min for 5 minutes — possible brute force or token rotation issue.",
+        "noDataState": "no_data",
+        "executionErrorState": "alerting"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "fillOpacity": 20 },
+          "color": { "fixedColor": "red", "mode": "fixed" }
+        }
+      }
+    },
+    {
+      "title": "Tool Errors / min",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"Tool execution error|internal_error|TIMEOUT\" |~ \"mcp\" [1m])",
+          "legendFormat": "Tool Errors",
+          "refId": "A"
+        }
+      ],
+      "alert": {
+        "name": "MCP Tool Error Alarm",
+        "conditions": [
+          {
+            "evaluator": { "params": [5], "type": "gt" },
+            "operator": { "type": "and" },
+            "query": { "params": ["A", "5m", "now"] },
+            "reducer": { "params": [], "type": "avg" },
+            "type": "query"
+          }
+        ],
+        "frequency": "1m",
+        "for": "5m",
+        "message": "MCP tool errors exceed 5/min — investigate handler failures or timeouts.",
+        "noDataState": "no_data",
+        "executionErrorState": "alerting"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "fillOpacity": 20 },
+          "color": { "fixedColor": "orange", "mode": "fixed" }
+        }
+      }
+    },
+    {
+      "title": "Manifest Drift Events",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"MCP manifest drift\" [5m])",
+          "legendFormat": "Manifest Drift",
+          "refId": "A"
+        }
+      ],
+      "alert": {
+        "name": "MCP Manifest Drift Alarm",
+        "conditions": [
+          {
+            "evaluator": { "params": [1], "type": "gt" },
+            "operator": { "type": "and" },
+            "query": { "params": ["A", "1m", "now"] },
+            "reducer": { "params": [], "type": "avg" },
+            "type": "query"
+          }
+        ],
+        "frequency": "1m",
+        "for": "1m",
+        "message": "MCP tool manifest has drifted at runtime — possible tampering or hot-reload side effect.",
+        "noDataState": "no_data",
+        "executionErrorState": "alerting"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "fillOpacity": 20 },
+          "color": { "fixedColor": "purple", "mode": "fixed" }
+        }
+      }
+    },
+    {
+      "title": "Tool Calls by Category (5m)",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"mcp_tool_call\" | json | risk_tier=\"read\" [5m])",
+          "legendFormat": "Read",
+          "refId": "A"
+        },
+        {
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"mcp_tool_call\" | json | risk_tier=\"mutating\" [5m])",
+          "legendFormat": "Mutating",
+          "refId": "B"
+        },
+        {
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"mcp_tool_call\" | json | risk_tier=\"high_risk\" [5m])",
+          "legendFormat": "High Risk",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "I2 Host/Origin Rejections",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"I2: Rejected non-localhost\" [5m])",
+          "legendFormat": "Host/Origin Rejections",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "fillOpacity": 20 },
+          "color": { "fixedColor": "dark-red", "mode": "fixed" }
+        }
+      }
+    },
+    {
+      "title": "Concurrency Limit Hits",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 20 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"Concurrency limit reached\" [5m])",
+          "legendFormat": "Concurrency Limit",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "fillOpacity": 20 },
+          "color": { "fixedColor": "yellow", "mode": "fixed" }
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["mcp", "security", "sentinel"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "SIMBIOT MCP Security Alerts",
+  "uid": "mcp-security-alerts",
+  "version": 1
+}

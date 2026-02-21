@@ -1,10 +1,10 @@
-# Clawd Telegram Bot - SENTINEL BMS Integration
+# Sentry Telegram Bot - SENTINEL BMS Integration
 
-This document describes the integration between Clawd (Telegram AI bot) and SENTINEL BMS Intelligence Platform.
+This document describes the integration between Sentry (Telegram AI bot) and SENTINEL BMS Intelligence Platform.
 
 ## Overview
 
-Clawd is a Telegram AI bot located at `$SENTRY_HOME` that integrates with SENTINEL for building management queries. Technicians can ask questions via Telegram and receive BMS-aware responses with actual HVAC readings, diagnostics, and device control capabilities.
+Sentry is a Telegram AI bot located at `$SENTRY_HOME` that integrates with SENTINEL for building management queries. Technicians can ask questions via Telegram and receive BMS-aware responses with actual HVAC readings, diagnostics, and device control capabilities.
 
 **Demo Building:** Sandton - Full DALI lighting + HVAC + Energy Centre integration
 - 300 desks (100 per floor, 20 per zone)
@@ -15,8 +15,8 @@ Clawd is a Telegram AI bot located at `$SENTRY_HOME` that integrates with SENTIN
 
 | Mode | Direction | Description |
 |------|-----------|-------------|
-| **Query Mode** | User → Clawd → SENTINEL | Technician asks questions, gets BMS data |
-| **Alert Mode** | SENTINEL → Clawd → User | BMS sends alerts to FM team |
+| **Query Mode** | User → Sentry → SENTINEL | Technician asks questions, gets BMS data |
+| **Alert Mode** | SENTINEL → Sentry → User | BMS sends alerts to FM team |
 | **Work Order Mode** | Bidirectional | Alert → Dispatch → Data Collection |
 
 ## Architecture
@@ -29,13 +29,13 @@ Clawd is a Telegram AI bot located at `$SENTRY_HOME` that integrates with SENTIN
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      Clawd Bot                               │
+│                      Sentry Bot                               │
 │                  (Telegram interface)                        │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│               clawd_ai_bridge.py                             │
+│               sentry_ai_bridge.py                             │
 │         Pattern matching & intelligent routing               │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -54,7 +54,7 @@ Clawd is a Telegram AI bot located at `$SENTRY_HOME` that integrates with SENTIN
 └──────────────────────────┘    └──────────────────────────┘
 ```
 
-## Clawd BMS Tools
+## Sentry BMS Tools
 
 Located in `$SENTRY_HOME/tools/`:
 
@@ -63,14 +63,14 @@ Located in `$SENTRY_HOME/tools/`:
 | `bms_desk_diagnosis.py` | Desk comfort diagnosis | `/api/complaints/*` |
 | `bms_control.py` | Device control | `/api/devices/*` |
 | `bms_monitor.py` | Health monitoring alerts | `/api/alerts`, `/api/equipment` |
-| `clawd_ai_bridge.py` | AI routing with BMS detection | Routes to appropriate tool |
+| `sentry_ai_bridge.py` | AI routing with BMS detection | Routes to appropriate tool |
 | `tiered_ai_router.py` | Claude/Ollama fallback | N/A (AI routing) |
 
 ## Desk Comfort Diagnosis
 
 ### Pattern Detection
 
-`clawd_ai_bridge.py` recognizes desk complaint patterns:
+`sentry_ai_bridge.py` recognizes desk complaint patterns:
 
 ```python
 desk_complaint_patterns = [
@@ -91,7 +91,7 @@ desk_complaint_patterns = [
 
 ### Diagnosis Flow
 
-1. **Pattern Match**: `clawd_ai_bridge.is_desk_complaint()` detects desk query
+1. **Pattern Match**: `sentry_ai_bridge.is_desk_complaint()` detects desk query
 2. **Route to BMS**: Calls `bms_desk_diagnosis.diagnose_and_format()`
 3. **SENTINEL API**: `POST /api/complaints/submit?desk_id=X&complaint_type=Y`
 4. **Rich Response**: Returns with HVAC readings, root cause, actions
@@ -176,7 +176,7 @@ bms_control.py safety <device>
 }
 ```
 
-Header `X-User-Id: clawdbot` identifies bot for audit logging.
+Header `X-User-Id: sentrybot` identifies bot for audit logging.
 
 ## Demo Desks
 
@@ -220,12 +220,12 @@ python $SENTRY_HOME/tools/bms_control.py safety S001-CHILLER-B1-001
 ### Test AI Bridge
 
 ```bash
-python $SENTRY_HOME/tools/clawd_ai_bridge.py
+python $SENTRY_HOME/tools/sentry_ai_bridge.py
 ```
 
 ## SENTINEL API Requirements
 
-Clawd requires these SENTINEL endpoints:
+Sentry requires these SENTINEL endpoints:
 
 ### Complaints API (Desk Diagnosis)
 ```
@@ -246,9 +246,9 @@ GET  /api/devices/{id}/safety-status
 
 ## Configuration
 
-### Clawd Side
+### Sentry Side
 
-In Clawd tools, the BMS API URL is configured:
+In Sentry tools, the BMS API URL is configured:
 
 ```python
 BMS_API_URL = "http://localhost:9095"  # SENTINEL BMS Backend
@@ -277,15 +277,15 @@ Safety-critical operations always route to Claude.
 
 ## Audit Trail
 
-All Clawd actions are logged in SENTINEL:
+All Sentry actions are logged in SENTINEL:
 
-- User ID: `clawdbot`
+- User ID: `sentrybot`
 - Source: Telegram user ID passed in metadata
 - Actions logged: Device reads, control actions, complaints submitted
 
 Query audit logs:
 ```
-GET /api/audit/logs?user=clawdbot
+GET /api/audit/logs?user=sentrybot
 ```
 
 ## Troubleshooting
@@ -315,9 +315,9 @@ Error: Control action blocked by safety rule
 
 **Solution**: Check safety rules - temperature must be 16-28°C.
 
-## Alert Notifications (SENTINEL → Clawd)
+## Alert Notifications (SENTINEL → Sentry)
 
-When SENTINEL detects equipment faults, it sends alerts to FM team via Clawd Telegram.
+When SENTINEL detects equipment faults, it sends alerts to FM team via Sentry Telegram.
 
 ### Alert Flow
 
@@ -328,7 +328,7 @@ Zone Diagnostics Service
     ↓
 Root Cause Analysis (FCU valve stuck at 15%)
     ↓
-Alert Notifier → Clawd Bot → Telegram FM Group
+Alert Notifier → Sentry Bot → Telegram FM Group
     ↓
 FM replies: /dispatch
     ↓
@@ -364,14 +364,14 @@ Time: 14:32:15
 Telegram bot commands can only contain letters, numbers, and underscores. Commands end at hyphens or spaces. Therefore:
 
 - Equipment code `FCU-L10-03` becomes command `/WO_FCU_L10_03`
-- Clawdbot converts underscores back to dashes when looking up equipment
+- Sentrybot converts underscores back to dashes when looking up equipment
 - The actual equipment code is displayed in the `Code:` field for reference
 
 ### Alert Notifier Service
 
-**Location**: `backend/app/services/clawd_integration/alert_notifier.py`
+**Location**: `backend/app/services/sentry_integration/alert_notifier.py`
 
-The alert notifier sends Telegram messages via the `clawdbot` CLI tool.
+The alert notifier sends Telegram messages via the `sentrybot` CLI tool.
 
 ```python
 from app.services.sentry_integration.alert_notifier import alert_notifier
@@ -392,30 +392,30 @@ alert_notifier.send_alert_sync({
 The notifier automatically:
 1. Formats the equipment code with underscores for clickable Telegram commands
 2. Includes the original code in the message body for reference
-3. Sends via `clawdbot message send` CLI
+3. Sends via `sentrybot message send` CLI
 
 **Configuration**:
 - FM Chat ID: Set in `alert_notifier.py` or via `SENTRY_FM_CHAT_ID` env var
-- Clawdbot must be installed and in PATH
+- Sentrybot must be installed and in PATH
 
 ## Work Order Commands
 
 ### `/WO_<equipment_code>` - Create Work Order
 
-When FM clicks the `/WO_` command in a Telegram alert, Clawdbot:
+When FM clicks the `/WO_` command in a Telegram alert, Sentrybot:
 
 1. Extracts equipment code (converts underscores back to dashes)
 2. Looks up equipment from SENTINEL API
 3. Creates a Concept Evolution-compatible work order
 4. Returns confirmation with job card number
 
-**Handler**: `clawd_ai_bridge.py:handle_wo_command()`
+**Handler**: `sentry_ai_bridge.py:handle_wo_command()`
 
 **Example**:
 ```
 User clicks: /WO_FCU_L12_03
 
-Clawdbot response:
+Sentrybot response:
 Work order created:
 
 JC-2026-0202143256 🟡
@@ -433,13 +433,13 @@ Reply /email to send to maintenance team.
 
 For alerts that don't require a work order (acknowledged but no action needed).
 
-**Handler**: `clawd_ai_bridge.py:handle_note_command()`
+**Handler**: `sentry_ai_bridge.py:handle_note_command()`
 
 **Example**:
 ```
 User clicks: /note_FCU_L12_03
 
-Clawdbot response:
+Sentrybot response:
 📝 Note logged for FCU-L12-03
 
 Logged by: @username
@@ -523,22 +523,22 @@ When FM replies `/dispatch` to an alert, SENTINEL creates a work order with full
 
 1. **Create Work Order** - Linked to alert
 2. **Create Service Record** - With diagnostic context
-3. **Email Technician** - Via Clawd Gmail skill
+3. **Email Technician** - Via Sentry Gmail skill
 4. **Telegram Notification** - To assigned technician
 5. **Update Alert Status** - Marked as "dispatched"
 
 ## ML Knowledge Capture
 
-After technician repairs equipment, Clawd collects service data for ML training.
+After technician repairs equipment, Sentry collects service data for ML training.
 
 See `docs/04-features/41-ml-knowledge-capture-01.md` for complete details.
 
 ### Context-Aware Prompts
 
-Because Clawd knows the original fault, it asks **targeted questions**:
+Because Sentry knows the original fault, it asks **targeted questions**:
 
 ```
-Clawd: FCU-L10-03 repair complete - thanks!
+Sentry: FCU-L10-03 repair complete - thanks!
        We detected: FCU valve stuck at 15% (E04)
        Did you confirm this was the issue?
        □ Yes, confirmed
@@ -546,7 +546,7 @@ Clawd: FCU-L10-03 repair complete - thanks!
 
 Tech: Yes, confirmed
 
-Clawd: What was the root cause?
+Sentry: What was the root cause?
        □ Actuator motor failed
        □ Actuator jammed mechanically
        □ Control signal issue (0-10V)
@@ -560,7 +560,7 @@ If technician provides all info at once:
 ```
 Tech: Yes actuator motor failed, replaced Belimo LMV-D3, zone now 21.5C
 
-Clawd: Got it! (fault confirmed, root cause: Actuator motor failed,
+Sentry: Got it! (fault confirmed, root cause: Actuator motor failed,
        part: Belimo LMV-D3, temp: 21.5°C)
 
        Just need a photo of the replacement part label
@@ -598,7 +598,7 @@ Technician sends service sheet photo
 Store in service_readings table
 ```
 
-### Clawd OCR Endpoints
+### Sentry OCR Endpoints
 
 ```bash
 # Upload service sheet photo
@@ -625,20 +625,20 @@ GET /api/sentry/ocr/status/{service_record_id}
 
 ### Correction Flow
 
-If OCR has low confidence or validation errors, Clawd prompts for corrections:
+If OCR has low confidence or validation errors, Sentry prompts for corrections:
 
 ```
-Clawd: ⚠️ Battery voltage not detected on service sheet.
+Sentry: ⚠️ Battery voltage not detected on service sheet.
        Please type the value:
 
 Tech: 24.5
 
-Clawd: ✅ Got it! (battery_voltage: 24.5V)
+Sentry: ✅ Got it! (battery_voltage: 24.5V)
        Next: Hour meter reading?
 
 Tech: 1247
 
-Clawd: ✅ Service sheet data complete!
+Sentry: ✅ Service sheet data complete!
        - Battery voltage: 24.5V
        - Hour meter: 1247h
        - Oil pressure: 45 psi (from OCR)
@@ -664,20 +664,20 @@ All corrections tracked for ML data quality:
 - `backend/app/api/complaints.py` - Complaint endpoints
 - `backend/app/api/alerts.py` - Alert and dispatch endpoints
 - `backend/app/api/ocr.py` - OCR processing endpoints
-- `backend/app/api/clawd_webhooks.py` - Sentry webhook endpoints (WO + OCR)
+- `backend/app/api/sentry_webhooks.py` - Sentry webhook endpoints (WO + OCR)
 - `backend/app/services/complaint_handler.py` - Diagnosis logic
 - `backend/app/services/zone_diagnostics.py` - Zone fault analysis
 - `backend/app/services/ocr_service.py` - 3-stage OCR pipeline
-- `backend/app/services/clawd_integration/alert_notifier.py` - Alert notifications
-- `backend/app/services/clawd_integration/work_order_notifier.py` - WO notifications
-- `backend/app/services/clawd_integration/ocr_correction_handler.py` - OCR corrections
+- `backend/app/services/sentry_integration/alert_notifier.py` - Alert notifications
+- `backend/app/services/sentry_integration/work_order_notifier.py` - WO notifications
+- `backend/app/services/sentry_integration/ocr_correction_handler.py` - OCR corrections
 - `backend/app/services/ml_template_service.py` - ML data collection templates
 - `backend/app/data/ml_data_templates.json` - Equipment-specific templates (23 types)
 - `backend/app/data/buildings/sandton/zones.json` - Zone definitions
 
-### Clawd (`$SENTRY_HOME`)
+### Sentry (`$SENTRY_HOME`)
 - `tools/bms_desk_diagnosis.py` - Desk diagnosis client
 - `tools/bms_control.py` - Device control client
-- `tools/clawd_ai_bridge.py` - Pattern detection & routing
+- `tools/sentry_ai_bridge.py` - Pattern detection & routing
 - `tools/tiered_ai_router.py` - AI model routing
 - Gmail skill - Email notifications to technicians

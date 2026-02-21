@@ -7312,7 +7312,7 @@ Use BACnet Priority 14 for AI writes = TEMPORARY adjustments:
 
 Looking at Molt.bot - this is a **multi-tenant AI agent platform**. Smart integration!
 
-This is brilliant! Moltbot (formerly Clawdbot) is a **personal AI agent platform** that:
+This is brilliant! Moltbot (formerly Sentrybot) is a **personal AI agent platform** that:
 
 - Runs on your machine (local or cloud)
 - Connects via WhatsApp, Telegram, Discord, Slack
@@ -8064,9 +8064,9 @@ USER: "Zone is 23.5°C. Options: A) Boost cooling..."
 
 ### **Implementation Files**
 
-- `/home/bederf/clawd/HYBRID_AI_SETUP.md` - Full setup guide
-- `/home/bederf/clawd/ai_router_config.py` - Router implementation
-- `/home/bederf/clawd/test_ai_router.py` - Test script
+- `/home/bederf/sentry/HYBRID_AI_SETUP.md` - Full setup guide
+- `/home/bederf/sentry/ai_router_config.py` - Router implementation
+- `/home/bederf/sentry/test_ai_router.py` - Test script
 
 **Status**: Ready to implement! 🚀
 

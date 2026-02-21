@@ -1121,76 +1121,104 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
     """
     Look up a desk and return its zone, HVAC, and sensor context.
 
-    For Sandton which has DALI integration, this returns
-    detailed occupancy and lighting data from PIR sensors.
+    Queries Supabase for desk and zone data. Desk IDs encode the floor:
+    L0=001-100, L1=101-200, L2=201-300. Each zone has 20 desks and
+    linked HVAC equipment (FCU, VAV, AHU).
 
     Args:
-        desk_id: Desk identifier (e.g., "201", "L12-25", "Desk 25")
-        building: Optional building name. If not provided and multiple buildings
-                  have desks, will return a prompt asking for clarification.
+        desk_id: Desk identifier (e.g., "205", "desk 205", "25")
+        building: Optional building code (defaults to site-002).
 
     Returns:
         Dictionary with desk info, zone, HVAC status, and DALI sensor data
     """
     try:
-        # Load desk and zone data
-        desks = load_json("desks.json")
-        zones = load_json("hvac_zones.json")
-
-        if not desks:
-            return {
-                "success": False,
-                "error": "Desk data not available",
-                "prompt_user": "I don't have desk mapping data loaded. Which building and zone is the user in?",
-            }
-
-        # Normalize desk ID - extract number from various formats
         import re
 
-        desk_num = re.sub(r"[^0-9]", "", str(desk_id))
+        # Normalize desk ID - extract number from various formats
+        raw = str(desk_id).strip().lower().replace("desk", "").strip()
+        desk_num = re.sub(r"[^0-9]", "", raw)
         if not desk_num:
             return {
                 "success": False,
                 "error": f"Invalid desk ID format: {desk_id}",
                 "prompt_user": (
-                    f"I couldn't parse desk ID '{desk_id}'. Can you provide just the desk number (e.g., 201, 25)?"
+                    f"I couldn't parse desk ID '{desk_id}'. "
+                    "Please provide the desk number (e.g., 205 for Level 2 desk 5)."
                 ),
             }
 
-        # Find desk - try exact match first, then partial
-        desk = None
-        for d in desks:
-            d_num = re.sub(r"[^0-9]", "", str(d.get("desk_id", "")))
-            if d_num == desk_num:
-                desk = d
-                break
+        # Zero-pad to 3 digits to match Supabase format
+        desk_num_padded = desk_num.zfill(3)
 
-        if not desk:
-            # Desk not found - prompt for more info
-            available_desks = [d.get("desk_id") for d in desks[:10]]
+        # Query Supabase for desk
+        building_code = building or SANDTON_SITE_ID
+        client = get_supabase_client()
+
+        # Get building UUID
+        bld_resp = client.table("buildings").select("id").eq("code", building_code).execute()
+        if not bld_resp.data:
             return {
                 "success": False,
-                "error": f"Desk {desk_id} not found in mapping",
+                "error": f"Building {building_code} not found",
+                "prompt_user": f"Building '{building_code}' not found in the database.",
+            }
+        building_uuid = bld_resp.data[0]["id"]
+
+        # Find desk by padded ID
+        desk_resp = (
+            client.table("desks").select("*").eq("building_id", building_uuid).eq("desk_id", desk_num_padded).execute()
+        )
+
+        desk = desk_resp.data[0] if desk_resp.data else None
+
+        if not desk:
+            # Show nearby desks from the same floor for guidance
+            floor_prefix = desk_num_padded[0] if len(desk_num_padded) >= 2 else "0"
+            floor_map = {"0": "L0", "1": "L1", "2": "L2", "3": "L3"}
+            floor = floor_map.get(floor_prefix, "L0")
+
+            nearby_resp = (
+                client.table("desks")
+                .select("desk_id, zone_id")
+                .eq("building_id", building_uuid)
+                .eq("floor", floor)
+                .order("desk_id")
+                .limit(10)
+                .execute()
+            )
+            nearby = [d["desk_id"] for d in (nearby_resp.data or [])]
+
+            return {
+                "success": False,
+                "error": f"Desk {desk_num_padded} not found",
                 "prompt_user": (
-                    f"I don't have desk {desk_id} in my database."
-                    " Can you confirm the desk number?"
-                    f" Available desks include: {', '.join(available_desks)}..."
+                    f"Desk {desk_num_padded} not found on {floor}."
+                    f" Available desks on {floor} include: {', '.join(nearby)}..."
+                    if nearby
+                    else (
+                        f"Desk {desk_num_padded} not found. "
+                        f"Desks are numbered 001-100 (L0), 101-200 (L1), 201-300 (L2)."
+                    )
                 ),
-                "available_sample": available_desks,
+                "available_sample": nearby,
             }
 
-        # Get zone info
+        # Get zone info from zones table
         zone_id = desk.get("zone_id")
-        zone = next((z for z in zones if z.get("zone_id") == zone_id), None)
+        zone = None
+        if zone_id:
+            zone_resp = (
+                client.table("zones").select("*").eq("building_id", building_uuid).eq("zone_id", zone_id).execute()
+            )
+            zone = zone_resp.data[0] if zone_resp.data else None
 
-        # Get DALI/occupancy context for Sandton
+        # Get DALI/occupancy context
         dali_context = {}
         try:
             from app.services.cross_system_analyzer import get_cross_system_analyzer
 
             analyzer = get_cross_system_analyzer()
-
-            # Get zone occupancy from DALI sensors
             if zone_id:
                 zone_analysis = analyzer.dali.get_zone_analysis(zone_id)
                 dali_context = {
@@ -1210,11 +1238,13 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
             "desk": {
                 "desk_id": desk.get("desk_id"),
                 "floor": desk.get("floor"),
-                "building": desk.get("building", "Sandton"),
+                "building": building_code,
                 "zone_id": zone_id,
+                "context": desk.get("context"),
                 "near_window": desk.get("near_window", False),
                 "near_diffuser": desk.get("near_diffuser", False),
                 "near_printer": desk.get("near_printer", False),
+                "orientation": desk.get("orientation"),
             },
             "zone": None,
             "hvac": None,
@@ -1232,12 +1262,14 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
         if dali_context.get("high_daylight"):
             response["context_flags"].append("HIGH_DAYLIGHT - Solar gain likely")
 
-        # Add zone info if available
+        # Add zone info with HVAC equipment
         if zone:
             response["zone"] = {
                 "zone_id": zone.get("zone_id"),
                 "zone_name": zone.get("zone_name"),
                 "floor": zone.get("floor"),
+                "zone_type": zone.get("zone_type"),
+                "typical_occupancy": zone.get("typical_occupancy"),
                 "setpoint": zone.get("setpoint"),
                 "current_temp": zone.get("current_temp"),
                 "status": zone.get("status"),
@@ -1245,7 +1277,10 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
             response["hvac"] = {
                 "fcu_id": zone.get("fcu_id"),
                 "vav_id": zone.get("vav_id"),
-                "sensors": zone.get("sensors", []),
+                "ahu_id": zone.get("ahu_id"),
+                "temp_sensor": zone.get("temp_sensor"),
+                "co2_sensor": zone.get("co2_sensor"),
+                "humidity_sensor": zone.get("humidity_sensor"),
             }
 
         return response
@@ -1261,19 +1296,77 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
         }
 
 
+async def _get_zone_equipment_status(zone: dict, building_code: str) -> dict[str, Any]:
+    """Query all equipment in a zone and return their status/health.
+
+    Gathers FCU, VAV, AHU, temp sensor, CO2 sensor, humidity sensor,
+    and diffusers. Also queries latest zone history for live readings.
+    """
+    client = get_supabase_client()
+    equip_codes = []
+    for key in ("fcu_id", "vav_id", "ahu_id", "temp_sensor", "co2_sensor", "humidity_sensor"):
+        val = zone.get(key)
+        if val:
+            equip_codes.append(val)
+
+    # Also get diffusers for this zone
+    zone_id = zone.get("zone_id", "")
+    zone_num = zone_id.replace("Zone-", "")
+    diff_prefix = f"S002-DIFF-{zone_num}-"
+
+    equipment_status = {}
+    if equip_codes:
+        resp = client.table("equipment").select("code, type, status, health_score").in_("code", equip_codes).execute()
+        for e in resp.data or []:
+            equipment_status[e["code"]] = e
+
+    # Get diffusers
+    diff_resp = (
+        client.table("equipment").select("code, type, status, health_score").like("code", f"{diff_prefix}%").execute()
+    )
+    diffusers = diff_resp.data or []
+    for d in diffusers:
+        equipment_status[d["code"]] = d
+
+    # Get latest zone history readings (temp, humidity, co2)
+    bld_resp = client.table("buildings").select("id").eq("code", building_code).execute()
+    building_uuid = bld_resp.data[0]["id"] if bld_resp.data else None
+
+    live_readings = {}
+    if building_uuid:
+        hist_resp = (
+            client.table("hvac_zone_history")
+            .select("temp, humidity, co2, setpoint, status, occupancy, time")
+            .eq("zone_id", zone_id)
+            .eq("building_id", building_uuid)
+            .order("time", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if hist_resp.data:
+            live_readings = hist_resp.data[0]
+
+    return {
+        "equipment": equipment_status,
+        "diffusers": diffusers,
+        "live_readings": live_readings,
+        "equipment_count": len(equipment_status),
+    }
+
+
 async def diagnose_comfort_complaint(
     desk_id: str, complaint_type: str, building: str | None = None, additional_info: str | None = None
 ) -> dict[str, Any]:
     """
     Diagnose a comfort complaint for a specific desk.
 
-    Uses desk location, HVAC zone data, and DALI sensors to determine
-    the root cause and suggest actions.
+    Queries ALL zone equipment (FCU, VAV, AHU, temp/CO2/humidity sensors,
+    diffusers) and uses their status + readings for diagnosis.
 
     Args:
-        desk_id: Desk identifier (e.g., "201", "L12-25")
+        desk_id: Desk identifier (e.g., "205")
         complaint_type: Type of complaint: "too_hot", "too_cold", "stuffy", "drafty"
-        building: Optional building name for disambiguation
+        building: Optional building code (defaults to site-002)
         additional_info: Any additional context from the technician
 
     Returns:
@@ -1286,21 +1379,68 @@ async def diagnose_comfort_complaint(
         if not desk_info.get("success"):
             return desk_info  # Pass through the error/prompt
 
-        # Get current time for solar analysis
-        from datetime import datetime
+        zone = desk_info.get("zone", {}) or {}
+        hvac = desk_info.get("hvac", {}) or {}
+        dali = desk_info.get("dali", {}) or {}
+        desk = desk_info.get("desk", {}) or {}
 
+        # Get ALL equipment status for this zone
+        building_code = building or SANDTON_SITE_ID
+        zone_equip = await _get_zone_equipment_status(zone, building_code)
+        equipment = zone_equip["equipment"]
+        live = zone_equip["live_readings"]
+        diffusers = zone_equip["diffusers"]
+
+        # Use live readings if available, fall back to zone table values
+        current_temp = live.get("temp") or zone.get("current_temp") or 22
+        current_humidity = live.get("humidity")
+        current_co2 = live.get("co2")
+        setpoint = live.get("setpoint") or zone.get("setpoint") or 22
+        occupancy = live.get("occupancy")
+        current_temp = float(current_temp)
+        setpoint = float(setpoint)
+        temp_diff = current_temp - setpoint
+
+        # Get current time for solar analysis
         current_hour = datetime.now().hour
         is_afternoon = 12 <= current_hour <= 18
+        is_morning = 6 <= current_hour <= 11
 
-        # Analyze based on complaint type and context
+        # Check equipment health — any faulted equipment?
+        faulted = [e for e in equipment.values() if e.get("status") == "fault" or (e.get("health_score") or 100) < 50]
+        degraded = [e for e in equipment.values() if 50 <= (e.get("health_score") or 100) < 80]
+
+        # Build equipment summary for the response
+        equip_summary = {}
+        for code, e in equipment.items():
+            equip_summary[code] = {
+                "type": e.get("type"),
+                "status": e.get("status"),
+                "health": e.get("health_score"),
+            }
+
+        # Build diagnosis
         diagnosis = {
             "success": True,
             "desk_id": desk_id,
             "complaint_type": complaint_type,
-            "desk_info": desk_info.get("desk"),
-            "zone_info": desk_info.get("zone"),
-            "hvac_info": desk_info.get("hvac"),
-            "dali_info": desk_info.get("dali"),
+            "desk_info": desk,
+            "zone_info": zone,
+            "hvac_info": hvac,
+            "dali_info": dali,
+            "readings": {
+                "temperature": current_temp,
+                "setpoint": setpoint,
+                "temp_diff": round(temp_diff, 1),
+                "humidity": current_humidity,
+                "co2_ppm": current_co2,
+                "occupancy": occupancy,
+            },
+            "zone_equipment": equip_summary,
+            "equipment_count": zone_equip["equipment_count"],
+            "faulted_equipment": [
+                k for k, e in equipment.items() if e.get("status") == "fault" or (e.get("health_score") or 100) < 50
+            ],
             "diagnosis": None,
             "root_cause": None,
             "confidence": "medium",
@@ -1309,83 +1449,118 @@ async def diagnose_comfort_complaint(
             "dispatch_required": False,
         }
 
-        zone = desk_info.get("zone", {}) or {}
-        dali = desk_info.get("dali", {}) or {}
-        desk = desk_info.get("desk", {}) or {}
+        # If any equipment is faulted, that's the likely cause regardless of complaint type
+        if faulted:
+            fault_codes = [f"{e.get('type')} {k}" for k, e in equipment.items() if e in faulted]
+            diagnosis["root_cause"] = f"Equipment fault detected: {', '.join(fault_codes)}"
+            diagnosis["confidence"] = "high"
+            diagnosis["diagnosis"] = (
+                f"Zone {zone.get('zone_id')} has {len(faulted)} faulted equipment: "
+                f"{', '.join(fault_codes)}. This is the most likely cause of the {complaint_type} complaint."
+            )
+            diagnosis["suggested_actions"] = [
+                f"Inspect faulted equipment: {', '.join(fault_codes)}",
+                "Check equipment alerts for error codes",
+                "Dispatch technician for repair",
+            ]
+            diagnosis["dispatch_required"] = True
+            return diagnosis
 
-        current_temp = zone.get("current_temp", 22)
-        setpoint = zone.get("setpoint", 22)
-        temp_diff = current_temp - setpoint if current_temp and setpoint else 0
+        # Diagnose based on complaint type + full equipment context
+        fcu_id = hvac.get("fcu_id", "unknown")
+        vav_id = hvac.get("vav_id", "unknown")
+        ahu_id = hvac.get("ahu_id", "unknown")
+        ts_id = hvac.get("temp_sensor", "unknown")
+        co2_id = hvac.get("co2_sensor", "unknown")
+        rh_id = hvac.get("humidity_sensor", "unknown")
+        diffuser_id = desk.get("diffuser_id") or (diffusers[0]["code"] if diffusers else "unknown")
 
-        # Diagnose based on complaint type
         if complaint_type in ["too_hot", "hot"]:
             if desk.get("near_window") and is_afternoon:
+                orientation = desk.get("orientation", "")
+                solar_note = ""
+                if orientation == "N":
+                    solar_note = " North-facing window receives direct sun most of the day (southern hemisphere)."
+                elif orientation == "E" and is_morning:
+                    solar_note = " East-facing window receiving morning sun."
+                elif orientation == "W" and is_afternoon:
+                    solar_note = " West-facing window receiving afternoon sun."
                 diagnosis["root_cause"] = "Solar heat gain from window"
                 diagnosis["confidence"] = "high"
                 diagnosis["diagnosis"] = (
-                    f"Desk {desk_id} is near a window and it's"
-                    f" {current_hour}:00 (afternoon). Solar radiation"
-                    " is likely causing localized heating"
-                    " despite HVAC working correctly."
+                    f"Desk {desk_id} is near a {orientation}-facing window at {current_hour}:00.{solar_note}"
+                    f" Zone temp: {current_temp}°C (setpoint {setpoint}°C)."
+                    f" Sensor {ts_id} reading confirmed."
                 )
                 diagnosis["suggested_actions"] = [
                     "Close blinds/shades near the desk",
-                    "Temporarily boost zone cooling by 2°C for 2 hours",
-                    "Offer to relocate user to shaded desk (away from windows)",
+                    f"Temporarily lower {fcu_id} setpoint by 2°C for 2 hours",
+                    f"Verify {vav_id} damper is open to increase airflow",
+                    "Offer to relocate user to shaded desk",
                 ]
             elif dali.get("high_daylight"):
                 diagnosis["root_cause"] = "High daylight/solar gain detected by DALI sensors"
                 diagnosis["confidence"] = "high"
                 diagnosis["diagnosis"] = (
-                    f"DALI sensors show {dali.get('avg_lux', 0)} lux"
-                    " at this location - significantly above"
-                    " normal. This indicates direct sunlight"
-                    " causing heat gain."
+                    f"DALI sensors show {dali.get('avg_lux', 0)} lux at this location."
+                    f" Zone temp: {current_temp}°C. Direct sunlight causing heat gain."
                 )
                 diagnosis["suggested_actions"] = [
                     "Reduce lighting levels (daylight harvesting)",
                     "Close blinds to reduce solar load",
-                    "Boost cooling temporarily",
+                    f"Boost cooling via {fcu_id} temporarily",
                 ]
             elif temp_diff > 1.5:
                 diagnosis["root_cause"] = "Zone temperature above setpoint"
                 diagnosis["confidence"] = "high"
                 diagnosis["diagnosis"] = (
-                    f"Zone is {temp_diff:.1f}°C above setpoint"
-                    f" ({current_temp}°C vs {setpoint}°C target)."
-                    " HVAC may be undersized or equipment fault."
+                    f"Sensor {ts_id} reads {current_temp}°C — {temp_diff:.1f}°C above"
+                    f" setpoint ({setpoint}°C). FCU {fcu_id} may be undersized or struggling."
                 )
+                if current_humidity and current_humidity > 60:
+                    diagnosis["diagnosis"] += f" Humidity is high ({current_humidity}% via {rh_id})."
+                if current_co2 and current_co2 > 800:
+                    diagnosis["diagnosis"] += f" CO2 elevated ({current_co2}ppm via {co2_id}) — high occupancy."
                 diagnosis["suggested_actions"] = [
-                    f"Check FCU {zone.get('fcu_id', 'unknown')} for faults",
-                    "Verify supply air temperature",
-                    "Check if zone is overcrowded",
+                    f"Check FCU {fcu_id} — verify fan running and coil valve open",
+                    f"Check VAV {vav_id} damper position — should be >70% open",
+                    f"Verify temp sensor {ts_id} calibration",
+                    f"Check AHU {ahu_id} supply air temperature",
                 ]
+                if degraded:
+                    degraded_info = ", ".join(
+                        e.get("type", "?") + " " + k for k, e in equipment.items() if e in degraded
+                    )
+                    diagnosis["suggested_actions"].append(f"Degraded equipment detected: {degraded_info}")
                 diagnosis["dispatch_required"] = True
             elif desk.get("near_printer"):
                 diagnosis["root_cause"] = "Local heat source (printer/equipment)"
                 diagnosis["confidence"] = "medium"
                 diagnosis["diagnosis"] = (
-                    f"Desk {desk_id} is near a printer or other"
-                    " heat-generating equipment. This creates"
-                    " a localized hot spot."
+                    f"Desk {desk_id} is near a printer/heat source."
+                    f" Zone temp: {current_temp}°C (setpoint {setpoint}°C) — zone HVAC is OK."
+                    " Localized hot spot from equipment."
                 )
                 diagnosis["suggested_actions"] = [
                     "Relocate printer or add local extraction",
+                    f"Open nearest diffuser {diffuser_id} wider for more airflow",
                     "Consider desk relocation",
-                    "Add small desk fan as temporary measure",
                 ]
             else:
-                diagnosis["root_cause"] = "Unknown - requires investigation"
+                diagnosis["root_cause"] = "Unknown — requires investigation"
                 diagnosis["confidence"] = "low"
-                diagnosis["diagnosis"] = (
-                    f"No obvious cause found. Zone temp is"
-                    f" {current_temp}°C (setpoint {setpoint}°C)."
-                    " May need on-site inspection."
-                )
+                diag_parts = [f"Zone temp: {current_temp}°C (setpoint {setpoint}°C)."]
+                if current_humidity:
+                    diag_parts.append(f"Humidity: {current_humidity}% ({rh_id}).")
+                if current_co2:
+                    diag_parts.append(f"CO2: {current_co2}ppm ({co2_id}).")
+                diag_parts.append("No obvious cause — needs on-site inspection.")
+                diagnosis["diagnosis"] = " ".join(diag_parts)
                 diagnosis["suggested_actions"] = [
-                    "Check for blocked diffusers near desk",
-                    "Verify VAV damper position",
-                    "Check occupancy levels in zone",
+                    f"Check diffusers near desk {desk_id} for blockages",
+                    f"Verify VAV {vav_id} damper position",
+                    f"Check CO2 sensor {co2_id} — high occupancy?",
+                    f"Inspect FCU {fcu_id} filter condition",
                 ]
                 diagnosis["dispatch_required"] = True
 
@@ -1393,14 +1568,15 @@ async def diagnose_comfort_complaint(
             if desk.get("near_diffuser"):
                 diagnosis["root_cause"] = "Direct airflow from supply diffuser"
                 diagnosis["confidence"] = "high"
+                diff_code = desk.get("diffuser_id") or diffuser_id
                 diagnosis["diagnosis"] = (
-                    f"Desk {desk_id} is directly under or near a"
-                    " supply diffuser. Cold supply air is"
-                    " causing discomfort."
+                    f"Desk {desk_id} is near diffuser {diff_code}."
+                    f" Cold supply air causing discomfort."
+                    f" Zone temp: {current_temp}°C (setpoint {setpoint}°C)."
                 )
                 diagnosis["suggested_actions"] = [
-                    f"Adjust VAV damper {zone.get('vav_id', 'unknown')} to reduce airflow",
-                    "Install diffuser deflector",
+                    f"Adjust VAV {vav_id} damper to reduce airflow to this area",
+                    f"Install deflector on diffuser {diff_code}",
                     "Relocate user away from direct airflow",
                 ]
                 diagnosis["dispatch_required"] = True
@@ -1408,71 +1584,125 @@ async def diagnose_comfort_complaint(
                 diagnosis["root_cause"] = "Zone overcooling"
                 diagnosis["confidence"] = "high"
                 diagnosis["diagnosis"] = (
-                    f"Zone is {abs(temp_diff):.1f}°C below setpoint"
-                    f" ({current_temp}°C vs {setpoint}°C)."
-                    " Possible control issue."
+                    f"Sensor {ts_id} reads {current_temp}°C — {abs(temp_diff):.1f}°C below"
+                    f" setpoint ({setpoint}°C). Possible control issue."
                 )
                 diagnosis["suggested_actions"] = [
-                    "Raise zone setpoint by 1-2°C",
-                    "Check cooling valve position",
-                    "Verify temperature sensor calibration",
+                    f"Raise {fcu_id} setpoint by 1-2°C",
+                    f"Check {fcu_id} cooling valve — may be stuck open",
+                    f"Verify temp sensor {ts_id} calibration",
                 ]
             else:
                 diagnosis["root_cause"] = "Personal comfort preference"
                 diagnosis["confidence"] = "medium"
                 diagnosis["diagnosis"] = (
-                    f"Zone temperature ({current_temp}°C) is close"
-                    f" to setpoint ({setpoint}°C)."
-                    " May be personal preference."
+                    f"Zone temp ({current_temp}°C) is close to setpoint ({setpoint}°C)."
+                    " May be personal preference or localized draft."
                 )
-                diagnosis["suggested_actions"] = [
-                    "Offer desk heater (temporary)",
-                    "Check for drafts from windows/doors",
-                    "Consider desk relocation to warmer area",
-                ]
+                if current_humidity and current_humidity < 30:
+                    diagnosis["diagnosis"] += f" Low humidity ({current_humidity}%) can increase cold sensation."
+                    diagnosis["suggested_actions"].append("Consider portable humidifier")
+                diagnosis["suggested_actions"].extend(
+                    [
+                        "Offer desk heater (temporary)",
+                        f"Check diffusers near desk for draft — closest: {diffuser_id}",
+                        "Consider desk relocation to warmer area",
+                    ]
+                )
 
         elif complaint_type in ["stuffy", "poor_air", "stale"]:
-            if dali.get("occupancy_percent", 0) > 70:
-                diagnosis["root_cause"] = "High occupancy causing CO2 buildup"
+            co2_high = current_co2 and current_co2 > 800
+            humidity_high = current_humidity and current_humidity > 60
+            occ_high = dali.get("occupancy_percent", 0) > 70 or (occupancy and occupancy > 15)
+
+            if co2_high:
+                diagnosis["root_cause"] = f"High CO2 ({current_co2}ppm) — poor ventilation"
                 diagnosis["confidence"] = "high"
                 diagnosis["diagnosis"] = (
-                    f"Zone occupancy is"
-                    f" {dali.get('occupancy_percent', 0):.0f}%"
-                    " - high density is likely causing"
-                    " poor air quality."
+                    f"CO2 sensor {co2_id} reads {current_co2}ppm (>800ppm threshold)."
+                    f" Fresh air intake insufficient."
+                )
+                if humidity_high:
+                    diagnosis["diagnosis"] += f" Humidity also elevated: {current_humidity}% ({rh_id})."
+                diagnosis["suggested_actions"] = [
+                    f"Increase fresh air damper on AHU {ahu_id}",
+                    f"Check VAV {vav_id} minimum airflow setting",
+                    f"Verify CO2 sensor {co2_id} calibration",
+                ]
+            elif occ_high:
+                diagnosis["root_cause"] = "High occupancy causing CO2 buildup"
+                diagnosis["confidence"] = "high"
+                occ_pct = dali.get("occupancy_percent", occupancy or 0)
+                diagnosis["diagnosis"] = (
+                    f"Zone occupancy ~{occ_pct}% — high density causing poor air quality."
+                    f" CO2: {current_co2 or 'no reading'}ppm. Humidity: {current_humidity or 'no reading'}%."
                 )
                 diagnosis["suggested_actions"] = [
-                    "Increase fresh air damper on AHU",
-                    "Check CO2 sensor readings",
+                    f"Increase fresh air damper on AHU {ahu_id}",
+                    f"Boost VAV {vav_id} minimum airflow",
                     "Consider temporary portable air purifier",
                 ]
             else:
                 diagnosis["root_cause"] = "Insufficient ventilation"
                 diagnosis["confidence"] = "medium"
-                diagnosis[
-                    "diagnosis"
-                ] = "Air quality complaint despite normal occupancy. May be ventilation equipment issue."
+                diagnosis["diagnosis"] = (
+                    f"Air quality complaint. CO2: {current_co2 or 'no reading'}ppm ({co2_id})."
+                    f" Humidity: {current_humidity or 'no reading'}% ({rh_id})."
+                    " May be ventilation equipment issue."
+                )
                 diagnosis["suggested_actions"] = [
-                    f"Check FCU {zone.get('fcu_id', 'unknown')} fan status",
-                    "Verify fresh air damper position",
-                    "Check for blocked return air grilles",
+                    f"Check FCU {fcu_id} fan status — may be off or on low speed",
+                    f"Verify AHU {ahu_id} fresh air damper position",
+                    "Check for blocked return air grilles near desk",
+                    f"Read CO2 sensor {co2_id} and humidity sensor {rh_id} directly",
                 ]
                 diagnosis["dispatch_required"] = True
 
         elif complaint_type in ["drafty", "draft", "windy"]:
-            diagnosis["root_cause"] = "Excessive airflow or infiltration"
-            diagnosis["confidence"] = "medium"
-            diagnosis[
-                "diagnosis"
-            ] = f"Draft complaint at desk {desk_id}. Could be supply diffuser, window seals, or door proximity."
-            diagnosis["suggested_actions"] = [
-                "Check nearby diffuser airflow direction",
-                "Inspect window seals for gaps",
-                "Install draft deflector if near diffuser",
-            ]
+            diff_code = desk.get("diffuser_id") or diffuser_id
             if desk.get("near_diffuser"):
+                diagnosis["root_cause"] = f"Supply diffuser {diff_code} causing draft"
                 diagnosis["confidence"] = "high"
-                diagnosis["root_cause"] = "Supply diffuser causing draft"
+                diagnosis["diagnosis"] = (
+                    f"Desk {desk_id} is near diffuser {diff_code}." f" VAV {vav_id} airflow may be too high."
+                )
+                diagnosis["suggested_actions"] = [
+                    f"Reduce VAV {vav_id} maximum airflow setting",
+                    f"Install deflector on diffuser {diff_code}",
+                    f"Check {vav_id} damper — may be fully open",
+                ]
+            elif desk.get("near_window"):
+                diagnosis["root_cause"] = "Window infiltration or poor seals"
+                diagnosis["confidence"] = "medium"
+                diagnosis["diagnosis"] = (
+                    f"Desk {desk_id} is near a window. Draft may be from window seals." f" Zone temp: {current_temp}°C."
+                )
+                diagnosis["suggested_actions"] = [
+                    "Inspect window seals for gaps",
+                    "Check if window is slightly open",
+                    f"Verify nearest diffuser {diff_code} direction",
+                ]
+            else:
+                diagnosis["root_cause"] = "Excessive airflow or infiltration"
+                diagnosis["confidence"] = "medium"
+                diagnosis["diagnosis"] = (
+                    f"Draft complaint at desk {desk_id}."
+                    f" Could be diffuser, window seals, or door proximity."
+                    f" Nearest diffuser: {diff_code}."
+                )
+                diagnosis["suggested_actions"] = [
+                    f"Check diffuser {diff_code} airflow direction",
+                    "Inspect window seals for gaps",
+                    f"Verify VAV {vav_id} damper position",
+                ]
+            diagnosis["dispatch_required"] = True
+
+        # Add degraded equipment warning if any
+        if degraded:
+            deg_list = [
+                f"{e.get('type')} {k} (health: {e.get('health_score')}%)" for k, e in equipment.items() if e in degraded
+            ]
+            diagnosis["suggested_actions"].append(f"Note: degraded equipment in zone: {', '.join(deg_list)}")
 
         return diagnosis
 

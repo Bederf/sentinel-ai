@@ -43,7 +43,7 @@ Since the original gap analysis, the following controls have been implemented:
 | API Keys Migrated to DB (hashed, revocable) | Logical Access Control | 65-03 | ✅ Complete |
 | Subprocess Call Sanitization | Application Security | 58-04 | ✅ Complete |
 | MFA for Admin Access (TOTP, pyotp) | Logical Access Control | 58.1 | ✅ Complete |
-| Privacy Impact Assessments (Claude API, Clawd) | Risk & Compliance | 58.1 | ✅ Complete |
+| Privacy Impact Assessments (Claude API, Sentry) | Risk & Compliance | 58.1 | ✅ Complete |
 | POPIA Section 72 Cross-Border Register | Risk & Compliance | 58.1 | ✅ Complete |
 | Security Documentation Suite (27 documents) | Governance | 63-64 | ✅ Complete |
 | SAST/DAST in CI (Bandit, safety, pip-audit, Trivy, gitleaks) | Vulnerability Mgmt | 63-64 | ✅ Complete |
@@ -367,7 +367,7 @@ SELECT cleanup_old_login_logs(90);
 | 58-04 | Generic error handler (production-safe) | ✅ Complete |
 | 58-04 | JWT expiration reduced to 8 hours | ✅ Complete |
 | 58.1 | MFA for admin access (TOTP, pyotp) | ✅ Complete |
-| 58.1 | Privacy Impact Assessments (Claude API, Clawd) | ✅ Complete |
+| 58.1 | Privacy Impact Assessments (Claude API, Sentry) | ✅ Complete |
 | 58.1 | POPIA Section 72 cross-border register | ✅ Complete |
 
 ### 4.2 Remaining Items
@@ -421,7 +421,7 @@ SELECT cleanup_old_login_logs(90);
 | Third-Party Security Register | `docs/08-security/third-party-security-register.md` | Third Party Mgmt |
 | Risk Register | `docs/08-security/information-security-risk-register.md` | Risk & Compliance |
 | PIA — Claude API | `docs/08-security/pia-claude-api.md` | Risk & Compliance |
-| PIA — Clawd Messaging | `docs/08-security/pia-clawd-messaging.md` | Risk & Compliance |
+| PIA — Sentry Messaging | `docs/08-security/pia-sentry-messaging.md` | Risk & Compliance |
 | POPIA Cross-Border Register | `docs/08-security/popia-cross-border-register.md` | Risk & Compliance |
 | Security & Privacy Architecture | `docs/SECURITY-PRIVACY.md` | Multiple |
 | Audit logging documentation | `docs/06-safety-compliance/audit-logging.md` | Audit |

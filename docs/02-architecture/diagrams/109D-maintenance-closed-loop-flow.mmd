@@ -1,0 +1,9 @@
+flowchart TD
+    A[Health threshold crossed] --> B[Create alert]
+    B --> C[Auto-create work order]
+    C --> D[Dispatch WO to technician channels]
+    D --> E[Technician executes and submits evidence]
+    E --> F[Validate completion package]
+    F --> G[Update equipment health and baseline deviation]
+    G --> H[Close WO and alert]
+    H --> I[Trigger recommendation refresh]

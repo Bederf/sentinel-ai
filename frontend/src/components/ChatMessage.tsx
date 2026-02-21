@@ -10,14 +10,20 @@
 
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
+import { Volume2, Loader2 } from "lucide-react";
 
 interface ChatMessageProps {
   role: "user" | "assistant";
   content: string;
   isStreaming?: boolean;
+  messageId?: string;
+  /** Callback to speak the message text (only for assistant messages with TTS) */
+  onSpeak?: (text: string, messageId: string) => void;
+  /** TTS state for this specific message */
+  ttsState?: { isLoading: boolean; isPlaying: boolean };
 }
 
-export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
+export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, ttsState }: ChatMessageProps) {
   const isUser = role === "user";
   const [displayedContent, setDisplayedContent] = useState("");
   const [charIndex, setCharIndex] = useState(0);
@@ -262,6 +268,39 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
                 style={{ background: "var(--color-grafana-orange)" }}
                 aria-label="typing"
               />
+            )}
+            {/* Speaker button for TTS (non-streaming assistant messages only) */}
+            {onSpeak && !isStreaming && messageId && (
+              <button
+                type="button"
+                onClick={() => onSpeak(content, messageId)}
+                disabled={ttsState?.isLoading}
+                className="flex items-center gap-1.5 mt-2 px-2 py-1 rounded text-xs transition-all hover:brightness-110"
+                style={{
+                  background: ttsState?.isPlaying
+                    ? "rgba(50, 116, 217, 0.2)"
+                    : "transparent",
+                  border: "1px solid var(--color-grafana-border)",
+                  color: ttsState?.isPlaying
+                    ? "var(--color-grafana-blue)"
+                    : "var(--color-grafana-text-secondary)",
+                  cursor: ttsState?.isLoading ? "wait" : "pointer",
+                }}
+                aria-label={ttsState?.isPlaying ? "Stop audio" : "Listen to response"}
+              >
+                {ttsState?.isLoading ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Volume2 className="w-3 h-3" />
+                )}
+                <span>
+                  {ttsState?.isLoading
+                    ? "Loading..."
+                    : ttsState?.isPlaying
+                      ? "Playing..."
+                      : "Listen"}
+                </span>
+              </button>
             )}
           </div>
         )}

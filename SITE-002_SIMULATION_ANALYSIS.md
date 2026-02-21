@@ -53,7 +53,7 @@ Health Restored → Dashboard Updated
 │  Hour 10:00  → Peak Load Begins (occupancy: 80%)           │
 │  Hour 11:00* → FAULT INJECTION (equipment fails)           │
 │              → Alert Created in Supabase                    │
-│              → Clawd Notification to FM Team               │
+│              → Sentry Notification to FM Team               │
 │              → Work Order Auto-Created                      │
 │              → Technician Auto-Assigned                     │
 │  Hour 12:00  → Inspection Period                            │
@@ -90,7 +90,7 @@ Health Restored → Dashboard Updated
 - Triggers SSE event (real-time dashboard update)
 - Toast notification: "⚠️ S002-CHILLER-B1-002 - Critical Alert (30% health)"
 
-**4. Clawd Notification (Hour 11)**
+**4. Sentry Notification (Hour 11)**
 - Telegram message sent to FM team
 - Includes: Equipment name, health, severity, action buttons
 - Button: `/inspect_S002_CHILLER_B1_002`
@@ -419,7 +419,7 @@ psql postgresql://postgres:postgres@127.0.0.1:55322/postgres \
    - Alert creation: ✓ (Supabase)
    - Work order creation: ✓ (Supabase)
    - SSE events: ✓ (Real-time dashboard)
-   - Clawd notifications: ✓ (Telegram)
+   - Sentry notifications: ✓ (Telegram)
 
 3. **Run the simulation**
    ```bash

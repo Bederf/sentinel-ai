@@ -18,7 +18,7 @@ export type ModuleType =
   // Paid add-ons
   | 'control' | 'maintenance' | 'digital_twin'
   // Building system add-ons
-  | 'lighting' | 'fire' | 'security' | 'solar' | 'sustainability' | 'water' | 'contracts';
+  | 'lighting' | 'fire' | 'access' | 'security' | 'solar' | 'sustainability' | 'water' | 'contracts';
 export type ModuleStatus = 'active' | 'inactive' | 'error' | 'maintenance';
 export type RecommendationType = 'optimization' | 'maintenance' | 'alert' | 'cross_system' | 'predictive';
 export type RecommendationPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -381,6 +381,7 @@ export const MODULE_ICONS: Record<ModuleType, string> = {
   security: 'shield-check',
   lighting: 'sun',
   fire: 'flame',
+  access: 'key-round',
   solar: 'sun',
   water: 'droplets',
   ml: 'bar-chart',
@@ -402,6 +403,7 @@ export const MODULE_COLORS: Record<ModuleType, string> = {
   security: 'purple',
   lighting: 'yellow',
   fire: 'red',
+  access: 'violet',
   solar: 'yellow',
   water: 'blue',
   ml: 'cyan',

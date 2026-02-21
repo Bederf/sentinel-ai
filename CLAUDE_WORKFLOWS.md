@@ -86,7 +86,7 @@ Dashboard updates real-time (SSE): equipment status green ✅
 
 - **Alert creation:** `backend/app/api/alerts.py`, triggers in `supabase/migrations/`
 - **Work order:** `backend/app/api/work_orders.py`, `work_order_repository.py`
-- **Notification:** `backend/app/api/clawd_webhooks.py`, `background_scheduler.py` (30s job)
+- **Notification:** `backend/app/api/sentry_webhooks.py`, `background_scheduler.py` (30s job)
 - **Feedback:** `backend/app/api/service_feedback.py`, `feedback_collection_service.py`
 
 ### Example Timeline (fault_day simulation)

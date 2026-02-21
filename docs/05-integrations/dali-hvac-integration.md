@@ -431,12 +431,12 @@ Diagnosis: "HVAC FAULT + Energy waste - empty zone with full lighting"
 | PIR-L12-FAULT-001 | Sensor | Sensor fault, 0 lux reading |
 | DALI-L11-04 | Controller | Offline status |
 
-## Integration with Clawd (Telegram)
+## Integration with Sentry (Telegram)
 
-The DALI-HVAC integration is exposed to Clawd via the BMS desk diagnosis tool:
+The DALI-HVAC integration is exposed to Sentry via the BMS desk diagnosis tool:
 
 ```python
-# Clawd tool: bms_desk_diagnosis.py
+# Sentry tool: bms_desk_diagnosis.py
 # Parses messages like "user at desk 201 is too hot"
 
 result = handler.handle_complaint(
@@ -513,4 +513,4 @@ Check:
 - [DALI API Reference](../03-api-reference/dali-api.md)
 - [Comfort Complaints API](../03-api-reference/complaints-api.md)
 - [Building Data Loader](../02-architecture/building-loader.md)
-- [Clawd Integration](CLAWD_INTEGRATION.md)
+- [Sentry Integration](SENTRY_INTEGRATION.md)

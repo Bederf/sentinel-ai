@@ -227,7 +227,7 @@ anomaly = SentinelAnomaly(
 | Source | Description | Example |
 |--------|-------------|---------|
 | `BMS_ANOMALY` | Detected from BMS telemetry by ML models | Vibration spike, temperature drift |
-| `OCCUPANT_REQUEST` | Via WhatsApp/Telegram (Clawd bot) | "It's too hot on Level 2" |
+| `OCCUPANT_REQUEST` | Via WhatsApp/Telegram (Sentry bot) | "It's too hot on Level 2" |
 | `PPM_CONDITION` | Condition-based preventive maintenance trigger | RUL below threshold |
 | `MANUAL_ESCALATION` | Manually created by operator | Technician reports issue |
 | `SYSTEM_ALERT` | Infrastructure alert | Network failure, sensor offline |

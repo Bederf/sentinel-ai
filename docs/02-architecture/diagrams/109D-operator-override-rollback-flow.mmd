@@ -1,0 +1,12 @@
+flowchart TD
+    A[Recommendation created] --> B[Operator review in supervised mode]
+    B --> C{Operator decision}
+    C -->|Reject| D[Log rejection reason and close recommendation]
+    C -->|Approve| E[Apply planned action]
+    C -->|Approve override| F[Apply override action]
+    E --> G[Post-action verification]
+    F --> G
+    G -->|Pass| H[Log success and close]
+    G -->|Fail| I[Execute rollback path]
+    I --> J[Log rollback and incident]
+    J --> K[Feed outcome to feedback loop]

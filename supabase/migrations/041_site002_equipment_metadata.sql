@@ -1,5 +1,5 @@
 -- Migration 041: Populate location and manufacturer for site-002 equipment
--- These fields were empty after auto-discovery from Niagara, causing N/A in Clawd bot alerts
+-- These fields were empty after auto-discovery from Niagara, causing N/A in Sentry bot alerts
 -- Data sourced from mock_devices.json equipment specs and building layout
 
 -- ============================================================================

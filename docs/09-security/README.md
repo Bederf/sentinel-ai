@@ -61,7 +61,7 @@ This directory contains the SENTINEL Information Security Policy Suite -- the go
 | [Information Classification Policy](information-classification-policy.md) | Classification scheme, labelling, handling procedures | Complete |
 | [Privacy Impact Assessment Template](privacy-impact-assessment-template.md) | PIA template for new systems/features | Complete |
 | [PIA: Claude API](pia-claude-api.md) | Privacy impact assessment for Claude API integration | Complete |
-| [PIA: Clawd Messaging](pia-clawd-messaging.md) | Privacy impact assessment for Telegram/WhatsApp messaging | Complete |
+| [PIA: Sentry Messaging](pia-sentry-messaging.md) | Privacy impact assessment for Telegram/WhatsApp messaging | Complete |
 | [POPIA Cross-Border Register](popia-cross-border-register.md) | Register of cross-border data transfers | Complete |
 
 ### HR, Crypto, Assets & Audit (Phase 64-06)

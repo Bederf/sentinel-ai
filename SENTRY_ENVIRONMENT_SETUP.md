@@ -6,7 +6,7 @@
 
 ## Overview
 
-After renaming from OpenClaw to SENTRY, all hardcoded paths are replaced with the `$SENTRY_HOME` environment variable. This enables **single deployment image** to work across:
+After renaming from Sentry to SENTRY, all hardcoded paths are replaced with the `$SENTRY_HOME` environment variable. This enables **single deployment image** to work across:
 
 - ✅ Development VM (`/home/bederf/.sentry`)
 - ✅ Jetson appliance (`/opt/sentry`)
@@ -388,7 +388,7 @@ After rename, these hardcoded paths become `$SENTRY_HOME`:
 | `$SENTRY_HOME` | `$SENTRY_HOME` | bot.py, tools/*.py, handlers/*.py |
 | `$SENTRY_HOME` | `$SENTRY_HOME` | config files, docs |
 | `$SENTRY_HOME` | `$SENTRY_HOME` | shell scripts |
-| `~/.clawd` | `$SENTRY_HOME` | shell scripts, documentation |
+| `~/.sentry` | `$SENTRY_HOME` | shell scripts, documentation |
 
 All are replaced with the literal string `$SENTRY_HOME` so that at runtime, the environment variable is expanded.
 

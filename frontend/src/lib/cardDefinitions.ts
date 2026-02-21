@@ -92,54 +92,7 @@ export function getDemoDefaultCards(email: string): {
   kpiCards: string[];
   sections: string[];
 } {
-  const normalized = email.toLowerCase().trim();
-
-  // Wardew demo (Grant) — DALI lighting focus
-  if (normalized.endsWith('@wardew.co.za')) {
-    return {
-      kpiCards: [
-        'kpi-protected-sites',
-        'kpi-monitored-assets',
-      ],
-      sections: [
-        'kpi-row',
-        'site-protection',
-        'lighting-intelligence',  // His core module
-        'energy-comparison',      // Energy metrics
-        'energy-comparison-actual-vs-sentinel',  // Energy savings - the money shot
-        'comfort-assistant',      // Cross-module intelligence
-        'occupancy-dashboard',    // PIR sensors + automation
-      ],
-    };
-  }
-
-  // Bederf demo (bederf@protonmail.com) — Solar & BESS focus
-  if (normalized === 'bederf@protonmail.com') {
-    return {
-      kpiCards: [
-        'kpi-protected-sites',
-        'kpi-monitored-assets',
-        'kpi-active-risks',
-        'kpi-risk-predictions',
-      ],
-      sections: [
-        'solar-bess',             // His core module - system status
-        'solar-annual',           // Annual performance
-        'energy-comparison-actual-vs-sentinel',  // Energy savings
-        'risk-predictions',       // AI monitoring
-      ],
-    };
-  }
-
-  // Bederf demo (bederf@gmail.com) — Full platform access, all modules + cards
-  if (normalized === 'bederf@gmail.com') {
-    return {
-      kpiCards: DEFAULT_KPI_CARDS,
-      sections: DEFAULT_SECTIONS,
-    };
-  }
-
-  // Default for all other users
+  // All demo users get full access — users manage visibility from settings page
   return {
     kpiCards: DEFAULT_KPI_CARDS,
     sections: DEFAULT_SECTIONS,

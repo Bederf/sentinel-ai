@@ -11,12 +11,14 @@
 
 import { useState, useRef, useEffect } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
-import { Send, MessageSquare, Bot, BookOpen } from "lucide-react";
+import { Send, MessageSquare, Bot, BookOpen, Mic, MicOff } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
 import { DocumentUpload } from "./DocumentUpload";
 import { BuildingSelector } from "./BuildingSelector";
 import api, { isExpectedApiError, streamChat } from '@/lib/api';
 import type { Site } from '@/lib/api';
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 
 interface Message {
   id: string;
@@ -36,6 +38,12 @@ export function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const hasLoadedSitesRef = useRef(false);
+
+  // Voice chat hooks
+  const stt = useSpeechRecognition({
+    onResult: (text) => setInput(text),
+  });
+  const tts = useTextToSpeech();
 
   // Fetch sites on mount
   useEffect(() => {
@@ -77,6 +85,22 @@ export function Chat() {
     };
     loadSites();
   }, []);
+
+  // Check TTS availability on mount
+  useEffect(() => {
+    const checkTts = async () => {
+      try {
+        const resp = await fetch("/api/chat/status");
+        if (resp.ok) {
+          const data = await resp.json();
+          tts.setAvailable(data.features?.tts === true);
+        }
+      } catch {
+        // TTS unavailable, no action needed
+      }
+    };
+    checkTts();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -234,7 +258,25 @@ export function Chat() {
         )}
 
         {messages.map((msg) => (
-          <ChatMessage key={msg.id} role={msg.role} content={msg.content} />
+          <ChatMessage
+            key={msg.id}
+            messageId={msg.id}
+            role={msg.role}
+            content={msg.content}
+            onSpeak={
+              tts.isAvailable && msg.role === "assistant"
+                ? (text, id) => tts.speak(text, id)
+                : undefined
+            }
+            ttsState={
+              tts.isAvailable && msg.role === "assistant"
+                ? {
+                    isLoading: tts.isLoading && tts.activeMessageId === msg.id,
+                    isPlaying: tts.isPlaying && tts.activeMessageId === msg.id,
+                  }
+                : undefined
+            }
+          />
         ))}
 
         {/* Streaming message */}
@@ -321,19 +363,34 @@ export function Chat() {
           )}
         </div>
 
+        {/* STT error message */}
+        {stt.error && (
+          <p className="text-xs mb-2" style={{ color: "#f44" }}>
+            {stt.error}
+          </p>
+        )}
+
         <div className="flex gap-2 md:gap-3">
           <input
             ref={inputRef}
             type="text"
-            value={input}
+            value={stt.isListening ? stt.transcript : input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={searchDocs ? "Ask about SENTINEL features..." : "Ask about building management..."}
-            disabled={isLoading}
+            placeholder={
+              stt.isListening
+                ? "Listening..."
+                : searchDocs
+                  ? "Ask about SENTINEL features..."
+                  : "Ask about building management..."
+            }
+            disabled={isLoading || stt.isListening}
             className="flex-1 px-3 py-2 md:px-4 md:py-2 text-sm md:text-base rounded focus:outline-none disabled:cursor-not-allowed"
             style={{
               background: "var(--color-grafana-bg-panel)",
-              border: "1px solid var(--color-grafana-border)",
+              border: stt.isListening
+                ? "1px solid var(--color-grafana-orange)"
+                : "1px solid var(--color-grafana-border)",
               color: "var(--color-grafana-text-primary)",
             }}
             aria-label="Chat message input"
@@ -365,6 +422,32 @@ export function Chat() {
                 ]);
               }}
             />
+          )}
+
+          {/* Mic button (only when browser supports Web Speech API) */}
+          {stt.isSupported && (
+            <button
+              type="button"
+              onClick={stt.toggleListening}
+              disabled={isLoading}
+              className="px-3 py-2 rounded flex items-center transition-all hover:brightness-110 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: stt.isListening
+                  ? "rgba(255, 68, 68, 0.2)"
+                  : "var(--color-grafana-bg-panel)",
+                border: stt.isListening
+                  ? "1px solid #f44"
+                  : "1px solid var(--color-grafana-border)",
+                color: stt.isListening
+                  ? "#f44"
+                  : "var(--color-grafana-text-secondary)",
+                animation: stt.isListening ? "pulse 1.5s ease-in-out infinite" : undefined,
+              }}
+              aria-label={stt.isListening ? "Stop listening" : "Start voice input"}
+              title={stt.isListening ? "Stop listening" : "Voice input"}
+            >
+              {stt.isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </button>
           )}
 
           <button

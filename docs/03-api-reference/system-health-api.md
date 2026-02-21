@@ -261,6 +261,130 @@ curl "http://localhost:9095/api/system/health/history?range=7d" | jq '{
 
 ---
 
+### GET /api/system/monitoring
+
+Retrieves unified monitoring snapshot for ingestion quality, control activity, commissioning readiness, and quality gate status.
+
+**Purpose:** Single endpoint consumed by deterministic onboarding policy flows (Phase 109C/109D).
+
+**Method:** `GET`  
+**Path:** `/api/system/monitoring`  
+**Authentication:** Optional  
+**Rate Limit:** 60 requests/minute  
+**Cache:** None (fresh snapshot)  
+**Query Parameters:**
+- `building_id` (optional): Building/site ID (example: `site-002`)
+
+#### Request
+
+```bash
+# Global snapshot (no building filter)
+curl -X GET http://localhost:9095/api/system/monitoring
+
+# Building-specific snapshot
+curl -X GET "http://localhost:9095/api/system/monitoring?building_id=site-002"
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "ingestion_mode": "shadow_live",
+  "is_live": true,
+  "building_id": "site-002",
+  "ingestion": {
+    "freshness_hours": 0.4,
+    "error_rate": 0.2,
+    "unmatched_points": 8,
+    "total_points": 420,
+    "match_coverage": 98.1,
+    "provenance_summary": {
+      "live_protocol": 4,
+      "file_manual": 0
+    }
+  },
+  "control": {
+    "shadow_writes_24h": 12,
+    "blocked_writes_24h": 1,
+    "approved_writes_24h": 44,
+    "safety_violations_24h": 0
+  },
+  "commissioning": {
+    "gates_passed": 8,
+    "gates_total": 8,
+    "all_gates_passed": true,
+    "consecutive_pass_days": 2,
+    "can_promote": true,
+    "blocking_gates": []
+  },
+  "alerts": [],
+  "trend_24h": [
+    {
+      "hour": "2026-02-21T08:00:00",
+      "freshness_hours": 0.0,
+      "error_rate": 0.0,
+      "shadow_writes": 1,
+      "derived": true
+    }
+  ],
+  "checked_at": "2026-02-21T10:15:00.000000",
+  "quality_gate": {
+    "overall_status": "pass",
+    "enforcement_action": "normal",
+    "mode": "shadow_live",
+    "failed_rules": [],
+    "warn_rules": [],
+    "reason_codes": [],
+    "evaluated_at": "2026-02-21T10:15:00.000000"
+  }
+}
+```
+
+#### Response Schema
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ingestion_mode` | enum | `simulation` \| `shadow_live` \| `live_control` |
+| `is_live` | boolean | True when mode is `shadow_live` or `live_control` |
+| `building_id` | string \| null | Filtered building ID if provided |
+| `ingestion` | object | Ingestion health KPIs |
+| `ingestion.freshness_hours` | float | Data age in hours |
+| `ingestion.error_rate` | float | Ingestion error rate percentage (example: `0.2` means `0.2%`) |
+| `ingestion.unmatched_points` | int | Unmatched points count |
+| `ingestion.total_points` | int | Total mapped points |
+| `ingestion.match_coverage` | float | Match coverage percentage (0-100) |
+| `ingestion.provenance_summary` | object | Source counts by provenance class |
+| `control` | object | 24h control KPIs from audit logs |
+| `commissioning` | object \| null | Commissioning summary (null in simulation or when unavailable) |
+| `alerts` | array | Monitoring rule alerts |
+| `trend_24h` | array | 24 hourly buckets |
+| `trend_24h[*].derived` | boolean | True when values are synthetic/derived from current snapshot |
+| `checked_at` | ISO 8601 | Snapshot generation time |
+| `quality_gate` | object \| null | Quality gate outcome and reason codes |
+
+#### Error responses
+
+```json
+{
+  "status": 500,
+  "message": "Monitoring snapshot failed",
+  "error": "Failed to collect monitoring data"
+}
+```
+
+| Status | Message | Cause |
+|--------|---------|-------|
+| 500 | Monitoring snapshot failed | Aggregation or downstream source failure |
+
+#### Notes for deterministic policy flows
+
+- `ingestion.provenance_summary.file_manual` is used to detect provenance breach in live stages.
+- `control.blocked_writes_24h + control.safety_violations_24h` is used as conflict signal.
+- `commissioning.*` fields gate stage promotions.
+- `quality_gate.overall_status` is used for mode-specific promotion/fail-closed decisions.
+
+---
+
 ### POST /api/system/diagnostics
 
 Triggers SIMBIOT diagnostic workflow for deep system inspection.
@@ -649,6 +773,7 @@ Public access enabled by default. To require authentication, set `REQUIRE_AUTH=t
 |----------|-------|--------|
 | GET /api/system/health | 60 req/min | Per IP |
 | GET /api/system/health/history | 30 req/min | Per IP |
+| GET /api/system/monitoring | 60 req/min | Per IP |
 | POST /api/system/diagnostics | 10 req/min | Per IP |
 | GET /api/system/diagnostics/{id} | Unlimited | (Polling) |
 | GET /api/system/error-logs | 60 req/min | Per IP |

@@ -12,14 +12,9 @@ Phase 44: Asset Baseline Assessment
 
 from typing import List, Optional, Dict, Any
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from app.models.baseline import (
-    EquipmentBaseline,
-    ElementBaseline,
-    BaselineComparison,
-    EquipmentElement
-)
+from app.models.baseline import EquipmentBaseline, ElementBaseline, BaselineComparison, EquipmentElement
 from app.database.supabase_client import get_supabase_client
 
 
@@ -39,7 +34,7 @@ class BaselineRepository:
         measurement_conditions: Optional[Dict[str, Any]] = None,
         source_type: str = "manual",
         notes: Optional[str] = None,
-        attachment_urls: Optional[List[str]] = None
+        attachment_urls: Optional[List[str]] = None,
     ) -> EquipmentBaseline:
         """Create a new equipment baseline record."""
         data = {
@@ -55,49 +50,66 @@ class BaselineRepository:
             "notes": notes,
             "attachment_urls": attachment_urls or [],
             "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat()
+            "updated_at": datetime.now().isoformat(),
         }
 
         result = get_supabase_client().table("equipment_baselines").insert(data).execute()
         return EquipmentBaseline(**result.data[0])
 
-    async def get_equipment_baseline(
-        self,
-        baseline_id: str
-    ) -> Optional[EquipmentBaseline]:
+    async def get_equipment_baseline(self, baseline_id: str) -> Optional[EquipmentBaseline]:
         """Get equipment baseline by ID."""
         result = get_supabase_client().table("equipment_baselines").select("*").eq("id", baseline_id).execute()
         if result.data:
             return EquipmentBaseline(**result.data[0])
         return None
 
-    async def get_active_equipment_baseline(
-        self,
-        equipment_id: str
-    ) -> Optional[EquipmentBaseline]:
+    async def get_active_equipment_baseline(self, equipment_id: str) -> Optional[EquipmentBaseline]:
         """Get the most recent active baseline for equipment."""
-        result = get_supabase_client().table("equipment_baselines").select("*").eq("equipment_id", equipment_id).eq("status", "active").order("baseline_date", desc=True).limit(1).execute()
+        result = (
+            get_supabase_client()
+            .table("equipment_baselines")
+            .select("*")
+            .eq("equipment_id", equipment_id)
+            .eq("status", "active")
+            .order("baseline_date", desc=True)
+            .limit(1)
+            .execute()
+        )
         if result.data:
             return EquipmentBaseline(**result.data[0])
         return None
 
-    async def get_equipment_baseline_history(
-        self,
-        equipment_id: str,
-        limit: int = 10
-    ) -> List[EquipmentBaseline]:
+    async def get_equipment_baseline_history(self, equipment_id: str, limit: int = 10) -> List[EquipmentBaseline]:
         """Get baseline history for equipment."""
-        result = get_supabase_client().table("equipment_baselines").select("*").eq("equipment_id", equipment_id).order("baseline_date", desc=True).limit(limit).execute()
+        result = (
+            get_supabase_client()
+            .table("equipment_baselines")
+            .select("*")
+            .eq("equipment_id", equipment_id)
+            .order("baseline_date", desc=True)
+            .limit(limit)
+            .execute()
+        )
         return [EquipmentBaseline(**row) for row in result.data]
 
     async def archive_equipment_baseline(self, baseline_id: str):
         """Archive a baseline (set status to archived)."""
-        get_supabase_client().table("equipment_baselines").update({"status": "archived"}).eq("id", baseline_id).execute()
+        get_supabase_client().table("equipment_baselines").update({"status": "archived"}).eq(
+            "id", baseline_id
+        ).execute()
 
     async def archive_old_baselines(self, equipment_id: str, keep_last: int = 5):
         """Archive old baselines, keeping only the last N active ones."""
         # Get all active baselines sorted by date
-        result = get_supabase_client().table("equipment_baselines").select("id").eq("equipment_id", equipment_id).eq("status", "active").order("baseline_date", desc=True).execute()
+        result = (
+            get_supabase_client()
+            .table("equipment_baselines")
+            .select("id")
+            .eq("equipment_id", equipment_id)
+            .eq("status", "active")
+            .order("baseline_date", desc=True)
+            .execute()
+        )
 
         baselines = result.data
         if len(baselines) <= keep_last:
@@ -123,7 +135,7 @@ class BaselineRepository:
         serial_number: Optional[str] = None,
         installation_date: Optional[str] = None,
         expected_life_days: Optional[int] = None,
-        criticality: str = "medium"
+        criticality: str = "medium",
     ) -> EquipmentElement:
         """Create a new equipment element."""
         element_name = element_name or element_id.replace("_", " ").title()
@@ -141,29 +153,27 @@ class BaselineRepository:
             "expected_life_days": expected_life_days,
             "criticality": criticality,
             "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat()
+            "updated_at": datetime.now().isoformat(),
         }
 
         result = get_supabase_client().table("equipment_elements").insert(data).execute()
         return EquipmentElement(**result.data[0])
 
-    async def get_element(
-        self,
-        equipment_id: str,
-        element_id: str
-    ) -> Optional[EquipmentElement]:
+    async def get_element(self, equipment_id: str, element_id: str) -> Optional[EquipmentElement]:
         """Get equipment element by equipment_id and element_id."""
-        result = get_supabase_client().table("equipment_elements").select("*").eq("equipment_id", equipment_id).eq("element_id", element_id).execute()
+        result = (
+            get_supabase_client()
+            .table("equipment_elements")
+            .select("*")
+            .eq("equipment_id", equipment_id)
+            .eq("element_id", element_id)
+            .execute()
+        )
         if result.data:
             return EquipmentElement(**result.data[0])
         return None
 
-    async def get_or_create_element(
-        self,
-        equipment_id: str,
-        element_id: str,
-        element_type: str
-    ) -> EquipmentElement:
+    async def get_or_create_element(self, equipment_id: str, element_id: str, element_type: str) -> EquipmentElement:
         """Get existing element or create if not exists."""
         element = await self.get_element(equipment_id, element_id)
         if element:
@@ -177,21 +187,22 @@ class BaselineRepository:
             element_id=element_id,
             element_type=element_type,
             element_name=element_name,
-            criticality="medium"  # Default, can be updated
+            criticality="medium",  # Default, can be updated
         )
 
-    async def get_equipment_elements(
-        self,
-        equipment_id: str
-    ) -> List[EquipmentElement]:
+    async def get_equipment_elements(self, equipment_id: str) -> List[EquipmentElement]:
         """Get all elements for equipment."""
-        result = get_supabase_client().table("equipment_elements").select("*").eq("equipment_id", equipment_id).order("element_id").execute()
+        result = (
+            get_supabase_client()
+            .table("equipment_elements")
+            .select("*")
+            .eq("equipment_id", equipment_id)
+            .order("element_id")
+            .execute()
+        )
         return [EquipmentElement(**row) for row in result.data]
 
-    async def get_element_by_id(
-        self,
-        element_id: str
-    ) -> Optional[EquipmentElement]:
+    async def get_element_by_id(self, element_id: str) -> Optional[EquipmentElement]:
         """Get equipment element by its UUID."""
         result = get_supabase_client().table("equipment_elements").select("*").eq("id", element_id).execute()
         if result.data:
@@ -211,7 +222,7 @@ class BaselineRepository:
         baseline_values: Dict[str, Any],
         measurement_conditions: Optional[Dict[str, Any]] = None,
         notes: Optional[str] = None,
-        attachment_urls: Optional[List[str]] = None
+        attachment_urls: Optional[List[str]] = None,
     ) -> ElementBaseline:
         """Create a new element baseline record."""
         data = {
@@ -228,29 +239,39 @@ class BaselineRepository:
             "notes": notes,
             "attachment_urls": attachment_urls or [],
             "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat()
+            "updated_at": datetime.now().isoformat(),
         }
 
         result = get_supabase_client().table("element_baselines").insert(data).execute()
         return ElementBaseline(**result.data[0])
 
-    async def get_active_element_baseline(
-        self,
-        element_id: str
-    ) -> Optional[ElementBaseline]:
+    async def get_active_element_baseline(self, element_id: str) -> Optional[ElementBaseline]:
         """Get most recent active baseline for element."""
-        result = get_supabase_client().table("element_baselines").select("*").eq("element_id", element_id).eq("status", "active").order("baseline_date", desc=True).limit(1).execute()
+        result = (
+            get_supabase_client()
+            .table("element_baselines")
+            .select("*")
+            .eq("element_id", element_id)
+            .eq("status", "active")
+            .order("baseline_date", desc=True)
+            .limit(1)
+            .execute()
+        )
         if result.data:
             return ElementBaseline(**result.data[0])
         return None
 
-    async def get_element_baseline_history(
-        self,
-        element_id: str,
-        limit: int = 10
-    ) -> List[ElementBaseline]:
+    async def get_element_baseline_history(self, element_id: str, limit: int = 10) -> List[ElementBaseline]:
         """Get baseline history for element."""
-        result = get_supabase_client().table("element_baselines").select("*").eq("element_id", element_id).order("baseline_date", desc=True).limit(limit).execute()
+        result = (
+            get_supabase_client()
+            .table("element_baselines")
+            .select("*")
+            .eq("element_id", element_id)
+            .order("baseline_date", desc=True)
+            .limit(limit)
+            .execute()
+        )
         return [ElementBaseline(**row) for row in result.data]
 
     # ============================================================================
@@ -269,7 +290,7 @@ class BaselineRepository:
         element_id: Optional[str] = None,
         comparison_notes: Optional[str] = None,
         alert_generated: bool = False,
-        alert_id: Optional[str] = None
+        alert_id: Optional[str] = None,
     ) -> BaselineComparison:
         """Create a new baseline comparison record."""
         data = {
@@ -286,28 +307,37 @@ class BaselineRepository:
             "comparison_notes": comparison_notes,
             "alert_generated": alert_generated,
             "alert_id": alert_id,
-            "created_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat(),
         }
 
         result = get_supabase_client().table("baseline_comparisons").insert(data).execute()
         return BaselineComparison(**result.data[0])
 
-    async def get_recent_comparisons(
-        self,
-        equipment_id: str,
-        limit: int = 10
-    ) -> List[BaselineComparison]:
+    async def get_recent_comparisons(self, equipment_id: str, limit: int = 10) -> List[BaselineComparison]:
         """Get recent baseline comparisons for equipment."""
-        result = get_supabase_client().table("baseline_comparisons").select("*").eq("equipment_id", equipment_id).order("comparison_date", desc=True).limit(limit).execute()
+        result = (
+            get_supabase_client()
+            .table("baseline_comparisons")
+            .select("*")
+            .eq("equipment_id", equipment_id)
+            .order("comparison_date", desc=True)
+            .limit(limit)
+            .execute()
+        )
         return [BaselineComparison(**row) for row in result.data]
 
     async def get_critical_deviations(
-        self,
-        equipment_id: Optional[str] = None,
-        days: int = 30
+        self, equipment_id: Optional[str] = None, days: int = 30
     ) -> List[BaselineComparison]:
         """Get critical deviation comparisons."""
-        query = get_supabase_client().table("baseline_comparisons").select("*").eq("overall_status", "critical").gte("comparison_date", datetime.now() - timedelta(days=days).isoformat()).order("comparison_date", desc=True)
+        query = (
+            get_supabase_client()
+            .table("baseline_comparisons")
+            .select("*")
+            .eq("overall_status", "critical")
+            .gte("comparison_date", datetime.now() - timedelta(days=days).isoformat())
+            .order("comparison_date", desc=True)
+        )
 
         if equipment_id:
             query = query.eq("equipment_id", equipment_id)
@@ -340,5 +370,5 @@ class BaselineRepository:
             "total_baselines": baseline_count,
             "total_elements": len(elements),
             "elements_with_baselines": elements_with_baselines,
-            "last_baseline_date": active_baseline.baseline_date if active_baseline else None
+            "last_baseline_date": active_baseline.baseline_date if active_baseline else None,
         }

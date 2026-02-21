@@ -332,11 +332,11 @@ Service Record: Status='notified'
     ↓
 Background Job (30s interval)
     ↓
-Clawd Bot Sends Telegram to Technician
+Sentry Bot Sends Telegram to Technician
     ↓
 Technician On-Site → Repairs Equipment
     ↓
-Technician Submits Feedback via Clawd
+Technician Submits Feedback via Sentry
     ↓
 Health Score Updated: +2 (positive), 0 (neutral), -3 (negative), -5 (critical)
     ↓
@@ -380,7 +380,7 @@ async def control_device(device_id: str, value: float):
 |---------|-------|
 | **Health Score Lifecycle** | `prediction_generator.py`, `alerts.py`, `feedback_collection_service.py` |
 | **Device Control** | `device_abstraction.py`, `approval_service.py`, `safety_interlocks.py` |
-| **Alerts & Notifications** | `alerts.py`, `clawd_webhooks.py`, `background_scheduler.py` |
+| **Alerts & Notifications** | `alerts.py`, `sentry_webhooks.py`, `background_scheduler.py` |
 | **Work Orders** | `work_orders.py`, `feedback_collection_service.py`, `technician_repository.py` |
 | **React Query Caching** | `lib/queryClient.ts`, `lib/api/batchers.ts` |
 | **Batch Optimization** | `lib/api/batchers.ts`, each `lib/api/{domain}.ts` |

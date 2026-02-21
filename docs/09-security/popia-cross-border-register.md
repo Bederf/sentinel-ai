@@ -85,7 +85,7 @@ SENTINEL relies primarily on:
 | **Legal Basis** | s72(1)(b): Consent; s72(1)(d): Necessary for service delivery |
 | **Safeguards** | End-to-end encryption; WhatsApp Business Terms; GDPR compliance (Ireland) |
 | **Consent Mechanism** | Technician onboarding consent; `PI_processing` consent type |
-| **PIA Reference** | `docs/08-security/pia-clawd-messaging.md` (PIA-2026-002) |
+| **PIA Reference** | `docs/08-security/pia-sentry-messaging.md` (PIA-2026-002) |
 | **Residual Risk** | MEDIUM |
 | **Next Review** | 2027-02-05 |
 
@@ -102,7 +102,7 @@ SENTINEL relies primarily on:
 | **Legal Basis** | s72(1)(b): Consent; s72(1)(d): Necessary for service delivery |
 | **Safeguards** | Client-server encryption (note: not E2E for bots); Telegram Terms |
 | **Consent Mechanism** | Technician onboarding consent; `PI_processing` consent type |
-| **PIA Reference** | `docs/08-security/pia-clawd-messaging.md` (PIA-2026-002) |
+| **PIA Reference** | `docs/08-security/pia-sentry-messaging.md` (PIA-2026-002) |
 | **Residual Risk** | MEDIUM |
 | **Next Review** | 2027-02-05 |
 
@@ -258,7 +258,7 @@ Suspend cross-border transfer immediately if:
 | POPIA (Protection of Personal Information Act, 2013) | Government Gazette |
 | PIA Template | `docs/08-security/privacy-impact-assessment-template.md` |
 | PIA: Claude API | `docs/08-security/pia-claude-api.md` |
-| PIA: Clawd Messaging | `docs/08-security/pia-clawd-messaging.md` |
+| PIA: Sentry Messaging | `docs/08-security/pia-sentry-messaging.md` |
 | Third-Party Security Register | `docs/08-security/third-party-security-register.md` |
 | Consent and Privacy Controls | `docs/08-security/consent-and-privacy.md` |
 | Data Privacy Policy | `docs/08-security/data-privacy-policy.md` |

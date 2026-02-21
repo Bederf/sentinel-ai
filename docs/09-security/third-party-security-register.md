@@ -49,8 +49,8 @@ This register covers all external service providers that:
 
 | Provider | Service | Data Access | Classification | Location | Security Assessment | Agreement Date | Next Review | Risk Rating | PIA Reference | Notes |
 |----------|---------|-------------|----------------|----------|---------------------|----------------|-------------|-------------|---------------|-------|
-| **Meta / WhatsApp** | WhatsApp Business API (occupant messaging) | Processes occupant phone numbers, names, and facilities request messages | Confidential | **Global** (Meta infrastructure; cross-border transfer) | WhatsApp Business API terms; end-to-end encryption for messages | 2025-09-01 | 2026-09-01 | **Medium** | [PIA-2026-002](pia-clawd-messaging.md) | Cross-border transfer requires POPIA s72 consent. Phone numbers are PI. Minimal data transferred -- only message content. |
-| **Telegram** | Bot API (technician and occupant messaging via Sentry bot) | Processes occupant and technician phone numbers, names, and messages | Confidential | **Global** (Telegram infrastructure; cross-border transfer) | Telegram Bot API terms; client-server encryption (not E2E for bots) | 2025-09-01 | 2026-09-01 | **Medium** | [PIA-2026-002](pia-clawd-messaging.md) | Cross-border transfer requires POPIA s72 consent. Bot messages not end-to-end encrypted. Minimal data transferred. |
+| **Meta / WhatsApp** | WhatsApp Business API (occupant messaging) | Processes occupant phone numbers, names, and facilities request messages | Confidential | **Global** (Meta infrastructure; cross-border transfer) | WhatsApp Business API terms; end-to-end encryption for messages | 2025-09-01 | 2026-09-01 | **Medium** | [PIA-2026-002](pia-sentry-messaging.md) | Cross-border transfer requires POPIA s72 consent. Phone numbers are PI. Minimal data transferred -- only message content. |
+| **Telegram** | Bot API (technician and occupant messaging via Sentry bot) | Processes occupant and technician phone numbers, names, and messages | Confidential | **Global** (Telegram infrastructure; cross-border transfer) | Telegram Bot API terms; client-server encryption (not E2E for bots) | 2025-09-01 | 2026-09-01 | **Medium** | [PIA-2026-002](pia-sentry-messaging.md) | Cross-border transfer requires POPIA s72 consent. Bot messages not end-to-end encrypted. Minimal data transferred. |
 
 ### 3.4 Business Application Providers
 
@@ -188,7 +188,7 @@ SENTINEL must promptly notify the FSR client of:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-02-04 | SENTINEL Platform Team | Initial register creation |
-| 1.1 | 2026-02-05 | SENTINEL Platform Team | Added PIA Reference column to all provider tables; linked to PIA-2026-001 (Claude API) and PIA-2026-002 (Clawd messaging) |
+| 1.1 | 2026-02-05 | SENTINEL Platform Team | Added PIA Reference column to all provider tables; linked to PIA-2026-001 (Claude API) and PIA-2026-002 (Sentry messaging) |
 
 **Review schedule:**
 - Register reviewed quarterly (provider status, risk ratings, compliance)
@@ -205,7 +205,7 @@ SENTINEL must promptly notify the FSR client of:
 | **Privacy Impact Assessments** | |
 | PIA Template | `docs/08-security/privacy-impact-assessment-template.md` |
 | PIA: Claude API (PIA-2026-001) | `docs/08-security/pia-claude-api.md` |
-| PIA: Clawd Messaging (PIA-2026-002) | `docs/08-security/pia-clawd-messaging.md` |
+| PIA: Sentry Messaging (PIA-2026-002) | `docs/08-security/pia-sentry-messaging.md` |
 | POPIA Section 72 Register | `docs/08-security/popia-cross-border-register.md` |
 | **Policies and Standards** | |
 | Data Privacy Policy | `docs/08-security/data-privacy-policy.md` |

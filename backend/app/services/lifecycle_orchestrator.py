@@ -270,6 +270,10 @@ class LifecycleOrchestrator:
         self._task: asyncio.Task | None = None
         self._callbacks: list[Callable[[LifecycleEvent], None]] = []
 
+        # Cycle tracking for completion
+        self.max_cycles: int = 1  # How many full cycles before completing
+        self.completed_cycles: int = 0
+
         # Energy tracking
         self.total_energy_kwh: float = 0.0  # Cumulative energy consumption
         self.current_hour_power_kw: float = 0.0  # Current hour's power in kW
@@ -446,6 +450,7 @@ class LifecycleOrchestrator:
         task_id: str = None,  # For checkpoint recovery
         speed_multiplier: float = 10.0,
         start_date: str | None = None,  # ISO date string e.g. "2025-06-15"
+        max_cycles: int = 1,  # Number of full cycles before completing (0=infinite)
     ) -> dict[str, Any]:
         """
         Start the 24-hour simulation.
@@ -499,6 +504,10 @@ class LifecycleOrchestrator:
 
         # Set speed multiplier for new speed control system
         self.speed_multiplier = max(0.1, min(10000, speed_multiplier))
+
+        # Set max cycles (0 = infinite loop, 1 = single run, N = N cycles)
+        self.max_cycles = max_cycles
+        self.completed_cycles = 0
 
         # Determine max days for recovery path too
         self.max_days = 365 if is_annual else 1
@@ -624,6 +633,9 @@ class LifecycleOrchestrator:
                 await self._task
             except asyncio.CancelledError:
                 pass
+
+        # Write stopped status to DB (with final state snapshot)
+        await self._write_stopped_status()
 
         logger.info(
             f"Simulation stopped: {self.days_simulated} days, "
@@ -791,8 +803,22 @@ class LifecycleOrchestrator:
 
                 # Check if completed max_days (one full cycle)
                 if iteration >= total_iterations:
+                    self.completed_cycles += 1
                     days = self.days_simulated
-                    logger.warning(f"[CYCLE {cycle_num} COMPLETE] Completed {days} days. Resetting for next cycle...")
+                    logger.warning(
+                        f"[CYCLE {cycle_num} COMPLETE] Completed {days}"
+                        f" days (cycle {self.completed_cycles}"
+                        f"/{self.max_cycles or '∞'})"
+                    )
+
+                    # Check if we've reached max_cycles (0 = infinite)
+                    if self.max_cycles > 0 and self.completed_cycles >= self.max_cycles:
+                        logger.warning(
+                            f"[SIMULATION COMPLETE] {self.max_cycles} cycle(s) done — writing completion status"
+                        )
+                        await self._write_completion_status()
+                        break
+
                     # Reset for next cycle
                     iteration = 0
                     self.days_simulated = 0
@@ -835,6 +861,57 @@ class LifecycleOrchestrator:
             logger.debug(f"Updated task {self.task_id}: {progress_pct}% progress, {self.days_simulated} days")
         except Exception as e:
             logger.warning(f"Failed to update progress for task {self.task_id}: {e}")
+
+    async def _write_completion_status(self) -> None:
+        """Write final completion status to database when simulation finishes all cycles."""
+        if not self.task_id:
+            return
+
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            supabase = get_supabase_client()
+            state_snapshot = self.serialize_state()
+
+            supabase.table("lifecycle_simulation_tasks").update(
+                {
+                    "status": "completed",
+                    "progress_pct": 100,
+                    "days_completed": self.days_simulated,
+                    "state_snapshot": state_snapshot,
+                    "completed_at": datetime.now().isoformat(),
+                }
+            ).eq("task_id", self.task_id).execute()
+
+            logger.info(
+                f"Simulation {self.task_id} completed: {self.completed_cycles} cycle(s), "
+                f"{self.days_simulated} days, {self.total_energy_kwh:.0f} kWh"
+            )
+        except Exception as e:
+            logger.error(f"Failed to write completion status for task {self.task_id}: {e}")
+
+    async def _write_stopped_status(self) -> None:
+        """Write stopped status to database when simulation is manually stopped."""
+        if not self.task_id:
+            return
+
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            supabase = get_supabase_client()
+            state_snapshot = self.serialize_state()
+
+            supabase.table("lifecycle_simulation_tasks").update(
+                {
+                    "status": "stopped",
+                    "state_snapshot": state_snapshot,
+                    "completed_at": datetime.now().isoformat(),
+                }
+            ).eq("task_id", self.task_id).execute()
+
+            logger.info(f"Simulation {self.task_id} stopped at day {self.days_simulated}")
+        except Exception as e:
+            logger.error(f"Failed to write stopped status for task {self.task_id}: {e}")
 
     async def _process_hour(self, hour: int):
         """Process a simulated hour using the building schedule engine.
@@ -956,7 +1033,8 @@ class LifecycleOrchestrator:
             zone_base = min(zone_base, ambient_temp) if ambient_temp > setpoint else max(zone_base, ambient_temp)
 
         # Update all known zones (or seed with defaults for known zones)
-        default_zones = ["Zone-L1-A", "Zone-L1-B", "Zone-L2-A", "Zone-L2-B"]
+        # All 15 office zones: L0 (001-005), L1 (101-105), L2 (201-205)
+        default_zones = [f"Zone-{z:03d}" for z in list(range(1, 6)) + list(range(101, 106)) + list(range(201, 206))]
         for zone_id in set(list(self.zone_temperatures.keys()) + default_zones):
             # Small per-zone variation (orientation, occupancy, solar gain)
             variation = self._scenario_rng.uniform(-0.5, 0.5)
@@ -1903,7 +1981,19 @@ class LifecycleOrchestrator:
         equipment_states: dict[str, dict] = {}
 
         try:
-            equipment_list = self.equipment_repo.get_all(building_id=self.site_id)
+            # Resolve building UUID from site code (building_id column expects UUID)
+            building_uuid = None
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                client = get_supabase_client()
+                bld_resp = client.table("buildings").select("id").eq("code", self.site_id).execute()
+                if bld_resp.data:
+                    building_uuid = bld_resp.data[0]["id"]
+            except Exception:
+                pass
+
+            equipment_list = self.equipment_repo.get_all(building_id=building_uuid)
             site_prefix = self.site_id.replace("site-", "S").upper()  # site-002 -> S002
 
             for equip in equipment_list:
@@ -2139,14 +2229,15 @@ class LifecycleOrchestrator:
     def _equipment_to_zone(self, equipment_code: str) -> str:
         """Map equipment code to zone ID for temperature lookup.
 
-        Examples:
-            S002-VAV-L1-A  -> Zone-L1-A
-            S002-FCU-L2-B  -> Zone-L2-B
-            S002-AHU-B1-001 -> Zone-B1-001
+        Supports both numbered and letter-based equipment codes:
+            S002-FCU-201   -> Zone-201
+            S002-VAV-003   -> Zone-003
+            S002-VAV-L1-A  -> Zone-L1-A  (legacy)
+            S002-FCU-L2-B  -> Zone-L2-B  (legacy)
         """
         parts = equipment_code.split("-")
         if len(parts) >= 3:
-            location = "-".join(parts[2:])  # L1-A, L2-B, B1-001
+            location = "-".join(parts[2:])  # 201, 003, L1-A, L2-B
             return f"Zone-{location}"
         return ""
 
@@ -2262,18 +2353,50 @@ class LifecycleOrchestrator:
             readings["status"] = 1.0 if lighting_pct > 0 else 0.0
 
         elif equip_type == "zone_sensor":
-            # CO2 and humidity
+            # CO2 and humidity (legacy combined sensor)
             occupancy_factor = schedule_state.target_occupancy_pct / 100.0
             readings["co2_ppm"] = 400 + occupancy_factor * 200 + self._scenario_rng.uniform(-20, 20)
             readings["humidity_pct"] = 45 + occupancy_factor * 10 + self._scenario_rng.uniform(-3, 3)
+
+        elif equip_type == "temp_sensor":
+            # Temperature sensor — reads zone temperature
+            zone_id = self._equipment_to_zone(code)
+            actual_temp = self.zone_temperatures.get(
+                zone_id, self.building_schedule.COMFORT_SETPOINT + schedule_state.setpoint_offset
+            )
+            sensor_noise = self._scenario_rng.uniform(-0.2, 0.2)
+            readings["zone_temp"] = round(actual_temp + sensor_noise, 1)
+
+        elif equip_type == "co2_sensor":
+            # CO2 sensor — occupancy-driven
+            occupancy_factor = schedule_state.target_occupancy_pct / 100.0
+            readings["co2_ppm"] = round(400 + occupancy_factor * 200 + self._scenario_rng.uniform(-20, 20))
+
+        elif equip_type == "humidity_sensor":
+            # Humidity sensor — seasonal + occupancy
+            occupancy_factor = schedule_state.target_occupancy_pct / 100.0
+            base_humidity = getattr(self, "current_humidity", 50.0)
+            indoor_rh = base_humidity * 0.6 + occupancy_factor * 10 + self._scenario_rng.uniform(-3, 3)
+            readings["humidity_pct"] = round(max(25, min(75, indoor_rh)), 1)
+
+        elif equip_type == "diffuser":
+            # Diffuser status — follows HVAC schedule
+            from app.services.building_schedule import HVACMode
+
+            is_hvac_on = schedule_state.hvac_mode not in (HVACMode.OFF, HVACMode.NIGHT_SETBACK)
+            readings["status"] = 1.0 if is_hvac_on else 0.0
+            if is_hvac_on:
+                readings["airflow_pct"] = round(60 + self._scenario_rng.uniform(-10, 10), 1)
+            else:
+                readings["airflow_pct"] = 0.0
 
         return readings
 
     async def _inject_fault(self):
         """Inject a fault into equipment and create real alerts."""
         try:
-            # Get equipment to fault (filtered by site_id)
-            equipment_list = self.equipment_repo.get_all(building_id=self.site_id)
+            # Get equipment to fault (resolve site code like "site-002" to UUID internally)
+            equipment_list = self.equipment_repo.get_by_building_code(self.site_id)
             if not equipment_list:
                 logger.warning("No equipment available to fault")
                 return

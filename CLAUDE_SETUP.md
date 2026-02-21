@@ -137,8 +137,12 @@ ANTHROPIC_API_KEY=sk-...                    # Claude API (only if DEMO_MODE=fals
 REDIS_ENABLED=true                          # Query caching
 REDIS_URL=redis://localhost:6379
 
+# Voice Chat (optional)
+ELEVENLABS_API_KEY=...                      # ElevenLabs TTS
+ELEVENLABS_TTS_ENABLED=true                 # Enable voice output
+
 # Integrations (optional for local dev)
-CLAWD_WEBHOOK_SECRET=...                    # Telegram bot
+SENTRY_WEBHOOK_SECRET=...                    # Telegram bot
 ESKOMSEPush_API_TOKEN=...                   # South African load shedding
 SIMBIOT_*=...                               # MRI Evolution
 ```

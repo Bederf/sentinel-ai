@@ -236,7 +236,7 @@ Global `Exception` handler in `main.py`:
 | File                                                  | Changes                              |
 |-------------------------------------------------------|--------------------------------------|
 | `backend/app/api/devices.py`                          | Pydantic DeviceControlRequest model  |
-| `backend/app/services/clawd_integration/alert_notifier.py` | Subprocess sanitisation        |
+| `backend/app/services/sentry_integration/alert_notifier.py` | Subprocess sanitisation        |
 | `backend/app/config/settings.py`                      | `jwt_expiration_hours` setting       |
 | `backend/app/api/auth.py`                             | 8h expiry, brute force protection    |
 | `backend/app/middleware/audit_middleware.py`           | Recursive log data sanitisation      |

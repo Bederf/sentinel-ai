@@ -5,7 +5,7 @@ import os
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, HTTPException, Request as FastAPIRequest
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -55,18 +55,18 @@ def format_sse_chunk(chunk: str) -> str:
 
     This function handles newlines in chunks by sending each line with its own prefix.
     """
-    if '\n' not in chunk:
+    if "\n" not in chunk:
         # Simple case - no newlines
         return f"data: {chunk}\n\n"
 
     # Multi-line chunk - send each line with its own data: prefix
     # The SSE spec says multi-line data should use multiple data: lines
-    lines = chunk.split('\n')
+    lines = chunk.split("\n")
     sse_lines = []
     for line in lines:
         sse_lines.append(f"data: {line}")
     # Join with \n and add final \n\n separator
-    return '\n'.join(sse_lines) + '\n\n'
+    return "\n".join(sse_lines) + "\n\n"
 
 
 async def generate_sse_stream(
@@ -164,6 +164,7 @@ async def generate_docs_sse_stream(user_message: str, site_id: str | None = None
         if site_id:
             try:
                 from app.database.supabase_client import get_supabase_client
+
                 client = get_supabase_client()
                 result = client.table("buildings").select("id").eq("code", site_id).single().execute()
                 building_id = result.data["id"] if result.data else None
@@ -190,7 +191,7 @@ async def generate_docs_sse_stream(user_message: str, site_id: str | None = None
         async for chunk in claude_service.stream_response(
             messages,
             system_prompt=system_prompt,
-            include_building_context=True  # Still include building data
+            include_building_context=True,  # Still include building data
         ):
             yield format_sse_chunk(chunk)
 
@@ -242,14 +243,14 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
         logger.warning(f"Query: {user_message[:100]}...")
         raise HTTPException(
             status_code=400,
-            detail={
-                "error": "Security concern",
-                "message": rejection_reason,
-                "code": "PROMPT_INJECTION_DETECTED"
-            }
+            detail={"error": "Security concern", "message": rejection_reason, "code": "PROMPT_INJECTION_DETECTED"},
         )
 
-    logger.info(f"Chat request: conversation_id={chat_request.conversation_id}, search_docs={chat_request.search_docs}, site_id={chat_request.site_id}, message={user_message[:50]}...")
+    logger.info(
+        f"Chat request: conversation_id={chat_request.conversation_id}, "
+        f"search_docs={chat_request.search_docs}, site_id={chat_request.site_id}, "
+        f"message={user_message[:50]}..."
+    )
 
     # 1. Documentation search mode takes priority - this is Q&A, not device control
     #    No work order detection or demo cache in docs mode
@@ -309,7 +310,7 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
         cached_response = demo_cache.get_cached_response(user_message)
         if cached_response:
             logger.info("Using cached demo response for query")
-            citations = demo_cache.get_citations(user_message)
+            _citations = demo_cache.get_citations(user_message)
 
             async def stream_cached_response() -> AsyncGenerator[str, None]:
                 yield format_sse_chunk(cached_response)
@@ -355,7 +356,10 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
 @router.get("/chat/status")
 async def chat_status():
     """Check if the chat service is configured and available."""
+    from app.services.tts_service import get_tts_service
+
     demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
+    tts = get_tts_service()
     return {
         "configured": claude_service.is_configured(),
         "demo_mode": demo_mode,
@@ -367,8 +371,50 @@ async def chat_status():
             "demo_cache": demo_mode,
             "tool_calling": True,  # Claude tool use enabled
             "documentation_search": True,  # RAG-based documentation search
+            "tts": tts.is_configured(),  # Voice chat TTS
         },
     }
+
+
+class TTSRequest(BaseModel):
+    """Request model for text-to-speech endpoint."""
+
+    text: str
+
+
+@router.post("/chat/tts")
+@limiter.limit("10/minute")
+async def chat_tts(request: FastAPIRequest, tts_request: TTSRequest):
+    """Convert chat response text to speech audio.
+
+    Summarizes the text to 1-2 sentences, then synthesizes speech via ElevenLabs.
+    Returns MP3 audio bytes.
+
+    Rate limited to 10 requests per minute.
+    """
+    from app.services.tts_service import get_tts_service
+
+    tts = get_tts_service()
+
+    if not tts.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Text-to-speech is not configured. Set ELEVENLABS_API_KEY and ELEVENLABS_TTS_ENABLED=true.",
+        )
+
+    text = tts_request.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+
+    audio = await tts.text_to_speech(text)
+    if audio is None:
+        raise HTTPException(status_code=502, detail="Speech synthesis failed")
+
+    return Response(
+        content=audio,
+        media_type="audio/mpeg",
+        headers={"Content-Disposition": "inline; filename=response.mp3"},
+    )
 
 
 @router.get("/work-orders")

@@ -1,4 +1,4 @@
-# Privacy Impact Assessment: Clawd Messaging Platforms
+# Privacy Impact Assessment: Sentry Messaging Platforms
 
 **PIA Reference:** PIA-2026-002
 **Document Owner:** Information Security Officer
@@ -18,7 +18,7 @@
 | Field | Details |
 |-------|---------|
 | **PIA Reference** | PIA-2026-002 |
-| **Project/System Name** | Clawd Telegram/WhatsApp Bot Integration |
+| **Project/System Name** | Sentry Telegram/WhatsApp Bot Integration |
 | **Business Owner** | SENTINEL Platform Team |
 | **Technical Owner** | SENTINEL Development Team |
 | **Date Initiated** | 2025-09-01 |
@@ -27,7 +27,7 @@
 
 ### 1.2 Purpose of Processing
 
-Clawd is a Telegram/WhatsApp bot that enables technicians and building occupants to interact with SENTINEL:
+Sentry is a Telegram/WhatsApp bot that enables technicians and building occupants to interact with SENTINEL:
 
 - **Primary purpose:** Work order creation and management via messaging platforms
 - **Secondary purposes:** Equipment fault reporting, desk comfort complaints, technician dispatch notifications
@@ -144,7 +144,7 @@ Technician/Occupant (South Africa)
            +------------------------------+
                        |
                        v
-              [Clawd Bot Server]
+              [Sentry Bot Server]
                        |
                        | Parse request, query SENTINEL API
                        v
@@ -165,10 +165,10 @@ Technician/Occupant (South Africa)
 |------|------|-----|--------------|-----------------|------------|
 | 1 | User | WhatsApp/Telegram App | Message text | App encryption | Yes (E2E for WhatsApp; TLS for Telegram bots) |
 | 2 | App | Platform API | Message + user metadata | HTTPS | Yes (TLS 1.3) |
-| 3 | Platform | Clawd Bot | Webhook payload (message, user info) | HTTPS | Yes (TLS 1.3) |
-| 4 | Clawd | SENTINEL API | Parsed request | HTTPS | Yes (TLS 1.3) |
-| 5 | SENTINEL | Clawd | Work order data, technician info | HTTPS | Yes (TLS 1.3) |
-| 6 | Clawd | Platform API | Response message | HTTPS | Yes (TLS 1.3) |
+| 3 | Platform | Sentry Bot | Webhook payload (message, user info) | HTTPS | Yes (TLS 1.3) |
+| 4 | Sentry | SENTINEL API | Parsed request | HTTPS | Yes (TLS 1.3) |
+| 5 | SENTINEL | Sentry | Work order data, technician info | HTTPS | Yes (TLS 1.3) |
+| 6 | Sentry | Platform API | Response message | HTTPS | Yes (TLS 1.3) |
 | 7 | Platform | User App | Response message | App encryption | Yes |
 
 ### 4.3 Cross-Border Transfers
@@ -398,17 +398,17 @@ Processing may proceed only if:
 
 **Reference:** [Telegram Bot API Terms](https://core.telegram.org/bots/tos)
 
-### Appendix C: Clawd Bot Architecture
+### Appendix C: Sentry Bot Architecture
 
 The Sentry bot (`$SENTRY_HOME`) integrates with SENTINEL via:
-- `clawd_ai_bridge.py` - Message routing and AI integration
+- `sentry_ai_bridge.py` - Message routing and AI integration
 - `bms_desk_diagnosis.py` - Desk comfort diagnosis
 - SENTINEL API webhooks for work order management
 
 **Key privacy features:**
 - No bulk data export to messaging platforms
 - Minimal message content (work order IDs, equipment codes)
-- Technician data looked up from SENTINEL, not stored in Clawd
+- Technician data looked up from SENTINEL, not stored in Sentry
 
 ### Appendix D: Version History
 
@@ -424,8 +424,8 @@ The Sentry bot (`$SENTRY_HOME`) integrates with SENTINEL via:
 |----------|----------|
 | SENTINEL Third-Party Security Register | `docs/08-security/third-party-security-register.md` |
 | SENTINEL Consent and Privacy Controls | `docs/08-security/consent-and-privacy.md` |
-| Clawd Integration Documentation | `docs/SENTRY_INTEGRATION.md` |
-| Clawd Bot Code | `$SENTRY_HOME/` |
+| Sentry Integration Documentation | `docs/SENTRY_INTEGRATION.md` |
+| Sentry Bot Code | `$SENTRY_HOME/` |
 | WhatsApp Business Terms | https://www.whatsapp.com/legal/business-terms |
 | Telegram Bot API Terms | https://core.telegram.org/bots/tos |
 | POPIA Section 72 | Cross-border transfer requirements |

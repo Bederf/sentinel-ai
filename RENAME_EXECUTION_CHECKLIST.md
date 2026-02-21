@@ -1,4 +1,4 @@
-# OpenClaw → SENTRY Rename Execution Checklist
+# Sentry → SENTRY Rename Execution Checklist
 
 **Complete, portable rename with environment variable support**
 
@@ -6,7 +6,7 @@
 
 ## Pre-Execution Verification ✅
 
-- [x] Rename script created: `scripts/rename_clawd_to_sentry.sh`
+- [x] Rename script created: `scripts/rename_sentry_to_sentry.sh`
 - [x] Validation script created: `scripts/validate_sentry_rename.py`
 - [x] Environment setup guide: `SENTRY_ENVIRONMENT_SETUP.md`
 - [x] Rename guide: `SENTRY_RENAME_GUIDE.md`
@@ -27,7 +27,7 @@
 cd /opt/bms-intelligence
 
 # Run dry-run
-./scripts/rename_clawd_to_sentry.sh --dry-run
+./scripts/rename_sentry_to_sentry.sh --dry-run
 
 # Review output
 cat .rename-log-*.txt | less
@@ -54,7 +54,7 @@ cat .rename-log-*.txt | less
 cd /opt/bms-intelligence
 
 # Execute rename (will prompt for confirmation)
-./scripts/rename_clawd_to_sentry.sh --execute
+./scripts/rename_sentry_to_sentry.sh --execute
 
 # You'll see:
 #   ✓ Automatic backup created
@@ -73,14 +73,14 @@ cd /opt/bms-intelligence
 **If something goes wrong:**
 ```bash
 # One-command rollback
-./scripts/rename_clawd_to_sentry.sh --rollback
+./scripts/rename_sentry_to_sentry.sh --rollback
 ```
 
 ---
 
 ### Stage 3: Validate Completeness (2-3 min)
 
-**Goal:** Verify no clawd references remain and all changes are consistent
+**Goal:** Verify no sentry references remain and all changes are consistent
 
 ```bash
 cd /opt/bms-intelligence
@@ -98,7 +98,7 @@ python3 scripts/validate_sentry_rename.py
 ```
 
 **Success criteria:**
-- ✅ No forbidden patterns found (all clawd refs renamed)
+- ✅ No forbidden patterns found (all sentry refs renamed)
 - ✅ All Python files have valid syntax
 - ✅ No import errors
 - ✅ Final status: PASS
@@ -109,7 +109,7 @@ python3 scripts/validate_sentry_rename.py
 python3 scripts/validate_sentry_rename.py
 
 # If needed, rollback and retry
-./scripts/rename_clawd_to_sentry.sh --rollback
+./scripts/rename_sentry_to_sentry.sh --rollback
 ```
 
 ---
@@ -129,9 +129,9 @@ git diff --stat
 git add -A
 
 # Commit with generated message
-git commit -m "refactor(bot): Rename OpenClaw → SENTRY system-wide
+git commit -m "refactor(bot): Rename Sentry → SENTRY system-wide
 
-This commit renames all clawd/openclaw references to sentry across the
+This commit renames all sentry/sentry references to sentry across the
 entire codebase, including:
 
 - Python class names (SentryAuthService → SentryAuthService)
@@ -170,10 +170,10 @@ git log -1 --stat
 cd /home/bederf
 
 # Backup current directory
-cp -r clawd clawd.backup.$(date +%s)
+cp -r sentry sentry.backup.$(date +%s)
 
 # Rename directory
-mv clawd .sentry
+mv sentry .sentry
 
 # Verify
 ls -la .sentry
@@ -191,8 +191,8 @@ cd $SENTRY_HOME
 python3 bot.py --version
 
 # Update systemd service if running as service
-sudo systemctl stop clawd 2>/dev/null || true
-sudo systemctl disable clawd 2>/dev/null || true
+sudo systemctl stop sentry 2>/dev/null || true
+sudo systemctl disable sentry 2>/dev/null || true
 
 # Create new sentry service (see SENTRY_ENVIRONMENT_SETUP.md)
 # Then restart
@@ -203,7 +203,7 @@ cd $SENTRY_HOME && python3 bot.py &
 - ✅ Directory renamed to `.sentry`
 - ✅ `$SENTRY_HOME` environment variable set
 - ✅ Bot still runs: `python3 $SENTRY_HOME/bot.py`
-- ✅ Processes show SENTRY (not Clawd)
+- ✅ Processes show SENTRY (not Sentry)
 
 ---
 
@@ -220,8 +220,8 @@ echo $SENTRY_HOME
 ls -la $SENTRY_HOME/
 # Expected: bot.py, config/, tools/, handlers/, memory/
 
-# 3. No clawd references in code
-grep -r "clawd\|openclaw" /opt/bms-intelligence --include="*.py" | wc -l
+# 3. No sentry references in code
+grep -r "sentry\|sentry" /opt/bms-intelligence --include="*.py" | wc -l
 # Expected: 0
 
 # 4. API endpoints renamed
@@ -268,7 +268,7 @@ If anything goes wrong at any stage:
 rm .rename-log-*.txt
 
 # Stages 2-3 (after execution): Automatic backup exists
-./scripts/rename_clawd_to_sentry.sh --rollback
+./scripts/rename_sentry_to_sentry.sh --rollback
 
 # Stage 5 (directory): Restore from backup
 cp -r $SENTRY_HOME.backup.* $SENTRY_HOME
@@ -311,14 +311,14 @@ Once rename is complete and verified:
 
 ### "No files found" during dry-run
 ```bash
-# Means rename already done or no clawd references exist
-grep -r "clawd" /opt/bms-intelligence --include="*.py" | head -5
+# Means rename already done or no sentry references exist
+grep -r "sentry" /opt/bms-intelligence --include="*.py" | head -5
 ```
 
 ### Python syntax error during execution
 ```bash
 # Fix the file manually or rollback
-./scripts/rename_clawd_to_sentry.sh --rollback
+./scripts/rename_sentry_to_sentry.sh --rollback
 
 # Then examine what went wrong
 git diff .rename-backup-*/backend/app/api/...
@@ -334,13 +334,13 @@ SENTRY_HOME = os.environ.get('SENTRY_HOME', '/home/bederf/.sentry')
 echo 'export SENTRY_HOME=/home/bederf/.sentry' >> ~/.bashrc
 ```
 
-### Validation still shows clawd references
+### Validation still shows sentry references
 ```bash
 # Find remaining references
-grep -rn "clawd\|CLAWD" /opt/bms-intelligence --include="*.py" | head -20
+grep -rn "sentry\|SENTRY" /opt/bms-intelligence --include="*.py" | head -20
 
 # Manually fix or rollback and retry
-./scripts/rename_clawd_to_sentry.sh --rollback
+./scripts/rename_sentry_to_sentry.sh --rollback
 ```
 
 ---
@@ -355,7 +355,7 @@ grep -rn "clawd\|CLAWD" /opt/bms-intelligence --include="*.py" | head -20
 - [ ] Directory renamed to `.sentry`
 - [ ] `$SENTRY_HOME` environment variable set
 - [ ] Bot runs: `python3 $SENTRY_HOME/bot.py`
-- [ ] No `clawd` references remain in code
+- [ ] No `sentry` references remain in code
 
 ---
 
@@ -381,5 +381,5 @@ grep -rn "clawd\|CLAWD" /opt/bms-intelligence --include="*.py" | head -20
 
 ```bash
 cd /opt/bms-intelligence
-./scripts/rename_clawd_to_sentry.sh --dry-run
+./scripts/rename_sentry_to_sentry.sh --dry-run
 ```

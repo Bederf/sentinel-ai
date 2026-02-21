@@ -1,8 +1,8 @@
 # SENTRY Rename Guide
 
-**Renaming OpenClaw → SENTRY System-Wide**
+**Renaming Sentry → SENTRY System-Wide**
 
-This guide walks through the complete, safe process of renaming all `clawd` references to `sentry` across the SENTINEL codebase.
+This guide walks through the complete, safe process of renaming all `sentry` references to `sentry` across the SENTINEL codebase.
 
 ---
 
@@ -30,19 +30,19 @@ This is a **4-stage systematic rename** with built-in safety:
 
 ```bash
 # Stage 1: See what will change
-./scripts/rename_clawd_to_sentry.sh --dry-run
+./scripts/rename_sentry_to_sentry.sh --dry-run
 
 # Review output in .rename-log-*.txt
 
 # Stage 2: Execute the rename
-./scripts/rename_clawd_to_sentry.sh --execute
+./scripts/rename_sentry_to_sentry.sh --execute
 
 # Stage 3: Validate
 python3 scripts/validate_sentry_rename.py
 
 # Stage 4: Commit
 git add -A
-git commit -m "refactor(bot): Rename OpenClaw → SENTRY system-wide"
+git commit -m "refactor(bot): Rename Sentry → SENTRY system-wide"
 ```
 
 ---
@@ -56,7 +56,7 @@ Preview everything that will change **without modifying files**.
 ```bash
 cd /opt/bms-intelligence
 
-./scripts/rename_clawd_to_sentry.sh --dry-run
+./scripts/rename_sentry_to_sentry.sh --dry-run
 ```
 
 **Output:**
@@ -68,13 +68,13 @@ cd /opt/bms-intelligence
 Files to be modified:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-backend/app/api/clawd_webhooks.py
+backend/app/api/sentry_webhooks.py
   Line 34:
-    - router = APIRouter(prefix="/api/clawd", tags=["clawd"])
+    - router = APIRouter(prefix="/api/sentry", tags=["sentry"])
     + router = APIRouter(prefix="/api/sentry", tags=["sentry"])
 
   Line 50:
-    - x_clawd_secret: Optional[str] = Header(None),
+    - x_sentry_secret: Optional[str] = Header(None),
     + x_sentry_secret: Optional[str] = Header(None),
 
 backend/app/services/sentry_auth_service.py
@@ -113,13 +113,13 @@ ls -lh .rename-log-*.txt | tail -1
 cat .rename-log-*.txt | less
 
 # Or search for specific files
-grep "backend/app/api/clawd_webhooks.py" .rename-log-*.txt
+grep "backend/app/api/sentry_webhooks.py" .rename-log-*.txt
 ```
 
 **What to look for:**
 - ✅ Each change has "before" and "after" lines
 - ✅ All patterns match the mapping table (see below)
-- ✅ No accidental partial replacements (e.g., "clawd-integration" → "sentry-integration" not "sentryintegration")
+- ✅ No accidental partial replacements (e.g., "sentry-integration" → "sentry-integration" not "sentryintegration")
 - ✅ Comments and documentation properly renamed
 
 ### Stage 3️⃣: Execute the Rename
@@ -127,7 +127,7 @@ grep "backend/app/api/clawd_webhooks.py" .rename-log-*.txt
 Actually apply all changes. **This will prompt for confirmation.**
 
 ```bash
-./scripts/rename_clawd_to_sentry.sh --execute
+./scripts/rename_sentry_to_sentry.sh --execute
 ```
 
 **You'll see:**
@@ -142,9 +142,9 @@ Continue with rename execution? (yes/no): yes
 [✓] Backup created at .rename-backup-1708266925
 
 [INFO] Performing replacements...
-[✓] backend/app/api/clawd_webhooks.py (8 replacements)
+[✓] backend/app/api/sentry_webhooks.py (8 replacements)
 [✓] backend/app/services/sentry_auth_service.py (12 replacements)
-[✓] backend/app/services/clawd_integration/alert_notifier.py (5 replacements)
+[✓] backend/app/services/sentry_integration/alert_notifier.py (5 replacements)
 ... (42 more files)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -164,7 +164,7 @@ Rollback instructions:
 
 ### Stage 4️⃣: Validate Completeness
 
-Run the validation script to ensure **no clawd references remain** and everything is consistent:
+Run the validation script to ensure **no sentry references remain** and everything is consistent:
 
 ```bash
 python3 scripts/validate_sentry_rename.py
@@ -195,7 +195,7 @@ SENTRY Rename Validation Report
 
 ✓ Successes (5):
   ✓ All 145 Python files have valid syntax
-  ✓ API endpoints properly use /api/sentry/ in clawd_webhooks.py
+  ✓ API endpoints properly use /api/sentry/ in sentry_webhooks.py
   ✓ Configuration keys use sentry_ prefix
   ✓ Documentation: 28/30 files reference SENTRY
   ✓ No forbidden patterns found
@@ -276,7 +276,7 @@ sentry-bms-phase-41         → sentry-bms-phase-41
 If something goes wrong, **one command reverses everything:**
 
 ```bash
-./scripts/rename_clawd_to_sentry.sh --rollback
+./scripts/rename_sentry_to_sentry.sh --rollback
 ```
 
 **This:**
@@ -297,18 +297,18 @@ If something goes wrong, **one command reverses everything:**
 
 ### Issue: Script says "No files found"
 
-This means no clawd references exist in the codebase — **rename is already complete** or files don't exist.
+This means no sentry references exist in the codebase — **rename is already complete** or files don't exist.
 
 **Check:**
 ```bash
-grep -r "clawd\|openclaw" /opt/bms-intelligence --include="*.py" | head -5
+grep -r "sentry\|sentry" /opt/bms-intelligence --include="*.py" | head -5
 ```
 
 If nothing shows up, rename is done.
 
 ### Issue: Validation fails with "Pattern: /api/sentry/"
 
-Some files still contain clawd references. **Find them:**
+Some files still contain sentry references. **Find them:**
 
 ```bash
 grep -rn "/api/sentry/" /opt/bms-intelligence --include="*.py" --include="*.ts"
@@ -316,7 +316,7 @@ grep -rn "/api/sentry/" /opt/bms-intelligence --include="*.py" --include="*.ts"
 
 **Fix manually or rollback and try again:**
 ```bash
-./scripts/rename_clawd_to_sentry.sh --rollback
+./scripts/rename_sentry_to_sentry.sh --rollback
 ```
 
 ### Issue: Python syntax errors after rename
@@ -331,7 +331,7 @@ python3 -m py_compile backend/app/services/sentry_auth_service.py
 
 **Fix:** Edit the file manually or rollback:
 ```bash
-./scripts/rename_clawd_to_sentry.sh --rollback
+./scripts/rename_sentry_to_sentry.sh --rollback
 ```
 
 ### Issue: Git merge conflicts
@@ -389,7 +389,7 @@ grep "SENTRY_" backend/.env 2>/dev/null || echo "(.env not committed)"
 
 ```bash
 cd backend
-pytest tests/api/test_clawd_webhooks.py -v 2>&1 | head -50
+pytest tests/api/test_sentry_webhooks.py -v 2>&1 | head -50
 # Should have test files named test_sentry_webhooks.py or similar if renamed
 ```
 
@@ -401,9 +401,9 @@ After validation passes, **commit with this message:**
 
 ```bash
 git add -A
-git commit -m "refactor(bot): Rename OpenClaw → SENTRY system-wide
+git commit -m "refactor(bot): Rename Sentry → SENTRY system-wide
 
-This commit renames all clawd/openclaw references to sentry across the
+This commit renames all sentry/sentry references to sentry across the
 entire codebase, including:
 
 - Python class names (SentryAuthService → SentryAuthService)
@@ -432,7 +432,7 @@ Total replacements: 156"
 ## 🔍 Files Modified (Full List)
 
 **Backend API:**
-- `backend/app/api/clawd_webhooks.py` → `sentry_webhooks.py` (optional)
+- `backend/app/api/sentry_webhooks.py` → `sentry_webhooks.py` (optional)
 - `backend/app/api/registrars/operations.py` (imports)
 - `backend/app/api/registrars/safety_simulation.py` (imports)
 - `backend/app/api/sensor_analysis.py` (imports)
@@ -441,7 +441,7 @@ Total replacements: 156"
 
 **Backend Services:**
 - `backend/app/services/sentry_auth_service.py` → class + functions renamed
-- `backend/app/services/clawd_integration/` (directory) — 8 files
+- `backend/app/services/sentry_integration/` (directory) — 8 files
 - `backend/app/services/equipment_alert_service.py`
 - `backend/app/services/lifecycle_orchestrator.py`
 - `backend/app/services/background_scheduler.py`
@@ -465,7 +465,7 @@ Total replacements: 156"
 - 25+ other .md files
 
 **Tests & Scripts:**
-- `backend/scripts/test_clawd_integration.sh` → `test_sentry_integration.sh` (optional)
+- `backend/scripts/test_sentry_integration.sh` → `test_sentry_integration.sh` (optional)
 
 ---
 
@@ -495,8 +495,8 @@ Breakdown:
 1. **Commit the changes** (see template above)
 2. **Update directory names** (optional but recommended):
    ```bash
-   # If Clawd directory exists on VM
-   mv ~/.clawd ~/.sentry
+   # If Sentry directory exists on VM
+   mv ~/.sentry ~/.sentry
    mv $SENTRY_HOME /home/bederf/.sentry
    ```
 3. **Update documentation** referring to directory paths
@@ -516,7 +516,7 @@ If you encounter issues:
 1. **Check the log file:** `.rename-log-*.txt`
 2. **Run validation:** `python3 scripts/validate_sentry_rename.py --strict`
 3. **Review diffs:** `git diff --stat` to see all changed files
-4. **Rollback if needed:** `./scripts/rename_clawd_to_sentry.sh --rollback`
+4. **Rollback if needed:** `./scripts/rename_sentry_to_sentry.sh --rollback`
 
 ---
 

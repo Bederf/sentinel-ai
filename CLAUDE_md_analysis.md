@@ -22,7 +22,7 @@
 - Frontend TypeScript best practices
 - Maintenance history feature
 - Advanced features (24-hour simulation, Service feedback, ML metrics)
-- Telegram/Clawd integration patterns
+- Telegram/Sentry integration patterns
 - Database schema management
 - Digital Twin & zones architecture
 - Comprehensive debugging scenarios

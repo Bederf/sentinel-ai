@@ -10,7 +10,7 @@
 
 | Script | Purpose | Location |
 |--------|---------|----------|
-| **rename_clawd_to_sentry.sh** | Main rename engine | `scripts/rename_clawd_to_sentry.sh` |
+| **rename_sentry_to_sentry.sh** | Main rename engine | `scripts/rename_sentry_to_sentry.sh` |
 | **validate_sentry_rename.py** | Post-rename verification | `scripts/validate_sentry_rename.py` |
 
 **Key features:**
@@ -91,7 +91,7 @@ Done!                   (17 min total)
 
 **Stage 1:** ✅ Dry-run shows 45+ files, 150+ changes
 **Stage 2:** ✅ Execute completes, Python syntax valid
-**Stage 3:** ✅ Validation passes (0 clawd refs found)
+**Stage 3:** ✅ Validation passes (0 sentry refs found)
 **Stage 4:** ✅ Single commit created in git
 **Stage 5:** ✅ `$SENTRY_HOME` environment variable set
 
@@ -102,7 +102,7 @@ Done!                   (17 min total)
 **At ANY stage, revert with one command:**
 
 ```bash
-./scripts/rename_clawd_to_sentry.sh --rollback
+./scripts/rename_sentry_to_sentry.sh --rollback
 ```
 
 This restores from automatic backup. No data loss possible.
@@ -142,7 +142,7 @@ declare -A PATTERNS=(
 
 ### Validation Strategy
 
-1. **Forbidden pattern detection:** `clawd|openclaw|moltbot` must not exist
+1. **Forbidden pattern detection:** `sentry|sentry|moltbot` must not exist
 2. **Required pattern verification:** `sentry|SentryAuthService|/api/sentry/` must exist
 3. **Python syntax validation:** All 145+ Python files compile
 4. **Import verification:** No broken imports
@@ -197,13 +197,13 @@ Result: Single codebase, deploy anywhere, multi-site ready
 cd /opt/bms-intelligence
 
 # Stage 1: See what will change (zero risk)
-./scripts/rename_clawd_to_sentry.sh --dry-run
+./scripts/rename_sentry_to_sentry.sh --dry-run
 
 # Review the output
 cat .rename-log-*.txt | less
 
 # Stage 2: Execute (with automatic backup)
-./scripts/rename_clawd_to_sentry.sh --execute
+./scripts/rename_sentry_to_sentry.sh --execute
 
 # Stage 3: Validate
 python3 scripts/validate_sentry_rename.py
@@ -245,7 +245,7 @@ python3 scripts/validate_sentry_rename.py
 Common questions answered:
 
 **Q: What if the rename breaks something?**
-A: Automatic backup created. One command rollback: `./scripts/rename_clawd_to_sentry.sh --rollback`
+A: Automatic backup created. One command rollback: `./scripts/rename_sentry_to_sentry.sh --rollback`
 
 **Q: Can I stop halfway through?**
 A: Yes. Each stage is independent. You can run dry-run, review, then decide.
@@ -271,7 +271,7 @@ If you get stuck:
 1. **Check log file:** `.rename-log-*.txt` in project root
 2. **Run validation:** `python3 scripts/validate_sentry_rename.py`
 3. **Review diffs:** `git diff` to see what changed
-4. **Rollback if needed:** `./scripts/rename_clawd_to_sentry.sh --rollback`
+4. **Rollback if needed:** `./scripts/rename_sentry_to_sentry.sh --rollback`
 
 ---
 

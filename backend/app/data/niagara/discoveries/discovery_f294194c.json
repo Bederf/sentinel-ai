@@ -1,0 +1,1836 @@
+{
+  "metadata": {
+    "discovery_id": "f294194c",
+    "device_ip": "192.168.1.100",
+    "site_id": "site-002",
+    "device_id": null,
+    "status": "complete",
+    "started_at": "2026-02-19T14:18:03.230868",
+    "completed_at": "2026-02-19T14:18:03.238098",
+    "points_count": 57,
+    "classified_count": 57,
+    "summary": {
+      "total_points": 57,
+      "equipment_type_counts": {
+        "chiller": 10,
+        "ahu": 10,
+        "vav": 8,
+        "fcu": 3,
+        "pump": 4,
+        "cooling_tower": 2,
+        "meter": 3,
+        "generator": 3,
+        "unknown": 10,
+        "ups": 2,
+        "dali_controller": 2
+      },
+      "confidence_counts": {
+        "high": 34,
+        "medium": 23
+      },
+      "point_type_counts": {
+        "sensor": 43,
+        "status": 8,
+        "setpoint": 4,
+        "alarm": 2
+      },
+      "unique_equipment": {
+        "chiller": 2,
+        "ahu": 2,
+        "vav": 3,
+        "fcu": 1,
+        "pump": 2,
+        "cooling_tower": 1,
+        "meter": 1,
+        "generator": 1,
+        "unknown": 4,
+        "ups": 1,
+        "dali_controller": 1
+      },
+      "equipment_ids": {
+        "chiller": [
+          "CH-1",
+          "CH-2"
+        ],
+        "ahu": [
+          "AHU-1",
+          "AHU-2"
+        ],
+        "vav": [
+          "VAV-L1-A",
+          "VAV-L1-B",
+          "VAV-L2-A"
+        ],
+        "fcu": [
+          "FCU-L1-A"
+        ],
+        "pump": [
+          "PUMP-CW-1",
+          "PUMP-CHW-1"
+        ],
+        "cooling_tower": [
+          "CT-1"
+        ],
+        "meter": [
+          "MTR-MAIN"
+        ],
+        "generator": [
+          "GEN-1"
+        ],
+        "unknown": [
+          "ZONE-L1",
+          "ZONE-L2",
+          "DALI-L1-A",
+          "DALI-L2-B"
+        ],
+        "ups": [
+          "UPS-1"
+        ],
+        "dali_controller": [
+          "DALI-CTRL-L1"
+        ]
+      },
+      "needs_review": 0
+    },
+    "error": null
+  },
+  "classified_points": [
+    {
+      "original_name": "CH-1_CHW_Supply_Temp",
+      "original_description": "Chiller 1 Chilled Water Supply Temperature",
+      "equipment_type": "chiller",
+      "equipment_id": "CH-1",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "CH-1/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "chiller",
+        "Chiller",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "CH-1_CHW_Return_Temp",
+      "original_description": "Chiller 1 Chilled Water Return Temperature",
+      "equipment_type": "chiller",
+      "equipment_id": "CH-1",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "CH-1/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "chiller",
+        "Chiller",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "CH-1_Condenser_Water_Temp",
+      "original_description": "Chiller 1 Condenser Water Temperature",
+      "equipment_type": "chiller",
+      "equipment_id": "CH-1",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "CH-1/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "chiller",
+        "Chiller",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "CH-1_Compressor_Status",
+      "original_description": "Chiller 1 Compressor Run Status",
+      "equipment_type": "chiller",
+      "equipment_id": "CH-1",
+      "point_type": "status",
+      "point_category": "status",
+      "brick_class": "Status",
+      "standardized_name": "CH-1/status_status",
+      "unit": "",
+      "confidence": "high",
+      "tags": [
+        "chiller",
+        "Chiller",
+        "status",
+        "status",
+        "point"
+      ],
+      "object_type": "binaryInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "CH-1_Load_Percent",
+      "original_description": "Chiller 1 Current Load",
+      "equipment_type": "chiller",
+      "equipment_id": "CH-1",
+      "point_type": "sensor",
+      "point_category": "current",
+      "brick_class": "Current_Sensor",
+      "standardized_name": "CH-1/current_sensor",
+      "unit": "%",
+      "confidence": "medium",
+      "tags": [
+        "chiller",
+        "Chiller",
+        "current",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "CH-1_CHW_SP",
+      "original_description": "Chiller 1 CHW Supply Setpoint",
+      "equipment_type": "chiller",
+      "equipment_id": "CH-1",
+      "point_type": "setpoint",
+      "point_category": "setpoint",
+      "brick_class": "Setpoint",
+      "standardized_name": "CH-1/setpoint_setpoint",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "chiller",
+        "Chiller",
+        "setpoint",
+        "setpoint",
+        "point",
+        "writable"
+      ],
+      "object_type": "analogValue",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "CH-1_Alarm",
+      "original_description": "Chiller 1 General Alarm",
+      "equipment_type": "chiller",
+      "equipment_id": "CH-1",
+      "point_type": "alarm",
+      "point_category": "alarm",
+      "brick_class": "Alarm",
+      "standardized_name": "CH-1/alarm_alarm",
+      "unit": "",
+      "confidence": "medium",
+      "tags": [
+        "chiller",
+        "Chiller",
+        "alarm",
+        "alarm",
+        "point"
+      ],
+      "object_type": "binaryInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "CH-2_CHW_Supply_Temp",
+      "original_description": "Chiller 2 Chilled Water Supply Temperature",
+      "equipment_type": "chiller",
+      "equipment_id": "CH-2",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "CH-2/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "chiller",
+        "Chiller",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "CH-2_Compressor_Status",
+      "original_description": "Chiller 2 Compressor Status",
+      "equipment_type": "chiller",
+      "equipment_id": "CH-2",
+      "point_type": "sensor",
+      "point_category": "pressure",
+      "brick_class": "Pressure_Sensor",
+      "standardized_name": "CH-2/pressure_sensor",
+      "unit": "kPa",
+      "confidence": "medium",
+      "tags": [
+        "chiller",
+        "Chiller",
+        "pressure",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "binaryInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "CH-2_Load_Percent",
+      "original_description": "Chiller 2 Load Percentage",
+      "equipment_type": "chiller",
+      "equipment_id": "CH-2",
+      "point_type": "sensor",
+      "point_category": "unknown",
+      "brick_class": "Chiller",
+      "standardized_name": "CH-2/sensor",
+      "unit": "%",
+      "confidence": "medium",
+      "tags": [
+        "chiller",
+        "Chiller",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "AHU-1_Supply_Air_Temp",
+      "original_description": "AHU-1 Supply Air Temperature",
+      "equipment_type": "ahu",
+      "equipment_id": "AHU-1",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "AHU-1/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "ahu",
+        "Air_Handling_Unit",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "AHU-1_Return_Air_Temp",
+      "original_description": "AHU-1 Return Air Temperature",
+      "equipment_type": "ahu",
+      "equipment_id": "AHU-1",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "AHU-1/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "ahu",
+        "Air_Handling_Unit",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "AHU-1_Mixed_Air_Temp",
+      "original_description": "AHU-1 Mixed Air Temperature",
+      "equipment_type": "ahu",
+      "equipment_id": "AHU-1",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "AHU-1/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "ahu",
+        "Air_Handling_Unit",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "AHU-1_Filter_DP",
+      "original_description": "AHU-1 Filter Differential Pressure",
+      "equipment_type": "ahu",
+      "equipment_id": "AHU-1",
+      "point_type": "sensor",
+      "point_category": "pressure",
+      "brick_class": "Pressure_Sensor",
+      "standardized_name": "AHU-1/pressure_sensor",
+      "unit": "Pa",
+      "confidence": "high",
+      "tags": [
+        "ahu",
+        "Air_Handling_Unit",
+        "pressure",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "AHU-1_Fan_Status",
+      "original_description": "AHU-1 Supply Fan Run Status",
+      "equipment_type": "ahu",
+      "equipment_id": "AHU-1",
+      "point_type": "status",
+      "point_category": "status",
+      "brick_class": "Status",
+      "standardized_name": "AHU-1/status_status",
+      "unit": "",
+      "confidence": "high",
+      "tags": [
+        "ahu",
+        "Air_Handling_Unit",
+        "status",
+        "status",
+        "point"
+      ],
+      "object_type": "binaryInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "AHU-1_Fan_Speed",
+      "original_description": "AHU-1 Supply Fan Speed",
+      "equipment_type": "ahu",
+      "equipment_id": "AHU-1",
+      "point_type": "sensor",
+      "point_category": "speed",
+      "brick_class": "Speed_Sensor",
+      "standardized_name": "AHU-1/speed_sensor",
+      "unit": "%",
+      "confidence": "high",
+      "tags": [
+        "ahu",
+        "Air_Handling_Unit",
+        "speed",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogOutput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "AHU-1_SA_SP",
+      "original_description": "AHU-1 Supply Air Setpoint",
+      "equipment_type": "ahu",
+      "equipment_id": "AHU-1",
+      "point_type": "setpoint",
+      "point_category": "setpoint",
+      "brick_class": "Setpoint",
+      "standardized_name": "AHU-1/setpoint_setpoint",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "ahu",
+        "Air_Handling_Unit",
+        "setpoint",
+        "setpoint",
+        "point",
+        "writable"
+      ],
+      "object_type": "analogValue",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "AHU-2_Supply_Air_Temp",
+      "original_description": "AHU-2 Supply Air Temperature",
+      "equipment_type": "ahu",
+      "equipment_id": "AHU-2",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "AHU-2/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "ahu",
+        "Air_Handling_Unit",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "AHU-2_Fan_Status",
+      "original_description": "AHU-2 Supply Fan Status",
+      "equipment_type": "ahu",
+      "equipment_id": "AHU-2",
+      "point_type": "status",
+      "point_category": "status",
+      "brick_class": "Status",
+      "standardized_name": "AHU-2/status_status",
+      "unit": "",
+      "confidence": "medium",
+      "tags": [
+        "ahu",
+        "Air_Handling_Unit",
+        "status",
+        "status",
+        "point"
+      ],
+      "object_type": "binaryInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "AHU-2_Fan_Speed",
+      "original_description": "AHU-2 Fan Speed",
+      "equipment_type": "ahu",
+      "equipment_id": "AHU-2",
+      "point_type": "sensor",
+      "point_category": "speed",
+      "brick_class": "Speed_Sensor",
+      "standardized_name": "AHU-2/speed_sensor",
+      "unit": "%",
+      "confidence": "high",
+      "tags": [
+        "ahu",
+        "Air_Handling_Unit",
+        "speed",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogOutput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "VAV-L1-A_Zone_Temp",
+      "original_description": "VAV Level 1 Zone A Temperature",
+      "equipment_type": "vav",
+      "equipment_id": "VAV-L1-A",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "VAV-L1-A/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "vav",
+        "Variable_Air_Volume_Box",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "VAV-L1-A_Damper_Pos",
+      "original_description": "VAV Level 1 Zone A Damper Position",
+      "equipment_type": "vav",
+      "equipment_id": "VAV-L1-A",
+      "point_type": "sensor",
+      "point_category": "valve_position",
+      "brick_class": "Valve_Position_Sensor",
+      "standardized_name": "VAV-L1-A/valve_position_sensor",
+      "unit": "%",
+      "confidence": "high",
+      "tags": [
+        "vav",
+        "Variable_Air_Volume_Box",
+        "valve_position",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogOutput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "VAV-L1-A_Airflow",
+      "original_description": "VAV Level 1 Zone A Airflow",
+      "equipment_type": "vav",
+      "equipment_id": "VAV-L1-A",
+      "point_type": "sensor",
+      "point_category": "flow",
+      "brick_class": "Flow_Sensor",
+      "standardized_name": "VAV-L1-A/flow_sensor",
+      "unit": "L/s",
+      "confidence": "high",
+      "tags": [
+        "vav",
+        "Variable_Air_Volume_Box",
+        "flow",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "VAV-L1-A_Zone_SP",
+      "original_description": "VAV Level 1 Zone A Temperature Setpoint",
+      "equipment_type": "vav",
+      "equipment_id": "VAV-L1-A",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "VAV-L1-A/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "vav",
+        "Variable_Air_Volume_Box",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogValue",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "VAV-L1-B_Zone_Temp",
+      "original_description": "VAV Level 1 Zone B Temperature",
+      "equipment_type": "vav",
+      "equipment_id": "VAV-L1-B",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "VAV-L1-B/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "vav",
+        "Variable_Air_Volume_Box",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "VAV-L1-B_Damper_Pos",
+      "original_description": "VAV Level 1 Zone B Damper Position",
+      "equipment_type": "vav",
+      "equipment_id": "VAV-L1-B",
+      "point_type": "sensor",
+      "point_category": "valve_position",
+      "brick_class": "Valve_Position_Sensor",
+      "standardized_name": "VAV-L1-B/valve_position_sensor",
+      "unit": "%",
+      "confidence": "high",
+      "tags": [
+        "vav",
+        "Variable_Air_Volume_Box",
+        "valve_position",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogOutput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "VAV-L2-A_Zone_Temp",
+      "original_description": "VAV Level 2 Zone A Temperature",
+      "equipment_type": "vav",
+      "equipment_id": "VAV-L2-A",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "VAV-L2-A/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "vav",
+        "Variable_Air_Volume_Box",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "VAV-L2-A_Zone_SP",
+      "original_description": "VAV Level 2 Zone A Setpoint",
+      "equipment_type": "vav",
+      "equipment_id": "VAV-L2-A",
+      "point_type": "setpoint",
+      "point_category": "setpoint",
+      "brick_class": "Setpoint",
+      "standardized_name": "VAV-L2-A/setpoint_setpoint",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "vav",
+        "Variable_Air_Volume_Box",
+        "setpoint",
+        "setpoint",
+        "point",
+        "writable"
+      ],
+      "object_type": "analogValue",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "FCU-L1-A_Room_Temp",
+      "original_description": "FCU Level 1 Zone A Room Temperature",
+      "equipment_type": "fcu",
+      "equipment_id": "FCU-L1-A",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "FCU-L1-A/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "fcu",
+        "Fan_Coil_Unit",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "FCU-L1-A_Fan_Speed",
+      "original_description": "FCU Level 1 Zone A Fan Speed",
+      "equipment_type": "fcu",
+      "equipment_id": "FCU-L1-A",
+      "point_type": "sensor",
+      "point_category": "speed",
+      "brick_class": "Speed_Sensor",
+      "standardized_name": "FCU-L1-A/speed_sensor",
+      "unit": "%",
+      "confidence": "high",
+      "tags": [
+        "fcu",
+        "Fan_Coil_Unit",
+        "speed",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogOutput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "FCU-L1-A_Valve_Pos",
+      "original_description": "FCU Level 1 Zone A Cooling Valve",
+      "equipment_type": "fcu",
+      "equipment_id": "FCU-L1-A",
+      "point_type": "sensor",
+      "point_category": "valve_position",
+      "brick_class": "Valve_Position_Sensor",
+      "standardized_name": "FCU-L1-A/valve_position_sensor",
+      "unit": "%",
+      "confidence": "high",
+      "tags": [
+        "fcu",
+        "Fan_Coil_Unit",
+        "valve_position",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogOutput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "PUMP-CW-1_Status",
+      "original_description": "Condenser Water Pump 1 Status",
+      "equipment_type": "pump",
+      "equipment_id": "PUMP-CW-1",
+      "point_type": "status",
+      "point_category": "status",
+      "brick_class": "Status",
+      "standardized_name": "PUMP-CW-1/status_status",
+      "unit": "",
+      "confidence": "medium",
+      "tags": [
+        "pump",
+        "Pump",
+        "status",
+        "status",
+        "point"
+      ],
+      "object_type": "binaryInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "PUMP-CW-1_Speed",
+      "original_description": "Condenser Water Pump 1 Speed",
+      "equipment_type": "pump",
+      "equipment_id": "PUMP-CW-1",
+      "point_type": "setpoint",
+      "point_category": "setpoint",
+      "brick_class": "Setpoint",
+      "standardized_name": "PUMP-CW-1/setpoint_setpoint",
+      "unit": "%",
+      "confidence": "medium",
+      "tags": [
+        "pump",
+        "Pump",
+        "setpoint",
+        "setpoint",
+        "point",
+        "writable"
+      ],
+      "object_type": "analogOutput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "PUMP-CHW-1_Status",
+      "original_description": "Chilled Water Pump 1 Status",
+      "equipment_type": "pump",
+      "equipment_id": "PUMP-CHW-1",
+      "point_type": "status",
+      "point_category": "status",
+      "brick_class": "Status",
+      "standardized_name": "PUMP-CHW-1/status_status",
+      "unit": "",
+      "confidence": "medium",
+      "tags": [
+        "pump",
+        "Pump",
+        "status",
+        "status",
+        "point"
+      ],
+      "object_type": "binaryInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "PUMP-CHW-1_DP",
+      "original_description": "Chilled Water Pump 1 Discharge Pressure",
+      "equipment_type": "pump",
+      "equipment_id": "PUMP-CHW-1",
+      "point_type": "sensor",
+      "point_category": "pressure",
+      "brick_class": "Pressure_Sensor",
+      "standardized_name": "PUMP-CHW-1/pressure_sensor",
+      "unit": "kPa",
+      "confidence": "high",
+      "tags": [
+        "pump",
+        "Pump",
+        "pressure",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "CT-1_Fan_Speed",
+      "original_description": "Cooling Tower 1 Fan Speed",
+      "equipment_type": "cooling_tower",
+      "equipment_id": "CT-1",
+      "point_type": "sensor",
+      "point_category": "speed",
+      "brick_class": "Speed_Sensor",
+      "standardized_name": "CT-1/speed_sensor",
+      "unit": "%",
+      "confidence": "high",
+      "tags": [
+        "cooling_tower",
+        "Cooling_Tower",
+        "speed",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogOutput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "CT-1_Basin_Temp",
+      "original_description": "Cooling Tower 1 Basin Water Temperature",
+      "equipment_type": "cooling_tower",
+      "equipment_id": "CT-1",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "CT-1/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "cooling_tower",
+        "Cooling_Tower",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "MTR-MAIN_kW",
+      "original_description": "Main Power Meter Active Power",
+      "equipment_type": "meter",
+      "equipment_id": "MTR-MAIN",
+      "point_type": "sensor",
+      "point_category": "power",
+      "brick_class": "Power_Sensor",
+      "standardized_name": "MTR-MAIN/power_sensor",
+      "unit": "kW",
+      "confidence": "high",
+      "tags": [
+        "meter",
+        "Meter",
+        "power",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "MTR-MAIN_kWh",
+      "original_description": "Main Power Meter Energy",
+      "equipment_type": "meter",
+      "equipment_id": "MTR-MAIN",
+      "point_type": "sensor",
+      "point_category": "power",
+      "brick_class": "Power_Sensor",
+      "standardized_name": "MTR-MAIN/power_sensor",
+      "unit": "kWh",
+      "confidence": "high",
+      "tags": [
+        "meter",
+        "Meter",
+        "power",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "MTR-MAIN_PF",
+      "original_description": "Main Power Meter Power Factor",
+      "equipment_type": "meter",
+      "equipment_id": "MTR-MAIN",
+      "point_type": "sensor",
+      "point_category": "power",
+      "brick_class": "Power_Sensor",
+      "standardized_name": "MTR-MAIN/power_sensor",
+      "unit": "kW",
+      "confidence": "medium",
+      "tags": [
+        "meter",
+        "Meter",
+        "power",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "GEN-1_Status",
+      "original_description": "Generator 1 Run Status",
+      "equipment_type": "generator",
+      "equipment_id": "GEN-1",
+      "point_type": "status",
+      "point_category": "status",
+      "brick_class": "Status",
+      "standardized_name": "GEN-1/status_status",
+      "unit": "",
+      "confidence": "high",
+      "tags": [
+        "generator",
+        "Generator",
+        "status",
+        "status",
+        "point"
+      ],
+      "object_type": "binaryInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "GEN-1_Fuel_Level",
+      "original_description": "Generator 1 Fuel Level",
+      "equipment_type": "generator",
+      "equipment_id": "GEN-1",
+      "point_type": "sensor",
+      "point_category": "level",
+      "brick_class": "Level_Sensor",
+      "standardized_name": "GEN-1/level_sensor",
+      "unit": "%",
+      "confidence": "high",
+      "tags": [
+        "generator",
+        "Generator",
+        "level",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "GEN-1_Output_kW",
+      "original_description": "Generator 1 Output Power",
+      "equipment_type": "generator",
+      "equipment_id": "GEN-1",
+      "point_type": "sensor",
+      "point_category": "power",
+      "brick_class": "Power_Sensor",
+      "standardized_name": "GEN-1/power_sensor",
+      "unit": "kW",
+      "confidence": "high",
+      "tags": [
+        "generator",
+        "Generator",
+        "power",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "ZONE-L1_CO2",
+      "original_description": "Level 1 CO2 Sensor",
+      "equipment_type": "unknown",
+      "equipment_id": "ZONE-L1",
+      "point_type": "sensor",
+      "point_category": "co2",
+      "brick_class": "CO2_Sensor",
+      "standardized_name": "ZONE-L1/co2_sensor",
+      "unit": "ppm",
+      "confidence": "medium",
+      "tags": [
+        "co2",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "ZONE-L1_Humidity",
+      "original_description": "Level 1 Humidity Sensor",
+      "equipment_type": "unknown",
+      "equipment_id": "ZONE-L1",
+      "point_type": "sensor",
+      "point_category": "humidity",
+      "brick_class": "Humidity_Sensor",
+      "standardized_name": "ZONE-L1/humidity_sensor",
+      "unit": "%",
+      "confidence": "medium",
+      "tags": [
+        "humidity",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "ZONE-L2_CO2",
+      "original_description": "Level 2 CO2 Sensor",
+      "equipment_type": "unknown",
+      "equipment_id": "ZONE-L2",
+      "point_type": "sensor",
+      "point_category": "co2",
+      "brick_class": "CO2_Sensor",
+      "standardized_name": "ZONE-L2/co2_sensor",
+      "unit": "ppm",
+      "confidence": "medium",
+      "tags": [
+        "co2",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "UPS-1_Battery_Level",
+      "original_description": "UPS 1 Battery Level",
+      "equipment_type": "ups",
+      "equipment_id": "UPS-1",
+      "point_type": "sensor",
+      "point_category": "level",
+      "brick_class": "Level_Sensor",
+      "standardized_name": "UPS-1/level_sensor",
+      "unit": "%",
+      "confidence": "medium",
+      "tags": [
+        "ups",
+        "UPS",
+        "level",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "UPS-1_Load_Percent",
+      "original_description": "UPS 1 Load Percentage",
+      "equipment_type": "ups",
+      "equipment_id": "UPS-1",
+      "point_type": "sensor",
+      "point_category": "unknown",
+      "brick_class": "UPS",
+      "standardized_name": "UPS-1/sensor",
+      "unit": "%",
+      "confidence": "medium",
+      "tags": [
+        "ups",
+        "UPS",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "DALI-L1-A_Brightness",
+      "original_description": "DALI Zone L1-A Dimming Level",
+      "equipment_type": "unknown",
+      "equipment_id": "DALI-L1-A",
+      "point_type": "sensor",
+      "point_category": "brightness",
+      "brick_class": "Brightness_Sensor",
+      "standardized_name": "DALI-L1-A/brightness_sensor",
+      "unit": "%",
+      "confidence": "medium",
+      "tags": [
+        "brightness",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogOutput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "DALI-L1-A_Occupancy",
+      "original_description": "DALI Zone L1-A PIR Occupancy",
+      "equipment_type": "unknown",
+      "equipment_id": "DALI-L1-A",
+      "point_type": "sensor",
+      "point_category": "occupancy",
+      "brick_class": "Occupancy_Sensor",
+      "standardized_name": "DALI-L1-A/occupancy_sensor",
+      "unit": "",
+      "confidence": "medium",
+      "tags": [
+        "occupancy",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "binaryInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "DALI-L1-A_Lux",
+      "original_description": "DALI Zone L1-A Daylight Sensor",
+      "equipment_type": "unknown",
+      "equipment_id": "DALI-L1-A",
+      "point_type": "sensor",
+      "point_category": "lux",
+      "brick_class": "Luminance_Sensor",
+      "standardized_name": "DALI-L1-A/lux_sensor",
+      "unit": "lux",
+      "confidence": "medium",
+      "tags": [
+        "lux",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "DALI-L1-A_Lamp_Status",
+      "original_description": "DALI Zone L1-A Lamp Fault",
+      "equipment_type": "unknown",
+      "equipment_id": "DALI-L1-A",
+      "point_type": "status",
+      "point_category": "status",
+      "brick_class": "Status",
+      "standardized_name": "DALI-L1-A/status_status",
+      "unit": "",
+      "confidence": "medium",
+      "tags": [
+        "status",
+        "status",
+        "point"
+      ],
+      "object_type": "binaryInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "DALI-L2-B_Brightness",
+      "original_description": "DALI Zone L2-B Dimming Level",
+      "equipment_type": "unknown",
+      "equipment_id": "DALI-L2-B",
+      "point_type": "sensor",
+      "point_category": "brightness",
+      "brick_class": "Brightness_Sensor",
+      "standardized_name": "DALI-L2-B/brightness_sensor",
+      "unit": "%",
+      "confidence": "medium",
+      "tags": [
+        "brightness",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogOutput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "DALI-L2-B_Occupancy",
+      "original_description": "DALI Zone L2-B Presence",
+      "equipment_type": "unknown",
+      "equipment_id": "DALI-L2-B",
+      "point_type": "sensor",
+      "point_category": "occupancy",
+      "brick_class": "Occupancy_Sensor",
+      "standardized_name": "DALI-L2-B/occupancy_sensor",
+      "unit": "",
+      "confidence": "medium",
+      "tags": [
+        "occupancy",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "binaryInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "DALI-L2-B_Color_Temp",
+      "original_description": "DALI Zone L2-B Color Temperature",
+      "equipment_type": "unknown",
+      "equipment_id": "DALI-L2-B",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "DALI-L2-B/temperature_sensor",
+      "unit": "K",
+      "confidence": "medium",
+      "tags": [
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogOutput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "DALI-CTRL-L1_Status",
+      "original_description": "DALI Controller L1 Online Status",
+      "equipment_type": "dali_controller",
+      "equipment_id": "DALI-CTRL-L1",
+      "point_type": "status",
+      "point_category": "status",
+      "brick_class": "Status",
+      "standardized_name": "DALI-CTRL-L1/status_status",
+      "unit": "",
+      "confidence": "medium",
+      "tags": [
+        "dali_controller",
+        "DALI_Controller",
+        "status",
+        "status",
+        "point"
+      ],
+      "object_type": "binaryInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    },
+    {
+      "original_name": "DALI-CTRL-L1_Bus_Fault",
+      "original_description": "DALI Controller L1 Bus Fault",
+      "equipment_type": "dali_controller",
+      "equipment_id": "DALI-CTRL-L1",
+      "point_type": "alarm",
+      "point_category": "alarm",
+      "brick_class": "Alarm",
+      "standardized_name": "DALI-CTRL-L1/alarm_alarm",
+      "unit": "",
+      "confidence": "medium",
+      "tags": [
+        "dali_controller",
+        "DALI_Controller",
+        "alarm",
+        "alarm",
+        "point"
+      ],
+      "object_type": "binaryInput",
+      "instance": 0,
+      "present_value": null,
+      "writable": false
+    }
+  ],
+  "raw_points": [
+    {
+      "name": "CH-1_CHW_Supply_Temp",
+      "description": "Chiller 1 Chilled Water Supply Temperature",
+      "object_type": "analogInput",
+      "units": "degC",
+      "value": 6.5
+    },
+    {
+      "name": "CH-1_CHW_Return_Temp",
+      "description": "Chiller 1 Chilled Water Return Temperature",
+      "object_type": "analogInput",
+      "units": "degC",
+      "value": 12.3
+    },
+    {
+      "name": "CH-1_Condenser_Water_Temp",
+      "description": "Chiller 1 Condenser Water Temperature",
+      "object_type": "analogInput",
+      "units": "degC",
+      "value": 32.1
+    },
+    {
+      "name": "CH-1_Compressor_Status",
+      "description": "Chiller 1 Compressor Run Status",
+      "object_type": "binaryInput",
+      "units": "",
+      "value": 1
+    },
+    {
+      "name": "CH-1_Load_Percent",
+      "description": "Chiller 1 Current Load",
+      "object_type": "analogInput",
+      "units": "%",
+      "value": 72
+    },
+    {
+      "name": "CH-1_CHW_SP",
+      "description": "Chiller 1 CHW Supply Setpoint",
+      "object_type": "analogValue",
+      "units": "degC",
+      "value": 6.0
+    },
+    {
+      "name": "CH-1_Alarm",
+      "description": "Chiller 1 General Alarm",
+      "object_type": "binaryInput",
+      "units": "",
+      "value": 0
+    },
+    {
+      "name": "CH-2_CHW_Supply_Temp",
+      "description": "Chiller 2 Chilled Water Supply Temperature",
+      "object_type": "analogInput",
+      "units": "degC",
+      "value": 6.8
+    },
+    {
+      "name": "CH-2_Compressor_Status",
+      "description": "Chiller 2 Compressor Status",
+      "object_type": "binaryInput",
+      "units": "",
+      "value": 1
+    },
+    {
+      "name": "CH-2_Load_Percent",
+      "description": "Chiller 2 Load Percentage",
+      "object_type": "analogInput",
+      "units": "%",
+      "value": 65
+    },
+    {
+      "name": "AHU-1_Supply_Air_Temp",
+      "description": "AHU-1 Supply Air Temperature",
+      "object_type": "analogInput",
+      "units": "degC",
+      "value": 14.2
+    },
+    {
+      "name": "AHU-1_Return_Air_Temp",
+      "description": "AHU-1 Return Air Temperature",
+      "object_type": "analogInput",
+      "units": "degC",
+      "value": 24.5
+    },
+    {
+      "name": "AHU-1_Mixed_Air_Temp",
+      "description": "AHU-1 Mixed Air Temperature",
+      "object_type": "analogInput",
+      "units": "degC",
+      "value": 19.3
+    },
+    {
+      "name": "AHU-1_Filter_DP",
+      "description": "AHU-1 Filter Differential Pressure",
+      "object_type": "analogInput",
+      "units": "Pa",
+      "value": 180
+    },
+    {
+      "name": "AHU-1_Fan_Status",
+      "description": "AHU-1 Supply Fan Run Status",
+      "object_type": "binaryInput",
+      "units": "",
+      "value": 1
+    },
+    {
+      "name": "AHU-1_Fan_Speed",
+      "description": "AHU-1 Supply Fan Speed",
+      "object_type": "analogOutput",
+      "units": "%",
+      "value": 78
+    },
+    {
+      "name": "AHU-1_SA_SP",
+      "description": "AHU-1 Supply Air Setpoint",
+      "object_type": "analogValue",
+      "units": "degC",
+      "value": 14.0
+    },
+    {
+      "name": "AHU-2_Supply_Air_Temp",
+      "description": "AHU-2 Supply Air Temperature",
+      "object_type": "analogInput",
+      "units": "degC",
+      "value": 15.1
+    },
+    {
+      "name": "AHU-2_Fan_Status",
+      "description": "AHU-2 Supply Fan Status",
+      "object_type": "binaryInput",
+      "units": "",
+      "value": 1
+    },
+    {
+      "name": "AHU-2_Fan_Speed",
+      "description": "AHU-2 Fan Speed",
+      "object_type": "analogOutput",
+      "units": "%",
+      "value": 65
+    },
+    {
+      "name": "VAV-L1-A_Zone_Temp",
+      "description": "VAV Level 1 Zone A Temperature",
+      "object_type": "analogInput",
+      "units": "degC",
+      "value": 22.5
+    },
+    {
+      "name": "VAV-L1-A_Damper_Pos",
+      "description": "VAV Level 1 Zone A Damper Position",
+      "object_type": "analogOutput",
+      "units": "%",
+      "value": 55
+    },
+    {
+      "name": "VAV-L1-A_Airflow",
+      "description": "VAV Level 1 Zone A Airflow",
+      "object_type": "analogInput",
+      "units": "L/s",
+      "value": 120
+    },
+    {
+      "name": "VAV-L1-A_Zone_SP",
+      "description": "VAV Level 1 Zone A Temperature Setpoint",
+      "object_type": "analogValue",
+      "units": "degC",
+      "value": 22.0
+    },
+    {
+      "name": "VAV-L1-B_Zone_Temp",
+      "description": "VAV Level 1 Zone B Temperature",
+      "object_type": "analogInput",
+      "units": "degC",
+      "value": 23.1
+    },
+    {
+      "name": "VAV-L1-B_Damper_Pos",
+      "description": "VAV Level 1 Zone B Damper Position",
+      "object_type": "analogOutput",
+      "units": "%",
+      "value": 40
+    },
+    {
+      "name": "VAV-L2-A_Zone_Temp",
+      "description": "VAV Level 2 Zone A Temperature",
+      "object_type": "analogInput",
+      "units": "degC",
+      "value": 21.8
+    },
+    {
+      "name": "VAV-L2-A_Zone_SP",
+      "description": "VAV Level 2 Zone A Setpoint",
+      "object_type": "analogValue",
+      "units": "degC",
+      "value": 22.0
+    },
+    {
+      "name": "FCU-L1-A_Room_Temp",
+      "description": "FCU Level 1 Zone A Room Temperature",
+      "object_type": "analogInput",
+      "units": "degC",
+      "value": 22.8
+    },
+    {
+      "name": "FCU-L1-A_Fan_Speed",
+      "description": "FCU Level 1 Zone A Fan Speed",
+      "object_type": "analogOutput",
+      "units": "%",
+      "value": 60
+    },
+    {
+      "name": "FCU-L1-A_Valve_Pos",
+      "description": "FCU Level 1 Zone A Cooling Valve",
+      "object_type": "analogOutput",
+      "units": "%",
+      "value": 45
+    },
+    {
+      "name": "PUMP-CW-1_Status",
+      "description": "Condenser Water Pump 1 Status",
+      "object_type": "binaryInput",
+      "units": "",
+      "value": 1
+    },
+    {
+      "name": "PUMP-CW-1_Speed",
+      "description": "Condenser Water Pump 1 Speed",
+      "object_type": "analogOutput",
+      "units": "%",
+      "value": 80
+    },
+    {
+      "name": "PUMP-CHW-1_Status",
+      "description": "Chilled Water Pump 1 Status",
+      "object_type": "binaryInput",
+      "units": "",
+      "value": 1
+    },
+    {
+      "name": "PUMP-CHW-1_DP",
+      "description": "Chilled Water Pump 1 Discharge Pressure",
+      "object_type": "analogInput",
+      "units": "kPa",
+      "value": 250
+    },
+    {
+      "name": "CT-1_Fan_Speed",
+      "description": "Cooling Tower 1 Fan Speed",
+      "object_type": "analogOutput",
+      "units": "%",
+      "value": 70
+    },
+    {
+      "name": "CT-1_Basin_Temp",
+      "description": "Cooling Tower 1 Basin Water Temperature",
+      "object_type": "analogInput",
+      "units": "degC",
+      "value": 28.5
+    },
+    {
+      "name": "MTR-MAIN_kW",
+      "description": "Main Power Meter Active Power",
+      "object_type": "analogInput",
+      "units": "kW",
+      "value": 450
+    },
+    {
+      "name": "MTR-MAIN_kWh",
+      "description": "Main Power Meter Energy",
+      "object_type": "analogInput",
+      "units": "kWh",
+      "value": 12500
+    },
+    {
+      "name": "MTR-MAIN_PF",
+      "description": "Main Power Meter Power Factor",
+      "object_type": "analogInput",
+      "units": "",
+      "value": 0.92
+    },
+    {
+      "name": "GEN-1_Status",
+      "description": "Generator 1 Run Status",
+      "object_type": "binaryInput",
+      "units": "",
+      "value": 0
+    },
+    {
+      "name": "GEN-1_Fuel_Level",
+      "description": "Generator 1 Fuel Level",
+      "object_type": "analogInput",
+      "units": "%",
+      "value": 85
+    },
+    {
+      "name": "GEN-1_Output_kW",
+      "description": "Generator 1 Output Power",
+      "object_type": "analogInput",
+      "units": "kW",
+      "value": 0
+    },
+    {
+      "name": "ZONE-L1_CO2",
+      "description": "Level 1 CO2 Sensor",
+      "object_type": "analogInput",
+      "units": "ppm",
+      "value": 650
+    },
+    {
+      "name": "ZONE-L1_Humidity",
+      "description": "Level 1 Humidity Sensor",
+      "object_type": "analogInput",
+      "units": "%",
+      "value": 55
+    },
+    {
+      "name": "ZONE-L2_CO2",
+      "description": "Level 2 CO2 Sensor",
+      "object_type": "analogInput",
+      "units": "ppm",
+      "value": 720
+    },
+    {
+      "name": "UPS-1_Battery_Level",
+      "description": "UPS 1 Battery Level",
+      "object_type": "analogInput",
+      "units": "%",
+      "value": 98
+    },
+    {
+      "name": "UPS-1_Load_Percent",
+      "description": "UPS 1 Load Percentage",
+      "object_type": "analogInput",
+      "units": "%",
+      "value": 45
+    },
+    {
+      "name": "DALI-L1-A_Brightness",
+      "description": "DALI Zone L1-A Dimming Level",
+      "object_type": "analogOutput",
+      "units": "%",
+      "value": 85
+    },
+    {
+      "name": "DALI-L1-A_Occupancy",
+      "description": "DALI Zone L1-A PIR Occupancy",
+      "object_type": "binaryInput",
+      "units": "",
+      "value": 1
+    },
+    {
+      "name": "DALI-L1-A_Lux",
+      "description": "DALI Zone L1-A Daylight Sensor",
+      "object_type": "analogInput",
+      "units": "lux",
+      "value": 450
+    },
+    {
+      "name": "DALI-L1-A_Lamp_Status",
+      "description": "DALI Zone L1-A Lamp Fault",
+      "object_type": "binaryInput",
+      "units": "",
+      "value": 0
+    },
+    {
+      "name": "DALI-L2-B_Brightness",
+      "description": "DALI Zone L2-B Dimming Level",
+      "object_type": "analogOutput",
+      "units": "%",
+      "value": 70
+    },
+    {
+      "name": "DALI-L2-B_Occupancy",
+      "description": "DALI Zone L2-B Presence",
+      "object_type": "binaryInput",
+      "units": "",
+      "value": 0
+    },
+    {
+      "name": "DALI-L2-B_Color_Temp",
+      "description": "DALI Zone L2-B Color Temperature",
+      "object_type": "analogOutput",
+      "units": "K",
+      "value": 4000
+    },
+    {
+      "name": "DALI-CTRL-L1_Status",
+      "description": "DALI Controller L1 Online Status",
+      "object_type": "binaryInput",
+      "units": "",
+      "value": 1
+    },
+    {
+      "name": "DALI-CTRL-L1_Bus_Fault",
+      "description": "DALI Controller L1 Bus Fault",
+      "object_type": "binaryInput",
+      "units": "",
+      "value": 0
+    }
+  ]
+}

@@ -2,14 +2,14 @@
 
 External system integrations: Telegram, SIMBIOT, MCP server, webhooks.
 
-## Telegram/Clawd Bot Integration
+## Telegram/Sentry Bot Integration
 
 ### Architecture
 
 ```
 SENTINEL Alert/Work Order
     ↓
-Clawd Bot (middleware)
+Sentry Bot (middleware)
     ↓
 Telegram Chat (Technician's phone)
     ↓
@@ -68,9 +68,9 @@ Service record marked 'data_collection'
 Feedback collection phase begins
 ```
 
-### Clawd Bot Endpoints
+### Sentry Bot Endpoints
 
-**In `backend/app/api/clawd_webhooks.py`:**
+**In `backend/app/api/sentry_webhooks.py`:**
 
 ```python
 @router.post("/api/sentry/process-pending-notifications")
@@ -82,8 +82,8 @@ async def process_pending_notifications():
     return {"success": count, "processed": processed_ids}
 
 @router.post("/api/sentry/feedback")
-async def handle_clawd_feedback(payload: ClaudFeedback):
-    """Handle feedback submission from Clawd"""
+async def handle_sentry_feedback(payload: ClaudFeedback):
+    """Handle feedback submission from Sentry"""
     # Parse technician response
     # Update service record
     # Calculate health impact

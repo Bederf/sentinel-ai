@@ -4,11 +4,11 @@ version: 41-01
 date: 2026-01-31
 ---
 
-# Phase 41-01: Clawd WO Conversation Flow - Implementation
+# Phase 41-01: Sentry WO Conversation Flow - Implementation
 
 ## Overview
 
-Clawd work order conversation flow for ML engineer knowledge capture. When critical equipment alerts occur, Clawd notifies technicians via Telegram in sequential one-by-one prompts, collecting service data (photos, audio, observations) which becomes training data for predictive maintenance models.
+Sentry work order conversation flow for ML engineer knowledge capture. When critical equipment alerts occur, Sentry notifies technicians via Telegram in sequential one-by-one prompts, collecting service data (photos, audio, observations) which becomes training data for predictive maintenance models.
 
 ## Architecture
 
@@ -19,7 +19,7 @@ Work Order Created
     ↓
 bms@company.co.za (Email)
     ↓ (parallel)
-Clawd Bot → Telegram Notification
+Sentry Bot → Telegram Notification
     ↓
 Technician replies "done"
     ↓ (sequential prompts)
@@ -62,9 +62,9 @@ Store in Training Dataset
 - When finished, replies to Telegram: "done" or "completed"
 
 ### 4. Data Collection Workflow Starts (After "done")
-Clawd receives "done" → Calls BMS webhook → BMS responds with first prompt:
+Sentry receives "done" → Calls BMS webhook → BMS responds with first prompt:
 
-**Clawd shows technician:**
+**Sentry shows technician:**
 ```
 ✅ Service completed!
 
@@ -176,7 +176,7 @@ extract_info_from_response(eq_type, context, response_text)  # NLP extraction
 
 ### ✅ Context-Aware Prompts (Breakdown Repairs)
 
-When dispatching from an alert, Clawd already knows the detected fault. Instead of asking open-ended questions, the system uses **context-aware prompts** with pre-filled options.
+When dispatching from an alert, Sentry already knows the detected fault. Instead of asking open-ended questions, the system uses **context-aware prompts** with pre-filled options.
 
 **Diagnostic Context** (`backend/app/models/service_record.py`):
 ```python
@@ -203,7 +203,7 @@ class DiagnosticContext(BaseModel):
 
 **Example Conversation**:
 ```
-Clawd: FCU-L10-03 repair complete - thanks!
+Sentry: FCU-L10-03 repair complete - thanks!
        We detected: FCU valve stuck at 15% (E04)
        Did you confirm this was the issue?
        □ Yes, confirmed
@@ -212,7 +212,7 @@ Clawd: FCU-L10-03 repair complete - thanks!
 
 Tech: Yes, confirmed
 
-Clawd: What was the root cause?
+Sentry: What was the root cause?
        □ Actuator motor failed
        □ Actuator jammed mechanically
        □ Control signal issue (0-10V)
@@ -220,15 +220,15 @@ Clawd: What was the root cause?
 
 Tech: Actuator motor failed
 
-Clawd: Photo of replacement part label?
+Sentry: Photo of replacement part label?
 
 Tech: [photo]
 
-Clawd: Zone temp now? (was 25.0°C, setpoint 21.0°C)
+Sentry: Zone temp now? (was 25.0°C, setpoint 21.0°C)
 
 Tech: 21.5
 
-Clawd: Service record complete!
+Sentry: Service record complete!
 ```
 
 ### ✅ Comprehensive Response Handling
@@ -250,7 +250,7 @@ If the technician provides all info in one message, the system extracts it and s
 
 **Response**:
 ```
-Clawd: Got it! (fault confirmed, root cause: Actuator motor failed,
+Sentry: Got it! (fault confirmed, root cause: Actuator motor failed,
        part: Belimo LMV-D3, temp: 21.5°C)
 
        Just need a photo of the replacement part label
@@ -258,10 +258,10 @@ Clawd: Got it! (fault confirmed, root cause: Actuator motor failed,
 
 This respects technician time while capturing complete ML training data.
 
-### ✅ Clawd Integration Layer
+### ✅ Sentry Integration Layer
 
-**Work Order Notifier** (`backend/app/services/clawd_integration/work_order_notifier.py`):
-- Sends WO notifications to Clawd
+**Work Order Notifier** (`backend/app/services/sentry_integration/work_order_notifier.py`):
+- Sends WO notifications to Sentry
 - Handles technician replies
 - Manages sequential data collection flow
 - File classification (auto-detects service_sheet, oil_sample, etc.)
@@ -274,7 +274,7 @@ Key flow:
 3. `_classify_attachment()` - Determine attachment type from file
 4. `get_collection_status()` - Report what's still needed
 
-**Webhook API** (`backend/app/api/clawd_webhooks.py`):
+**Webhook API** (`backend/app/api/sentry_webhooks.py`):
 ```python
 POST   /api/sentry/work-order/response      # Handle tech replies
 GET    /api/sentry/work-order/status/{code}  # Get collection status
@@ -292,7 +292,7 @@ Protected with `X-Sentry-Secret` header for security.
 # BMS alert triggers WO
 WO assigned to technician → bms@company.co.za
 
-# Parallel notification to Clawd
+# Parallel notification to Sentry
 await work_order_notifier.notify_technician({
     "work_order_id": "wo-123",
     "equipment_id": "eq-123",
@@ -303,7 +303,7 @@ await work_order_notifier.notify_technician({
 })
 ```
 
-**Clawd notification message:**
+**Sentry notification message:**
 ```
 🚨 HIGH PRIORITY WORK ORDER
 
@@ -341,7 +341,7 @@ BMS responds:
 }
 ```
 
-Clawd shows next prompt to technician.
+Sentry shows next prompt to technician.
 
 ### 3. Sequential Collection
 
@@ -480,7 +480,7 @@ python -m pytest tests/api/test_service_records.py::test_create_service_record -
 python -m pytest tests/services/test_ml_template_service.py -v
 
 # Test Sentry webhooks
-python -m pytest tests/api/test_clawd_webhooks.py -v
+python -m pytest tests/api/test_sentry_webhooks.py -v
 ```
 
 ### Manual Testing
@@ -556,15 +556,15 @@ curl -X POST http://localhost:9095/api/sentry/work-order/response \
 - `backend/app/services/ml_template_service.py` - Template management + context-aware prompts
 - `backend/app/services/zone_diagnostics.py` - Zone fault analysis and root cause
 - `backend/app/data/ml_data_templates.json` - Equipment templates (19 types)
-- `backend/app/services/clawd_integration/work_order_notifier.py` - Sentry integration + comprehensive response handling
-- `backend/app/services/clawd_integration/alert_notifier.py` - Send alerts to Telegram
-- `backend/app/api/clawd_webhooks.py` - Webhook endpoints
+- `backend/app/services/sentry_integration/work_order_notifier.py` - Sentry integration + comprehensive response handling
+- `backend/app/services/sentry_integration/alert_notifier.py` - Send alerts to Telegram
+- `backend/app/api/sentry_webhooks.py` - Webhook endpoints
 - `backend/app/main.py` - Router inclusion
 
-**Clawd Side** (`$SENTRY_HOME`):
+**Sentry Side** (`$SENTRY_HOME`):
 - `tools/wo_notifier.py` - Send WO notifications to BMS
 - `tools/wo_conversation_handler.py` - Handle technician replies
-- `tools/clawd_ai_bridge.py` - Route WO conversations
+- `tools/sentry_ai_bridge.py` - Route WO conversations
 - Gmail skill - Email notifications to technicians
 
 ## Usage Example
@@ -585,7 +585,7 @@ await work_order_notifier.notify_technician({
     "description": "Low oil pressure alarm"
 })
 
-# Clawd handles sequential collection
+# Sentry handles sequential collection
 # All data stored in service record
 # Trigger ML processing when complete
 ```

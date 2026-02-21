@@ -7,6 +7,7 @@ import { useSimulation } from '@/contexts/SimulationContext';
 
 interface DaliData {
   data_source: 'simulation' | 'live';
+  source_type?: string;
   timestamp?: string;
   summary: {
     baseline_annual_cost?: number;
@@ -49,6 +50,7 @@ interface DaliData {
   }>;
   zones?: Array<{
     zone_id: string;
+    source_type?: string;
     occupancy_percent: number;
     avg_brightness_level: number;
     total_sensors: number;
@@ -149,7 +151,7 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
     return (
       <div className="p-8 text-center rounded-lg" style={{ background: 'var(--color-sentinel-bg-panel)' }}>
         <p style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-          DALI simulation data is incomplete or unavailable
+          Lighting protocol simulation data is incomplete or unavailable
         </p>
       </div>
     );

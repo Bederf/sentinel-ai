@@ -316,7 +316,7 @@ Water module links to sustainability for ESG reporting:
 }
 ```
 
-### Clawd Telegram Bot
+### Sentry Telegram Bot
 
 Water alerts can be routed via Telegram for real-time notifications (future enhancement):
 
@@ -429,7 +429,7 @@ curl localhost:9095/api/water/trending/site-002?period=week
 
 - Replace mock Modbus adapter with real ModbusClient for production meters
 - Configure Supabase `water_consumption` and `water_alerts` tables
-- Set up alert notifications via Telegram/Clawd bot integration
+- Set up alert notifications via Telegram/Sentry bot integration
 - Implement alert escalation rules (unresolved HIGH → 1 hour, CRITICAL → 15 min)
 - Add data validation and quality checks
 - Implement retry logic for failed Modbus reads

@@ -1,0 +1,9 @@
+flowchart TD
+    A[Automatic stage active] --> B[Evaluate fail-closed gates]
+    B -->|All pass| C[Hold automatic]
+    B -->|Any fail| D[Decision: would_fail_closed_demote]
+    D --> E[Set write action: stop_writes]
+    E --> F[Demote to supervised]
+    F --> G[Persist state and last_demoted_at]
+    G --> H[Emit alert + audit event]
+    H --> I[Start 24h requalification stability window]

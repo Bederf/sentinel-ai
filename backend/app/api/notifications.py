@@ -21,10 +21,10 @@ Endpoints:
 import logging
 from typing import List, Optional
 from uuid import UUID
-from datetime import datetime, time
+from datetime import datetime
 from pydantic import BaseModel, Field
 
-from fastapi import APIRouter, HTTPException, Query, Header
+from fastapi import APIRouter, HTTPException, Query
 
 from app.database.repositories.notification_repository import NotificationRepository
 from app.services.notification_service import NotificationService
@@ -34,7 +34,6 @@ from app.models.notification import (
     NotificationStatus,
     TechnicianNotificationChannel,
     TechnicianNotificationPreferences,
-    NotificationDeliveryLog,
 )
 
 logger = logging.getLogger(__name__)
@@ -74,25 +73,13 @@ class NotificationChannelResponse(BaseModel):
 class NotificationPreferencesCreate(BaseModel):
     """Create/update notification preferences request."""
 
-    preferred_channel: ChannelType = Field(
-        default=ChannelType.TELEGRAM, description="Primary notification channel"
-    )
-    enabled_channels: List[ChannelType] = Field(
-        default=[ChannelType.TELEGRAM], description="Channels to send to"
-    )
-    alert_level_min: AlertLevel = Field(
-        default=AlertLevel.WARNING, description="Minimum alert severity to send"
-    )
+    preferred_channel: ChannelType = Field(default=ChannelType.TELEGRAM, description="Primary notification channel")
+    enabled_channels: List[ChannelType] = Field(default=[ChannelType.TELEGRAM], description="Channels to send to")
+    alert_level_min: AlertLevel = Field(default=AlertLevel.WARNING, description="Minimum alert severity to send")
     quiet_hours_enabled: bool = Field(default=True, description="Enable quiet hours")
-    quiet_hours_start: str = Field(
-        default="22:00", description="Quiet hours start (HH:MM format)"
-    )
-    quiet_hours_end: str = Field(
-        default="06:00", description="Quiet hours end (HH:MM format)"
-    )
-    emergency_override_enabled: bool = Field(
-        default=True, description="Allow critical alerts to bypass quiet hours"
-    )
+    quiet_hours_start: str = Field(default="22:00", description="Quiet hours start (HH:MM format)")
+    quiet_hours_end: str = Field(default="06:00", description="Quiet hours end (HH:MM format)")
+    emergency_override_enabled: bool = Field(default=True, description="Allow critical alerts to bypass quiet hours")
     batch_low_priority: bool = Field(default=False, description="Batch low-priority alerts")
     batch_interval_minutes: int = Field(default=60, ge=5, le=1440)
 
@@ -166,6 +153,25 @@ class TestChannelRequest(BaseModel):
     )
 
 
+# ========== Helpers ==========
+
+
+async def _resolve_technician_id(technician_id: str) -> UUID:
+    """Resolve technician_id to UUID — accepts UUID string or email address."""
+    try:
+        return UUID(technician_id)
+    except ValueError:
+        pass
+    # Not a UUID — try email lookup
+    from app.database.supabase_client import get_supabase_client
+
+    client = get_supabase_client()
+    result = client.table("technicians").select("id").eq("email", technician_id).limit(1).execute()
+    if result.data:
+        return UUID(result.data[0]["id"])
+    raise HTTPException(status_code=404, detail=f"Technician not found: {technician_id}")
+
+
 # ========== Notification Channels ==========
 
 
@@ -175,9 +181,7 @@ class TestChannelRequest(BaseModel):
 )
 async def list_notification_channels(
     technician_id: str,
-    channel_type: Optional[ChannelType] = Query(
-        None, description="Filter by channel type"
-    ),
+    channel_type: Optional[ChannelType] = Query(None, description="Filter by channel type"),
 ):
     """
     List notification channels for a technician.
@@ -191,7 +195,7 @@ async def list_notification_channels(
     """
     try:
         repo = NotificationRepository()
-        tech_uuid = UUID(technician_id)
+        tech_uuid = await _resolve_technician_id(technician_id)
         channel_types = [channel_type] if channel_type else None
 
         channels = await repo.get_notification_channels(tech_uuid, channel_types=channel_types)
@@ -241,7 +245,7 @@ async def create_notification_channel(
     """
     try:
         repo = NotificationRepository()
-        tech_uuid = UUID(technician_id)
+        tech_uuid = await _resolve_technician_id(technician_id)
 
         # Validate that at least one identifier is provided
         if not any([request.telegram_id, request.whatsapp_number, request.sms_number]):
@@ -304,7 +308,7 @@ async def get_notification_channel(
     """
     try:
         repo = NotificationRepository()
-        tech_uuid = UUID(technician_id)
+        tech_uuid = await _resolve_technician_id(technician_id)
         ch_uuid = UUID(channel_id)
 
         channel = await repo.get_notification_channel(tech_uuid, ch_uuid)
@@ -356,7 +360,7 @@ async def update_notification_channel(
     """
     try:
         repo = NotificationRepository()
-        tech_uuid = UUID(technician_id)
+        tech_uuid = await _resolve_technician_id(technician_id)
         ch_uuid = UUID(channel_id)
 
         # Get existing channel
@@ -416,7 +420,7 @@ async def delete_notification_channel(
     """
     try:
         repo = NotificationRepository()
-        tech_uuid = UUID(technician_id)
+        tech_uuid = await _resolve_technician_id(technician_id)
         ch_uuid = UUID(channel_id)
 
         # Verify channel exists
@@ -464,7 +468,7 @@ async def get_notification_preferences(
     """
     try:
         repo = NotificationRepository()
-        tech_uuid = UUID(technician_id)
+        tech_uuid = await _resolve_technician_id(technician_id)
 
         preferences = await repo.get_notification_preferences(tech_uuid)
         if not preferences:
@@ -516,7 +520,7 @@ async def create_notification_preferences(
     """
     try:
         repo = NotificationRepository()
-        tech_uuid = UUID(technician_id)
+        tech_uuid = await _resolve_technician_id(technician_id)
 
         # Parse times
         start_time = datetime.strptime(request.quiet_hours_start, "%H:%M").time()
@@ -581,7 +585,7 @@ async def update_notification_preferences(
     """
     try:
         repo = NotificationRepository()
-        tech_uuid = UUID(technician_id)
+        tech_uuid = await _resolve_technician_id(technician_id)
 
         # Get existing preferences
         existing = await repo.get_notification_preferences(tech_uuid)
@@ -656,7 +660,7 @@ async def get_delivery_logs(
     """
     try:
         repo = NotificationRepository()
-        tech_uuid = UUID(technician_id) if technician_id else None
+        tech_uuid = (await _resolve_technician_id(technician_id)) if technician_id else None
 
         logs = await repo.get_delivery_logs(
             technician_id=tech_uuid,
@@ -781,7 +785,7 @@ async def send_test_notification(
     try:
         repo = NotificationRepository()
         service = NotificationService()
-        tech_uuid = UUID(technician_id)
+        tech_uuid = await _resolve_technician_id(technician_id)
         ch_uuid = UUID(channel_id)
 
         # Get channel

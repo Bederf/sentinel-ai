@@ -24,7 +24,7 @@ SENTINEL processes PI for the following categories of data subjects:
 | Data Subject | Interaction Channel | PI Collected | Purpose |
 |-------------|--------------------|--------------|---------|
 | **Building occupants** | WhatsApp, Telegram, web portal | Phone numbers, names, desk locations, facilities requests, occupancy data | Handle comfort complaints, facilities requests, building access |
-| **Technicians** | MRI Evolution CAFM, Clawd Telegram bot, mobile app | Names, phone numbers, skills, work assignments, location (during dispatch) | Work order dispatch, skill matching, field data collection |
+| **Technicians** | MRI Evolution CAFM, Sentry Telegram bot, mobile app | Names, phone numbers, skills, work assignments, location (during dispatch) | Work order dispatch, skill matching, field data collection |
 | **System administrators** | SSH, web dashboard, API | Usernames, email addresses, IP addresses, access logs | System administration, audit trail |
 
 ---
@@ -284,7 +284,7 @@ SENTINEL implements automated data lifecycle management:
 | Logging Architecture | `docs/08-security/logging-architecture.md` |
 | Access Control Implementation | `docs/08-security/access-control-implementation.md` |
 | Vulnerability Management | `docs/08-security/vulnerability-management.md` |
-| Clawd Telegram Integration | `docs/CLAWD_INTEGRATION.md` |
+| Sentry Telegram Integration | `docs/SENTRY_INTEGRATION.md` |
 
 ---
 

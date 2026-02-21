@@ -1,0 +1,12 @@
+flowchart TD
+    A[Recommendation outcome recorded] --> B[Build feedback payload]
+    B --> C[Idempotent dedup check]
+    C -->|Duplicate| D[Discard duplicate and log]
+    C -->|New| E[Persist feedback event]
+    E --> F[Update feedback quality metrics]
+    F --> G[Evaluate mode-aware training-readiness gates]
+    G -->|Not ready| H[Defer retraining with reason]
+    G -->|Ready| I[Check retraining cooldown]
+    I -->|In cooldown| H
+    I -->|Eligible| J[Trigger retraining scheduler]
+    J --> K[Store retraining decision and model status]

@@ -40,23 +40,8 @@
       "standard": "NRS 097-2-1:2024 Ed.3",
       "date": "2025-10-17",
       "issuer": "Intertek",
-      "expiry": null
-    },
-    {
-      "equipment": "Huawei SUN2000-100KTL-M2",
-      "cert_no": "CN-PVES-250512",
-      "standard": "NRS 097-2-1:2024 Ed.3",
-      "date": "2025-05-12",
-      "issuer": "Intertek",
-      "expiry": null
-    },
-    {
-      "equipment": "Schneider Conext CL 25000E",
-      "cert_no": "U14-0636",
-      "standard": "NRS 097-2-1:2010 Ed.1",
-      "date": "2014-11-21",
-      "issuer": "Bureau Veritas",
-      "expiry": null
+      "expiry": null,
+      "note": "Covers S002-INV-R-001 to R-002 and S002-INV-C-001 to C-002"
     }
   ]
 }

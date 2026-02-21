@@ -106,7 +106,7 @@ SENTINEL processes PI under the following legal bases:
 | Attribute | Detail |
 |-----------|--------|
 | **Who** | Maintenance technicians, service contractors, specialist engineers |
-| **Interaction channels** | MRI Evolution CAFM, Clawd Telegram bot, mobile inspection app |
+| **Interaction channels** | MRI Evolution CAFM, Sentry Telegram bot, mobile inspection app |
 | **PI collected** | Names, phone numbers, skill categories, work assignments, service records, location (during dispatch) |
 | **Purpose** | Work order dispatch, skill matching, field data collection, service quality tracking |
 | **Legal basis** | Contractual necessity (FM service agreement) |
