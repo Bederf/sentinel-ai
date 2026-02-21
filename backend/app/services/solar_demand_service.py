@@ -1,8 +1,8 @@
 """Solar Demand Charge Management — peak shaving, NMD tracking, load deferral.
 
 Demand charges are typically 30-40% of a commercial electricity bill in SA.
-For Site-002 (NMD 6,000 kVA), shaving just the top 200 kW of demand with BESS
-saves ~R31,100/month (200 kW x R155.50/kVA).
+For Site-002 (NMD 1,820 kVA), shaving just the top 200 kW of demand with BESS
+saves ~R79,096/month (200 x R395.48/kVA).
 
 NMD (Notified Maximum Demand):
   - Contractual maximum demand with City Power
@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 
+from app.services.solar_config_service import get_site_solar_config
+
 logger = logging.getLogger(__name__)
 
 
@@ -32,6 +34,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DemandStatus:
     """Current building demand snapshot."""
+
     site_id: str
     timestamp: str
     current_demand_kw: float
@@ -63,6 +66,7 @@ class DemandStatus:
 @dataclass
 class DemandInterval:
     """A single 15-minute demand reading."""
+
     timestamp: str
     demand_kw: float
     solar_offset_kw: float = 0.0
@@ -82,6 +86,7 @@ class DemandInterval:
 @dataclass
 class DemandProfile:
     """15-minute demand profile for a period."""
+
     site_id: str
     period: str  # day / week
     intervals: List[DemandInterval] = field(default_factory=list)
@@ -107,6 +112,7 @@ class DemandProfile:
 @dataclass
 class MonthlyPeak:
     """Monthly peak demand record for NMD ratchet tracking."""
+
     month: str  # YYYY-MM
     peak_demand_kw: float
     peak_timestamp: str
@@ -128,6 +134,7 @@ class MonthlyPeak:
 @dataclass
 class NMDStatus:
     """NMD compliance and ratchet tracking."""
+
     site_id: str
     nmd_limit_kva: float
     current_demand_kw: float
@@ -157,6 +164,7 @@ class NMDStatus:
 @dataclass
 class PeakRiskAssessment:
     """Prediction of peak demand risk for the current day."""
+
     site_id: str
     timestamp: str
     predicted_peak_kw: float
@@ -184,6 +192,7 @@ class PeakRiskAssessment:
 @dataclass
 class ShavingPotential:
     """How much BESS can reduce peak demand."""
+
     site_id: str
     current_peak_kw: float
     bess_available_kw: float
@@ -209,6 +218,7 @@ class ShavingPotential:
 @dataclass
 class ShavingRecommendation:
     """When to pre-emptively discharge BESS to cap demand."""
+
     site_id: str
     timestamp: str
     should_shave: bool
@@ -234,6 +244,7 @@ class ShavingRecommendation:
 @dataclass
 class DeferralSuggestion:
     """Non-critical load that could shift to off-peak."""
+
     equipment_code: str
     equipment_name: str
     load_kw: float
@@ -259,12 +270,13 @@ class DeferralSuggestion:
 @dataclass
 class DemandSavings:
     """Demand charge savings from peak shaving."""
+
     site_id: str
     period: str  # month
     unmanaged_peak_kw: float
     managed_peak_kw: float
     peak_reduction_kw: float
-    demand_charge_per_kva: float  # R155.50/kVA for City Power
+    demand_charge_per_kva: float  # R395.48/kVA for City Power
     unmanaged_cost_zar: float
     managed_cost_zar: float
     savings_zar: float
@@ -296,26 +308,38 @@ class SolarDemandService:
     demand approaches NMD threshold.
     """
 
-    # Site-002 reference parameters
-    NMD_LIMIT_KVA = 6000.0  # City Power contractual NMD
-    DEMAND_CHARGE_PER_KVA = 155.50  # ZAR/kVA/month (City Power 2026)
+    # Loaded from solar_config_service; class attrs are fallback defaults only
+    NMD_LIMIT_KVA = 1820.0  # City Power contractual NMD (from energy_centre.json)
+    DEMAND_CHARGE_PER_KVA = 395.48  # ZAR/kVA/month (City Power 2025/26 verified)
     NMD_WARNING_PCT = 85.0  # Alert when demand exceeds 85% of NMD
     NMD_CRITICAL_PCT = 95.0  # Critical when demand exceeds 95% of NMD
 
-    # BESS parameters (from 34-05 arbitrage engine)
-    BESS_CAPACITY_KWH = 5015.0
-    BESS_RATED_POWER_KW = 2507.0  # 0.5C rate
+    # BESS parameters (Huawei LUNA2000, from site-002_config.json)
+    BESS_CAPACITY_KWH = 500.0
+    BESS_RATED_POWER_KW = 250.0  # 0.5C rate
     BESS_MIN_SOC_PCT = 10.0
 
-    # Building profile (Site-002 campus)
-    BASE_LOAD_KW = 1800.0
-    PEAK_DEMAND_KW = 2500.0
+    # Building profile (Site-002 Sandton office tower)
+    BASE_LOAD_KW = 900.0
+    PEAK_DEMAND_KW = 1850.0
 
     def __init__(self):
         self._demand_history: Dict[str, List[DemandInterval]] = {}
         self._monthly_peaks: Dict[str, List[MonthlyPeak]] = {}
-        self._nmd_cache: Dict[str, float] = {}  # PHASE 081: Cache NMD values from database
+        self._nmd_cache: Dict[str, float] = {}
+        self._load_config("site-002")
         self._seed_demo_data("site-002")
+
+    def _load_config(self, site_id: str):
+        """Load site parameters from solar_config_service."""
+        try:
+            cfg = get_site_solar_config(site_id)
+            self.NMD_LIMIT_KVA = cfg.grid.nmd_limit_kva
+            self.DEMAND_CHARGE_PER_KVA = cfg.tariff.demand_charge_r_kva()
+            self.BESS_CAPACITY_KWH = cfg.bess.capacity_kwh
+            self.BESS_RATED_POWER_KW = cfg.bess.rated_power_kw
+        except Exception as e:
+            logger.warning(f"Failed to load solar config for {site_id}, using defaults: {e}")
 
     async def get_nmd_limit(self, site_id: str) -> float:
         """PHASE 081: Fetch actual NMD from database, fallback to hardcoded.
@@ -335,6 +359,7 @@ class SolarDemandService:
 
         try:
             from app.database.repositories.building_repository import BuildingRepository
+
             building_repo = BuildingRepository()
             building = await building_repo.get_by_code(site_id)
 
@@ -383,13 +408,15 @@ class SolarDemandService:
                 bess_kw = min(self.BESS_RATED_POWER_KW, net_demand - nmd_target)
                 net_demand -= bess_kw
 
-            intervals.append(DemandInterval(
-                timestamp=t.isoformat(),
-                demand_kw=building_kw,
-                solar_offset_kw=solar_kw,
-                bess_offset_kw=bess_kw,
-                net_demand_kw=max(0, net_demand),
-            ))
+            intervals.append(
+                DemandInterval(
+                    timestamp=t.isoformat(),
+                    demand_kw=building_kw,
+                    solar_offset_kw=solar_kw,
+                    bess_offset_kw=bess_kw,
+                    net_demand_kw=max(0, net_demand),
+                )
+            )
 
             t += timedelta(minutes=15)
 
@@ -403,8 +430,8 @@ class SolarDemandService:
 
             # Simulate seasonal variation (winter peaks higher in SA)
             is_winter = month_dt.month in (6, 7, 8)
-            base_peak = 5200.0 if is_winter else 4800.0
-            noise = random.uniform(-200, 200)
+            base_peak = 1800.0 if is_winter else 1700.0
+            noise = random.uniform(-100, 100)
             peak = base_peak + noise
 
             # Simulate BESS shaving ~200kW off the top
@@ -418,76 +445,77 @@ class SolarDemandService:
 
             peak_day = random.randint(1, 28)
             peak_hour = random.choice([9, 10, 14, 15])
-            peak_ts = month_dt.replace(
-                day=peak_day, hour=peak_hour, minute=30,
-                second=0, microsecond=0
-            )
+            peak_ts = month_dt.replace(day=peak_day, hour=peak_hour, minute=30, second=0, microsecond=0)
 
-            monthly_peaks.append(MonthlyPeak(
-                month=month_str,
-                peak_demand_kw=round(managed_peak, 1),
-                peak_timestamp=peak_ts.isoformat(),
-                nmd_limit_kva=self.NMD_LIMIT_KVA,
-                exceeded_nmd=exceeded,
-                penalty_zar=penalty,
-            ))
+            monthly_peaks.append(
+                MonthlyPeak(
+                    month=month_str,
+                    peak_demand_kw=round(managed_peak, 1),
+                    peak_timestamp=peak_ts.isoformat(),
+                    nmd_limit_kva=self.NMD_LIMIT_KVA,
+                    exceeded_nmd=exceeded,
+                    penalty_zar=penalty,
+                )
+            )
 
         self._monthly_peaks[site_id] = monthly_peaks
         logger.info(
             "Seeded demand data for %s: %d intervals, %d monthly peaks",
-            site_id, len(intervals), len(monthly_peaks),
+            site_id,
+            len(intervals),
+            len(monthly_peaks),
         )
 
     @staticmethod
     def _simulated_building_load(hour: float) -> float:
         """Simulate Site-002 building load profile (kW) by hour of day.
 
-        Profile: Morning ramp-up 06:00-09:30 peaking at ~5,100 kW,
-        sustained high demand 09:30-15:00, afternoon peak 14:00-15:00 at ~5,200 kW,
-        evening wind-down to ~1,200 kW base load.
+        Sandton office tower: base load ~900 kW (overnight), peak ~1750-1850 kW
+        during business hours (09:30-15:00). Morning ramp 06:00-09:30.
         """
         if hour < 5:
-            return 1200 + random.uniform(-50, 50)
+            return 900 + random.uniform(-30, 30)
         elif hour < 6:
-            return 1200 + (hour - 5) * 300 + random.uniform(-30, 30)
+            return 900 + (hour - 5) * 100 + random.uniform(-20, 20)
         elif hour < 7:
-            return 1500 + (hour - 6) * 800 + random.uniform(-40, 40)
+            return 1000 + (hour - 6) * 200 + random.uniform(-25, 25)
         elif hour < 8:
-            return 2300 + (hour - 7) * 1200 + random.uniform(-50, 50)
+            return 1200 + (hour - 7) * 250 + random.uniform(-30, 30)
         elif hour < 9:
-            return 3500 + (hour - 8) * 1200 + random.uniform(-60, 60)
+            return 1450 + (hour - 8) * 200 + random.uniform(-30, 30)
         elif hour < 9.5:
-            return 4700 + (hour - 9) * 800 + random.uniform(-50, 50)
+            return 1650 + (hour - 9) * 200 + random.uniform(-25, 25)
         elif hour < 10:
-            return 5100 + random.uniform(-80, 80)
+            return 1750 + random.uniform(-40, 40)
         elif hour < 12:
-            return 4800 + random.uniform(-100, 100)
+            return 1700 + random.uniform(-50, 50)
         elif hour < 13:
-            return 4600 + random.uniform(-80, 80)
+            return 1650 + random.uniform(-40, 40)
         elif hour < 14:
-            return 4800 + random.uniform(-100, 100)
+            return 1700 + random.uniform(-50, 50)
         elif hour < 15:
-            return 5200 + random.uniform(-100, 100)  # afternoon peak
+            return 1850 + random.uniform(-50, 50)  # afternoon peak
         elif hour < 16:
-            return 4900 + random.uniform(-80, 80)
+            return 1750 + random.uniform(-40, 40)
         elif hour < 17:
-            return 4400 + random.uniform(-80, 80)
+            return 1550 + random.uniform(-40, 40)
         elif hour < 18:
-            return 3500 + random.uniform(-60, 60)
+            return 1300 + random.uniform(-30, 30)
         elif hour < 19:
-            return 2500 + random.uniform(-50, 50)
+            return 1100 + random.uniform(-25, 25)
         elif hour < 20:
-            return 1800 + random.uniform(-40, 40)
+            return 1000 + random.uniform(-20, 20)
         elif hour < 22:
-            return 1400 + random.uniform(-30, 30)
+            return 950 + random.uniform(-20, 20)
         else:
-            return 1200 + random.uniform(-30, 30)
+            return 900 + random.uniform(-20, 20)
 
     @staticmethod
     def _simulated_solar_generation(hour: float) -> float:
-        """Simulate solar generation (kW) for 3.9 MWp Site-002 installation.
+        """Simulate solar generation (kW) for 946 kWp Site-002 installation.
 
-        Bell curve peaking at ~3,200 kW at solar noon (12:30 SAST).
+        Bell curve peaking at ~750 kW at solar noon (12:30 SAST).
+        946 kWp x ~80% performance ratio = ~757 kW peak output.
         """
         if hour < 6 or hour > 19:
             return 0.0
@@ -495,7 +523,7 @@ class SolarDemandService:
         # Bell curve centered on 12.5 (solar noon SAST)
         peak_hour = 12.5
         spread = 3.5  # hours of significant generation either side
-        peak_kw = 3200.0
+        peak_kw = 750.0  # 946 kWp x 80% PR
 
         generation = peak_kw * math.exp(-0.5 * ((hour - peak_hour) / spread) ** 2)
         noise = random.uniform(0.92, 1.08)  # cloud cover variation
@@ -515,9 +543,7 @@ class SolarDemandService:
 
         # Monthly peak from history
         intervals = self._demand_history.get(site_id, [])
-        monthly_peak = max(
-            (i.net_demand_kw for i in intervals), default=net_demand
-        )
+        monthly_peak = max((i.net_demand_kw for i in intervals), default=net_demand)
 
         headroom = self.NMD_LIMIT_KVA - net_demand
         headroom_pct = (headroom / self.NMD_LIMIT_KVA) * 100
@@ -559,9 +585,7 @@ class SolarDemandService:
             bess_shaving_kw=bess_kw,
         )
 
-    def get_demand_profile(
-        self, site_id: str, period: str = "day"
-    ) -> DemandProfile:
+    def get_demand_profile(self, site_id: str, period: str = "day") -> DemandProfile:
         """Get 15-minute interval demand profile with shaving overlay."""
         intervals = self._demand_history.get(site_id, [])
 
@@ -590,9 +614,7 @@ class SolarDemandService:
             peak_with_shaving_kw=peak_net,
         )
 
-    def get_monthly_peak_history(
-        self, site_id: str, months: int = 12
-    ) -> List[MonthlyPeak]:
+    def get_monthly_peak_history(self, site_id: str, months: int = 12) -> List[MonthlyPeak]:
         """Get historical monthly peaks for NMD ratchet tracking."""
         peaks = self._monthly_peaks.get(site_id, [])
         return peaks[-months:]
@@ -623,8 +645,7 @@ class SolarDemandService:
         else:
             alert_level = "normal"
             alert_msg = (
-                f"Normal: Monthly peak {demand.monthly_peak_kw:.0f} kW is "
-                f"{utilisation:.1f}% of NMD. Adequate headroom."
+                f"Normal: Monthly peak {demand.monthly_peak_kw:.0f} kW is {utilisation:.1f}% of NMD. Adequate headroom."
             )
 
         ratchet_risk = utilisation >= self.NMD_WARNING_PCT
@@ -655,7 +676,7 @@ class SolarDemandService:
         # Morning peak typically at 09:00-09:30, afternoon at 14:00-15:00
         if hour < 8:
             # Before peak: predict based on ramp rate
-            predicted_peak = 5100 + random.uniform(-100, 200)
+            predicted_peak = 1800 + random.uniform(-50, 100)
             predicted_time = sast.replace(hour=9, minute=30).isoformat()
         elif hour < 12:
             # Between peaks: morning peak likely happened
@@ -670,7 +691,7 @@ class SolarDemandService:
             predicted_time = sast.isoformat()
         else:
             # After peak hours: use actual observed max
-            predicted_peak = 4800 + random.uniform(-200, 0)
+            predicted_peak = 1700 + random.uniform(-100, 0)
             predicted_time = sast.replace(hour=14, minute=30).isoformat()
 
         # Account for solar offset
@@ -730,6 +751,7 @@ class SolarDemandService:
         # Get current BESS state from dispatch service
         try:
             from app.services.solar_dispatch_service import get_solar_dispatch_service
+
             dispatch = get_solar_dispatch_service()
             status = dispatch.get_dispatch_status(site_id)
             bess_soc = status.bess_soc_pct if status else 50.0
@@ -749,9 +771,7 @@ class SolarDemandService:
 
         # Current unmanaged peak from profile
         intervals = self._demand_history.get(site_id, [])
-        unmanaged_peak = max(
-            (i.demand_kw - i.solar_offset_kw for i in intervals), default=self.PEAK_DEMAND_KW
-        )
+        unmanaged_peak = max((i.demand_kw - i.solar_offset_kw for i in intervals), default=self.PEAK_DEMAND_KW)
         achievable_peak = max(0, unmanaged_peak - max_shaving)
 
         # Monthly demand charge savings
@@ -844,7 +864,7 @@ class SolarDemandService:
                 load_kw=75.0,
                 current_schedule="06:00-18:00 (continuous)",
                 suggested_schedule="Pre-cool 05:00-07:00, reduce 12:00-14:00 when solar peaks",
-                savings_zar_month=round(75 * 2 * 22 * 0.02 * 155.50, 2),  # 2 hrs shifted
+                savings_zar_month=round(75 * 2 * 22 * 0.02 * self.DEMAND_CHARGE_PER_KVA, 2),  # 2 hrs shifted
                 criticality="medium",
                 reason="Thermal mass allows 2-hour pre-cooling. Reduce pump speed during solar peak to lower demand.",
             ),
@@ -854,7 +874,7 @@ class SolarDemandService:
                 load_kw=45.0,
                 current_schedule="06:00-18:00 (continuous)",
                 suggested_schedule="Staggered start: 06:30-18:00 (30-min delay reduces morning ramp)",
-                savings_zar_month=round(45 * 0.5 * 22 * 0.015 * 155.50, 2),
+                savings_zar_month=round(45 * 0.5 * 22 * 0.015 * self.DEMAND_CHARGE_PER_KVA, 2),
                 criticality="low",
                 reason="Staggering AHU start times reduces coincident demand during morning ramp-up.",
             ),
@@ -864,7 +884,7 @@ class SolarDemandService:
                 load_kw=120.0,
                 current_schedule="On-demand (any time)",
                 suggested_schedule="Defer to off-peak 22:00-06:00 unless post-load-shedding",
-                savings_zar_month=round(120 * 4 * 10 * 0.01 * 155.50, 2),
+                savings_zar_month=round(120 * 4 * 10 * 0.01 * self.DEMAND_CHARGE_PER_KVA, 2),
                 criticality="medium",
                 reason="UPS battery charging is deferrable. Schedule post-LS recharge for off-peak hours.",
             ),
@@ -874,7 +894,7 @@ class SolarDemandService:
                 load_kw=55.0,
                 current_schedule="07:00-18:00 (follows chiller)",
                 suggested_schedule="Reduce to 70% speed 14:00-15:00 during afternoon demand peak",
-                savings_zar_month=round(55 * 0.3 * 22 * 155.50 / 60, 2),
+                savings_zar_month=round(55 * 0.3 * 22 * self.DEMAND_CHARGE_PER_KVA / 60, 2),
                 criticality="low",
                 reason="Brief CT fan speed reduction during demand peak. Condenser approach rises <2C, minimal impact.",
             ),
@@ -884,7 +904,7 @@ class SolarDemandService:
                 load_kw=15.0,
                 current_schedule="Continuous",
                 suggested_schedule="Timer: 04:00-06:00 only (pre-heat before business hours)",
-                savings_zar_month=round(15 * 20 * 22 * 0.005 * 155.50, 2),
+                savings_zar_month=round(15 * 20 * 22 * 0.005 * self.DEMAND_CHARGE_PER_KVA, 2),
                 criticality="low",
                 reason="Block heaters only needed pre-start. Timer control eliminates 20h/day unnecessary load.",
             ),
@@ -894,25 +914,23 @@ class SolarDemandService:
 
     # === Demand charge savings ===
 
-    def calculate_demand_savings(
-        self, site_id: str, period: str = "month"
-    ) -> DemandSavings:
+    def calculate_demand_savings(self, site_id: str, period: str = "month") -> DemandSavings:
         """Calculate demand charge savings from BESS peak shaving.
 
         Formula: savings = (unmanaged_peak - managed_peak) x demand_charge_per_kVA
-        City Power 2026: R155.50/kVA/month
+        City Power 2025/26: R395.48/kVA/month
         """
         intervals = self._demand_history.get(site_id, [])
 
         if not intervals:
             # Use reference values
-            unmanaged_peak = self.PEAK_DEMAND_KW + 2600  # ~5,100 kW typical
+            unmanaged_peak = self.PEAK_DEMAND_KW
             managed_peak = unmanaged_peak - 200  # ~200 kW BESS shaving
         else:
             # Unmanaged = building demand minus solar only
             unmanaged_peak = max(
                 (i.demand_kw - i.solar_offset_kw for i in intervals),
-                default=5100.0,
+                default=self.PEAK_DEMAND_KW,
             )
             # Managed = with BESS shaving
             managed_peak = max(

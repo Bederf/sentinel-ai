@@ -8,17 +8,38 @@
       "max_efficiency_pct": 99.0,
       "euro_efficiency_pct": 98.6,
       "mppt_count": 12,
-      "mppt_voltage_range_v": [200, 1100],
+      "mppt_voltage_range_v": [
+        200,
+        1100
+      ],
       "max_input_voltage_v": 1500,
       "max_input_current_a": 26,
       "ac_voltage_v": 800,
-      "ac_frequency_hz": [45, 55],
+      "ac_frequency_hz": [
+        45,
+        55
+      ],
       "weight_kg": 118,
-      "dimensions_mm": [1075, 555, 300],
+      "dimensions_mm": [
+        1075,
+        555,
+        300
+      ],
       "ip_rating": "IP66",
-      "operating_temp_c": [-25, 60],
-      "communication": ["modbus_tcp", "modbus_rtu", "fusionsolar_cloud"],
-      "certifications": ["IEC 62109-1", "IEC 62109-2", "NRS 097-2-1"],
+      "operating_temp_c": [
+        -25,
+        60
+      ],
+      "communication": [
+        "modbus_tcp",
+        "modbus_rtu",
+        "fusionsolar_cloud"
+      ],
+      "certifications": [
+        "IEC 62109-1",
+        "IEC 62109-2",
+        "NRS 097-2-1"
+      ],
       "warranty_years": 10,
       "datasheet_url": "https://solar.huawei.com/en/products/smart-pv/SUN2000-330KTL-H2"
     },
@@ -30,17 +51,37 @@
       "max_efficiency_pct": 98.2,
       "euro_efficiency_pct": 97.6,
       "mppt_count": 5,
-      "mppt_voltage_range_v": [250, 850],
+      "mppt_voltage_range_v": [
+        250,
+        850
+      ],
       "max_input_voltage_v": 1000,
       "max_input_current_a": 36,
       "ac_voltage_v": 400,
-      "ac_frequency_hz": [45, 55],
+      "ac_frequency_hz": [
+        45,
+        55
+      ],
       "weight_kg": 68,
-      "dimensions_mm": [698, 600, 271],
+      "dimensions_mm": [
+        698,
+        600,
+        271
+      ],
       "ip_rating": "IP65",
-      "operating_temp_c": [-20, 60],
-      "communication": ["modbus_tcp", "modbus_rtu"],
-      "certifications": ["IEC 62109-1", "IEC 62109-2", "NRS 097-2-1"],
+      "operating_temp_c": [
+        -20,
+        60
+      ],
+      "communication": [
+        "modbus_tcp",
+        "modbus_rtu"
+      ],
+      "certifications": [
+        "IEC 62109-1",
+        "IEC 62109-2",
+        "NRS 097-2-1"
+      ],
       "warranty_years": 5,
       "datasheet_url": "https://www.se.com/conext-cl"
     },
@@ -52,17 +93,38 @@
       "max_efficiency_pct": 98.8,
       "euro_efficiency_pct": 98.5,
       "mppt_count": 10,
-      "mppt_voltage_range_v": [200, 1000],
+      "mppt_voltage_range_v": [
+        200,
+        1000
+      ],
       "max_input_voltage_v": 1100,
       "max_input_current_a": 22,
       "ac_voltage_v": 800,
-      "ac_frequency_hz": [45, 55],
+      "ac_frequency_hz": [
+        45,
+        55
+      ],
       "weight_kg": 75,
-      "dimensions_mm": [1035, 555, 300],
+      "dimensions_mm": [
+        1035,
+        555,
+        300
+      ],
       "ip_rating": "IP66",
-      "operating_temp_c": [-25, 60],
-      "communication": ["modbus_tcp", "modbus_rtu", "fusionsolar_cloud"],
-      "certifications": ["IEC 62109-1", "IEC 62109-2", "NRS 097-2-1"],
+      "operating_temp_c": [
+        -25,
+        60
+      ],
+      "communication": [
+        "modbus_tcp",
+        "modbus_rtu",
+        "fusionsolar_cloud"
+      ],
+      "certifications": [
+        "IEC 62109-1",
+        "IEC 62109-2",
+        "NRS 097-2-1"
+      ],
       "warranty_years": 10,
       "datasheet_url": "https://solar.huawei.com/en/products/smart-pv/SUN2000-100KTL-M2"
     },
@@ -74,17 +136,37 @@
       "max_efficiency_pct": 98.3,
       "euro_efficiency_pct": 97.9,
       "mppt_count": 2,
-      "mppt_voltage_range_v": [390, 800],
+      "mppt_voltage_range_v": [
+        390,
+        800
+      ],
       "max_input_voltage_v": 1000,
       "max_input_current_a": 33,
       "ac_voltage_v": 400,
-      "ac_frequency_hz": [44, 55],
+      "ac_frequency_hz": [
+        44,
+        55
+      ],
       "weight_kg": 61,
-      "dimensions_mm": [661, 682, 264],
+      "dimensions_mm": [
+        661,
+        682,
+        264
+      ],
       "ip_rating": "IP65",
-      "operating_temp_c": [-25, 60],
-      "communication": ["modbus_tcp", "sunspec", "speedwire"],
-      "certifications": ["IEC 62109-1", "IEC 62109-2"],
+      "operating_temp_c": [
+        -25,
+        60
+      ],
+      "communication": [
+        "modbus_tcp",
+        "sunspec",
+        "speedwire"
+      ],
+      "certifications": [
+        "IEC 62109-1",
+        "IEC 62109-2"
+      ],
       "warranty_years": 5,
       "datasheet_url": "https://www.sma.de/en/products/solarinverters/sunny-tripower-25000tl"
     }
@@ -102,30 +184,54 @@
       "round_trip_efficiency_pct": 95,
       "rack_count": 2,
       "rack_capacity_kwh": 100,
-      "voltage_range_v": [600, 900],
-      "operating_temp_c": [-10, 50],
+      "voltage_range_v": [
+        600,
+        900
+      ],
+      "operating_temp_c": [
+        -10,
+        50
+      ],
       "ip_rating": "IP55",
-      "communication": ["modbus_tcp", "can"],
-      "certifications": ["IEC 62619", "UN 38.3"],
+      "communication": [
+        "modbus_tcp",
+        "can"
+      ],
+      "certifications": [
+        "IEC 62619",
+        "UN 38.3"
+      ],
       "warranty_years": 10
     },
-    "LUNA2000-5015-2S": {
+    "LUNA2000-500KWH-2H1": {
       "manufacturer": "Huawei",
       "type": "bess_container",
-      "capacity_kwh": 5015,
-      "rated_power_kw": 2507,
-      "max_power_kw": 2750,
+      "capacity_kwh": 500,
+      "rated_power_kw": 250,
+      "max_power_kw": 275,
       "cell_chemistry": "LFP",
       "cycle_life": 6000,
       "dod_pct": 90,
       "round_trip_efficiency_pct": 95,
-      "rack_count": 6,
-      "rack_capacity_kwh": 835.8,
-      "voltage_range_v": [600, 900],
-      "operating_temp_c": [-10, 50],
+      "rack_count": 2,
+      "rack_capacity_kwh": 250,
+      "voltage_range_v": [
+        600,
+        900
+      ],
+      "operating_temp_c": [
+        -10,
+        50
+      ],
       "ip_rating": "IP55",
-      "communication": ["modbus_tcp", "can"],
-      "certifications": ["IEC 62619", "UN 38.3"],
+      "communication": [
+        "modbus_tcp",
+        "can"
+      ],
+      "certifications": [
+        "IEC 62619",
+        "UN 38.3"
+      ],
       "warranty_years": 10
     }
   },
@@ -134,10 +240,30 @@
       "manufacturer": "Schneider Electric",
       "type": "power_meter",
       "accuracy_class": "0.2S",
-      "voltage_range_v": [57, 480],
-      "current_range_a": [0.05, 10000],
-      "measurement_types": ["voltage", "current", "power", "energy", "frequency", "power_factor", "thd", "harmonics"],
-      "communication": ["modbus_tcp", "modbus_rtu", "dnp3", "iec_61850"],
+      "voltage_range_v": [
+        57,
+        480
+      ],
+      "current_range_a": [
+        0.05,
+        10000
+      ],
+      "measurement_types": [
+        "voltage",
+        "current",
+        "power",
+        "energy",
+        "frequency",
+        "power_factor",
+        "thd",
+        "harmonics"
+      ],
+      "communication": [
+        "modbus_tcp",
+        "modbus_rtu",
+        "dnp3",
+        "iec_61850"
+      ],
       "display": "color_lcd",
       "logging": true
     },
@@ -145,10 +271,26 @@
       "manufacturer": "Schneider Electric",
       "type": "power_meter",
       "accuracy_class": "0.5S",
-      "voltage_range_v": [57, 480],
-      "current_range_a": [0.05, 6000],
-      "measurement_types": ["voltage", "current", "power", "energy", "frequency", "power_factor"],
-      "communication": ["modbus_tcp", "modbus_rtu"],
+      "voltage_range_v": [
+        57,
+        480
+      ],
+      "current_range_a": [
+        0.05,
+        6000
+      ],
+      "measurement_types": [
+        "voltage",
+        "current",
+        "power",
+        "energy",
+        "frequency",
+        "power_factor"
+      ],
+      "communication": [
+        "modbus_tcp",
+        "modbus_rtu"
+      ],
       "display": "mono_lcd",
       "logging": false
     }

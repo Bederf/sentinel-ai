@@ -6,7 +6,7 @@ from starlette.requests import Request
 
 from app.api import auth as auth_api
 from app.config.settings import settings
-from app.main import _admin_requests_by_ip, _check_admin_rate_limit
+from app.startup.middleware import _admin_requests_by_ip, _check_admin_rate_limit
 from app.middleware.auth_middleware import validate_jwt_token
 
 
@@ -26,11 +26,7 @@ def _make_request(path: str = "/api/auth/refresh") -> Request:
 
 
 def test_validate_jwt_token_rejects_missing_jti():
-    secret = (
-        settings.jwt_secret_key
-        or settings.supabase_key
-        or "sentinel-demo-jwt-secret-change-in-production"
-    )
+    secret = settings.jwt_secret_key or settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
     payload = {
         "sub": "user-1",
         "email": "user@example.com",
@@ -74,12 +70,11 @@ async def test_refresh_rotation_blacklists_old_refresh_token(monkeypatch):
     monkeypatch.setattr(
         auth_api,
         "_create_jwt_token",
-        lambda user_info, token_type="access": (
-            minted.append(f"{token_type}-token-{len(minted)}") or minted[-1]
-        ),
+        lambda user_info, token_type="access": minted.append(f"{token_type}-token-{len(minted)}") or minted[-1],
     )
 
-    result = await auth_api.refresh_access_token(_make_request(), "old-refresh-token")
+    body = auth_api.RefreshTokenRequest(refresh_token="old-refresh-token")
+    result = await auth_api.refresh_access_token(_make_request(), body)
 
     assert result["access_token"].startswith("access-token-")
     assert result["refresh_token"].startswith("refresh-token-")

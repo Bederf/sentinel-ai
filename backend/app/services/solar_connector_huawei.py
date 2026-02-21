@@ -31,45 +31,45 @@ logger = logging.getLogger(__name__)
 # === Huawei SUN2000 Modbus Register Map (Holding Registers) ===
 HUAWEI_SUN2000_REGISTERS: Dict[str, tuple] = {
     # (address, count, type, scale_factor, unit)
-    "model":           (30000, 15, "str",   1,     ""),
-    "serial":          (30015, 10, "str",   1,     ""),
-    "firmware":        (30025, 15, "str",   1,     ""),
-    "rated_power":     (30073,  2, "u32",   1000,  "kW"),
-    "dc_power":        (32064,  2, "i32",   1000,  "kW"),
-    "ac_power":        (32080,  2, "i32",   1000,  "kW"),
-    "efficiency":      (32086,  1, "u16",   100,   "%"),
-    "inverter_temp":   (32087,  1, "i16",   10,    "C"),
-    "status":          (32089,  1, "u16",   1,     ""),
-    "fault_code":      (32090,  1, "u16",   1,     ""),
-    "grid_frequency":  (32085,  1, "u16",   100,   "Hz"),
-    "power_factor":    (32084,  1, "i16",   1000,  ""),
-    "daily_yield":     (32114,  2, "u32",   100,   "kWh"),
-    "total_yield":     (32106,  2, "u32",   100,   "kWh"),
+    "model": (30000, 15, "str", 1, ""),
+    "serial": (30015, 10, "str", 1, ""),
+    "firmware": (30025, 15, "str", 1, ""),
+    "rated_power": (30073, 2, "u32", 1000, "kW"),
+    "dc_power": (32064, 2, "i32", 1000, "kW"),
+    "ac_power": (32080, 2, "i32", 1000, "kW"),
+    "efficiency": (32086, 1, "u16", 100, "%"),
+    "inverter_temp": (32087, 1, "i16", 10, "C"),
+    "status": (32089, 1, "u16", 1, ""),
+    "fault_code": (32090, 1, "u16", 1, ""),
+    "grid_frequency": (32085, 1, "u16", 100, "Hz"),
+    "power_factor": (32084, 1, "i16", 1000, ""),
+    "daily_yield": (32114, 2, "u32", 100, "kWh"),
+    "total_yield": (32106, 2, "u32", 100, "kWh"),
     # MPPT string inputs (per-tracker)
-    "pv1_voltage":     (32016,  1, "i16",   10,    "V"),
-    "pv1_current":     (32017,  1, "i16",   100,   "A"),
-    "pv2_voltage":     (32018,  1, "i16",   10,    "V"),
-    "pv2_current":     (32019,  1, "i16",   100,   "A"),
+    "pv1_voltage": (32016, 1, "i16", 10, "V"),
+    "pv1_current": (32017, 1, "i16", 100, "A"),
+    "pv2_voltage": (32018, 1, "i16", 10, "V"),
+    "pv2_current": (32019, 1, "i16", 100, "A"),
 }
 
 # === Huawei LUNA2000 BESS Registers ===
 HUAWEI_LUNA2000_REGISTERS: Dict[str, tuple] = {
-    "soc":             (37004,  1, "u16",   10,    "%"),
-    "soh":             (37760,  1, "u16",   10,    "%"),
-    "charge_power":    (37001,  2, "i32",   1000,  "kW"),
-    "discharge_power": (37003,  2, "i32",   1000,  "kW"),
-    "bus_voltage":     (37006,  1, "u16",   10,    "V"),
-    "bus_current":     (37007,  1, "i16",   10,    "A"),
-    "batt_temp":       (37022,  1, "i16",   10,    "C"),
-    "status":          (37000,  1, "u16",   1,     ""),
-    "fault_code":      (37014,  1, "u16",   1,     ""),
+    "soc": (37004, 1, "u16", 10, "%"),
+    "soh": (37760, 1, "u16", 10, "%"),
+    "charge_power": (37001, 2, "i32", 1000, "kW"),
+    "discharge_power": (37003, 2, "i32", 1000, "kW"),
+    "bus_voltage": (37006, 1, "u16", 10, "V"),
+    "bus_current": (37007, 1, "i16", 10, "A"),
+    "batt_temp": (37022, 1, "i16", 10, "C"),
+    "status": (37000, 1, "u16", 1, ""),
+    "fault_code": (37014, 1, "u16", 1, ""),
 }
 
 # Inverter status code mapping
 HUAWEI_STATUS_MAP = {
     0x0000: "standby",
     0x0001: "online",
-    0x0002: "online",    # grid-connected
+    0x0002: "online",  # grid-connected
     0x0003: "fault",
     0x0100: "offline",
     0x0200: "warning",
@@ -105,7 +105,7 @@ def _bess_mode_for_hour(hour: float) -> str:
     if (6 <= hour < 9) or (17 <= hour < 19):
         return "discharging"
     elif 9 <= hour < 17:
-        return "idle"   # solar tops up if excess
+        return "idle"  # solar tops up if excess
     else:
         return "charging"
 
@@ -194,14 +194,15 @@ class SimulatedHuaweiConnector(SolarConnector):
             frequency_hz=round(50.0 + random.uniform(-0.05, 0.05), 2),
             power_factor=round(0.99 + random.uniform(-0.01, 0.005), 3),
             daily_yield_kwh=round(
-                rated_kva * 5.2 * solar_factor * random.uniform(0.92, 1.0)
-                * (0.88 if inverter_id == "S002-INV-H07" else 1.0), 1
+                rated_kva
+                * 5.2
+                * solar_factor
+                * random.uniform(0.92, 1.0)
+                * (0.88 if inverter_id == "S002-INV-H07" else 1.0),
+                1,
             ),
             total_yield_mwh=round(rated_kva * 1460 * random.uniform(0.85, 0.95) / 1000, 1),
-            alarms=(
-                ["String fault detected on MPPT tracker 4"]
-                if inverter_id == "S002-INV-H07" else []
-            ),
+            alarms=(["String fault detected on MPPT tracker 4"] if inverter_id == "S002-INV-H07" else []),
             last_poll=now.isoformat(),
         )
         self._inverter_state[inverter_id] = inv
@@ -230,28 +231,28 @@ class SimulatedHuaweiConnector(SolarConnector):
 
                 # --- Simulated fault: H07 MPPT tracker 4 strings degraded
                 #     Reduces current by ~30% (soiling + partial disconnect) ---
-                mppt4_fault = (
-                    inverter_id == "S002-INV-H07" and mppt == 4
-                )
+                mppt4_fault = inverter_id == "S002-INV-H07" and mppt == 4
                 fault_factor = 0.70 if mppt4_fault else 1.0
 
-                voc = 49.5 * panels_on_string  # ~693V at Voc
+                _voc = 49.5 * panels_on_string  # ~693V at Voc
                 vmp = 41.7 * panels_on_string * solar_factor * variance
                 imp = (panel_rating_w / 41.7) * solar_factor * variance * fault_factor
                 dc_power = (vmp * imp / 1000) if solar_factor > 0 else 0
 
-                strings.append(SolarString(
-                    string_id=string_id,
-                    inverter_id=inverter_id,
-                    mppt_tracker=mppt,
-                    panel_count=panels_on_string,
-                    panel_model=cfg.get("panel_model", "CS6.2-66TB-615"),
-                    panel_rating_w=panel_rating_w,
-                    dc_voltage_v=round(vmp, 1),
-                    dc_current_a=round(imp, 2),
-                    dc_power_kw=round(dc_power, 3),
-                    irradiance_w_m2=round(1000 * solar_factor * variance, 0),
-                ))
+                strings.append(
+                    SolarString(
+                        string_id=string_id,
+                        inverter_id=inverter_id,
+                        mppt_tracker=mppt,
+                        panel_count=panels_on_string,
+                        panel_model=cfg.get("panel_model", "CS6.2-66TB-615"),
+                        panel_rating_w=panel_rating_w,
+                        dc_voltage_v=round(vmp, 1),
+                        dc_current_a=round(imp, 2),
+                        dc_power_kw=round(dc_power, 3),
+                        irradiance_w_m2=round(1000 * solar_factor * variance, 0),
+                    )
+                )
         return strings
 
     async def read_bess(self, container_id: str) -> Optional[BESSContainer]:
@@ -263,8 +264,8 @@ class SimulatedHuaweiConnector(SolarConnector):
         mode = _bess_mode_for_hour(sast_hour)
 
         cfg = self._bess_config
-        rated_kw = cfg.get("rated_power_kw", 2507)
-        capacity_kwh = cfg.get("capacity_kwh", 5015)
+        rated_kw = cfg.get("rated_power_kw", 250)
+        capacity_kwh = cfg.get("capacity_kwh", 500)
 
         # SOC follows TOU pattern
         if mode == "discharging":
@@ -286,7 +287,7 @@ class SimulatedHuaweiConnector(SolarConnector):
             site_id=cfg.get("site_id", ""),
             name=cfg.get("name", "LUNA2000 BESS"),
             manufacturer="Huawei",
-            model=cfg.get("model", "LUNA2000-5015-2S"),
+            model=cfg.get("model", "LUNA2000-200KWH-2H1"),
             capacity_kwh=capacity_kwh,
             rated_power_kw=rated_kw,
             rack_count=cfg.get("rack_count", 6),
@@ -325,7 +326,7 @@ class SimulatedHuaweiConnector(SolarConnector):
         bess_kw = 0
         mode = _bess_mode_for_hour(sast_hour)
         if mode == "discharging":
-            bess_kw = 2507 * random.uniform(0.6, 0.85)
+            bess_kw = 250 * random.uniform(0.6, 0.85)
 
         net_grid = building_load - total_pv_kw - bess_kw
         import_kw = max(0, net_grid)
@@ -357,78 +358,108 @@ class SimulatedHuaweiConnector(SolarConnector):
         for inv_id in self._inverter_configs:
             inv = await self.read_inverter(inv_id)
             if inv:
-                readings.extend([
-                    NormalisedReading(
-                        timestamp=now, equipment_id=inv_id,
-                        equipment_type="inverter", reading_type="power",
-                        value=inv.ac_power_kw, unit="kW",
-                        quality_flag=QualityFlag.GOOD.value,
-                        source=DataSource.SIMULATED.value,
-                    ),
-                    NormalisedReading(
-                        timestamp=now, equipment_id=inv_id,
-                        equipment_type="inverter", reading_type="temperature",
-                        value=inv.temp_c, unit="C",
-                        quality_flag=QualityFlag.GOOD.value,
-                        source=DataSource.SIMULATED.value,
-                    ),
-                    NormalisedReading(
-                        timestamp=now, equipment_id=inv_id,
-                        equipment_type="inverter", reading_type="energy",
-                        value=inv.daily_yield_kwh, unit="kWh",
-                        quality_flag=QualityFlag.GOOD.value,
-                        source=DataSource.SIMULATED.value,
-                    ),
-                ])
+                readings.extend(
+                    [
+                        NormalisedReading(
+                            timestamp=now,
+                            equipment_id=inv_id,
+                            equipment_type="inverter",
+                            reading_type="power",
+                            value=inv.ac_power_kw,
+                            unit="kW",
+                            quality_flag=QualityFlag.GOOD.value,
+                            source=DataSource.SIMULATED.value,
+                        ),
+                        NormalisedReading(
+                            timestamp=now,
+                            equipment_id=inv_id,
+                            equipment_type="inverter",
+                            reading_type="temperature",
+                            value=inv.temp_c,
+                            unit="C",
+                            quality_flag=QualityFlag.GOOD.value,
+                            source=DataSource.SIMULATED.value,
+                        ),
+                        NormalisedReading(
+                            timestamp=now,
+                            equipment_id=inv_id,
+                            equipment_type="inverter",
+                            reading_type="energy",
+                            value=inv.daily_yield_kwh,
+                            unit="kWh",
+                            quality_flag=QualityFlag.GOOD.value,
+                            source=DataSource.SIMULATED.value,
+                        ),
+                    ]
+                )
 
         # BESS readings
         if self._bess_config:
             bess = await self.read_bess(self._bess_config["container_id"])
             if bess:
-                readings.extend([
-                    NormalisedReading(
-                        timestamp=now, equipment_id=bess.container_id,
-                        equipment_type="bess", reading_type="soc",
-                        value=bess.soc_pct, unit="%",
-                        quality_flag=QualityFlag.GOOD.value,
-                        source=DataSource.SIMULATED.value,
-                    ),
-                    NormalisedReading(
-                        timestamp=now, equipment_id=bess.container_id,
-                        equipment_type="bess", reading_type="power",
-                        value=bess.discharge_power_kw - bess.charge_power_kw, unit="kW",
-                        quality_flag=QualityFlag.GOOD.value,
-                        source=DataSource.SIMULATED.value,
-                    ),
-                    NormalisedReading(
-                        timestamp=now, equipment_id=bess.container_id,
-                        equipment_type="bess", reading_type="temperature",
-                        value=bess.temp_c, unit="C",
-                        quality_flag=QualityFlag.GOOD.value,
-                        source=DataSource.SIMULATED.value,
-                    ),
-                ])
+                readings.extend(
+                    [
+                        NormalisedReading(
+                            timestamp=now,
+                            equipment_id=bess.container_id,
+                            equipment_type="bess",
+                            reading_type="soc",
+                            value=bess.soc_pct,
+                            unit="%",
+                            quality_flag=QualityFlag.GOOD.value,
+                            source=DataSource.SIMULATED.value,
+                        ),
+                        NormalisedReading(
+                            timestamp=now,
+                            equipment_id=bess.container_id,
+                            equipment_type="bess",
+                            reading_type="power",
+                            value=bess.discharge_power_kw - bess.charge_power_kw,
+                            unit="kW",
+                            quality_flag=QualityFlag.GOOD.value,
+                            source=DataSource.SIMULATED.value,
+                        ),
+                        NormalisedReading(
+                            timestamp=now,
+                            equipment_id=bess.container_id,
+                            equipment_type="bess",
+                            reading_type="temperature",
+                            value=bess.temp_c,
+                            unit="C",
+                            quality_flag=QualityFlag.GOOD.value,
+                            source=DataSource.SIMULATED.value,
+                        ),
+                    ]
+                )
 
         # Meter readings
         for mtr_id in self._meter_configs:
             mtr = await self.read_meter(mtr_id)
             if mtr:
-                readings.extend([
-                    NormalisedReading(
-                        timestamp=now, equipment_id=mtr_id,
-                        equipment_type="meter", reading_type="power",
-                        value=mtr.import_kw - mtr.export_kw, unit="kW",
-                        quality_flag=QualityFlag.GOOD.value,
-                        source=DataSource.SIMULATED.value,
-                    ),
-                    NormalisedReading(
-                        timestamp=now, equipment_id=mtr_id,
-                        equipment_type="meter", reading_type="power_factor",
-                        value=mtr.power_factor, unit="",
-                        quality_flag=QualityFlag.GOOD.value,
-                        source=DataSource.SIMULATED.value,
-                    ),
-                ])
+                readings.extend(
+                    [
+                        NormalisedReading(
+                            timestamp=now,
+                            equipment_id=mtr_id,
+                            equipment_type="meter",
+                            reading_type="power",
+                            value=mtr.import_kw - mtr.export_kw,
+                            unit="kW",
+                            quality_flag=QualityFlag.GOOD.value,
+                            source=DataSource.SIMULATED.value,
+                        ),
+                        NormalisedReading(
+                            timestamp=now,
+                            equipment_id=mtr_id,
+                            equipment_type="meter",
+                            reading_type="power_factor",
+                            value=mtr.power_factor,
+                            unit="",
+                            quality_flag=QualityFlag.GOOD.value,
+                            source=DataSource.SIMULATED.value,
+                        ),
+                    ]
+                )
 
         self._status.last_poll = now
         return readings

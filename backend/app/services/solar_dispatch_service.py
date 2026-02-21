@@ -22,6 +22,7 @@ from app.services.solar_arbitrage_engine import (
     get_solar_arbitrage_engine,
     DispatchActionType,
 )
+from app.services.solar_config_service import get_site_solar_config
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DispatchEvent:
     """A single dispatch execution event."""
+
     timestamp: str
     action: str  # charge / discharge / idle / solar_priority
     power_kw: float
@@ -67,6 +69,7 @@ class DispatchEvent:
 @dataclass
 class DispatchStatus:
     """Current dispatch status for a site."""
+
     site_id: str
     mode: str  # autonomous / manual / stopped
     current_action: str
@@ -114,7 +117,7 @@ class SolarDispatchService:
 
     # Simulation parameters
     CYCLE_INTERVAL_MINUTES = 5
-    BESS_CAPACITY_KWH = 5015.0
+    BESS_CAPACITY_KWH = 500.0  # Huawei LUNA2000-200KWH-2H1
     BESS_MIN_SOC = 10.0
     BESS_MAX_SOC = 95.0
     BESS_EFFICIENCY = 0.90
@@ -124,6 +127,12 @@ class SolarDispatchService:
         self._simulated_soc: Dict[str, float] = {}
         self._started_at: Dict[str, str] = {}
         self._mode: Dict[str, str] = {}  # autonomous / manual / stopped
+        try:
+            cfg = get_site_solar_config("site-002")
+            self.BESS_CAPACITY_KWH = cfg.bess.capacity_kwh
+            self.BESS_RATED_POWER_KW = cfg.bess.rated_power_kw
+        except Exception:
+            pass
         self._seed_demo_history("site-002")
 
     # === Demo seed ===
@@ -142,7 +151,7 @@ class SolarDispatchService:
         engine = get_solar_arbitrage_engine()
         events: List[DispatchEvent] = []
         now = datetime.now(timezone.utc)
-        sast_now = now + timedelta(hours=2)
+        _sast_now = now + timedelta(hours=2)
 
         # Start from yesterday 22:00 SAST
         start = now.replace(hour=20, minute=0, second=0, microsecond=0)  # UTC 20:00 = SAST 22:00
@@ -180,7 +189,7 @@ class SolarDispatchService:
                 soc = max(self.BESS_MIN_SOC, soc - soc_delta)
             elif action == "solar_priority" and solar_kw > load_kw:
                 excess = solar_kw - load_kw
-                charge_kw = min(excess, 2507)
+                charge_kw = min(excess, 250)
                 energy_kwh = charge_kw * interval_hours * self.BESS_EFFICIENCY
                 soc_delta = (energy_kwh / self.BESS_CAPACITY_KWH) * 100
                 soc = min(self.BESS_MAX_SOC, soc + soc_delta)
@@ -208,20 +217,22 @@ class SolarDispatchService:
 
             reason = profile.get("reason", f"{action} during {band_name}")
 
-            events.append(DispatchEvent(
-                timestamp=sim_time.isoformat(),
-                action=action,
-                power_kw=power_kw,
-                soc_before_pct=soc_before,
-                soc_after_pct=soc,
-                tariff_band=band_name,
-                rate_per_kwh=rate,
-                reason=reason,
-                solar_gen_kw=solar_kw_noisy,
-                building_load_kw=load_kw_noisy,
-                grid_import_kw=grid_import,
-                grid_export_kw=grid_export,
-            ))
+            events.append(
+                DispatchEvent(
+                    timestamp=sim_time.isoformat(),
+                    action=action,
+                    power_kw=power_kw,
+                    soc_before_pct=soc_before,
+                    soc_after_pct=soc,
+                    tariff_band=band_name,
+                    rate_per_kwh=rate,
+                    reason=reason,
+                    solar_gen_kw=solar_kw_noisy,
+                    building_load_kw=load_kw_noisy,
+                    grid_import_kw=grid_import,
+                    grid_export_kw=grid_export,
+                )
+            )
 
             sim_time += timedelta(minutes=self.CYCLE_INTERVAL_MINUTES)
 
@@ -232,32 +243,72 @@ class SolarDispatchService:
 
         logger.info(
             "Seeded %d dispatch events for %s (SOC: %.1f%%)",
-            len(events), site_id, soc,
+            len(events),
+            site_id,
+            soc,
         )
 
     def _get_hourly_profile(self, engine) -> Dict[int, Dict[str, Any]]:
         """Build hour-by-hour dispatch profile (SAST hours)."""
         season = engine._get_season()
         off_peak_rate = engine._get_band_rate("off_peak", season)
-        std_rate = engine._get_band_rate("standard", season)
+        _std_rate = engine._get_band_rate("standard", season)
         peak_rate = engine._get_band_rate("peak", season)
 
         # Solar generation curve for Johannesburg (clear day)
         solar_curve = {
-            0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0,
-            6: 50, 7: 400, 8: 1200, 9: 2000,
-            10: 2600, 11: 3000, 12: 3200, 13: 3100, 14: 2800,
-            15: 2300, 16: 1600, 17: 800, 18: 200, 19: 0,
-            20: 0, 21: 0, 22: 0, 23: 0,
+            0: 0,
+            1: 0,
+            2: 0,
+            3: 0,
+            4: 0,
+            5: 0,
+            6: 50,
+            7: 400,
+            8: 1200,
+            9: 2000,
+            10: 2600,
+            11: 3000,
+            12: 3200,
+            13: 3100,
+            14: 2800,
+            15: 2300,
+            16: 1600,
+            17: 800,
+            18: 200,
+            19: 0,
+            20: 0,
+            21: 0,
+            22: 0,
+            23: 0,
         }
 
         # Building load profile
         load_curve = {
-            0: 1200, 1: 1100, 2: 1000, 3: 1000, 4: 1050, 5: 1200,
-            6: 1500, 7: 2000, 8: 2300, 9: 2500,
-            10: 2400, 11: 2300, 12: 2200, 13: 2300, 14: 2400,
-            15: 2300, 16: 2200, 17: 2000, 18: 1800, 19: 1600,
-            20: 1400, 21: 1300, 22: 1200, 23: 1200,
+            0: 1200,
+            1: 1100,
+            2: 1000,
+            3: 1000,
+            4: 1050,
+            5: 1200,
+            6: 1500,
+            7: 2000,
+            8: 2300,
+            9: 2500,
+            10: 2400,
+            11: 2300,
+            12: 2200,
+            13: 2300,
+            14: 2400,
+            15: 2300,
+            16: 2200,
+            17: 2000,
+            18: 1800,
+            19: 1600,
+            20: 1400,
+            21: 1300,
+            22: 1200,
+            23: 1200,
         }
 
         profile = {}
@@ -267,38 +318,56 @@ class SolarDispatchService:
 
             if h >= 22 or h < 6:
                 profile[h] = {
-                    "action": "charge", "power_kw": 2000, "band": "off_peak",
-                    "solar_kw": 0, "load_kw": load_kw,
+                    "action": "charge",
+                    "power_kw": 2000,
+                    "band": "off_peak",
+                    "solar_kw": 0,
+                    "load_kw": load_kw,
                     "reason": f"Off-peak charging @ R{off_peak_rate:.2f}/kWh",
                 }
             elif h == 6:
                 profile[h] = {
-                    "action": "idle", "power_kw": 0, "band": "standard",
-                    "solar_kw": solar_kw, "load_kw": load_kw,
+                    "action": "idle",
+                    "power_kw": 0,
+                    "band": "standard",
+                    "solar_kw": solar_kw,
+                    "load_kw": load_kw,
                     "reason": "Standard early morning; awaiting peak window",
                 }
             elif 7 <= h < 10:
                 profile[h] = {
-                    "action": "discharge", "power_kw": 2500, "band": "peak",
-                    "solar_kw": solar_kw, "load_kw": load_kw,
+                    "action": "discharge",
+                    "power_kw": 2500,
+                    "band": "peak",
+                    "solar_kw": solar_kw,
+                    "load_kw": load_kw,
                     "reason": f"Morning peak discharge @ R{peak_rate:.2f}/kWh",
                 }
             elif 10 <= h < 18:
                 profile[h] = {
-                    "action": "solar_priority", "power_kw": 0, "band": "standard",
-                    "solar_kw": solar_kw, "load_kw": load_kw,
+                    "action": "solar_priority",
+                    "power_kw": 0,
+                    "band": "standard",
+                    "solar_kw": solar_kw,
+                    "load_kw": load_kw,
                     "reason": f"Solar priority; {solar_kw:.0f} kW PV generation",
                 }
             elif 18 <= h < 20:
                 profile[h] = {
-                    "action": "discharge", "power_kw": 2500, "band": "peak",
-                    "solar_kw": solar_kw, "load_kw": load_kw,
+                    "action": "discharge",
+                    "power_kw": 2500,
+                    "band": "peak",
+                    "solar_kw": solar_kw,
+                    "load_kw": load_kw,
                     "reason": f"Evening peak discharge @ R{peak_rate:.2f}/kWh",
                 }
             elif 20 <= h < 22:
                 profile[h] = {
-                    "action": "idle", "power_kw": 0, "band": "standard",
-                    "solar_kw": 0, "load_kw": load_kw,
+                    "action": "idle",
+                    "power_kw": 0,
+                    "band": "standard",
+                    "solar_kw": 0,
+                    "load_kw": load_kw,
                     "reason": "Standard evening; BESS idle, conserving for overnight charge",
                 }
 
@@ -394,17 +463,12 @@ class SolarDispatchService:
 
     # === Dispatch log ===
 
-    def get_dispatch_log(
-        self, site_id: str, hours: int = 24
-    ) -> List[DispatchEvent]:
+    def get_dispatch_log(self, site_id: str, hours: int = 24) -> List[DispatchEvent]:
         """Get recent dispatch history for a site."""
         events = self._dispatch_log.get(site_id, [])
         if hours > 0:
             cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
-            events = [
-                e for e in events
-                if datetime.fromisoformat(e.timestamp) >= cutoff
-            ]
+            events = [e for e in events if datetime.fromisoformat(e.timestamp) >= cutoff]
         # Most recent first
         return sorted(events, key=lambda e: e.timestamp, reverse=True)
 

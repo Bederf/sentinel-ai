@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import patch
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 from app.services.security_occupancy_service import (
@@ -13,7 +13,8 @@ from app.services.security_occupancy_service import (
 @pytest.fixture
 async def client():
     """Create test client."""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
 
 
@@ -39,7 +40,7 @@ class TestProfileIntegration:
                     "empty_zone_setback": 3.0,
                     "empty_zone_lighting": 15,
                     "low_occupancy_lighting": 40,
-                }
+                },
             }
 
             thresholds = svc._get_profile_thresholds("site-002")
@@ -116,10 +117,11 @@ class TestProfileIntegration:
         svc = SecurityOccupancyService()
 
         # Mock dependencies
-        with patch.object(svc, "_repo") as mock_repo, \
-             patch.object(svc, "_get_profile_thresholds") as mock_thresh, \
-             patch.object(svc, "_get_dali_occupancy_data") as mock_dali:
-
+        with (
+            patch.object(svc, "_repo") as mock_repo,
+            patch.object(svc, "_get_profile_thresholds") as mock_thresh,
+            patch.object(svc, "_get_dali_occupancy_data") as mock_dali,
+        ):
             mock_repo.get_zones.return_value = [
                 {"zone_id": "zone-1"},
                 {"zone_id": "zone-2"},
@@ -164,8 +166,8 @@ class TestProfileIntegration:
             "name": "Aggressive Cost Saving",
             "thresholds": {
                 "empty_zone_setback": 5.0,  # Much higher than default
-                "empty_zone_lighting": 5,   # Much dimmer than default
-            }
+                "empty_zone_lighting": 5,  # Much dimmer than default
+            },
         }
 
         with patch.object(svc, "_profile_service") as mock_ps:

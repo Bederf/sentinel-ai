@@ -19,8 +19,10 @@ import uuid
 # Access Control Models
 # ============================================================================
 
+
 class AccessType(str, Enum):
     """Type of access credential used."""
+
     BADGE = "badge"
     CODE = "code"
     OVERRIDE = "override"
@@ -30,6 +32,7 @@ class AccessType(str, Enum):
 
 class AccessStatus(str, Enum):
     """Result of access attempt."""
+
     GRANTED = "granted"
     DENIED = "denied"
     TIMEOUT = "timeout"
@@ -38,6 +41,7 @@ class AccessStatus(str, Enum):
 
 class AccessEvent(BaseModel):
     """Single access control event (person entering/exiting)."""
+
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: datetime
     access_point_id: str  # Door/reader ID
@@ -68,6 +72,7 @@ class AccessEvent(BaseModel):
 
 class DeviceType(str, Enum):
     """Type of access control device."""
+
     READER = "reader"
     LOCK = "lock"
     SENSOR = "sensor"
@@ -76,6 +81,7 @@ class DeviceType(str, Enum):
 
 class PointStatus(str, Enum):
     """Status of access control point."""
+
     ACTIVE = "active"
     INACTIVE = "inactive"
     ALARM = "alarm"
@@ -84,6 +90,7 @@ class PointStatus(str, Enum):
 
 class AccessPoint(BaseModel):
     """Physical access control point (door, gate, reader)."""
+
     point_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     building_id: str
     zone: str  # Floor or area
@@ -110,6 +117,7 @@ class AccessPoint(BaseModel):
 
 class CardStatus(str, Enum):
     """Status of access card."""
+
     ACTIVE = "active"
     REVOKED = "revoked"
     EXPIRED = "expired"
@@ -118,6 +126,7 @@ class CardStatus(str, Enum):
 
 class AccessLevel(str, Enum):
     """Access privilege level."""
+
     VISITOR = "visitor"
     EMPLOYEE = "employee"
     CONTRACTOR = "contractor"
@@ -127,6 +136,7 @@ class AccessLevel(str, Enum):
 
 class AccessCard(BaseModel):
     """Access credential (badge, card, code)."""
+
     card_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     person_name: str
     access_level: AccessLevel
@@ -155,8 +165,10 @@ class AccessCard(BaseModel):
 # Visitor Management Models
 # ============================================================================
 
+
 class VisitorStatus(str, Enum):
     """Visitor state."""
+
     PENDING = "pending"
     CHECKED_IN = "checked_in"
     CHECKED_OUT = "checked_out"
@@ -165,6 +177,7 @@ class VisitorStatus(str, Enum):
 
 class Visitor(BaseModel):
     """Temporary visitor with managed access."""
+
     visitor_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     company: str
@@ -197,6 +210,7 @@ class Visitor(BaseModel):
 
 class VisitSchedule(BaseModel):
     """Scheduled visitor visit."""
+
     visit_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     visitor_id: str
     scheduled_date: datetime
@@ -209,8 +223,10 @@ class VisitSchedule(BaseModel):
 # Alert Models
 # ============================================================================
 
+
 class AlertType(str, Enum):
     """Type of security alert."""
+
     FORCED_ENTRY = "forced_entry"
     TAILGATING = "tailgating"
     AFTER_HOURS = "after_hours"
@@ -222,6 +238,7 @@ class AlertType(str, Enum):
 
 class AlertSeverity(str, Enum):
     """Alert priority level."""
+
     CRITICAL = "critical"
     WARNING = "warning"
     INFO = "info"
@@ -229,6 +246,7 @@ class AlertSeverity(str, Enum):
 
 class AlertStatus(str, Enum):
     """Alert resolution state."""
+
     OPEN = "open"
     ACKNOWLEDGED = "acknowledged"
     RESOLVED = "resolved"
@@ -236,6 +254,7 @@ class AlertStatus(str, Enum):
 
 class SecurityAlert(BaseModel):
     """Security event that requires attention."""
+
     alert_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     alert_type: AlertType
     timestamp: datetime
@@ -274,8 +293,10 @@ class SecurityAlert(BaseModel):
 # Summary Models (for API responses)
 # ============================================================================
 
+
 class SecurityOverview(BaseModel):
     """Security system status summary."""
+
     total_access_events_today: int
     active_visitors: int
     open_alerts: int
@@ -286,7 +307,29 @@ class SecurityOverview(BaseModel):
 
 class OccupancyData(BaseModel):
     """Building occupancy from security system."""
+
     total_occupancy: int
     by_floor: Dict[str, int]
     by_zone: Dict[str, int]
     last_updated: datetime
+
+
+class OccupancySource(str, Enum):
+    """Source of occupancy data."""
+
+    BADGE = "badge"
+    SENSOR = "sensor"
+    CAMERA = "camera"
+    MANUAL = "manual"
+
+
+class SecurityOccupancy(BaseModel):
+    """Per-zone occupancy snapshot from security system."""
+
+    zone_id: str
+    zone_name: str = ""
+    occupancy_count: int = 0
+    badge_entries: int = 0
+    badge_exits: int = 0
+    last_updated: Optional[str] = None
+    source: OccupancySource = OccupancySource.BADGE

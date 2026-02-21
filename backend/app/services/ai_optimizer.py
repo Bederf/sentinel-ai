@@ -605,9 +605,9 @@ class AIOptimizerService:
     def _generate_mock_energy_prices(self) -> Dict[str, Any]:
         """Generate mock energy pricing (South African time-of-use)."""
         return {
-            "current_rate": 2.50,  # Rand per kWh
-            "peak_rate": 3.50,
-            "off_peak_rate": 1.80,
+            "current_rate": 2.28,  # R/kWh standard (City Power LPU-TOU 2025/26)
+            "peak_rate": 3.01,  # R/kWh peak
+            "off_peak_rate": 1.77,  # R/kWh off-peak
             "period": "standard",  # peak, off_peak, standard
             "currency": "ZAR",
         }
@@ -2366,7 +2366,7 @@ Provide ONLY the JSON response, no additional text."""
         bess_savings = bess_savings_kw  # Calculated above based on dispatch decisions
 
         energy_savings = hvac_savings + lighting_savings + power_savings + solar_savings + bess_savings
-        energy_rate = energy_prices.get("current_rate", 2.50)
+        energy_rate = energy_prices.get("current_rate", 2.28)
         cost_savings = energy_savings * energy_rate
         percentage = min(8.0 + (len(recommendations) * 1.5), 20.0)  # Higher cap with lighting
 

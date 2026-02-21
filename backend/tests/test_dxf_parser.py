@@ -5,7 +5,9 @@ Tests coordinate transformations, geometry utilities, and DXF parsing logic.
 
 import pytest
 
-from app.services.geometry_utils import (
+ezdxf = pytest.importorskip("ezdxf", reason="ezdxf not installed")
+
+from app.services.geometry_utils import (  # noqa: E402
     BoundingBox,
     normalize_coordinates,
     infer_floor_from_z_coordinate,
@@ -13,7 +15,7 @@ from app.services.geometry_utils import (
     cluster_points,
     get_cluster_centroid,
 )
-from app.services.dxf_parser_service import get_dxf_parser_service
+from app.services.dxf_parser_service import get_dxf_parser_service  # noqa: E402
 
 
 class TestGeometryUtils:
@@ -30,9 +32,7 @@ class TestGeometryUtils:
     def test_normalize_coordinates_center(self):
         """Test coordinate normalization at center."""
         bbox = BoundingBox(0, 0, 1000, 800)  # DXF in millimeters
-        x_norm, y_norm = normalize_coordinates(
-            500, 400, bbox, target_width=100, target_depth=80
-        )
+        x_norm, y_norm = normalize_coordinates(500, 400, bbox, target_width=100, target_depth=80)
         assert x_norm == pytest.approx(50, abs=1)  # Center
         assert y_norm == pytest.approx(40, abs=1)
 
@@ -265,9 +265,7 @@ class TestDXFParserIntegration:
 
         # Add HVAC equipment
         msp.add_circle((50, 40, 0), radius=2, dxfattribs={"layer": "AE-HVAC"})
-        msp.add_text(
-            "CH-1", dxfattribs={"layer": "AE-HVAC", "insert": (50, 40, 0)}
-        )
+        msp.add_text("CH-1", dxfattribs={"layer": "AE-HVAC", "insert": (50, 40, 0)})
 
         # Save to temp file then read as bytes
         with tempfile.NamedTemporaryFile(suffix=".dxf", delete=False) as f:
@@ -279,6 +277,7 @@ class TestDXFParserIntegration:
             dxf_bytes = f.read()
 
         import os
+
         os.remove(temp_path)
 
         return dxf_bytes
@@ -287,9 +286,7 @@ class TestDXFParserIntegration:
     async def test_parse_dxf_returns_valid_config(self, sample_dxf_bytes):
         """Test DXF parsing returns valid config structure."""
         parser = get_dxf_parser_service()
-        config = await parser.parse_dxf_file(
-            sample_dxf_bytes, "site-002", "Test Building"
-        )
+        config = await parser.parse_dxf_file(sample_dxf_bytes, "site-002", "Test Building")
 
         assert config is not None
         assert "equipment" in config
@@ -302,9 +299,7 @@ class TestDXFParserIntegration:
     async def test_parse_dxf_extracts_equipment(self, sample_dxf_bytes):
         """Test DXF parsing extracts equipment."""
         parser = get_dxf_parser_service()
-        config = await parser.parse_dxf_file(
-            sample_dxf_bytes, "site-002", "Test Building"
-        )
+        config = await parser.parse_dxf_file(sample_dxf_bytes, "site-002", "Test Building")
 
         equipment = config["equipment"]
         assert len(equipment) > 0
@@ -346,6 +341,7 @@ class TestDXFParserIntegration:
             dxf_bytes = f.read()
 
         import os
+
         os.remove(temp_path)
 
         parser = get_dxf_parser_service()

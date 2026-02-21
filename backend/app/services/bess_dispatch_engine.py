@@ -18,13 +18,17 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Any, Tuple
 
+from app.services.solar_config_service import get_site_solar_config
+
 logger = logging.getLogger(__name__)
 
 
 # === Enums ===
 
+
 class DispatchActionType(str, Enum):
     """Dispatch action types."""
+
     CHARGE = "charge"
     DISCHARGE = "discharge"
     IDLE = "idle"
@@ -32,6 +36,7 @@ class DispatchActionType(str, Enum):
 
 class ConstraintType(str, Enum):
     """Constraint violation types."""
+
     TEMPERATURE_HIGH = "temperature_high"
     TEMPERATURE_LOW = "temperature_low"
     SOC_MIN = "soc_min"
@@ -44,9 +49,11 @@ class ConstraintType(str, Enum):
 
 # === Dataclass Models ===
 
+
 @dataclass
 class DispatchConstraint:
     """A constraint violation or limit applied."""
+
     constraint_type: str  # ConstraintType
     severity: str  # warning / block / alarm
     current_value: float
@@ -68,6 +75,7 @@ class DispatchConstraint:
 @dataclass
 class DispatchCommand:
     """A BESS dispatch command ready for execution."""
+
     site_id: str
     timestamp: str  # ISO timestamp
     action: str  # charge / discharge / idle
@@ -97,6 +105,7 @@ class DispatchCommand:
 @dataclass
 class BESSState:
     """Current BESS state for constraint validation."""
+
     soc_pct: float  # 0-100 State of charge
     temperature_c: float  # °C
     power_kw: float  # Current power (positive = discharge)
@@ -105,12 +114,13 @@ class BESSState:
 
 # === BESS Dispatch Engine ===
 
+
 class BESSDispatchEngine:
     """Autonomous BESS dispatch executor with multi-constraint safety system."""
 
-    # BESS specifications (Site-002 LUNA2000-5015-2S)
-    BESS_CAPACITY_KWH = 5015.0
-    BESS_RATED_POWER_KW = 2507.0
+    # BESS specifications (Site-002 LUNA2000-200KWH-2H1)
+    BESS_CAPACITY_KWH = 500.0
+    BESS_RATED_POWER_KW = 250.0
 
     # Operating constraints
     CHARGE_TEMP_MIN_C = 12.0
@@ -134,6 +144,14 @@ class BESSDispatchEngine:
         """Initialize dispatch engine."""
         self._last_power_kw = 0.0
         self._last_update_time = datetime.now(timezone.utc)
+
+        # Override class defaults from site solar config
+        try:
+            cfg = get_site_solar_config("site-002")
+            self.BESS_CAPACITY_KWH = cfg.bess.capacity_kwh
+            self.BESS_RATED_POWER_KW = cfg.bess.rated_power_kw
+        except Exception:
+            pass  # use class defaults
 
     def validate_dispatch(
         self,
@@ -164,7 +182,10 @@ class BESSDispatchEngine:
                     severity="block",
                     current_value=bess_state.temperature_c,
                     limit_value=self.CHARGE_TEMP_MIN_C,
-                    message=f"Charge blocked: temperature {bess_state.temperature_c}°C below minimum {self.CHARGE_TEMP_MIN_C}°C",
+                    message=(
+                        f"Charge blocked: temperature {bess_state.temperature_c}°C"
+                        f" below minimum {self.CHARGE_TEMP_MIN_C}°C"
+                    ),
                     mitigation="Action blocked",
                 )
                 constraints.append(constraint)
@@ -180,8 +201,12 @@ class BESSDispatchEngine:
                         severity="warning",
                         current_value=bess_state.temperature_c,
                         limit_value=self.CHARGE_TEMP_MAX_C,
-                        message=f"Charge power reduced due to temperature {bess_state.temperature_c}°C approaching limit {self.CHARGE_TEMP_MAX_C}°C",
-                        mitigation=f"Reduced to {limited_power:.0f} kW ({reduction_factor*100:.0f}%)",
+                        message=(
+                            f"Charge power reduced due to temperature"
+                            f" {bess_state.temperature_c}°C approaching limit"
+                            f" {self.CHARGE_TEMP_MAX_C}°C"
+                        ),
+                        mitigation=(f"Reduced to {limited_power:.0f} kW ({reduction_factor * 100:.0f}%)"),
                     )
                     constraints.append(constraint)
         else:  # discharge
@@ -191,7 +216,10 @@ class BESSDispatchEngine:
                     severity="block",
                     current_value=bess_state.temperature_c,
                     limit_value=self.DISCHARGE_TEMP_MIN_C,
-                    message=f"Discharge blocked: temperature {bess_state.temperature_c}°C below minimum {self.DISCHARGE_TEMP_MIN_C}°C",
+                    message=(
+                        f"Discharge blocked: temperature {bess_state.temperature_c}°C"
+                        f" below minimum {self.DISCHARGE_TEMP_MIN_C}°C"
+                    ),
                     mitigation="Action blocked",
                 )
                 constraints.append(constraint)
@@ -202,7 +230,10 @@ class BESSDispatchEngine:
                     severity="block",
                     current_value=bess_state.temperature_c,
                     limit_value=self.DISCHARGE_TEMP_MAX_C,
-                    message=f"Discharge blocked: temperature {bess_state.temperature_c}°C exceeds maximum {self.DISCHARGE_TEMP_MAX_C}°C",
+                    message=(
+                        f"Discharge blocked: temperature {bess_state.temperature_c}°C"
+                        f" exceeds maximum {self.DISCHARGE_TEMP_MAX_C}°C"
+                    ),
                     mitigation="Action blocked",
                 )
                 constraints.append(constraint)
@@ -245,33 +276,36 @@ class BESSDispatchEngine:
                     severity="warning",
                     current_value=bess_state.grid_frequency_hz,
                     limit_value=self.GRID_FREQUENCY_HIGH_THRESHOLD,
-                    message=f"Discharge reduced: grid frequency {bess_state.grid_frequency_hz:.2f} Hz above threshold {self.GRID_FREQUENCY_HIGH_THRESHOLD} Hz",
-                    mitigation=f"Reduced to {limited_power:.0f} kW ({reduction_factor*100:.0f}%)",
+                    message=(
+                        f"Discharge reduced: grid frequency"
+                        f" {bess_state.grid_frequency_hz:.2f} Hz above threshold"
+                        f" {self.GRID_FREQUENCY_HIGH_THRESHOLD} Hz"
+                    ),
+                    mitigation=(f"Reduced to {limited_power:.0f} kW ({reduction_factor * 100:.0f}%)"),
                 )
                 constraints.append(constraint)
 
         # 4. Ramp rate constraint
-        max_ramp_pct = (
-            self.RAMP_RATE_LS_PCT_PER_MIN
-            if load_shedding_stage >= 4
-            else self.RAMP_RATE_NORMAL_PCT_PER_MIN
-        )
-        max_ramp_power = (self.BESS_RATED_POWER_KW * max_ramp_pct / 100.0)
+        max_ramp_pct = self.RAMP_RATE_LS_PCT_PER_MIN if load_shedding_stage >= 4 else self.RAMP_RATE_NORMAL_PCT_PER_MIN
+        max_ramp_power = self.BESS_RATED_POWER_KW * max_ramp_pct / 100.0
 
         time_delta = (datetime.now(timezone.utc) - self._last_update_time).total_seconds() / 60.0
         max_power_change = max_ramp_power * max(1.0, time_delta)
 
         if abs(limited_power - self._last_power_kw) > max_power_change:
             limited_power = self._last_power_kw + (
-                max_power_change if limited_power > self._last_power_kw
-                else -max_power_change
+                max_power_change if limited_power > self._last_power_kw else -max_power_change
             )
             constraint = DispatchConstraint(
                 constraint_type=ConstraintType.RAMP_RATE.value,
                 severity="warning",
                 current_value=abs(limited_power - self._last_power_kw),
                 limit_value=max_power_change,
-                message=f"Ramp rate limited: requested change {abs(limited_power - self._last_power_kw):.0f} kW exceeds max {max_power_change:.0f} kW/min",
+                message=(
+                    f"Ramp rate limited: requested change"
+                    f" {abs(limited_power - self._last_power_kw):.0f} kW"
+                    f" exceeds max {max_power_change:.0f} kW/min"
+                ),
                 mitigation=f"Limited to {limited_power:.0f} kW",
             )
             constraints.append(constraint)
@@ -285,7 +319,10 @@ class BESSDispatchEngine:
                     severity="warning",
                     current_value=limited_power,
                     limit_value=max_export,
-                    message=f"Export limited: requested {limited_power:.0f} kW exceeds NRS 097 limit of 50% Prated ({max_export:.0f} kW)",
+                    message=(
+                        f"Export limited: requested {limited_power:.0f} kW"
+                        f" exceeds NRS 097 limit of 50% Prated ({max_export:.0f} kW)"
+                    ),
                     mitigation=f"Limited to {max_export:.0f} kW",
                 )
                 constraints.append(constraint)
@@ -307,8 +344,14 @@ class BESSDispatchEngine:
                         severity="warning",
                         current_value=load_shedding_stage,
                         limit_value=3,  # Normal is 0-3
-                        message=f"Discharge limited for load shedding stage {load_shedding_stage}: reserving capacity for grid support",
-                        mitigation=f"Limited to {reduced_power:.0f} kW ({reduced_power/limited_power*100:.0f}%)" if reduced_power > 0 else "Disabled",
+                        message=(
+                            f"Discharge limited for load shedding stage"
+                            f" {load_shedding_stage}: reserving capacity"
+                            f" for grid support"
+                        ),
+                        mitigation=f"Limited to {reduced_power:.0f} kW ({reduced_power / limited_power * 100:.0f}%)"
+                        if reduced_power > 0
+                        else "Disabled",
                     )
                     constraints.append(constraint)
                     limited_power = reduced_power
@@ -429,7 +472,11 @@ class BESSDispatchEngine:
             # Stages 6-8: Stop discharge, charge to reserve
             action_taken = "stop_discharge_charge_reserve"
             power_change_kw = self.BESS_RATED_POWER_KW  # Switch to charging
-            recommendation = f"Emergency: stopping discharge and charging to {self.SOC_LS_RESERVE_PCT}% SOC reserve for grid support during stages 6-8"
+            recommendation = (
+                f"Emergency: stopping discharge and charging to"
+                f" {self.SOC_LS_RESERVE_PCT}% SOC reserve for grid support"
+                f" during stages 6-8"
+            )
 
         return {
             "site_id": site_id,

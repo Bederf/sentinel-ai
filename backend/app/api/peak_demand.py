@@ -12,6 +12,8 @@ import logging
 
 # # from app.services.demand_aware_coordinator import get_demand_aware_coordinator
 from app.services.solar_demand_service import get_solar_demand_service
+from app.services.solar_config_service import get_site_solar_config
+from app.services.demand_ratchet import get_demand_ratchet_service
 from app.services.module_registry_service import module_registry
 from app.services.approval_service import get_approval_service
 from app.models.module_registry import ModuleType
@@ -23,8 +25,10 @@ router = APIRouter(prefix="/api/peak-demand", tags=["peak_demand"])
 
 # ==================== Request/Response Models ====================
 
+
 class DemandStatusResponse(BaseModel):
     """Current demand status with NMD context."""
+
     site_id: str
     current_demand_kw: float
     nmd_limit_kva: float
@@ -39,6 +43,7 @@ class DemandStatusResponse(BaseModel):
 
 class ModuleActionResponse(BaseModel):
     """Single module action in a coordinated recommendation."""
+
     module: str
     action: str
     duration_min: Optional[int] = None
@@ -49,6 +54,7 @@ class ModuleActionResponse(BaseModel):
 
 class MultiModuleRecommendationResponse(BaseModel):
     """Multi-module peak shaving recommendation."""
+
     recommendation_id: str
     timestamp: str
     type: str
@@ -64,6 +70,7 @@ class MultiModuleRecommendationResponse(BaseModel):
 
 class ApproveRecommendationRequest(BaseModel):
     """Approve a peak shaving recommendation."""
+
     recommendation_id: str
     approved_by: str
     approval_notes: Optional[str] = None
@@ -71,6 +78,7 @@ class ApproveRecommendationRequest(BaseModel):
 
 class ForecastIntervalResponse(BaseModel):
     """Hourly demand forecast interval."""
+
     hour: int
     date: str
     forecasted_demand_kw: float
@@ -83,6 +91,7 @@ class ForecastIntervalResponse(BaseModel):
 
 class DemandForecastResponse(BaseModel):
     """24-hour demand forecast."""
+
     site_id: str
     forecast_start: str
     forecast_hours: List[ForecastIntervalResponse]
@@ -94,6 +103,7 @@ class DemandForecastResponse(BaseModel):
 
 
 # ==================== Status & Monitoring Endpoints ====================
+
 
 @router.get("/{site_id}/status", response_model=DemandStatusResponse)
 async def get_demand_status(site_id: str):
@@ -109,10 +119,7 @@ async def get_demand_status(site_id: str):
         demand_status = demand_service.get_current_demand(site_id)
 
         if not demand_status:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No demand data available for site {site_id}"
-            )
+            raise HTTPException(status_code=404, detail=f"No demand data available for site {site_id}")
 
         current_demand_kw = demand_status.get("current_demand_kw", 0)
 
@@ -123,7 +130,7 @@ async def get_demand_status(site_id: str):
                 nmd_limit_kva = await demand_service.get_nmd_limit(site_id)
             except Exception as exc:
                 logger.warning(f"Failed to fetch NMD from database for {site_id}: {exc}")
-                nmd_limit_kva = 6000  # Final fallback to default
+                nmd_limit_kva = 1820  # Fallback: Site-002 energy_centre.json max_demand_kw
         headroom_kw = nmd_limit_kva - current_demand_kw
         headroom_percent = (headroom_kw / nmd_limit_kva * 100) if nmd_limit_kva > 0 else 100
 
@@ -145,24 +152,25 @@ async def get_demand_status(site_id: str):
         available_reductions = {}
 
         if ModuleType.SOLAR in [m.module_type for m in active_modules]:
+            cfg = get_site_solar_config(site_id)
             available_reductions["solar"] = {
-                "max_reduction_kw": 200,
+                "max_reduction_kw": cfg.bess.rated_power_kw,
                 "method": "bess_discharge",
-                "duration_options": [30, 60, 120]
+                "duration_options": [30, 60, 120],
             }
 
         if ModuleType.HVAC in [m.module_type for m in active_modules]:
             available_reductions["hvac"] = {
                 "max_reduction_kw": 50,
                 "method": "setpoint_increase",
-                "duration_options": [15, 30, 60]
+                "duration_options": [15, 30, 60],
             }
 
         if ModuleType.ENERGY in [m.module_type for m in active_modules]:
             available_reductions["energy"] = {
                 "max_reduction_kw": 30,
                 "method": "load_deferral",
-                "duration_options": [15, 30]
+                "duration_options": [15, 30],
             }
 
         return DemandStatusResponse(
@@ -175,7 +183,7 @@ async def get_demand_status(site_id: str):
             demand_trend=demand_status.get("demand_trend", "stable"),
             active_modules=active_module_names,
             available_reductions=available_reductions,
-            last_updated=demand_status.get("timestamp", "")
+            last_updated=demand_status.get("timestamp", ""),
         )
 
     except HTTPException:
@@ -199,10 +207,7 @@ async def get_demand_forecast(site_id: str):
         # Get current demand for NMD limit reference
         current_status = demand_service.get_current_demand(site_id)
         if not current_status:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No demand data available for site {site_id}"
-            )
+            raise HTTPException(status_code=404, detail=f"No demand data available for site {site_id}")
 
         # PHASE 081: Fetch NMD from database (from municipal bills)
         nmd_limit_kva = current_status.get("nmd_limit_kva")
@@ -211,15 +216,12 @@ async def get_demand_forecast(site_id: str):
                 nmd_limit_kva = await demand_service.get_nmd_limit(site_id)
             except Exception as exc:
                 logger.warning(f"Failed to fetch NMD from database for forecast: {exc}")
-                nmd_limit_kva = 6000  # Fallback
+                nmd_limit_kva = 1820  # Fallback: Site-002 energy_centre.json
 
         # Get 24-hour profile
         profile = demand_service.get_demand_profile(site_id, period="day")
         if not profile:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No forecast available for site {site_id}"
-            )
+            raise HTTPException(status_code=404, detail=f"No forecast available for site {site_id}")
 
         # Build forecast intervals
         forecast_intervals = []
@@ -241,16 +243,18 @@ async def get_demand_forecast(site_id: str):
             else:
                 risk_level = "safe"
 
-            forecast_intervals.append(ForecastIntervalResponse(
-                hour=i,
-                date=interval.get("date", ""),
-                forecasted_demand_kw=demand_kw,
-                confidence_low_kw=max(0, demand_kw - 50),  # ±50kW confidence band
-                confidence_high_kw=demand_kw + 50,
-                nmd_headroom_kw=headroom_kw,
-                headroom_percent=round(headroom_percent, 1),
-                risk_level=risk_level
-            ))
+            forecast_intervals.append(
+                ForecastIntervalResponse(
+                    hour=i,
+                    date=interval.get("date", ""),
+                    forecasted_demand_kw=demand_kw,
+                    confidence_low_kw=max(0, demand_kw - 50),  # ±50kW confidence band
+                    confidence_high_kw=demand_kw + 50,
+                    nmd_headroom_kw=headroom_kw,
+                    headroom_percent=round(headroom_percent, 1),
+                    risk_level=risk_level,
+                )
+            )
 
             # Track peak
             if demand_kw > peak_demand_kw:
@@ -277,7 +281,7 @@ async def get_demand_forecast(site_id: str):
             peak_demand_kw=peak_demand_kw,
             peak_headroom_kw=peak_headroom_kw,
             peak_headroom_percent=round(peak_headroom_percent, 1),
-            peak_risk_level=peak_risk_level
+            peak_risk_level=peak_risk_level,
         )
 
     except HTTPException:
@@ -288,6 +292,7 @@ async def get_demand_forecast(site_id: str):
 
 
 # ==================== Recommendation Endpoints ====================
+
 
 @router.get("/{site_id}/recommendations", response_model=List[MultiModuleRecommendationResponse])
 async def get_peak_shaving_recommendations(site_id: str):
@@ -318,14 +323,14 @@ async def get_peak_shaving_recommendations(site_id: str):
                         action=action.get("action"),
                         duration_min=action.get("duration_min"),
                         reduction_kw=action.get("reduction_kw"),
-                        estimated_savings_r=action.get("estimated_savings_r")
+                        estimated_savings_r=action.get("estimated_savings_r"),
                     )
                     for action in rec.get("module_actions", [])
                 ],
                 estimated_reduction_kw=rec.get("estimated_reduction_kw", 0),
                 estimated_savings_r=rec.get("estimated_savings_r", 0),
                 reasoning=rec.get("reasoning", ""),
-                requires_approval=rec.get("requires_approval", True)
+                requires_approval=rec.get("requires_approval", True),
             )
             for rec in recommendations
         ]
@@ -336,10 +341,7 @@ async def get_peak_shaving_recommendations(site_id: str):
 
 
 @router.post("/{site_id}/approve-recommendation")
-async def approve_peak_shaving_recommendation(
-    site_id: str,
-    request: ApproveRecommendationRequest
-):
+async def approve_peak_shaving_recommendation(site_id: str, request: ApproveRecommendationRequest):
     """
     Approve a multi-module peak shaving recommendation.
 
@@ -353,14 +355,11 @@ async def approve_peak_shaving_recommendation(
         result = await approval_service.execute_multi_module_approval(
             recommendation_id=request.recommendation_id,
             approved_by=request.approved_by,
-            approval_notes=request.approval_notes or ""
+            approval_notes=request.approval_notes or "",
         )
 
         if not result.get("success"):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Approval failed: {result.get('error', 'Unknown error')}"
-            )
+            raise HTTPException(status_code=400, detail=f"Approval failed: {result.get('error', 'Unknown error')}")
 
         logger.info(
             f"Peak shaving recommendation {request.recommendation_id} approved and executing - "
@@ -373,7 +372,7 @@ async def approve_peak_shaving_recommendation(
             "modules_executing": len(result.get("module_actions", [])),
             "estimated_reduction_kw": result.get("estimated_reduction_kw", 0),
             "estimated_savings_r": result.get("estimated_savings_r", 0),
-            "execution_details": result.get("details", {})
+            "execution_details": result.get("details", {}),
         }
 
     except HTTPException:
@@ -384,6 +383,7 @@ async def approve_peak_shaving_recommendation(
 
 
 # ==================== Utility Endpoints ====================
+
 
 @router.get("/{site_id}/summary")
 async def get_demand_summary(site_id: str):
@@ -410,23 +410,36 @@ async def get_demand_summary(site_id: str):
                 nmd_limit_kva = await demand_service.get_nmd_limit(site_id)
             except Exception as exc:
                 logger.warning(f"Failed to fetch NMD from database for summary: {exc}")
-                nmd_limit_kva = 6000  # Fallback
+                nmd_limit_kva = 1820  # Fallback: Site-002 energy_centre.json
 
         current_demand_kw = demand_status.get("current_demand_kw", 0)
         headroom_percent = ((nmd_limit_kva - current_demand_kw) / nmd_limit_kva * 100) if nmd_limit_kva > 0 else 100
+
+        # Demand ratchet calculation
+        ratchet_service = get_demand_ratchet_service()
+        ratchet = ratchet_service.calculate_ratchet(site_id, current_month_peak_kva=current_demand_kw)
+
+        cfg = get_site_solar_config(site_id)
 
         return {
             "site_id": site_id,
             "current_demand_kw": round(current_demand_kw, 1),
             "nmd_limit_kva": round(nmd_limit_kva, 1),
+            "demand_charge_r_kva": cfg.tariff.demand_charge_r_kva(),
             "headroom_percent": round(headroom_percent, 1),
-            "risk_level": "critical" if headroom_percent < 5 else (
-                "warning" if headroom_percent < 15 else (
-                    "caution" if headroom_percent < 25 else "safe"
-                )
-            ),
+            "risk_level": "critical"
+            if headroom_percent < 5
+            else ("warning" if headroom_percent < 15 else ("caution" if headroom_percent < 25 else "safe")),
             "active_modules": active_names,
-            "coordinator_active": ModuleType.SOLAR in [m.module_type for m in active_modules]
+            "coordinator_active": ModuleType.SOLAR in [m.module_type for m in active_modules],
+            # Ratchet fields (Phase 109C)
+            "billing_demand_kva": ratchet.billing_demand_kva,
+            "ratchet_demand_kva": ratchet.ratchet_demand_kva,
+            "ratchet_active": ratchet.ratchet_active,
+            "monthly_demand_cost_r": ratchet.monthly_demand_cost_r,
+            "spike_cost_r": ratchet.spike_cost_r,
+            "shaving_target_kva": ratchet.shaving_target_kva,
+            "ratchet_expires": ratchet.ratchet_expires,
         }
 
     except HTTPException:

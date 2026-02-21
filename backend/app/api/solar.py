@@ -40,6 +40,7 @@ from app.services.solar_generator_coordinator import get_solar_generator_coordin
 from app.services.solar_health_service import get_solar_health_service
 from app.services.solar_maintenance_service import get_solar_maintenance_service
 from app.services.solar_financial_service import get_solar_financial_service
+from app.services.solar_config_service import get_site_solar_config
 
 router = APIRouter(
     dependencies=[
@@ -98,10 +99,7 @@ async def get_inverter_detail(request: Request, site_id: str, inverter_id: str):
     svc = get_solar_ingestion_service()
     detail = await svc.get_inverter_detail(site_id, inverter_id)
     if not detail:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Inverter '{inverter_id}' not found at site '{site_id}'"
-        )
+        raise HTTPException(status_code=404, detail=f"Inverter '{inverter_id}' not found at site '{site_id}'")
     return detail
 
 
@@ -146,16 +144,17 @@ async def get_bess_status(request: Request, site_id: str):
                 last_poll=None,
             )
         else:
-            # Default mock BESS for site-002
+            # Default mock BESS for site-002 (from solar_config_service)
+            bess_cfg_fallback = get_site_solar_config(site_id).bess
             bess = BESSContainer(
                 container_id="S002-BESS-B1-001",
                 site_id=site_id,
                 name="LUNA2000 BESS",
-                manufacturer="Huawei",
-                model="LUNA2000-200KWH-2H1",
-                capacity_kwh=200,
-                rated_power_kw=100,
-                rack_count=2,
+                manufacturer=bess_cfg_fallback.manufacturer,
+                model=bess_cfg_fallback.model,
+                capacity_kwh=bess_cfg_fallback.capacity_kwh,
+                rated_power_kw=bess_cfg_fallback.rated_power_kw,
+                rack_count=bess_cfg_fallback.rack_count,
                 cell_chemistry="LFP",
                 protocol="modbus_tcp",
                 # Mock runtime state
@@ -238,10 +237,7 @@ async def get_performance_metrics(
     perf = get_solar_performance_service()
     metrics = await perf.calculate_pr(site_id, period=period)
     if not metrics:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Solar site '{site_id}' not found or no generation data"
-        )
+        raise HTTPException(status_code=404, detail=f"Solar site '{site_id}' not found or no generation data")
     return metrics.to_dict()
 
 
@@ -259,16 +255,11 @@ async def get_inverter_peer_comparison(request: Request, site_id: str):
     if not comparisons:
         ingestion = get_solar_ingestion_service()
         if site_id not in [s["site_id"] for s in ingestion.get_registered_sites()]:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Solar site '{site_id}' not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Solar site '{site_id}' not found")
     return {
         "site_id": site_id,
         "inverter_count": len(comparisons),
-        "underperforming": sum(
-            1 for c in comparisons if c.status != "normal"
-        ),
+        "underperforming": sum(1 for c in comparisons if c.status != "normal"),
         "inverters": [c.to_dict() for c in comparisons],
     }
 
@@ -276,9 +267,7 @@ async def get_inverter_peer_comparison(request: Request, site_id: str):
 @router.get("/solar/sites/{site_id}/performance/strings")
 async def get_string_anomalies(
     site_id: str,
-    inverter_id: Optional[str] = Query(
-        None, description="Filter to specific inverter"
-    ),
+    inverter_id: Optional[str] = Query(None, description="Filter to specific inverter"),
 ):
     """Get string-level detail with anomaly flags.
 
@@ -287,9 +276,7 @@ async def get_string_anomalies(
     (disconnection), string_short (bypass diode), mppt_fault (tracker hardware).
     """
     perf = get_solar_performance_service()
-    anomalies = await perf.detect_string_anomalies(
-        site_id, inverter_id=inverter_id
-    )
+    anomalies = await perf.detect_string_anomalies(site_id, inverter_id=inverter_id)
 
     # If filtering by inverter, include total string count for context
     total_strings = 0
@@ -320,10 +307,7 @@ async def get_diagnostics(request: Request, site_id: str):
     perf = get_solar_performance_service()
     report = await perf.get_diagnostic_summary(site_id)
     if not report:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Solar site '{site_id}' not found or no data available"
-        )
+        raise HTTPException(status_code=404, detail=f"Solar site '{site_id}' not found or no data available")
     return report.to_dict()
 
 
@@ -342,10 +326,7 @@ async def get_compliance_status(request: Request, site_id: str):
     svc = get_solar_compliance_service()
     result = await svc.get_overall_compliance(site_id)
     if not result:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Solar site '{site_id}' not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Solar site '{site_id}' not found")
     return result
 
 
@@ -439,10 +420,7 @@ async def get_compliance_report(
     svc = get_solar_compliance_service()
     report = await svc.generate_compliance_report(site_id, period=period)
     if not report:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Solar site '{site_id}' not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Solar site '{site_id}' not found")
     return report.to_dict()
 
 

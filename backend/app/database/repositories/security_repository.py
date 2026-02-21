@@ -11,10 +11,7 @@ import logging
 from pathlib import Path
 
 from app.database.supabase_client import get_supabase_client
-from app.models.security import (
-    AccessEvent, SecurityAlert,
-    AccessStatus, VisitorStatus, AlertStatus
-)
+from app.models.security import AccessEvent, SecurityAlert, AccessStatus, VisitorStatus, AlertStatus
 
 logger = logging.getLogger(__name__)
 
@@ -210,10 +207,7 @@ class SecurityRepository:
         try:
             response = (
                 self.client.table("visitors")
-                .update({
-                    "status": VisitorStatus.CHECKED_IN,
-                    "checkin_time": now.isoformat()
-                })
+                .update({"status": VisitorStatus.CHECKED_IN, "checkin_time": now.isoformat()})
                 .eq("visitor_id", visitor_id)
                 .execute()
             )
@@ -228,10 +222,7 @@ class SecurityRepository:
         try:
             response = (
                 self.client.table("visitors")
-                .update({
-                    "status": VisitorStatus.CHECKED_OUT,
-                    "checkout_time": now.isoformat()
-                })
+                .update({"status": VisitorStatus.CHECKED_OUT, "checkout_time": now.isoformat()})
                 .eq("visitor_id", visitor_id)
                 .execute()
             )
@@ -311,11 +302,13 @@ class SecurityRepository:
         try:
             response = (
                 self.client.table("security_alerts")
-                .update({
-                    "status": AlertStatus.ACKNOWLEDGED,
-                    "acknowledged_by": acknowledged_by,
-                    "acknowledged_at": now.isoformat()
-                })
+                .update(
+                    {
+                        "status": AlertStatus.ACKNOWLEDGED,
+                        "acknowledged_by": acknowledged_by,
+                        "acknowledged_at": now.isoformat(),
+                    }
+                )
                 .eq("alert_id", alert_id)
                 .execute()
             )
@@ -367,16 +360,11 @@ class SecurityRepository:
                 "total_occupancy": len(people_in),
                 "by_floor": {"L0": len([p for p in people_in if True])},  # Simplified
                 "by_zone": {},
-                "last_updated": datetime.now().isoformat()
+                "last_updated": datetime.now().isoformat(),
             }
         except Exception as e:
             logger.warning(f"Failed to calculate occupancy for {site}: {e}")
-            return {
-                "total_occupancy": 0,
-                "by_floor": {},
-                "by_zone": {},
-                "last_updated": datetime.now().isoformat()
-            }
+            return {"total_occupancy": 0, "by_floor": {}, "by_zone": {}, "last_updated": datetime.now().isoformat()}
 
     # ========================================================================
     # Helper Methods
@@ -393,3 +381,15 @@ class SecurityRepository:
             return hour >= 18 or hour < 6
         except Exception:
             return False
+
+
+# Singleton accessor
+_security_repository_instance: Optional["SecurityRepository"] = None
+
+
+def get_security_repository() -> SecurityRepository:
+    """Get or create the SecurityRepository singleton."""
+    global _security_repository_instance
+    if _security_repository_instance is None:
+        _security_repository_instance = SecurityRepository()
+    return _security_repository_instance

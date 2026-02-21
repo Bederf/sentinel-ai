@@ -10,12 +10,14 @@ Tests geometric abstraction pipeline:
 
 import io
 
-import cv2
 import numpy as np
 import pytest
-from PIL import Image, ImageDraw
 
-from app.services.floor_plan_sanitizer import FloorPlanSanitizer
+PIL = pytest.importorskip("PIL", reason="Pillow not installed")
+cv2 = pytest.importorskip("cv2", reason="opencv-python not installed")
+
+from PIL import Image, ImageDraw  # noqa: E402
+from app.services.floor_plan_sanitizer import FloorPlanSanitizer  # noqa: E402
 
 
 @pytest.fixture
@@ -152,9 +154,7 @@ class TestFloorPlanSanitizer:
 
     def test_sanitize_simple_floor_plan(self, sanitizer, simple_floor_plan):
         """Test sanitizing a simple floor plan."""
-        sanitized_bytes, lookup = sanitizer.sanitize_floor_plan(
-            simple_floor_plan, remove_text=True, return_lookup=True
-        )
+        sanitized_bytes, lookup = sanitizer.sanitize_floor_plan(simple_floor_plan, remove_text=True, return_lookup=True)
 
         # Should return bytes
         assert isinstance(sanitized_bytes, bytes)
@@ -194,9 +194,7 @@ class TestFloorPlanSanitizer:
 
     def test_sanitize_skip_text_removal(self, sanitizer, simple_floor_plan):
         """Test sanitization without text removal."""
-        sanitized_bytes, _ = sanitizer.sanitize_floor_plan(
-            simple_floor_plan, remove_text=False, return_lookup=True
-        )
+        sanitized_bytes, _ = sanitizer.sanitize_floor_plan(simple_floor_plan, remove_text=False, return_lookup=True)
 
         assert isinstance(sanitized_bytes, bytes)
         assert len(sanitized_bytes) > 0
@@ -300,9 +298,7 @@ class TestIntegration:
     async def test_full_sanitization_workflow(self, sanitizer, simple_floor_plan):
         """Test complete workflow: load → sanitize → verify."""
         # Step 1: Load and sanitize
-        sanitized_bytes, lookup = sanitizer.sanitize_floor_plan(
-            simple_floor_plan, remove_text=True, return_lookup=True
-        )
+        sanitized_bytes, lookup = sanitizer.sanitize_floor_plan(simple_floor_plan, remove_text=True, return_lookup=True)
 
         assert isinstance(sanitized_bytes, bytes)
         assert isinstance(lookup, dict)
@@ -321,17 +317,13 @@ class TestIntegration:
         }
 
         # Step 4: Re-identify with original zone names
-        reidentified = sanitizer.reidentify_equipment_config(
-            extracted_config, lookup
-        )
+        reidentified = sanitizer.reidentify_equipment_config(extracted_config, lookup)
         assert len(reidentified.get("equipment", [])) > 0
 
     @pytest.mark.asyncio
     async def test_end_to_end_sanitization_export(self, sanitizer, simple_floor_plan):
         """Test saving sanitized image to disk and re-loading."""
-        sanitized_bytes, lookup = sanitizer.sanitize_floor_plan(
-            simple_floor_plan, remove_text=True, return_lookup=True
-        )
+        sanitized_bytes, lookup = sanitizer.sanitize_floor_plan(simple_floor_plan, remove_text=True, return_lookup=True)
 
         # Decode and verify we can work with the sanitized version
         nparr = np.frombuffer(sanitized_bytes, np.uint8)

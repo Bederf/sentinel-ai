@@ -17,14 +17,18 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 
+from app.services.solar_config_service import get_site_solar_config
+
 logger = logging.getLogger(__name__)
 
 
 # === Dataclass Models ===
 
+
 @dataclass
 class PriceForecast:
     """Hourly price forecast for 24-hour period."""
+
     hour: int  # 0-23 (SAST)
     hour_start: str  # ISO timestamp
     hour_end: str  # ISO timestamp
@@ -56,6 +60,7 @@ class PriceForecast:
 @dataclass
 class ArbitrageWindow:
     """An optimal charge/discharge window pair."""
+
     charge_start_hour: int  # When to start charging (0-23)
     charge_end_hour: int  # When to stop charging
     charge_window_price_r_per_kwh: float  # Average price during charge window
@@ -88,50 +93,63 @@ class ArbitrageWindow:
 
 # === Price Forecaster ===
 
+
 class PriceForecaster:
     """24-hour price forecasting with multiple adjustment factors."""
 
-    # South African TOU base rates (ZAR/kWh)
+    # City Power LPU-TOU 2025/26 summer rates (R/kWh, energy + network)
     BASE_RATES = {
-        "off_peak": 0.80,
-        "standard": 1.20,
-        "peak": 1.80,
+        "off_peak": 1.77,  # (170.95 + 6.0) c/kWh
+        "standard": 2.28,  # (222.39 + 6.0) c/kWh
+        "peak": 3.01,  # (295.39 + 6.0) c/kWh
     }
 
     # Load shedding stage price adjustments
     LS_ADJUSTMENTS = {
-        0: 0.0,      # No LS
-        1: 0.0,      # Stage 1-2
+        0: 0.0,  # No LS
+        1: 0.0,  # Stage 1-2
         2: 0.0,
-        3: 0.50,     # Stage 3-5: +50%
+        3: 0.50,  # Stage 3-5: +50%
         4: 0.50,
         5: 0.50,
-        6: 1.00,     # Stage 6-8: +100% (emergency)
+        6: 1.00,  # Stage 6-8: +100% (emergency)
         7: 1.00,
         8: 1.00,
     }
 
     # Weather adjustment factors
     WEATHER_ADJUSTMENTS = {
-        "cold": 0.30,     # <10°C: +30%
-        "hot": 0.40,      # >32°C: +40%
-        "mild": 0.0,      # 10-32°C: no adjustment
+        "cold": 0.30,  # <10°C: +30%
+        "hot": 0.40,  # >32°C: +40%
+        "mild": 0.0,  # 10-32°C: no adjustment
     }
 
-    def __init__(self, tariff_data: Optional[Dict[str, Any]] = None):
+    def __init__(self, tariff_data: Optional[Dict[str, Any]] = None, site_id: Optional[str] = None):
         """Initialize forecaster with tariff configuration.
 
         Args:
             tariff_data: City Power TOU tariff configuration (loads from JSON if None)
+            site_id: Site ID for loading site-specific solar/tariff config
         """
         self._tariff = tariff_data or self._load_tariff()
+        # Override BASE_RATES from site solar config if available
+        if site_id:
+            try:
+                solar_cfg = get_site_solar_config(site_id)
+                tariff_rates = (solar_cfg or {}).get("tariff_rates")
+                if tariff_rates:
+                    self.BASE_RATES = {
+                        "off_peak": tariff_rates.get("off_peak", self.BASE_RATES["off_peak"]),
+                        "standard": tariff_rates.get("standard", self.BASE_RATES["standard"]),
+                        "peak": tariff_rates.get("peak", self.BASE_RATES["peak"]),
+                    }
+                    logger.info("Loaded tariff rates from site config for %s", site_id)
+            except Exception as e:
+                logger.warning("Could not load site solar config for %s: %s", site_id, e)
 
     def _load_tariff(self) -> Dict[str, Any]:
         """Load City Power TOU tariff from configuration."""
-        tariff_path = (
-            Path(__file__).parent.parent
-            / "data" / "solar" / "tariffs" / "city_power_2026.json"
-        )
+        tariff_path = Path(__file__).parent.parent / "data" / "solar" / "tariffs" / "city_power_2026.json"
         try:
             with open(tariff_path) as f:
                 tariff = json.load(f)
@@ -266,21 +284,35 @@ class PriceForecaster:
 
 # === Arbitrage Analyzer ===
 
+
 class ArbitrageAnalyzer:
     """Identifies optimal charge/discharge windows and calculates revenue."""
 
-    BESS_CAPACITY_KWH = 5015.0
+    BESS_CAPACITY_KWH = 500.0  # Huawei LUNA2000-200KWH-2H1
     BESS_ROUND_TRIP_EFF = 0.90
     BATTERY_DEGRADATION_COST_R_PER_KWH = 0.05
     MIN_ARBITRAGE_SPREAD = 0.10  # Minimum ZAR/kWh spread to make arbitrage worthwhile
 
-    def __init__(self, price_forecaster: Optional[PriceForecaster] = None):
+    def __init__(self, price_forecaster: Optional[PriceForecaster] = None, site_id: Optional[str] = None):
         """Initialize analyzer with price forecaster.
 
         Args:
             price_forecaster: PriceForecaster instance, creates default if None
+            site_id: Site ID for loading site-specific BESS capacity from config
         """
-        self.forecaster = price_forecaster or PriceForecaster()
+        self.forecaster = price_forecaster or PriceForecaster(site_id=site_id)
+        # Override BESS capacity from site solar config if available
+        if site_id:
+            try:
+                solar_cfg = get_site_solar_config(site_id)
+                bess_kwh = (solar_cfg or {}).get("bess_capacity_kwh")
+                if bess_kwh is not None:
+                    self.BESS_CAPACITY_KWH = float(bess_kwh)
+                    logger.info(
+                        "Loaded BESS capacity %.1f kWh from site config for %s", self.BESS_CAPACITY_KWH, site_id
+                    )
+            except Exception as e:
+                logger.warning("Could not load BESS config for %s: %s", site_id, e)
 
     def find_arbitrage_windows(
         self,
@@ -320,10 +352,7 @@ class ArbitrageAnalyzer:
                 if discharge_win["start_hour"] <= charge_win["end_hour"]:
                     continue
 
-                spread = (
-                    discharge_win["avg_price"]
-                    - charge_win["avg_price"]
-                )
+                spread = discharge_win["avg_price"] - charge_win["avg_price"]
 
                 # Filter by minimum spread
                 if spread < self.MIN_ARBITRAGE_SPREAD:
@@ -388,29 +417,28 @@ class ArbitrageAnalyzer:
                 current_valley_prices = [forecast.final_price_r_per_kwh]
             else:
                 # Add to current valley if price trending down/low
-                if (
-                    forecast.final_price_r_per_kwh
-                    < forecasts[i - 1].final_price_r_per_kwh * 1.05
-                ):
+                if forecast.final_price_r_per_kwh < forecasts[i - 1].final_price_r_per_kwh * 1.05:
                     current_valley_prices.append(forecast.final_price_r_per_kwh)
                 else:
                     # Valley ended - save if long enough
                     valley_duration = len(current_valley_prices)
                     if valley_duration >= min_duration_hours:
                         avg_price = sum(current_valley_prices) / len(current_valley_prices)
-                        avg_confidence = sum(
-                            f.confidence_pct
-                            for f in forecasts[
-                                current_valley_start : current_valley_start
-                                + valley_duration
-                            ]
-                        ) / valley_duration
-                        valleys.append({
-                            "start_hour": current_valley_start,
-                            "end_hour": current_valley_start + valley_duration - 1,
-                            "avg_price": avg_price,
-                            "confidence": avg_confidence,
-                        })
+                        avg_confidence = (
+                            sum(
+                                f.confidence_pct
+                                for f in forecasts[current_valley_start : current_valley_start + valley_duration]
+                            )
+                            / valley_duration
+                        )
+                        valleys.append(
+                            {
+                                "start_hour": current_valley_start,
+                                "end_hour": current_valley_start + valley_duration - 1,
+                                "avg_price": avg_price,
+                                "confidence": avg_confidence,
+                            }
+                        )
                     # Start new valley
                     current_valley_start = i
                     current_valley_prices = [forecast.final_price_r_per_kwh]
@@ -420,17 +448,16 @@ class ArbitrageAnalyzer:
             avg_price = sum(current_valley_prices) / len(current_valley_prices)
             avg_confidence = sum(
                 f.confidence_pct
-                for f in forecasts[
-                    current_valley_start : current_valley_start
-                    + len(current_valley_prices)
-                ]
+                for f in forecasts[current_valley_start : current_valley_start + len(current_valley_prices)]
             ) / len(current_valley_prices)
-            valleys.append({
-                "start_hour": current_valley_start,
-                "end_hour": current_valley_start + len(current_valley_prices) - 1,
-                "avg_price": avg_price,
-                "confidence": avg_confidence,
-            })
+            valleys.append(
+                {
+                    "start_hour": current_valley_start,
+                    "end_hour": current_valley_start + len(current_valley_prices) - 1,
+                    "avg_price": avg_price,
+                    "confidence": avg_confidence,
+                }
+            )
 
         return valleys
 
@@ -458,29 +485,28 @@ class ArbitrageAnalyzer:
                 current_peak_prices = [forecast.final_price_r_per_kwh]
             else:
                 # Add to current peak if price trending up/high
-                if (
-                    forecast.final_price_r_per_kwh
-                    > forecasts[i - 1].final_price_r_per_kwh * 0.95
-                ):
+                if forecast.final_price_r_per_kwh > forecasts[i - 1].final_price_r_per_kwh * 0.95:
                     current_peak_prices.append(forecast.final_price_r_per_kwh)
                 else:
                     # Peak ended - save if long enough
                     peak_duration = len(current_peak_prices)
                     if peak_duration >= min_duration_hours:
                         avg_price = sum(current_peak_prices) / len(current_peak_prices)
-                        avg_confidence = sum(
-                            f.confidence_pct
-                            for f in forecasts[
-                                current_peak_start : current_peak_start
-                                + peak_duration
-                            ]
-                        ) / peak_duration
-                        peaks.append({
-                            "start_hour": current_peak_start,
-                            "end_hour": current_peak_start + peak_duration - 1,
-                            "avg_price": avg_price,
-                            "confidence": avg_confidence,
-                        })
+                        avg_confidence = (
+                            sum(
+                                f.confidence_pct
+                                for f in forecasts[current_peak_start : current_peak_start + peak_duration]
+                            )
+                            / peak_duration
+                        )
+                        peaks.append(
+                            {
+                                "start_hour": current_peak_start,
+                                "end_hour": current_peak_start + peak_duration - 1,
+                                "avg_price": avg_price,
+                                "confidence": avg_confidence,
+                            }
+                        )
                     # Start new peak
                     current_peak_start = i
                     current_peak_prices = [forecast.final_price_r_per_kwh]
@@ -489,18 +515,16 @@ class ArbitrageAnalyzer:
         if len(current_peak_prices) >= min_duration_hours:
             avg_price = sum(current_peak_prices) / len(current_peak_prices)
             avg_confidence = sum(
-                f.confidence_pct
-                for f in forecasts[
-                    current_peak_start : current_peak_start
-                    + len(current_peak_prices)
-                ]
+                f.confidence_pct for f in forecasts[current_peak_start : current_peak_start + len(current_peak_prices)]
             ) / len(current_peak_prices)
-            peaks.append({
-                "start_hour": current_peak_start,
-                "end_hour": current_peak_start + len(current_peak_prices) - 1,
-                "avg_price": avg_price,
-                "confidence": avg_confidence,
-            })
+            peaks.append(
+                {
+                    "start_hour": current_peak_start,
+                    "end_hour": current_peak_start + len(current_peak_prices) - 1,
+                    "avg_price": avg_price,
+                    "confidence": avg_confidence,
+                }
+            )
 
         return peaks
 

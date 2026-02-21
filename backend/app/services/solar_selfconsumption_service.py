@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 
+from app.services.solar_config_service import get_site_solar_config
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,6 +30,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SelfConsumptionMetrics:
     """Self-consumption and self-sufficiency ratios for a period."""
+
     site_id: str
     period: str  # day / week / month
     solar_generated_kwh: float
@@ -63,6 +66,7 @@ class SelfConsumptionMetrics:
 @dataclass
 class ExportStatus:
     """Current grid export status."""
+
     site_id: str
     timestamp: str
     current_export_kw: float
@@ -90,6 +94,7 @@ class ExportStatus:
 @dataclass
 class ExcessPlan:
     """Plan for handling excess solar generation."""
+
     site_id: str
     timestamp: str
     excess_solar_kw: float
@@ -114,6 +119,7 @@ class ExcessPlan:
 @dataclass
 class EnergyBalanceInterval:
     """Energy balance for a single time interval."""
+
     timestamp: str
     solar_gen_kwh: float
     solar_self_consumed_kwh: float
@@ -139,6 +145,7 @@ class EnergyBalanceInterval:
 @dataclass
 class EnergyBalance:
     """Complete daily energy balance breakdown."""
+
     site_id: str
     period: str  # day / week / month
     date: str
@@ -185,23 +192,31 @@ class SolarSelfConsumptionService:
     """Self-consumption optimisation: maximise on-site solar use.
 
     Coordinates with BESS dispatch to ensure excess solar charges the
-    battery rather than being exported. For Site-002 (3.9 MWp PV,
-    5,015 kWh BESS), target is >95% self-consumption.
+    battery rather than being exported. For Site-002 (946 kWp PV,
+    500 kWh BESS), target is >95% self-consumption.
     """
 
     # Site-002 reference parameters
-    PV_CAPACITY_KWP = 3875.0  # Total installed PV
-    BESS_CAPACITY_KWH = 5015.0
-    BESS_RATED_POWER_KW = 2507.0
+    PV_CAPACITY_KWP = 946.0  # 550 roof + 396 carport
+    BESS_CAPACITY_KWH = 500.0  # Huawei LUNA2000-200KWH-2H1
+    BESS_RATED_POWER_KW = 250.0  # 0.5C rate
     BESS_EFFICIENCY = 0.90
     BASE_LOAD_KW = 1800.0
 
     # Export limits (SSEG Category B)
-    EXPORT_LIMIT_KW = 100.0  # Near-zero export with small tolerance
+    EXPORT_LIMIT_KW = 946.0  # SSEG Category B max export
     EXPORT_LIMIT_TYPE = "capped"  # zero_export / capped / unlimited
 
     def __init__(self):
         self._energy_balance_cache: Dict[str, EnergyBalance] = {}
+        try:
+            cfg = get_site_solar_config("site-002")
+            self.PV_CAPACITY_KWP = cfg.pv.total_capacity_kwp
+            self.BESS_CAPACITY_KWH = cfg.bess.capacity_kwh
+            self.BESS_RATED_POWER_KW = cfg.bess.rated_power_kw
+            self.EXPORT_LIMIT_KW = cfg.grid.max_export_kw
+        except Exception:
+            pass
         self._seed_demo_data("site-002")
 
     def _seed_demo_data(self, site_id: str) -> None:
@@ -210,17 +225,19 @@ class SolarSelfConsumptionService:
         self._energy_balance_cache[site_id] = balance
         logger.info(
             "Seeded energy balance for %s: %.0f kWh solar, %.1f%% self-consumption",
-            site_id, balance.solar_generated_kwh, balance.self_consumption_pct,
+            site_id,
+            balance.solar_generated_kwh,
+            balance.self_consumption_pct,
         )
 
     @staticmethod
     def _solar_generation_kw(hour: float) -> float:
-        """Simulate 3.9 MWp solar generation for JHB latitude."""
+        """Simulate 946 kWp solar generation for JHB latitude."""
         if hour < 6 or hour > 19:
             return 0.0
         peak_hour = 12.5
         spread = 3.5
-        peak_kw = 3200.0
+        peak_kw = 780.0  # ~82% performance ratio on 946 kWp
         gen = peak_kw * math.exp(-0.5 * ((hour - peak_hour) / spread) ** 2)
         return max(0, gen * random.uniform(0.93, 1.07))
 
@@ -323,16 +340,18 @@ class SolarSelfConsumptionService:
                     bess_soc += (charge_kwh * self.BESS_EFFICIENCY / self.BESS_CAPACITY_KWH) * 100
                     grid_import += charge_kwh
 
-            intervals.append(EnergyBalanceInterval(
-                timestamp=t.isoformat(),
-                solar_gen_kwh=solar_kwh,
-                solar_self_consumed_kwh=solar_to_building,
-                solar_to_bess_kwh=solar_to_bess,
-                solar_exported_kwh=solar_exported,
-                grid_imported_kwh=grid_import,
-                bess_discharged_kwh=bess_discharge,
-                building_consumed_kwh=load_kwh,
-            ))
+            intervals.append(
+                EnergyBalanceInterval(
+                    timestamp=t.isoformat(),
+                    solar_gen_kwh=solar_kwh,
+                    solar_self_consumed_kwh=solar_to_building,
+                    solar_to_bess_kwh=solar_to_bess,
+                    solar_exported_kwh=solar_exported,
+                    grid_imported_kwh=grid_import,
+                    bess_discharged_kwh=bess_discharge,
+                    building_consumed_kwh=load_kwh,
+                )
+            )
 
             totals["solar_gen"] += solar_kwh
             totals["solar_self"] += solar_to_building
@@ -377,9 +396,7 @@ class SolarSelfConsumptionService:
 
     # === Self-consumption metrics ===
 
-    def get_selfconsumption_ratio(
-        self, site_id: str, period: str = "day"
-    ) -> SelfConsumptionMetrics:
+    def get_selfconsumption_ratio(self, site_id: str, period: str = "day") -> SelfConsumptionMetrics:
         """Get self-consumption and self-sufficiency ratios for a period."""
         balance = self._energy_balance_cache.get(site_id)
         if not balance:
@@ -483,12 +500,14 @@ class SolarSelfConsumptionService:
                 site_id=site_id,
                 timestamp=now.isoformat(),
                 excess_solar_kw=0,
-                plan=[{
-                    "priority": 1,
-                    "action": "no_excess",
-                    "power_kw": 0,
-                    "note": f"No excess solar. Generation {solar_kw:.0f} kW < Load {load_kw:.0f} kW",
-                }],
+                plan=[
+                    {
+                        "priority": 1,
+                        "action": "no_excess",
+                        "power_kw": 0,
+                        "note": f"No excess solar. Generation {solar_kw:.0f} kW < Load {load_kw:.0f} kW",
+                    }
+                ],
                 total_absorbed_kw=0,
                 remaining_export_kw=0,
                 bess_can_absorb=True,
@@ -497,6 +516,7 @@ class SolarSelfConsumptionService:
         # Get BESS SOC to determine absorption capacity
         try:
             from app.services.solar_dispatch_service import get_solar_dispatch_service
+
             dispatch = get_solar_dispatch_service()
             status = dispatch.get_dispatch_status(site_id)
             bess_soc = status.bess_soc_pct if status else 50.0
@@ -509,12 +529,18 @@ class SolarSelfConsumptionService:
         if bess_soc < 95.0:
             bess_room_kwh = self.BESS_CAPACITY_KWH * (95.0 - bess_soc) / 100.0
             bess_absorb = min(remaining_excess, self.BESS_RATED_POWER_KW)
-            plan_items.append({
-                "priority": 1,
-                "action": "charge_bess",
-                "power_kw": round(bess_absorb, 0),
-                "note": f"BESS at {bess_soc:.1f}% SOC, can absorb {bess_absorb:.0f} kW ({bess_room_kwh:.0f} kWh remaining capacity)",
-            })
+            plan_items.append(
+                {
+                    "priority": 1,
+                    "action": "charge_bess",
+                    "power_kw": round(bess_absorb, 0),
+                    "note": (
+                        f"BESS at {bess_soc:.1f}% SOC, can absorb"
+                        f" {bess_absorb:.0f} kW"
+                        f" ({bess_room_kwh:.0f} kWh remaining capacity)"
+                    ),
+                }
+            )
             total_absorbed += bess_absorb
             remaining_excess -= bess_absorb
 
@@ -522,46 +548,54 @@ class SolarSelfConsumptionService:
         if remaining_excess > 0:
             deferrable_load = min(remaining_excess, 200)  # ~200 kW of deferrable loads
             if deferrable_load > 50:
-                plan_items.append({
-                    "priority": 2,
-                    "action": "increase_building_load",
-                    "power_kw": round(deferrable_load, 0),
-                    "note": "Bring forward deferrable loads: pre-cooling, UPS charging, hot water",
-                })
+                plan_items.append(
+                    {
+                        "priority": 2,
+                        "action": "increase_building_load",
+                        "power_kw": round(deferrable_load, 0),
+                        "note": "Bring forward deferrable loads: pre-cooling, UPS charging, hot water",
+                    }
+                )
                 total_absorbed += deferrable_load
                 remaining_excess -= deferrable_load
 
         # Priority 3: Export (if allowed and economical)
         if remaining_excess > 0:
             if self.EXPORT_LIMIT_TYPE == "unlimited":
-                plan_items.append({
-                    "priority": 3,
-                    "action": "export_to_grid",
-                    "power_kw": round(remaining_excess, 0),
-                    "note": f"Export {remaining_excess:.0f} kW to grid (SSEG feed-in)",
-                })
+                plan_items.append(
+                    {
+                        "priority": 3,
+                        "action": "export_to_grid",
+                        "power_kw": round(remaining_excess, 0),
+                        "note": f"Export {remaining_excess:.0f} kW to grid (SSEG feed-in)",
+                    }
+                )
                 total_absorbed += remaining_excess
                 remaining_excess = 0
             elif self.EXPORT_LIMIT_TYPE == "capped":
                 exportable = min(remaining_excess, self.EXPORT_LIMIT_KW)
                 if exportable > 0:
-                    plan_items.append({
-                        "priority": 3,
-                        "action": "export_to_grid",
-                        "power_kw": round(exportable, 0),
-                        "note": f"Export {exportable:.0f} kW (within {self.EXPORT_LIMIT_KW:.0f} kW cap)",
-                    })
+                    plan_items.append(
+                        {
+                            "priority": 3,
+                            "action": "export_to_grid",
+                            "power_kw": round(exportable, 0),
+                            "note": f"Export {exportable:.0f} kW (within {self.EXPORT_LIMIT_KW:.0f} kW cap)",
+                        }
+                    )
                     total_absorbed += exportable
                     remaining_excess -= exportable
 
         # Priority 4: Curtail if still excess
         if remaining_excess > 0:
-            plan_items.append({
-                "priority": 4,
-                "action": "curtail",
-                "power_kw": round(remaining_excess, 0),
-                "note": f"Curtail {remaining_excess:.0f} kW (BESS full, export limit reached)",
-            })
+            plan_items.append(
+                {
+                    "priority": 4,
+                    "action": "curtail",
+                    "power_kw": round(remaining_excess, 0),
+                    "note": f"Curtail {remaining_excess:.0f} kW (BESS full, export limit reached)",
+                }
+            )
             total_absorbed += remaining_excess
             remaining_export = 0
         else:
@@ -581,9 +615,7 @@ class SolarSelfConsumptionService:
 
     # === Energy balance ===
 
-    def get_energy_balance(
-        self, site_id: str, period: str = "day"
-    ) -> EnergyBalance:
+    def get_energy_balance(self, site_id: str, period: str = "day") -> EnergyBalance:
         """Get complete energy balance breakdown for a period."""
         balance = self._energy_balance_cache.get(site_id)
         if not balance:

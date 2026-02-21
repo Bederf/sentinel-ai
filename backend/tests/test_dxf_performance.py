@@ -6,10 +6,11 @@ for realistic floor plans with 100+ equipment.
 
 import pytest
 import time
-import ezdxf
 import io
 
-from app.services.dxf_parser_service import get_dxf_parser_service
+ezdxf = pytest.importorskip("ezdxf", reason="ezdxf not installed")
+
+from app.services.dxf_parser_service import get_dxf_parser_service  # noqa: E402
 
 
 @pytest.mark.performance
@@ -56,16 +57,12 @@ class TestDXFParserPerformance:
                 layer = "AE-HVAC" if i % 2 == 0 else "EL-POWER"
 
                 # Add equipment circle
-                msp.add_circle(
-                    (x, y, z), radius=1.5, dxfattribs={"layer": layer}
-                )
+                msp.add_circle((x, y, z), radius=1.5, dxfattribs={"layer": layer})
 
                 # Add equipment label
                 eq_type = "FCU" if i % 2 == 0 else "GEN"
                 eq_name = f"{eq_type}-{floor}-{i:02d}"
-                msp.add_text(
-                    eq_name, dxfattribs={"layer": layer, "insert": (x, y, z)}
-                )
+                msp.add_text(eq_name, dxfattribs={"layer": layer, "insert": (x, y, z)})
 
         # Save to temp file then read as bytes
         with tempfile.NamedTemporaryFile(suffix=".dxf", delete=False) as f:
@@ -88,9 +85,7 @@ class TestDXFParserPerformance:
 
         start_time = time.time()
 
-        config = await parser.parse_dxf_file(
-            dxf_bytes, "site-002", "Test Building"
-        )
+        config = await parser.parse_dxf_file(dxf_bytes, "site-002", "Test Building")
 
         elapsed = time.time() - start_time
 
@@ -105,9 +100,7 @@ class TestDXFParserPerformance:
 
         start_time = time.time()
 
-        config = await parser.parse_dxf_file(
-            dxf_bytes, "site-002", "Test Building"
-        )
+        config = await parser.parse_dxf_file(dxf_bytes, "site-002", "Test Building")
 
         elapsed = time.time() - start_time
 
@@ -122,11 +115,9 @@ class TestDXFParserPerformance:
         dxf_bytes = self.generate_large_dxf(equipment_count=200)
 
         # Get baseline memory
-        baseline_objects = len(gc.get_objects()) if 'gc' in dir() else 0
+        baseline_objects = len(gc.get_objects()) if "gc" in dir() else 0
 
-        config = await parser.parse_dxf_file(
-            dxf_bytes, "site-002", "Test Building"
-        )
+        config = await parser.parse_dxf_file(dxf_bytes, "site-002", "Test Building")
 
         # Check result is valid
         assert len(config["equipment"]) > 100
@@ -151,9 +142,7 @@ class TestDXFParserBenchmark:
         doc.layers.new("AE-HVAC")
 
         for i in range(10):
-            msp.add_circle(
-                (20 + i * 10, 40, 0), radius=1.5, dxfattribs={"layer": "AE-HVAC"}
-            )
+            msp.add_circle((20 + i * 10, 40, 0), radius=1.5, dxfattribs={"layer": "AE-HVAC"})
 
         stream = io.BytesIO()
         doc.write(stream)
@@ -164,7 +153,7 @@ class TestDXFParserBenchmark:
         config = await parser.parse_dxf_file(dxf_bytes, "site-002", "Test")
         elapsed = time.time() - start_time
 
-        print(f"\nSmall DXF (10 equipment): {elapsed*1000:.1f}ms")
+        print(f"\nSmall DXF (10 equipment): {elapsed * 1000:.1f}ms")
         assert elapsed < 0.5  # Should be very fast
 
     @pytest.mark.asyncio
@@ -177,7 +166,7 @@ class TestDXFParserBenchmark:
         config = await parser.parse_dxf_file(dxf_bytes, "site-002", "Test")
         elapsed = time.time() - start_time
 
-        print(f"\nMedium DXF (50 equipment): {elapsed*1000:.1f}ms")
+        print(f"\nMedium DXF (50 equipment): {elapsed * 1000:.1f}ms")
         assert elapsed < 2.0
 
     @pytest.mark.asyncio
@@ -190,7 +179,7 @@ class TestDXFParserBenchmark:
         config = await parser.parse_dxf_file(dxf_bytes, "site-002", "Test")
         elapsed = time.time() - start_time
 
-        print(f"\nLarge DXF (150 equipment): {elapsed*1000:.1f}ms")
+        print(f"\nLarge DXF (150 equipment): {elapsed * 1000:.1f}ms")
         assert elapsed < 5.0
 
 

@@ -7,9 +7,9 @@ The operator shouldn't need to think about it -- SENTINEL handles dispatch silen
 Tariff source: City Power Johannesburg Commercial TOU rates from
   backend/app/data/solar/tariffs/city_power_2026.json
 
-BESS constraints (Site-002 LUNA2000-5015-2S):
-  - Capacity: 5,015 kWh usable
-  - Max charge/discharge: 2,507 kW (0.5C)
+BESS constraints (Site-002 LUNA2000-200KWH-2H1):
+  - Capacity: 500 kWh usable
+  - Max charge/discharge: 250 kW (0.5C)
   - Min SOC: 10%  (protect cell longevity)
   - Max SOC: 95%  (prevent overcharge)
 
@@ -27,13 +27,17 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
+from app.services.solar_config_service import get_site_solar_config
+
 logger = logging.getLogger(__name__)
 
 
 # === Enums ===
 
+
 class TariffBandName(str, Enum):
     """TOU tariff band names."""
+
     PEAK = "peak"
     STANDARD = "standard"
     OFF_PEAK = "off_peak"
@@ -41,6 +45,7 @@ class TariffBandName(str, Enum):
 
 class DispatchActionType(str, Enum):
     """BESS dispatch action types."""
+
     CHARGE = "charge"
     DISCHARGE = "discharge"
     IDLE = "idle"
@@ -49,15 +54,18 @@ class DispatchActionType(str, Enum):
 
 class Season(str, Enum):
     """Tariff season (SA winter = high demand = Jun/Jul/Aug)."""
+
     SUMMER = "summer"
     WINTER = "winter"
 
 
 # === Dataclass Models ===
 
+
 @dataclass
 class TariffBand:
     """Current tariff band with rate information."""
+
     name: str  # peak / standard / off_peak
     rate_per_kwh: float  # ZAR/kWh (converted from c/kWh)
     season: str  # summer / winter
@@ -81,6 +89,7 @@ class TariffBand:
 @dataclass
 class ArbitrageValue:
     """Revenue calculation from buy-low sell-high arbitrage."""
+
     charge_kwh: float
     discharge_kwh: float
     charge_cost_zar: float  # cost to charge
@@ -106,6 +115,7 @@ class ArbitrageValue:
 @dataclass
 class DispatchSlot:
     """A time window in the dispatch schedule with BESS action."""
+
     start: str  # HH:MM
     end: str  # HH:MM
     action: str  # charge / discharge / idle / solar_priority
@@ -134,6 +144,7 @@ class DispatchSlot:
 @dataclass
 class DispatchSchedule:
     """Day-ahead BESS dispatch plan with 24-hour slots."""
+
     site_id: str
     date: str  # YYYY-MM-DD
     season: str
@@ -155,6 +166,7 @@ class DispatchSchedule:
 @dataclass
 class DispatchAction:
     """Real-time dispatch recommendation: what BESS should do RIGHT NOW."""
+
     action: str  # charge / discharge / idle / solar_priority
     power_kw: float
     reason: str
@@ -185,6 +197,7 @@ class DispatchAction:
 @dataclass
 class DailySavings:
     """Actual vs no-BESS cost comparison for a day."""
+
     site_id: str
     date: str
     period: str  # day / week / month
@@ -215,6 +228,7 @@ class DailySavings:
 
 # === Engine ===
 
+
 class SolarArbitrageEngine:
     """TOU tariff optimisation and BESS dispatch scheduling engine.
 
@@ -223,9 +237,9 @@ class SolarArbitrageEngine:
     Integrates with EskomSePush for load shedding reserve management.
     """
 
-    # BESS constraints (from Site-002 LUNA2000-5015-2S config)
-    BESS_CAPACITY_KWH = 5015.0
-    BESS_RATED_POWER_KW = 2507.0  # 0.5C rate
+    # BESS constraints (from Site-002 LUNA2000-200KWH-2H1 config)
+    BESS_CAPACITY_KWH = 500.0  # Huawei LUNA2000-200KWH-2H1
+    BESS_RATED_POWER_KW = 250.0  # 0.5C rate
     BESS_MIN_SOC_PCT = 10.0
     BESS_MAX_SOC_PCT = 95.0
     BESS_ROUND_TRIP_EFF = 0.90
@@ -234,13 +248,16 @@ class SolarArbitrageEngine:
     def __init__(self):
         self._tariff: Dict[str, Any] = {}
         self._load_tariff()
+        try:
+            cfg = get_site_solar_config("site-002")
+            self.BESS_CAPACITY_KWH = cfg.bess.capacity_kwh
+            self.BESS_RATED_POWER_KW = cfg.bess.rated_power_kw
+        except Exception:
+            pass
 
     def _load_tariff(self) -> None:
         """Load City Power TOU tariff from JSON configuration."""
-        tariff_path = (
-            Path(__file__).parent.parent
-            / "data" / "solar" / "tariffs" / "city_power_2026.json"
-        )
+        tariff_path = Path(__file__).parent.parent / "data" / "solar" / "tariffs" / "city_power_2026.json"
         try:
             with open(tariff_path) as f:
                 self._tariff = json.load(f)
@@ -308,8 +325,8 @@ class SolarArbitrageEngine:
                     )
 
         # Fallback to off-peak if no match (shouldn't happen with complete config)
-        off_peak_c = energy_charges.get("off_peak", 112.45)
-        off_peak_net_c = network_charges.get("off_peak", 15.23)
+        off_peak_c = energy_charges.get("off_peak", 170.95)
+        off_peak_net_c = network_charges.get("off_peak", 6.0)
         return TariffBand(
             name="off_peak",
             rate_per_kwh=off_peak_c / 100.0,
@@ -391,7 +408,7 @@ class SolarArbitrageEngine:
 
         Respects BESS constraints:
           - Min SOC 10%, Max SOC 95%
-          - Max charge/discharge rate 2,507 kW (0.5C)
+          - Max charge/discharge rate 250 kW (0.5C)
         """
         d = target_date or date.today()
         dt = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
@@ -399,9 +416,7 @@ class SolarArbitrageEngine:
         time_bands = self._tariff.get("time_bands", {}).get(season, {})
 
         # Usable capacity
-        usable_kwh = self.BESS_CAPACITY_KWH * (
-            (self.BESS_MAX_SOC_PCT - self.BESS_MIN_SOC_PCT) / 100.0
-        )
+        usable_kwh = self.BESS_CAPACITY_KWH * ((self.BESS_MAX_SOC_PCT - self.BESS_MIN_SOC_PCT) / 100.0)
 
         slots: List[DispatchSlot] = []
 
@@ -421,7 +436,7 @@ class SolarArbitrageEngine:
         total_savings = 0.0
         off_peak_rate = self._get_band_rate("off_peak", season)
         peak_rate = self._get_band_rate("peak", season)
-        std_rate = self._get_band_rate("standard", season)
+        _std_rate = self._get_band_rate("standard", season)
 
         for start_str, end_str, band_name in band_schedule:
             rate = self._get_band_rate(band_name, season)
@@ -455,16 +470,18 @@ class SolarArbitrageEngine:
                     target_soc = self.BESS_MAX_SOC_PCT
                     note = ""
 
-                slots.append(DispatchSlot(
-                    start=start_str,
-                    end=end_str,
-                    action=DispatchActionType.CHARGE.value,
-                    power_kw=charge_power,
-                    target_soc_pct=target_soc,
-                    tariff_band=band_name,
-                    rate_per_kwh=rate,
-                    note=note,
-                ))
+                slots.append(
+                    DispatchSlot(
+                        start=start_str,
+                        end=end_str,
+                        action=DispatchActionType.CHARGE.value,
+                        power_kw=charge_power,
+                        target_soc_pct=target_soc,
+                        tariff_band=band_name,
+                        rate_per_kwh=rate,
+                        note=note,
+                    )
+                )
 
             elif band_name == "peak":
                 # Discharge BESS during peak
@@ -478,14 +495,16 @@ class SolarArbitrageEngine:
                 slot_savings = discharged_kwh * (peak_rate - off_peak_rate) * self.BESS_ROUND_TRIP_EFF
                 total_savings += slot_savings
 
-                slots.append(DispatchSlot(
-                    start=start_str,
-                    end=end_str,
-                    action=DispatchActionType.DISCHARGE.value,
-                    power_kw=discharge_power,
-                    tariff_band=band_name,
-                    rate_per_kwh=rate,
-                ))
+                slots.append(
+                    DispatchSlot(
+                        start=start_str,
+                        end=end_str,
+                        action=DispatchActionType.DISCHARGE.value,
+                        power_kw=discharge_power,
+                        tariff_band=band_name,
+                        rate_per_kwh=rate,
+                    )
+                )
 
             elif band_name == "standard":
                 # During standard: solar priority (BESS absorbs excess solar)
@@ -498,35 +517,41 @@ class SolarArbitrageEngine:
                     # Forecast-aware standard period behaviour
                     if forecast_cloudy is True:
                         # Cloudy: BESS conserves energy, doesn't expect solar top-up
-                        slots.append(DispatchSlot(
+                        slots.append(
+                            DispatchSlot(
+                                start=start_str,
+                                end=end_str,
+                                action=DispatchActionType.IDLE.value,
+                                power_kw=0,
+                                tariff_band=band_name,
+                                rate_per_kwh=rate,
+                                note="Cloudy forecast: BESS conserving for evening peak",
+                            )
+                        )
+                    else:
+                        slots.append(
+                            DispatchSlot(
+                                start=start_str,
+                                end=end_str,
+                                action=DispatchActionType.SOLAR_PRIORITY.value,
+                                power_kw=0,
+                                tariff_band=band_name,
+                                rate_per_kwh=rate,
+                                note="BESS absorbs excess solar generation",
+                            )
+                        )
+                else:
+                    # Early morning or evening standard: idle
+                    slots.append(
+                        DispatchSlot(
                             start=start_str,
                             end=end_str,
                             action=DispatchActionType.IDLE.value,
                             power_kw=0,
                             tariff_band=band_name,
                             rate_per_kwh=rate,
-                            note="Cloudy forecast: BESS conserving for evening peak",
-                        ))
-                    else:
-                        slots.append(DispatchSlot(
-                            start=start_str,
-                            end=end_str,
-                            action=DispatchActionType.SOLAR_PRIORITY.value,
-                            power_kw=0,
-                            tariff_band=band_name,
-                            rate_per_kwh=rate,
-                            note="BESS absorbs excess solar generation",
-                        ))
-                else:
-                    # Early morning or evening standard: idle
-                    slots.append(DispatchSlot(
-                        start=start_str,
-                        end=end_str,
-                        action=DispatchActionType.IDLE.value,
-                        power_kw=0,
-                        tariff_band=band_name,
-                        rate_per_kwh=rate,
-                    ))
+                        )
+                    )
 
         # Sort slots by start time for clean output
         slots.sort(key=lambda s: s.start)
@@ -572,7 +597,7 @@ class SolarArbitrageEngine:
           6. Standard + no excess -> idle
         """
         band = self.get_current_tariff_band(timestamp)
-        ts = timestamp or datetime.now(timezone.utc)
+        _ts = timestamp or datetime.now(timezone.utc)
 
         # Priority 1: Load shedding -- discharge to sustain building
         if load_shedding_active:
@@ -715,26 +740,30 @@ class SolarArbitrageEngine:
             # Check if this slot is just before LS window
             if abs(slot_start_min - pre_ls_start_min) < 120:
                 # Force charge to LS reserve SOC
-                modified_slots.append(DispatchSlot(
-                    start=slot.start,
-                    end=ls_start,
-                    action=DispatchActionType.CHARGE.value,
-                    power_kw=self.BESS_RATED_POWER_KW,
-                    target_soc_pct=self.BESS_LS_RESERVE_SOC_PCT,
-                    tariff_band=slot.tariff_band,
-                    rate_per_kwh=slot.rate_per_kwh,
-                    note=f"Pre-LS charge: ensure SOC >= {self.BESS_LS_RESERVE_SOC_PCT}% before Stage {ls_stage}",
-                ))
+                modified_slots.append(
+                    DispatchSlot(
+                        start=slot.start,
+                        end=ls_start,
+                        action=DispatchActionType.CHARGE.value,
+                        power_kw=self.BESS_RATED_POWER_KW,
+                        target_soc_pct=self.BESS_LS_RESERVE_SOC_PCT,
+                        tariff_band=slot.tariff_band,
+                        rate_per_kwh=slot.rate_per_kwh,
+                        note=f"Pre-LS charge: ensure SOC >= {self.BESS_LS_RESERVE_SOC_PCT}% before Stage {ls_stage}",
+                    )
+                )
                 # Add LS discharge slot
-                modified_slots.append(DispatchSlot(
-                    start=ls_start,
-                    end=ls_end,
-                    action=DispatchActionType.DISCHARGE.value,
-                    power_kw=self.BESS_RATED_POWER_KW,
-                    tariff_band="load_shedding",
-                    rate_per_kwh=0,
-                    note=f"Load shedding Stage {ls_stage}: discharging to sustain critical loads",
-                ))
+                modified_slots.append(
+                    DispatchSlot(
+                        start=ls_start,
+                        end=ls_end,
+                        action=DispatchActionType.DISCHARGE.value,
+                        power_kw=self.BESS_RATED_POWER_KW,
+                        tariff_band="load_shedding",
+                        rate_per_kwh=0,
+                        note=f"Load shedding Stage {ls_stage}: discharging to sustain critical loads",
+                    )
+                )
             else:
                 modified_slots.append(slot)
 
@@ -773,9 +802,7 @@ class SolarArbitrageEngine:
         off_peak_rate = self._get_band_rate("off_peak", season)
 
         # Usable BESS capacity
-        usable_kwh = self.BESS_CAPACITY_KWH * (
-            (self.BESS_MAX_SOC_PCT - self.BESS_MIN_SOC_PCT) / 100.0
-        )
+        usable_kwh = self.BESS_CAPACITY_KWH * ((self.BESS_MAX_SOC_PCT - self.BESS_MIN_SOC_PCT) / 100.0)
         dischargeable_kwh = usable_kwh * self.BESS_ROUND_TRIP_EFF
 
         # Simulated daily profile for Site-002
@@ -794,9 +821,7 @@ class SolarArbitrageEngine:
         off_peak_grid_kwh = base_load_kw * off_peak_hours
 
         cost_without_bess = (
-            peak_grid_kwh * peak_rate
-            + max(0, std_grid_kwh) * std_rate
-            + off_peak_grid_kwh * off_peak_rate
+            peak_grid_kwh * peak_rate + max(0, std_grid_kwh) * std_rate + off_peak_grid_kwh * off_peak_rate
         )
 
         # With BESS: discharge during peak, charge during off-peak

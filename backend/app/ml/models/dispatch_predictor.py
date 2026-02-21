@@ -19,9 +19,11 @@ logger = logging.getLogger(__name__)
 
 # === Dataclass Models ===
 
+
 @dataclass
 class DispatchPrediction:
     """Predicted next dispatch action and timing."""
+
     action: str  # charge / discharge / idle
     confidence_pct: float  # 0-100%
     next_action_start_hour: int  # When action should start (0-23)
@@ -33,6 +35,7 @@ class DispatchPrediction:
 
 
 # === Dispatch Predictor ===
+
 
 class DispatchPredictor:
     """ML-based dispatch action predictor.
@@ -77,16 +80,18 @@ class DispatchPredictor:
         """
         # Default temps and demand if not provided
         temps = temperature_forecast or [20.0] * 24
-        demands = building_demand_kw or [1800.0] * 24
+        _demands = building_demand_kw or [1800.0] * 24
 
         # Look ahead window
         lookahead_hours = 6
         lookahead_forecasts = price_forecasts[current_hour : current_hour + lookahead_hours]
 
         # 1. Analyze price opportunity
-        avg_price = sum(f["final_price_r_per_kwh"] for f in lookahead_forecasts) / len(
-            lookahead_forecasts
-        ) if lookahead_forecasts else 1.20
+        avg_price = (
+            sum(f["final_price_r_per_kwh"] for f in lookahead_forecasts) / len(lookahead_forecasts)
+            if lookahead_forecasts
+            else 1.20
+        )
 
         # 2. Check constraints
         temp = temps[current_hour] if current_hour < len(temps) else 20.0
@@ -104,8 +109,8 @@ class DispatchPredictor:
         # 3. Identify opportunity
         is_low_price = False
         is_high_price = False
-        lowest_price = float('inf')
-        highest_price = float('-inf')
+        lowest_price = float("inf")
+        highest_price = float("-inf")
         lowest_hour = current_hour
         highest_hour = current_hour
 
@@ -136,19 +141,21 @@ class DispatchPredictor:
             action = "discharge"
             next_action_start = highest_hour
             duration = 2  # Typical 2-hour peak period
-            power = 2507.0 * 0.8  # 80% rated power
+            power = 250.0 * 0.8  # 80% rated power
             spread = highest_price - lowest_price
-            revenue = spread * 2507.0 * 0.9 * 2  # 2 hours, 90% efficiency
+            revenue = spread * 250.0 * 0.9 * 2  # 2 hours, 90% efficiency
             confidence = min(90.0, 70.0 + (spread / 0.5) * 10)  # Higher confidence with larger spread
             reasoning = f"Peak price ${highest_price:.2f}/kWh at hour {highest_hour}"
-            recommendation = f"Discharge at hour {highest_hour} for {duration}h to capture peak arbitrage (R{revenue:.0f})"
+            recommendation = (
+                f"Discharge at hour {highest_hour} for {duration}h to capture peak arbitrage (R{revenue:.0f})"
+            )
 
         elif is_low_price and can_charge:
             # Charge during off-peak pricing
             action = "charge"
             next_action_start = lowest_hour
             duration = 3  # Typical 3-hour off-peak window
-            power = 2507.0 * 0.7  # 70% rated power to protect battery
+            power = 250.0 * 0.7  # 70% rated power to protect battery
             revenue = 0.0  # Charging doesn't generate revenue (cost)
             confidence = min(85.0, 60.0 + (avg_price - lowest_price) / 0.2 * 10)
             reasoning = f"Off-peak price R{lowest_price:.2f}/kWh at hour {lowest_hour}"
@@ -160,7 +167,7 @@ class DispatchPredictor:
                 action = "charge"
                 next_action_start = current_hour
                 duration = 2
-                power = 2507.0  # Full power charging
+                power = 250.0  # Full power charging
                 confidence = 95.0
                 reasoning = f"Load shedding stage {load_shedding_stage}: emergency response"
                 recommendation = "Charge immediately to 80% SOC to support grid during LS"
@@ -239,33 +246,21 @@ class DispatchPredictor:
         if not predictions or not actual_actions:
             return {"accuracy_pct": 0.0, "total_predictions": 0}
 
-        correct = sum(
-            1
-            for pred, actual in zip(predictions, actual_actions)
-            if pred.action == actual
-        )
+        correct = sum(1 for pred, actual in zip(predictions, actual_actions) if pred.action == actual)
         accuracy = (correct / len(predictions)) * 100 if predictions else 0.0
 
         # Weighted accuracy (consider confidence)
         weighted_correct = sum(
-            pred.confidence_pct / 100.0
-            for pred, actual in zip(predictions, actual_actions)
-            if pred.action == actual
+            pred.confidence_pct / 100.0 for pred, actual in zip(predictions, actual_actions) if pred.action == actual
         )
-        weighted_accuracy = (
-            (weighted_correct / len(predictions)) * 100
-            if predictions
-            else 0.0
-        )
+        weighted_accuracy = (weighted_correct / len(predictions)) * 100 if predictions else 0.0
 
         return {
             "accuracy_pct": round(accuracy, 1),
             "weighted_accuracy_pct": round(weighted_accuracy, 1),
             "total_predictions": len(predictions),
             "correct_predictions": correct,
-            "avg_confidence_pct": round(
-                sum(p.confidence_pct for p in predictions) / len(predictions), 1
-            ),
+            "avg_confidence_pct": round(sum(p.confidence_pct for p in predictions) / len(predictions), 1),
         }
 
 

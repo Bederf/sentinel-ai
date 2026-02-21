@@ -16,7 +16,7 @@ Carbon offset:
   - Diesel CO2 avoided: litres x 2.68 kg/L
 
 For demo: generates 3 months of retrospective financial reports
-with realistic savings (R80-150K/month for Site-002 3.875 MWp).
+with realistic savings for Site-002 946 kWp (550 roof + 396 carport).
 """
 
 import logging
@@ -24,6 +24,8 @@ import random
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, date
 from typing import Dict, List, Optional, Any
+
+from app.services.solar_config_service import get_site_solar_config
 
 logger = logging.getLogger(__name__)
 
@@ -39,33 +41,32 @@ DIESEL_EMISSION_FACTOR_KG_L = 2.68
 # Diesel price (ZAR per litre, Feb 2026)
 DIESEL_PRICE_ZAR_L = 22.0
 
-# Average tariff for self-consumption savings
-AVG_TARIFF_ZAR_KWH = 2.85
+# City Power LPU-TOU 2025/26 — energy charge + 6 c/kWh network surcharge
+# Summer rates (Sep-May); see city_power_2025_26.json for winter
+PEAK_TARIFF_ZAR_KWH = 3.0139  # 295.39 + 6 c/kWh
+STANDARD_TARIFF_ZAR_KWH = 2.2839  # 222.39 + 6 c/kWh
+OFFPEAK_TARIFF_ZAR_KWH = 1.7695  # 170.95 + 6 c/kWh
 
-# Peak tariff rate
-PEAK_TARIFF_ZAR_KWH = 3.91
-
-# Off-peak tariff rate
-OFFPEAK_TARIFF_ZAR_KWH = 1.28
-
-# Standard tariff rate
-STANDARD_TARIFF_ZAR_KWH = 2.16
+# Weighted average (19% peak, 39% standard, 42% off-peak from reference bill)
+AVG_TARIFF_ZAR_KWH = 2.21
 
 # Demand charge rate (R/kVA/month)
-DEMAND_CHARGE_ZAR_KVA = 155.50
+DEMAND_CHARGE_ZAR_KVA = 395.48  # City Power LPU-TOU 2025/26 verified
 
 # Generator consumption rate (litres/hour at 70% load)
 GENERATOR_CONSUMPTION_L_HR = 30.0
 
 # Site-002 installed capacity
-_CAPACITY_KWP = 3875.0
+_CAPACITY_KWP = 946.0  # Site-002: 550 roof + 396 carport
 
 
 # === Data models ===
 
+
 @dataclass
 class SavingsBreakdown:
     """Breakdown of savings by category."""
+
     arbitrage_zar: float = 0.0
     demand_charge_zar: float = 0.0
     self_consumption_zar: float = 0.0
@@ -85,6 +86,7 @@ class SavingsBreakdown:
 @dataclass
 class MonthlyFinancialReport:
     """Monthly financial report showing SENTINEL value delivered."""
+
     site_id: str
     month: int
     year: int
@@ -126,6 +128,7 @@ class MonthlyFinancialReport:
 @dataclass
 class FinancialSummary:
     """Year-to-date financial summary."""
+
     site_id: str
     period: str
     months: List[Dict[str, Any]] = field(default_factory=list)
@@ -155,6 +158,7 @@ class FinancialSummary:
 @dataclass
 class CarbonReport:
     """Carbon offset report."""
+
     site_id: str
     period: str
     solar_kwh: float
@@ -189,10 +193,11 @@ class CarbonReport:
 
 # === Service ===
 
+
 class SolarFinancialService:
     """Financial reporting for solar installations."""
 
-    # Monthly demo data for Site-002 (3.875 MWp, JHB)
+    # Monthly demo data for Site-002 (946 kWp, JHB)
     # Realistic for SA commercial installation
     DEMO_MONTHLY_DATA = {
         # (month, year) -> (generation_kwh, pr, gen_hours_avoided, ls_events)
@@ -220,11 +225,15 @@ class SolarFinancialService:
     }
 
     def __init__(self):
+        try:
+            cfg = get_site_solar_config("site-002")
+            self.DEMAND_CHARGE_ZAR_KVA = cfg.tariff.demand_charge_r_kva()
+            self._CAPACITY_KWP = cfg.pv.total_capacity_kwp
+        except Exception:
+            pass
         logger.info("SolarFinancialService initialized")
 
-    def generate_monthly_report(
-        self, site_id: str, month: int, year: int
-    ) -> MonthlyFinancialReport:
+    def generate_monthly_report(self, site_id: str, month: int, year: int) -> MonthlyFinancialReport:
         """Generate monthly financial report with full savings breakdown.
 
         For demo, uses pre-seeded data for Dec 2025, Jan 2026, Feb 2026.
@@ -307,9 +316,7 @@ class SolarFinancialService:
             generated_at=now.isoformat(),
         )
 
-    def get_financial_summary(
-        self, site_id: str, period: str = "ytd"
-    ) -> FinancialSummary:
+    def get_financial_summary(self, site_id: str, period: str = "ytd") -> FinancialSummary:
         """Get year-to-date cumulative savings with monthly breakdown."""
         now = datetime.now(timezone.utc)
 
@@ -320,24 +327,26 @@ class SolarFinancialService:
 
         for (month, year), _ in sorted(self.DEMO_MONTHLY_DATA.items()):
             report = self.generate_monthly_report(site_id, month, year)
-            months_data.append({
-                "month": report.month,
-                "year": report.year,
-                "month_name": report.month_name,
-                "generation_kwh": round(report.generation_kwh, 1),
-                "total_savings_zar": round(report.savings.total_zar, 2),
-                "arbitrage_zar": round(report.savings.arbitrage_zar, 2),
-                "demand_charge_zar": round(report.savings.demand_charge_zar, 2),
-                "self_consumption_zar": round(report.savings.self_consumption_zar, 2),
-                "diesel_avoidance_zar": round(report.savings.diesel_avoidance_zar, 2),
-            })
+            months_data.append(
+                {
+                    "month": report.month,
+                    "year": report.year,
+                    "month_name": report.month_name,
+                    "generation_kwh": round(report.generation_kwh, 1),
+                    "total_savings_zar": round(report.savings.total_zar, 2),
+                    "arbitrage_zar": round(report.savings.arbitrage_zar, 2),
+                    "demand_charge_zar": round(report.savings.demand_charge_zar, 2),
+                    "self_consumption_zar": round(report.savings.self_consumption_zar, 2),
+                    "diesel_avoidance_zar": round(report.savings.diesel_avoidance_zar, 2),
+                }
+            )
             cumulative_savings += report.savings.total_zar
             cumulative_generation += report.generation_kwh
 
         num_months = len(months_data) or 1
         avg_monthly = cumulative_savings / num_months
 
-        # SENTINEL licence fee (demo estimate for a 3.9 MWp site)
+        # SENTINEL licence fee (demo estimate for a 946 kWp site)
         licence_fee = 85_000.0  # R85K/month
 
         roi = ((avg_monthly - licence_fee) / licence_fee * 100) if licence_fee > 0 else 0
@@ -356,9 +365,7 @@ class SolarFinancialService:
             generated_at=now.isoformat(),
         )
 
-    def get_carbon_offset(
-        self, site_id: str, period: str = "month"
-    ) -> CarbonReport:
+    def get_carbon_offset(self, site_id: str, period: str = "month") -> CarbonReport:
         """Calculate carbon offset from solar generation.
 
         Eskom grid emission factor: 0.95 kg CO2/kWh (2024 IRP)
@@ -378,8 +385,7 @@ class SolarFinancialService:
             # YTD — sum all months
             solar_kwh = sum(d["generation_kwh"] for d in self.DEMO_MONTHLY_DATA.values())
             diesel_litres = sum(
-                d["gen_hours_avoided"] * GENERATOR_CONSUMPTION_L_HR
-                for d in self.DEMO_MONTHLY_DATA.values()
+                d["gen_hours_avoided"] * GENERATOR_CONSUMPTION_L_HR for d in self.DEMO_MONTHLY_DATA.values()
             )
 
         grid_co2_kg = solar_kwh * ESKOM_EMISSION_FACTOR_KG_KWH
@@ -408,9 +414,18 @@ class SolarFinancialService:
         """Generate synthetic monthly data for months without demo data."""
         # JHB solar resource varies by season
         seasonal_factor = {
-            1: 1.05, 2: 1.00, 3: 0.95, 4: 0.85,
-            5: 0.75, 6: 0.70, 7: 0.72, 8: 0.80,
-            9: 0.90, 10: 0.95, 11: 1.02, 12: 1.05,
+            1: 1.05,
+            2: 1.00,
+            3: 0.95,
+            4: 0.85,
+            5: 0.75,
+            6: 0.70,
+            7: 0.72,
+            8: 0.80,
+            9: 0.90,
+            10: 0.95,
+            11: 1.02,
+            12: 1.05,
         }
         factor = seasonal_factor.get(month, 0.85)
 

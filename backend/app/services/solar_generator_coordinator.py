@@ -29,13 +29,17 @@ from datetime import datetime, timezone, timedelta
 from enum import Enum
 from typing import Dict, List, Optional, Any
 
+from app.services.solar_config_service import get_site_solar_config
+
 logger = logging.getLogger(__name__)
 
 
 # === Enums ===
 
+
 class DispatchSource(str, Enum):
     """Energy source in the priority stack."""
+
     SOLAR = "solar"
     BESS = "bess"
     GRID = "grid"
@@ -44,6 +48,7 @@ class DispatchSource(str, Enum):
 
 class GeneratorEventType(str, Enum):
     """Types of generator events."""
+
     START = "start"
     STOP = "stop"
     AVOIDED_START = "avoided_start"
@@ -57,6 +62,7 @@ class GeneratorEventType(str, Enum):
 @dataclass
 class DispatchPriority:
     """Current dispatch priority determination."""
+
     site_id: str
     timestamp: str
     active_source: str  # solar / bess / grid / generator
@@ -84,6 +90,7 @@ class DispatchPriority:
 @dataclass
 class GeneratorAssessment:
     """Assessment of whether the generator should be started."""
+
     site_id: str
     should_start: bool
     reason: str
@@ -111,6 +118,7 @@ class GeneratorAssessment:
 @dataclass
 class DieselAvoidance:
     """Diesel avoidance savings calculation."""
+
     site_id: str
     period: str  # day / week / month
     hours_would_have_run: float  # Generator hours without Solar+BESS
@@ -144,6 +152,7 @@ class DieselAvoidance:
 @dataclass
 class GeneratorEvent:
     """Log entry for a generator-related event."""
+
     timestamp: str
     event_type: str  # start / stop / avoided_start / ls_override / low_soc_start
     site_id: str
@@ -177,6 +186,7 @@ class GeneratorEvent:
 @dataclass
 class LSResponse:
     """Response to a load shedding event."""
+
     site_id: str
     stage: int
     ls_start: str
@@ -205,6 +215,7 @@ class LSResponse:
 
 # === Generator Coordinator ===
 
+
 class SolarGeneratorCoordinator:
     """Coordinates dispatch priority and diesel avoidance tracking.
 
@@ -213,8 +224,8 @@ class SolarGeneratorCoordinator:
     """
 
     # BESS parameters (from arbitrage engine)
-    BESS_CAPACITY_KWH = 5015.0
-    BESS_RATED_POWER_KW = 2507.0
+    BESS_CAPACITY_KWH = 500.0  # Huawei LUNA2000-200KWH-2H1
+    BESS_RATED_POWER_KW = 250.0  # 0.5C rate
     BESS_MIN_SOC_PCT = 10.0
     BESS_MAX_SOC_PCT = 95.0
     GENERATOR_SOC_THRESHOLD = 20.0  # Only start generator if SOC below this
@@ -230,6 +241,12 @@ class SolarGeneratorCoordinator:
 
     def __init__(self):
         self._events: Dict[str, List[GeneratorEvent]] = {}  # site_id -> events
+        try:
+            cfg = get_site_solar_config("site-002")
+            self.BESS_CAPACITY_KWH = cfg.bess.capacity_kwh
+            self.BESS_RATED_POWER_KW = cfg.bess.rated_power_kw
+        except Exception:
+            pass
         self._seed_demo_events()
 
     def _seed_demo_events(self) -> None:
@@ -274,56 +291,70 @@ class SolarGeneratorCoordinator:
 
                 if bess_runtime >= ls_duration:
                     # BESS can sustain -- generator avoided
-                    events.append(GeneratorEvent(
-                        timestamp=ls_start.isoformat(),
-                        event_type=GeneratorEventType.AVOIDED_START.value,
-                        site_id=site_id,
-                        reason=f"LS Stage {ls_stage}: BESS can sustain {bess_runtime:.1f}h, LS duration {ls_duration:.1f}h",
-                        bess_soc_pct=soc,
-                        solar_gen_kw=solar_gen,
-                        building_load_kw=critical_load,
-                        load_shedding_stage=ls_stage,
-                        duration_hours=ls_duration,
-                    ))
+                    events.append(
+                        GeneratorEvent(
+                            timestamp=ls_start.isoformat(),
+                            event_type=GeneratorEventType.AVOIDED_START.value,
+                            site_id=site_id,
+                            reason=(
+                                f"LS Stage {ls_stage}: BESS can sustain"
+                                f" {bess_runtime:.1f}h, LS duration {ls_duration:.1f}h"
+                            ),
+                            bess_soc_pct=soc,
+                            solar_gen_kw=solar_gen,
+                            building_load_kw=critical_load,
+                            load_shedding_stage=ls_stage,
+                            duration_hours=ls_duration,
+                        )
+                    )
                 else:
                     # BESS depleted -- generator must start
                     gen_hours = ls_duration - bess_runtime
                     fuel = gen_hours * self.GENERATOR_CONSUMPTION_LPH
 
-                    events.append(GeneratorEvent(
-                        timestamp=ls_start.isoformat(),
-                        event_type=GeneratorEventType.LOW_SOC_START.value,
-                        site_id=site_id,
-                        reason=f"LS Stage {ls_stage}: BESS sustains {bess_runtime:.1f}h but LS is {ls_duration:.1f}h",
-                        bess_soc_pct=soc,
-                        solar_gen_kw=solar_gen,
-                        building_load_kw=critical_load,
-                        load_shedding_stage=ls_stage,
-                        fuel_litres_used=fuel,
-                        duration_hours=gen_hours,
-                    ))
-                    events.append(GeneratorEvent(
-                        timestamp=(ls_start + timedelta(hours=bess_runtime)).isoformat(),
-                        event_type=GeneratorEventType.START.value,
-                        site_id=site_id,
-                        reason=f"BESS depleted during Stage {ls_stage}; generator started",
-                        bess_soc_pct=self.BESS_MIN_SOC_PCT + 5,
-                        solar_gen_kw=solar_gen * 0.5,
-                        building_load_kw=critical_load,
-                        load_shedding_stage=ls_stage,
-                    ))
-                    events.append(GeneratorEvent(
-                        timestamp=ls_end.isoformat(),
-                        event_type=GeneratorEventType.STOP.value,
-                        site_id=site_id,
-                        reason=f"Load shedding ended; generator stopped after {gen_hours:.1f}h",
-                        bess_soc_pct=self.BESS_MIN_SOC_PCT,
-                        solar_gen_kw=0,
-                        building_load_kw=critical_load,
-                        load_shedding_stage=ls_stage,
-                        fuel_litres_used=fuel,
-                        duration_hours=gen_hours,
-                    ))
+                    events.append(
+                        GeneratorEvent(
+                            timestamp=ls_start.isoformat(),
+                            event_type=GeneratorEventType.LOW_SOC_START.value,
+                            site_id=site_id,
+                            reason=(
+                                f"LS Stage {ls_stage}: BESS sustains"
+                                f" {bess_runtime:.1f}h but LS is {ls_duration:.1f}h"
+                            ),
+                            bess_soc_pct=soc,
+                            solar_gen_kw=solar_gen,
+                            building_load_kw=critical_load,
+                            load_shedding_stage=ls_stage,
+                            fuel_litres_used=fuel,
+                            duration_hours=gen_hours,
+                        )
+                    )
+                    events.append(
+                        GeneratorEvent(
+                            timestamp=(ls_start + timedelta(hours=bess_runtime)).isoformat(),
+                            event_type=GeneratorEventType.START.value,
+                            site_id=site_id,
+                            reason=f"BESS depleted during Stage {ls_stage}; generator started",
+                            bess_soc_pct=self.BESS_MIN_SOC_PCT + 5,
+                            solar_gen_kw=solar_gen * 0.5,
+                            building_load_kw=critical_load,
+                            load_shedding_stage=ls_stage,
+                        )
+                    )
+                    events.append(
+                        GeneratorEvent(
+                            timestamp=ls_end.isoformat(),
+                            event_type=GeneratorEventType.STOP.value,
+                            site_id=site_id,
+                            reason=f"Load shedding ended; generator stopped after {gen_hours:.1f}h",
+                            bess_soc_pct=self.BESS_MIN_SOC_PCT,
+                            solar_gen_kw=0,
+                            building_load_kw=critical_load,
+                            load_shedding_stage=ls_stage,
+                            fuel_litres_used=fuel,
+                            duration_hours=gen_hours,
+                        )
+                    )
 
         # Sort by timestamp
         events.sort(key=lambda e: e.timestamp)
@@ -380,8 +411,18 @@ class SolarGeneratorCoordinator:
             reason = "Load shedding active and BESS depleted; generator running"
 
         priority_stack = [
-            {"rank": 1, "source": "solar", "status": "active" if solar_kw > 0 else "unavailable", "output_kw": round(solar_kw, 0)},
-            {"rank": 2, "source": "bess", "status": "available" if bess_soc > self.BESS_MIN_SOC_PCT else "depleted", "soc_pct": round(bess_soc, 1)},
+            {
+                "rank": 1,
+                "source": "solar",
+                "status": "active" if solar_kw > 0 else "unavailable",
+                "output_kw": round(solar_kw, 0),
+            },
+            {
+                "rank": 2,
+                "source": "bess",
+                "status": "available" if bess_soc > self.BESS_MIN_SOC_PCT else "depleted",
+                "soc_pct": round(bess_soc, 1),
+            },
             {"rank": 3, "source": "grid", "status": "available" if not ls_active else "unavailable"},
             {"rank": 4, "source": "generator", "status": "standby", "note": "Last resort only"},
         ]
@@ -507,7 +548,11 @@ class SolarGeneratorCoordinator:
                 actual_starts += 1
                 # The full LS duration would have been gen runtime without BESS
                 # Actual gen runtime is just the portion after BESS depleted
-                hours_would_have_run += event.duration_hours + event.bess_runtime_hours if hasattr(event, 'bess_runtime_hours') else event.duration_hours
+                hours_would_have_run += (
+                    event.duration_hours + event.bess_runtime_hours
+                    if hasattr(event, "bess_runtime_hours")
+                    else event.duration_hours
+                )
                 hours_ran += event.duration_hours
                 ls_events.add(event.timestamp[:10])
 
@@ -529,9 +574,7 @@ class SolarGeneratorCoordinator:
 
         # Without Solar+BESS, generator would have run for full LS duration
         hours_would_have_run = (
-            sum(e.duration_hours for e in avoided_events)
-            + sum(e.duration_hours for e in low_soc_events)
-            + hours_ran
+            sum(e.duration_hours for e in avoided_events) + sum(e.duration_hours for e in low_soc_events) + hours_ran
         )
 
         hours_avoided = hours_would_have_run - hours_ran
@@ -633,7 +676,9 @@ class SolarGeneratorCoordinator:
             )
             strategy = f"BESS sustains for {bess_sustain_hours:.1f}h, then generator takes over"
         else:
-            strategy = f"BESS + Solar can sustain {bess_sustain_hours:.1f}h; LS is {ls_hours:.1f}h -- no generator needed"
+            strategy = (
+                f"BESS + Solar can sustain {bess_sustain_hours:.1f}h; LS is {ls_hours:.1f}h -- no generator needed"
+            )
 
         actions.append("Post-LS: Resume normal dispatch schedule, recharge BESS")
 
