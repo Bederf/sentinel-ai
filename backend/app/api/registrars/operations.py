@@ -18,6 +18,7 @@ from app.api import parts_orders, approval_workflow, delivery_tracking, approval
 from app.api import security, compliance, notifications
 from app.api import asset_health
 from app.api import health_rating
+from app.api import cafm_integration
 
 
 def register_operations_routers(app: FastAPI) -> None:
@@ -99,3 +100,6 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Health rating timeline (Phase 109B)
     app.include_router(health_rating.router, tags=["health-rating"])
+
+    # CAFM integration (Phase 110 — completes v5.0)
+    app.include_router(cafm_integration.router, tags=["cafm-integration"])
