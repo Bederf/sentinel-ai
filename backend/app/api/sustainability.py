@@ -210,6 +210,20 @@ class EmissionsUpdateRequest(BaseModel):
     unit: str
 
 
+class DailyMetricsUpdateRequest(BaseModel):
+    """Request to record daily sustainability metrics."""
+
+    date: date
+    grid_kwh: float = 0.0
+    hvac_kwh: float = 0.0
+    lighting_kwh: float = 0.0
+    other_kwh: float = 0.0
+    diesel_liters: float = 0.0
+    water_liters: float = 0.0
+    solar_generation_kwh: float = 0.0
+    data_source: str = "measured"  # measured | simulation | estimated
+
+
 @router.get("/buildings/{building_id}/emissions/monthly")
 async def get_monthly_emissions(
     building_id: str,
@@ -242,36 +256,96 @@ async def get_monthly_emissions(
             .execute()
         )
 
-        if not response.data:
+        monthly = {}
+        data_source = "emissions_sources"
+
+        if response.data:
+            # Group by month from emissions_sources
+            for row in response.data:
+                month = row["measurement_date"][:7]  # YYYY-MM
+                if month not in monthly:
+                    monthly[month] = {
+                        "month": month,
+                        "scope1_kg_co2e": 0,
+                        "scope2_kg_co2e": 0,
+                        "scope3_kg_co2e": 0,
+                        "total_kg_co2e": 0,
+                    }
+
+                scope = row["scope"]
+                co2e = row.get("co2e_kg", 0)
+                key = f"scope{scope}_kg_co2e"
+                monthly[month][key] += co2e
+                monthly[month]["total_kg_co2e"] += co2e
+        else:
+            # Fallback: aggregate from daily_sustainability_metrics
+            data_source = "daily_sustainability_metrics"
+            try:
+                daily_response = (
+                    supabase.table("daily_sustainability_metrics")
+                    .select("date,grid_kwh,diesel_liters,water_liters,solar_generation_kwh")
+                    .eq("site_id", building_id)
+                    .gte("date", start_date.isoformat())
+                    .lte("date", end_date.isoformat())
+                    .order("date")
+                    .execute()
+                )
+
+                if daily_response.data:
+                    # SA emission factors for aggregation
+                    grid_factor = 0.95  # kg CO2e/kWh
+                    diesel_factor = 2.68  # kg CO2e/L
+                    water_factor = 0.45  # kg CO2e/m3
+
+                    for row in daily_response.data:
+                        month = row["date"][:7]
+                        if month not in monthly:
+                            monthly[month] = {
+                                "month": month,
+                                "scope1_kg_co2e": 0,
+                                "scope2_kg_co2e": 0,
+                                "scope3_kg_co2e": 0,
+                                "total_kg_co2e": 0,
+                            }
+
+                        grid_kwh = float(row.get("grid_kwh", 0) or 0)
+                        diesel_l = float(row.get("diesel_liters", 0) or 0)
+                        water_l = float(row.get("water_liters", 0) or 0)
+                        solar_kwh = float(row.get("solar_generation_kwh", 0) or 0)
+
+                        # Scope 1: diesel
+                        s1 = diesel_l * diesel_factor
+                        # Scope 2: grid minus solar offset
+                        net_grid = max(0, grid_kwh - solar_kwh)
+                        s2 = net_grid * grid_factor
+                        # Scope 3: water (simplified)
+                        s3 = (water_l / 1000) * water_factor
+
+                        monthly[month]["scope1_kg_co2e"] += s1
+                        monthly[month]["scope2_kg_co2e"] += s2
+                        monthly[month]["scope3_kg_co2e"] += s3
+                        monthly[month]["total_kg_co2e"] += s1 + s2 + s3
+            except Exception as daily_err:
+                logger.debug(f"daily_sustainability_metrics fallback failed: {daily_err}")
+
+        if not monthly:
             return {
                 "status": "no_data",
                 "message": "No emissions data found for this period",
                 "timestamp": date.today().isoformat(),
             }
 
-        # Group by month
-        monthly = {}
-        for row in response.data:
-            month = row["measurement_date"][:7]  # YYYY-MM
-            if month not in monthly:
-                monthly[month] = {
-                    "month": month,
-                    "scope1_kg_co2e": 0,
-                    "scope2_kg_co2e": 0,
-                    "scope3_kg_co2e": 0,
-                    "total_kg_co2e": 0,
-                }
-
-            scope = row["scope"]
-            co2e = row.get("co2e_kg", 0)
-            key = f"scope{scope}_kg_co2e"
-            monthly[month][key] += co2e
-            monthly[month]["total_kg_co2e"] += co2e
+        # Round values
+        for month_data in monthly.values():
+            for key in ("scope1_kg_co2e", "scope2_kg_co2e", "scope3_kg_co2e", "total_kg_co2e"):
+                month_data[key] = round(month_data[key], 2)
 
         # Calculate intensity if floor area available
-        building = supabase.table("buildings").select("floor_area_m2").eq("id", building_id).execute()
-
-        floor_area = building.data[0]["floor_area_m2"] if building.data else None
+        try:
+            building = supabase.table("buildings").select("floor_area_m2").eq("id", building_id).execute()
+            floor_area = building.data[0]["floor_area_m2"] if building.data else None
+        except Exception:
+            floor_area = None
 
         for month_data in monthly.values():
             if floor_area and floor_area > 0:
@@ -282,6 +356,7 @@ async def get_monthly_emissions(
             "building_id": building_id,
             "period_start": start_date.isoformat(),
             "period_end": end_date.isoformat(),
+            "data_source": data_source,
             "data": sorted(monthly.values(), key=lambda x: x["month"]),
             "timestamp": date.today().isoformat(),
         }
@@ -627,6 +702,50 @@ async def update_emissions(
         raise
     except Exception as e:
         logger.error(f"Error updating emissions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/buildings/{building_id}/daily-metrics")
+async def update_daily_metrics(
+    building_id: str,
+    request: DailyMetricsUpdateRequest,
+):
+    """
+    Record daily sustainability metrics to daily_sustainability_metrics table.
+    Accepts energy breakdown, diesel, water, and solar generation for a single day.
+    """
+    try:
+        supabase = get_supabase_client()
+
+        record = {
+            "site_id": building_id,
+            "date": request.date.isoformat(),
+            "grid_kwh": request.grid_kwh,
+            "hvac_kwh": request.hvac_kwh,
+            "lighting_kwh": request.lighting_kwh,
+            "other_kwh": request.other_kwh,
+            "diesel_liters": request.diesel_liters,
+            "water_liters": request.water_liters,
+            "solar_generation_kwh": request.solar_generation_kwh,
+            "data_source": request.data_source,
+        }
+
+        supabase.table("daily_sustainability_metrics").upsert(
+            record,
+            on_conflict="site_id,date",
+        ).execute()
+
+        return {
+            "status": "success",
+            "message": "Daily metrics recorded",
+            "building_id": building_id,
+            "date": request.date.isoformat(),
+            "data_source": request.data_source,
+            "timestamp": date.today().isoformat(),
+        }
+
+    except Exception as e:
+        logger.error(f"Error recording daily metrics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

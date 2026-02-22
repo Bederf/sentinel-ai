@@ -156,10 +156,33 @@ class CarbonCalculator:
                     breakdown[source] = 0.0
                 breakdown[source] += co2e
 
-            # TODO: Query solar module for renewable energy offset and reduce Scope 2
-            # If solar PV data exists, subtract from grid emissions (for net carbon tracking)
+            # Solar offset — query daily_sustainability_metrics for generation
+            solar_kwh = 0.0
+            try:
+                solar_result = (
+                    self.supabase.table("daily_sustainability_metrics")
+                    .select("solar_generation_kwh")
+                    .eq("site_id", building_id)
+                    .gte("date", period_start.isoformat())
+                    .lte("date", period_end.isoformat())
+                    .execute()
+                )
+                if solar_result.data:
+                    solar_kwh = sum(float(r.get("solar_generation_kwh", 0) or 0) for r in solar_result.data)
+            except Exception as solar_err:
+                self._logger.debug(f"No solar data available: {solar_err}")
 
-            self._logger.info(f"Scope 2 calculation for {building_id}: {total_kg_co2e:.2f} kg CO2e")
+            if solar_kwh > 0:
+                grid_factor = self.EMISSION_FACTORS["grid_electricity"]["factor"]
+                solar_offset_kg = solar_kwh * grid_factor
+                breakdown["solar_offset_kg_co2e"] = -round(solar_offset_kg, 2)
+                total_kg_co2e = max(0, total_kg_co2e - solar_offset_kg)
+                breakdown["net_grid_kg_co2e"] = round(total_kg_co2e, 2)
+
+            self._logger.info(
+                f"Scope 2 calculation for {building_id}: {total_kg_co2e:.2f} kg CO2e"
+                f"{f' (solar offset: {solar_kwh:.1f} kWh)' if solar_kwh > 0 else ''}"
+            )
             return total_kg_co2e, breakdown
 
         except Exception as e:
