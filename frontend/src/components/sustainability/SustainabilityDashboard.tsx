@@ -16,6 +16,7 @@ import {
   Badge,
   Flex,
   BarChart,
+  DonutChart,
   ProgressBar,
   Metric,
   BarList,
@@ -141,6 +142,19 @@ export function SustainabilityDashboard({
   const trendLabel = summary?.trend === 'improving' ? 'Improving'
     : summary?.trend === 'worsening' ? 'Worsening' : 'Stable';
 
+  // Current month snapshot for per-system breakdown and data source
+  const currentMonth = summary?.current_month;
+  const dataSource = currentMonth?.data_source;
+
+  // Per-system carbon breakdown data for DonutChart
+  const systemBreakdownData = [
+    { name: 'HVAC', value: currentMonth?.hvac_kg_co2 || 0 },
+    { name: 'Lighting', value: currentMonth?.lighting_kg_co2 || 0 },
+    { name: 'Other Electrical', value: currentMonth?.other_kg_co2 || 0 },
+    { name: 'Diesel (Generators)', value: currentMonth?.scope1_kg_co2 || 0 },
+    { name: 'Water & Waste', value: currentMonth?.scope3_kg_co2 || 0 },
+  ].filter(d => d.value > 0);
+
   // Chart data: monthly emissions stacked by scope
   const chartData = (history?.data || []).map(d => ({
     month: d.month.slice(5), // MM only for compact labels
@@ -184,6 +198,14 @@ export function SustainabilityDashboard({
               >
                 Sustainability & ESG
               </h2>
+              {dataSource && (
+                <Badge
+                  color={dataSource === 'simulation' ? 'blue' : dataSource === 'measured' ? 'green' : 'gray'}
+                  size="xs"
+                >
+                  {dataSource === 'simulation' ? 'Sim Data' : dataSource === 'measured' ? 'Live Data' : 'Estimated'}
+                </Badge>
+              )}
               {isSimulationRunning && (
                 <div className="px-2 py-0.5 rounded text-xs font-medium"
                   style={{
@@ -249,6 +271,11 @@ export function SustainabilityDashboard({
             <span className="text-sm font-normal">kg/sqm</span>
           </Metric>
           <Text className="text-xs mt-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>Current month</Text>
+          {currentMonth?.solar_offset_kg_co2 != null && currentMonth.solar_offset_kg_co2 > 0 && (
+            <Text className="text-xs mt-1" style={{ color: 'var(--color-sentinel-emerald)' }}>
+              Solar offset: -{(currentMonth.solar_offset_kg_co2 / 1000).toFixed(1)}t CO2
+            </Text>
+          )}
         </Card>
 
         <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
@@ -296,6 +323,25 @@ export function SustainabilityDashboard({
           <Text style={{ color: "var(--color-sentinel-text-disabled)" }}>No emissions data available</Text>
         )}
       </Card>
+
+      {/* Per-System Carbon Breakdown */}
+      {systemBreakdownData.length > 0 && (
+        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+          <Title>Carbon by System</Title>
+          <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Source: {dataSource === 'simulation' ? 'Live Simulation' :
+                     dataSource === 'measured' ? 'Metered Data' : 'Estimated'}
+          </Text>
+          <DonutChart
+            className="mt-4 h-48"
+            data={systemBreakdownData}
+            category="value"
+            index="name"
+            colors={['blue', 'amber', 'gray', 'red', 'cyan']}
+            valueFormatter={(v: number) => `${(v / 1000).toFixed(1)}t`}
+          />
+        </Card>
+      )}
 
       {/* Efficiency vs Benchmarks */}
       <Grid className="grid grid-cols-1 lg:grid-cols-2 gap-4">

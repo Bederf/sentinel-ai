@@ -44,6 +44,12 @@ export interface EmissionsSnapshot {
   carbon_intensity_kg_per_sqm: number;
   energy_intensity_kwh_per_sqm: number;
   breakdown_by_system: Record<string, number>;
+  hvac_kg_co2?: number;
+  lighting_kg_co2?: number;
+  other_kg_co2?: number;
+  solar_offset_kg_co2?: number;
+  net_scope2_kg_co2?: number;
+  data_source?: 'estimated' | 'measured' | 'simulation';
 }
 
 export interface EmissionsHistory {
