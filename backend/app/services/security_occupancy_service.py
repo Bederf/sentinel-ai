@@ -136,6 +136,121 @@ class SecurityOccupancyService:
             "last_updated": datetime.now(timezone.utc).isoformat(),
         }
 
+    def get_floor_occupancy(self, floor: str) -> Dict[str, Any]:
+        """Alias for get_occupancy_by_floor — used by API endpoints."""
+        return self.get_occupancy_by_floor(floor)
+
+    def process_access_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle a badge access event and update zone occupancy.
+
+        Args:
+            event_data: Dict with keys: equipment_id, person_id, direction, timestamp, zone_id
+
+        Returns:
+            Dict with processing result including updated occupancy.
+        """
+        zone_id = event_data.get("zone_id", "")
+        direction = event_data.get("direction", "")
+        person_id = event_data.get("person_id", "unknown")
+
+        if not zone_id:
+            logger.warning("process_access_event: missing zone_id, skipping")
+            return {"status": "skipped", "reason": "missing zone_id"}
+
+        if direction not in ("entry", "exit"):
+            logger.warning(f"process_access_event: invalid direction '{direction}', skipping")
+            return {"status": "skipped", "reason": f"invalid direction: {direction}"}
+
+        # Recalculate occupancy after event
+        occ_data = self._calculate_zone_occupancy(zone_id)
+
+        logger.info(
+            f"Access event processed: {person_id} {direction} zone {zone_id}, "
+            f"occupancy now {occ_data['occupancy_count']}"
+        )
+
+        # Check for cross-module triggers
+        hvac_rec = self.check_hvac_adjustment(zone_id)
+        lighting_rec = self.check_lighting_adjustment(zone_id)
+
+        return {
+            "status": "processed",
+            "zone_id": zone_id,
+            "direction": direction,
+            "person_id": person_id,
+            "current_occupancy": occ_data["occupancy_count"],
+            "hvac_recommendation": hvac_rec,
+            "lighting_recommendation": lighting_rec,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+    def get_occupancy_trend(self, zone_id: str, hours: int = 24) -> List[Dict[str, Any]]:
+        """Get hourly occupancy trend data for a zone.
+
+        Queries badge events for the specified time range and returns
+        hourly occupancy snapshots for trending and analysis.
+
+        Args:
+            zone_id: Zone identifier
+            hours: Number of hours to look back (default 24)
+
+        Returns:
+            List of hourly occupancy readings for graphing.
+        """
+        now = datetime.now(timezone.utc)
+        start_time = now - timedelta(hours=hours)
+
+        # Get badge events for time range
+        events = self._repo.get_badge_events(zone_id=zone_id, limit=2000)
+
+        # Filter events to time window
+        filtered_events = []
+        for event in events:
+            ts_str = event.get("timestamp", "")
+            if ts_str:
+                try:
+                    ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    if ts >= start_time:
+                        filtered_events.append(event)
+                except (ValueError, TypeError):
+                    continue
+
+        # Build hourly buckets
+        hourly_data: List[Dict[str, Any]] = []
+        for h in range(hours):
+            bucket_start = start_time + timedelta(hours=h)
+            bucket_end = bucket_start + timedelta(hours=1)
+
+            # Count entries and exits in this hour
+            entries = 0
+            exits = 0
+            for event in filtered_events:
+                ts_str = event.get("timestamp", "")
+                try:
+                    ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    if bucket_start <= ts < bucket_end:
+                        if event.get("direction") == "entry" and event.get("granted", True):
+                            entries += 1
+                        elif event.get("direction") == "exit" and event.get("granted", True):
+                            exits += 1
+                except (ValueError, TypeError):
+                    continue
+
+            # Net occupancy for this hour
+            net_occupancy = max(0, entries - exits)
+
+            hourly_data.append(
+                {
+                    "hour": bucket_start.isoformat(),
+                    "entries": entries,
+                    "exits": exits,
+                    "net_occupancy": net_occupancy,
+                    "zone_id": zone_id,
+                }
+            )
+
+        return hourly_data
+
     # --- Cross-module coordination ---
 
     def check_hvac_adjustment(
