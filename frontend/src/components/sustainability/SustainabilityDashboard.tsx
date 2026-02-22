@@ -14,6 +14,7 @@ import {
   Text,
   Grid,
   Badge,
+  Button,
   Flex,
   BarChart,
   DonutChart,
@@ -241,20 +242,36 @@ export function SustainabilityDashboard({
           </div>
         </div>
 
-        {/* Building Selector */}
-        {!sitesLoading && sites.length > 0 && (
-          <Select
-            value={selectedSiteId}
-            onValueChange={setSelectedSiteId}
-            className="w-56"
+        {/* Building Selector + Export Buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {!sitesLoading && sites.length > 0 && (
+            <Select
+              value={selectedSiteId}
+              onValueChange={setSelectedSiteId}
+              className="w-56"
+            >
+              {sites.map((site) => (
+                <SelectItem key={site.id} value={site.id}>
+                  {site.name}
+                </SelectItem>
+              ))}
+            </Select>
+          )}
+          <Button
+            size="xs"
+            variant="secondary"
+            onClick={() => window.open(`/api/sustainability/${selectedSiteId}/report/export?format=csv&months=12`)}
           >
-            {sites.map((site) => (
-              <SelectItem key={site.id} value={site.id}>
-                {site.name}
-              </SelectItem>
-            ))}
-          </Select>
-        )}
+            Export CSV
+          </Button>
+          <Button
+            size="xs"
+            variant="secondary"
+            onClick={() => window.open(`/api/sustainability/${selectedSiteId}/report/export?format=html&months=12`)}
+          >
+            Export Report
+          </Button>
+        </div>
       </div>
 
       {/* KPI Row */}

@@ -11,11 +11,14 @@
 8. GET /buildings/{building_id}/emissions/forecast - 12-month projection
 """
 
+import csv
+import io
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 from app.api.dependencies.module_access import require_active_module
@@ -803,4 +806,102 @@ async def get_emissions_forecast(building_id: str):
 
     except Exception as e:
         logger.error(f"Error generating forecast: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{site_id}/report/export")
+async def export_sustainability_report(
+    site_id: str,
+    format: str = Query("csv", pattern="^(csv|html)$"),
+    months: int = Query(12, ge=1, le=36),
+):
+    """Export sustainability report as CSV or HTML."""
+    try:
+        if format == "csv":
+            history = sustainability_service.get_emissions_history(site_id, months)
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(
+                [
+                    "Month",
+                    "Scope 1 (kg CO2)",
+                    "Scope 2 (kg CO2)",
+                    "Scope 3 (kg CO2)",
+                    "Total (kg CO2)",
+                    "Grid kWh",
+                    "Diesel L",
+                    "HVAC CO2",
+                    "Lighting CO2",
+                    "Other CO2",
+                    "Solar Offset CO2",
+                    "Data Source",
+                ]
+            )
+            for snap in history:
+                d = snap.to_dict() if hasattr(snap, "to_dict") else snap
+                writer.writerow(
+                    [
+                        d.get("month"),
+                        d.get("scope1_kg_co2", 0),
+                        d.get("scope2_kg_co2", 0),
+                        d.get("scope3_kg_co2", 0),
+                        d.get("scope1_kg_co2", 0) + d.get("scope2_kg_co2", 0) + d.get("scope3_kg_co2", 0),
+                        d.get("grid_kwh", 0),
+                        d.get("diesel_litres", 0),
+                        d.get("hvac_kg_co2", 0),
+                        d.get("lighting_kg_co2", 0),
+                        d.get("other_kg_co2", 0),
+                        d.get("solar_offset_kg_co2", 0),
+                        d.get("data_source", "estimated"),
+                    ]
+                )
+            output.seek(0)
+            return StreamingResponse(
+                output,
+                media_type="text/csv",
+                headers={"Content-Disposition": f"attachment; filename=sustainability_{site_id}_{months}m.csv"},
+            )
+
+        elif format == "html":
+            summary = sustainability_service.get_summary(site_id)
+            green_star = sustainability_service.get_green_star_assessment(site_id)
+            efficiency = sustainability_service.get_efficiency_metrics(site_id)
+
+            gs_dict = green_star.to_dict() if hasattr(green_star, "to_dict") else green_star
+            ytd_tonnes = summary.get("ytd", {}).get("total_co2_tonnes", 0)
+            carbon_intensity = summary.get("carbon_intensity_kg_per_sqm", 0)
+            energy_intensity = summary.get("energy_intensity_kwh_per_sqm", 0)
+            gs_achieved = gs_dict.get("total_achieved", 0)
+            gs_max = gs_dict.get("total_max", 118)
+            eff_intensity = efficiency.get("energy_intensity_kwh_per_sqm_yr", 0)
+
+            html = f"""<!DOCTYPE html>
+<html><head><title>Sustainability Report - {site_id}</title>
+<style>
+body{{font-family:Arial,sans-serif;margin:40px;color:#333}}
+table{{border-collapse:collapse;width:100%}}
+th,td{{border:1px solid #ddd;padding:8px;text-align:left}}
+th{{background:#f5f5f5}}
+.kpi{{display:inline-block;margin:10px;padding:20px;border:1px solid #ddd;border-radius:8px;text-align:center}}
+.kpi h3{{margin:0;font-size:24px}}
+.kpi p{{margin:4px 0 0;color:#666}}
+hr{{border:none;border-top:1px solid #ddd;margin:20px 0}}
+</style>
+</head><body>
+<h1>SENTINEL Sustainability Report</h1>
+<p>Site: {site_id} | Generated: {datetime.now().strftime("%Y-%m-%d %H:%M")}</p>
+<hr>
+<h2>Key Performance Indicators</h2>
+<div class="kpi"><h3>{ytd_tonnes:.1f}t</h3><p>YTD CO2 Emissions</p></div>
+<div class="kpi"><h3>{carbon_intensity:.2f}</h3><p>kg CO2/m2/month</p></div>
+<div class="kpi"><h3>{energy_intensity:.0f}</h3><p>kWh/m2/year (EUI)</p></div>
+<h2>Green Star SA Progress</h2>
+<p>Score: {gs_achieved}/{gs_max} points</p>
+<h2>Benchmarks</h2>
+<p>Energy intensity: {eff_intensity:.0f} kWh/m2/yr (SA typical: 170, efficient: 120)</p>
+</body></html>"""
+            return HTMLResponse(content=html)
+
+    except Exception as e:
+        logger.error(f"Error exporting sustainability report: {e}")
         raise HTTPException(status_code=500, detail=str(e))
