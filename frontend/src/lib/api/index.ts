@@ -231,6 +231,13 @@ export {
   type ErrorLogResponse,
   type HealthHistoryData,
 } from './system';
+export {
+  aegisApi,
+  type AegisDecision,
+  type AegisDashboardKpis,
+  type AegisDashboardFilters,
+  type AegisDashboardResponse,
+} from './aegis';
 
 // Legacy: import everything from original api.ts for backward compatibility
 // This provides fallback for any APIs not yet migrated to modular structure

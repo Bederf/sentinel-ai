@@ -56,12 +56,12 @@ export function SecurityDashboard() {
     try {
       if (showRefreshing) setIsRefreshing(true);
 
-      const statusResult = await securityApi.getStatus();
+      const statusResult = await securityApi.getStatus(selectedSiteId);
       // Stagger subsequent requests by 250ms to avoid 429 rate limiting
       await new Promise((resolve) => setTimeout(resolve, 250));
-      const camerasResult = await securityApi.getCameras();
+      const camerasResult = await securityApi.getCameras(selectedSiteId);
       await new Promise((resolve) => setTimeout(resolve, 250));
-      const alarmsResult = await securityApi.getAlarmZones();
+      const alarmsResult = await securityApi.getAlarmZones(selectedSiteId);
 
       setStatus(statusResult);
       setCameras(camerasResult.cameras);
@@ -77,7 +77,7 @@ export function SecurityDashboard() {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [selectedSiteId]);
 
   // Fetch sites on mount
   useEffect(() => {
@@ -622,10 +622,10 @@ export function SecurityDashboard() {
         </div>
 
         {/* Section 2: Security Anomalies */}
-        <SecurityAnomaliesPanel refreshKey={refreshKey} />
+        <SecurityAnomaliesPanel siteId={selectedSiteId} refreshKey={refreshKey} />
 
         {/* Section 3: Access Events */}
-        <AccessEventsPanel refreshKey={refreshKey} />
+        <AccessEventsPanel siteId={selectedSiteId} refreshKey={refreshKey} />
 
         {/* Section 4: Camera & Alarm Status (2-column grid) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -885,7 +885,7 @@ export function SecurityDashboard() {
         </div>
 
         {/* Section 4: Occupancy */}
-        <SecurityOccupancyPanel refreshKey={refreshKey} />
+        <SecurityOccupancyPanel siteId={selectedSiteId} refreshKey={refreshKey} />
       </div>
     </div>
   );

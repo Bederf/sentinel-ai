@@ -14,6 +14,7 @@ from pathlib import Path
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
+from app.config.settings import settings
 from app.services.audit_logger import AuditLogger
 from app.services.ai_optimizer import get_ai_optimizer
 from app.models.optimization import OptimizationStatus
@@ -1243,16 +1244,24 @@ class BackgroundSchedulerService:
             import httpx
 
             logger.debug("Processing pending Sentry notifications...")
+            sentry_secret = (settings.sentry_webhook_secret or "").strip()
+            if settings.is_live_mode and not sentry_secret:
+                logger.error("SENTRY_WEBHOOK_SECRET is required in live mode; skipping Sentry notification job cycle")
+                return
 
             # Call the endpoint to process pending notifications
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
+            base_url = (settings.backend_url or "http://localhost:9095").rstrip("/")
+            headers = {"X-Sentry-Secret": sentry_secret} if sentry_secret else {}
+            if settings.sentry_bot_api_key:
+                headers["X-Sentry-API-Key"] = settings.sentry_bot_api_key
 
             async def process():
                 async with httpx.AsyncClient(timeout=10) as client:
                     response = await client.post(
-                        "http://localhost:9095/api/sentry/process-pending-notifications",
-                        headers={"X-Sentry-Secret": "sentry-bms-phase-41"},
+                        f"{base_url}/api/sentry/process-pending-notifications",
+                        headers=headers,
                     )
                     return response.json()
 

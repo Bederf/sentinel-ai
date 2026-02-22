@@ -13,6 +13,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 import httpx
 
+from app.config.settings import settings
 from app.database.repositories.service_record_repository import ServiceRecordRepository
 from app.database.repositories.work_order_repository import get_work_order_repository
 from app.services.ml_template_service import MLTemplateService
@@ -310,6 +311,8 @@ class WorkOrderNotifier:
             email_body = self._build_email_body(work_order_data, service_record, work_order)
 
             # Call Sentry bot email endpoint
+            sentry_secret = (settings.sentry_webhook_secret or "").strip()
+            headers = {"X-Sentry-Secret": sentry_secret} if sentry_secret else {}
             async with httpx.AsyncClient(timeout=10) as client:
                 response = await client.post(
                     f"{self.sentry_api_url}/send-email",  # Sentry email endpoint
@@ -320,7 +323,7 @@ class WorkOrderNotifier:
                         "service_record_code": service_record.get("code", ""),
                         "work_order_id": work_order_data.get("work_order_id", ""),
                     },
-                    headers={"X-Sentry-Secret": "sentry-bms-phase-41"},
+                    headers=headers,
                 )
 
                 if response.status_code == 200:

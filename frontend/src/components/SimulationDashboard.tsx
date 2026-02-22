@@ -870,9 +870,9 @@ function AnalyticsTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: str
   const allEventTypes = Array.from(new Set(events.map((e) => e.event_type)));
 
   // Collect all flags & recommendations across profiles
-  const allFlags = profileKeys.flatMap((k) => profileResults[k].flags);
+  const allFlags = profileKeys.flatMap((k) => profileResults[k]?.flags ?? []);
   const allRecs = profileKeys.flatMap((k) =>
-    profileResults[k].recommendations.map((r) => ({
+    (profileResults[k]?.recommendations ?? []).map((r) => ({
       profile: PROFILE_LABELS[k] ?? k,
       text: r,
     }))
@@ -1117,7 +1117,7 @@ function AnalyticsTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: str
                             </td>
                             {profileKeys.map((k) => {
                               const score =
-                                profileResults[k].component_scores[dim] ?? 0;
+                                profileResults[k]?.component_scores?.[dim] ?? 0;
                               return (
                                 <td
                                   key={k}
@@ -1147,7 +1147,7 @@ function AnalyticsTab({ selectedSiteId: _selectedSiteId }: { selectedSiteId: str
                             className="text-right px-4 py-2 font-mono font-bold"
                             style={{ color: profileColor(k) }}
                           >
-                            {profileResults[k].overall_score.toFixed(1)}
+                            {(profileResults[k]?.overall_score ?? 0).toFixed(1)}
                           </td>
                         ))}
                       </tr>

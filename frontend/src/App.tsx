@@ -38,6 +38,7 @@ import { WaterPanel } from "./components/water";
 import { ContractManagementPage } from "./pages/ContractManagementPage";
 import { BudgetReportPage } from "./pages/BudgetReportPage";
 import { ProfitabilityDashboardPage } from "./pages/ProfitabilityDashboardPage";
+import { AegisConsolePage } from "./pages/AegisConsolePage";
 import { ModularDashboard } from "./components/modules/ModularDashboard";
 import { SolarConfigWizard } from "./components/wizards/SolarConfigWizard";
 import { ModuleProvider } from "./contexts/ModuleContext";
@@ -827,6 +828,10 @@ function App() {
           ) : currentView === "simulation" ? (
             <div className="h-full overflow-y-auto">
               <SimulationDashboard />
+            </div>
+          ) : currentView === "aegis" ? (
+            <div className="h-full overflow-y-auto">
+              <AegisConsolePage />
             </div>
           ) : currentView === "sustainability" ? (
             <div className="h-full overflow-y-auto">

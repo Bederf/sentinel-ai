@@ -9,12 +9,12 @@ Central service for creating equipment alerts with:
 Phase: Demo Flow - Equipment Warning State with Notifications
 """
 
-import uuid
 import logging
-from typing import Dict, Any, Optional
+import uuid
+from typing import Any
 
-from app.database.supabase_client import get_supabase_client
 from app.database.repositories.alert_repository import AlertRepository
+from app.database.supabase_client import get_supabase_client
 from app.services.sentry_integration.alert_notifier import alert_notifier
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ class EquipmentAlertService:
         message: str,
         alert_type: str = "health_degradation",
         notify_telegram: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Create an alert for equipment and optionally send Telegram notification.
 
@@ -51,16 +51,21 @@ class EquipmentAlertService:
         Returns:
             Dict with created alert data and notification status
         """
-        # Get equipment details
+        # Get equipment details (accepts UUID or equipment code)
         equipment = self._get_equipment(equipment_id)
         if not equipment:
             return {"error": f"Equipment {equipment_id} not found"}
 
-        # Get building details
+        # Resolve building to UUID (accepts UUID or site/building code)
         building = self._get_building(building_id)
+        if not building and equipment.get("building_id"):
+            building = self._get_building(str(equipment.get("building_id")))
+
+        resolved_building_id = building.get("id") if building else equipment.get("building_id", building_id)
         building_name = building.get("name", "Unknown") if building else "Unknown"
 
         # Use equipment code as primary identifier
+        resolved_equipment_id = equipment.get("id", equipment_id)
         equipment_code = equipment.get("code", "UNKNOWN")
         equipment_type = equipment.get("type", "equipment").upper()
 
@@ -68,8 +73,8 @@ class EquipmentAlertService:
         alert_id = str(uuid.uuid4())
         alert_data = {
             "id": alert_id,
-            "building_id": building_id,
-            "equipment_id": equipment_id,
+            "building_id": resolved_building_id,
+            "equipment_id": resolved_equipment_id,
             "type": alert_type,
             "severity": severity,
             "status": "active",
@@ -83,7 +88,7 @@ class EquipmentAlertService:
             logger.info(f"Created alert {alert_id} for equipment {equipment.get('name')}")
         except Exception as e:
             logger.error(f"Failed to create alert: {e}")
-            return {"error": f"Failed to create alert: {str(e)}"}
+            return {"error": f"Failed to create alert: {e!s}"}
 
         # Send Telegram notification
         telegram_sent = False
@@ -114,8 +119,8 @@ class EquipmentAlertService:
             "building_name": building_name,
         }
 
-    def _get_equipment(self, equipment_id: str) -> Optional[Dict[str, Any]]:
-        """Get equipment by UUID."""
+    def _get_equipment(self, equipment_id: str) -> dict[str, Any] | None:
+        """Get equipment by UUID or code."""
         try:
             response = (
                 self.supabase.table("equipment")
@@ -123,6 +128,13 @@ class EquipmentAlertService:
                 .eq("id", equipment_id)
                 .execute()
             )
+            if not response.data:
+                response = (
+                    self.supabase.table("equipment")
+                    .select("id, code, name, type, health_score, building_id")
+                    .eq("code", equipment_id)
+                    .execute()
+                )
             if not response.data:
                 return None
             equipment = response.data[0]
@@ -145,10 +157,13 @@ class EquipmentAlertService:
             return f"Level {level} Zone {zone_letter}"
         return "Building"
 
-    def _get_building(self, building_id: str) -> Optional[Dict[str, Any]]:
-        """Get building by UUID."""
+    def _get_building(self, building_id: str) -> dict[str, Any] | None:
+        """Get building by UUID or building/site code."""
         try:
             response = self.supabase.table("buildings").select("id, code, name").eq("id", building_id).execute()
+            if response.data:
+                return response.data[0]
+            response = self.supabase.table("buildings").select("id, code, name").eq("code", building_id).execute()
             return response.data[0] if response.data else None
         except Exception as e:
             logger.error(f"Failed to get building: {e}")
@@ -184,7 +199,7 @@ class EquipmentAlertService:
 
 
 # Singleton instance
-_service_instance: Optional[EquipmentAlertService] = None
+_service_instance: EquipmentAlertService | None = None
 
 
 def get_equipment_alert_service() -> EquipmentAlertService:

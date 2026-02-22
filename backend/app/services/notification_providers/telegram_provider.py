@@ -10,6 +10,7 @@ import subprocess
 import logging
 
 from .base_provider import BaseNotificationProvider, NotificationResult
+from app.services.sentry_integration.config import get_sentry_bot_cli
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class TelegramProvider(BaseNotificationProvider):
     def __init__(self):
         self.bot_token = os.getenv("SENTRY_BOT_TOKEN", "")
         self.webhook_secret = os.getenv("SENTRY_WEBHOOK_SECRET", "")
+        self._cli_command = get_sentry_bot_cli()
 
     @property
     def channel_name(self) -> str:
@@ -36,10 +38,10 @@ class TelegramProvider(BaseNotificationProvider):
     async def test_connection(self) -> bool:
         """Test if sentrybot CLI is available."""
         try:
-            result = subprocess.run(["sentrybot", "--version"], capture_output=True, timeout=5)
+            result = subprocess.run([self._cli_command, "--version"], capture_output=True, timeout=5)
             return result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired):
-            logger.warning("sentrybot CLI not available")
+            logger.warning("%s CLI not available", self._cli_command)
             return False
 
     async def send(self, recipient: str, title: str, body: str, **kwargs) -> NotificationResult:
@@ -68,7 +70,7 @@ class TelegramProvider(BaseNotificationProvider):
             # Call sentrybot
             result = subprocess.run(
                 [
-                    "sentrybot",
+                    self._cli_command,
                     "message",
                     "send",
                     "--channel",
@@ -100,11 +102,11 @@ class TelegramProvider(BaseNotificationProvider):
 
         except subprocess.TimeoutExpired:
             return NotificationResult(
-                success=False, error_code="timeout", error_message="sentrybot request timed out after 30 seconds"
+                success=False, error_code="timeout", error_message="sentry bot request timed out after 30 seconds"
             )
         except FileNotFoundError:
             return NotificationResult(
-                success=False, error_code="not_found", error_message="sentrybot CLI not found in PATH"
+                success=False, error_code="not_found", error_message=f"{self._cli_command} CLI not found in PATH"
             )
         except Exception as e:
             logger.error(f"Telegram provider error: {e}")

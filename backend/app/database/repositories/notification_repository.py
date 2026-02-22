@@ -26,6 +26,8 @@ from app.models.notification import (
 )
 
 logger = logging.getLogger(__name__)
+SYSTEM_NOTIFIER_TECHNICIAN_ID = UUID("00000000-0000-0000-0000-000000000001")
+SYSTEM_NOTIFIER_TECHNICIAN_CODE = "TECH-SYSTEM-NOTIFIER"
 
 
 class NotificationRepository:
@@ -323,6 +325,40 @@ class NotificationRepository:
 
     # ========== Notification Delivery Logs ==========
 
+    def _resolve_delivery_log_technician_id(self, technician_id: UUID) -> UUID:
+        """Resolve delivery-log technician ID with FK-safe system notifier fallback."""
+        if self.use_json:
+            return technician_id
+
+        if technician_id not in (UUID(int=0), SYSTEM_NOTIFIER_TECHNICIAN_ID):
+            return technician_id
+
+        try:
+            existing = (
+                self.client.table("technicians")
+                .select("id")
+                .eq("code", SYSTEM_NOTIFIER_TECHNICIAN_CODE)
+                .limit(1)
+                .execute()
+            )
+            if existing.data:
+                return UUID(existing.data[0]["id"])
+
+            self.client.table("technicians").insert(
+                {
+                    "id": str(SYSTEM_NOTIFIER_TECHNICIAN_ID),
+                    "code": SYSTEM_NOTIFIER_TECHNICIAN_CODE,
+                    "name": "System Notifier",
+                    "email": "system-notifier@sentinel.local",
+                    "phone": None,
+                    "active": True,
+                }
+            ).execute()
+            return SYSTEM_NOTIFIER_TECHNICIAN_ID
+        except Exception as e:
+            logger.warning("Failed to ensure system notifier technician row: %s", e)
+            return technician_id
+
     async def create_delivery_log(self, log: NotificationDeliveryLog) -> NotificationDeliveryLog:
         """Create a notification delivery log entry.
 
@@ -342,9 +378,10 @@ class NotificationRepository:
             return log
 
         try:
-            result = (
-                self.client.table("notification_delivery_log").insert(self._delivery_log_model_to_dict(log)).execute()
-            )
+            payload = self._delivery_log_model_to_dict(log)
+            payload["technician_id"] = str(self._resolve_delivery_log_technician_id(log.technician_id))
+
+            result = self.client.table("notification_delivery_log").insert(payload).execute()
             if result.data and len(result.data) > 0:
                 return self._delivery_log_dict_to_model(result.data[0])
             return log

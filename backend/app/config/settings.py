@@ -92,6 +92,7 @@ class Settings(BaseSettings):
 
     # Sentry bot API key (for authenticated access to /api/sites/* endpoints)
     sentry_bot_api_key: str = Field(default="", validation_alias="SENTRY_BOT_API_KEY")
+    sentry_bot_cli: str = Field(default="sentrybot", validation_alias="SENTRY_BOT_CLI")
 
     # SIMBIOT Concept Evolution (FSI Public API) credentials
     simbiot_api_key: str = ""

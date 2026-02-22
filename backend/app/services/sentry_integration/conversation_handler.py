@@ -14,12 +14,23 @@ Handles the conversation flow AFTER technician replies "done":
 
 import requests
 import json
+import os
 from typing import Dict, Any, Optional, List
 from enum import Enum
 
 
-BMS_API_URL = "http://localhost:9095"  # SENTINEL BMS Backend
-SENTRY_SECRET = "sentry-bms-phase-41"
+BMS_API_URL = os.getenv("SENTINEL_API_URL", "http://localhost:9095")  # SENTINEL BMS Backend
+SENTRY_SECRET = (os.getenv("SENTRY_WEBHOOK_SECRET", "") or "").strip()
+SENTRY_API_KEY = (os.getenv("SENTRY_BOT_API_KEY", "") or "").strip()
+
+
+def _auth_headers() -> dict[str, str]:
+    if not SENTRY_SECRET:
+        raise RuntimeError("SENTRY_WEBHOOK_SECRET is required for /api/sentry requests")
+    headers = {"X-Sentry-Secret": SENTRY_SECRET}
+    if SENTRY_API_KEY:
+        headers["X-Sentry-API-Key"] = SENTRY_API_KEY
+    return headers
 
 
 class ReplyType(Enum):
@@ -53,7 +64,7 @@ class WOConversationHandler:
                     "message_type": "text",
                     "content": "done",
                 },
-                headers={"X-Sentry-Secret": SENTRY_SECRET},
+                headers=_auth_headers(),
                 timeout=10,
             )
 
@@ -100,7 +111,7 @@ class WOConversationHandler:
                     "message_type": message_type,
                     "content": file_info,
                 },
-                headers={"X-Sentry-Secret": SENTRY_SECRET},
+                headers=_auth_headers(),
                 timeout=30,  # Allow longer for file uploads
             )
 
@@ -145,7 +156,7 @@ class WOConversationHandler:
         try:
             response = requests.get(
                 f"{BMS_API_URL}/api/sentry/work-order/status/{self.service_record_code}",
-                headers={"X-Sentry-Secret": SENTRY_SECRET},
+                headers=_auth_headers(),
                 timeout=10,
             )
 

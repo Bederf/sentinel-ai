@@ -4,7 +4,7 @@ type: "guide"
 status: "approved"
 version: "1.0.0"
 created: "2026-01-30"
-updated: "2026-02-21"
+updated: "2026-02-22"
 author: "Sentinel Development Team"
 tags: ["documentation", "overview"]
 domain: "general"
@@ -128,6 +128,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 ### 🛡️ Safety & Compliance
 - [Safety Interlocks Engine](06-safety-compliance/safety-interlocks-engine.md) - Safety validation
 - [Audit Logging](06-safety-compliance/audit-logging.md) - Device control, login, and decision pipeline audit trail
+- [AEGIS Phase 1 Entry Gate](06-safety-compliance/aegis-phase1-entry-gate.md) - Mandatory readiness and sign-off checklist before enabling BESS writes
 - **[Data Privacy & Security Architecture](SECURITY-PRIVACY.md)** - Data sovereignty, local AI, air-gapped deployment, POPIA compliance
 
 ### 🔒 Security & Governance
@@ -151,6 +152,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Asset Workflow Architecture](05-integrations/asset-workflow-architecture.md)** - SIMBIOT + Baseline + Inspection + ML integration (Phase 53-01)
 - **[Asset Lifecycle State Machine](05-integrations/asset-lifecycle-state-machine.md)** - 13 states from onboarding to monitoring (Phase 53-01)
 - **[Workflow Triggers & Automation](05-integrations/workflow-triggers.md)** - 5 automated triggers for ML → Inspection → Repair → Validation (Phase 53-02)
+- [AEGIS Site-002 Discovery](05-integrations/aegis-site-002-discovery.md) - Site-level BESS control boundaries, interfaces, and pre-live confirmation points
 
 ### 📦 Modules
 - [Module Registry](13-modules/module-registry.md) - Bolt-on module system architecture
@@ -167,6 +169,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 ### 🔧 Operations
 - **[Monitoring Stack](10-operations/monitoring-stack.md)** - Loki + Promtail + Grafana deployment, config management, scrape jobs, dashboard provisioning
+- [AEGIS Phase 0 Daily Ops Runbook](10-operations/aegis-phase0-daily-ops.md) - Daily governance, queue, tripwire, and evidence workflow for 0A/0B
 
 ### 🩺 Troubleshooting
 - [ML Model Health](05-troubleshooting/ml-model-health.md) - ML model issues

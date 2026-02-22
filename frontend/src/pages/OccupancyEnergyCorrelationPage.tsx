@@ -238,14 +238,15 @@ export function OccupancyEnergyCorrelationPage() {
               <LineChart data={correlationData.hourly_data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis dataKey="time" stroke="#9CA3AF" />
-                <YAxis stroke="#9CA3AF" />
+                <YAxis yAxisId="left" stroke="#3B82F6" unit="%" />
+                <YAxis yAxisId="right" orientation="right" stroke="#EF4444" unit=" kWh" />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: '#1F2937',
                     border: '1px solid #374151',
                     borderRadius: '4px',
                   }}
-                  formatter={(value: any) => value.toFixed(2)}
+                  formatter={(value: any) => typeof value === 'number' ? value.toFixed(2) : value}
                 />
                 <Legend />
                 <Line type="monotone" dataKey="occupancy_percent" stroke="#3B82F6" name="Occupancy %" yAxisId="left" />

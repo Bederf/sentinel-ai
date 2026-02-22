@@ -30,6 +30,7 @@ export const USER_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
       'integrations',        // Base: System Health
       'control-audit',       // Base: Audit Logs (part of base package for all users)
       'solar',               // Add-on: Solar & BESS (their focus module)
+      'aegis',               // Add-on: AEGIS BESS ops console
       'control',             // Add-on: Building Controls (needed for solar control)
       'settings',            // Internal: password-protected module management
     ],

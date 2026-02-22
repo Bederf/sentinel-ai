@@ -260,7 +260,7 @@ export function InverterStatusMatrix({ siteId }: InverterStatusMatrixProps) {
                         background: "var(--color-sentinel-bg-secondary)",
                         border: getStatusBorder(inv.status),
                       }}
-                      title={`${inv.name}: ${inv.current_power_kw.toFixed(1)} kW (${inv.status})`}
+                      title={`${inv.name}: ${(inv.current_power_kw ?? 0).toFixed(1)} kW (${inv.status})`}
                     >
                       {/* Status dot */}
                       <div className="flex justify-center mb-1">
@@ -281,7 +281,7 @@ export function InverterStatusMatrix({ siteId }: InverterStatusMatrixProps) {
                         className="text-[10px] font-semibold"
                         style={{ color: getStatusColor(inv.status) }}
                       >
-                        {inv.current_power_kw.toFixed(0)}
+                        {(inv.current_power_kw ?? 0).toFixed(0)}
                       </div>
                       <div className="text-[8px]" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                         kW
@@ -330,7 +330,7 @@ export function InverterStatusMatrix({ siteId }: InverterStatusMatrixProps) {
                 <span className="text-[10px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>Power</span>
               </div>
               <div className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                {selectedInverter.current_power_kw.toFixed(1)} / {selectedInverter.rated_power_kw} kW
+                {(selectedInverter.current_power_kw ?? 0).toFixed(1)} / {selectedInverter.rated_power_kw ?? 0} kW
               </div>
             </div>
             <div className="p-2 rounded" style={{ background: "rgba(0,0,0,0.2)" }}>
@@ -347,7 +347,7 @@ export function InverterStatusMatrix({ siteId }: InverterStatusMatrixProps) {
                     : "var(--color-sentinel-red)",
                 }}
               >
-                {selectedInverter.efficiency_percent.toFixed(1)}%
+                {(selectedInverter.efficiency_percent ?? 0).toFixed(1)}%
               </div>
             </div>
             <div className="p-2 rounded" style={{ background: "rgba(0,0,0,0.2)" }}>
@@ -356,7 +356,7 @@ export function InverterStatusMatrix({ siteId }: InverterStatusMatrixProps) {
                 <span className="text-[10px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>Temp</span>
               </div>
               <div className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                {selectedInverter.temperature_c.toFixed(0)}&deg;C
+                {(selectedInverter.temperature_c ?? 0).toFixed(0)}&deg;C
               </div>
             </div>
             <div className="p-2 rounded" style={{ background: "rgba(0,0,0,0.2)" }}>
@@ -365,7 +365,7 @@ export function InverterStatusMatrix({ siteId }: InverterStatusMatrixProps) {
                 <span className="text-[10px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>Daily Yield</span>
               </div>
               <div className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                {selectedInverter.daily_yield_kwh.toFixed(0)} kWh
+                {(selectedInverter.daily_yield_kwh ?? 0).toFixed(0)} kWh
               </div>
             </div>
           </div>

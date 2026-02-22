@@ -14,14 +14,18 @@ Manager control additions:
 """
 
 import base64
+import hmac
 import logging
+import os
 import httpx
 from fastapi import APIRouter, HTTPException, status, Header, Request, Query
 
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 
+from app.config.settings import settings
 from app.services.sentry_integration.work_order_notifier import work_order_notifier
+from app.services.sentry_integration.config import get_sentry_webhook_secret
 from app.services.ocr_service import get_ocr_service
 from app.services.sentry_integration.ocr_correction_handler import get_ocr_correction_handler
 from app.database.repositories.service_record_repository import ServiceRecordRepository
@@ -32,6 +36,34 @@ router = APIRouter(prefix="/api/sentry", tags=["sentry"])
 
 # Equipment types blocked from remote reset (safety-critical)
 RESET_BLOCKED_TYPES = {"FIRE", "GEN"}
+
+
+def _require_sentry_secret(
+    provided_secret: Optional[str],
+    *,
+    endpoint_name: str,
+    allow_public_in_simulation: bool = False,
+) -> None:
+    """Validate Sentry webhook secret with live-mode fail-closed behavior."""
+    configured_secret = get_sentry_webhook_secret()
+
+    # Backward-compatible fallback: allow env var in simulation only.
+    if not configured_secret and not settings.is_live_mode:
+        configured_secret = (os.getenv("SENTRY_WEBHOOK_SECRET", "") or "").strip()
+
+    if not configured_secret:
+        if settings.is_live_mode:
+            logger.error("Missing SENTRY_WEBHOOK_SECRET in live mode for endpoint %s", endpoint_name)
+            raise HTTPException(status_code=503, detail="Sentry integration misconfigured")
+        if allow_public_in_simulation:
+            return
+        return
+
+    if allow_public_in_simulation and not settings.is_live_mode and not provided_secret:
+        return
+
+    if not provided_secret or not hmac.compare_digest(provided_secret, configured_secret):
+        raise HTTPException(status_code=403, detail="Unauthorized")
 
 
 class EquipmentResetRequest(BaseModel):
@@ -62,9 +94,7 @@ async def handle_work_order_response(
         - collected_items: List of collected items
         - is_complete: Whether data collection is complete
     """
-    # Verify Sentry secret (simple auth)
-    if x_sentry_secret and x_sentry_secret != "sentry-bms-webhooks":
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    _require_sentry_secret(x_sentry_secret, endpoint_name="work_order_response")
 
     # Required fields
     required_fields = ["service_record_code", "telegram_user_id", "message_type"]
@@ -126,9 +156,7 @@ async def notify_technician_of_work_order(
         - success: bool
         - service_record_code: Generated code
     """
-    # Verify auth
-    if x_sentry_secret and x_sentry_secret != "sentry-bms-webhooks":
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    _require_sentry_secret(x_sentry_secret, endpoint_name="work_order_notify")
 
     # Required fields
     required_fields = [
@@ -210,9 +238,7 @@ async def reset_equipment_fault(
         - equipment_name: str
         - predictions_resolved: int
     """
-    # Verify auth
-    if x_sentry_secret and x_sentry_secret != "sentry-bms-webhooks":
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    _require_sentry_secret(x_sentry_secret, endpoint_name="equipment_reset")
 
     equipment_code = request.equipment_code
 
@@ -352,9 +378,7 @@ async def process_service_sheet_ocr(
         - pipeline_info: Confidence scores and issues
         - correction_prompt: First correction prompt (if needs_review)
     """
-    # Verify auth
-    if x_sentry_secret and x_sentry_secret != "sentry-bms-webhooks":
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    _require_sentry_secret(x_sentry_secret, endpoint_name="ocr_process_service_sheet")
 
     # Decode image
     try:
@@ -410,9 +434,7 @@ async def submit_ocr_correction(
 
     Returns next correction prompt or completion status.
     """
-    # Verify auth
-    if x_sentry_secret and x_sentry_secret != "sentry-bms-webhooks":
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    _require_sentry_secret(x_sentry_secret, endpoint_name="ocr_correction")
 
     correction_handler = get_ocr_correction_handler()
 
@@ -464,9 +486,11 @@ async def get_pending_work_orders(
     Returns:
         List of pending service records ready for notification
     """
-    # Sentry bot authentication via header (optional - endpoint is public)
-    if x_sentry_secret and x_sentry_secret != "sentry-bms-webhooks":
-        logger.warning(f"Invalid Sentry secret provided: {x_sentry_secret[:10]}...")
+    _require_sentry_secret(
+        x_sentry_secret,
+        endpoint_name="work_order_pending",
+        allow_public_in_simulation=True,
+    )
 
     service_repo = ServiceRecordRepository()
 
@@ -515,8 +539,7 @@ async def process_pending_sentry_notifications(
     Status transitions must occur from real technician interaction
     (e.g., "done" reply via /work-order/response).
     """
-    if x_sentry_secret and x_sentry_secret != "sentry-bms-webhooks":
-        logger.warning(f"Invalid Sentry secret for process-pending: {x_sentry_secret[:10]}...")
+    _require_sentry_secret(x_sentry_secret, endpoint_name="process_pending_notifications")
 
     service_repo = ServiceRecordRepository()
     try:

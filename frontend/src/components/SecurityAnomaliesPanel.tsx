@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { AlertTriangle, Clock, Activity } from "lucide-react";
-import { authorizedFetch } from "../lib/api/client";
+import { securityApi } from "../lib/api";
 
 export interface SecurityAnomaly {
   type: string;
@@ -16,10 +16,12 @@ export interface SecurityAnomaly {
 }
 
 export interface SecurityAnomaliesPanelProps {
+  siteId?: string;
   refreshKey?: number;
 }
 
 export function SecurityAnomaliesPanel({
+  siteId = "site-002",
   refreshKey = 0,
 }: SecurityAnomaliesPanelProps) {
   const [anomalies, setAnomalies] = useState<SecurityAnomaly[]>([]);
@@ -27,14 +29,11 @@ export function SecurityAnomaliesPanel({
 
   useEffect(() => {
     fetchAnomalies();
-  }, [refreshKey]);
+  }, [refreshKey, siteId]);
 
   const fetchAnomalies = async () => {
     try {
-      const response = await authorizedFetch(
-        "/api/security/events/anomalies?since=24h"
-      );
-      const data = await response.json();
+      const data = await securityApi.getAnomalies(siteId, 1);
       setAnomalies(data.anomalies || []);
     } catch (error) {
       console.error("Failed to fetch security anomalies:", error);

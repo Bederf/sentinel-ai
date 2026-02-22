@@ -1,3 +1,18 @@
+---
+title: "AEGIS BESS discovery for site-002"
+type: "reference"
+status: "review"
+version: "1.0.0"
+created: "2026-02-22"
+updated: "2026-02-22"
+tags: ["aegis", "bess", "site-002", "integration", "solar"]
+related: ["../_templates/aegis-discovery-template.md", "../10-operations/aegis-phase0-daily-ops.md"]
+domain: "solar"
+audience: "operators"
+complexity: "intermediate"
+estimated_read_time: 20
+---
+
 # AEGIS BESS Discovery — Site-002
 
 > **Version:** 1.0 | **Completed:** 2026-02-22

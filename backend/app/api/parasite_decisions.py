@@ -261,7 +261,7 @@ def _compute_aegis_kpis(decisions: List[Dict[str, Any]]) -> Dict[str, Any]:
         elif outcome == "rejected":
             rejected += 1
 
-        ws = d.get("write_status")
+        ws = d.get("write_status") or cf.get("execution_mode")
         if ws == "blocked":
             blocked += 1
 

@@ -9,10 +9,21 @@ triggers data collection after "done" reply.
 
 import requests
 import argparse
+import os
 from typing import Dict, Any
 
-BMS_API_URL = "http://localhost:9095"  # SENTINEL BMS Backend
-SENTRY_SECRET = "sentry-bms-phase-41"  # Shared secret with BMS
+BMS_API_URL = os.getenv("SENTINEL_API_URL", "http://localhost:9095")  # SENTINEL BMS Backend
+SENTRY_SECRET = (os.getenv("SENTRY_WEBHOOK_SECRET", "") or "").strip()
+SENTRY_API_KEY = (os.getenv("SENTRY_BOT_API_KEY", "") or "").strip()
+
+
+def _auth_headers() -> dict[str, str]:
+    if not SENTRY_SECRET:
+        raise RuntimeError("SENTRY_WEBHOOK_SECRET is required for /api/sentry requests")
+    headers = {"X-Sentry-Secret": SENTRY_SECRET}
+    if SENTRY_API_KEY:
+        headers["X-Sentry-API-Key"] = SENTRY_API_KEY
+    return headers
 
 
 def send_notification(work_order_data: Dict[str, Any]) -> bool:
@@ -40,7 +51,7 @@ def send_notification(work_order_data: Dict[str, Any]) -> bool:
         response = requests.post(
             f"{BMS_API_URL}/api/sentry/work-order/notify",
             json=payload,
-            headers={"X-Sentry-Secret": SENTRY_SECRET},
+            headers=_auth_headers(),
             timeout=10,
         )
 
@@ -71,7 +82,7 @@ def get_collection_status(service_record_code: str) -> Dict[str, Any]:
     try:
         response = requests.get(
             f"{BMS_API_URL}/api/sentry/work-order/status/{service_record_code}",
-            headers={"X-Sentry-Secret": SENTRY_SECRET},
+            headers=_auth_headers(),
             timeout=10,
         )
 
@@ -98,7 +109,7 @@ def mark_complete(service_record_code: str) -> bool:
     try:
         response = requests.post(
             f"{BMS_API_URL}/api/sentry/work-order/complete/{service_record_code}",
-            headers={"X-Sentry-Secret": SENTRY_SECRET},
+            headers=_auth_headers(),
             timeout=10,
         )
 

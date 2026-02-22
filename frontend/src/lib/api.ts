@@ -4026,23 +4026,35 @@ export interface OccupancyRecommendation {
 
 export const securityApi = {
   /** Get overall security system status */
-  getStatus: async () => {
+  getStatus: async (site: string = "site-002") => {
     try {
-      return await fetchApi<SecuritySystemStatus>("/api/security/status");
-    } catch (error) {
-      if (isExpectedApiError(error)) {
-        return {
-          total_doors: 0,
-          doors_secure: 0,
-          cameras_online: 0,
-          cameras_total: 0,
-          alarm_zones_armed: 0,
-          alarm_zones_total: 0,
-          active_alerts: 0,
-          occupancy_total: 0,
+      const response = await fetchApi<{
+        metrics?: {
+          active_visitors?: number;
+          open_alerts?: number;
         };
-      }
-      throw error;
+      }>(`/api/security/status?site=${encodeURIComponent(site)}`);
+      return {
+        total_doors: 0,
+        doors_secure: 0,
+        cameras_online: 0,
+        cameras_total: 0,
+        alarm_zones_armed: 0,
+        alarm_zones_total: 0,
+        active_alerts: response.metrics?.open_alerts ?? 0,
+        occupancy_total: response.metrics?.active_visitors ?? 0,
+      };
+    } catch (error) {
+      return {
+        total_doors: 0,
+        doors_secure: 0,
+        cameras_online: 0,
+        cameras_total: 0,
+        alarm_zones_armed: 0,
+        alarm_zones_total: 0,
+        active_alerts: 0,
+        occupancy_total: 0,
+      };
     }
   },
 
@@ -4055,58 +4067,69 @@ export const securityApi = {
     fetchApi<{ doors: Door[]; count: number; secure: number }>("/api/security/doors"),
 
   /** Get badge events with optional filtering */
-  getEvents: async (params?: { zone_id?: string; limit?: number }) => {
+  getEvents: async (params?: { site?: string; zone_id?: string; limit?: number; after_hours?: boolean }) => {
     const searchParams = new URLSearchParams();
-    if (params?.zone_id) searchParams.set("zone_id", params.zone_id);
+    searchParams.set("site", params?.site || "site-002");
+    if (params?.zone_id) searchParams.set("location", params.zone_id);
     if (params?.limit) searchParams.set("limit", params.limit.toString());
+    if (params?.after_hours) searchParams.set("after_hours", "true");
     const qs = searchParams.toString();
     try {
-      return await fetchApi<{ events: BadgeEvent[]; count: number }>(
+      const response = await fetchApi<{ events: any[]; event_count: number }>(
         `/api/security/events${qs ? `?${qs}` : ""}`
       );
+      const mapped: BadgeEvent[] = (response.events || []).map((event: any) => ({
+        event_id: event.event_id,
+        door_id: event.access_point_id || "unknown",
+        zone_id: event.location || "unknown",
+        badge_id: event.card_id || "unknown",
+        person_name: event.person_name || "Unknown",
+        direction: "entry",
+        timestamp: event.timestamp,
+        granted: event.status === "granted",
+        reason: event.status || "unknown",
+      }));
+      return { events: mapped, count: response.event_count ?? mapped.length };
     } catch (error) {
-      if (isExpectedApiError(error)) return { events: [], count: 0 };
-      throw error;
+      return { events: [], count: 0 };
     }
   },
 
   /** Get denied access events */
-  getDeniedEvents: async () => {
+  getDeniedEvents: async (site: string = "site-002") => {
     try {
-      return await fetchApi<{ events: BadgeEvent[]; count: number }>("/api/security/events/denied");
+      const result = await securityApi.getEvents({ site, limit: 200 });
+      const denied = result.events.filter((event) => !event.granted);
+      return { events: denied, count: denied.length };
     } catch (error) {
-      if (isExpectedApiError(error)) return { events: [], count: 0 };
-      throw error;
+      return { events: [], count: 0 };
     }
   },
 
   /** Get after-hours access events */
-  getAfterHoursEvents: async () => {
+  getAfterHoursEvents: async (site: string = "site-002") => {
     try {
-      return await fetchApi<{ events: BadgeEvent[]; count: number }>("/api/security/events/after-hours");
+      return await securityApi.getEvents({ site, limit: 200, after_hours: true });
     } catch (error) {
-      if (isExpectedApiError(error)) return { events: [], count: 0 };
-      throw error;
+      return { events: [], count: 0 };
     }
   },
 
   /** Get all cameras with status */
-  getCameras: async () => {
+  getCameras: async (_site: string = "site-002") => {
     try {
-      return await fetchApi<{ cameras: SecurityCamera[]; count: number; online: number }>("/api/security/cameras");
+      return { cameras: [], count: 0, online: 0 };
     } catch (error) {
-      if (isExpectedApiError(error)) return { cameras: [], count: 0, online: 0 };
-      throw error;
+      return { cameras: [], count: 0, online: 0 };
     }
   },
 
   /** Get all alarm zones */
-  getAlarmZones: async () => {
+  getAlarmZones: async (_site: string = "site-002") => {
     try {
-      return await fetchApi<{ alarm_zones: SecurityAlarmZone[]; count: number; armed: number }>("/api/security/alarm-zones");
+      return { alarm_zones: [], count: 0, armed: 0 };
     } catch (error) {
-      if (isExpectedApiError(error)) return { alarm_zones: [], count: 0, armed: 0 };
-      throw error;
+      return { alarm_zones: [], count: 0, armed: 0 };
     }
   },
 
@@ -4125,12 +4148,48 @@ export const securityApi = {
     ),
 
   /** Get building-wide occupancy */
-  getOccupancy: async () => {
+  getOccupancy: async (site: string = "site-002") => {
     try {
-      return await fetchApi<{ total_occupancy: number; zones: SecurityOccupancy[] }>("/api/security/occupancy");
+      const response = await fetchApi<{
+        total_occupancy: number;
+        by_floor?: Record<string, number>;
+        by_zone?: Record<string, number>;
+        last_updated?: string | null;
+      }>(`/api/security/occupancy?site=${encodeURIComponent(site)}`);
+
+      const byZone = response.by_zone || {};
+      const zones: SecurityOccupancy[] = Object.entries(byZone).map(([zoneName, count]) => ({
+        zone_id: zoneName,
+        zone_name: zoneName,
+        occupancy_count: Number(count || 0),
+        badge_entries: Number(count || 0),
+        badge_exits: 0,
+        last_updated: response.last_updated || null,
+        source: "badge",
+      }));
+
+      // Fallback if backend has floor-only data
+      if (zones.length === 0) {
+        const byFloor = response.by_floor || {};
+        for (const [floorName, count] of Object.entries(byFloor)) {
+          zones.push({
+            zone_id: floorName,
+            zone_name: floorName,
+            occupancy_count: Number(count || 0),
+            badge_entries: Number(count || 0),
+            badge_exits: 0,
+            last_updated: response.last_updated || null,
+            source: "badge",
+          });
+        }
+      }
+
+      return {
+        total_occupancy: response.total_occupancy || 0,
+        zones,
+      };
     } catch (error) {
-      if (isExpectedApiError(error)) return { total_occupancy: 0, zones: [] };
-      throw error;
+      return { total_occupancy: 0, zones: [] };
     }
   },
 
@@ -4139,14 +4198,42 @@ export const securityApi = {
     fetchApi<SecurityOccupancy>(`/api/security/occupancy/${zoneId}`),
 
   /** Get cross-module occupancy recommendations */
-  getOccupancyRecommendations: async () => {
+  getOccupancyRecommendations: async (site: string = "site-002") => {
     try {
-      return await fetchApi<{ recommendations: OccupancyRecommendation[]; count: number }>(
-        "/api/security/occupancy/recommendations"
+      const response = await fetchApi<{
+        recommendations: Array<Record<string, any>>;
+        recommendation_count?: number;
+        current_occupancy?: number;
+        by_zone?: Record<string, number>;
+      }>(`/api/security/occupancy/recommendations?site=${encodeURIComponent(site)}`);
+
+      const byZone = response.by_zone || {};
+      const mapped: OccupancyRecommendation[] = (response.recommendations || []).map((rec, idx) => {
+        const zoneName = rec.zone || "Building-wide";
+        return {
+          zone_id: zoneName.toLowerCase().replace(/\s+/g, "-") || `zone-${idx + 1}`,
+          zone_name: zoneName,
+          current_occupancy: Number(byZone[zoneName] ?? response.current_occupancy ?? 0),
+          recommendation_type: rec.module === "lighting" ? "lighting" : "hvac",
+          action: rec.action || rec.type || "review",
+          detail: rec.description || rec.estimated_savings || "",
+        };
+      });
+
+      return { recommendations: mapped, count: response.recommendation_count ?? mapped.length };
+    } catch (error) {
+      return { recommendations: [], count: 0 };
+    }
+  },
+
+  /** Get detected security anomalies (24h default) */
+  getAnomalies: async (site: string = "site-002", daysBack = 1) => {
+    try {
+      return await fetchApi<{ anomalies: any[]; anomaly_count: number }>(
+        `/api/security/events/anomalies?site=${encodeURIComponent(site)}&days_back=${daysBack}`
       );
     } catch (error) {
-      if (isExpectedApiError(error)) return { recommendations: [], count: 0 };
-      throw error;
+      return { anomalies: [], anomaly_count: 0 };
     }
   },
 };

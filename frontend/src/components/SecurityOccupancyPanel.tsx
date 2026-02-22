@@ -25,11 +25,12 @@ import type { SecurityOccupancy, OccupancyRecommendation } from '@/lib/api';
 const ZONE_CAPACITY = 30;
 
 interface SecurityOccupancyPanelProps {
+  siteId?: string;
   /** Refresh key to force data reload from parent */
   refreshKey?: number;
 }
 
-export function SecurityOccupancyPanel({ refreshKey }: SecurityOccupancyPanelProps) {
+export function SecurityOccupancyPanel({ siteId = "site-002", refreshKey }: SecurityOccupancyPanelProps) {
   const [zones, setZones] = useState<SecurityOccupancy[]>([]);
   const [totalOccupancy, setTotalOccupancy] = useState(0);
   const [recommendations, setRecommendations] = useState<OccupancyRecommendation[]>([]);
@@ -40,8 +41,8 @@ export function SecurityOccupancyPanel({ refreshKey }: SecurityOccupancyPanelPro
     try {
 
       const [occupancyResult, recsResult] = await Promise.all([
-        securityApi.getOccupancy(),
-        securityApi.getOccupancyRecommendations(),
+        securityApi.getOccupancy(siteId),
+        securityApi.getOccupancyRecommendations(siteId),
       ]);
 
       setZones(occupancyResult.zones || []);
@@ -56,7 +57,7 @@ export function SecurityOccupancyPanel({ refreshKey }: SecurityOccupancyPanelPro
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [siteId]);
 
   // Fetch on mount
   useEffect(() => {

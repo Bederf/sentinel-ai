@@ -17,11 +17,12 @@ import type { BadgeEvent } from '@/lib/api';
 type EventFilter = "all" | "denied" | "after-hours";
 
 interface AccessEventsPanelProps {
+  siteId?: string;
   /** Refresh key to force data reload from parent */
   refreshKey?: number;
 }
 
-export function AccessEventsPanel({ refreshKey }: AccessEventsPanelProps) {
+export function AccessEventsPanel({ siteId = "site-002", refreshKey }: AccessEventsPanelProps) {
   const [events, setEvents] = useState<BadgeEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,13 +36,13 @@ export function AccessEventsPanel({ refreshKey }: AccessEventsPanelProps) {
       let result: { events: BadgeEvent[]; count: number };
       switch (filter) {
         case "denied":
-          result = await securityApi.getDeniedEvents();
+          result = await securityApi.getDeniedEvents(siteId);
           break;
         case "after-hours":
-          result = await securityApi.getAfterHoursEvents();
+          result = await securityApi.getAfterHoursEvents(siteId);
           break;
         default:
-          result = await securityApi.getEvents({ limit: 50 });
+          result = await securityApi.getEvents({ site: siteId, limit: 50 });
       }
 
       setEvents(result.events);
@@ -55,7 +56,7 @@ export function AccessEventsPanel({ refreshKey }: AccessEventsPanelProps) {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [filter]);
+  }, [filter, siteId]);
 
   // Fetch on mount and filter change
   useEffect(() => {

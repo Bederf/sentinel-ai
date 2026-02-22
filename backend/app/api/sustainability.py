@@ -25,7 +25,7 @@ from app.services.carbon_calculator import get_carbon_calculator
 from app.database.supabase_client import get_supabase_client
 
 router = APIRouter(
-    prefix="/api/sustainability",
+    prefix="/sustainability",
     dependencies=[
         Depends(
             require_active_module(

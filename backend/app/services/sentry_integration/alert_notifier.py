@@ -1,15 +1,23 @@
-"""Alert notification service for Sentry Telegram bot.
+"""Alert notification service for Sentry Telegram bot."""
 
-Sends BMS alerts to facility managers via Telegram using sentrybot CLI.
-"""
-
+import asyncio
 import json
+import logging
 import os
 import re
 import subprocess
-from pathlib import Path
-from typing import Dict, Any
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict
+from uuid import uuid4
+
+from app.config.settings import settings
+from app.database.repositories.notification_repository import (
+    NotificationRepository,
+    SYSTEM_NOTIFIER_TECHNICIAN_ID,
+)
+from app.models.notification import ChannelType, NotificationDeliveryLog, NotificationStatus
+from app.services.sentry_integration.config import get_sentry_bot_cli
 
 # Default alert commands when settings not configured
 DEFAULT_ALERT_COMMANDS = {
@@ -21,6 +29,7 @@ DEFAULT_ALERT_COMMANDS = {
 
 # Settings file path
 SETTINGS_FILE = Path(__file__).parent.parent.parent / "data" / "settings.json"
+logger = logging.getLogger(__name__)
 
 
 def _load_notification_settings() -> Dict[str, Any]:
@@ -39,10 +48,11 @@ class AlertNotifier:
     """Send BMS alerts via sentrybot CLI."""
 
     def __init__(self):
-        # Chat ID for FM team (your Telegram user ID)
-        self.fm_chat_id = os.getenv("SENTRY_FM_CHAT_ID", "8359288792")
+        self.fm_chat_id = (os.getenv("SENTRY_FM_CHAT_ID", "") or "").strip()
+        self._cli_command = get_sentry_bot_cli()
         # Track last alert time per equipment+severity to prevent spam
         self._last_alerts: Dict[str, datetime] = {}
+        self._notification_repo = NotificationRepository()
 
     @property
     def ALERT_COOLDOWN_MINUTES(self) -> int:
@@ -121,6 +131,60 @@ class AlertNotifier:
         """Send alert to FM team via sentrybot (async wrapper)."""
         return self.send_alert_sync(alert)
 
+    @staticmethod
+    def _title_from_alert(alert: Dict[str, Any]) -> str:
+        severity = str(alert.get("severity", "info")).upper()
+        equipment_code = alert.get("equipment_code", "UNKNOWN")
+        return f"{severity} ALERT - {equipment_code}"
+
+    def _log_delivery(
+        self,
+        *,
+        alert: Dict[str, Any],
+        message: str,
+        status: NotificationStatus,
+        error_code: str | None = None,
+        error_message: str | None = None,
+        provider_response: Dict[str, Any] | None = None,
+    ) -> None:
+        """Persist alert send attempt into notification delivery log."""
+        delivery_log = NotificationDeliveryLog(
+            id=uuid4(),
+            technician_id=SYSTEM_NOTIFIER_TECHNICIAN_ID,
+            notification_type="alert",
+            title=self._title_from_alert(alert),
+            body=message,
+            channel_type=ChannelType.TELEGRAM,
+            recipient_identifier=self.fm_chat_id or "UNCONFIGURED",
+            status=status,
+            error_code=error_code,
+            error_message=error_message,
+            provider="sentrybot",
+            provider_response=provider_response or {},
+            sent_at=datetime.utcnow() if status == NotificationStatus.SENT else None,
+        )
+
+        coro = self._notification_repo.create_delivery_log(delivery_log)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            try:
+                asyncio.run(coro)
+            except Exception as exc:
+                logger.warning("Failed to write alert delivery log: %s", exc)
+            return
+
+        loop.create_task(coro)
+
+    def _has_delivery_target(self) -> bool:
+        if self.fm_chat_id:
+            return True
+        if settings.is_live_mode:
+            logger.error("SENTRY_FM_CHAT_ID is missing in live mode; alert notification is blocked")
+        else:
+            logger.warning("SENTRY_FM_CHAT_ID is not configured; skipping FM Telegram alert")
+        return False
+
     def _should_send_alert(self, alert: Dict[str, Any]) -> bool:
         """Check if alert should be sent (cooldown/dedup check).
 
@@ -147,7 +211,7 @@ class AlertNotifier:
 
         # Allow immediate send if severity escalated
         if current_rank > previous_max_rank and previous_max_rank > 0:
-            print(f"🔺 Severity escalation for {equipment_code}: sending {severity} alert immediately")
+            logger.info("Severity escalation for %s: sending %s alert immediately", equipment_code, severity)
             self._last_alerts[f"{equipment_code}:{severity}"] = datetime.now()
             return True
 
@@ -160,7 +224,12 @@ class AlertNotifier:
             elapsed = now - last_sent
             if elapsed < timedelta(minutes=self.ALERT_COOLDOWN_MINUTES):
                 remaining = self.ALERT_COOLDOWN_MINUTES - (elapsed.total_seconds() / 60)
-                print(f"⏳ Alert throttled for {equipment_code} ({severity}) - {remaining:.1f}min cooldown remaining")
+                logger.info(
+                    "Alert throttled for %s (%s): %.1fmin cooldown remaining",
+                    equipment_code,
+                    severity,
+                    remaining,
+                )
                 return False
 
         # Update last alert time
@@ -179,7 +248,10 @@ class AlertNotifier:
                     return True
             return False
         except Exception:
-            # If module registry unavailable, default to sending (fail-open)
+            # Fail closed in live modes so an unavailable registry cannot bypass controls.
+            if settings.is_live_mode:
+                logger.error("Module registry unavailable in live mode; blocking Sentry notifications")
+                return False
             return True
 
     def send_alert_sync(self, alert: Dict[str, Any]) -> bool:
@@ -191,6 +263,16 @@ class AlertNotifier:
         # Check if notifications module is active
         if not self._is_notifications_module_active():
             return False  # Notifications module not active for this site
+
+        if not self._has_delivery_target():
+            self._log_delivery(
+                alert=alert,
+                message=self.format_alert_message(alert),
+                status=NotificationStatus.FAILED,
+                error_code="missing_target",
+                error_message="SENTRY_FM_CHAT_ID is not configured",
+            )
+            return False
 
         # Check cooldown before sending
         if not self._should_send_alert(alert):
@@ -205,7 +287,7 @@ class AlertNotifier:
         try:
             result = subprocess.run(
                 [
-                    "sentrybot",
+                    self._cli_command,
                     "message",
                     "send",
                     "--channel",
@@ -221,20 +303,55 @@ class AlertNotifier:
             )
 
             if result.returncode == 0:
-                print(f"✅ Alert sent via sentrybot: {alert.get('id', '')[:8]}")
+                self._log_delivery(
+                    alert=alert,
+                    message=message,
+                    status=NotificationStatus.SENT,
+                    provider_response={"stdout": result.stdout},
+                )
+                logger.info("Alert sent via sentrybot: %s", alert.get("id", "")[:8])
                 return True
             else:
-                print(f"❌ sentrybot error: {result.stderr}")
+                self._log_delivery(
+                    alert=alert,
+                    message=message,
+                    status=NotificationStatus.FAILED,
+                    error_code="send_failed",
+                    error_message=result.stderr or "Unknown sentrybot error",
+                    provider_response={"stderr": result.stderr},
+                )
+                logger.error("sentrybot error: %s", result.stderr)
                 return False
 
         except subprocess.TimeoutExpired:
-            print("❌ sentrybot timeout")
+            self._log_delivery(
+                alert=alert,
+                message=message,
+                status=NotificationStatus.FAILED,
+                error_code="timeout",
+                error_message="sentrybot request timed out after 30 seconds",
+            )
+            logger.error("sentrybot timeout")
             return False
         except FileNotFoundError:
-            print("❌ sentrybot not found in PATH")
+            self._log_delivery(
+                alert=alert,
+                message=message,
+                status=NotificationStatus.FAILED,
+                error_code="not_found",
+                error_message=f"{self._cli_command} CLI not found in PATH",
+            )
+            logger.error("%s not found in PATH", self._cli_command)
             return False
         except Exception as e:
-            print(f"❌ Failed to send alert: {e}")
+            self._log_delivery(
+                alert=alert,
+                message=message,
+                status=NotificationStatus.FAILED,
+                error_code="exception",
+                error_message=str(e),
+            )
+            logger.error("Failed to send alert: %s", e)
             return False
 
 

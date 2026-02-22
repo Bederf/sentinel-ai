@@ -20,6 +20,34 @@ interface SolarOverviewPanelProps {
   siteId: string;
 }
 
+function getFallbackOverview(siteId: string): SolarOverview {
+  return {
+    site_id: siteId,
+    site_name: "Sandton Rooftop Array",
+    installed_capacity_kwp: 297,
+    current_generation_kw: 0,
+    daily_yield_kwh: 0,
+    expected_daily_yield_kwh: 1485,
+    performance_ratio: 0,
+    bess_soc_percent: 0,
+    bess_mode: "idle",
+    grid_import_kw: 0,
+    grid_export_kw: 0,
+    self_consumption_percent: 0,
+    estimated_savings_today_zar: 0,
+    plants: [
+      {
+        plant_id: "sandton-roof",
+        plant_name: "Rooftop Array",
+        capacity_kwp: 297,
+        current_generation_kw: 0,
+        inverter_count: 4,
+        status: "normal",
+      },
+    ],
+  };
+}
+
 export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
   const [overview, setOverview] = useState<SolarOverview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,60 +56,27 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
   // Get live simulation data
   const { running, solarEfficiency, simulatedHour } = useSimulation();
 
-  // Sandton City solar installation specs (used during simulation)
-  const SANDTON_SOLAR: SolarOverview = {
-    site_id: siteId,
-    site_name: "Solar Campus",
-    installed_capacity_kwp: 3900,
-    current_generation_kw: 0,
-    daily_yield_kwh: 0,
-    expected_daily_yield_kwh: 20000,
-    performance_ratio: 0.92,
-    bess_soc_percent: 65,
-    bess_mode: "charging",
-    grid_import_kw: 150,
-    grid_export_kw: 0,
-    self_consumption_percent: 78,
-    estimated_savings_today_zar: 0,
-    plants: [
-      { plant_id: "west", plant_name: "Western Carports", capacity_kwp: 3300, current_generation_kw: 0, inverter_count: 10, status: "normal" },
-      { plant_id: "east", plant_name: "Eastern Carports", capacity_kwp: 600, current_generation_kw: 0, inverter_count: 23, status: "normal" }
-    ]
-  };
-
   const loadData = useCallback(async () => {
     try {
       const data = await fetchSolarOverview(siteId);
-      // If API returns 0 capacity but we're simulating, use Sandton specs
-      if (data.installed_capacity_kwp === 0 && running) {
-        setOverview(SANDTON_SOLAR);
-      } else {
-        setOverview(data);
-      }
+      setOverview(data);
       setError(null);
     } catch (err) {
       if (!isExpectedApiError(err)) {
         console.error("Failed to load solar overview:", err);
       }
-      // Fallback to Sandton specs
-      setOverview(SANDTON_SOLAR);
-      setError(null);
+      setOverview(getFallbackOverview(siteId));
+      setError("Live solar API unavailable, showing fallback baseline");
     } finally {
       setLoading(false);
     }
-  }, [siteId, running]);
+  }, [siteId]);
 
   useEffect(() => {
-    // When simulation is running, set Sandton specs immediately then try API
-    if (running && !overview) {
-      setOverview(SANDTON_SOLAR);
-      setLoading(false);
-    }
-
     loadData();
     const interval = setInterval(loadData, 15000);
     return () => clearInterval(interval);
-  }, [loadData, running]);
+  }, [loadData]);
 
   if (loading) {
     return (
@@ -104,7 +99,7 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
     );
   }
 
-  if (error || !overview) {
+  if (!overview) {
     return (
       <div
         className="rounded-md p-6 text-center"
@@ -121,7 +116,7 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
     );
   }
 
-  const installedCapacity = overview.installed_capacity_kwp || 3900; // Sandton = 3900 kWp
+  const installedCapacity = overview.installed_capacity_kwp || 0;
 
   // When simulation is running, derive all values from simulation context
   let currentGeneration = overview.current_generation_kw ?? 0;
@@ -131,7 +126,7 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
   let selfConsumption = overview.self_consumption_percent ?? 0;
   let gridImport = overview.grid_import_kw ?? 0;
   let gridExport = overview.grid_export_kw ?? 0;
-  let expectedDailyYield = overview.expected_daily_yield_kwh || 20000;
+  let expectedDailyYield = overview.expected_daily_yield_kwh || (installedCapacity * 5);
 
   if (running && solarEfficiency !== undefined) {
     // Current generation from simulation solar efficiency × capacity
@@ -164,7 +159,7 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
 
     // Savings: R5/kWh × daily yield
     savingsToday = Math.round(dailyYield * 5);
-    expectedDailyYield = 20000; // 3900 kWp × ~5.1 peak hours
+    expectedDailyYield = Math.round(installedCapacity * 5); // ~5 peak sun hours JHB
   }
 
   const generationPercent = installedCapacity > 0
@@ -188,6 +183,16 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
+
+  let statusLabel = "Offline";
+  if (running) {
+    statusLabel = (solarEfficiency ?? 0) > 0 ? "🔴 Live • Generating" : "🔴 Live • Nighttime";
+  } else if (currentGeneration > 0) {
+    statusLabel = "Generating";
+  }
+  if (error) {
+    statusLabel = `${statusLabel} • Fallback`;
+  }
 
   return (
     <div
@@ -222,15 +227,7 @@ export function SolarOverviewPanel({ siteId }: SolarOverviewPanelProps) {
             color: (currentGeneration > 0 || (running && (solarEfficiency ?? 0) > 0)) ? "var(--color-sentinel-green)" : "var(--color-sentinel-text-secondary)",
           }}
         >
-          {running ? (
-            <span>
-              {(solarEfficiency ?? 0) > 0 ? "🔴 Live • Generating" : "🔴 Live • Nighttime"}
-            </span>
-          ) : currentGeneration > 0 ? (
-            "Generating"
-          ) : (
-            "Offline"
-          )}
+          {statusLabel}
         </span>
       </div>
 

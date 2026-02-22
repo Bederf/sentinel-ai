@@ -90,6 +90,8 @@ async def startup_event(app: FastAPI) -> None:
         )
 
     _logger.info(f"Environment: {settings.environment}, Demo mode: {settings.demo_mode}")
+    if settings.is_live_mode and not settings.sentry_webhook_secret:
+        raise RuntimeError("SENTRY_WEBHOOK_SECRET must be configured when INGESTION_MODE is shadow_live/live_control")
 
     if testing_mode:
         _logger.info("TESTING mode: skipping background scheduler initialization")
@@ -195,9 +197,8 @@ async def startup_event(app: FastAPI) -> None:
     # Start Sentry notification processing (runs every 30 seconds)
     # When equipment health drops to warning/critical, technicians receive Telegram notifications
     # This background job ensures notifications are sent promptly even if Sentry bot polling is delayed
-    # TEMPORARILY DISABLED for testing - uncomment to re-enable
-    # if hasattr(scheduler_service, "add_sentry_notification_job"):
-    #     scheduler_service.add_sentry_notification_job(interval_seconds=30)  # 30 seconds
+    if hasattr(scheduler_service, "add_sentry_notification_job"):
+        scheduler_service.add_sentry_notification_job(interval_seconds=30)  # 30 seconds
 
     # Start ML model retraining job (runs daily)
     # Phase 45-01: Checks model age (>30 days) and R² score (<0.65), auto-retrains stale models

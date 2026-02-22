@@ -42,6 +42,7 @@ export type View =
   | "dashboard"
   | "ai-chat"
   | "digital-twin"
+  | "aegis"
   | "technician"
   | "control"
   | "control-audit"
@@ -86,6 +87,7 @@ export const VIEW_TITLES: Record<View, string> = {
   dashboard: "Dashboard",
   "ai-chat": "AI Chat",
   "digital-twin": "Digital Twin",
+  aegis: "AEGIS Ops",
   technician: "Technician Chat",
   control: "Control Dashboard",
   "control-audit": "Control Audit Trail",
@@ -151,6 +153,7 @@ export const ADDON_NAV_ITEMS: NavItem[] = [
   { id: "lighting", label: "Lighting", icon: Lightbulb, description: "Lighting Control", category: "addon", requiredModule: "lighting", defaultOrder: 12.5 },
   { id: "security", label: "Security", icon: ShieldCheck, description: "Access & CCTV", category: "addon", requiredModule: "security", defaultOrder: 13 },
   { id: "solar", label: "Solar & BESS", icon: Sun, description: "PV & Battery Storage", category: "addon", requiredModule: "solar", defaultOrder: 14 },
+  { id: "aegis", label: "AEGIS Ops", icon: Brain, description: "BESS Dispatch Governance", category: "addon", requiredModule: "solar", defaultOrder: 14.1 },
   { id: "water", label: "Water", icon: Droplets, description: "Water Consumption", category: "addon", requiredModule: "water", defaultOrder: 15 },
   { id: "sustainability", label: "ESG", icon: Leaf, description: "Sustainability & Carbon", category: "addon", requiredModule: "sustainability", defaultOrder: 16 },
   { id: "contracts", label: "Contracts", icon: FileText, description: "Contract & SLA", category: "addon", requiredModule: "contracts", defaultOrder: 17 },
