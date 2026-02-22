@@ -155,8 +155,62 @@ class SustainabilityService:
 
         return result
 
-    def _estimate_diesel_litres(self, site_id: str, month: str) -> float:
-        """Estimate diesel consumption for a month from generator data."""
+    def _get_daily_metrics(self, site_id: str, start_date: str, end_date: str) -> List[Dict]:
+        """Query daily_sustainability_metrics table. Falls back to JSON for demo mode."""
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            result = (
+                client.table("daily_sustainability_metrics")
+                .select("*")
+                .eq("site_id", site_id)
+                .gte("date", start_date)
+                .lte("date", end_date)
+                .order("date")
+                .execute()
+            )
+            if result.data:
+                return result.data
+        except Exception as e:
+            logger.debug(f"daily_sustainability_metrics query failed: {e}")
+
+        # Fallback: JSON file
+        json_path = DATA_DIR / "daily_metrics" / f"{site_id}.json"
+        if json_path.exists():
+            with open(json_path) as f:
+                records = json.load(f)
+            return [r for r in records if start_date <= r.get("date", "") <= end_date]
+
+        return []  # No data available — will fall through to estimates
+
+    def _get_diesel_data(self, site_id: str, month: str) -> tuple:
+        """Get diesel liters. Returns (liters, source)."""
+        # Try real metrics first
+        start = f"{month}-01"
+        end = f"{month}-28"  # Safe for all months
+        metrics = self._get_daily_metrics(site_id, start, end)
+        if metrics:
+            total = sum(float(m.get("diesel_liters", 0)) for m in metrics)
+            if total > 0:
+                return total, "measured"
+
+        # Fallback to estimate (existing logic)
+        return self._estimate_diesel_litres_legacy(site_id, month), "estimated"
+
+    def _get_water_data(self, site_id: str, month: str) -> tuple:
+        """Get water kL. Returns (kl, source)."""
+        metrics = self._get_daily_metrics(site_id, f"{month}-01", f"{month}-28")
+        if metrics:
+            total_liters = sum(float(m.get("water_liters", 0)) for m in metrics)
+            if total_liters > 0:
+                return total_liters / 1000, "measured"
+
+        config = self.get_config(site_id)
+        return config.monthly_water_kl, "estimated"
+
+    def _estimate_diesel_litres_legacy(self, site_id: str, month: str) -> float:
+        """Estimate diesel consumption for a month from generator data (legacy fallback)."""
         try:
             from app.services.generator_service import generator_service
 
@@ -184,47 +238,80 @@ class SustainabilityService:
             return 85.0  # Default estimate for demo
 
     def calculate_current_emissions(self, site_id: str) -> EmissionsSnapshot:
-        """Calculate current month's emissions from live data."""
+        """Calculate current month's emissions from live data.
+
+        Data priority: daily_sustainability_metrics -> energy API -> synthetic estimates.
+        Populates per-system breakdown, solar offset, and data_source tracking.
+        """
         config = self.get_config(site_id)
         ef = config.emission_factors
 
         # Get current month energy data
         now = datetime.now()
         days_so_far = now.day
-        energy_data = self._get_energy_data(site_id, days=days_so_far)
-
-        # Sum grid electricity
-        grid_kwh = sum(d["total_kwh"] for d in energy_data)
-
-        # Diesel consumption
         month_str = now.strftime("%Y-%m")
-        diesel_litres = self._estimate_diesel_litres(site_id, month_str)
-        # Scale to days elapsed
-        diesel_litres = diesel_litres * (days_so_far / 30.0)
+
+        # Try daily_sustainability_metrics first for energy breakdown
+        daily_metrics = self._get_daily_metrics(site_id, f"{month_str}-01", f"{month_str}-28")
+        has_daily_metrics = len(daily_metrics) > 0
+        data_source = "estimated"  # Conservative default
+
+        if has_daily_metrics:
+            # Use real metrics data
+            grid_kwh = sum(float(m.get("grid_kwh", 0) or m.get("total_kwh", 0)) for m in daily_metrics)
+            hvac_kwh = sum(float(m.get("hvac_kwh", 0)) for m in daily_metrics)
+            lighting_kwh = sum(float(m.get("lighting_kwh", 0)) for m in daily_metrics)
+            other_kwh = sum(float(m.get("other_kwh", 0)) for m in daily_metrics)
+            solar_kwh = sum(float(m.get("solar_generation_kwh", 0)) for m in daily_metrics)
+            data_source = "simulation"  # Data from daily metrics table
+        else:
+            # Fallback to energy API / synthetic
+            energy_data = self._get_energy_data(site_id, days=days_so_far)
+            grid_kwh = sum(d["total_kwh"] for d in energy_data)
+            hvac_kwh = sum(d["hvac_kwh"] for d in energy_data)
+            lighting_kwh = sum(d["lighting_kwh"] for d in energy_data)
+            other_kwh = sum(d["other_kwh"] for d in energy_data)
+            solar_kwh = 0.0
+
+        # Diesel consumption (real data path first)
+        diesel_litres, diesel_source = self._get_diesel_data(site_id, month_str)
+        if diesel_source == "estimated":
+            # Scale estimated diesel to days elapsed
+            diesel_litres = diesel_litres * (days_so_far / 30.0)
+            data_source = "estimated"  # Mixed data = conservative
+
+        # Water consumption (real data path first)
+        water_kl, water_source = self._get_water_data(site_id, month_str)
+        if water_source == "estimated":
+            data_source = "estimated"
 
         # Scope 1: Diesel
         scope1 = diesel_litres * ef.diesel_kg_co2_per_litre
 
-        # Scope 2: Grid
+        # Scope 2: Grid (gross, before solar offset)
         scope2 = grid_kwh * ef.grid_kg_co2_per_kwh
+
+        # Solar offset for Scope 2
+        solar_offset_kg = solar_kwh * ef.grid_kg_co2_per_kwh
+        net_scope2 = max(0, scope2 - solar_offset_kg)
 
         # Scope 3: Water + Waste + Commuting (scaled to days elapsed)
         monthly_frac = days_so_far / 30.0
-        water_co2 = config.monthly_water_kl * ef.water_kg_co2_per_kl * monthly_frac
+        water_co2 = water_kl * ef.water_kg_co2_per_kl * monthly_frac
         waste_co2 = config.monthly_waste_tons * ef.waste_kg_co2_per_ton * monthly_frac
         avg_employees = config.occupancy_capacity * (config.avg_occupancy_pct / 100.0)
         commute_co2 = avg_employees * days_so_far * ef.commute_kg_co2_per_person_day
         scope3 = water_co2 + waste_co2 + commute_co2
 
-        # Breakdown by system
-        hvac_kwh = sum(d["hvac_kwh"] for d in energy_data)
-        lighting_kwh = sum(d["lighting_kwh"] for d in energy_data)
-        other_kwh = sum(d["other_kwh"] for d in energy_data)
+        # Per-system carbon breakdown
+        hvac_co2 = hvac_kwh * ef.grid_kg_co2_per_kwh
+        lighting_co2 = lighting_kwh * ef.grid_kg_co2_per_kwh
+        other_co2 = other_kwh * ef.grid_kg_co2_per_kwh
 
         breakdown = {
-            "hvac": round(hvac_kwh * ef.grid_kg_co2_per_kwh, 2),
-            "lighting": round(lighting_kwh * ef.grid_kg_co2_per_kwh, 2),
-            "other_electrical": round(other_kwh * ef.grid_kg_co2_per_kwh, 2),
+            "hvac": round(hvac_co2, 2),
+            "lighting": round(lighting_co2, 2),
+            "other_electrical": round(other_co2, 2),
             "diesel_generators": round(scope1, 2),
             "water": round(water_co2, 2),
             "waste": round(waste_co2, 2),
@@ -243,6 +330,17 @@ class SustainabilityService:
             carbon_intensity_kg_per_sqm=(scope1 + scope2 + scope3) / sqm if sqm else 0,
             energy_intensity_kwh_per_sqm=grid_kwh / sqm if sqm else 0,
             breakdown_by_system=breakdown,
+            # Per-system carbon breakdown (plan 111-02)
+            hvac_kg_co2=hvac_co2,
+            lighting_kg_co2=lighting_co2,
+            other_kg_co2=other_co2,
+            solar_offset_kg_co2=solar_offset_kg,
+            net_scope2_kg_co2=net_scope2,
+            # Source data tracking
+            actual_diesel_liters=diesel_litres if diesel_source == "measured" else None,
+            actual_water_kl=water_kl if water_source == "measured" else None,
+            solar_generation_kwh=solar_kwh if solar_kwh > 0 else None,
+            data_source=data_source,
         )
 
     def get_emissions_history(self, site_id: str, months: int = 12) -> List[EmissionsSnapshot]:
@@ -269,22 +367,39 @@ class SustainabilityService:
             month_data = monthly[month_key]
             grid_kwh = sum(d["total_kwh"] for d in month_data)
 
-            # Diesel varies by month (more during load shedding season)
-            month_num = int(month_key.split("-")[1])
-            # SA load shedding peaks in winter (Jun-Aug) and summer peaks (Dec-Feb)
-            seasonal_factor = 1.0
-            if month_num in (6, 7, 8):
-                seasonal_factor = 1.5  # Winter peak
-            elif month_num in (12, 1, 2):
-                seasonal_factor = 1.3  # Summer peak
-            base_diesel = self._estimate_diesel_litres(site_id, month_key)
-            diesel_litres = base_diesel * seasonal_factor * random.uniform(0.8, 1.2)
+            # Try real diesel data first, fall back to seasonal estimate
+            diesel_litres, diesel_source = self._get_diesel_data(site_id, month_key)
+            if diesel_source == "estimated":
+                # Apply seasonal variation for estimated data
+                month_num = int(month_key.split("-")[1])
+                seasonal_factor = 1.0
+                if month_num in (6, 7, 8):
+                    seasonal_factor = 1.5  # Winter peak
+                elif month_num in (12, 1, 2):
+                    seasonal_factor = 1.3  # Summer peak
+                diesel_litres = diesel_litres * seasonal_factor * random.uniform(0.8, 1.2)
+
+            # Try real water data first
+            water_kl, water_source = self._get_water_data(site_id, month_key)
+
+            # Determine data source
+            data_source = "estimated"
+            if diesel_source == "measured" and water_source == "measured":
+                data_source = "measured"
+            elif diesel_source != "estimated" or water_source != "estimated":
+                data_source = "simulation"
 
             scope1 = diesel_litres * ef.diesel_kg_co2_per_litre
             scope2 = grid_kwh * ef.grid_kg_co2_per_kwh
 
+            # Check for solar data in daily metrics
+            daily_metrics = self._get_daily_metrics(site_id, f"{month_key}-01", f"{month_key}-28")
+            solar_kwh = sum(float(m.get("solar_generation_kwh", 0)) for m in daily_metrics)
+            solar_offset_kg = solar_kwh * ef.grid_kg_co2_per_kwh
+            net_scope2 = max(0, scope2 - solar_offset_kg)
+
             # Scope 3
-            water_co2 = config.monthly_water_kl * ef.water_kg_co2_per_kl
+            water_co2 = water_kl * ef.water_kg_co2_per_kl
             waste_co2 = config.monthly_waste_tons * ef.waste_kg_co2_per_ton
             avg_employees = config.occupancy_capacity * (config.avg_occupancy_pct / 100.0)
             commute_co2 = avg_employees * config.working_days_per_month * ef.commute_kg_co2_per_person_day
@@ -294,10 +409,14 @@ class SustainabilityService:
             lighting_kwh = sum(d["lighting_kwh"] for d in month_data)
             other_kwh = sum(d["other_kwh"] for d in month_data)
 
+            hvac_co2 = hvac_kwh * ef.grid_kg_co2_per_kwh
+            lighting_co2 = lighting_kwh * ef.grid_kg_co2_per_kwh
+            other_co2 = other_kwh * ef.grid_kg_co2_per_kwh
+
             breakdown = {
-                "hvac": round(hvac_kwh * ef.grid_kg_co2_per_kwh, 2),
-                "lighting": round(lighting_kwh * ef.grid_kg_co2_per_kwh, 2),
-                "other_electrical": round(other_kwh * ef.grid_kg_co2_per_kwh, 2),
+                "hvac": round(hvac_co2, 2),
+                "lighting": round(lighting_co2, 2),
+                "other_electrical": round(other_co2, 2),
                 "diesel_generators": round(scope1, 2),
                 "water": round(water_co2, 2),
                 "waste": round(waste_co2, 2),
@@ -317,6 +436,15 @@ class SustainabilityService:
                     carbon_intensity_kg_per_sqm=total_co2 / sqm if sqm else 0,
                     energy_intensity_kwh_per_sqm=grid_kwh / sqm if sqm else 0,
                     breakdown_by_system=breakdown,
+                    hvac_kg_co2=hvac_co2,
+                    lighting_kg_co2=lighting_co2,
+                    other_kg_co2=other_co2,
+                    solar_offset_kg_co2=solar_offset_kg,
+                    net_scope2_kg_co2=net_scope2,
+                    actual_diesel_liters=diesel_litres if diesel_source == "measured" else None,
+                    actual_water_kl=water_kl if water_source == "measured" else None,
+                    solar_generation_kwh=solar_kwh if solar_kwh > 0 else None,
+                    data_source=data_source,
                 )
             )
 
