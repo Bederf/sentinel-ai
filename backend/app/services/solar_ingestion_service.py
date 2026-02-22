@@ -125,9 +125,17 @@ class SolarIngestionService:
             bess = client.table("solar_bess").select("*").execute().data or []
             meters = client.table("solar_meters").select("*").execute().data or []
 
+            # Build UUID → site code mapping via buildings table.
+            # solar_plants/bess/meters reference buildings(id) as UUID,
+            # but solar_sites uses TEXT site_id (e.g. "site-002").
+            buildings_data = client.table("buildings").select("id, code").execute().data or []
+            building_uuid_to_code = {str(b["id"]): b["code"] for b in buildings_data}
+
             plants_by_site: Dict[str, List[Dict]] = {}
             for plant in plants:
-                plants_by_site.setdefault(plant["site_id"], []).append(plant)
+                plant_site_uuid = str(plant["site_id"])
+                resolved_site_id = building_uuid_to_code.get(plant_site_uuid, plant_site_uuid)
+                plants_by_site.setdefault(resolved_site_id, []).append(plant)
 
             inverters_by_plant: Dict[str, List[Dict]] = {}
             for inv in inverters:
@@ -135,11 +143,15 @@ class SolarIngestionService:
 
             bess_by_site: Dict[str, Dict] = {}
             for b in bess:
-                bess_by_site[b["site_id"]] = b
+                bess_site_uuid = str(b.get("site_id", ""))
+                resolved_bess_site = building_uuid_to_code.get(bess_site_uuid, bess_site_uuid)
+                bess_by_site[resolved_bess_site] = b
 
             meters_by_site: Dict[str, List[Dict]] = {}
             for m in meters:
-                meters_by_site.setdefault(m["site_id"], []).append(m)
+                meter_site_uuid = str(m.get("site_id", ""))
+                resolved_meter_site = building_uuid_to_code.get(meter_site_uuid, meter_site_uuid)
+                meters_by_site.setdefault(resolved_meter_site, []).append(m)
 
             configs: List[Dict] = []
             for site in sites:
@@ -164,10 +176,10 @@ class SolarIngestionService:
                                     "name": inv.get("name", ""),
                                     "manufacturer": inv.get("manufacturer", ""),
                                     "model": inv.get("model", ""),
-                                    "rated_kva": inv.get("rated_kva", 0),
+                                    "rated_kva": inv.get("rated_power_kva") or inv.get("rated_kva", 0),
                                     "mppt_count": inv.get("mppt_count", 0),
                                     "protocol": inv.get("protocol", ""),
-                                    "ip": inv.get("ip", ""),
+                                    "ip": inv.get("ip_address") or inv.get("ip", ""),
                                     "port": inv.get("port", 0),
                                     "unit_id": inv.get("unit_id", 0),
                                     "strings_per_mppt": inv.get("strings_per_mppt", 0),
@@ -503,14 +515,20 @@ class SolarIngestionService:
             plant_summaries = []
             for plant in site.plants.values():
                 plant_inverters = [i for i in all_inverters if i.plant_id == plant.plant_id]
+                current_kw = round(sum(i.ac_power_kw for i in plant_inverters), 1)
+                has_fault = any(i.status == "fault" for i in plant_inverters)
                 plant_summaries.append(
                     {
                         "plant_id": plant.plant_id,
                         "name": plant.name,
+                        "plant_name": plant.name,
                         "capacity_kwp": plant.capacity_kwp,
-                        "current_kw": round(sum(i.ac_power_kw for i in plant_inverters), 1),
+                        "current_kw": current_kw,
+                        "current_generation_kw": current_kw,
                         "inverters_online": sum(1 for i in plant_inverters if i.status == "online"),
                         "inverters_total": len(plant_inverters),
+                        "inverter_count": len(plant_inverters),
+                        "status": "fault" if has_fault else "normal",
                     }
                 )
 
@@ -518,13 +536,37 @@ class SolarIngestionService:
             total_capacity_kwp = sum(p.capacity_kwp for p in site.plants.values())
             performance_ratio = (total_pv_kw / total_capacity_kwp * 100) if total_capacity_kwp > 0 else 0
 
+            # Derive flat fields for frontend SolarOverview compatibility
+            if performance_ratio > 1:
+                perf_ratio_frac = round(performance_ratio / 100, 3)
+            else:
+                perf_ratio_frac = round(performance_ratio, 3)
+            if total_pv_kw > 0:
+                self_consumption_pct = round((total_pv_kw - grid_export_kw) / total_pv_kw * 100, 1)
+            else:
+                self_consumption_pct = 0
+            bess_soc = bess.soc_pct if bess else 0
+            bess_mode_str = bess.mode if bess else "idle"
+
             # Build response: annual metrics + live connector data
             response = {
                 "site_id": site_id,
                 "site_name": site.site_name,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "data_source": "annual_simulation + live_connectors",
-                # Real-time generation & grid
+                # Flat fields (frontend SolarOverview interface)
+                "installed_capacity_kwp": round(total_capacity_kwp, 1),
+                "current_generation_kw": round(total_pv_kw, 1),
+                "daily_yield_kwh": round(total_daily_kwh, 0),
+                "expected_daily_yield_kwh": round(total_capacity_kwp * 5, 0),
+                "performance_ratio": perf_ratio_frac,
+                "bess_soc_percent": bess_soc,
+                "bess_mode": bess_mode_str,
+                "grid_import_kw": round(grid_import_kw, 1),
+                "grid_export_kw": round(grid_export_kw, 1),
+                "self_consumption_percent": self_consumption_pct,
+                "estimated_savings_today_zar": round(total_daily_kwh * 5, 0),
+                # Nested details (kept for backwards compatibility)
                 "generation": {
                     "total_pv_kw": round(total_pv_kw, 1),
                     "total_daily_kwh": round(total_daily_kwh, 0),

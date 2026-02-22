@@ -86,6 +86,30 @@ export interface HealthHistoryData {
   snapshot_count: number;
 }
 
+export interface CommissioningSnapshot {
+  all_gates_passed: boolean;
+  blocking_gates: string[];
+  gates_passed: number;
+  gates_total: number;
+  consecutive_pass_days: number;
+  can_promote: boolean;
+}
+
+export interface IngestionKPIs {
+  freshness_hours: number;
+  error_rate: number;
+  match_coverage: number;
+  unmatched_points: number;
+  total_points: number;
+}
+
+export interface ControlKPIs {
+  shadow_writes_24h: number;
+  blocked_writes_24h: number;
+  approved_writes_24h: number;
+  safety_violations_24h: number;
+}
+
 /**
  * System health API client
  */

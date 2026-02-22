@@ -32,6 +32,7 @@ import { MaintenanceHistoryTabs } from "./maintenance/MaintenanceHistoryTabs";
 interface PredictionDetailProps {
   prediction: {
     id: string;
+    equipment_id?: string;
     equipment_name: string;
     site_name: string;
     site_id?: string;
@@ -890,7 +891,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
             <button
               onClick={() => {
                 if (onCreateWorkOrder) {
-                  onCreateWorkOrder(prediction.id, prediction.equipment_name);
+                  onCreateWorkOrder(prediction.equipment_id || prediction.id, prediction.equipment_name);
                 }
                 onClose();
               }}

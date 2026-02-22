@@ -71,13 +71,26 @@ class WorkOrderRepository:
             if building_id:
                 payload["building_id"] = building_id
 
-            # Insert and return with generated code
-            result = self.client.table("work_orders").insert(payload).execute()
+            # Insert with retry on duplicate code collision (DB trigger generates code)
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    result = self.client.table("work_orders").insert(payload).execute()
 
-            if result.data and len(result.data) > 0:
-                created = result.data[0]
-                logger.info(f"Created work order: {created.get('code')}")
-                return created
+                    if result.data and len(result.data) > 0:
+                        created = result.data[0]
+                        logger.info(f"Created work order: {created.get('code')}")
+                        return created
+
+                    return None
+                except Exception as insert_err:
+                    err_msg = str(insert_err)
+                    if "23505" in err_msg and "work_orders_code_key" in err_msg:
+                        logger.warning(f"Work order code collision (attempt {attempt + 1}/{max_retries}), retrying...")
+                        if attempt == max_retries - 1:
+                            raise
+                        continue
+                    raise
 
             return None
 
