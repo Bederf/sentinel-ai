@@ -13,6 +13,7 @@ Scopes:
 """
 
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Dict, List, Optional
 
 
@@ -258,3 +259,133 @@ class BenchmarkComparison:
             "carbon_typical_kg_per_sqm_yr": self.carbon_typical_kg_per_sqm_yr,
             "carbon_efficient_kg_per_sqm_yr": self.carbon_efficient_kg_per_sqm_yr,
         }
+
+
+# ---------------------------------------------------------------------------
+# Daily sustainability metrics — written by SustainabilityMetricsCollector
+# (plan 111-01)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class DailySustainabilityWrite:
+    """Write model for daily_sustainability_metrics table.
+
+    Contains only user-supplied fields (no GENERATED ALWAYS columns).
+    Used by SustainabilityMetricsCollector.persist() for Supabase upserts
+    and JSON-fallback writes.
+    """
+
+    site_id: str
+    date: date  # YYYY-MM-DD
+
+    # Energy breakdown (kWh)
+    grid_kwh: float = 0.0
+    hvac_kwh: float = 0.0
+    lighting_kwh: float = 0.0
+    other_kwh: float = 0.0
+    solar_generation_kwh: float = 0.0
+    solar_export_kwh: float = 0.0
+
+    # Water (liters)
+    water_liters: float = 0.0
+
+    # Fuel
+    diesel_liters: float = 0.0
+    generator_runtime_hours: float = 0.0
+
+    # Occupancy
+    avg_occupancy_pct: float = 0.0
+    peak_occupancy_count: int = 0
+
+    # Computed emissions (kg CO2e)
+    scope1_kg_co2: float = 0.0
+    scope2_kg_co2: float = 0.0
+    scope3_kg_co2: float = 0.0
+
+    # Metadata
+    source: str = "simulation"
+    building_id: Optional[str] = None  # UUID as string for JSON compat
+
+    def to_dict(self) -> Dict:
+        """Convert to dict for Supabase upsert / JSON write."""
+        d: Dict = {
+            "site_id": self.site_id,
+            "date": self.date.isoformat() if isinstance(self.date, date) else str(self.date),
+            "grid_kwh": round(self.grid_kwh, 2),
+            "hvac_kwh": round(self.hvac_kwh, 2),
+            "lighting_kwh": round(self.lighting_kwh, 2),
+            "other_kwh": round(self.other_kwh, 2),
+            "solar_generation_kwh": round(self.solar_generation_kwh, 2),
+            "solar_export_kwh": round(self.solar_export_kwh, 2),
+            "water_liters": round(self.water_liters, 1),
+            "diesel_liters": round(self.diesel_liters, 2),
+            "generator_runtime_hours": round(self.generator_runtime_hours, 2),
+            "avg_occupancy_pct": round(self.avg_occupancy_pct, 1),
+            "peak_occupancy_count": self.peak_occupancy_count,
+            "scope1_kg_co2": round(self.scope1_kg_co2, 2),
+            "scope2_kg_co2": round(self.scope2_kg_co2, 2),
+            "scope3_kg_co2": round(self.scope3_kg_co2, 2),
+            "source": self.source,
+        }
+        if self.building_id:
+            d["building_id"] = self.building_id
+        return d
+
+
+@dataclass
+class DailySustainabilityMetrics(DailySustainabilityWrite):
+    """Full read model including server-generated columns.
+
+    Extends DailySustainabilityWrite with columns that Postgres computes
+    via GENERATED ALWAYS AS ... STORED.
+    """
+
+    id: Optional[str] = None  # UUID from Postgres
+    net_grid_kwh: float = 0.0  # grid_kwh - solar_generation_kwh
+    water_kl: float = 0.0  # water_liters / 1000
+    total_kg_co2: float = 0.0  # scope1 + scope2 + scope3
+    created_at: Optional[str] = None  # ISO timestamp
+
+    def to_dict(self) -> Dict:
+        d = super().to_dict()
+        d["id"] = self.id
+        d["net_grid_kwh"] = round(self.net_grid_kwh, 2)
+        d["water_kl"] = round(self.water_kl, 3)
+        d["total_kg_co2"] = round(self.total_kg_co2, 2)
+        d["created_at"] = self.created_at
+        return d
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> "DailySustainabilityMetrics":
+        """Create from Supabase row or JSON record."""
+        dt = data.get("date")
+        if isinstance(dt, str):
+            from datetime import date as _date
+
+            dt = _date.fromisoformat(dt)
+        return cls(
+            id=data.get("id"),
+            site_id=data["site_id"],
+            date=dt,
+            grid_kwh=float(data.get("grid_kwh") or 0),
+            hvac_kwh=float(data.get("hvac_kwh") or 0),
+            lighting_kwh=float(data.get("lighting_kwh") or 0),
+            other_kwh=float(data.get("other_kwh") or 0),
+            solar_generation_kwh=float(data.get("solar_generation_kwh") or 0),
+            solar_export_kwh=float(data.get("solar_export_kwh") or 0),
+            net_grid_kwh=float(data.get("net_grid_kwh") or 0),
+            water_liters=float(data.get("water_liters") or 0),
+            water_kl=float(data.get("water_kl") or 0),
+            diesel_liters=float(data.get("diesel_liters") or 0),
+            generator_runtime_hours=float(data.get("generator_runtime_hours") or 0),
+            avg_occupancy_pct=float(data.get("avg_occupancy_pct") or 0),
+            peak_occupancy_count=int(data.get("peak_occupancy_count") or 0),
+            scope1_kg_co2=float(data.get("scope1_kg_co2") or 0),
+            scope2_kg_co2=float(data.get("scope2_kg_co2") or 0),
+            scope3_kg_co2=float(data.get("scope3_kg_co2") or 0),
+            total_kg_co2=float(data.get("total_kg_co2") or 0),
+            source=data.get("source", "simulation"),
+            building_id=data.get("building_id"),
+            created_at=data.get("created_at"),
+        )
