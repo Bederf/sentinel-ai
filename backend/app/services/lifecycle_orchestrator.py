@@ -47,6 +47,7 @@ from app.services.feedback_collection_service import (
 from app.services.power_meter_validation_engine import get_power_meter_validation_engine
 from app.services.seasonal_modeler import SeasonalModeler
 from app.services.simulation_persistence import get_simulation_persistence
+from app.services.sustainability_metrics_collector import SustainabilityMetricsCollector
 from app.services.thermal_simulation_engine import update_simulation_temperatures
 
 logger = logging.getLogger(__name__)
@@ -324,6 +325,13 @@ class LifecycleOrchestrator:
         # Supabase persistence for dashboard visibility (104-02)
         self.persistence = get_simulation_persistence(site_id=site_id)
 
+        # Sustainability metrics accumulators (111-01)
+        self._daily_hvac_kwh: float = 0.0
+        self._daily_lighting_kwh: float = 0.0
+        self._daily_other_kwh: float = 0.0
+        self._daily_occupancy_samples: list[float] = []
+        self._sustainability_collector = SustainabilityMetricsCollector(self.site_id)
+
     # Equipment type -> technician specialty mapping (106-01)
     EQUIPMENT_SPECIALTY_MAP = {
         "chiller": "HVAC",
@@ -395,6 +403,10 @@ class LifecycleOrchestrator:
         self.zone_temperatures = {}  # Reset zone temps (105-01)
         self.health_status_cache = {}  # Reset health monitoring (106-01)
         self.last_alert_time = {}  # Reset alert cooldowns (106-01)
+        self._daily_hvac_kwh = 0.0  # Reset sustainability accumulators (111-01)
+        self._daily_lighting_kwh = 0.0
+        self._daily_other_kwh = 0.0
+        self._daily_occupancy_samples = []
         logger.info("Orchestrator reset: Ready for fresh demo")
 
     @property
@@ -781,6 +793,9 @@ class LifecycleOrchestrator:
 
                     # Track day transitions (every 24 hours)
                     if iteration > 0 and (iteration % 24) == 0:
+                        # Write daily sustainability snapshot before incrementing day (111-01)
+                        await self._write_daily_sustainability()
+
                         self.days_simulated += 1
                         progress = int((self.days_simulated / max_days) * 100)
                         if is_annual:
@@ -1047,6 +1062,15 @@ class LifecycleOrchestrator:
         self.current_hour_power_kw = base_power
         self.total_energy_kwh += base_power
 
+        # === SUSTAINABILITY ACCUMULATORS (111-01) ===
+        breakdown = getattr(self, "_last_hour_power_breakdown", {})
+        self._daily_hvac_kwh += breakdown.get("hvac_kw", 0)
+        self._daily_lighting_kwh += breakdown.get("lighting_kw", 0)
+        self._daily_other_kwh += breakdown.get("other_kw", 0)
+        if occupancy_data:
+            avg_occ = sum(occupancy_data.values()) / max(len(occupancy_data), 1)
+            self._daily_occupancy_samples.append(avg_occ)
+
         # === POWER METER VALIDATION (A.3) ===
         try:
             power_engine = get_power_meter_validation_engine("S002")
@@ -1109,6 +1133,43 @@ class LifecycleOrchestrator:
                 self._scan_safety_boundaries(equipment_states, hour)
         except Exception as e:
             logger.warning(f"[SAFETY SCAN] Failed safety boundary scan at hour {hour}: {e}")
+
+    async def _write_daily_sustainability(self):
+        """Emit daily sustainability metrics at end of simulated day (111-01)."""
+        try:
+            energy_breakdown = {
+                "total_kwh": self._daily_hvac_kwh + self._daily_lighting_kwh + self._daily_other_kwh,
+                "hvac_kwh": self._daily_hvac_kwh,
+                "lighting_kwh": self._daily_lighting_kwh,
+                "other_kwh": self._daily_other_kwh,
+            }
+            occ_samples = self._daily_occupancy_samples
+            occupancy_data = {
+                "avg_pct": sum(occ_samples) / max(len(occ_samples), 1),
+                "peak_count": int(max(occ_samples, default=0) / 100 * 150),  # 150 capacity
+            }
+
+            metrics = await self._sustainability_collector.collect_daily_metrics(
+                date=self.simulated_time.date(),
+                energy_breakdown=energy_breakdown,
+                occupancy_data=occupancy_data,
+            )
+            await self._sustainability_collector.persist(metrics)
+
+            logger.info(
+                f"[SUSTAINABILITY] Day {self.days_simulated}: "
+                f"grid={energy_breakdown['total_kwh']:.1f} kWh, "
+                f"hvac={energy_breakdown['hvac_kwh']:.1f} kWh, "
+                f"scope2={metrics.scope2_kg_co2:.1f} kg CO2"
+            )
+        except Exception as e:
+            logger.warning(f"[SUSTAINABILITY] Failed to write daily metrics: {e}")
+        finally:
+            # Reset daily accumulators regardless of success
+            self._daily_hvac_kwh = 0.0
+            self._daily_lighting_kwh = 0.0
+            self._daily_other_kwh = 0.0
+            self._daily_occupancy_samples = []
 
     async def _emit_schedule_event(self, hour: int, schedule_state: ScheduleState):
         """Emit events on meaningful schedule transitions."""
@@ -1199,7 +1260,17 @@ class LifecycleOrchestrator:
         total = base_kw + hvac_kw + ahu_kw + lighting_kw + misc_kw
         # Add +/-5% noise for realism
         noise = self._scenario_rng.uniform(0.95, 1.05)
-        return round(total * noise, 1)
+        total_noisy = round(total * noise, 1)
+
+        # Store breakdown for sustainability collector (111-01)
+        self._last_hour_power_breakdown = {
+            "hvac_kw": round((hvac_kw + ahu_kw) * noise, 1),
+            "lighting_kw": round(lighting_kw * noise, 1),
+            "other_kw": round((base_kw + misc_kw) * noise, 1),
+            "total_kw": total_noisy,
+        }
+
+        return total_noisy
 
     def _generate_occupancy_for_hour(self, hour: int) -> dict[str, float]:
         """
