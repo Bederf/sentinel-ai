@@ -2021,98 +2021,40 @@ Provide ONLY the JSON response, no additional text."""
                         recommendations[-1]["confidence"] = 0.5
 
         # ============================================================
-        # DALI Lighting Optimization Rules
+        # DALI Lighting — Tridonic Handles Native Controls
         # ============================================================
+        # Tridonic DALI-2 gateway natively handles:
+        #   - Daylight harvesting (continuous proportional dimming to 500 lux setpoint)
+        #   - Occupancy-based dimming (PIR sensors → 20% when unoccupied)
+        #   - Emergency zone protection (maintains 70% minimum)
+        # AI does NOT duplicate these. Only cross-system coordination recommended.
         lighting_recommendations = []
         cross_system_recommendations = []
         lighting_savings_kw = 0.0
 
         if dali_zones:
             for zone_id, zone in dali_zones.items():
-                occupancy = zone.get("occupancy", {})
                 lighting = zone.get("lighting", {})
                 is_occupied = zone.get("is_occupied", True)
-                has_high_daylight = zone.get("has_high_daylight", False)
 
-                # Skip if no lighting data
                 if not lighting:
                     continue
 
-                current_dim = lighting.get("avg_brightness", lighting.get("avg_dim_level", 0))
-                total_power = lighting.get("total_power_watts", lighting.get("total_power_w", 0))
                 zone_name = zone.get("zone_name", zone_id)
-                is_emergency = "emergency" in zone_name.lower()
 
-                # Rule 5: Unoccupied zone dimming
-                # Dim to 20% (level 51) if zone is unoccupied
-                if not is_occupied and current_dim > 25:  # 25 = ~10%, 51 = ~20%
-                    # Don't dim emergency zones below 70%
-                    target_dim = 178 if is_emergency else 51
-
-                    if current_dim > target_dim:
-                        power_saved = total_power * (1 - target_dim / 254)
-                        lighting_savings_kw += power_saved / 1000
-
-                        lighting_recommendations.append(
-                            {
-                                "equipment_id": zone_id,
-                                "equipment_name": zone_name,
-                                "point_name": "dim_level",
-                                "current_value": int(current_dim * 254 / 100),  # Convert % to DALI level
-                                "recommended_value": target_dim,
-                                "unit": "level",
-                                "reason": (
-                                    f"Zone unoccupied "
-                                    f"({occupancy.get('occupancy_percent', 0):.0f}%"
-                                    f" sensors active) - dim to "
-                                    f"{target_dim * 100 // 254}%"
-                                    f" for safety lighting"
-                                ),
-                                "system": "lighting",
-                            }
-                        )
-
-                        # Add cross-system recommendation for coordinated action
-                        cross_system_recommendations.append(
-                            {
-                                "zone_id": zone_id,
-                                "zone_name": zone_name,
-                                "hvac_action": "Raise setpoint +2°C",
-                                "lighting_action": f"Dim to {target_dim * 100 // 254}%",
-                                "reason": "Zone unoccupied - coordinated energy savings",
-                                "combined_savings_kw": round(power_saved / 1000 + 0.5, 2),  # Estimate HVAC savings
-                            }
-                        )
-
-                # Rule 6: Daylight harvesting
-                # If lux > setpoint (500), dim proportionally
-                elif is_occupied and has_high_daylight and current_dim > 50:
-                    avg_lux = occupancy.get("avg_lux_level", 0)
-                    daylight_excess = (avg_lux - 500) / 500  # How much over setpoint
-                    dim_reduction = min(daylight_excess * 30, 40)  # Max 40% reduction
-
-                    target_dim = max(current_dim - dim_reduction, 30)  # Never below 30%
-
-                    if current_dim - target_dim > 10:  # Only recommend if meaningful
-                        power_saved = total_power * dim_reduction / 100
-                        lighting_savings_kw += power_saved / 1000
-
-                        lighting_recommendations.append(
-                            {
-                                "equipment_id": zone_id,
-                                "equipment_name": zone_name,
-                                "point_name": "dim_level",
-                                "current_value": int(current_dim * 254 / 100),
-                                "recommended_value": int(target_dim * 254 / 100),
-                                "unit": "level",
-                                "reason": (
-                                    f"Daylight harvesting - avg lux"
-                                    f" {avg_lux:.0f} exceeds setpoint"
-                                    f" 500, dim to {target_dim:.0f}%"
-                                ),
-                                "system": "lighting",
-                            }
-                        )
+                # Cross-system only: coordinate HVAC + lighting when zone unoccupied
+                # (Tridonic dims lighting on its own, but can't adjust HVAC)
+                if not is_occupied:
+                    cross_system_recommendations.append(
+                        {
+                            "zone_id": zone_id,
+                            "zone_name": zone_name,
+                            "hvac_action": "Raise setpoint +2°C",
+                            "lighting_action": "Managed by Tridonic controller",
+                            "reason": "Zone unoccupied - HVAC setback (lighting handled by Tridonic)",
+                            "combined_savings_kw": round(0.5, 2),  # HVAC savings only
+                        }
+                    )
 
         # ============================================================
         # Power Equipment Rules (Generators, UPS, ATS)

@@ -22,6 +22,7 @@ EQUIPMENT_TYPES = ["chiller", "ahu", "fcu", "vav", "gen", "pump"]
 @dataclass
 class TrainingResult:
     """Result of a global model training operation."""
+
     success: bool
     global_model_id: str
     model_type: str
@@ -160,9 +161,7 @@ class GlobalModelTrainer:
 
         return models
 
-    def train_global_model(
-        self, model_type: str, equipment_type: str
-    ) -> TrainingResult:
+    def train_global_model(self, model_type: str, equipment_type: str) -> TrainingResult:
         """Train a global model on aggregated fleet data.
 
         Args:
@@ -310,14 +309,11 @@ class GlobalModelTrainer:
                 "r2_pct": round(improvement_pct, 1),
             },
             "recommendation": (
-                "Local model outperforms global" if improvement > 0.01
-                else "Global model competitive with local"
+                "Local model outperforms global" if improvement > 0.01 else "Global model competitive with local"
             ),
         }
 
-    def get_training_history(
-        self, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    def get_training_history(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Get global model training history.
 
         Args:

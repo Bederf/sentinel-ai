@@ -32,6 +32,7 @@ from app.services.niagara.point_discovery import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def classifier():
     """Create a fresh PointClassifier instance."""
@@ -56,6 +57,7 @@ def demo_points():
 # ---------------------------------------------------------------------------
 # Point Classifier Tests
 # ---------------------------------------------------------------------------
+
 
 class TestPointClassifier:
     """Tests for PointClassifier."""
@@ -261,6 +263,7 @@ class TestPointClassifier:
 # Point Discovery Service Tests
 # ---------------------------------------------------------------------------
 
+
 class TestPointDiscoveryService:
     """Tests for PointDiscoveryService."""
 
@@ -357,6 +360,7 @@ class TestPointDiscoveryService:
 # ---------------------------------------------------------------------------
 # Singleton Tests
 # ---------------------------------------------------------------------------
+
 
 class TestSingletons:
     """Test singleton factory functions."""

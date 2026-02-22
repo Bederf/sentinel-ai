@@ -14,14 +14,37 @@ CODEBASE_ROOT = Path("/opt/bms-intelligence")
 
 # Directories to always exclude
 EXCLUDE_DIRS = {
-    "__pycache__", ".git", ".pytest_cache", "node_modules", ".venv", "venv",
-    ".next", "build", "dist", ".env", ".idea", ".vscode", "*.egg-info",
+    "__pycache__",
+    ".git",
+    ".pytest_cache",
+    "node_modules",
+    ".venv",
+    "venv",
+    ".next",
+    "build",
+    "dist",
+    ".env",
+    ".idea",
+    ".vscode",
+    "*.egg-info",
 }
 
 # File extensions to search
 SEARCHABLE_EXTENSIONS = {
-    ".py", ".tsx", ".ts", ".js", ".jsx", ".json", ".md", ".sql", ".yaml", ".yml",
-    ".txt", ".html", ".css", ".scss",
+    ".py",
+    ".tsx",
+    ".ts",
+    ".js",
+    ".jsx",
+    ".json",
+    ".md",
+    ".sql",
+    ".yaml",
+    ".yml",
+    ".txt",
+    ".html",
+    ".css",
+    ".scss",
 }
 
 
@@ -42,11 +65,7 @@ def _should_include_file(path: Path) -> bool:
     return path.suffix.lower() in SEARCHABLE_EXTENSIONS
 
 
-def search_files_by_pattern(
-    pattern: str,
-    base_path: Optional[str] = None,
-    limit: int = 50
-) -> List[Dict[str, Any]]:
+def search_files_by_pattern(pattern: str, base_path: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
     """
     Search for files matching glob pattern.
 
@@ -71,21 +90,25 @@ def search_files_by_pattern(
             for path in root.rglob("*"):
                 if fnmatch.fnmatch(str(path.relative_to(root)), pattern):
                     if _should_include_file(path) and len(matches) < limit:
-                        matches.append({
+                        matches.append(
+                            {
+                                "path": str(path.relative_to(CODEBASE_ROOT)),
+                                "name": path.name,
+                                "type": "directory" if path.is_dir() else "file",
+                                "size": path.stat().st_size if path.is_file() else 0,
+                            }
+                        )
+        else:
+            for path in root.glob(pattern):
+                if _should_include_file(path) and len(matches) < limit:
+                    matches.append(
+                        {
                             "path": str(path.relative_to(CODEBASE_ROOT)),
                             "name": path.name,
                             "type": "directory" if path.is_dir() else "file",
                             "size": path.stat().st_size if path.is_file() else 0,
-                        })
-        else:
-            for path in root.glob(pattern):
-                if _should_include_file(path) and len(matches) < limit:
-                    matches.append({
-                        "path": str(path.relative_to(CODEBASE_ROOT)),
-                        "name": path.name,
-                        "type": "directory" if path.is_dir() else "file",
-                        "size": path.stat().st_size if path.is_file() else 0,
-                    })
+                        }
+                    )
     except Exception as e:
         return [{"error": f"Search failed: {str(e)}"}]
 
@@ -93,10 +116,7 @@ def search_files_by_pattern(
 
 
 def search_file_contents(
-    query: str,
-    base_path: Optional[str] = None,
-    is_regex: bool = False,
-    limit: int = 20
+    query: str, base_path: Optional[str] = None, is_regex: bool = False, limit: int = 20
 ) -> List[Dict[str, Any]]:
     """
     Search file contents for keyword or regex pattern.
@@ -136,25 +156,31 @@ def search_file_contents(
                 for line_no, line in enumerate(lines, 1):
                     if is_regex:
                         if pattern.search(line):
-                            file_matches.append({
-                                "line_no": line_no,
-                                "line": line.rstrip(),
-                                "context": "".join(lines[max(0, line_no-2):min(len(lines), line_no+1)])
-                            })
+                            file_matches.append(
+                                {
+                                    "line_no": line_no,
+                                    "line": line.rstrip(),
+                                    "context": "".join(lines[max(0, line_no - 2) : min(len(lines), line_no + 1)]),
+                                }
+                            )
                     else:
                         if query_lower in line.lower():
-                            file_matches.append({
-                                "line_no": line_no,
-                                "line": line.rstrip(),
-                                "context": "".join(lines[max(0, line_no-2):min(len(lines), line_no+1)])
-                            })
+                            file_matches.append(
+                                {
+                                    "line_no": line_no,
+                                    "line": line.rstrip(),
+                                    "context": "".join(lines[max(0, line_no - 2) : min(len(lines), line_no + 1)]),
+                                }
+                            )
 
                 if file_matches and len(matches) < limit:
-                    matches.append({
-                        "path": str(path.relative_to(CODEBASE_ROOT)),
-                        "match_count": len(file_matches),
-                        "matches": file_matches[:5],  # Limit matches per file
-                    })
+                    matches.append(
+                        {
+                            "path": str(path.relative_to(CODEBASE_ROOT)),
+                            "match_count": len(file_matches),
+                            "matches": file_matches[:5],  # Limit matches per file
+                        }
+                    )
             except Exception:
                 pass  # Skip files we can't read
 
@@ -221,13 +247,15 @@ def search_symbols(
                             symbol_type = "function"
 
                     if symbol_type:
-                        matches.append({
-                            "path": str(path.relative_to(CODEBASE_ROOT)),
-                            "type": symbol_type,
-                            "name": symbol_name,
-                            "line_no": line_no,
-                            "line": line.rstrip(),
-                        })
+                        matches.append(
+                            {
+                                "path": str(path.relative_to(CODEBASE_ROOT)),
+                                "type": symbol_type,
+                                "name": symbol_name,
+                                "line_no": line_no,
+                                "line": line.rstrip(),
+                            }
+                        )
 
             except Exception:
                 pass  # Skip files we can't read
@@ -239,9 +267,7 @@ def search_symbols(
 
 
 def build_directory_tree(
-    base_path: Optional[str] = None,
-    depth: int = 2,
-    exclude_patterns: Optional[List[str]] = None
+    base_path: Optional[str] = None, depth: int = 2, exclude_patterns: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
     Build directory tree structure.
@@ -301,7 +327,7 @@ def build_directory_tree(
             "total_directories": dir_count,
             "max_depth": depth,
             "root_path": str(root.relative_to(CODEBASE_ROOT)) if base_path else "/",
-        }
+        },
     }
 
 

@@ -1,4 +1,5 @@
 """RAG API endpoints for documentation search and LLM explanations."""
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List, Dict
@@ -14,6 +15,7 @@ router = APIRouter(prefix="/api/rag", tags=["rag"])
 
 
 # Request/Response Models
+
 
 class QueryRequest(BaseModel):
     query: str
@@ -64,6 +66,7 @@ class KnowledgeRequest(BaseModel):
 
 # Endpoints
 
+
 @router.post("/query", response_model=QueryResponse)
 async def query_rag(request: QueryRequest):
     """Query the RAG system with natural language."""
@@ -74,7 +77,7 @@ async def query_rag(request: QueryRequest):
         query=request.query,
         equipment_type=request.equipment_type,
         use_hybrid=request.use_hybrid,
-        use_local_llm=request.use_local_llm
+        use_local_llm=request.use_local_llm,
     )
 
     return QueryResponse(**result)
@@ -86,7 +89,7 @@ async def search_documents(
     equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
     document_type: Optional[str] = Query(None, description="Filter by document type"),
     n_results: int = Query(5, ge=1, le=20, description="Number of results"),
-    similarity_threshold: float = Query(0.5, ge=0.0, le=1.0, description="Minimum similarity score")
+    similarity_threshold: float = Query(0.5, ge=0.0, le=1.0, description="Minimum similarity score"),
 ):
     """Search documents by semantic similarity."""
     client = get_supabase_client()
@@ -97,7 +100,7 @@ async def search_documents(
         n_results=n_results,
         equipment_type=equipment_type,
         document_type=document_type,
-        similarity_threshold=similarity_threshold
+        similarity_threshold=similarity_threshold,
     )
 
     return {"query": query, "count": len(results), "results": results}
@@ -108,17 +111,14 @@ async def search_knowledge(
     query: str = Query(..., description="Search query"),
     equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
     knowledge_type: Optional[str] = Query(None, description="Filter by knowledge type"),
-    n_results: int = Query(5, ge=1, le=20, description="Number of results")
+    n_results: int = Query(5, ge=1, le=20, description="Number of results"),
 ):
     """Search equipment knowledge base."""
     client = get_supabase_client()
     vector_db = get_vector_db_service(client)
 
     results = vector_db.search_knowledge(
-        query=query,
-        n_results=n_results,
-        equipment_type=equipment_type,
-        knowledge_type=knowledge_type
+        query=query, n_results=n_results, equipment_type=equipment_type, knowledge_type=knowledge_type
     )
 
     return {"query": query, "count": len(results), "results": results}
@@ -130,7 +130,7 @@ async def hybrid_search(
     equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
     n_results: int = Query(5, ge=1, le=20, description="Number of results"),
     keyword_weight: float = Query(0.3, ge=0.0, le=1.0, description="Weight for keyword matching"),
-    semantic_weight: float = Query(0.7, ge=0.0, le=1.0, description="Weight for semantic matching")
+    semantic_weight: float = Query(0.7, ge=0.0, le=1.0, description="Weight for semantic matching"),
 ):
     """Hybrid search combining keyword and semantic matching."""
     client = get_supabase_client()
@@ -141,7 +141,7 @@ async def hybrid_search(
         n_results=n_results,
         equipment_type=equipment_type,
         keyword_weight=keyword_weight,
-        semantic_weight=semantic_weight
+        semantic_weight=semantic_weight,
     )
 
     return {"query": query, "count": len(results), "results": results}
@@ -149,8 +149,7 @@ async def hybrid_search(
 
 @router.get("/explain/{equipment_id}")
 async def explain_equipment_risk(
-    equipment_id: str,
-    include_context: bool = Query(True, description="Include RAG context in response")
+    equipment_id: str, include_context: bool = Query(True, description="Include RAG context in response")
 ):
     """Get natural language explanation for equipment risk prediction."""
     client = get_supabase_client()
@@ -161,7 +160,7 @@ async def explain_equipment_risk(
 
     # Check if we have equipment in the database
     try:
-        equipment_result = client.table('equipment').select('*').eq('id', equipment_id).single().execute()
+        equipment_result = client.table("equipment").select("*").eq("id", equipment_id).single().execute()
         if equipment_result.data:
             equipment = equipment_result.data
             prediction = {
@@ -172,7 +171,7 @@ async def explain_equipment_risk(
                 "predicted_failure": "General maintenance required",
                 "anomaly_score": 0.002,
                 "risk_level": "low",
-                "contributing_factors": []
+                "contributing_factors": [],
             }
     except Exception as e:
         logger.warning(f"Equipment lookup failed: {e}")
@@ -191,8 +190,8 @@ async def explain_equipment_risk(
                 {"factor": "Runtime hours", "importance": 0.35},
                 {"factor": "Vibration trend", "importance": 0.28},
                 {"factor": "Oil analysis", "importance": 0.22},
-                {"factor": "Age", "importance": 0.15}
-            ]
+                {"factor": "Age", "importance": 0.15},
+            ],
         }
 
     explanation = await rag_service.explain_prediction(equipment_id, prediction)
@@ -221,21 +220,21 @@ async def add_document(request: DocumentRequest):
         model=request.model,
         summary=request.summary,
         keywords=request.keywords,
-        failure_modes=request.failure_modes
+        failure_modes=request.failure_modes,
     )
 
     if not doc:
         raise HTTPException(status_code=500, detail="Failed to create document")
 
     # Chunk and embed
-    chunk_count = vector_db.chunk_and_embed_document(doc['id'])
+    chunk_count = vector_db.chunk_and_embed_document(doc["id"])
 
     return {
-        "id": doc['id'],
-        "code": doc['code'],
-        "title": doc['title'],
+        "id": doc["id"],
+        "code": doc["code"],
+        "title": doc["title"],
         "chunk_count": chunk_count,
-        "status": "indexed"
+        "status": "indexed",
     }
 
 
@@ -260,18 +259,18 @@ async def add_knowledge(request: KnowledgeRequest):
         solution=request.solution,
         parts_required=request.parts_required,
         estimated_labor_hours=request.estimated_labor_hours,
-        priority=request.priority
+        priority=request.priority,
     )
 
     if not entry:
         raise HTTPException(status_code=500, detail="Failed to create knowledge entry")
 
     return {
-        "id": entry['id'],
-        "title": entry['title'],
-        "equipment_type": entry['equipment_type'],
-        "knowledge_type": entry['knowledge_type'],
-        "status": "indexed"
+        "id": entry["id"],
+        "title": entry["title"],
+        "equipment_type": entry["equipment_type"],
+        "knowledge_type": entry["knowledge_type"],
+        "status": "indexed",
     }
 
 
@@ -279,17 +278,13 @@ async def add_knowledge(request: KnowledgeRequest):
 async def list_documents(
     equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
     document_type: Optional[str] = Query(None, description="Filter by document type"),
-    limit: int = Query(50, ge=1, le=200, description="Maximum number of results")
+    limit: int = Query(50, ge=1, le=200, description="Maximum number of results"),
 ):
     """List documents in the RAG system."""
     client = get_supabase_client()
     vector_db = get_vector_db_service(client)
 
-    documents = vector_db.list_documents(
-        equipment_type=equipment_type,
-        document_type=document_type,
-        limit=limit
-    )
+    documents = vector_db.list_documents(equipment_type=equipment_type, document_type=document_type, limit=limit)
 
     return {"count": len(documents), "documents": documents}
 
@@ -314,7 +309,7 @@ async def reindex_document(document_id: str):
     vector_db = get_vector_db_service(client)
 
     # Delete existing chunks
-    client.table('document_chunks').delete().eq('document_id', document_id).execute()
+    client.table("document_chunks").delete().eq("document_id", document_id).execute()
 
     # Re-chunk and embed
     chunk_count = vector_db.chunk_and_embed_document(document_id)
@@ -337,15 +332,15 @@ async def rag_health():
 
     try:
         # Check documents table
-        doc_result = client.table('documents').select('id', count='exact').execute()
+        doc_result = client.table("documents").select("id", count="exact").execute()
         document_count = doc_result.count or 0
 
         # Check chunks table
-        chunk_result = client.table('document_chunks').select('id', count='exact').execute()
+        chunk_result = client.table("document_chunks").select("id", count="exact").execute()
         chunk_count = chunk_result.count or 0
 
         # Check knowledge table
-        knowledge_result = client.table('equipment_knowledge').select('id', count='exact').execute()
+        knowledge_result = client.table("equipment_knowledge").select("id", count="exact").execute()
         knowledge_count = knowledge_result.count or 0
 
         db_available = True
@@ -356,7 +351,7 @@ async def rag_health():
     ollama_models = []
     if ollama_available:
         models = await ollama.list_models()
-        ollama_models = [m.get('name', 'unknown') for m in models]
+        ollama_models = [m.get("name", "unknown") for m in models]
 
     status = "healthy" if (ollama_available and db_available) else "degraded"
     if not db_available:
@@ -368,12 +363,12 @@ async def rag_health():
             "available": ollama_available,
             "url": ollama.base_url,
             "default_model": ollama.default_model,
-            "models": ollama_models
+            "models": ollama_models,
         },
         "database": {
             "available": db_available,
             "documents": document_count,
             "chunks": chunk_count,
-            "knowledge_entries": knowledge_count
-        }
+            "knowledge_entries": knowledge_count,
+        },
     }

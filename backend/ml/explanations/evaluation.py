@@ -15,12 +15,14 @@ from datetime import datetime
 # Optional imports for advanced metrics
 try:
     from bert_score import score as bert_score
+
     BERT_SCORE_AVAILABLE = True
 except ImportError:
     BERT_SCORE_AVAILABLE = False
 
 try:
     from rouge_score import rouge_scorer
+
     ROUGE_AVAILABLE = True
 except ImportError:
     ROUGE_AVAILABLE = False
@@ -28,6 +30,7 @@ except ImportError:
 try:
     import nltk
     from nltk.translate.bleu_score import sentence_bleu
+
     NLTK_AVAILABLE = True
 except ImportError:
     NLTK_AVAILABLE = False
@@ -65,10 +68,7 @@ class ExplanationMetrics:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
-        return {
-            k: v for k, v in self.__dict__.items()
-            if not k.startswith('_')
-        }
+        return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
 
 
 class ExplanationEvaluator:
@@ -88,10 +88,7 @@ class ExplanationEvaluator:
 
         if ROUGE_AVAILABLE:
             try:
-                self.rouge_scorer = rouge_scorer.RougeScorer(
-                    ['rouge1', 'rouge2', 'rougeL'],
-                    use_stemmer=True
-                )
+                self.rouge_scorer = rouge_scorer.RougeScorer(["rouge1", "rouge2", "rougeL"], use_stemmer=True)
             except Exception as e:
                 logger.warning(f"ROUGE scorer initialization failed: {e}")
 
@@ -100,7 +97,7 @@ class ExplanationEvaluator:
         predicted_explanation: str,
         reference_explanation: Optional[str] = None,
         generated_actions: Optional[List[Dict]] = None,
-        context_documents: Optional[List[Dict]] = None
+        context_documents: Optional[List[Dict]] = None,
     ) -> ExplanationMetrics:
         """
         Evaluate a generated explanation against references.
@@ -118,10 +115,7 @@ class ExplanationEvaluator:
 
         # Semantic similarity metrics (if reference provided)
         if reference_explanation:
-            similarity_metrics = self._calculate_similarity(
-                predicted_explanation,
-                reference_explanation
-            )
+            similarity_metrics = self._calculate_similarity(predicted_explanation, reference_explanation)
             metrics.bert_precision = similarity_metrics.get("bert_precision")
             metrics.bert_recall = similarity_metrics.get("bert_recall")
             metrics.bert_f1 = similarity_metrics.get("bert_f1")
@@ -136,10 +130,7 @@ class ExplanationEvaluator:
 
         # Factuality score based on RAG grounding
         if context_documents:
-            metrics.factuality_score = self._calculate_factuality(
-                predicted_explanation,
-                context_documents
-            )
+            metrics.factuality_score = self._calculate_factuality(predicted_explanation, context_documents)
 
         # Intrinsic metrics
         metrics.completeness_score = self._calculate_completeness(predicted_explanation)
@@ -147,11 +138,7 @@ class ExplanationEvaluator:
 
         return metrics
 
-    def _calculate_similarity(
-        self,
-        predicted: str,
-        reference: str
-    ) -> Dict[str, Optional[float]]:
+    def _calculate_similarity(self, predicted: str, reference: str) -> Dict[str, Optional[float]]:
         """Calculate semantic similarity between texts."""
         metrics = {}
 
@@ -189,10 +176,7 @@ class ExplanationEvaluator:
             try:
                 reference_tokens = reference.lower().split()
                 predicted_tokens = predicted.lower().split()
-                metrics["bleu_score"] = sentence_bleu(
-                    [reference_tokens],
-                    predicted_tokens
-                )
+                metrics["bleu_score"] = sentence_bleu([reference_tokens], predicted_tokens)
             except Exception as e:
                 logger.warning(f"BLEU calculation failed: {e}")
 
@@ -244,11 +228,7 @@ class ExplanationEvaluator:
         # Average across all actions
         return total_score / len(actions)
 
-    def _calculate_factuality(
-        self,
-        explanation: str,
-        context_docs: List[Dict]
-    ) -> float:
+    def _calculate_factuality(self, explanation: str, context_docs: List[Dict]) -> float:
         """
         Calculate factuality score based on RAG grounding.
 
@@ -299,10 +279,10 @@ class ExplanationEvaluator:
 
         # Check for key explanation components
         completeness_checks = [
-            ("observation", ['observed', 'showing', 'shows', 'indicates']),
-            ("interpretation", ['because', 'due to', 'caused by', 'suggests']),
-            ("implication", ['could lead to', 'may result in', 'impact']),
-            ("recommendation", ['recommend', 'should', 'advised to', 'consider']),
+            ("observation", ["observed", "showing", "shows", "indicates"]),
+            ("interpretation", ["because", "due to", "caused by", "suggests"]),
+            ("implication", ["could lead to", "may result in", "impact"]),
+            ("recommendation", ["recommend", "should", "advised to", "consider"]),
         ]
 
         for component, keywords in completeness_checks:
@@ -317,7 +297,7 @@ class ExplanationEvaluator:
             return 0.0
 
         words = explanation.split()
-        sentences = explanation.split('.')
+        sentences = explanation.split(".")
 
         # Ideal: 8-60 words, 1-3 sentences
         word_count = len(words)
@@ -459,20 +439,15 @@ def format_evaluation_results(results: List[ExplanationMetrics]) -> Dict[str, fl
 
     all_metrics = {}
     for metric_name in vars(results[0]).keys():
-        values = [
-            getattr(r, metric_name) for r in results
-            if getattr(r, metric_name) is not None
-        ]
-        numeric_values = [
-            v for v in values if isinstance(v, (int, float, np.floating))
-        ]
+        values = [getattr(r, metric_name) for r in results if getattr(r, metric_name) is not None]
+        numeric_values = [v for v in values if isinstance(v, (int, float, np.floating))]
         if numeric_values:
             all_metrics[metric_name] = {
                 "count": len(numeric_values),
                 "mean": np.mean(numeric_values),
                 "std": np.std(numeric_values),
                 "min": np.min(numeric_values),
-                "max": np.max(numeric_values)
+                "max": np.max(numeric_values),
             }
 
     return all_metrics

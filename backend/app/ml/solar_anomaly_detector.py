@@ -22,24 +22,24 @@ logger = logging.getLogger(__name__)
 
 # === String anomaly thresholds ===
 
-CURRENT_DEVIATION_THRESHOLD = 0.08      # 8% deviation from baseline
-VOLTAGE_DEVIATION_THRESHOLD = 0.08      # 8% deviation
-POWER_DEVIATION_THRESHOLD = 0.10        # 10% deviation
+CURRENT_DEVIATION_THRESHOLD = 0.08  # 8% deviation from baseline
+VOLTAGE_DEVIATION_THRESHOLD = 0.08  # 8% deviation
+POWER_DEVIATION_THRESHOLD = 0.10  # 10% deviation
 
 # Failure detection thresholds
-DEAD_STRING_CURRENT_THRESHOLD = 0.1     # <0.1A = dead string
-DEAD_STRING_VOLTAGE_THRESHOLD = 45.0    # >45V = open circuit (high voltage)
+DEAD_STRING_CURRENT_THRESHOLD = 0.1  # <0.1A = dead string
+DEAD_STRING_VOLTAGE_THRESHOLD = 45.0  # >45V = open circuit (high voltage)
 
 SHORTED_STRING_VOLTAGE_THRESHOLD = 5.0  # <5V = short circuit
 SHORTED_STRING_CURRENT_THRESHOLD = 8.0  # >8A = short circuit (high current)
 
-DEGRADED_STRING_POWER_LOSS = 0.20       # >20% power loss = degraded
-BYPASS_DIODE_VOLTAGE_RIPPLE = 0.15      # >15% voltage variance = bypass diode failure
+DEGRADED_STRING_POWER_LOSS = 0.20  # >20% power loss = degraded
+BYPASS_DIODE_VOLTAGE_RIPPLE = 0.15  # >15% voltage variance = bypass diode failure
 
 # Anomaly scoring
 ANOMALY_SCORE_THRESHOLDS = {
-    "warning": 70,      # >70: Warning, investigate within 24h
-    "critical": 90,     # >90: Critical, stop array or shut down
+    "warning": 70,  # >70: Warning, investigate within 24h
+    "critical": 90,  # >90: Critical, stop array or shut down
 }
 
 ANOMALY_PERSISTENCE_HOURS = 4  # >4h persistent = likely hardware failure
@@ -48,6 +48,7 @@ ANOMALY_PERSISTENCE_HOURS = 4  # >4h persistent = likely hardware failure
 @dataclass
 class StringBaseline:
     """7-day rolling baseline for a PV string."""
+
     string_id: str
     inverter_id: str
     mppt_tracker: int
@@ -89,6 +90,7 @@ class StringBaseline:
 @dataclass
 class StringHealthScore:
     """Health assessment for a single string."""
+
     string_id: str
     inverter_id: str
     timestamp: str
@@ -179,10 +181,7 @@ class StringAnalyzer:
         power_deviation = 0.0
 
         if baseline.voltage_v_avg > 0:
-            voltage_deviation = (
-                abs(string.dc_voltage_v - baseline.voltage_v_avg)
-                / baseline.voltage_v_avg
-            )
+            voltage_deviation = abs(string.dc_voltage_v - baseline.voltage_v_avg) / baseline.voltage_v_avg
 
         if baseline.current_a_avg > 0:
             # Current is expected to vary with irradiance
@@ -190,8 +189,7 @@ class StringAnalyzer:
                 string.irradiance_w_m2 / 500.0
             )  # Normalize to 500 W/m²
             current_deviation = (
-                abs(string.dc_current_a - current_baseline_adjusted)
-                / current_baseline_adjusted
+                abs(string.dc_current_a - current_baseline_adjusted) / current_baseline_adjusted
                 if current_baseline_adjusted > 0.1
                 else 0.0
             )
@@ -201,8 +199,7 @@ class StringAnalyzer:
                 (string.irradiance_w_m2 / 500.0) ** 1.1
             )  # Power scales non-linearly
             power_deviation = (
-                abs(string.dc_power_kw - power_baseline_adjusted)
-                / power_baseline_adjusted
+                abs(string.dc_power_kw - power_baseline_adjusted) / power_baseline_adjusted
                 if power_baseline_adjusted > 0.01
                 else 0.0
             )
@@ -267,10 +264,7 @@ class StringAnalyzer:
         failure_type = None
 
         # Dead string: High voltage, no current
-        if (
-            string.dc_voltage_v > DEAD_STRING_VOLTAGE_THRESHOLD
-            and string.dc_current_a < DEAD_STRING_CURRENT_THRESHOLD
-        ):
+        if string.dc_voltage_v > DEAD_STRING_VOLTAGE_THRESHOLD and string.dc_current_a < DEAD_STRING_CURRENT_THRESHOLD:
             failure_type = "dead"
             confidence = min(1.0, (string.dc_voltage_v / 50.0) * (0.1 / (string.dc_current_a + 0.01)))
 
@@ -284,9 +278,7 @@ class StringAnalyzer:
 
         # Degraded string: Sustained power loss >20%
         elif string.dc_power_kw > 0.01:
-            power_baseline_adjusted = baseline.power_kw_avg * (
-                (string.irradiance_w_m2 / 500.0) ** 1.1
-            )
+            power_baseline_adjusted = baseline.power_kw_avg * ((string.irradiance_w_m2 / 500.0) ** 1.1)
             if power_baseline_adjusted > 0.01:
                 power_loss = (power_baseline_adjusted - string.dc_power_kw) / power_baseline_adjusted
                 if power_loss > DEGRADED_STRING_POWER_LOSS:
@@ -294,10 +286,7 @@ class StringAnalyzer:
                     confidence = min(1.0, power_loss - DEGRADED_STRING_POWER_LOSS)
 
         # Bypass diode failure: High voltage ripple (variance in readings)
-        if (
-            string.irradiance_w_m2 > 200
-            and string.dc_voltage_v > baseline.voltage_v_avg * 1.1
-        ):
+        if string.irradiance_w_m2 > 200 and string.dc_voltage_v > baseline.voltage_v_avg * 1.1:
             # Check if we have history to detect ripple pattern
             if baseline.voltage_history and len(baseline.voltage_history) > 3:
                 voltage_std = statistics.stdev(baseline.voltage_history[-5:])
@@ -356,11 +345,11 @@ class StringAnalyzer:
 
         # Penalty for specific failure types
         failure_penalties = {
-            "dead": 100,           # Critical
-            "shorted": 95,         # Critical
-            "degraded": 50,        # Warning
-            "bypass_diode": 70,    # Warning
-            "healthy": 0,          # No penalty
+            "dead": 100,  # Critical
+            "shorted": 95,  # Critical
+            "degraded": 50,  # Warning
+            "bypass_diode": 70,  # Warning
+            "healthy": 0,  # No penalty
         }
 
         failure_penalty = failure_penalties.get(failure_type, 0)
@@ -417,8 +406,7 @@ class StringAnalyzer:
         # Keep only last 24 hours
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
         self._anomaly_history[string_id] = [
-            a for a in self._anomaly_history[string_id]
-            if datetime.fromisoformat(a.timestamp) > cutoff_time
+            a for a in self._anomaly_history[string_id] if datetime.fromisoformat(a.timestamp) > cutoff_time
         ]
 
         # Check for persistence
@@ -482,15 +470,21 @@ class StringAnalyzer:
         # Recalculate averages and std deviation
         if baseline.voltage_history:
             baseline.voltage_v_avg = statistics.mean(baseline.voltage_history)
-            baseline.voltage_v_std = statistics.stdev(baseline.voltage_history) if len(baseline.voltage_history) > 1 else 0.5
+            baseline.voltage_v_std = (
+                statistics.stdev(baseline.voltage_history) if len(baseline.voltage_history) > 1 else 0.5
+            )
 
         if baseline.current_history:
             baseline.current_a_avg = statistics.mean(baseline.current_history)
-            baseline.current_a_std = statistics.stdev(baseline.current_history) if len(baseline.current_history) > 1 else 0.5
+            baseline.current_a_std = (
+                statistics.stdev(baseline.current_history) if len(baseline.current_history) > 1 else 0.5
+            )
 
         if baseline.power_history:
             baseline.power_kw_avg = statistics.mean(baseline.power_history)
-            baseline.power_kw_std = statistics.stdev(baseline.power_history) if len(baseline.power_history) > 1 else 0.02
+            baseline.power_kw_std = (
+                statistics.stdev(baseline.power_history) if len(baseline.power_history) > 1 else 0.02
+            )
 
         baseline.last_updated = datetime.now(timezone.utc).isoformat()
 

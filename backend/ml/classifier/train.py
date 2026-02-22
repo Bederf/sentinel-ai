@@ -35,12 +35,7 @@ class ClassifierTrainer:
 
         self.registry = ModelRegistry()
 
-    def train_equipment_type(
-        self,
-        equipment_type: str,
-        n_estimators: int = 100,
-        max_depth: int = 10
-    ) -> dict:
+    def train_equipment_type(self, equipment_type: str, n_estimators: int = 100, max_depth: int = 10) -> dict:
         """Train classifier for an equipment type.
 
         Args:
@@ -61,11 +56,7 @@ class ClassifierTrainer:
             logger.info(f"Prepared {len(X)} samples with {len(y.unique())} classes")
         except Exception as e:
             logger.error(f"Failed to prepare data for {equipment_type}: {e}")
-            return {
-                "equipment_type": equipment_type,
-                "error": str(e),
-                "status": "failed"
-            }
+            return {"equipment_type": equipment_type, "error": str(e), "status": "failed"}
 
         # Train model
         model = FailureClassifier(n_estimators=n_estimators, max_depth=max_depth)
@@ -75,14 +66,10 @@ class ClassifierTrainer:
             logger.info(f"Training complete: CV accuracy {metrics['cv_accuracy']:.3f}")
         except Exception as e:
             logger.error(f"Failed to train model for {equipment_type}: {e}")
-            return {
-                "equipment_type": equipment_type,
-                "error": str(e),
-                "status": "failed"
-            }
+            return {"equipment_type": equipment_type, "error": str(e), "status": "failed"}
 
         # Save model
-        timestamp = datetime.now().strftime('%Y%m%d')
+        timestamp = datetime.now().strftime("%Y%m%d")
         model_filename = f"{equipment_type}_rf_{timestamp}.joblib"
         model_path = self.models_dir / model_filename
 
@@ -91,11 +78,7 @@ class ClassifierTrainer:
             logger.info(f"Model saved to {model_path}")
         except Exception as e:
             logger.error(f"Failed to save model: {e}")
-            return {
-                "equipment_type": equipment_type,
-                "error": f"Save failed: {e}",
-                "status": "failed"
-            }
+            return {"equipment_type": equipment_type, "error": f"Save failed: {e}", "status": "failed"}
 
         # Register in model registry
         try:
@@ -110,8 +93,8 @@ class ClassifierTrainer:
                     "n_samples": metrics["n_samples"],
                     "n_estimators": n_estimators,
                     "max_depth": max_depth,
-                    "trained_at": datetime.now().isoformat()
-                }
+                    "trained_at": datetime.now().isoformat(),
+                },
             )
             logger.info("Model registered in registry")
         except Exception as e:
@@ -126,14 +109,10 @@ class ClassifierTrainer:
             "n_classes": metrics["n_classes"],
             "classes": metrics["classes"],
             "model_path": str(model_path),
-            "feature_importance": metrics["feature_importance"][:5]  # Top 5
+            "feature_importance": metrics["feature_importance"][:5],  # Top 5
         }
 
-    def train_all(
-        self,
-        n_estimators: int = 100,
-        max_depth: int = 10
-    ) -> List[dict]:
+    def train_all(self, n_estimators: int = 100, max_depth: int = 10) -> List[dict]:
         """Train classifiers for all equipment types.
 
         Args:
@@ -163,35 +142,16 @@ def main():
 
     parser = argparse.ArgumentParser(description="Train failure type classifiers")
     parser.add_argument(
-        "--equipment-type",
-        type=str,
-        help="Equipment type to train (chiller, ahu, generator, fcu, ups)"
+        "--equipment-type", type=str, help="Equipment type to train (chiller, ahu, generator, fcu, ups)"
     )
-    parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Train all equipment types"
-    )
-    parser.add_argument(
-        "--n-estimators",
-        type=int,
-        default=100,
-        help="Number of trees in Random Forest (default: 100)"
-    )
-    parser.add_argument(
-        "--max-depth",
-        type=int,
-        default=10,
-        help="Maximum tree depth (default: 10)"
-    )
+    parser.add_argument("--all", action="store_true", help="Train all equipment types")
+    parser.add_argument("--n-estimators", type=int, default=100, help="Number of trees in Random Forest (default: 100)")
+    parser.add_argument("--max-depth", type=int, default=10, help="Maximum tree depth (default: 10)")
 
     args = parser.parse_args()
 
     # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     trainer = ClassifierTrainer()
 
@@ -211,11 +171,7 @@ def main():
 
     elif args.equipment_type:
         print(f"Training {args.equipment_type} classifier...")
-        result = trainer.train_equipment_type(
-            args.equipment_type,
-            args.n_estimators,
-            args.max_depth
-        )
+        result = trainer.train_equipment_type(args.equipment_type, args.n_estimators, args.max_depth)
 
         if result["status"] == "success":
             print("\nTraining successful!")

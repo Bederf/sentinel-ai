@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 # === Enums ===
 
+
 class MaintenancePriority(str, Enum):
     ROUTINE = "routine"
     SOON = "soon"
@@ -59,9 +60,11 @@ STRING_UNDERPERFORM_THRESHOLD = -5.0  # % deviation from peer mean
 
 # === Data models ===
 
+
 @dataclass
 class MaintenanceRecommendation:
     """A single maintenance recommendation."""
+
     type: MaintenanceType
     equipment_id: str
     equipment_name: str
@@ -87,6 +90,7 @@ class MaintenanceRecommendation:
 @dataclass
 class MaintenanceCalendarEntry:
     """An entry in the 90-day maintenance calendar."""
+
     date: str
     type: MaintenanceType
     equipment_id: str
@@ -112,6 +116,7 @@ class MaintenanceCalendarEntry:
 @dataclass
 class MaintenanceCalendar:
     """90-day maintenance schedule."""
+
     site_id: str
     generated_at: str
     entries: List[MaintenanceCalendarEntry] = field(default_factory=list)
@@ -131,6 +136,7 @@ class MaintenanceCalendar:
 @dataclass
 class WorkOrderResult:
     """Result of work order generation."""
+
     work_order_id: str
     equipment_id: str
     description: str
@@ -151,6 +157,7 @@ class WorkOrderResult:
 
 # === Service ===
 
+
 class SolarMaintenanceService:
     """Condition-based maintenance scheduler for solar installations."""
 
@@ -158,9 +165,7 @@ class SolarMaintenanceService:
         self._last_evaluation: Dict[str, datetime] = {}
         logger.info("SolarMaintenanceService initialized")
 
-    async def evaluate_maintenance_needs(
-        self, site_id: str
-    ) -> List[MaintenanceRecommendation]:
+    async def evaluate_maintenance_needs(self, site_id: str) -> List[MaintenanceRecommendation]:
         """Evaluate all equipment and return maintenance recommendations.
 
         Checks:
@@ -195,9 +200,7 @@ class SolarMaintenanceService:
         self._last_evaluation[site_id] = now
         return recommendations
 
-    async def generate_work_orders(
-        self, site_id: str
-    ) -> List[WorkOrderResult]:
+    async def generate_work_orders(self, site_id: str) -> List[WorkOrderResult]:
         """Convert urgent/soon recommendations to work orders.
 
         Uses existing work order patterns with auto-assignment.
@@ -207,31 +210,29 @@ class SolarMaintenanceService:
 
         # Filter to urgent and soon only
         actionable = [
-            r for r in recommendations
-            if r.priority in (MaintenancePriority.URGENT, MaintenancePriority.SOON)
+            r for r in recommendations if r.priority in (MaintenancePriority.URGENT, MaintenancePriority.SOON)
         ]
 
         work_orders: List[WorkOrderResult] = []
         for i, rec in enumerate(actionable, start=1):
             wo_id = f"WO-SOLAR-{site_id.upper()}-{i:03d}"
-            work_orders.append(WorkOrderResult(
-                work_order_id=wo_id,
-                equipment_id=rec.equipment_id,
-                description=f"[{rec.type.value}] {rec.reason}",
-                priority=rec.priority.value,
-                assigned_to="Electrical Team (Solar)",
-                status="created",
-            ))
+            work_orders.append(
+                WorkOrderResult(
+                    work_order_id=wo_id,
+                    equipment_id=rec.equipment_id,
+                    description=f"[{rec.type.value}] {rec.reason}",
+                    priority=rec.priority.value,
+                    assigned_to="Electrical Team (Solar)",
+                    status="created",
+                )
+            )
             logger.info(
-                f"Generated solar work order {wo_id} for {rec.equipment_id} "
-                f"({rec.priority.value}): {rec.reason}"
+                f"Generated solar work order {wo_id} for {rec.equipment_id} ({rec.priority.value}): {rec.reason}"
             )
 
         return work_orders
 
-    async def get_maintenance_schedule(
-        self, site_id: str
-    ) -> MaintenanceCalendar:
+    async def get_maintenance_schedule(self, site_id: str) -> MaintenanceCalendar:
         """Generate 90-day PPM (Planned Preventive Maintenance) calendar.
 
         Includes:
@@ -255,20 +256,20 @@ class SolarMaintenanceService:
 
         # Monthly panel cleaning (1st of each month)
         for month_offset in range(1, 4):
-            clean_date = (
-                now.replace(day=1) + timedelta(days=32 * month_offset)
-            ).replace(day=1)
+            clean_date = (now.replace(day=1) + timedelta(days=32 * month_offset)).replace(day=1)
             if (clean_date - now).days <= 90:
-                entries.append(MaintenanceCalendarEntry(
-                    date=clean_date.strftime("%Y-%m-%d"),
-                    type=MaintenanceType.PANEL_CLEANING,
-                    equipment_id=f"{site_id}-PANELS-ALL",
-                    equipment_name="All PV Panels",
-                    description="Scheduled monthly panel cleaning — remove dust/soiling",
-                    priority=MaintenancePriority.ROUTINE,
-                    estimated_duration_hours=8.0,
-                    estimated_cost_zar=15_000.0,
-                ))
+                entries.append(
+                    MaintenanceCalendarEntry(
+                        date=clean_date.strftime("%Y-%m-%d"),
+                        type=MaintenanceType.PANEL_CLEANING,
+                        equipment_id=f"{site_id}-PANELS-ALL",
+                        equipment_name="All PV Panels",
+                        description="Scheduled monthly panel cleaning — remove dust/soiling",
+                        priority=MaintenancePriority.ROUTINE,
+                        estimated_duration_hours=8.0,
+                        estimated_cost_zar=15_000.0,
+                    )
+                )
 
         # Quarterly inverter visual inspection (15th of quarter month)
         quarter_months = [3, 6, 9, 12]
@@ -277,46 +278,52 @@ class SolarMaintenanceService:
             if q_date < now:
                 q_date = q_date.replace(year=now.year + 1)
             if 0 < (q_date - now).days <= 90:
-                entries.append(MaintenanceCalendarEntry(
-                    date=q_date.strftime("%Y-%m-%d"),
-                    type=MaintenanceType.VISUAL_INSPECTION,
-                    equipment_id=f"{site_id}-INV-ALL",
-                    equipment_name="All Inverters",
-                    description="Quarterly visual inspection — check for damage, corrosion, fan operation",
-                    priority=MaintenancePriority.ROUTINE,
-                    estimated_duration_hours=4.0,
-                    estimated_cost_zar=5_000.0,
-                ))
+                entries.append(
+                    MaintenanceCalendarEntry(
+                        date=q_date.strftime("%Y-%m-%d"),
+                        type=MaintenanceType.VISUAL_INSPECTION,
+                        equipment_id=f"{site_id}-INV-ALL",
+                        equipment_name="All Inverters",
+                        description="Quarterly visual inspection — check for damage, corrosion, fan operation",
+                        priority=MaintenancePriority.ROUTINE,
+                        estimated_duration_hours=4.0,
+                        estimated_cost_zar=5_000.0,
+                    )
+                )
 
         # Annual thermal imaging (June — winter maintenance window)
         thermal_date = now.replace(month=6, day=15)
         if thermal_date < now:
             thermal_date = thermal_date.replace(year=now.year + 1)
         if 0 < (thermal_date - now).days <= 90:
-            entries.append(MaintenanceCalendarEntry(
-                date=thermal_date.strftime("%Y-%m-%d"),
-                type=MaintenanceType.THERMAL_IMAGING,
-                equipment_id=f"{site_id}-PANELS-ALL",
-                equipment_name="All PV Arrays",
-                description="Annual thermal imaging survey — detect hot spots, bypass diode failures",
-                priority=MaintenancePriority.ROUTINE,
-                estimated_duration_hours=6.0,
-                estimated_cost_zar=25_000.0,
-            ))
+            entries.append(
+                MaintenanceCalendarEntry(
+                    date=thermal_date.strftime("%Y-%m-%d"),
+                    type=MaintenanceType.THERMAL_IMAGING,
+                    equipment_id=f"{site_id}-PANELS-ALL",
+                    equipment_name="All PV Arrays",
+                    description="Annual thermal imaging survey — detect hot spots, bypass diode failures",
+                    priority=MaintenancePriority.ROUTINE,
+                    estimated_duration_hours=6.0,
+                    estimated_cost_zar=25_000.0,
+                )
+            )
 
         # Condition-based entries from current recommendations
         recs = await self.evaluate_maintenance_needs(site_id)
         for rec in recs:
-            entries.append(MaintenanceCalendarEntry(
-                date=rec.next_due_date,
-                type=rec.type,
-                equipment_id=rec.equipment_id,
-                equipment_name=rec.equipment_name,
-                description=rec.reason,
-                priority=rec.priority,
-                estimated_duration_hours=self._estimate_duration(rec.type),
-                estimated_cost_zar=rec.estimated_cost_zar,
-            ))
+            entries.append(
+                MaintenanceCalendarEntry(
+                    date=rec.next_due_date,
+                    type=rec.type,
+                    equipment_id=rec.equipment_id,
+                    equipment_name=rec.equipment_name,
+                    description=rec.reason,
+                    priority=rec.priority,
+                    estimated_duration_hours=self._estimate_duration(rec.type),
+                    estimated_cost_zar=rec.estimated_cost_zar,
+                )
+            )
 
         entries.sort(key=lambda e: e.date)
 
@@ -331,9 +338,7 @@ class SolarMaintenanceService:
 
     # --- Private evaluation methods ---
 
-    async def _check_panel_cleaning(
-        self, site_id: str, now: datetime
-    ) -> List[MaintenanceRecommendation]:
+    async def _check_panel_cleaning(self, site_id: str, now: datetime) -> List[MaintenanceRecommendation]:
         """Check for soiling loss — PR decline above expected degradation."""
         recs: List[MaintenanceRecommendation] = []
 
@@ -357,32 +362,34 @@ class SolarMaintenanceService:
         soiling_loss = (expected_pr - current_pr) * 100  # % points
         if soiling_loss > SOILING_LOSS_THRESHOLD_PCT:
             priority = (
-                MaintenancePriority.URGENT if soiling_loss > 5.0
-                else MaintenancePriority.SOON if soiling_loss > 3.0
+                MaintenancePriority.URGENT
+                if soiling_loss > 5.0
+                else MaintenancePriority.SOON
+                if soiling_loss > 3.0
                 else MaintenancePriority.ROUTINE
             )
             due_date = (now + timedelta(days=7 if priority == MaintenancePriority.URGENT else 30)).strftime("%Y-%m-%d")
-            recs.append(MaintenanceRecommendation(
-                type=MaintenanceType.PANEL_CLEANING,
-                equipment_id=f"{site_id}-PANELS-ALL",
-                equipment_name="All PV Panels",
-                priority=priority,
-                estimated_cost_zar=15_000.0,
-                reason=f"Estimated soiling loss {soiling_loss:.1f}% "
-                       f"(PR {current_pr:.2f} vs expected {expected_pr:.2f} after degradation)",
-                next_due_date=due_date,
-                details={
-                    "current_pr": round(current_pr, 3),
-                    "expected_pr_after_degradation": round(expected_pr, 3),
-                    "soiling_loss_pct": round(soiling_loss, 1),
-                    "fleet_degradation_rate_pct_year": round(fleet_avg_rate, 2),
-                },
-            ))
+            recs.append(
+                MaintenanceRecommendation(
+                    type=MaintenanceType.PANEL_CLEANING,
+                    equipment_id=f"{site_id}-PANELS-ALL",
+                    equipment_name="All PV Panels",
+                    priority=priority,
+                    estimated_cost_zar=15_000.0,
+                    reason=f"Estimated soiling loss {soiling_loss:.1f}% "
+                    f"(PR {current_pr:.2f} vs expected {expected_pr:.2f} after degradation)",
+                    next_due_date=due_date,
+                    details={
+                        "current_pr": round(current_pr, 3),
+                        "expected_pr_after_degradation": round(expected_pr, 3),
+                        "soiling_loss_pct": round(soiling_loss, 1),
+                        "fleet_degradation_rate_pct_year": round(fleet_avg_rate, 2),
+                    },
+                )
+            )
         return recs
 
-    async def _check_inverter_service(
-        self, site_id: str, now: datetime
-    ) -> List[MaintenanceRecommendation]:
+    async def _check_inverter_service(self, site_id: str, now: datetime) -> List[MaintenanceRecommendation]:
         """Check inverter runtime hours, fault count, thermal events."""
         recs: List[MaintenanceRecommendation] = []
 
@@ -401,6 +408,7 @@ class SolarMaintenanceService:
 
             # Simulate fault count (seeded per inverter, higher for older units)
             import hashlib
+
             seed = int(hashlib.md5(inv_id.encode()).hexdigest()[:8], 16) % 20
             fault_count = seed  # 0-19 faults
 
@@ -409,7 +417,9 @@ class SolarMaintenanceService:
 
             reasons = []
             if est_runtime_hours > INVERTER_RUNTIME_SERVICE_HOURS:
-                reasons.append(f"Runtime {est_runtime_hours:.0f}h exceeds {INVERTER_RUNTIME_SERVICE_HOURS}h service interval")
+                reasons.append(
+                    f"Runtime {est_runtime_hours:.0f}h exceeds {INVERTER_RUNTIME_SERVICE_HOURS}h service interval"
+                )
             if fault_count >= INVERTER_FAULT_COUNT_THRESHOLD:
                 reasons.append(f"{fault_count} fault events recorded")
             if thermal_events >= INVERTER_THERMAL_EVENT_THRESHOLD:
@@ -418,25 +428,25 @@ class SolarMaintenanceService:
             if reasons:
                 priority = MaintenancePriority.URGENT if len(reasons) >= 2 else MaintenancePriority.SOON
                 due_days = 14 if priority == MaintenancePriority.URGENT else 30
-                recs.append(MaintenanceRecommendation(
-                    type=MaintenanceType.INVERTER_SERVICE,
-                    equipment_id=inv_id,
-                    equipment_name=inv_name,
-                    priority=priority,
-                    estimated_cost_zar=8_500.0,
-                    reason="; ".join(reasons),
-                    next_due_date=(now + timedelta(days=due_days)).strftime("%Y-%m-%d"),
-                    details={
-                        "estimated_runtime_hours": round(est_runtime_hours, 0),
-                        "fault_count": fault_count,
-                        "thermal_events": thermal_events,
-                    },
-                ))
+                recs.append(
+                    MaintenanceRecommendation(
+                        type=MaintenanceType.INVERTER_SERVICE,
+                        equipment_id=inv_id,
+                        equipment_name=inv_name,
+                        priority=priority,
+                        estimated_cost_zar=8_500.0,
+                        reason="; ".join(reasons),
+                        next_due_date=(now + timedelta(days=due_days)).strftime("%Y-%m-%d"),
+                        details={
+                            "estimated_runtime_hours": round(est_runtime_hours, 0),
+                            "fault_count": fault_count,
+                            "thermal_events": thermal_events,
+                        },
+                    )
+                )
         return recs
 
-    async def _check_bess_maintenance(
-        self, site_id: str, now: datetime
-    ) -> List[MaintenanceRecommendation]:
+    async def _check_bess_maintenance(self, site_id: str, now: datetime) -> List[MaintenanceRecommendation]:
         """Check BESS cycle milestones and cell imbalance."""
         recs: List[MaintenanceRecommendation] = []
 
@@ -451,51 +461,52 @@ class SolarMaintenanceService:
         cycles_to_milestone = next_milestone - cycles
 
         if cycles_to_milestone <= 50:
-            recs.append(MaintenanceRecommendation(
-                type=MaintenanceType.BESS_MAINTENANCE,
-                equipment_id=f"{site_id}-BESS-01",
-                equipment_name="BESS Container 1 (LUNA2000)",
-                priority=MaintenancePriority.SOON,
-                estimated_cost_zar=12_000.0,
-                reason=f"Approaching {next_milestone}-cycle maintenance milestone "
-                       f"({cycles} current cycles, {cycles_to_milestone} remaining)",
-                next_due_date=(now + timedelta(days=14)).strftime("%Y-%m-%d"),
-                details={
-                    "current_cycles": cycles,
-                    "next_milestone": next_milestone,
-                    "cycles_remaining": cycles_to_milestone,
-                },
-            ))
+            recs.append(
+                MaintenanceRecommendation(
+                    type=MaintenanceType.BESS_MAINTENANCE,
+                    equipment_id=f"{site_id}-BESS-01",
+                    equipment_name="BESS Container 1 (LUNA2000)",
+                    priority=MaintenancePriority.SOON,
+                    estimated_cost_zar=12_000.0,
+                    reason=f"Approaching {next_milestone}-cycle maintenance milestone "
+                    f"({cycles} current cycles, {cycles_to_milestone} remaining)",
+                    next_due_date=(now + timedelta(days=14)).strftime("%Y-%m-%d"),
+                    details={
+                        "current_cycles": cycles,
+                        "next_milestone": next_milestone,
+                        "cycles_remaining": cycles_to_milestone,
+                    },
+                )
+            )
 
         # Cell imbalance check
         for rack in bess_health.racks:
             if rack.cell_imbalance_mv > BESS_CELL_IMBALANCE_THRESHOLD:
-                priority = (
-                    MaintenancePriority.URGENT if rack.cell_imbalance_mv > 100
-                    else MaintenancePriority.SOON
+                priority = MaintenancePriority.URGENT if rack.cell_imbalance_mv > 100 else MaintenancePriority.SOON
+                recs.append(
+                    MaintenanceRecommendation(
+                        type=MaintenanceType.BESS_MAINTENANCE,
+                        equipment_id=f"{site_id}-BESS-01-RACK-{rack.rack_id}",
+                        equipment_name=f"BESS Rack {rack.rack_id}",
+                        priority=priority,
+                        estimated_cost_zar=18_000.0,
+                        reason=f"Cell imbalance {rack.cell_imbalance_mv:.0f}mV exceeds "
+                        f"{BESS_CELL_IMBALANCE_THRESHOLD}mV threshold "
+                        f"(fleet avg {bess_health.avg_cell_imbalance_mv:.0f}mV)",
+                        next_due_date=(
+                            now + timedelta(days=7 if priority == MaintenancePriority.URGENT else 21)
+                        ).strftime("%Y-%m-%d"),
+                        details={
+                            "rack_id": rack.rack_id,
+                            "cell_imbalance_mv": round(rack.cell_imbalance_mv, 1),
+                            "fleet_avg_mv": round(bess_health.avg_cell_imbalance_mv, 1),
+                        },
+                    )
                 )
-                recs.append(MaintenanceRecommendation(
-                    type=MaintenanceType.BESS_MAINTENANCE,
-                    equipment_id=f"{site_id}-BESS-01-RACK-{rack.rack_id}",
-                    equipment_name=f"BESS Rack {rack.rack_id}",
-                    priority=priority,
-                    estimated_cost_zar=18_000.0,
-                    reason=f"Cell imbalance {rack.cell_imbalance_mv:.0f}mV exceeds "
-                           f"{BESS_CELL_IMBALANCE_THRESHOLD}mV threshold "
-                           f"(fleet avg {bess_health.avg_cell_imbalance_mv:.0f}mV)",
-                    next_due_date=(now + timedelta(days=7 if priority == MaintenancePriority.URGENT else 21)).strftime("%Y-%m-%d"),
-                    details={
-                        "rack_id": rack.rack_id,
-                        "cell_imbalance_mv": round(rack.cell_imbalance_mv, 1),
-                        "fleet_avg_mv": round(bess_health.avg_cell_imbalance_mv, 1),
-                    },
-                ))
 
         return recs
 
-    async def _check_string_repair(
-        self, site_id: str, now: datetime
-    ) -> List[MaintenanceRecommendation]:
+    async def _check_string_repair(self, site_id: str, now: datetime) -> List[MaintenanceRecommendation]:
         """Check for persistently underperforming strings."""
         recs: List[MaintenanceRecommendation] = []
 
@@ -505,27 +516,31 @@ class SolarMaintenanceService:
         for anomaly in anomalies:
             if anomaly.deviation_pct is not None and anomaly.deviation_pct < STRING_UNDERPERFORM_THRESHOLD:
                 priority = (
-                    MaintenancePriority.URGENT if anomaly.deviation_pct < -15
-                    else MaintenancePriority.SOON if anomaly.deviation_pct < -10
+                    MaintenancePriority.URGENT
+                    if anomaly.deviation_pct < -15
+                    else MaintenancePriority.SOON
+                    if anomaly.deviation_pct < -10
                     else MaintenancePriority.ROUTINE
                 )
                 due_days = 7 if priority == MaintenancePriority.URGENT else 30
-                recs.append(MaintenanceRecommendation(
-                    type=MaintenanceType.STRING_REPAIR,
-                    equipment_id=anomaly.string_id,
-                    equipment_name=f"String {anomaly.string_id}",
-                    priority=priority,
-                    estimated_cost_zar=4_500.0,
-                    reason=f"Persistent underperformance: {anomaly.deviation_pct:.1f}% "
-                           f"below peer average — probable cause: {anomaly.anomaly_type}",
-                    next_due_date=(now + timedelta(days=due_days)).strftime("%Y-%m-%d"),
-                    details={
-                        "string_id": anomaly.string_id,
-                        "inverter_id": anomaly.inverter_id,
-                        "deviation_pct": round(anomaly.deviation_pct, 1),
-                        "anomaly_type": anomaly.anomaly_type,
-                    },
-                ))
+                recs.append(
+                    MaintenanceRecommendation(
+                        type=MaintenanceType.STRING_REPAIR,
+                        equipment_id=anomaly.string_id,
+                        equipment_name=f"String {anomaly.string_id}",
+                        priority=priority,
+                        estimated_cost_zar=4_500.0,
+                        reason=f"Persistent underperformance: {anomaly.deviation_pct:.1f}% "
+                        f"below peer average — probable cause: {anomaly.anomaly_type}",
+                        next_due_date=(now + timedelta(days=due_days)).strftime("%Y-%m-%d"),
+                        details={
+                            "string_id": anomaly.string_id,
+                            "inverter_id": anomaly.inverter_id,
+                            "deviation_pct": round(anomaly.deviation_pct, 1),
+                            "anomaly_type": anomaly.anomaly_type,
+                        },
+                    )
+                )
         return recs
 
     def _estimate_duration(self, mtype: MaintenanceType) -> float:

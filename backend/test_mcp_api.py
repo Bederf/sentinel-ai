@@ -62,10 +62,7 @@ def test_get_tool_schema_not_found():
 def test_call_get_buildings():
     """Test POST /call with get_buildings tool."""
     print("Testing POST /call (get_buildings)...")
-    response = requests.post(
-        f"{BASE_URL}/call",
-        json={"tool_name": "get_buildings", "arguments": {}}
-    )
+    response = requests.post(f"{BASE_URL}/call", json={"tool_name": "get_buildings", "arguments": {}})
     assert response.status_code == 200
     data = response.json()
     assert data["tool_name"] == "get_buildings"
@@ -77,10 +74,7 @@ def test_call_get_buildings():
 def test_call_get_devices():
     """Test POST /call with get_devices tool."""
     print("Testing POST /call (get_devices)...")
-    response = requests.post(
-        f"{BASE_URL}/call",
-        json={"tool_name": "get_devices", "arguments": {}}
-    )
+    response = requests.post(f"{BASE_URL}/call", json={"tool_name": "get_devices", "arguments": {}})
     assert response.status_code == 200
     data = response.json()
     assert data["tool_name"] == "get_devices"
@@ -91,10 +85,7 @@ def test_call_get_devices():
 def test_call_get_alarms():
     """Test POST /call with get_alarms tool."""
     print("Testing POST /call (get_alarms)...")
-    response = requests.post(
-        f"{BASE_URL}/call",
-        json={"tool_name": "get_alarms", "arguments": {"limit": 10}}
-    )
+    response = requests.post(f"{BASE_URL}/call", json={"tool_name": "get_alarms", "arguments": {"limit": 10}})
     assert response.status_code == 200
     data = response.json()
     assert data["tool_name"] == "get_alarms"
@@ -109,11 +100,8 @@ def test_call_read_device_point():
         f"{BASE_URL}/call",
         json={
             "tool_name": "read_device_point",
-            "arguments": {
-                "device_id": "S001-CHILLER-B1-001",
-                "point_name": "chw_supply_temp"
-            }
-        }
+            "arguments": {"device_id": "S001-CHILLER-B1-001", "point_name": "chw_supply_temp"},
+        },
     )
     assert response.status_code == 200
     data = response.json()
@@ -129,10 +117,7 @@ def test_call_read_device_point():
 def test_call_unknown_tool():
     """Test POST /call with unknown tool returns 400 error."""
     print("Testing POST /call (unknown_tool, 400 expected)...")
-    response = requests.post(
-        f"{BASE_URL}/call",
-        json={"tool_name": "unknown_tool", "arguments": {}}
-    )
+    response = requests.post(f"{BASE_URL}/call", json={"tool_name": "unknown_tool", "arguments": {}})
     assert response.status_code == 400
     print("  OK: Unknown tool returns 400")
 
@@ -141,11 +126,7 @@ def test_call_get_health_score():
     """Test POST /call with get_health_score tool."""
     print("Testing POST /call (get_health_score)...")
     response = requests.post(
-        f"{BASE_URL}/call",
-        json={
-            "tool_name": "get_health_score",
-            "arguments": {"building_id": "site-001"}
-        }
+        f"{BASE_URL}/call", json={"tool_name": "get_health_score", "arguments": {"building_id": "site-001"}}
     )
     assert response.status_code == 200
     data = response.json()

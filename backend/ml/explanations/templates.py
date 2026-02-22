@@ -171,10 +171,7 @@ EQUIPMENT_CONTEXTS = {
 }
 
 
-def get_equipment_specific_template(
-    equipment_type: str,
-    include_context: bool = True
-) -> str:
+def get_equipment_specific_template(equipment_type: str, include_context: bool = True) -> str:
     """Get the explanation template with equipment-specific additions.
 
     Args:
@@ -190,8 +187,7 @@ def get_equipment_specific_template(
         # Insert equipment-specific context before the RAG context
         equipment_context = EQUIPMENT_CONTEXTS[equipment_type.lower()]
         template = template.replace(
-            "## Relevant Technical Documentation",
-            f"{equipment_context}\n## Relevant Technical Documentation"
+            "## Relevant Technical Documentation", f"{equipment_context}\n## Relevant Technical Documentation"
         )
 
     # Ensure the template includes the literal equipment type for tests/inspection.
@@ -225,8 +221,8 @@ def format_contributing_factors(factors: list) -> str:
         if not isinstance(f, dict):
             lines.append(f"- **{f}:**")
             continue
-        name = f.get('name', f.get('factor', 'Unknown'))
-        importance = f.get('importance', f.get('weight', 0))
+        name = f.get("name", f.get("factor", "Unknown"))
+        importance = f.get("importance", f.get("weight", 0))
         if isinstance(importance, (int, float)):
             if 0 <= float(importance) <= 1:
                 lines.append(f"- **{name}:** {importance:.1%} contribution")
@@ -239,10 +235,7 @@ def format_contributing_factors(factors: list) -> str:
 
 
 def format_prediction_for_template(
-    equipment_id: str,
-    equipment_type: str,
-    predictions: dict,
-    equipment_info: Optional[dict] = None
+    equipment_id: str, equipment_type: str, predictions: dict, equipment_info: Optional[dict] = None
 ) -> dict:
     """Format prediction data for template insertion.
 
@@ -273,9 +266,7 @@ def format_prediction_for_template(
 
     manufacturer = equipment_info.get("manufacturer", "Unknown") if equipment_info else "Unknown"
     model = equipment_info.get("model", "Unknown") if equipment_info else "Unknown"
-    formatted_predictions = (
-        f"Equipment {equipment_id} ({equipment_type}) - {manufacturer} {model}"
-    )
+    formatted_predictions = f"Equipment {equipment_id} ({equipment_type}) - {manufacturer} {model}"
 
     return {
         "equipment_id": equipment_id,

@@ -25,6 +25,7 @@ from app.services.chat_tools import (
 # Chat Tool Tests
 # ---------------------------------------------------------------------------
 
+
 class TestDiscoverNiagaraPointsTool:
     """Tests for the discover_niagara_points chat tool."""
 
@@ -113,9 +114,7 @@ class TestApprovePointMappingTool:
         discovery_id = discover_result["discovery_id"]
 
         # Approve
-        result = await approve_point_mapping(
-            discovery_id, approved_by="test_admin"
-        )
+        result = await approve_point_mapping(discovery_id, approved_by="test_admin")
 
         assert result["success"] is True
         assert result["equipment_created"] > 0
@@ -198,9 +197,7 @@ class TestEndToEndWorkflow:
         assert correct_result["success"] is True
 
         # Step 4: Approve
-        approve_result = await approve_point_mapping(
-            discovery_id, approved_by="test_admin"
-        )
+        approve_result = await approve_point_mapping(discovery_id, approved_by="test_admin")
         assert approve_result["success"] is True
         assert approve_result["equipment_created"] > 0
 
@@ -208,6 +205,7 @@ class TestEndToEndWorkflow:
 # ---------------------------------------------------------------------------
 # Tool Registration Tests
 # ---------------------------------------------------------------------------
+
 
 class TestToolRegistration:
     """Tests that Niagara tools are properly registered."""

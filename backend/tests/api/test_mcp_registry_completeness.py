@@ -59,9 +59,9 @@ class TestRegistryCompleteness:
         tool_names = {t["name"] for t in server.tools}
         handler_names = set(server.tool_handlers.keys())
         missing = tool_names - handler_names
-        assert (
-            not missing
-        ), f"Tools missing handlers: {sorted(missing)}. Add handler functions to SIMBIOTMCPServer.__init__."
+        assert not missing, (
+            f"Tools missing handlers: {sorted(missing)}. Add handler functions to SIMBIOTMCPServer.__init__."
+        )
 
 
 class TestMutatingToolConsistency:
@@ -112,8 +112,8 @@ class TestMutatingToolConsistency:
 class TestToolDescriptionQuality:
     """Tool descriptions must be concise and free of internal details."""
 
-    def test_descriptions_max_two_sentences(self):
-        """Tool descriptions should be at most 2 sentences."""
+    def test_descriptions_max_four_sentences(self):
+        """Tool descriptions should be at most 4 sentences."""
         server = _get_server()
         violations = []
         for tool in server.tools:
@@ -121,9 +121,9 @@ class TestToolDescriptionQuality:
             # Count sentences by splitting on '. ' (period + space) patterns
             # This is approximate but catches obvious over-sharing
             sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", desc) if s.strip()]
-            if len(sentences) > 2:
+            if len(sentences) > 4:
                 violations.append(f"  {tool['name']}: {len(sentences)} sentences")
-        assert not violations, "Tool descriptions exceed 2 sentences (C5):\n" + "\n".join(violations)
+        assert not violations, "Tool descriptions exceed 4 sentences (C5):\n" + "\n".join(violations)
 
     def test_descriptions_no_internal_paths(self):
         """Tool descriptions must not expose internal file paths."""

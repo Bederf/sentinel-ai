@@ -26,13 +26,15 @@ class BudgetReportingService:
         for month in range(1, 13):
             entries = [b for b in budgets if b.get("budget_month") == month and b.get("equipment_type") is None]
             if not entries:
-                monthly.append({
-                    "month": month,
-                    "total_budget_zar": 0.0,
-                    "total_actual_zar": 0.0,
-                    "variance_zar": 0.0,
-                    "spend_percentage": 0.0
-                })
+                monthly.append(
+                    {
+                        "month": month,
+                        "total_budget_zar": 0.0,
+                        "total_actual_zar": 0.0,
+                        "variance_zar": 0.0,
+                        "spend_percentage": 0.0,
+                    }
+                )
                 continue
 
             entry = entries[0]
@@ -41,35 +43,42 @@ class BudgetReportingService:
             variance = float(entry.get("variance_zar") or (total_budget - total_actual))
             spend_pct = round((total_actual / total_budget * 100), 2) if total_budget > 0 else 0.0
 
-            monthly.append({
-                "month": month,
-                "total_budget_zar": total_budget,
-                "total_actual_zar": total_actual,
-                "variance_zar": variance,
-                "spend_percentage": spend_pct
-            })
+            monthly.append(
+                {
+                    "month": month,
+                    "total_budget_zar": total_budget,
+                    "total_actual_zar": total_actual,
+                    "variance_zar": variance,
+                    "spend_percentage": spend_pct,
+                }
+            )
 
         # Equipment-type breakdown (annual totals)
         for budget in budgets:
             equipment_type = budget.get("equipment_type")
             if not equipment_type:
                 continue
-            entry = equipment_type_totals.setdefault(equipment_type, {
-                "equipment_type": equipment_type,
-                "total_budget_zar": 0.0,
-                "total_actual_zar": 0.0,
-                "variance_zar": 0.0,
-                "spend_percentage": 0.0
-            })
+            entry = equipment_type_totals.setdefault(
+                equipment_type,
+                {
+                    "equipment_type": equipment_type,
+                    "total_budget_zar": 0.0,
+                    "total_actual_zar": 0.0,
+                    "variance_zar": 0.0,
+                    "spend_percentage": 0.0,
+                },
+            )
             if month is None or budget.get("budget_month") == month:
                 entry["total_budget_zar"] += float(budget.get("total_budget_zar") or 0.0)
                 entry["total_actual_zar"] += float(budget.get("total_actual_zar") or 0.0)
 
         for entry in equipment_type_totals.values():
             entry["variance_zar"] = entry["total_budget_zar"] - entry["total_actual_zar"]
-            entry["spend_percentage"] = round(
-                (entry["total_actual_zar"] / entry["total_budget_zar"] * 100), 2
-            ) if entry["total_budget_zar"] > 0 else 0.0
+            entry["spend_percentage"] = (
+                round((entry["total_actual_zar"] / entry["total_budget_zar"] * 100), 2)
+                if entry["total_budget_zar"] > 0
+                else 0.0
+            )
 
         filtered_monthly = monthly if month is None else [m for m in monthly if m["month"] == month]
         total_budget_ytd = sum(m["total_budget_zar"] for m in filtered_monthly)
@@ -94,7 +103,7 @@ class BudgetReportingService:
                 "total_budget_zar": round(total_budget_ytd, 2),
                 "total_actual_zar": round(total_actual_ytd, 2),
                 "variance_zar": round(variance_ytd, 2),
-                "spend_percentage": spend_pct_ytd
+                "spend_percentage": spend_pct_ytd,
             },
             "month": month,
             "monthly": filtered_monthly,

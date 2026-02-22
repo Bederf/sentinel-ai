@@ -16,10 +16,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-from app.models.generator import (
-    Generator, GeneratorGroup, DieselTank,
-    GeneratorHealth, PredictiveIndicator
-)
+from app.models.generator import Generator, GeneratorGroup, DieselTank, GeneratorHealth, PredictiveIndicator
 
 
 class GeneratorService:
@@ -60,18 +57,19 @@ class GeneratorService:
                     tank = DieselTank(**t)
                     self._tanks[tank.tank_id] = tank
 
-                logger.info(f"Loaded generator data from {data_path}: "
-                           f"{len(self._generators)} generators, "
-                           f"{len(self._groups)} groups, "
-                           f"{len(self._tanks)} tanks")
+                logger.info(
+                    f"Loaded generator data from {data_path}: "
+                    f"{len(self._generators)} generators, "
+                    f"{len(self._groups)} groups, "
+                    f"{len(self._tanks)} tanks"
+                )
                 break
         else:
             logger.warning("Generator mock data not found")
 
     # === Generator Operations ===
 
-    def get_generators(self, site_id: Optional[str] = None,
-                       group_id: Optional[str] = None) -> List[Generator]:
+    def get_generators(self, site_id: Optional[str] = None, group_id: Optional[str] = None) -> List[Generator]:
         """Get all generators with optional filters."""
         generators = list(self._generators.values())
         if site_id:
@@ -146,10 +144,7 @@ class GeneratorService:
         on_load = [g for g in generators if g.on_load]
         faulted = [g for g in generators if g.status == "fault"]
 
-        total_load = sum(
-            g.electrical.get("power_kw", 0) if g.electrical else 0
-            for g in on_load
-        )
+        total_load = sum(g.electrical.get("power_kw", 0) if g.electrical else 0 for g in on_load)
         total_capacity = sum(g.rated_power_kw for g in generators)
 
         # Get fuel tank status
@@ -217,10 +212,7 @@ class GeneratorService:
         generators = [self._generators.get(gid) for gid in group.generator_ids]
         generators = [g for g in generators if g is not None and g.on_load]
 
-        current_burn_rate = sum(
-            g.engine.get("fuel_rate_lph", 0) if g.engine else 0
-            for g in generators
-        )
+        current_burn_rate = sum(g.engine.get("fuel_rate_lph", 0) if g.engine else 0 for g in generators)
 
         # Estimate runtime remaining
         if current_burn_rate > 0:
@@ -248,17 +240,21 @@ class GeneratorService:
         alerts = []
 
         if tank.current_level_pct <= tank.low_level_alarm_pct:
-            alerts.append({
-                "severity": "alarm",
-                "message": f"Low fuel level: {tank.current_level_pct}%",
-                "action": "Urgent refuel required",
-            })
+            alerts.append(
+                {
+                    "severity": "alarm",
+                    "message": f"Low fuel level: {tank.current_level_pct}%",
+                    "action": "Urgent refuel required",
+                }
+            )
         elif tank.current_level_pct <= tank.reorder_level_pct:
-            alerts.append({
-                "severity": "warning",
-                "message": f"Fuel below reorder level: {tank.current_level_pct}%",
-                "action": "Schedule fuel delivery",
-            })
+            alerts.append(
+                {
+                    "severity": "warning",
+                    "message": f"Fuel below reorder level: {tank.current_level_pct}%",
+                    "action": "Schedule fuel delivery",
+                }
+            )
 
         return alerts
 
@@ -434,16 +430,15 @@ class GeneratorService:
         for gen in generators:
             health = self.get_generator_health(gen.generator_id)
             if health:
-                health_data.append({
-                    "generator_id": gen.generator_id,
-                    "name": gen.name,
-                    "score": health.overall_score,
-                    "status": health.status,
-                    "critical_issues": [
-                        i.parameter for i in health.indicators
-                        if i.trend == "critical"
-                    ],
-                })
+                health_data.append(
+                    {
+                        "generator_id": gen.generator_id,
+                        "name": gen.name,
+                        "score": health.overall_score,
+                        "status": health.status,
+                        "critical_issues": [i.parameter for i in health.indicators if i.trend == "critical"],
+                    }
+                )
 
         avg_score = sum(h["score"] for h in health_data) / len(health_data) if health_data else 0
 
@@ -480,10 +475,7 @@ class GeneratorService:
             "running": sum(1 for g in all_gens if g.engine_running),
             "on_load": sum(1 for g in all_gens if g.on_load),
             "faulted": sum(1 for g in all_gens if g.status == "fault"),
-            "total_load_kw": sum(
-                g.electrical.get("power_kw", 0) if g.electrical else 0
-                for g in all_gens if g.on_load
-            ),
+            "total_load_kw": sum(g.electrical.get("power_kw", 0) if g.electrical else 0 for g in all_gens if g.on_load),
             "total_capacity_kw": sum(g.rated_power_kw for g in all_gens),
             "mains_healthy": all(g.mains_available for g in all_gens),
         }

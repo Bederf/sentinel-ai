@@ -29,6 +29,7 @@ DEFAULT_FINE_TUNE_CONFIG = {
 @dataclass
 class FineTuneResult:
     """Result of a fine-tuning operation."""
+
     site_code: str
     model_type: str
     equipment_type: str
@@ -152,14 +153,12 @@ class LocalFineTuner:
         try:
             # Check if global model exists
             from ml.fleet.global_model import get_global_model_trainer
+
             trainer = get_global_model_trainer()
             global_model = trainer.get_global_model(model_type, equipment_type)
 
             if not global_model:
-                result.error = (
-                    f"No global model found for {model_type}/{equipment_type}. "
-                    "Train a global model first."
-                )
+                result.error = f"No global model found for {model_type}/{equipment_type}. Train a global model first."
                 self._fine_tune_history.append(result)
                 return result
 
@@ -271,9 +270,7 @@ class LocalFineTuner:
         if equipment_type:
             models = [m for m in models if m["equipment_type"] == equipment_type]
 
-        return sorted(
-            models, key=lambda m: m.get("fine_tuned_at", ""), reverse=True
-        )
+        return sorted(models, key=lambda m: m.get("fine_tuned_at", ""), reverse=True)
 
     def get_fine_tune_history(
         self,
@@ -333,9 +330,7 @@ class LocalFineTuner:
             }
 
         improvements = [
-            m["improvement"]["r2_pct"]
-            for m in models
-            if "improvement" in m and "r2_pct" in m["improvement"]
+            m["improvement"]["r2_pct"] for m in models if "improvement" in m and "r2_pct" in m["improvement"]
         ]
 
         avg_improvement = sum(improvements) / max(len(improvements), 1)
@@ -348,9 +343,7 @@ class LocalFineTuner:
             "max_improvement_pct": round(max_improvement, 1),
             "min_improvement_pct": round(min_improvement, 1),
             "site_code": site_code or "all",
-            "best_model": max(models, key=lambda m: m["metrics"].get("r2_score", 0))
-            if models
-            else None,
+            "best_model": max(models, key=lambda m: m["metrics"].get("r2_score", 0)) if models else None,
         }
 
 

@@ -14,10 +14,7 @@ import sys
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -51,17 +48,11 @@ class SurvivalTrainer:
         df = self.data_prep.prepare_survival_data()
 
         if len(df) < min_samples:
-            raise ValueError(
-                f"Insufficient data: {len(df)} equipment "
-                f"(need {min_samples}+)"
-            )
+            raise ValueError(f"Insufficient data: {len(df)} equipment (need {min_samples}+)")
 
         n_events = df["event"].sum()
         if n_events < 2:
-            raise ValueError(
-                f"Insufficient failure events: {n_events} "
-                f"(need at least 2)"
-            )
+            raise ValueError(f"Insufficient failure events: {n_events} (need at least 2)")
 
         logger.info(f"Dataset: {len(df)} samples, {n_events} events")
 
@@ -97,13 +88,13 @@ class SurvivalTrainer:
                 "c_index": float(metrics["c_index"]),
                 "n_samples": metrics["n_samples"],
                 "n_events": metrics["n_events"],
-                "n_features": metrics["n_features"]
+                "n_features": metrics["n_features"],
             },
             metadata={
                 "penalizer": penalizer,
                 "feature_cols": model.feature_cols,
-                "trained_at": datetime.now().isoformat()
-            }
+                "trained_at": datetime.now().isoformat(),
+            },
         )
 
         logger.info(f"Registered model: {model_id}")
@@ -115,7 +106,7 @@ class SurvivalTrainer:
             "n_events": metrics["n_events"],
             "n_features": metrics["n_features"],
             "hazard_ratios": hazard_ratios.to_dict("records"),
-            "model_path": str(model_path)
+            "model_path": str(model_path),
         }
 
     def cross_validate(self, n_folds: int = 5) -> dict:
@@ -134,10 +125,7 @@ class SurvivalTrainer:
         df = self.data_prep.prepare_survival_data()
 
         if len(df) < n_folds * 2:
-            raise ValueError(
-                f"Insufficient data for CV: {len(df)} samples "
-                f"(need at least {n_folds * 2})"
-            )
+            raise ValueError(f"Insufficient data for CV: {len(df)} samples (need at least {n_folds * 2})")
 
         c_indexes = []
 
@@ -154,12 +142,9 @@ class SurvivalTrainer:
 
             # Evaluate on test set
             from lifelines.utils import concordance_index
+
             predictions = model.model.predict_partial_hazard(test_df)
-            c_index = concordance_index(
-                test_df["duration"],
-                -predictions,
-                test_df["event"]
-            )
+            c_index = concordance_index(test_df["duration"], -predictions, test_df["event"])
 
             c_indexes.append(c_index)
             logger.info(f"Fold {fold + 1} C-index: {c_index:.3f}")
@@ -168,43 +153,18 @@ class SurvivalTrainer:
             "mean_c_index": float(np.mean(c_indexes)),
             "std_c_index": float(np.std(c_indexes)),
             "fold_c_indexes": [float(c) for c in c_indexes],
-            "n_folds": n_folds
+            "n_folds": n_folds,
         }
 
 
 def main():
     """CLI entry point for training."""
-    parser = argparse.ArgumentParser(
-        description="Train survival analysis models"
-    )
-    parser.add_argument(
-        "--penalizer",
-        type=float,
-        default=0.1,
-        help="L2 regularization strength (default: 0.1)"
-    )
-    parser.add_argument(
-        "--min-samples",
-        type=int,
-        default=10,
-        help="Minimum samples required (default: 10)"
-    )
-    parser.add_argument(
-        "--cross-validate",
-        action="store_true",
-        help="Perform k-fold cross-validation"
-    )
-    parser.add_argument(
-        "--folds",
-        type=int,
-        default=5,
-        help="Number of CV folds (default: 5)"
-    )
-    parser.add_argument(
-        "--output",
-        type=str,
-        help="Output JSON file for results"
-    )
+    parser = argparse.ArgumentParser(description="Train survival analysis models")
+    parser.add_argument("--penalizer", type=float, default=0.1, help="L2 regularization strength (default: 0.1)")
+    parser.add_argument("--min-samples", type=int, default=10, help="Minimum samples required (default: 10)")
+    parser.add_argument("--cross-validate", action="store_true", help="Perform k-fold cross-validation")
+    parser.add_argument("--folds", type=int, default=5, help="Number of CV folds (default: 5)")
+    parser.add_argument("--output", type=str, help="Output JSON file for results")
 
     args = parser.parse_args()
 
@@ -215,10 +175,7 @@ def main():
         results = trainer.cross_validate(n_folds=args.folds)
     else:
         logger.info("Training survival model...")
-        results = trainer.train(
-            penalizer=args.penalizer,
-            min_samples=args.min_samples
-        )
+        results = trainer.train(penalizer=args.penalizer, min_samples=args.min_samples)
 
     # Print results
     print(json.dumps(results, indent=2))

@@ -22,13 +22,10 @@ def mock_recommendation():
     return Recommendation(
         id="rec-123",
         target_equipment="S002-CHILLER-B1-001",
-        action={
-            "point": "setpoint",
-            "value": 20.0
-        },
+        action={"point": "setpoint", "value": 20.0},
         confidence="high",
         reason="Peak demand response",
-        status=RecommendationStatus.PENDING
+        status=RecommendationStatus.PENDING,
     )
 
 
@@ -41,7 +38,8 @@ def approval_service():
     service.device_manager = AsyncMock()
     service.safety_engine = MagicMock()
     service.safety_engine.initialize = AsyncMock()
-    service.safety_engine.validate = MagicMock(return_value={"is_safe": True})
+    # _validate_safety is the actual method called during execute_approval
+    service._validate_safety = AsyncMock(return_value={"is_safe": True})
     return service
 
 
@@ -53,20 +51,18 @@ class TestApprovalExecution:
         """Should approve recommendation and execute device control."""
         # Setup mocks
         approval_service.recommendations_repo.get_by_id.return_value = mock_recommendation
-        approval_service.safety_engine.validate.return_value = {"is_safe": True}
+        approval_service._validate_safety = AsyncMock(return_value={"is_safe": True})
         # First read returns original value, second read returns new value (COV verify)
         approval_service.device_manager.read_value.side_effect = [
             {"success": True, "value": 18.0},  # Original value
-            {"success": True, "value": 20.0}   # After write (COV verify)
+            {"success": True, "value": 20.0},  # After write (COV verify)
         ]
         approval_service.device_manager.set_value.return_value = {"success": True}
         approval_service.audit_repo.log_action.return_value = None
 
         # Execute approval
         result = await approval_service.execute_approval(
-            recommendation_id="rec-123",
-            approved_by="technician@site-002",
-            approval_notes="Urgent - peak demand"
+            recommendation_id="rec-123", approved_by="technician@site-002", approval_notes="Urgent - peak demand"
         )
 
         # Verify result
@@ -79,7 +75,7 @@ class TestApprovalExecution:
 
         # Verify method calls
         approval_service.recommendations_repo.get_by_id.assert_called_once_with("rec-123")
-        approval_service.safety_engine.validate.assert_called_once()
+        approval_service._validate_safety.assert_called_once()
         approval_service.device_manager.set_value.assert_called_once()
         approval_service.audit_repo.log_action.assert_called_once()
 
@@ -88,16 +84,12 @@ class TestApprovalExecution:
         """Should reject approval if SafetyEngine validation fails."""
         # Setup mocks
         approval_service.recommendations_repo.get_by_id.return_value = mock_recommendation
-        approval_service.safety_engine.validate.return_value = {
-            "is_safe": False,
-            "reason": "Temperature below minimum allowed (4°C)"
-        }
+        approval_service._validate_safety = AsyncMock(
+            return_value={"is_safe": False, "reason": "Temperature below minimum allowed (4°C)"}
+        )
 
         # Execute approval
-        result = await approval_service.execute_approval(
-            recommendation_id="rec-123",
-            approved_by="technician@site-002"
-        )
+        result = await approval_service.execute_approval(recommendation_id="rec-123", approved_by="technician@site-002")
 
         # Verify result
         assert result.success is False
@@ -116,14 +108,11 @@ class TestApprovalExecution:
         approval_service.device_manager.read_value.return_value = {"success": True, "value": 18.0}
         approval_service.device_manager.set_value.return_value = {
             "success": False,
-            "error": "Device communication timeout"
+            "error": "Device communication timeout",
         }
 
         # Execute approval
-        result = await approval_service.execute_approval(
-            recommendation_id="rec-123",
-            approved_by="technician@site-002"
-        )
+        result = await approval_service.execute_approval(recommendation_id="rec-123", approved_by="technician@site-002")
 
         # Verify result
         assert result.success is False
@@ -138,16 +127,13 @@ class TestApprovalExecution:
         approval_service.safety_engine.validate.return_value = {"is_safe": True}
         approval_service.device_manager.read_value.side_effect = [
             {"success": True, "value": 18.0},  # Original value
-            {"success": True, "value": 19.0}   # After write (mismatch!)
+            {"success": True, "value": 19.0},  # After write (mismatch!)
         ]
         approval_service.device_manager.set_value.return_value = {"success": True}
         approval_service.audit_repo.log_action.return_value = None
 
         # Execute approval
-        result = await approval_service.execute_approval(
-            recommendation_id="rec-123",
-            approved_by="technician@site-002"
-        )
+        result = await approval_service.execute_approval(recommendation_id="rec-123", approved_by="technician@site-002")
 
         # Verify result
         assert result.success is True  # Still succeeds
@@ -168,7 +154,7 @@ class TestRecommendationRejection:
         result = await approval_service.reject_approval(
             recommendation_id="rec-123",
             rejected_by="supervisor@site-002",
-            reason="Conflicting with scheduled maintenance"
+            reason="Conflicting with scheduled maintenance",
         )
 
         # Verify result
@@ -188,9 +174,7 @@ class TestRecommendationRejection:
 
         # Execute rejection
         result = await approval_service.reject_approval(
-            recommendation_id="nonexistent",
-            rejected_by="supervisor@site-002",
-            reason="Test"
+            recommendation_id="nonexistent", rejected_by="supervisor@site-002", reason="Test"
         )
 
         # Verify result
@@ -216,8 +200,8 @@ class TestRollbackMechanism:
                 "success": True,
                 "original_value": 18.0,
                 "target_value": 20.0,
-                "control_point": "setpoint"
-            }
+                "control_point": "setpoint",
+            },
         )
 
         # Setup mocks
@@ -228,9 +212,7 @@ class TestRollbackMechanism:
 
         # Execute rollback
         result = await approval_service.rollback_approval(
-            recommendation_id="rec-123",
-            rollback_reason="Error in recommendation",
-            initiated_by="technician@site-002"
+            recommendation_id="rec-123", rollback_reason="Error in recommendation", initiated_by="technician@site-002"
         )
 
         # Verify result
@@ -254,9 +236,7 @@ class TestRollbackMechanism:
 
         # Execute rollback
         result = await approval_service.rollback_approval(
-            recommendation_id="rec-123",
-            rollback_reason="Test",
-            initiated_by="technician@site-002"
+            recommendation_id="rec-123", rollback_reason="Test", initiated_by="technician@site-002"
         )
 
         # Verify result
@@ -275,7 +255,7 @@ class TestRollbackMechanism:
             confidence="medium",
             reason="Flow optimization",
             status=RecommendationStatus.EXECUTED,
-            execution_result={}  # Missing original_value and control_point
+            execution_result={},  # Missing original_value and control_point
         )
 
         # Setup mocks
@@ -283,9 +263,7 @@ class TestRollbackMechanism:
 
         # Execute rollback
         result = await approval_service.rollback_approval(
-            recommendation_id="rec-456",
-            rollback_reason="Test",
-            initiated_by="technician@site-002"
+            recommendation_id="rec-456", rollback_reason="Test", initiated_by="technician@site-002"
         )
 
         # Verify result
@@ -304,8 +282,7 @@ class TestApprovalValidation:
 
         # Validate
         is_valid, error_msg = await approval_service.validate_approval(
-            recommendation_id="rec-123",
-            approved_by="technician@site-002"
+            recommendation_id="rec-123", approved_by="technician@site-002"
         )
 
         # Verify result
@@ -320,8 +297,7 @@ class TestApprovalValidation:
 
         # Validate
         is_valid, error_msg = await approval_service.validate_approval(
-            recommendation_id="nonexistent",
-            approved_by="technician@site-002"
+            recommendation_id="nonexistent", approved_by="technician@site-002"
         )
 
         # Verify result
@@ -338,7 +314,7 @@ class TestApprovalValidation:
             action={"point": "setpoint", "value": 20.0},
             confidence="high",
             reason="Peak demand response",
-            status=RecommendationStatus.EXECUTED
+            status=RecommendationStatus.EXECUTED,
         )
 
         # Setup mocks
@@ -346,8 +322,7 @@ class TestApprovalValidation:
 
         # Validate
         is_valid, error_msg = await approval_service.validate_approval(
-            recommendation_id="rec-123",
-            approved_by="technician@site-002"
+            recommendation_id="rec-123", approved_by="technician@site-002"
         )
 
         # Verify result

@@ -145,9 +145,7 @@ def normalize_coordinates(
     return (float(x_normalized), float(y_normalized))
 
 
-def infer_floor_from_z_coordinate(
-    z: float, floor_height: float = 3.5
-) -> str:
+def infer_floor_from_z_coordinate(z: float, floor_height: float = 3.5) -> str:
     """
     Infer floor code from Z-coordinate in 3D DXF drawing.
 
@@ -190,9 +188,7 @@ def infer_floor_from_z_coordinate(
         return f"L{level_num}"
 
 
-def euclidean_distance(
-    p1: Tuple[float, float], p2: Tuple[float, float]
-) -> float:
+def euclidean_distance(p1: Tuple[float, float], p2: Tuple[float, float]) -> float:
     """
     Calculate Euclidean distance between two 2D points.
 
@@ -310,9 +306,7 @@ def angle_from_points(p1: Tuple[float, float], p2: Tuple[float, float]) -> float
     return float(angle_deg)
 
 
-def point_in_bounding_box(
-    point: Tuple[float, float], bbox: BoundingBox
-) -> bool:
+def point_in_bounding_box(point: Tuple[float, float], bbox: BoundingBox) -> bool:
     """
     Check if a point is inside a bounding box.
 
@@ -331,15 +325,10 @@ def point_in_bounding_box(
         False
     """
     x, y = point
-    return (
-        bbox.min_x <= x <= bbox.max_x
-        and bbox.min_y <= y <= bbox.max_y
-    )
+    return bbox.min_x <= x <= bbox.max_x and bbox.min_y <= y <= bbox.max_y
 
 
-def scale_coordinates(
-    x: float, y: float, scale_factor: float
-) -> Tuple[float, float]:
+def scale_coordinates(x: float, y: float, scale_factor: float) -> Tuple[float, float]:
     """
     Scale coordinates by a factor.
 
@@ -359,9 +348,7 @@ def scale_coordinates(
     return (float(x * scale_factor), float(y * scale_factor))
 
 
-def translate_coordinates(
-    x: float, y: float, dx: float, dy: float
-) -> Tuple[float, float]:
+def translate_coordinates(x: float, y: float, dx: float, dy: float) -> Tuple[float, float]:
     """
     Translate (shift) coordinates by an offset.
 

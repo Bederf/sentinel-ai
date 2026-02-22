@@ -381,9 +381,7 @@ class ElectricalCompliance(BaseModel):
         """Validate expiry date is set and valid (5 years from issue in SA)."""
         if not self.expiry_date:
             # Auto-calculate 5-year validity (South African standard)
-            self.expiry_date = self.issue_date + __import__("datetime").timedelta(
-                days=365 * 5
-            )
+            self.expiry_date = self.issue_date + __import__("datetime").timedelta(days=365 * 5)
 
     class Config:
         json_schema_extra = {

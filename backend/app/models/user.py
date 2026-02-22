@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 class User(BaseModel):
     """User model for authentication."""
+
     id: str
     username: str
     email: Optional[str] = None
@@ -21,6 +22,7 @@ class User(BaseModel):
 
 class UserCreate(BaseModel):
     """Model for creating a new user."""
+
     username: str
     email: Optional[str] = None
     password: str
@@ -30,6 +32,7 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     """Model for updating a user."""
+
     email: Optional[str] = None
     full_name: Optional[str] = None
     role: Optional[str] = None
@@ -38,4 +41,5 @@ class UserUpdate(BaseModel):
 
 class UserInDB(User):
     """User model as stored in database."""
+
     hashed_password: str

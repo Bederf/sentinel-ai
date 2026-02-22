@@ -48,9 +48,7 @@ async def init_site_devices(
         )
 
         if not has_access:
-            logger.warning(
-                f"User {auth.email} attempted to initialize devices for unauthorized site {site_id}"
-            )
+            logger.warning(f"User {auth.email} attempted to initialize devices for unauthorized site {site_id}")
             # Return consistent 403 for all unauthorized access (prevents enumeration)
             raise HTTPException(
                 status_code=403,
@@ -97,9 +95,7 @@ async def init_default_devices(
         )
 
         if not has_access:
-            logger.warning(
-                f"User {auth.email} attempted to initialize devices for unauthorized default site"
-            )
+            logger.warning(f"User {auth.email} attempted to initialize devices for unauthorized default site")
             # Return consistent 403 for all unauthorized access (prevents enumeration)
             raise HTTPException(
                 status_code=403,

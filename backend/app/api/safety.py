@@ -80,10 +80,7 @@ async def validate_control_action(request: Dict[str, Any]):
     value = request.get("value")
 
     if not device_id or not point_name or value is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing required fields: device_id, point_name, value"
-        )
+        raise HTTPException(status_code=400, detail="Missing required fields: device_id, point_name, value")
 
     # Get device
     device = await device_manager.get_device(device_id)
@@ -263,25 +260,15 @@ async def acknowledge_escalation(request: Dict[str, Any]):
     comment = request.get("comment")
 
     if not escalation_id or not acknowledged_by:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing required fields: escalation_id, acknowledged_by"
-        )
+        raise HTTPException(status_code=400, detail="Missing required fields: escalation_id, acknowledged_by")
 
     if not escalation_engine._initialized:
         await escalation_engine.initialize()
 
-    success = await escalation_engine.acknowledge_escalation(
-        escalation_id,
-        acknowledged_by,
-        comment
-    )
+    success = await escalation_engine.acknowledge_escalation(escalation_id, acknowledged_by, comment)
 
     if not success:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Escalation {escalation_id} not found or already acknowledged"
-        )
+        raise HTTPException(status_code=404, detail=f"Escalation {escalation_id} not found or already acknowledged")
 
     return {
         "success": True,
@@ -293,9 +280,7 @@ async def acknowledge_escalation(request: Dict[str, Any]):
 
 @router.get("/escalation/history")
 async def get_escalation_history(
-    limit: Optional[int] = 100,
-    escalation_level: Optional[int] = None,
-    acknowledged: Optional[bool] = None
+    limit: Optional[int] = 100, escalation_level: Optional[int] = None, acknowledged: Optional[bool] = None
 ):
     """Get escalation history with optional filtering."""
     if not escalation_engine._initialized:
@@ -307,9 +292,7 @@ async def get_escalation_history(
         esc_level = EscalationLevel(escalation_level)
 
     history = await escalation_engine.get_escalation_history(
-        limit=limit,
-        escalation_level=esc_level,
-        acknowledged=acknowledged
+        limit=limit, escalation_level=esc_level, acknowledged=acknowledged
     )
 
     return {
@@ -348,7 +331,7 @@ async def test_escalation(request: Dict[str, Any]):
             "email": level.value >= EscalationLevel.ALERT.value,
             "slack": level.value >= EscalationLevel.CRITICAL.value,
             "dashboard": level.value >= EscalationLevel.WARNING.value,
-        }
+        },
     }
 
 
@@ -376,7 +359,7 @@ async def test_email_notification():
         acknowledged_at=None,
         auto_resolved=False,
         warnings=["This is a test email notification"],
-        metadata={"test": True}
+        metadata={"test": True},
     )
 
     # Initialize notification service if needed
@@ -425,7 +408,7 @@ async def emergency_stop():
         acknowledged_at=None,
         auto_resolved=False,
         warnings=["Manual emergency stop triggered"],
-        metadata={"triggered_by": "api_endpoint"}
+        metadata={"triggered_by": "api_endpoint"},
     )
 
     # Handle emergency

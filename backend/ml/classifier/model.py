@@ -38,18 +38,13 @@ class FailureClassifier:
             max_depth=max_depth,
             class_weight="balanced",  # Handle imbalanced classes
             random_state=42,
-            n_jobs=-1  # Use all cores
+            n_jobs=-1,  # Use all cores
         )
         self.label_encoder = LabelEncoder()
         self.feature_names = None
         self.class_names = None
 
-    def train(
-        self,
-        X: pd.DataFrame,
-        y: pd.Series,
-        cv_folds: int = 5
-    ) -> Dict:
+    def train(self, X: pd.DataFrame, y: pd.Series, cv_folds: int = 5) -> Dict:
         """Train classifier with cross-validation.
 
         Args:
@@ -69,14 +64,7 @@ class FailureClassifier:
         logger.info(f"Training classifier with {len(X)} samples, {len(self.class_names)} classes")
 
         # Cross-validation
-        cv_scores = cross_val_score(
-            self.model,
-            X,
-            y_encoded,
-            cv=cv_folds,
-            scoring='accuracy',
-            n_jobs=-1
-        )
+        cv_scores = cross_val_score(self.model, X, y_encoded, cv=cv_folds, scoring="accuracy", n_jobs=-1)
 
         logger.info(f"CV Accuracy: {cv_scores.mean():.3f} (+/- {cv_scores.std() * 2:.3f})")
 
@@ -84,10 +72,9 @@ class FailureClassifier:
         self.model.fit(X, y_encoded)
 
         # Get feature importance
-        importance = pd.DataFrame({
-            "feature": self.feature_names,
-            "importance": self.model.feature_importances_
-        }).sort_values("importance", ascending=False)
+        importance = pd.DataFrame(
+            {"feature": self.feature_names, "importance": self.model.feature_importances_}
+        ).sort_values("importance", ascending=False)
 
         return {
             "cv_accuracy": float(cv_scores.mean()),
@@ -95,7 +82,7 @@ class FailureClassifier:
             "n_samples": len(X),
             "n_classes": len(self.class_names),
             "classes": self.class_names,
-            "feature_importance": importance.head(20).to_dict("records")  # Top 20
+            "feature_importance": importance.head(20).to_dict("records"),  # Top 20
         }
 
     def predict(self, X: pd.DataFrame) -> List[Dict]:
@@ -116,19 +103,18 @@ class FailureClassifier:
         results = []
         for i, row_proba in enumerate(proba):
             # Create probability dict for each class
-            class_proba = {
-                self.class_names[j]: float(p)
-                for j, p in enumerate(row_proba)
-            }
+            class_proba = {self.class_names[j]: float(p) for j, p in enumerate(row_proba)}
 
             # Get top prediction
             top_class_idx = np.argmax(row_proba)
 
-            results.append({
-                "predicted_failure": self.class_names[top_class_idx],
-                "confidence": float(row_proba[top_class_idx]),
-                "all_probabilities": class_proba
-            })
+            results.append(
+                {
+                    "predicted_failure": self.class_names[top_class_idx],
+                    "confidence": float(row_proba[top_class_idx]),
+                    "all_probabilities": class_proba,
+                }
+            )
 
         return results
 
@@ -144,18 +130,13 @@ class FailureClassifier:
         if self.model is None:
             raise ValueError("Model not trained yet")
 
-        importance = pd.DataFrame({
-            "feature": self.feature_names,
-            "importance": self.model.feature_importances_
-        }).sort_values("importance", ascending=False)
+        importance = pd.DataFrame(
+            {"feature": self.feature_names, "importance": self.model.feature_importances_}
+        ).sort_values("importance", ascending=False)
 
         return importance.head(top_n)
 
-    def explain_prediction(
-        self,
-        X: pd.DataFrame,
-        prediction_idx: int = 0
-    ) -> List[Dict]:
+    def explain_prediction(self, X: pd.DataFrame, prediction_idx: int = 0) -> List[Dict]:
         """Explain a specific prediction using feature contributions.
 
         Args:
@@ -182,12 +163,14 @@ class FailureClassifier:
                 # In production, use actual SHAP values
                 contribution = importance * (value if not pd.isna(value) else 0)
 
-                contributions.append({
-                    "feature": name,
-                    "value": float(value if not pd.isna(value) else 0),
-                    "importance": float(importance),
-                    "contribution": float(contribution)
-                })
+                contributions.append(
+                    {
+                        "feature": name,
+                        "value": float(value if not pd.isna(value) else 0),
+                        "importance": float(importance),
+                        "contribution": float(contribution),
+                    }
+                )
 
         # Sort by absolute contribution
         contributions.sort(key=lambda x: abs(x["contribution"]), reverse=True)
@@ -206,7 +189,7 @@ class FailureClassifier:
             "model": self.model,
             "label_encoder": self.label_encoder,
             "feature_names": self.feature_names,
-            "class_names": self.class_names
+            "class_names": self.class_names,
         }
 
         joblib.dump(model_data, path)

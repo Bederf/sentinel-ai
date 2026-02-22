@@ -42,6 +42,7 @@ def _is_supabase_available() -> bool:
     """Check if Supabase is configured and available."""
     try:
         from app.config.settings import settings
+
         return bool(settings.supabase_url and settings.supabase_service_role_key)
     except Exception:
         return False
@@ -50,6 +51,7 @@ def _is_supabase_available() -> bool:
 @dataclass
 class Building:
     """Building metadata."""
+
     id: str
     name: str
     display_name: str = ""
@@ -251,6 +253,7 @@ class BuildingDataLoader:
         if _is_supabase_available():
             try:
                 from app.database.repositories import DeskRepository
+
                 repo = DeskRepository()
                 supabase_desks = repo.get_by_building_code(building_id)
                 if supabase_desks and isinstance(supabase_desks, list):
@@ -304,6 +307,7 @@ class BuildingDataLoader:
         if _is_supabase_available():
             try:
                 from app.database.repositories import ZoneRepository
+
                 repo = ZoneRepository()
                 supabase_zones = repo.get_by_building(
                     # Get building UUID from building code
@@ -322,7 +326,9 @@ class BuildingDataLoader:
                         else:
                             logger.warning(f"Skipping non-dict zone record: {type(zone).__name__}")
                     if zones_with_building:
-                        logger.debug(f"Loaded {len(zones_with_building)} zones from Supabase zones table for {building_id}")
+                        logger.debug(
+                            f"Loaded {len(zones_with_building)} zones from Supabase zones table for {building_id}"
+                        )
                         return zones_with_building
             except Exception as e:
                 logger.debug(f"Supabase zone query failed, using JSON: {e}")
@@ -353,6 +359,7 @@ class BuildingDataLoader:
 
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
             response = client.table("buildings").select("id").eq("code", building_id).execute()
             if response.data:
@@ -393,6 +400,7 @@ class BuildingDataLoader:
         if _is_supabase_available():
             try:
                 from app.database.repositories import DeskRepository
+
                 repo = DeskRepository()
                 desk = repo.find_desk(desk_id, building_id)
                 if desk:
@@ -437,6 +445,7 @@ class BuildingDataLoader:
         if _is_supabase_available():
             try:
                 from app.database.repositories import HVACZoneRepository
+
                 repo = HVACZoneRepository()
                 zone = repo.get_by_zone_id(zone_id)
                 if zone:

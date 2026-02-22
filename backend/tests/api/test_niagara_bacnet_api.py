@@ -25,6 +25,7 @@ from app.services.niagara.bacnet_client import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def mock_bacnet_client():
     """Create a mock BACnet client with common properties."""
@@ -44,6 +45,7 @@ def mock_bacnet_client():
 # ---------------------------------------------------------------------------
 # Status endpoint
 # ---------------------------------------------------------------------------
+
 
 class TestBACnetStatusEndpoint:
     """Tests for get_bacnet_status endpoint function."""
@@ -80,6 +82,7 @@ class TestBACnetStatusEndpoint:
 # ---------------------------------------------------------------------------
 # Device Discovery
 # ---------------------------------------------------------------------------
+
 
 class TestDeviceDiscoveryEndpoint:
     """Tests for discover_devices endpoint function."""
@@ -133,9 +136,7 @@ class TestDeviceDiscoveryEndpoint:
         from app.api.niagara_bacnet import discover_devices
         from app.models.niagara import BACnetDiscoverRequest
 
-        mock_bacnet_client.discover_devices = AsyncMock(
-            side_effect=BACnetTimeoutError("Discovery timed out")
-        )
+        mock_bacnet_client.discover_devices = AsyncMock(side_effect=BACnetTimeoutError("Discovery timed out"))
 
         with patch("app.api.niagara_bacnet.get_bacnet_client", return_value=mock_bacnet_client):
             result = await discover_devices(BACnetDiscoverRequest())
@@ -146,6 +147,7 @@ class TestDeviceDiscoveryEndpoint:
 # ---------------------------------------------------------------------------
 # Point Discovery
 # ---------------------------------------------------------------------------
+
 
 class TestPointDiscoveryEndpoint:
     """Tests for discover_device_points endpoint function."""
@@ -203,6 +205,7 @@ class TestPointDiscoveryEndpoint:
 # Point Read
 # ---------------------------------------------------------------------------
 
+
 class TestPointReadEndpoint:
     """Tests for read_point endpoint function."""
 
@@ -248,9 +251,7 @@ class TestPointReadEndpoint:
         from app.api.niagara_bacnet import read_point
         from fastapi import HTTPException
 
-        mock_bacnet_client.read_point = AsyncMock(
-            side_effect=BACnetTimeoutError("Timed out")
-        )
+        mock_bacnet_client.read_point = AsyncMock(side_effect=BACnetTimeoutError("Timed out"))
 
         with patch("app.api.niagara_bacnet.get_bacnet_client", return_value=mock_bacnet_client):
             with pytest.raises(HTTPException) as exc_info:
@@ -267,9 +268,7 @@ class TestPointReadEndpoint:
         from app.api.niagara_bacnet import read_point
         from fastapi import HTTPException
 
-        mock_bacnet_client.read_point = AsyncMock(
-            side_effect=BACnetReadError("Read failed")
-        )
+        mock_bacnet_client.read_point = AsyncMock(side_effect=BACnetReadError("Read failed"))
 
         with patch("app.api.niagara_bacnet.get_bacnet_client", return_value=mock_bacnet_client):
             with pytest.raises(HTTPException) as exc_info:
@@ -302,6 +301,7 @@ class TestPointReadEndpoint:
 # ---------------------------------------------------------------------------
 # Point Write
 # ---------------------------------------------------------------------------
+
 
 class TestPointWriteEndpoint:
     """Tests for write_point endpoint function."""
@@ -354,9 +354,7 @@ class TestPointWriteEndpoint:
         from app.models.niagara import BACnetPointWriteRequest
         from fastapi import HTTPException
 
-        mock_bacnet_client.write_point = AsyncMock(
-            side_effect=BACnetWriteError("Write rejected")
-        )
+        mock_bacnet_client.write_point = AsyncMock(side_effect=BACnetWriteError("Write rejected"))
 
         with patch("app.api.niagara_bacnet.get_bacnet_client", return_value=mock_bacnet_client):
             with pytest.raises(HTTPException) as exc_info:
@@ -374,9 +372,7 @@ class TestPointWriteEndpoint:
         from app.models.niagara import BACnetPointWriteRequest
         from fastapi import HTTPException
 
-        mock_bacnet_client.write_point = AsyncMock(
-            side_effect=BACnetTimeoutError("Timed out")
-        )
+        mock_bacnet_client.write_point = AsyncMock(side_effect=BACnetTimeoutError("Timed out"))
 
         with patch("app.api.niagara_bacnet.get_bacnet_client", return_value=mock_bacnet_client):
             with pytest.raises(HTTPException) as exc_info:
@@ -392,6 +388,7 @@ class TestPointWriteEndpoint:
 # ---------------------------------------------------------------------------
 # COV Subscriptions
 # ---------------------------------------------------------------------------
+
 
 class TestCOVSubscriptionEndpoints:
     """Tests for COV subscription endpoint functions."""
@@ -483,6 +480,7 @@ class TestCOVSubscriptionEndpoints:
 # ---------------------------------------------------------------------------
 # Pydantic model validation
 # ---------------------------------------------------------------------------
+
 
 class TestModelValidation:
     """Tests for BACnet Pydantic model validation."""

@@ -72,9 +72,7 @@ class MunicipalReconciliationService:
         variance_explanation = None
         if abs(variance_pct) > 5.0:
             status = "variance_detected"
-            variance_explanation = (
-                f"BMS shows {bms_consumption:.1f} kWh, billed for {billed_consumption:.1f} kWh"
-            )
+            variance_explanation = f"BMS shows {bms_consumption:.1f} kWh, billed for {billed_consumption:.1f} kWh"
 
         tariff_result = None
         tariff_name = parsed_data.get("tariff_type") or parsed_data.get("tariff_name")
@@ -146,17 +144,21 @@ class MunicipalReconciliationService:
 
         recommendations = []
         if peak_ratio < 0.2:
-            recommendations.append({
-                "tariff": "TOU Commercial",
-                "reason": "Low peak usage (off-peak heavy)",
-                "confidence": "high",
-            })
+            recommendations.append(
+                {
+                    "tariff": "TOU Commercial",
+                    "reason": "Low peak usage (off-peak heavy)",
+                    "confidence": "high",
+                }
+            )
         if peak_ratio > 0.4:
-            recommendations.append({
-                "tariff": "Flat / Homebug",
-                "reason": "High peak usage (flat rate may be better)",
-                "confidence": "medium",
-            })
+            recommendations.append(
+                {
+                    "tariff": "Flat / Homebug",
+                    "reason": "High peak usage (flat rate may be better)",
+                    "confidence": "medium",
+                }
+            )
 
         return {
             "profile": {
@@ -339,7 +341,9 @@ class MunicipalReconciliationService:
                         "timestamp": row.get("peak_timestamp"),
                         "demand_kw": float(row.get("peak_demand_kw") or 0.0),
                     }
-                    for row in sorted(demand_rows, key=lambda r: float(r.get("peak_demand_kw") or 0.0), reverse=True)[:3]
+                    for row in sorted(demand_rows, key=lambda r: float(r.get("peak_demand_kw") or 0.0), reverse=True)[
+                        :3
+                    ]
                 ]
 
         if tou_breakdown:

@@ -28,10 +28,20 @@ router = APIRouter()
 
 # Whitelist of allowed control actions
 _ALLOWED_ACTIONS = {
-    "set_temperature", "set_brightness", "set_mode", "set_speed",
-    "set_setpoint", "set_schedule", "set_value",
-    "start", "stop", "enable", "disable", "reset",
-    "override", "release_override",
+    "set_temperature",
+    "set_brightness",
+    "set_mode",
+    "set_speed",
+    "set_setpoint",
+    "set_schedule",
+    "set_value",
+    "start",
+    "stop",
+    "enable",
+    "disable",
+    "reset",
+    "override",
+    "release_override",
 }
 
 
@@ -42,6 +52,7 @@ class DeviceControlRequest(BaseModel):
     to prevent injection and out-of-range values before they reach the
     safety engine.
     """
+
     point: str = Field(
         ...,
         min_length=1,
@@ -64,9 +75,7 @@ class DeviceControlRequest(BaseModel):
     def validate_point_name(cls, v: str) -> str:
         """Reject point names with shell/SQL metacharacters."""
         if not re.match(r"^[a-zA-Z0-9_\-./]+$", v):
-            raise ValueError(
-                "Point name may only contain alphanumerics, underscores, hyphens, dots, and slashes"
-            )
+            raise ValueError("Point name may only contain alphanumerics, underscores, hyphens, dots, and slashes")
         return v
 
     @field_validator("value")
@@ -83,7 +92,7 @@ class DeviceControlRequest(BaseModel):
             if len(v) > 200:
                 raise ValueError("String value must be 200 characters or fewer")
             # Reject shell metacharacters in string values
-            if re.search(r'[;&|`$(){}[\]<>!#]', v):
+            if re.search(r"[;&|`$(){}[\]<>!#]", v):
                 raise ValueError("Value contains disallowed characters")
             return v
         return v
@@ -180,7 +189,7 @@ def _transform_equipment_to_device(eq_data: dict) -> Optional[dict]:
                 **eq_data.get("metadata", {}),
                 "equipment_type": eq_data.get("equipment_type"),
                 "source": "building_equipment",
-            }
+            },
         }
 
         # Add hvac_type if applicable
@@ -260,12 +269,14 @@ async def startup_event():
         print(f"[DEVICES] ERROR: Failed to initialize device manager: {e}")
         logger.error(f"Failed to initialize device manager: {e}")
         import traceback
+
         traceback.print_exc()
         # Initialize empty manager if loading fails
         await device_manager.initialize([])
 
 
 if os.getenv("TESTING", "").lower() != "true":
+
     @router.on_event("shutdown")
     async def shutdown_event():
         """Shutdown device manager on shutdown."""
@@ -275,6 +286,7 @@ if os.getenv("TESTING", "").lower() != "true":
         except Exception as e:
             logger.error(f"Error shutting down device manager: {e}")
 else:
+
     async def shutdown_event():
         """Shutdown device manager on shutdown (testing no-op)."""
         return None
@@ -284,7 +296,7 @@ else:
 async def get_devices(
     site_id: Optional[str] = Query(None, description="Filter by site ID"),
     device_type: Optional[str] = Query(None, description="Filter by device type"),
-    protocol: Optional[str] = Query(None, description="Filter by protocol")
+    protocol: Optional[str] = Query(None, description="Filter by protocol"),
 ) -> List[dict]:
     """Get all devices with optional filtering."""
     try:
@@ -309,7 +321,7 @@ async def _enrich_device_with_current_values(device_id: str, device_dict: dict) 
     """Add current point values from adapter state to device dict."""
     try:
         adapter = await device_manager.get_adapter(device_id)
-        if adapter and hasattr(adapter, 'get_state'):
+        if adapter and hasattr(adapter, "get_state"):
             state = adapter.get_state()
             for point_name, point_data in device_dict.get("points", {}).items():
                 if point_name in state:
@@ -355,7 +367,7 @@ async def get_device_points(request: Request, device_id: str) -> dict:
         return {
             "device_id": device_id,
             "device_name": device.name,
-            "points": {name: point.__dict__ for name, point in points.items()}
+            "points": {name: point.__dict__ for name, point in points.items()},
         }
     except HTTPException:
         raise
@@ -366,11 +378,7 @@ async def get_device_points(request: Request, device_id: str) -> dict:
 
 @router.get("/devices/{device_id}/points/{point_name}", response_model=dict)
 @limiter.limit("30/minute")
-async def read_device_point(
-    request: Request,
-    device_id: str,
-    point_name: str
-) -> dict:
+async def read_device_point(request: Request, device_id: str, point_name: str) -> dict:
     """Read a value from a device point."""
     try:
         device_value = await device_manager.read_device_value(device_id, point_name)
@@ -380,7 +388,7 @@ async def read_device_point(
             "value": device_value.value,
             "unit": device_value.unit,
             "timestamp": device_value.timestamp,
-            "quality": device_value.quality
+            "quality": device_value.quality,
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -409,9 +417,7 @@ async def control_device(
         # Extract user from headers (demo: hardcoded, production: from auth)
         user = request.headers.get("X-User-Id", "system")
 
-        success = await device_manager.write_device_value(
-            device_id, body.point, body.value, body.priority, user
-        )
+        success = await device_manager.write_device_value(device_id, body.point, body.value, body.priority, user)
 
         if success:
             return {
@@ -453,7 +459,7 @@ async def get_device_status(request: Request, device_id: str) -> dict:
             "device_name": device.name,
             "status": status.value,
             "last_seen": device.last_seen,
-            "protocol": device.protocol.value
+            "protocol": device.protocol.value,
         }
     except HTTPException:
         raise
@@ -493,7 +499,7 @@ async def scan_device_points(device_id: str) -> dict:
             "device_id": device_id,
             "device_name": device.name,
             "points_found": len(points),
-            "points": {name: point.__dict__ for name, point in points.items()}
+            "points": {name: point.__dict__ for name, point in points.items()},
         }
     except ConnectionError as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -515,7 +521,7 @@ async def connect_device(device_id: str) -> dict:
             "success": success,
             "device_id": device_id,
             "device_name": device.name,
-            "message": f"Device {'connected' if success else 'failed to connect'}"
+            "message": f"Device {'connected' if success else 'failed to connect'}",
         }
     except Exception as e:
         logger.error(f"Error connecting to device {device_id}: {e}")
@@ -531,12 +537,7 @@ async def disconnect_device(device_id: str) -> dict:
             raise HTTPException(status_code=404, detail=f"Device {device_id} not found")
 
         await device_manager.disconnect_device(device_id)
-        return {
-            "success": True,
-            "device_id": device_id,
-            "device_name": device.name,
-            "message": "Device disconnected"
-        }
+        return {"success": True, "device_id": device_id, "device_name": device.name, "message": "Device disconnected"}
     except Exception as e:
         logger.error(f"Error disconnecting from device {device_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -561,7 +562,7 @@ async def get_site_device_status(site_id: str) -> dict:
 
         # Calculate aggregated status
         total_devices = len(devices)
-        online_devices = sum(1 for d in devices if getattr(d, 'online', True))
+        online_devices = sum(1 for d in devices if getattr(d, "online", True))
         offline_devices = total_devices - online_devices
 
         device_statuses = [
@@ -569,8 +570,8 @@ async def get_site_device_status(site_id: str) -> dict:
                 "id": d.id,
                 "name": d.name,
                 "type": d.type,
-                "online": getattr(d, 'online', True),
-                "health": getattr(d, 'health', 'unknown')
+                "online": getattr(d, "online", True),
+                "health": getattr(d, "health", "unknown"),
             }
             for d in devices
         ]
@@ -581,7 +582,7 @@ async def get_site_device_status(site_id: str) -> dict:
             "online_devices": online_devices,
             "offline_devices": offline_devices,
             "status": "online" if offline_devices == 0 else "warning" if offline_devices < total_devices else "offline",
-            "devices": device_statuses
+            "devices": device_statuses,
         }
     except Exception as e:
         logger.error(f"Error getting site device status for {site_id}: {e}")

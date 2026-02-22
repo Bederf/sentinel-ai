@@ -43,9 +43,7 @@ class ComplianceRepository:
     # OHS Compliance Methods
     # ========================================================================
 
-    async def get_ohs_checklist_template(
-        self, site_code: str
-    ) -> Optional[Dict[str, Any]]:
+    async def get_ohs_checklist_template(self, site_code: str) -> Optional[Dict[str, Any]]:
         """Get OHS checklist template for site."""
         try:
             result = (
@@ -62,9 +60,7 @@ class ComplianceRepository:
             logger.error(f"Failed to get OHS template: {e}")
             return None
 
-    async def create_inspection_task(
-        self, template: Dict[str, Any], zone_id: str
-    ) -> InspectionTask:
+    async def create_inspection_task(self, template: Dict[str, Any], zone_id: str) -> InspectionTask:
         """Create inspection task from template."""
         task_data = {
             "id": str(uuid.uuid4()),
@@ -76,14 +72,10 @@ class ComplianceRepository:
             "updated_at": datetime.now().isoformat(),
         }
 
-        result = (
-            self.supabase.table("inspection_tasks").insert(task_data).execute()
-        )
+        result = self.supabase.table("inspection_tasks").insert(task_data).execute()
         return InspectionTask(**result.data[0])
 
-    async def create_inspection_result(
-        self, task_id: str, findings: Dict[str, Any]
-    ) -> InspectionResult:
+    async def create_inspection_result(self, task_id: str, findings: Dict[str, Any]) -> InspectionResult:
         """Create inspection result from findings."""
         result_data = {
             "id": str(uuid.uuid4()),
@@ -94,23 +86,17 @@ class ComplianceRepository:
             "updated_at": datetime.now().isoformat(),
         }
 
-        result = (
-            self.supabase.table("inspection_results").insert(result_data).execute()
-        )
+        result = self.supabase.table("inspection_results").insert(result_data).execute()
         return InspectionResult(**result.data[0])
 
     # ========================================================================
     # Fire Equipment Methods
     # ========================================================================
 
-    async def get_fire_equipment(
-        self, site_code: str, zone_id: Optional[str] = None
-    ) -> List[FireEquipmentTracking]:
+    async def get_fire_equipment(self, site_code: str, zone_id: Optional[str] = None) -> List[FireEquipmentTracking]:
         """Get fire equipment at site/zone."""
         try:
-            query = self.supabase.table("fire_equipment_tracking").select("*").eq(
-                "site_id", site_code
-            )
+            query = self.supabase.table("fire_equipment_tracking").select("*").eq("site_id", site_code)
 
             if zone_id:
                 query = query.eq("zone_id", zone_id)
@@ -122,9 +108,7 @@ class ComplianceRepository:
             logger.error(f"Failed to get fire equipment: {e}")
             return []
 
-    async def create_fire_inspection_schedule(
-        self, equipment_type: str, location_zone: str
-    ) -> InspectionSchedule:
+    async def create_fire_inspection_schedule(self, equipment_type: str, location_zone: str) -> InspectionSchedule:
         """Create 12-month fire equipment inspection schedule."""
         schedule_data = {
             "id": str(uuid.uuid4()),
@@ -138,11 +122,7 @@ class ComplianceRepository:
             "updated_at": datetime.now().isoformat(),
         }
 
-        result = (
-            self.supabase.table("inspection_schedules")
-            .insert(schedule_data)
-            .execute()
-        )
+        result = self.supabase.table("inspection_schedules").insert(schedule_data).execute()
         return InspectionSchedule(**result.data[0])
 
     async def update_fire_equipment_pressure(
@@ -160,12 +140,7 @@ class ComplianceRepository:
             "updated_at": datetime.now().isoformat(),
         }
 
-        result = (
-            self.supabase.table("fire_equipment_tracking")
-            .update(update_data)
-            .eq("id", equipment_id)
-            .execute()
-        )
+        result = self.supabase.table("fire_equipment_tracking").update(update_data).eq("id", equipment_id).execute()
 
         if result.data:
             return FireEquipmentTracking(**result.data[0])
@@ -188,19 +163,13 @@ class ComplianceRepository:
                 "frequency_type": "daily",
                 "frequency_days": 1,
                 "is_active": True,
-                "next_due_date": (
-                    datetime.now().replace(hour=1, minute=0, second=0)
-                ).isoformat(),
+                "next_due_date": (datetime.now().replace(hour=1, minute=0, second=0)).isoformat(),
                 "created_by": "system",
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat(),
             }
 
-            result = (
-                self.supabase.table("inspection_schedules")
-                .insert(schedule_data)
-                .execute()
-            )
+            result = self.supabase.table("inspection_schedules").insert(schedule_data).execute()
             schedules.append(InspectionSchedule(**result.data[0]))
 
         return schedules
@@ -216,20 +185,13 @@ class ComplianceRepository:
         }
 
         # Get existing record
-        result = (
-            self.supabase.table("emergency_light_testing")
-            .select("*")
-            .eq("light_code", light_code)
-            .execute()
-        )
+        result = self.supabase.table("emergency_light_testing").select("*").eq("light_code", light_code).execute()
 
         if result.data:
             existing = result.data[0]
             # Update battery trend and history
             trend = existing.get("battery_health_trend", [])
-            trend.append(
-                {"date": datetime.now().isoformat(), "value": battery_health_percent}
-            )
+            trend.append({"date": datetime.now().isoformat(), "value": battery_health_percent})
 
             history = existing.get("test_results_history", [])
             history.append(test_record)
@@ -257,9 +219,7 @@ class ComplianceRepository:
                 "fixture_location": "unknown",
                 "site_id": "unknown",
                 "battery_health_percent": battery_health_percent,
-                "battery_health_trend": [
-                    {"date": datetime.now().isoformat(), "value": battery_health_percent}
-                ],
+                "battery_health_trend": [{"date": datetime.now().isoformat(), "value": battery_health_percent}],
                 "test_results_history": [test_record],
                 "last_test_date": datetime.now().isoformat(),
                 "auto_test_enabled": True,
@@ -268,11 +228,7 @@ class ComplianceRepository:
                 "updated_at": datetime.now().isoformat(),
             }
 
-            insert_result = (
-                self.supabase.table("emergency_light_testing")
-                .insert(new_data)
-                .execute()
-            )
+            insert_result = self.supabase.table("emergency_light_testing").insert(new_data).execute()
             return insert_result.data[0] if insert_result.data else {}
 
     # ========================================================================
@@ -290,11 +246,7 @@ class ComplianceRepository:
         if 20 <= water_temp <= 45 and days_since_treatment > 30:
             risk_level = RiskLevel.HIGH
         # Medium risk: moderate conditions
-        elif (
-            20 <= water_temp <= 45
-            or days_since_treatment > 30
-            or water_temp < 20
-        ):
+        elif 20 <= water_temp <= 45 or days_since_treatment > 30 or water_temp < 20:
             risk_level = RiskLevel.MEDIUM
         # Low risk: cold water or recent treatment
         else:
@@ -312,25 +264,14 @@ class ComplianceRepository:
             "updated_at": datetime.now().isoformat(),
         }
 
-        result = (
-            self.supabase.table("legionella_risk_assessment")
-            .insert(assessment_data)
-            .execute()
-        )
+        result = self.supabase.table("legionella_risk_assessment").insert(assessment_data).execute()
 
         return LegionellaRiskAssessment(**result.data[0])
 
-    async def create_legionella_maintenance_task(
-        self, risk_assessment_id: str
-    ) -> InspectionSchedule:
+    async def create_legionella_maintenance_task(self, risk_assessment_id: str) -> InspectionSchedule:
         """Create legionella maintenance task based on risk."""
         # Get risk assessment
-        result = (
-            self.supabase.table("legionella_risk_assessment")
-            .select("*")
-            .eq("id", risk_assessment_id)
-            .execute()
-        )
+        result = self.supabase.table("legionella_risk_assessment").select("*").eq("id", risk_assessment_id).execute()
 
         if not result.data:
             raise ValueError(f"Risk assessment {risk_assessment_id} not found")
@@ -361,11 +302,7 @@ class ComplianceRepository:
             "updated_at": datetime.now().isoformat(),
         }
 
-        schedule_result = (
-            self.supabase.table("inspection_schedules")
-            .insert(schedule_data)
-            .execute()
-        )
+        schedule_result = self.supabase.table("inspection_schedules").insert(schedule_data).execute()
 
         return InspectionSchedule(**schedule_result.data[0])
 
@@ -373,9 +310,7 @@ class ComplianceRepository:
     # Electrical Compliance Methods
     # ========================================================================
 
-    async def create_electrical_compliance(
-        self, certificate: ElectricalCompliance
-    ) -> ElectricalCompliance:
+    async def create_electrical_compliance(self, certificate: ElectricalCompliance) -> ElectricalCompliance:
         """Create electrical compliance record."""
         # Auto-calculate 5-year expiry (South African standard)
         expiry_date = certificate.issue_date + timedelta(days=365 * 5)
@@ -384,8 +319,7 @@ class ComplianceRepository:
             "id": str(uuid.uuid4()),
             "site_id": certificate.site_id,
             "certificate_type": certificate.certificate_type.value,
-            "certificate_number": certificate.certificate_number
-            or str(uuid.uuid4()),
+            "certificate_number": certificate.certificate_number or str(uuid.uuid4()),
             "issued_by": certificate.issued_by,
             "issued_by_license": certificate.issued_by_license,
             "issue_date": certificate.issue_date.isoformat(),
@@ -398,24 +332,13 @@ class ComplianceRepository:
             "updated_at": datetime.now().isoformat(),
         }
 
-        result = (
-            self.supabase.table("electrical_compliance")
-            .insert(cert_data)
-            .execute()
-        )
+        result = self.supabase.table("electrical_compliance").insert(cert_data).execute()
 
         return ElectricalCompliance(**result.data[0])
 
-    async def get_electrical_compliance_status(
-        self, site_code: str
-    ) -> ComplianceStatus:
+    async def get_electrical_compliance_status(self, site_code: str) -> ComplianceStatus:
         """Get electrical compliance status for site."""
-        result = (
-            self.supabase.table("electrical_compliance")
-            .select("*")
-            .eq("site_id", site_code)
-            .execute()
-        )
+        result = self.supabase.table("electrical_compliance").select("*").eq("site_id", site_code).execute()
 
         certs = result.data or []
         now = datetime.now()
@@ -441,9 +364,7 @@ class ComplianceRepository:
     # Lift Inspection Methods
     # ========================================================================
 
-    async def create_lift_inspection_schedule(
-        self, lift_code: str, inspection_type: str
-    ) -> InspectionSchedule:
+    async def create_lift_inspection_schedule(self, lift_code: str, inspection_type: str) -> InspectionSchedule:
         """Create lift inspection schedule."""
         if inspection_type == "periodic_6monthly":
             frequency_days = 180
@@ -458,25 +379,17 @@ class ComplianceRepository:
             "frequency_type": "custom",
             "frequency_days": frequency_days,
             "is_active": True,
-            "next_due_date": (
-                datetime.now() + timedelta(days=frequency_days)
-            ).isoformat(),
+            "next_due_date": (datetime.now() + timedelta(days=frequency_days)).isoformat(),
             "created_by": "system",
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
         }
 
-        result = (
-            self.supabase.table("inspection_schedules")
-            .insert(schedule_data)
-            .execute()
-        )
+        result = self.supabase.table("inspection_schedules").insert(schedule_data).execute()
 
         return InspectionSchedule(**result.data[0])
 
-    async def record_lift_test_results(
-        self, lift_code: str, test_results: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def record_lift_test_results(self, lift_code: str, test_results: Dict[str, Any]) -> Dict[str, Any]:
         """Record lift inspection test results."""
         is_compliant = (
             test_results.get("brake_load_test") == "pass"
@@ -496,11 +409,7 @@ class ComplianceRepository:
             "updated_at": datetime.now().isoformat(),
         }
 
-        result = (
-            self.supabase.table("lift_inspection_tracking")
-            .insert(result_data)
-            .execute()
-        )
+        result = self.supabase.table("lift_inspection_tracking").insert(result_data).execute()
 
         return result.data[0] if result.data else {"compliant": is_compliant}
 
@@ -527,9 +436,7 @@ class ComplianceRepository:
             "updated_at": datetime.now().isoformat(),
         }
 
-        result = (
-            self.supabase.table("compliance_audits").insert(audit_data).execute()
-        )
+        result = self.supabase.table("compliance_audits").insert(audit_data).execute()
 
         return ComplianceAudit(**result.data[0])
 
@@ -541,11 +448,7 @@ class ComplianceRepository:
         limit: int = 50,
     ) -> List[ComplianceAudit]:
         """Get compliance audit history."""
-        query = (
-            self.supabase.table("compliance_audits")
-            .select("*")
-            .eq("site_id", site_code)
-        )
+        query = self.supabase.table("compliance_audits").select("*").eq("site_id", site_code)
 
         if compliance_type:
             query = query.eq("compliance_type", compliance_type)
@@ -569,8 +472,7 @@ class ComplianceRepository:
         critical_count = sum(
             1
             for audit in audits
-            if audit.findings.get("critical_issues")
-            and len(audit.findings.get("critical_issues", [])) > 0
+            if audit.findings.get("critical_issues") and len(audit.findings.get("critical_issues", [])) > 0
         )
 
         return ComplianceStatus(

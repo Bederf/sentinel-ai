@@ -4,6 +4,7 @@ Equipment Lookup Service Test Script
 
 Tests the EquipmentLookup service with fault code database lookups.
 """
+
 import asyncio
 import sys
 import os
@@ -109,7 +110,7 @@ async def test_lookup():
 
     if result.get("parts"):
         print(f"✓ Parts suggested: {len(result['parts'])}")
-        for part in result['parts'][:2]:
+        for part in result["parts"][:2]:
             print(f"  - {part['part_name']}")
             print(f"    Suppliers: {len(part['suppliers'])}")
     else:
@@ -151,17 +152,17 @@ async def test_sample_diagnosis():
         print(f"  {fault['description']}")
 
         print("\nProbable Causes:")
-        for i, cause in enumerate(fault['probable_causes'], 1):
+        for i, cause in enumerate(fault["probable_causes"], 1):
             print(f"  {i}. {cause['cause']} (Likelihood: {cause['likelihood']})")
             print(f"     Check: {cause['check']}")
 
         print("\nRecommended Actions:")
-        for action in fault['recommended_fix']['immediate']:
+        for action in fault["recommended_fix"]["immediate"]:
             print(f"  • {action}")
 
-        if fault['recommended_fix'].get('scenarios'):
+        if fault["recommended_fix"].get("scenarios"):
             print("\nScenario-Based Fixes:")
-            for scenario, fix in fault['recommended_fix']['scenarios'].items():
+            for scenario, fix in fault["recommended_fix"]["scenarios"].items():
                 print(f"  {scenario}: {fix}")
 
     print()

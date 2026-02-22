@@ -119,8 +119,8 @@ class BESSDispatchEngine:
     """Autonomous BESS dispatch executor with multi-constraint safety system."""
 
     # BESS specifications (Site-002 LUNA2000-200KWH-2H1)
-    BESS_CAPACITY_KWH = 500.0
-    BESS_RATED_POWER_KW = 250.0
+    BESS_CAPACITY_KWH = 200.0
+    BESS_RATED_POWER_KW = 100.0
 
     # Operating constraints
     CHARGE_TEMP_MIN_C = 12.0

@@ -94,24 +94,26 @@ async def load_equipment() -> list[dict]:
                         # site-002 → site-002
                         extracted_site = first_part
 
-                equipment_list.append({
-                    "id": eq.get("id") or "",
-                    "site_id": extracted_site or "unknown",
-                    "site_name": eq.get("site_name") or "",
-                    "type": eq.get("type") or "unknown",
-                    "name": eq.get("name") or "Unknown Equipment",
-                    "code": eq.get("code") or "",
-                    "manufacturer": eq.get("manufacturer") or "Unknown",
-                    "model": eq.get("model") or "Unknown",
-                    "capacity": eq.get("capacity") or "N/A",
-                    "install_date": eq.get("install_date") or "",
-                    "last_service": eq.get("last_service") or "",
-                    "status": eq.get("status") or "normal",
-                    "health_score": int(eq.get("health_score") or 100),
-                    "location": eq.get("location") or "",
-                    "serial_number": eq.get("serial_number") or "",
-                    "building_id": eq.get("building_id") or "",
-                })
+                equipment_list.append(
+                    {
+                        "id": eq.get("id") or "",
+                        "site_id": extracted_site or "unknown",
+                        "site_name": eq.get("site_name") or "",
+                        "type": eq.get("type") or "unknown",
+                        "name": eq.get("name") or "Unknown Equipment",
+                        "code": eq.get("code") or "",
+                        "manufacturer": eq.get("manufacturer") or "Unknown",
+                        "model": eq.get("model") or "Unknown",
+                        "capacity": eq.get("capacity") or "N/A",
+                        "install_date": eq.get("install_date") or "",
+                        "last_service": eq.get("last_service") or "",
+                        "status": eq.get("status") or "normal",
+                        "health_score": int(eq.get("health_score") or 100),
+                        "location": eq.get("location") or "",
+                        "serial_number": eq.get("serial_number") or "",
+                        "building_id": eq.get("building_id") or "",
+                    }
+                )
 
             logger.info(f"Loaded {len(equipment_list)} equipment items from Supabase")
             return equipment_list
@@ -143,9 +145,7 @@ async def load_equipment() -> list[dict]:
 
                 # Calculate health score from condition and age
                 health_score = _derive_health_score(
-                    asset.get("condition", "fair"),
-                    asset.get("age_years", 0),
-                    asset.get("expected_life_years", 20)
+                    asset.get("condition", "fair"), asset.get("age_years", 0), asset.get("expected_life_years", 20)
                 )
 
                 # Derive status from condition
@@ -166,28 +166,30 @@ async def load_equipment() -> list[dict]:
                 asset_category = asset.get("asset_category", "").lower()
                 capacity = capacity_map.get(asset_category, "N/A")
 
-                equipment_list.append({
-                    "id": asset.get("asset_id", ""),
-                    "site_id": asset.get("site_id", "").lower(),  # Normalize to lowercase
-                    "site_name": asset.get("site_name", ""),
-                    "type": asset.get("asset_category", "unknown"),
-                    "name": asset.get("asset_tag", "Unknown Equipment"),
-                    "manufacturer": asset.get("make", "Unknown"),
-                    "model": asset.get("model", "Unknown"),
-                    "capacity": capacity,
-                    "install_date": install_date,
-                    "last_service": last_service,
-                    "status": status,
-                    "health_score": health_score,
-                    "location": asset.get("site_name", ""),
-                    "serial_number": asset.get("serial_number", ""),
-                    "condition": asset.get("condition", "fair"),
-                    "criticality": asset.get("criticality", "standard"),
-                    "notes": asset.get("notes", ""),
-                    "age_years": asset.get("age_years", 0),
-                    "expected_life_years": asset.get("expected_life_years", 20),
-                    "remaining_life_years": asset.get("remaining_life_years", 0),
-                })
+                equipment_list.append(
+                    {
+                        "id": asset.get("asset_id", ""),
+                        "site_id": asset.get("site_id", "").lower(),  # Normalize to lowercase
+                        "site_name": asset.get("site_name", ""),
+                        "type": asset.get("asset_category", "unknown"),
+                        "name": asset.get("asset_tag", "Unknown Equipment"),
+                        "manufacturer": asset.get("make", "Unknown"),
+                        "model": asset.get("model", "Unknown"),
+                        "capacity": capacity,
+                        "install_date": install_date,
+                        "last_service": last_service,
+                        "status": status,
+                        "health_score": health_score,
+                        "location": asset.get("site_name", ""),
+                        "serial_number": asset.get("serial_number", ""),
+                        "condition": asset.get("condition", "fair"),
+                        "criticality": asset.get("criticality", "standard"),
+                        "notes": asset.get("notes", ""),
+                        "age_years": asset.get("age_years", 0),
+                        "expected_life_years": asset.get("expected_life_years", 20),
+                        "remaining_life_years": asset.get("remaining_life_years", 0),
+                    }
+                )
 
             logger.info(f"Loaded {len(equipment_list)} equipment items from assets.csv (Supabase unavailable)")
             return equipment_list
@@ -254,11 +256,19 @@ async def load_sensors() -> list[dict]:
                             "id": f"{eq['id']}_{sensor_name.upper()}",
                             "equipment_id": eq["id"],
                             "name": f"{eq['name']} {sensor_name.replace('_', ' ').title()}",
-                            "type": "temperature" if "temp" in sensor_name.lower() else "pressure" if "press" in sensor_name.lower() else "generic",
-                            "unit": "°C" if "temp" in sensor_name.lower() else "bar" if "press" in sensor_name.lower() else "-",
+                            "type": "temperature"
+                            if "temp" in sensor_name.lower()
+                            else "pressure"
+                            if "press" in sensor_name.lower()
+                            else "generic",
+                            "unit": "°C"
+                            if "temp" in sensor_name.lower()
+                            else "bar"
+                            if "press" in sensor_name.lower()
+                            else "-",
                             "current_value": value,
                             "timestamp": eq.get("timestamp", ""),
-                            "quality": "good"
+                            "quality": "good",
                         }
                         all_sensors.append(sensor)
 
@@ -291,24 +301,26 @@ async def load_alerts() -> list[dict]:
                     else:
                         triggered_at = str(alarm["triggered_at"])
 
-                alerts_list.append({
-                    "id": alarm.get("alarm_id", ""),
-                    "equipment_id": alarm.get("asset_id", ""),
-                    "type": "alarm",
-                    "severity": severity,
-                    "title": f"{alarm.get('asset_tag', '')} - {alarm.get('alarm_code', '')}",
-                    "description": alarm.get("alarm_description", ""),
-                    "status": "cleared" if alarm.get("cleared_at") else "active",
-                    "created_at": triggered_at,
-                    "acknowledged": bool(alarm.get("acknowledged_at")),
-                    "acknowledged_by": alarm.get("acknowledged_by", None),
-                    "assigned_to": None,
-                    "priority": priority,
-                    "tags": ["alarm", alarm.get("source", "bms")],
-                    "site_id": alarm.get("site_id", ""),
-                    "site_name": alarm.get("site_name", ""),
-                    "notes": alarm.get("notes", ""),
-                })
+                alerts_list.append(
+                    {
+                        "id": alarm.get("alarm_id", ""),
+                        "equipment_id": alarm.get("asset_id", ""),
+                        "type": "alarm",
+                        "severity": severity,
+                        "title": f"{alarm.get('asset_tag', '')} - {alarm.get('alarm_code', '')}",
+                        "description": alarm.get("alarm_description", ""),
+                        "status": "cleared" if alarm.get("cleared_at") else "active",
+                        "created_at": triggered_at,
+                        "acknowledged": bool(alarm.get("acknowledged_at")),
+                        "acknowledged_by": alarm.get("acknowledged_by", None),
+                        "assigned_to": None,
+                        "priority": priority,
+                        "tags": ["alarm", alarm.get("source", "bms")],
+                        "site_id": alarm.get("site_id", ""),
+                        "site_name": alarm.get("site_name", ""),
+                        "notes": alarm.get("notes", ""),
+                    }
+                )
 
             logger.info(f"Loaded {len(alerts_list)} alerts from alarms.csv")
             return alerts_list
@@ -351,7 +363,7 @@ async def load_alerts() -> list[dict]:
                         "acknowledged": False,
                         "assigned_to": None,
                         "priority": 4 if "E14" in fault_code or "F21" in fault_code else 2,
-                        "tags": ["fault", "simulated"]
+                        "tags": ["fault", "simulated"],
                     }
                     all_alerts.append(alert)
 
@@ -371,9 +383,7 @@ def load_safety_rules() -> list[dict]:
     return []
 
 
-def get_safety_limits_for_point(
-    device_type: str, point_name: str, safety_rules: list[dict]
-) -> dict | None:
+def get_safety_limits_for_point(device_type: str, point_name: str, safety_rules: list[dict]) -> dict | None:
     """
     Find applicable safety rule limits for a device type and point name.
 
@@ -398,9 +408,9 @@ def get_safety_limits_for_point(
 
         # Check device type match (or rule applies to all)
         device_match = (
-            not rule_device_type or
-            rule_device_type == normalized_type or
-            (rule_device_type == "hvac" and normalized_type in hvac_types)
+            not rule_device_type
+            or rule_device_type == normalized_type
+            or (rule_device_type == "hvac" and normalized_type in hvac_types)
         )
 
         # Check point name match (flexible matching)
@@ -541,10 +551,7 @@ async def list_equipment(
     result = []
     for eq in equipment:
         eq_sensors = [s for s in sensors if s.get("equipment_id") == eq["id"]]
-        eq_alerts = [
-            a for a in alerts
-            if a.get("equipment_id") == eq["id"] and a.get("status") == "active"
-        ]
+        eq_alerts = [a for a in alerts if a.get("equipment_id") == eq["id"] and a.get("status") == "active"]
         result.append(
             EquipmentResponse(
                 **eq,
@@ -596,10 +603,7 @@ async def get_equipment(equipment_id: str) -> EquipmentResponse:
     }
 
     eq_sensors = [s for s in sensors if s.get("equipment_id") == equipment_id]
-    eq_alerts = [
-        a for a in alerts
-        if a.get("equipment_id") == equipment_id and a.get("status") == "active"
-    ]
+    eq_alerts = [a for a in alerts if a.get("equipment_id") == equipment_id and a.get("status") == "active"]
 
     return EquipmentResponse(
         **eq,
@@ -686,9 +690,21 @@ async def get_equipment_controls(equipment_id: str):
             # Most sensors are read-only monitoring values
             # Only setpoints and control outputs are writable
             read_only_types = [
-                "temperature", "humidity", "pressure", "flow", "power", "energy",
-                "vibration", "battery_voltage", "battery_runtime", "current",
-                "voltage", "frequency", "speed", "level", "status"
+                "temperature",
+                "humidity",
+                "pressure",
+                "flow",
+                "power",
+                "energy",
+                "vibration",
+                "battery_voltage",
+                "battery_runtime",
+                "current",
+                "voltage",
+                "frequency",
+                "speed",
+                "level",
+                "status",
             ]
             is_writable = sensor_type.lower() not in read_only_types
             # Check sensor name/location for setpoint indicators
@@ -770,7 +786,11 @@ async def get_equipment_controls(equipment_id: str):
             "description": f"{eq.get('manufacturer', '')} {eq.get('model', '')}".strip() or eq.get("name", ""),
             "points": points,
             "status": eq.get("status", "normal"),
-            "safety_status": "warning" if eq.get("status") == "warning" else "critical" if eq.get("status") == "critical" else "safe",
+            "safety_status": "warning"
+            if eq.get("status") == "warning"
+            else "critical"
+            if eq.get("status") == "critical"
+            else "safe",
             "health_score": eq.get("health_score", 100),
         }
 
@@ -838,7 +858,7 @@ async def control_equipment(
                 raise HTTPException(
                     status_code=400,
                     detail=f"Value {value} is outside safety limits ({min_val}-{max_val}). "
-                           f"Please adjust within the allowed range."
+                    f"Please adjust within the allowed range.",
                 )
 
         # Get the sensor if it's a sensor point
@@ -860,11 +880,11 @@ async def control_equipment(
                 # Update sensor current_value in Supabase
                 try:
                     from app.database.supabase_client import get_supabase_client
+
                     client = get_supabase_client()
-                    client.table("sensors").update({
-                        "current_value": float(value),
-                        "updated_at": datetime.now().isoformat()
-                    }).eq("code", point).execute()
+                    client.table("sensors").update(
+                        {"current_value": float(value), "updated_at": datetime.now().isoformat()}
+                    ).eq("code", point).execute()
                     sensor_value = value
                 except Exception as sensor_err:
                     logger.warning(f"Could not update sensor value in Supabase: {sensor_err}")
@@ -872,21 +892,23 @@ async def control_equipment(
         # Log the control action to audit trail
         try:
             audit_repo = AuditRepository()
-            audit_repo.create({
-                "action": "equipment_control",
-                "user": body.get("user", "system"),
-                "device_id": eq["id"],
-                "point_name": point,
-                "old_value": old_value,
-                "new_value": value,
-                "result": "success",
-                "metadata": {
-                    "equipment_code": equipment_id,
-                    "equipment_name": eq.get("name"),
-                    "equipment_type": eq.get("type"),
-                    "priority": priority,
+            audit_repo.create(
+                {
+                    "action": "equipment_control",
+                    "user": body.get("user", "system"),
+                    "device_id": eq["id"],
+                    "point_name": point,
+                    "old_value": old_value,
+                    "new_value": value,
+                    "result": "success",
+                    "metadata": {
+                        "equipment_code": equipment_id,
+                        "equipment_name": eq.get("name"),
+                        "equipment_type": eq.get("type"),
+                        "priority": priority,
+                    },
                 }
-            })
+            )
         except Exception as audit_err:
             logger.warning(f"Could not log audit entry: {audit_err}")
 

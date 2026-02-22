@@ -56,6 +56,7 @@ async def upload_invoice(
 
     try:
         from app.services.municipal_pdf_extraction_service import MunicipalPdfExtractionService
+
         pdf_service = MunicipalPdfExtractionService()
         parsed_data = await pdf_service.parse_invoice(pdf_path)
         ocr_status = "completed" if parsed_data else "pending"
@@ -444,6 +445,7 @@ def _store_invoice_pdf(site_id: str, file: UploadFile) -> Path:
 def _parse_json_field(value: str):
     try:
         import json
+
         return json.loads(value)
     except Exception:
         return {}

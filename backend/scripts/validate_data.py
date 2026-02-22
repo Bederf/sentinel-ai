@@ -132,6 +132,7 @@ def validate_readings(sensor_ids: set) -> tuple[bool, list[str]]:
     # Sample validation (don't check every reading for performance)
     sample_size = min(1000, len(readings))
     import random
+
     random.seed(42)
     sample = random.sample(readings, sample_size)
 
@@ -168,9 +169,17 @@ def validate_anomalies(equipment_ids: set, sensor_ids: set) -> tuple[bool, list[
         return False, errors
 
     required_fields = [
-        "id", "equipment_id", "site_id", "type", "severity",
-        "detected_date", "predicted_failure", "confidence",
-        "root_cause", "repair_cost_zar", "damage_cost_zar"
+        "id",
+        "equipment_id",
+        "site_id",
+        "type",
+        "severity",
+        "detected_date",
+        "predicted_failure",
+        "confidence",
+        "root_cause",
+        "repair_cost_zar",
+        "damage_cost_zar",
     ]
 
     anomaly_ids = set()
@@ -186,10 +195,14 @@ def validate_anomalies(equipment_ids: set, sensor_ids: set) -> tuple[bool, list[
             anomaly_ids.add(anomaly["id"])
 
         if "equipment_id" in anomaly and anomaly["equipment_id"] not in equipment_ids:
-            errors.append(f"Anomaly {anomaly.get('id', i)}: references non-existent equipment '{anomaly['equipment_id']}'")
+            errors.append(
+                f"Anomaly {anomaly.get('id', i)}: references non-existent equipment '{anomaly['equipment_id']}'"
+            )
 
         if "affected_sensor" in anomaly and anomaly["affected_sensor"] not in sensor_ids:
-            errors.append(f"Anomaly {anomaly.get('id', i)}: references non-existent sensor '{anomaly['affected_sensor']}'")
+            errors.append(
+                f"Anomaly {anomaly.get('id', i)}: references non-existent sensor '{anomaly['affected_sensor']}'"
+            )
 
         # Validate cost logic
         if anomaly.get("repair_cost_zar", 0) >= anomaly.get("damage_cost_zar", 0):
@@ -210,10 +223,7 @@ def validate_alerts(equipment_ids: set) -> tuple[bool, list[str]]:
         errors.append("alerts.json is empty or missing")
         return False, errors
 
-    required_fields = [
-        "id", "equipment_id", "site_id", "type", "severity",
-        "status", "title", "message", "created_at"
-    ]
+    required_fields = ["id", "equipment_id", "site_id", "type", "severity", "status", "title", "message", "created_at"]
 
     alert_ids = set()
 

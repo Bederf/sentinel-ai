@@ -44,61 +44,57 @@ def format_prediction_for_frontend(pred: dict) -> dict:
     Legacy values (high/medium/low) are still mapped for backwards compatibility.
     """
     # Extract related data
-    building = pred.get('building', {})
-    equipment = pred.get('equipment', {})
+    building = pred.get("building", {})
+    equipment = pred.get("equipment", {})
 
     # Map database severity to frontend severity
     # DB values (after migration 032): critical, warning, healthy
     # Legacy DB values: critical, high, medium, low
     # Frontend expects: critical, high, warning, healthy
-    db_severity = pred['severity']
-    if db_severity == 'critical':
-        severity = 'critical'
-    elif db_severity in ('warning', 'high'):
-        severity = 'warning'
-    elif db_severity in ('healthy', 'low', 'medium'):
-        severity = 'healthy'
+    db_severity = pred["severity"]
+    if db_severity == "critical":
+        severity = "critical"
+    elif db_severity in ("warning", "high"):
+        severity = "warning"
+    elif db_severity in ("healthy", "low", "medium"):
+        severity = "healthy"
     else:
-        severity = 'healthy'  # Default fallback
+        severity = "healthy"  # Default fallback
 
     # Extract financial impact
     financial_impact = {
-        'repair_cost_zar': pred.get('repair_cost_zar', 0),
-        'replacement_cost_zar': pred.get('replacement_cost_zar', 0),
-        'downtime_cost_per_hour_zar': pred.get('downtime_cost_per_hour_zar', 0),
-        'potential_loss_zar': pred.get('potential_loss_zar', 0),
+        "repair_cost_zar": pred.get("repair_cost_zar", 0),
+        "replacement_cost_zar": pred.get("replacement_cost_zar", 0),
+        "downtime_cost_per_hour_zar": pred.get("downtime_cost_per_hour_zar", 0),
+        "potential_loss_zar": pred.get("potential_loss_zar", 0),
     }
 
     return {
-        'id': pred['code'],  # Use code as frontend ID
-        'uuid': pred['id'],  # Keep UUID for reference
-        'equipment_id': equipment.get('code', pred['equipment_id']),
-        'equipment_name': equipment.get('name', 'Unknown'),
-        'equipment_type': equipment.get('type', 'unknown'),
-        'site_id': building.get('code', pred['building_id']),
-        'site_name': building.get('name', 'Unknown'),
-        'building_id': pred['building_id'],
-
+        "id": pred["code"],  # Use code as frontend ID
+        "uuid": pred["id"],  # Keep UUID for reference
+        "equipment_id": equipment.get("code", pred["equipment_id"]),
+        "equipment_name": equipment.get("name", "Unknown"),
+        "equipment_type": equipment.get("type", "unknown"),
+        "site_id": building.get("code", pred["building_id"]),
+        "site_name": building.get("name", "Unknown"),
+        "building_id": pred["building_id"],
         # Prediction details
-        'prediction_type': pred['prediction_type'],
-        'probability_percent': pred['probability_percent'],
-        'confidence': normalize_prediction_confidence(pred.get('confidence')) or pred.get('confidence'),
-        'predicted_failure_date': pred['predicted_failure_date'],
-        'timeframe_days': pred['timeframe_days'],
-        'severity': severity,  # Mapped to system values
-
+        "prediction_type": pred["prediction_type"],
+        "probability_percent": pred["probability_percent"],
+        "confidence": normalize_prediction_confidence(pred.get("confidence")) or pred.get("confidence"),
+        "predicted_failure_date": pred["predicted_failure_date"],
+        "timeframe_days": pred["timeframe_days"],
+        "severity": severity,  # Mapped to system values
         # Evidence - parse JSON strings if needed (Supabase returns JSONB as strings)
-        'evidence': _parse_json_field(pred.get('evidence'), {}),
-        'contributing_factors': _parse_json_field(pred.get('contributing_factors'), []),
-        'similar_failures': _parse_json_field(pred.get('similar_failures'), []),
-
+        "evidence": _parse_json_field(pred.get("evidence"), {}),
+        "contributing_factors": _parse_json_field(pred.get("contributing_factors"), []),
+        "similar_failures": _parse_json_field(pred.get("similar_failures"), []),
         # Financial
-        'financial_impact': financial_impact,
-
+        "financial_impact": financial_impact,
         # Status
-        'status': pred.get('status', 'active'),
-        'recommended_action': pred.get('recommended_action'),
-        'urgency': normalize_prediction_urgency(pred.get('urgency')) or pred.get('urgency'),
+        "status": pred.get("status", "active"),
+        "recommended_action": pred.get("recommended_action"),
+        "urgency": normalize_prediction_urgency(pred.get("urgency")) or pred.get("urgency"),
     }
 
 
@@ -128,18 +124,22 @@ async def list_predictions(
     repo = PredictionRepository()
 
     # Get predictions from Supabase with building and equipment data joined
-    query = repo.client.table('predictions').select("""
+    query = (
+        repo.client.table("predictions")
+        .select("""
         *,
         building:buildings!inner(id, name, code),
         equipment:equipment!inner(id, name, type)
-    """).eq('status', 'active')  # Only active predictions
+    """)
+        .eq("status", "active")
+    )  # Only active predictions
 
     # Apply filters
     if building_code:
         # First get building UUID by code
-        building_result = repo.client.table('buildings').select('id').eq('code', building_code).execute()
+        building_result = repo.client.table("buildings").select("id").eq("code", building_code).execute()
         if building_result.data:
-            query = query.eq('building_id', building_result.data[0]['id'])
+            query = query.eq("building_id", building_result.data[0]["id"])
         else:
             # Building not found, return empty results
             return {
@@ -152,14 +152,11 @@ async def list_predictions(
     if severity:
         normalized_severity = _normalize_prediction_severity(severity)
         if not normalized_severity:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid severity. Use critical, warning, or healthy."
-            )
-        query = query.eq('severity', normalized_severity)
+            raise HTTPException(status_code=400, detail="Invalid severity. Use critical, warning, or healthy.")
+        query = query.eq("severity", normalized_severity)
 
     if min_probability is not None:
-        query = query.gte('probability_percent', min_probability)
+        query = query.gte("probability_percent", min_probability)
 
     response = query.execute()
     predictions = response.data
@@ -170,17 +167,16 @@ async def list_predictions(
     # Filter by equipment_type after formatting (it's in the equipment object)
     if equipment_type:
         formatted_predictions = [
-            p for p in formatted_predictions
-            if p['equipment_type'].lower() == equipment_type.lower()
+            p for p in formatted_predictions if p["equipment_type"].lower() == equipment_type.lower()
         ]
 
     # Calculate summary statistics
     total = len(formatted_predictions)
 
     if total > 0:
-        avg_probability = sum(p['probability_percent'] for p in formatted_predictions) / total
-        total_repair = sum(p['financial_impact']['repair_cost_zar'] for p in formatted_predictions)
-        total_loss = sum(p['financial_impact']['potential_loss_zar'] for p in formatted_predictions)
+        avg_probability = sum(p["probability_percent"] for p in formatted_predictions) / total
+        total_repair = sum(p["financial_impact"]["repair_cost_zar"] for p in formatted_predictions)
+        total_loss = sum(p["financial_impact"]["potential_loss_zar"] for p in formatted_predictions)
     else:
         avg_probability = 0
         total_repair = 0
@@ -189,7 +185,7 @@ async def list_predictions(
     # Count by severity (uses new schema: critical, warning, healthy)
     severity_counts = {"critical": 0, "warning": 0, "healthy": 0}
     for pred in formatted_predictions:
-        sev = pred['severity'].lower()
+        sev = pred["severity"].lower()
         if sev in severity_counts:
             severity_counts[sev] += 1
 
@@ -228,11 +224,16 @@ async def get_prediction(prediction_code: str) -> dict:
     repo = PredictionRepository()
 
     # Get prediction with joins
-    response = repo.client.table('predictions').select("""
+    response = (
+        repo.client.table("predictions")
+        .select("""
         *,
         building:buildings!inner(id, name, code, address),
         equipment:equipment!inner(id, name, type, manufacturer, model)
-    """).eq('code', prediction_code).execute()
+    """)
+        .eq("code", prediction_code)
+        .execute()
+    )
 
     if not response.data:
         raise HTTPException(status_code=404, detail=f"Prediction {prediction_code} not found")
@@ -257,17 +258,17 @@ async def get_predictions_summary() -> dict:
     repo = PredictionRepository()
 
     # Get all active predictions
-    response = repo.client.table('predictions').select('*').eq('status', 'active').execute()
+    response = repo.client.table("predictions").select("*").eq("status", "active").execute()
     predictions = response.data
 
     total = len(predictions)
-    high_priority = sum(1 for p in predictions if p['probability_percent'] >= 80)
-    critical_count = sum(1 for p in predictions if p['severity'] == 'critical')
+    high_priority = sum(1 for p in predictions if p["probability_percent"] >= 80)
+    critical_count = sum(1 for p in predictions if p["severity"] == "critical")
 
     if total > 0:
-        avg_probability = sum(p['probability_percent'] for p in predictions) / total
-        total_repair = sum(p.get('repair_cost_zar', 0) for p in predictions)
-        total_loss = sum(p.get('potential_loss_zar', 0) for p in predictions)
+        avg_probability = sum(p["probability_percent"] for p in predictions) / total
+        total_repair = sum(p.get("repair_cost_zar", 0) for p in predictions)
+        total_loss = sum(p.get("potential_loss_zar", 0) for p in predictions)
     else:
         avg_probability = 0
         total_repair = 0

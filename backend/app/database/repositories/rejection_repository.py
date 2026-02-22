@@ -56,9 +56,7 @@ class RejectionRepository:
 
                 self._client = get_supabase_client()
             except Exception as e:
-                logger.warning(
-                    f"Failed to get Supabase client, using JSON fallback: {e}"
-                )
+                logger.warning(f"Failed to get Supabase client, using JSON fallback: {e}")
                 self._use_json = True
         return self._client
 
@@ -86,9 +84,7 @@ class RejectionRepository:
         try:
             self._rejections[rejection.recommendation_id] = rejection.to_dict()
             self._save_json()
-            logger.debug(
-                f"Stored rejection in JSON for {rejection.recommendation_id}"
-            )
+            logger.debug(f"Stored rejection in JSON for {rejection.recommendation_id}")
         except Exception as e:
             logger.error(f"Error storing rejection in JSON: {e}")
             raise
@@ -97,16 +93,12 @@ class RejectionRepository:
         """Store rejection in Supabase."""
         try:
             self.client.table("rejections").insert(rejection.to_dict()).execute()
-            logger.debug(
-                f"Stored rejection in Supabase for {rejection.recommendation_id}"
-            )
+            logger.debug(f"Stored rejection in Supabase for {rejection.recommendation_id}")
         except Exception as e:
             logger.error(f"Error storing rejection in Supabase: {e}")
             raise
 
-    async def get_recent(
-        self, site_id: str, action_type: str, days: int = 30
-    ) -> List:
+    async def get_recent(self, site_id: str, action_type: str, days: int = 30) -> List:
         """Get recent rejections for pattern detection.
 
         Args:
@@ -126,19 +118,14 @@ class RejectionRepository:
             logger.error(f"Error retrieving recent rejections: {e}")
             return []
 
-    def _get_recent_json(
-        self, site_id: str, action_type: str, days: int = 30
-    ) -> List:
+    def _get_recent_json(self, site_id: str, action_type: str, days: int = 30) -> List:
         """Get recent rejections from JSON."""
         try:
             cutoff_date = datetime.utcnow() - timedelta(days=days)
             results = []
 
             for rec_id, data in self._rejections.items():
-                if (
-                    data.get("site_id") == site_id
-                    and data.get("action_type") == action_type
-                ):
+                if data.get("site_id") == site_id and data.get("action_type") == action_type:
                     # Parse timestamp
                     rejected_at = data.get("rejected_at")
                     if isinstance(rejected_at, str):
@@ -161,14 +148,10 @@ class RejectionRepository:
             logger.error(f"Error retrieving recent rejections from JSON: {e}")
             return []
 
-    async def _get_recent_supabase(
-        self, site_id: str, action_type: str, days: int = 30
-    ) -> List:
+    async def _get_recent_supabase(self, site_id: str, action_type: str, days: int = 30) -> List:
         """Get recent rejections from Supabase."""
         try:
-            cutoff_date = (
-                datetime.utcnow() - timedelta(days=days)
-            ).isoformat()
+            cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
 
             result = (
                 self.client.table("rejections")

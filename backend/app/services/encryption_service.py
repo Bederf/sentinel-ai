@@ -191,10 +191,7 @@ class EncryptionService:
 _encryption_service: Optional[EncryptionService] = None
 
 
-def get_encryption_service(
-    encryption_key: Optional[str] = None,
-    enabled: Optional[bool] = None
-) -> EncryptionService:
+def get_encryption_service(encryption_key: Optional[str] = None, enabled: Optional[bool] = None) -> EncryptionService:
     """Get or create global encryption service instance.
 
     Args:

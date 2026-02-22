@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).parent.parent / '.env')
+load_dotenv(Path(__file__).parent.parent / ".env")
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
@@ -18,18 +18,12 @@ try:
     print("=" * 70)
 
     # The correct thresholds (from settings.json)
-    correct_thresholds = {
-        'healthy': 80,
-        'warning': 60,
-        'critical': 0
-    }
+    correct_thresholds = {"healthy": 80, "warning": 60, "critical": 0}
 
     print("\n[1] Current Supabase system_settings:")
-    current = client.table('system_settings').select('value').eq(
-        'key', 'health_thresholds'
-    ).execute()
+    current = client.table("system_settings").select("value").eq("key", "health_thresholds").execute()
     if current.data:
-        old_value = current.data[0]['value']
+        old_value = current.data[0]["value"]
         print(f"  healthy: {old_value.get('healthy', 'N/A')}")
         print(f"  warning: {old_value.get('warning', 'N/A')}")
         print(f"  critical: {old_value.get('critical', 'N/A')}")
@@ -40,20 +34,19 @@ try:
     print(f"  critical: {correct_thresholds['critical']}")
 
     print("\n[3] Updating Supabase...")
-    result = client.table('system_settings').update({
-        'value': correct_thresholds
-    }).eq('key', 'health_thresholds').execute()
+    result = (
+        client.table("system_settings").update({"value": correct_thresholds}).eq("key", "health_thresholds").execute()
+    )
 
     if result.data:
         print("  ✓ Successfully updated system_settings")
-        updated = result.data[0]['value']
+        updated = result.data[0]["value"]
         print(f"  New values: {updated}")
     else:
         print("  ✗ No rows updated - creating new entry...")
-        result = client.table('system_settings').insert({
-            'key': 'health_thresholds',
-            'value': correct_thresholds
-        }).execute()
+        result = (
+            client.table("system_settings").insert({"key": "health_thresholds", "value": correct_thresholds}).execute()
+        )
         if result.data:
             print("  ✓ Successfully created system_settings entry")
         else:
@@ -74,5 +67,6 @@ try:
 except Exception as e:
     print(f"❌ Error: {e}")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)

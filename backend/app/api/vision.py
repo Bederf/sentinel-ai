@@ -23,17 +23,12 @@ router = APIRouter(prefix="/vision", tags=["vision"])
 # Max image size: 5MB
 MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
-ALLOWED_MEDIA_TYPES = {
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
-    "image/gif",
-    "image/webp"
-}
+ALLOWED_MEDIA_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"}
 
 
 class AnalyzeRequest(BaseModel):
     """Request for image analysis with base64 image."""
+
     image: str = Field(..., description="Base64-encoded image data")
     media_type: str = Field(default="image/jpeg", description="Image MIME type")
     prompt: Optional[str] = Field(None, description="Custom analysis prompt")
@@ -41,6 +36,7 @@ class AnalyzeRequest(BaseModel):
 
 class ComponentRequest(BaseModel):
     """Request for component identification."""
+
     image: str = Field(..., description="Base64-encoded image data")
     media_type: str = Field(default="image/jpeg", description="Image MIME type")
     context: Optional[str] = Field(None, description="Equipment context")
@@ -48,6 +44,7 @@ class ComponentRequest(BaseModel):
 
 class DiagnoseRequest(BaseModel):
     """Request for damage diagnosis."""
+
     image: str = Field(..., description="Base64-encoded image data")
     media_type: str = Field(default="image/jpeg", description="Image MIME type")
     equipment_context: Optional[str] = Field(None, description="Equipment context")
@@ -55,6 +52,7 @@ class DiagnoseRequest(BaseModel):
 
 class ErrorDisplayRequest(BaseModel):
     """Request for error display reading."""
+
     image: str = Field(..., description="Base64-encoded image data")
     media_type: str = Field(default="image/jpeg", description="Image MIME type")
     manufacturer: Optional[str] = Field(None, description="Equipment manufacturer")
@@ -67,8 +65,7 @@ def _validate_media_type(media_type: str) -> str:
         normalized = "image/jpeg"
     if normalized not in ALLOWED_MEDIA_TYPES:
         raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported media type: {media_type}. Allowed: {ALLOWED_MEDIA_TYPES}"
+            status_code=400, detail=f"Unsupported media type: {media_type}. Allowed: {ALLOWED_MEDIA_TYPES}"
         )
     return normalized
 
@@ -76,6 +73,7 @@ def _validate_media_type(media_type: str) -> str:
 def _decode_base64_image(image_b64: str) -> bytes:
     """Decode base64 image data."""
     import base64
+
     try:
         # Handle data URL format
         if "," in image_b64:
@@ -241,7 +239,7 @@ async def read_error_display(request: ErrorDisplayRequest):
 async def upload_and_analyze(
     file: UploadFile = File(...),
     analysis_type: str = Form(default="analyze"),
-    context: Optional[str] = Form(default=None)
+    context: Optional[str] = Form(default=None),
 ):
     """
     Upload image file and analyze.
@@ -265,10 +263,7 @@ async def upload_and_analyze(
 
     # Validate content type
     if file.content_type not in ALLOWED_MEDIA_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type: {file.content_type}"
-        )
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {file.content_type}")
 
     # Read file
     image_data = await file.read()

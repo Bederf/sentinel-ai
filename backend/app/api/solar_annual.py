@@ -44,10 +44,11 @@ async def get_annual_summary(
     try:
         # Query Supabase for cached results (year is optional for flexibility)
         supabase = get_supabase_client()
-        query = supabase.table("solar_annual_simulations").select(
-            "*"
-        ).eq("site_id", site_id).eq(
-            "scenario", "grant_solar_bess_ai_annual"
+        query = (
+            supabase.table("solar_annual_simulations")
+            .select("*")
+            .eq("site_id", site_id)
+            .eq("scenario", "grant_solar_bess_ai_annual")
         )
 
         # If year specified, filter by it. Otherwise, get the most recent
@@ -58,10 +59,7 @@ async def get_annual_summary(
 
         if not response.data:
             # Not cached, return 404 to signal client to trigger simulation
-            raise HTTPException(
-                status_code=404,
-                detail="Simulation results not cached. POST /simulate to generate."
-            )
+            raise HTTPException(status_code=404, detail="Simulation results not cached. POST /simulate to generate.")
 
         # Get the most recent result (or the one matching the year if specified)
         if len(response.data) > 1 and year is None:
@@ -218,6 +216,7 @@ async def _run_annual_simulation(
         try:
             logger.info("Step 1: Importing orchestrator...")
             from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
+
             logger.info("Step 2: Getting orchestrator singleton...")
             orchestrator = get_lifecycle_orchestrator()
             logger.info(f"Step 3: Orchestrator state BEFORE reset: running={orchestrator.running}")
@@ -264,7 +263,9 @@ async def _run_annual_simulation(
         task["progress_pct"] = 100
         task["days_completed"] = 365
 
-        logger.info(f"🎉 Annual simulation complete: {annual_summary.annual_savings_pct:.1f}% savings, R{annual_summary.annual_savings_zar:,.0f}")
+        logger.info(
+            f"🎉 Annual simulation complete: {annual_summary.annual_savings_pct:.1f}% savings, R{annual_summary.annual_savings_zar:,.0f}"
+        )
 
     except Exception as e:
         logger.error(f"Simulation failed: {e}", exc_info=True)
@@ -296,10 +297,7 @@ async def _generate_hourly_snapshots_paced(orchestrator, duration_minutes: float
         current_hour = current_time.hour
 
         # Solar generation (0 at night, peaks at noon)
-        solar_efficiency = modeler.get_solar_generation_factor(
-            current_time.date(),
-            cloud_cover=0.2
-        )
+        solar_efficiency = modeler.get_solar_generation_factor(current_time.date(), cloud_cover=0.2)
         hour_factor = max(0, 1 - abs(current_hour - 12) / 6)
         solar_gen_kw = 3900 * solar_efficiency * hour_factor * 0.8
 
@@ -407,7 +405,7 @@ def _generate_hourly_snapshots(orchestrator) -> list:
         # Solar generation (0 at night, peaks at noon)
         solar_efficiency = modeler.get_solar_generation_factor(
             current_time.date(),
-            cloud_cover=0.2  # Assume 20% cloud cover
+            cloud_cover=0.2,  # Assume 20% cloud cover
         )
 
         # Solar peaks at noon (12:00)
@@ -522,8 +520,7 @@ async def _cache_results(site_id: str, annual_summary: AnnualSummary, hourly_dat
                 daily_records[day_key]["bess_charge_kwh"] += snap.bess_charge_kw
                 daily_records[day_key]["bess_discharge_kwh"] += snap.bess_discharge_kw
                 daily_records[day_key]["peak_generation_kw"] = max(
-                    daily_records[day_key]["peak_generation_kw"],
-                    snap.solar_gen_kw
+                    daily_records[day_key]["peak_generation_kw"], snap.solar_gen_kw
                 )
                 daily_records[day_key]["avg_bess_soc_pct"].append(snap.bess_soc_pct)
 
@@ -534,8 +531,15 @@ async def _cache_results(site_id: str, annual_summary: AnnualSummary, hourly_dat
                 daily["avg_bess_soc_pct"] = round(avg_soc, 1)
 
                 # Round to 1 decimal place
-                for key in ["solar_gen_kwh", "building_load_kwh", "grid_import_kwh", "grid_export_kwh",
-                           "bess_charge_kwh", "bess_discharge_kwh", "peak_generation_kw"]:
+                for key in [
+                    "solar_gen_kwh",
+                    "building_load_kwh",
+                    "grid_import_kwh",
+                    "grid_export_kwh",
+                    "bess_charge_kwh",
+                    "bess_discharge_kwh",
+                    "peak_generation_kw",
+                ]:
                     daily[key] = round(daily[key], 1)
 
                 daily_insert_records.append(daily)
@@ -575,15 +579,21 @@ async def _cache_results(site_id: str, annual_summary: AnnualSummary, hourly_dat
         }
 
         # Upsert annual simulation into Supabase (replace if exists)
-        response = supabase.table("solar_annual_simulations").upsert({
-            "site_id": site_id,
-            "year": annual_summary.year,
-            "scenario": annual_summary.scenario,
-            "results": results_json,
-            "simulation_started_at": annual_summary.simulation_started_at,
-            "simulation_completed_at": annual_summary.simulation_completed_at,
-            "simulation_duration_seconds": annual_summary.simulation_duration_seconds,
-        }).execute()
+        response = (
+            supabase.table("solar_annual_simulations")
+            .upsert(
+                {
+                    "site_id": site_id,
+                    "year": annual_summary.year,
+                    "scenario": annual_summary.scenario,
+                    "results": results_json,
+                    "simulation_started_at": annual_summary.simulation_started_at,
+                    "simulation_completed_at": annual_summary.simulation_completed_at,
+                    "simulation_duration_seconds": annual_summary.simulation_duration_seconds,
+                }
+            )
+            .execute()
+        )
 
         logger.info(f"Cached annual summary for {site_id}: {response.data}")
 

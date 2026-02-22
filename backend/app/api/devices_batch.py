@@ -27,36 +27,35 @@ limiter = Limiter(key_func=get_remote_address)
 
 # ---- Request/Response Models ----
 
+
 class BatchDeviceRequest(BaseModel):
     """Request for batch device operations."""
+
     device_ids: List[str] = Field(
-        ...,
-        min_items=1,
-        max_items=100,
-        description="List of device IDs (max 100 per request)"
+        ..., min_items=1, max_items=100, description="List of device IDs (max 100 per request)"
     )
 
 
 class BatchDeviceResponse(BaseModel):
     """Response from batch device operations."""
+
     results: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Dict of device_id -> result (keyed for O(1) lookup)"
+        default_factory=dict, description="Dict of device_id -> result (keyed for O(1) lookup)"
     )
     errors: Dict[str, str] = Field(
-        default_factory=dict,
-        description="Dict of device_id -> error message for missing/failed devices"
+        default_factory=dict, description="Dict of device_id -> error message for missing/failed devices"
     )
 
 
 # ---- Endpoints ----
+
 
 @router.post(
     "/devices/batch/safety-status",
     response_model=BatchDeviceResponse,
     summary="Get safety status for multiple devices",
     description="Fetch safety status for up to 100 devices in a single request. "
-                "Uses single Supabase query instead of N individual queries."
+    "Uses single Supabase query instead of N individual queries.",
 )
 @limiter.limit("30/minute")
 async def batch_safety_status(
@@ -81,10 +80,7 @@ async def batch_safety_status(
     unique_device_ids = list(set(payload.device_ids))
 
     if len(unique_device_ids) > 100:
-        raise HTTPException(
-            status_code=400,
-            detail="Maximum 100 unique device IDs per request"
-        )
+        raise HTTPException(status_code=400, detail="Maximum 100 unique device IDs per request")
 
     results: Dict[str, Any] = {}
     errors: Dict[str, str] = {}
@@ -112,7 +108,7 @@ async def batch_safety_status(
     response_model=BatchDeviceResponse,
     summary="Get latest readings for multiple devices",
     description="Fetch latest readings for up to 100 devices in a single request. "
-                "Uses single Supabase query instead of N individual queries."
+    "Uses single Supabase query instead of N individual queries.",
 )
 @limiter.limit("30/minute")
 async def batch_latest_readings(
@@ -137,10 +133,7 @@ async def batch_latest_readings(
     unique_device_ids = list(set(payload.device_ids))
 
     if len(unique_device_ids) > 100:
-        raise HTTPException(
-            status_code=400,
-            detail="Maximum 100 unique device IDs per request"
-        )
+        raise HTTPException(status_code=400, detail="Maximum 100 unique device IDs per request")
 
     results: Dict[str, Any] = {}
     errors: Dict[str, str] = {}
@@ -169,7 +162,7 @@ async def batch_latest_readings(
     response_model=BatchDeviceResponse,
     summary="Get device condition for multiple devices",
     description="Fetch device condition/health for up to 100 devices in a single request. "
-                "Uses single Supabase query instead of N individual queries."
+    "Uses single Supabase query instead of N individual queries.",
 )
 @limiter.limit("30/minute")
 async def batch_condition(
@@ -194,10 +187,7 @@ async def batch_condition(
     unique_device_ids = list(set(payload.device_ids))
 
     if len(unique_device_ids) > 100:
-        raise HTTPException(
-            status_code=400,
-            detail="Maximum 100 unique device IDs per request"
-        )
+        raise HTTPException(status_code=400, detail="Maximum 100 unique device IDs per request")
 
     results: Dict[str, Any] = {}
     errors: Dict[str, str] = {}
@@ -214,8 +204,8 @@ async def batch_condition(
             device_dict = {
                 "id": device.id,
                 "name": device.name,
-                "device_type": device.device_type.value if hasattr(device.device_type, 'value') else device.device_type,
-                "status": device.status.value if hasattr(device.status, 'value') else device.status,
+                "device_type": device.device_type.value if hasattr(device.device_type, "value") else device.device_type,
+                "status": device.status.value if hasattr(device.status, "value") else device.status,
                 "last_seen": device.last_seen,
                 "updated_at": device.updated_at,
             }

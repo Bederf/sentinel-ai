@@ -73,6 +73,7 @@ HASH_SALT = "sentinel-bms-consent-2026"
 # Models
 # ---------------------------------------------------------------------------
 
+
 class ConsentRecord(BaseModel):
     """Immutable consent record. Withdrawals create new records."""
 
@@ -93,6 +94,7 @@ class ConsentRecord(BaseModel):
 # Helper functions
 # ---------------------------------------------------------------------------
 
+
 def hash_identifier(raw_id: str) -> str:
     """Hash a phone number or user ID with salt for privacy.
 
@@ -110,6 +112,7 @@ def _now_iso() -> str:
 # ---------------------------------------------------------------------------
 # Consent Service
 # ---------------------------------------------------------------------------
+
 
 class ConsentService:
     """Consent management with dual-write storage (JSON + Supabase)."""
@@ -140,12 +143,8 @@ class ConsentService:
         try:
             if self._json_path.exists():
                 data = json.loads(self._json_path.read_text())
-                self._records = [
-                    ConsentRecord(**r) for r in data.get("records", [])
-                ]
-                logger.info(
-                    "Loaded %d consent records from JSON", len(self._records)
-                )
+                self._records = [ConsentRecord(**r) for r in data.get("records", [])]
+                logger.info("Loaded %d consent records from JSON", len(self._records))
             else:
                 self._records = []
                 self._save_json()
@@ -161,9 +160,7 @@ class ConsentService:
                 "schema_version": "1.0",
                 "records": [r.model_dump() for r in self._records],
             }
-            self._json_path.write_text(
-                json.dumps(payload, indent=2, default=str)
-            )
+            self._json_path.write_text(json.dumps(payload, indent=2, default=str))
         except Exception as exc:
             logger.error("Failed to save consent records: %s", exc)
 
@@ -199,9 +196,7 @@ class ConsentService:
         hashed_id = hash_identifier(data_subject_id) if hash_subject else data_subject_id
 
         if consent_text is None:
-            consent_text = CONSENT_TEMPLATES.get("consent_types", {}).get(
-                consent_type, f"Consent for {consent_type}"
-            )
+            consent_text = CONSENT_TEMPLATES.get("consent_types", {}).get(consent_type, f"Consent for {consent_type}")
 
         record = ConsentRecord(
             data_subject_id=hashed_id,
@@ -226,9 +221,7 @@ class ConsentService:
         )
         return record
 
-    def check_consent(
-        self, data_subject_id: str, consent_type: str, *, hash_subject: bool = True
-    ) -> bool:
+    def check_consent(self, data_subject_id: str, consent_type: str, *, hash_subject: bool = True) -> bool:
         """Check if a data subject currently has active consent.
 
         Returns True only if the most recent record for this subject+type
@@ -236,11 +229,7 @@ class ConsentService:
         """
         hashed_id = hash_identifier(data_subject_id) if hash_subject else data_subject_id
 
-        relevant = [
-            r
-            for r in self._records
-            if r.data_subject_id == hashed_id and r.consent_type == consent_type
-        ]
+        relevant = [r for r in self._records if r.data_subject_id == hashed_id and r.consent_type == consent_type]
 
         if not relevant:
             return False
@@ -289,14 +278,10 @@ class ConsentService:
         self._records.append(withdrawal)
         self._save_json()
 
-        logger.info(
-            "Consent withdrawn: subject=%s type=%s", hashed_id[:12], consent_type
-        )
+        logger.info("Consent withdrawn: subject=%s type=%s", hashed_id[:12], consent_type)
         return withdrawal
 
-    def get_consent_history(
-        self, data_subject_id: str, *, hash_subject: bool = True
-    ) -> List[ConsentRecord]:
+    def get_consent_history(self, data_subject_id: str, *, hash_subject: bool = True) -> List[ConsentRecord]:
         """Get the full consent history for a data subject."""
         hashed_id = hash_identifier(data_subject_id) if hash_subject else data_subject_id
 
@@ -305,11 +290,7 @@ class ConsentService:
     def get_consent_stats(self) -> Dict[str, Any]:
         """Get aggregate consent statistics for FSR audit reporting."""
         total = len(self._records)
-        active_consents = sum(
-            1
-            for r in self._records
-            if r.consent_given and r.withdrawn_at is None
-        )
+        active_consents = sum(1 for r in self._records if r.consent_given and r.withdrawn_at is None)
         withdrawals = sum(1 for r in self._records if not r.consent_given)
 
         # By platform
@@ -358,6 +339,7 @@ class ConsentService:
 # ---------------------------------------------------------------------------
 # Singleton accessor
 # ---------------------------------------------------------------------------
+
 
 def get_consent_service() -> ConsentService:
     """Get the singleton ConsentService instance."""

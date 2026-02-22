@@ -2,11 +2,11 @@
  * Inverter Status Matrix
  *
  * Compact traffic-light grid of all inverters:
- * - Grouped by plant (Western Carports / Eastern Carports)
+ * - Grouped by plant (Rooftop Array)
  * - Each tile: name, current kW, status icon (green/yellow/red)
  * - Click tile for detail: efficiency %, temperature, daily yield
  * - Underperforming inverters highlighted with yellow/red border
- * - Fits all 33 inverters at once
+ * - 4 inverters (matches Supabase solar_inverters table)
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -57,47 +57,31 @@ export function InverterStatusMatrix({ siteId }: InverterStatusMatrixProps) {
   const [collapsedPlants, setCollapsedPlants] = useState<Set<string>>(new Set());
 
   const loadData = useCallback(async () => {
-    const buildDemoInverters = (): SolarInverter[] => [
-      ...Array.from({ length: 10 }, (_, i) => ({
-        inverter_id: `S002-INV-H0${i+1}`,
-        name: `Huawei INV-${i+1}`,
+    // Demo fallback: 4 roof inverters matching Supabase solar_inverters table
+    const buildDemoInverters = (): SolarInverter[] =>
+      Array.from({ length: 4 }, (_, i) => ({
+        inverter_id: `S002-INV-R-00${i + 1}`,
+        name: `Huawei INV-${i + 1} (Roof)`,
         manufacturer: "huawei",
-        model: "SUN2000-330KTL-H2",
-        plant_id: "site-002-west",
-        plant_name: "Western Carports",
-        rated_power_kw: 330,
-        current_power_kw: 300 + Math.random() * 30,
-        daily_yield_kwh: 2400 + Math.random() * 200,
-        efficiency_percent: 96 + Math.random() * 3,
-        temperature_c: 38 + Math.random() * 8,
+        model: "SUN2000-100KTL-M2",
+        plant_id: "sandton-roof",
+        plant_name: "Rooftop Array",
+        rated_power_kw: 100,
+        current_power_kw: 60 + Math.random() * 15,
+        daily_yield_kwh: 380 + Math.random() * 20,
+        efficiency_percent: 96 + Math.random() * 2,
+        temperature_c: 40 + Math.random() * 5,
         status: "normal" as const,
-        mppt_count: 12,
-        string_count: 48
-      })),
-      ...Array.from({ length: 23 }, (_, i) => ({
-        inverter_id: `S002-INV-S${(i+1).toString().padStart(2, '0')}`,
-        name: `Schneider INV-${i+1}`,
-        manufacturer: "schneider",
-        model: "Conext CL25000E",
-        plant_id: "site-002-east",
-        plant_name: "Eastern Carports",
-        rated_power_kw: 25,
-        current_power_kw: 20 + Math.random() * 5,
-        daily_yield_kwh: 150 + Math.random() * 30,
-        efficiency_percent: 94 + Math.random() * 4,
-        temperature_c: 35 + Math.random() * 10,
-        status: "normal" as const,
-        mppt_count: 5,
-        string_count: 10
-      }))
-    ];
+        mppt_count: 10,
+        string_count: 10,
+      }));
 
     try {
       const result = await fetchInverters(siteId);
       // API may succeed but return empty list when no hardware connected
       if (result.inverters.length === 0) {
         const demoInverters = buildDemoInverters();
-        setData({ site_id: siteId, inverter_count: 33, inverters: demoInverters });
+        setData({ site_id: siteId, inverter_count: 4, inverters: demoInverters });
       } else {
         setData(result);
       }
@@ -107,7 +91,7 @@ export function InverterStatusMatrix({ siteId }: InverterStatusMatrixProps) {
         console.error("Failed to load inverters:", err);
       }
       const demoInverters = buildDemoInverters();
-      setData({ site_id: siteId, inverter_count: 33, inverters: demoInverters });
+      setData({ site_id: siteId, inverter_count: 4, inverters: demoInverters });
       setError(null);
     } finally {
       setLoading(false);
@@ -290,7 +274,7 @@ export function InverterStatusMatrix({ siteId }: InverterStatusMatrixProps) {
                         className="text-[9px] font-medium truncate"
                         style={{ color: "var(--color-sentinel-text-primary)" }}
                       >
-                        {inv.name.replace(/SUN2000-330KTL-|CL25 #|LUNA2000-213KTL-/, "").substring(0, 6)}
+                        {inv.name.replace(/SUN2000-100KTL-|SUN2000-330KTL-|CL25 #|LUNA2000-213KTL-/, "").substring(0, 6)}
                       </div>
                       {/* Power */}
                       <div

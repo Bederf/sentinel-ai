@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 class HealthThresholdsUpdate(BaseModel):
     """Health threshold update model."""
+
     healthy: int
     warning: int
     critical: int
@@ -21,6 +22,7 @@ class HealthThresholdsUpdate(BaseModel):
 
 class SettingUpdate(BaseModel):
     """Generic setting update model."""
+
     value: Dict[str, Any]
     category: Optional[str] = None
     description: Optional[str] = None
@@ -46,17 +48,14 @@ async def get_all_settings() -> Dict[str, Any]:
                 "dataType": setting.get("data_type"),
                 "isPublic": setting.get("is_public", False),
                 "isEditable": setting.get("is_editable", True),
-                "updatedAt": setting.get("updated_at")
+                "updatedAt": setting.get("updated_at"),
             }
 
         return settings
 
     except Exception as e:
         logger.error(f"Error loading settings: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to load settings from database: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to load settings from database: {str(e)}")
 
 
 @router.get("/settings/public")
@@ -78,10 +77,7 @@ async def get_public_settings() -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Error loading public settings: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to load public settings: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to load public settings: {str(e)}")
 
 
 @router.get("/settings/health-thresholds")
@@ -94,10 +90,7 @@ async def get_health_thresholds() -> Dict[str, int]:
         supabase = get_supabase_client()
 
         # Try to get from database first
-        result = supabase.table("system_settings")\
-            .select("value")\
-            .eq("key", "health_thresholds")\
-            .execute()
+        result = supabase.table("system_settings").select("value").eq("key", "health_thresholds").execute()
 
         if result.data:
             return result.data[0]["value"]
@@ -124,57 +117,52 @@ async def update_health_thresholds(thresholds: HealthThresholdsUpdate) -> Dict[s
     for field in ["healthy", "warning", "critical"]:
         value = getattr(thresholds, field)
         if not (0 <= value <= 100):
-            raise HTTPException(
-                status_code=400,
-                detail=f"{field} must be between 0 and 100, got {value}"
-            )
+            raise HTTPException(status_code=400, detail=f"{field} must be between 0 and 100, got {value}")
 
     # Validate threshold ordering (healthy > warning > critical)
     if thresholds.healthy <= thresholds.warning:
         raise HTTPException(
             status_code=400,
-            detail=f"healthy threshold ({thresholds.healthy}) must be greater than warning threshold ({thresholds.warning})"
+            detail=f"healthy threshold ({thresholds.healthy}) must be greater than warning threshold ({thresholds.warning})",
         )
 
     if thresholds.warning <= thresholds.critical:
         raise HTTPException(
             status_code=400,
-            detail=f"warning threshold ({thresholds.warning}) must be greater than critical threshold ({thresholds.critical})"
+            detail=f"warning threshold ({thresholds.warning}) must be greater than critical threshold ({thresholds.critical})",
         )
 
     try:
         supabase = get_supabase_client()
 
         # Update in database
-        result = supabase.table("system_settings")\
-            .upsert({
-                "key": "health_thresholds",
-                "value": {
-                    "healthy": thresholds.healthy,
-                    "warning": thresholds.warning,
-                    "critical": thresholds.critical
+        result = (
+            supabase.table("system_settings")
+            .upsert(
+                {
+                    "key": "health_thresholds",
+                    "value": {
+                        "healthy": thresholds.healthy,
+                        "warning": thresholds.warning,
+                        "critical": thresholds.critical,
+                    },
+                    "category": "health",
+                    "description": "Health score thresholds for equipment classification (0-100 scale)",
+                    "data_type": "object",
+                    "is_public": True,
                 },
-                "category": "health",
-                "description": "Health score thresholds for equipment classification (0-100 scale)",
-                "data_type": "object",
-                "is_public": True
-            }, on_conflict="key")\
+                on_conflict="key",
+            )
             .execute()
+        )
 
         logger.info(f"Updated health thresholds: {thresholds.dict()}")
 
-        return {
-            "healthy": thresholds.healthy,
-            "warning": thresholds.warning,
-            "critical": thresholds.critical
-        }
+        return {"healthy": thresholds.healthy, "warning": thresholds.warning, "critical": thresholds.critical}
 
     except Exception as e:
         logger.error(f"Error updating health thresholds: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update health thresholds: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to update health thresholds: {str(e)}")
 
 
 @router.get("/settings/alert-intervals")
@@ -187,10 +175,7 @@ async def get_alert_intervals() -> Dict[str, int]:
     try:
         supabase = get_supabase_client()
 
-        result = supabase.table("system_settings")\
-            .select("value")\
-            .eq("key", "alert_intervals")\
-            .execute()
+        result = supabase.table("system_settings").select("value").eq("key", "alert_intervals").execute()
 
         if result.data:
             return result.data[0]["value"]
@@ -217,23 +202,27 @@ async def update_alert_intervals(intervals: Dict[str, int]) -> Dict[str, int]:
     for key, value in intervals.items():
         if not isinstance(value, int) or value < 1:
             raise HTTPException(
-                status_code=400,
-                detail=f"{key} interval must be a positive integer (minutes), got {value}"
+                status_code=400, detail=f"{key} interval must be a positive integer (minutes), got {value}"
             )
 
     try:
         supabase = get_supabase_client()
 
-        result = supabase.table("system_settings")\
-            .upsert({
-                "key": "alert_intervals",
-                "value": intervals,
-                "category": "alerts",
-                "description": "Alert throttling intervals in minutes",
-                "data_type": "object",
-                "is_public": False
-            }, on_conflict="key")\
+        result = (
+            supabase.table("system_settings")
+            .upsert(
+                {
+                    "key": "alert_intervals",
+                    "value": intervals,
+                    "category": "alerts",
+                    "description": "Alert throttling intervals in minutes",
+                    "data_type": "object",
+                    "is_public": False,
+                },
+                on_conflict="key",
+            )
             .execute()
+        )
 
         logger.info(f"Updated alert intervals: {intervals}")
 
@@ -241,10 +230,7 @@ async def update_alert_intervals(intervals: Dict[str, int]) -> Dict[str, int]:
 
     except Exception as e:
         logger.error(f"Error updating alert intervals: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update alert intervals: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to update alert intervals: {str(e)}")
 
 
 @router.get("/settings/{key}")
@@ -257,16 +243,10 @@ async def get_setting(key: str) -> Dict[str, Any]:
     try:
         supabase = get_supabase_client()
 
-        result = supabase.table("system_settings")\
-            .select("*")\
-            .eq("key", key)\
-            .execute()
+        result = supabase.table("system_settings").select("*").eq("key", key).execute()
 
         if not result.data:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Setting '{key}' not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Setting '{key}' not found")
 
         setting = result.data[0]
 
@@ -280,17 +260,14 @@ async def get_setting(key: str) -> Dict[str, Any]:
             "description": setting.get("description"),
             "dataType": setting.get("data_type"),
             "isEditable": setting.get("is_editable", True),
-            "updatedAt": setting.get("updated_at")
+            "updatedAt": setting.get("updated_at"),
         }
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error getting setting '{key}': {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get setting: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get setting: {str(e)}")
 
 
 @router.put("/settings/{key}")
@@ -305,23 +282,17 @@ async def update_setting(key: str, update: SettingUpdate) -> Dict[str, Any]:
         supabase = get_supabase_client()
 
         # Check if setting exists and is editable
-        existing = repo.supabase.table("system_settings")\
-            .select("is_editable")\
-            .eq("key", key)\
-            .execute()
+        existing = repo.supabase.table("system_settings").select("is_editable").eq("key", key).execute()
 
         if existing.data:
             if not existing.data[0].get("is_editable", True):
-                raise HTTPException(
-                    status_code=403,
-                    detail=f"Setting '{key}' is not editable"
-                )
+                raise HTTPException(status_code=403, detail=f"Setting '{key}' is not editable")
 
         # Build update data
         update_data = {
             "key": key,
             "value": update.value,
-            "data_type": "object" if isinstance(update.value, dict) else "string"
+            "data_type": "object" if isinstance(update.value, dict) else "string",
         }
 
         if update.category:
@@ -330,9 +301,7 @@ async def update_setting(key: str, update: SettingUpdate) -> Dict[str, Any]:
             update_data["description"] = update.description
 
         # Update in database
-        result = supabase.table("system_settings")\
-            .upsert(update_data, on_conflict="key")\
-            .execute()
+        result = supabase.table("system_settings").upsert(update_data, on_conflict="key").execute()
 
         logger.info(f"Updated setting '{key}': {update.value}")
 
@@ -340,14 +309,11 @@ async def update_setting(key: str, update: SettingUpdate) -> Dict[str, Any]:
             "key": key,
             "value": update.value,
             "category": update.get("category"),
-            "description": update.get("description")
+            "description": update.get("description"),
         }
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating setting '{key}': {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update setting: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to update setting: {str(e)}")

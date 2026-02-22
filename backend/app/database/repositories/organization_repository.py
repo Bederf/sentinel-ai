@@ -18,10 +18,7 @@ class OrganizationRepository:
         self.client = get_supabase_client()
 
     def get_all(
-        self,
-        tier: Optional[str] = None,
-        status: Optional[str] = None,
-        limit: int = 50
+        self, tier: Optional[str] = None, status: Optional[str] = None, limit: int = 50
     ) -> List[Dict[str, Any]]:
         """
         List organizations with optional filters.
@@ -39,9 +36,7 @@ class OrganizationRepository:
             return []
 
         try:
-            query = self.client.table("organizations").select("*").order(
-                "name"
-            ).limit(limit)
+            query = self.client.table("organizations").select("*").order("name").limit(limit)
 
             if tier:
                 query = query.eq("tier", tier)
@@ -61,9 +56,7 @@ class OrganizationRepository:
             return None
 
         try:
-            result = self.client.table("organizations").select(
-                "*"
-            ).eq("id", org_id).execute()
+            result = self.client.table("organizations").select("*").eq("id", org_id).execute()
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
@@ -79,9 +72,7 @@ class OrganizationRepository:
             return None
 
         try:
-            result = self.client.table("organizations").select(
-                "*"
-            ).eq("code", code).execute()
+            result = self.client.table("organizations").select("*").eq("code", code).execute()
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
@@ -133,9 +124,7 @@ class OrganizationRepository:
             return None
 
         try:
-            result = self.client.table("organizations").update(
-                data
-            ).eq("id", org_id).execute()
+            result = self.client.table("organizations").update(data).eq("id", org_id).execute()
 
             if result.data and len(result.data) > 0:
                 return result.data[0]

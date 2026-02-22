@@ -36,14 +36,17 @@ def get_server() -> SIMBIOTMCPServer:
 # Pydantic Models
 # ============================================================================
 
+
 class ToolCallRequest(BaseModel):
     """Request body for tool execution."""
+
     tool_name: str
     arguments: Dict[str, Any] = {}
 
 
 class ToolCallResponse(BaseModel):
     """Response from tool execution."""
+
     tool_name: str
     result: Any
     error: Optional[str] = None
@@ -51,6 +54,7 @@ class ToolCallResponse(BaseModel):
 
 class MCPServerInfo(BaseModel):
     """Server information and capabilities."""
+
     name: str
     version: str
     description: str
@@ -61,6 +65,7 @@ class MCPServerInfo(BaseModel):
 # ============================================================================
 # API Endpoints
 # ============================================================================
+
 
 @router.get("/tools")
 async def list_tools() -> List[Dict[str, Any]]:
@@ -88,20 +93,13 @@ async def call_tool(request: ToolCallRequest) -> ToolCallResponse:
     server = get_server()
     try:
         result = await server.call_tool(request.tool_name, **request.arguments)
-        return ToolCallResponse(
-            tool_name=request.tool_name,
-            result=result
-        )
+        return ToolCallResponse(tool_name=request.tool_name, result=result)
     except ValueError as e:
         # Tool not found or invalid arguments
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Tool execution error for {request.tool_name}: {e}")
-        return ToolCallResponse(
-            tool_name=request.tool_name,
-            result=None,
-            error=str(e)
-        )
+        return ToolCallResponse(tool_name=request.tool_name, result=None, error=str(e))
 
 
 @router.get("/info", response_model=MCPServerInfo)
@@ -121,9 +119,9 @@ async def server_info() -> MCPServerInfo:
         capabilities={
             "tools": True,
             "resources": False,  # Future: building:// URIs
-            "prompts": False,    # Future: analyze_asset, diagnose_equipment, etc.
-            "logging": True
-        }
+            "prompts": False,  # Future: analyze_asset, diagnose_equipment, etc.
+            "logging": True,
+        },
     )
 
 

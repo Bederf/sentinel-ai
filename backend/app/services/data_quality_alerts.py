@@ -396,10 +396,7 @@ class DataQualityAlertService:
             with open(equipment_path, "r") as f:
                 all_equipment = json.load(f)
 
-            return [
-                {"equipment_id": eq["id"], "equipment_type": eq.get("type", "unknown")}
-                for eq in all_equipment
-            ]
+            return [{"equipment_id": eq["id"], "equipment_type": eq.get("type", "unknown")} for eq in all_equipment]
         except Exception as e:
             logger.warning(f"Failed to load equipment: {e}")
             return []

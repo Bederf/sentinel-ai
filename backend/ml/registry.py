@@ -35,9 +35,7 @@ class ModelRegistry:
     def _save_registry(self):
         """Save registry to disk."""
         self.registry_path.parent.mkdir(parents=True, exist_ok=True)
-        self.registry_path.write_text(
-            json.dumps(self.registry, indent=2, default=str)
-        )
+        self.registry_path.write_text(json.dumps(self.registry, indent=2, default=str))
 
     def register_model(
         self,
@@ -46,7 +44,7 @@ class ModelRegistry:
         model_path: str,
         metrics: dict,
         metadata: dict = None,
-        auto_activate: bool = True
+        auto_activate: bool = True,
     ) -> str:
         """
         Register a new model version.
@@ -73,7 +71,7 @@ class ModelRegistry:
             "metrics": metrics,
             "metadata": metadata or {},
             "registered_at": datetime.now().isoformat(),
-            "status": "registered"
+            "status": "registered",
         }
 
         self.registry["models"][model_id] = entry
@@ -106,9 +104,7 @@ class ModelRegistry:
 
         logger.info(f"Activated model: {model_id}")
 
-    def get_active_model(
-        self, model_type: str, equipment_type: str
-    ) -> Optional[dict]:
+    def get_active_model(self, model_type: str, equipment_type: str) -> Optional[dict]:
         """Get the currently active model for inference."""
         key = f"{model_type}_{equipment_type}"
         model_id = self.registry["active"].get(key)
@@ -117,12 +113,7 @@ class ModelRegistry:
             return self.registry["models"][model_id]
         return None
 
-    def list_models(
-        self,
-        model_type: str = None,
-        equipment_type: str = None,
-        status: str = None
-    ) -> List[dict]:
+    def list_models(self, model_type: str = None, equipment_type: str = None, status: str = None) -> List[dict]:
         """List registered models with optional filters."""
         models = list(self.registry["models"].values())
 
@@ -157,18 +148,11 @@ class ModelRegistry:
         logger.info(f"Deleted model: {model_id}")
         return True
 
-    def get_model_comparison(
-        self, model_type: str, equipment_type: str
-    ) -> List[dict]:
+    def get_model_comparison(self, model_type: str, equipment_type: str) -> List[dict]:
         """Compare all models for a specific type/equipment."""
         models = self.list_models(model_type, equipment_type)
         return [
-            {
-                "model_id": m["model_id"],
-                "registered_at": m["registered_at"],
-                "status": m["status"],
-                **m["metrics"]
-            }
+            {"model_id": m["model_id"], "registered_at": m["registered_at"], "status": m["status"], **m["metrics"]}
             for m in models
         ]
 

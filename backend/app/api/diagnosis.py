@@ -23,14 +23,17 @@ router = APIRouter(prefix="/diagnosis", tags=["diagnosis"])
 
 # Request/Response Models
 
+
 class StartDiagnosisRequest(BaseModel):
     """Request to start a new diagnosis session"""
+
     query: str = Field(..., description="Initial problem description")
     session_id: Optional[str] = Field(None, description="Optional session ID (auto-generated if not provided)")
 
 
 class StartDiagnosisResponse(BaseModel):
     """Response from starting diagnosis"""
+
     session_id: str
     type: str
     state: str
@@ -42,6 +45,7 @@ class StartDiagnosisResponse(BaseModel):
 
 class RespondRequest(BaseModel):
     """Request to respond to a checkpoint"""
+
     session_id: str = Field(..., description="Session ID")
     step_id: str = Field(..., description="ID of the step being answered")
     response: str = Field(..., description="Technician's response")
@@ -49,6 +53,7 @@ class RespondRequest(BaseModel):
 
 class FlowStateResponse(BaseModel):
     """Current state of a diagnosis flow"""
+
     session_id: str
     state: str
     equipment: dict
@@ -60,6 +65,7 @@ class FlowStateResponse(BaseModel):
 
 
 # API Endpoints
+
 
 @router.post("/start", response_model=dict)
 async def start_diagnosis(request: StartDiagnosisRequest):
@@ -106,9 +112,7 @@ async def process_response(request: RespondRequest):
 
     try:
         result = engine.process_response(
-            session_id=request.session_id,
-            step_id=request.step_id,
-            response=request.response
+            session_id=request.session_id, step_id=request.step_id, response=request.response
         )
 
         if result.get("error"):
@@ -140,10 +144,7 @@ async def get_flow_state(session_id: str):
 
     flow_state = engine.get_flow_state(session_id)
     if not flow_state:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Diagnosis session not found: {session_id}"
-        )
+        raise HTTPException(status_code=404, detail=f"Diagnosis session not found: {session_id}")
 
     return flow_state
 
@@ -189,14 +190,11 @@ async def get_fault_checklist(fault_code: str):
     engine = get_diagnosis_engine()
 
     fault_code_upper = fault_code.upper()
-    checklist = engine.FAULT_CHECKLISTS.get(
-        fault_code_upper,
-        engine.DEFAULT_CHECKLIST
-    )
+    checklist = engine.FAULT_CHECKLISTS.get(fault_code_upper, engine.DEFAULT_CHECKLIST)
 
     return {
         "fault_code": fault_code_upper,
         "checklist": checklist,
         "is_default": fault_code_upper not in engine.FAULT_CHECKLISTS,
-        "total_steps": len(checklist)
+        "total_steps": len(checklist),
     }

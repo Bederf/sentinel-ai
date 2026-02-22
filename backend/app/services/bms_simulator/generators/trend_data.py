@@ -86,10 +86,7 @@ class TrendDataGenerator:
         start = datetime.combine(self.config.start_date, datetime.min.time())
         n_intervals = self.config.days * 24 * 60 // self.config.interval_minutes
 
-        timestamps = np.array([
-            start + timedelta(minutes=i * self.config.interval_minutes)
-            for i in range(n_intervals)
-        ])
+        timestamps = np.array([start + timedelta(minutes=i * self.config.interval_minutes) for i in range(n_intervals)])
 
         return timestamps
 
@@ -113,10 +110,7 @@ class TrendDataGenerator:
         points = device.get("points", {})
 
         # Check if this device should have degradation
-        should_degrade = (
-            self.config.include_degradation and
-            device_id in self.config.degradation_equipment
-        )
+        should_degrade = self.config.include_degradation and device_id in self.config.degradation_equipment
 
         # Generate degradation factors if needed
         degradation_factors = None
@@ -425,31 +419,33 @@ class TrendDataGenerator:
         equipment = device.get("equipment", {})
         location = device.get("device_location", {})
 
-        telemetry_df = pd.DataFrame({
-            "timestamp": df["timestamp"],
-            "site_id": site_id,
-            "site_name": location.get("building", "Unknown"),
-            "asset_id": device_id.replace("-", "-").upper(),
-            "asset_tag": f"{site_id[:2]}-HVAC-CH-001",
-            "chiller_type": "centrifugal",
-            "chiller_make": equipment.get("manufacturer", "Unknown"),
-            "chiller_model": equipment.get("model", "Unknown"),
-            "capacity_tons": int(device.get("capacity", 200)),
-            "reading_source": "bacnet-scheduled",
-            "chw_supply_temp_c": df.get("chw_supply_temp", 7.0),
-            "chw_return_temp_c": df.get("chw_return_temp", 12.0),
-            "chw_setpoint_c": df.get("chw_supply_temp_setpoint", 7.0),
-            "chw_flow_lps": 50.0 + np.random.default_rng(self.config.seed).normal(0, 5, len(df)),
-            "cond_water_in_c": 30.0 + np.random.default_rng(self.config.seed).normal(0, 2, len(df)),
-            "cond_water_out_c": 35.0 + np.random.default_rng(self.config.seed).normal(0, 2, len(df)),
-            "compressor_status": "RUNNING",
-            "compressor_load_pct": df.get("compressor_amps", 145) / 2,  # Approximate
-            "compressor_current_a": df.get("compressor_amps", 145),
-            "power_kw": df.get("compressor_amps", 145) * 0.8,  # Approximate
-            "efficiency_kw_ton": 0.6,
-            "alarm_code": "",
-            "alarm_description": "",
-        })
+        telemetry_df = pd.DataFrame(
+            {
+                "timestamp": df["timestamp"],
+                "site_id": site_id,
+                "site_name": location.get("building", "Unknown"),
+                "asset_id": device_id.replace("-", "-").upper(),
+                "asset_tag": f"{site_id[:2]}-HVAC-CH-001",
+                "chiller_type": "centrifugal",
+                "chiller_make": equipment.get("manufacturer", "Unknown"),
+                "chiller_model": equipment.get("model", "Unknown"),
+                "capacity_tons": int(device.get("capacity", 200)),
+                "reading_source": "bacnet-scheduled",
+                "chw_supply_temp_c": df.get("chw_supply_temp", 7.0),
+                "chw_return_temp_c": df.get("chw_return_temp", 12.0),
+                "chw_setpoint_c": df.get("chw_supply_temp_setpoint", 7.0),
+                "chw_flow_lps": 50.0 + np.random.default_rng(self.config.seed).normal(0, 5, len(df)),
+                "cond_water_in_c": 30.0 + np.random.default_rng(self.config.seed).normal(0, 2, len(df)),
+                "cond_water_out_c": 35.0 + np.random.default_rng(self.config.seed).normal(0, 2, len(df)),
+                "compressor_status": "RUNNING",
+                "compressor_load_pct": df.get("compressor_amps", 145) / 2,  # Approximate
+                "compressor_current_a": df.get("compressor_amps", 145),
+                "power_kw": df.get("compressor_amps", 145) * 0.8,  # Approximate
+                "efficiency_kw_ton": 0.6,
+                "alarm_code": "",
+                "alarm_description": "",
+            }
+        )
 
         # Determine output path
         if output_path is None:

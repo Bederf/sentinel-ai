@@ -60,12 +60,12 @@ class TestHybridAIFallback:
         # Mock Claude to raise 500 error
         mock_api_error = _create_api_error("Internal server error")
 
-        with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
             # Claude raises APIError
             mock_claude.stream_response.side_effect = mock_api_error
 
             # Mock Ollama to succeed
-            with patch.object(hybrid_ai, 'query_ollama', new_callable=AsyncMock) as mock_ollama:
+            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
                 mock_ollama_response = "Here are optimization recommendations from Ollama..."
                 mock_ollama.return_value = mock_ollama_response
 
@@ -89,11 +89,11 @@ class TestHybridAIFallback:
         # Mock connection error
         mock_conn_error = _create_connection_error("Connection to api.anthropic.com failed")
 
-        with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
             mock_claude.stream_response.side_effect = mock_conn_error
 
             # Mock Ollama to succeed
-            with patch.object(hybrid_ai, 'query_ollama', new_callable=AsyncMock) as mock_ollama:
+            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
                 mock_ollama.return_value = "AHU-7 status: Online, 72% health"
 
                 response_chunks = []
@@ -115,10 +115,10 @@ class TestHybridAIFallback:
         # Mock timeout error
         mock_timeout = _create_timeout_error()
 
-        with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
             mock_claude.stream_response.side_effect = mock_timeout
 
-            with patch.object(hybrid_ai, 'query_ollama', new_callable=AsyncMock) as mock_ollama:
+            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
                 mock_ollama.return_value = "Desk 25 is in Zone L1-A with temperature 24°C"
 
                 response_chunks = []
@@ -139,10 +139,10 @@ class TestHybridAIFallback:
         # Mock rate limit error
         mock_rate_limit = _create_rate_limit_error("Rate limit exceeded")
 
-        with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
             mock_claude.stream_response.side_effect = mock_rate_limit
 
-            with patch.object(hybrid_ai, 'query_ollama', new_callable=AsyncMock) as mock_ollama:
+            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
                 mock_ollama.return_value = "Equipment: CH-1, CH-2, CH-3, AHU-7..."
 
                 response_chunks = []
@@ -161,7 +161,7 @@ class TestHybridAIFallback:
 
         mock_api_error = _create_api_error("Internal server error")
 
-        with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
             mock_claude.stream_response_with_tools.side_effect = mock_api_error
 
             response_chunks = []
@@ -180,11 +180,11 @@ class TestHybridAIFallback:
 
         mock_api_error = _create_api_error("Internal server error")
 
-        with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
             mock_claude.stream_response.side_effect = mock_api_error
 
             # Mock Ollama to also fail
-            with patch.object(hybrid_ai, 'query_ollama', new_callable=AsyncMock) as mock_ollama:
+            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
                 mock_ollama.side_effect = Exception("Ollama service unavailable")
 
                 response_chunks = []
@@ -203,7 +203,7 @@ class TestHybridAIFallback:
         message = "Diagnose the HVAC problem"  # Tier 2 query to ensure Claude routing
 
         # Mock a ValueError (programming error, not API error)
-        with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
             mock_claude.stream_response.side_effect = ValueError("Invalid input format")
 
             # Should raise the error, not fall back to Ollama
@@ -222,14 +222,15 @@ class TestHybridAIFallback:
         message = "What is the building occupancy?"  # This might route to Ollama, so override
 
         # Mock Claude to succeed
-        with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
+
             async def mock_stream(*args, **kwargs):
                 yield "Building occupancy is 56%"
 
             mock_claude.stream_response.return_value = mock_stream()
 
             # Mock Ollama (should NOT be called)
-            with patch.object(hybrid_ai, 'query_ollama', new_callable=AsyncMock) as mock_ollama:
+            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
                 response_chunks = []
                 async for chunk in hybrid_ai.stream_response(message, use_tools=False):
                     response_chunks.append(chunk)
@@ -248,10 +249,10 @@ class TestHybridAIFallback:
 
         mock_api_error = _create_api_error("Service unavailable")
 
-        with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
             mock_claude.stream_response.side_effect = mock_api_error
 
-            with patch.object(hybrid_ai, 'query_ollama', new_callable=AsyncMock) as mock_ollama:
+            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
                 mock_ollama.return_value = "Response from local AI"
 
                 response_chunks = []
@@ -273,31 +274,35 @@ class TestHybridAIFallback:
 
         mock_api_error = _create_api_error("Internal server error")
 
-        with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
             mock_claude.stream_response.side_effect = mock_api_error
 
-            with patch.object(hybrid_ai, 'query_ollama', new_callable=AsyncMock) as mock_ollama:
+            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
                 mock_ollama.return_value = "Error E123: Temperature sensor fault"
 
                 # Override classification to force Tier 2 for this test
-                with patch.object(hybrid_ai, 'classify_task', return_value={
-                    "provider": "anthropic",
-                    "model": "claude-sonnet-4-20250514",
-                    "reason": "Forced to Claude for test",
-                    "estimated_cost": 0.0105,
-                    "tier": 2
-                }):
+                with patch.object(
+                    hybrid_ai,
+                    "classify_task",
+                    return_value={
+                        "provider": "anthropic",
+                        "model": "claude-sonnet-4-20250514",
+                        "reason": "Forced to Claude for test",
+                        "estimated_cost": 0.0105,
+                        "tier": 2,
+                    },
+                ):
                     async for _ in hybrid_ai.stream_response(message, use_tools=False):
                         pass
 
                 # Should use balanced model for forced Tier 2
                 call_args = mock_ollama.call_args
-                assert call_args[1]['model'] == 'phi3:mini'  # Balanced model
+                assert call_args[1]["model"] == "phi3:mini"  # Balanced model
 
-        with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
             mock_claude.stream_response.side_effect = mock_api_error
 
-            with patch.object(hybrid_ai, 'query_ollama', new_callable=AsyncMock) as mock_ollama:
+            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
                 mock_ollama.return_value = "Error E123: Temperature sensor fault"
 
                 async for _ in hybrid_ai.stream_response(message, use_tools=False):
@@ -305,7 +310,7 @@ class TestHybridAIFallback:
 
                 # Should use fast model for Tier 1 queries
                 call_args = mock_ollama.call_args
-                assert call_args[1]['model'] == 'llama3.2:1b'  # Fast model
+                assert call_args[1]["model"] == "llama3.2:1b"  # Fast model
 
     @pytest.mark.asyncio
     async def test_fallback_model_selection_tier2(self, hybrid_ai):
@@ -314,10 +319,10 @@ class TestHybridAIFallback:
 
         mock_api_error = _create_api_error("Internal server error")
 
-        with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
             mock_claude.stream_response.side_effect = mock_api_error
 
-            with patch.object(hybrid_ai, 'query_ollama', new_callable=AsyncMock) as mock_ollama:
+            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
                 mock_ollama.return_value = "Based on vibration analysis..."
 
                 async for _ in hybrid_ai.stream_response(message, use_tools=False):
@@ -325,7 +330,7 @@ class TestHybridAIFallback:
 
                 # Should use balanced model for Tier 2 queries
                 call_args = mock_ollama.call_args
-                assert call_args[1]['model'] == 'phi3:mini'  # Balanced model
+                assert call_args[1]["model"] == "phi3:mini"  # Balanced model
 
     @pytest.mark.asyncio
     async def test_fallback_prevents_escalation(self, hybrid_ai):
@@ -334,34 +339,38 @@ class TestHybridAIFallback:
 
         mock_api_error = _create_api_error("Internal server error")
 
-        with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
             mock_claude.stream_response.side_effect = mock_api_error
 
-            with patch.object(hybrid_ai, 'query_ollama', new_callable=AsyncMock) as mock_ollama:
+            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
                 mock_ollama.return_value = "Equipment health data..."
 
                 # Override classification to force Tier 2 for this test
-                with patch.object(hybrid_ai, 'classify_task', return_value={
-                    "provider": "anthropic",
-                    "model": "claude-sonnet-4-20250514",
-                    "reason": "Forced to Claude for test",
-                    "estimated_cost": 0.0105,
-                    "tier": 2
-                }):
+                with patch.object(
+                    hybrid_ai,
+                    "classify_task",
+                    return_value={
+                        "provider": "anthropic",
+                        "model": "claude-sonnet-4-20250514",
+                        "reason": "Forced to Claude for test",
+                        "estimated_cost": 0.0105,
+                        "tier": 2,
+                    },
+                ):
                     async for _ in hybrid_ai.stream_response(message, use_tools=False):
                         pass
 
                 # Verify Ollama was called with escalate_on_fail=False
                 call_args = mock_ollama.call_args
-                assert call_args[1]['escalate_on_fail'] is False
+                assert call_args[1]["escalate_on_fail"] is False
 
                 # Claude should only be called once (the failed attempt)
                 assert mock_claude.stream_response.call_count == 1
 
-        with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
             mock_claude.stream_response.side_effect = mock_api_error
 
-            with patch.object(hybrid_ai, 'query_ollama', new_callable=AsyncMock) as mock_ollama:
+            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
                 mock_ollama.return_value = "Equipment health data..."
 
                 async for _ in hybrid_ai.stream_response(message, use_tools=False):
@@ -369,7 +378,7 @@ class TestHybridAIFallback:
 
                 # Verify Ollama was called with escalate_on_fail=False
                 call_args = mock_ollama.call_args
-                assert call_args[1]['escalate_on_fail'] is False
+                assert call_args[1]["escalate_on_fail"] is False
 
                 # Claude should only be called once (the failed attempt)
                 assert mock_claude.stream_response.call_count == 1
@@ -392,10 +401,10 @@ class TestRateLimitTracking:
         """Test that rate limit error sets cooldown flag."""
         mock_rate_limit = _create_rate_limit_error("Rate limit exceeded")
 
-        with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
             mock_claude.stream_response.side_effect = mock_rate_limit
 
-            with patch.object(hybrid_ai, 'query_ollama', new_callable=AsyncMock) as mock_ollama:
+            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
                 mock_ollama.return_value = "Fallback response"
 
                 async for _ in hybrid_ai.stream_response("test", use_tools=False):
@@ -417,20 +426,20 @@ class TestErrorClassification:
     def test_classify_tier1_simple_lookup(self, hybrid_ai):
         """Test classification of Tier 1 (simple) queries."""
         routing = hybrid_ai.classify_task("What does error code E123 mean?")
-        assert routing['tier'] == 1
-        assert routing['provider'] == 'ollama'
-        assert routing['estimated_cost'] == 0.0
+        assert routing["tier"] == 1
+        assert routing["provider"] == "ollama"
+        assert routing["estimated_cost"] == 0.0
 
     def test_classify_tier2_complex_reasoning(self, hybrid_ai):
         """Test classification of Tier 2 (complex) queries."""
         routing = hybrid_ai.classify_task("Why is AHU-7 showing bearing degradation?")
-        assert routing['tier'] == 2
-        assert routing['provider'] == 'anthropic'
-        assert routing['estimated_cost'] > 0
+        assert routing["tier"] == 2
+        assert routing["provider"] == "anthropic"
+        assert routing["estimated_cost"] > 0
 
     def test_classify_tier2_control_action(self, hybrid_ai):
         """Test classification of control actions."""
         routing = hybrid_ai.classify_task("Turn off AHU-7")
-        assert routing['tier'] == 2
-        assert routing['provider'] == 'anthropic'
-        assert 'safety critical' in routing['reason']
+        assert routing["tier"] == 2
+        assert routing["provider"] == "anthropic"
+        assert "safety critical" in routing["reason"]

@@ -4,6 +4,7 @@ Pytest configuration and fixtures for BMS Intelligence backend tests.
 
 import os
 import warnings
+
 # Enable demo mode before importing the app so the global auth middleware
 # allows requests without a real JWT token (localhost bypass).
 os.environ.setdefault("DEMO_MODE", "true")
@@ -70,6 +71,7 @@ if os.getenv("LIGHTWEIGHT_APP", "").lower() == "true":
     from app.api import safety as safety_api
     from app.api import stats as stats_api
     from app.api import workflow as workflow_api
+
     app = FastAPI()
     app.router.redirect_slashes = False
     app.include_router(devices_api.router, prefix="/api", tags=["devices"])
@@ -135,6 +137,14 @@ class _SyncASGIClient:
 def test_client() -> Generator[TestClient, None, None]:
     """FastAPI test client for synchronous tests."""
     yield _SyncASGIClient(app)
+
+
+@pytest.fixture
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    """Async HTTP client for tests that use ``client`` fixture name."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
 
 
 @pytest.fixture
@@ -334,6 +344,75 @@ def reset_services():
     # This runs before each test
     yield
     # Cleanup after each test if needed
+
+
+class _Mocker:
+    """Lightweight pytest-mock compatible mocker fixture.
+
+    Provides ``patch()`` and ``patch.object()`` that auto-cleanup after each test,
+    mirroring the ``mocker`` fixture from the ``pytest-mock`` package.
+    """
+
+    def __init__(self):
+        self._patchers = []
+
+    def patch(self, target: str, *args, **kwargs):
+        """Wrapper around ``unittest.mock.patch`` with automatic cleanup."""
+        patcher = patch(target, *args, **kwargs)
+        mock_obj = patcher.start()
+        self._patchers.append(patcher)
+        return mock_obj
+
+    def patch_object(self, target, attribute: str, *args, **kwargs):
+        """Wrapper around ``unittest.mock.patch.object`` with automatic cleanup."""
+        patcher = patch.object(target, attribute, *args, **kwargs)
+        mock_obj = patcher.start()
+        self._patchers.append(patcher)
+        return mock_obj
+
+    def stopall(self):
+        """Stop all active patchers."""
+        for patcher in reversed(self._patchers):
+            patcher.stop()
+        self._patchers.clear()
+
+
+# Make patch.object accessible as mocker.patch.object via a wrapper
+class _PatchProxy:
+    """Proxy so ``mocker.patch(...)`` and ``mocker.patch.object(...)`` both work."""
+
+    def __init__(self, mocker: _Mocker):
+        self._mocker = mocker
+
+    def __call__(self, target: str, *args, **kwargs):
+        return self._mocker.patch(target, *args, **kwargs)
+
+    def object(self, target, attribute: str, *args, **kwargs):
+        return self._mocker.patch_object(target, attribute, *args, **kwargs)
+
+
+class MockerFixture:
+    """Public mocker fixture exposing ``mocker.patch(...)`` and ``mocker.patch.object(...)``."""
+
+    def __init__(self):
+        self._mocker = _Mocker()
+        self.patch = _PatchProxy(self._mocker)
+
+    def stopall(self):
+        self._mocker.stopall()
+
+
+@pytest.fixture
+def mocker():
+    """Lightweight mocker fixture compatible with pytest-mock's API.
+
+    Supports:
+        mocker.patch("some.module.path", return_value=...)
+        mocker.patch.object(obj, "attr", return_value=...)
+    """
+    m = MockerFixture()
+    yield m
+    m.stopall()
 
 
 @pytest.fixture

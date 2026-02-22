@@ -10,12 +10,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any
 
-from app.models.inspection import (
-    InspectionSchedule,
-    InspectionTask,
-    InspectionTaskStatus,
-    InspectionScheduleFrequency
-)
+from app.models.inspection import InspectionSchedule, InspectionTask, InspectionTaskStatus, InspectionScheduleFrequency
 from app.database.repositories.inspection_repository import InspectionRepository
 from app.services.baseline_service import get_baseline_service
 
@@ -59,16 +54,12 @@ class InspectionScheduler:
 
                 # Update schedule last_generated_date
                 await self.repository.update_schedule_last_generated(
-                    schedule_id=schedule.id,
-                    last_generated_date=datetime.now()
+                    schedule_id=schedule.id, last_generated_date=datetime.now()
                 )
 
                 # Calculate next due date
                 next_due = self._calculate_next_due_date(schedule)
-                await self.repository.update_schedule_next_due(
-                    schedule_id=schedule.id,
-                    next_due_date=next_due
-                )
+                await self.repository.update_schedule_next_due(schedule_id=schedule.id, next_due_date=next_due)
 
                 logger.info(f"Generated inspection task: {task.task_name} (ID: {task.id})")
 
@@ -113,16 +104,16 @@ class InspectionScheduler:
 
         # Set priority based on critical elements
         is_critical = await self._is_inspection_critical(schedule)
-        priority = "urgent" if is_critical else (
-            "high" if schedule.frequency_type in [InspectionScheduleFrequency.WEEKLY] else "normal"
+        priority = (
+            "urgent"
+            if is_critical
+            else ("high" if schedule.frequency_type in [InspectionScheduleFrequency.WEEKLY] else "normal")
         )
 
         # Get baseline reference
         baseline_ref = None
         if schedule.equipment_id:
-            baseline = await self.baseline_service.repository.get_active_equipment_baseline(
-                schedule.equipment_id
-            )
+            baseline = await self.baseline_service.repository.get_active_equipment_baseline(schedule.equipment_id)
             baseline_ref = baseline.id if baseline else None
 
         # Create task
@@ -140,7 +131,7 @@ class InspectionScheduler:
             "estimated_duration_minutes": schedule.estimated_duration_minutes,
             "priority": priority,
             "is_critical": is_critical,
-            "baseline_reference_id": baseline_ref
+            "baseline_reference_id": baseline_ref,
         }
 
         return await self.repository.create_inspection_task(task_data)
@@ -201,27 +192,20 @@ class InspectionScheduler:
         """Determine if inspection should be marked as critical."""
         # Check if schedule is for critical element
         if schedule.element_id:
-            element = await self.baseline_service.repository.get_element_by_id(
-                schedule.element_id
-            )
+            element = await self.baseline_service.repository.get_element_by_id(schedule.element_id)
             if element and element.criticality in ["high", "critical"]:
                 return True
 
         # Check if equipment has critical elements
         if schedule.equipment_id:
-            elements = await self.baseline_service.repository.get_equipment_elements(
-                schedule.equipment_id
-            )
+            elements = await self.baseline_service.repository.get_equipment_elements(schedule.equipment_id)
             critical_count = sum(1 for e in elements if e.criticality in ["high", "critical"])
             return critical_count > 0
 
         return False
 
     async def get_due_inspections(
-        self,
-        assigned_to: Optional[str] = None,
-        equipment_id: Optional[str] = None,
-        days_ahead: int = 7
+        self, assigned_to: Optional[str] = None, equipment_id: Optional[str] = None, days_ahead: int = 7
     ) -> List[InspectionTask]:
         """
         Get inspection tasks that are due or overdue.
@@ -238,36 +222,23 @@ class InspectionScheduler:
         due_before = now + timedelta(days=days_ahead)
 
         return await self.repository.get_tasks_due_before(
-            due_date=due_before,
-            assigned_to=assigned_to,
-            equipment_id=equipment_id
+            due_date=due_before, assigned_to=assigned_to, equipment_id=equipment_id
         )
 
     async def get_overdue_inspections(
-        self,
-        assigned_to: Optional[str] = None,
-        equipment_id: Optional[str] = None
+        self, assigned_to: Optional[str] = None, equipment_id: Optional[str] = None
     ) -> List[InspectionTask]:
         """Get inspection tasks that are overdue."""
         now = datetime.now()
 
         return await self.repository.get_overdue_tasks(
-            overdue_date=now,
-            assigned_to=assigned_to,
-            equipment_id=equipment_id
+            overdue_date=now, assigned_to=assigned_to, equipment_id=equipment_id
         )
 
-    async def mark_task_in_progress(
-        self,
-        task_id: str,
-        started_by: str
-    ) -> Optional[InspectionTask]:
+    async def mark_task_in_progress(self, task_id: str, started_by: str) -> Optional[InspectionTask]:
         """Mark an inspection task as in progress."""
         return await self.repository.update_task_status(
-            task_id=task_id,
-            status=InspectionTaskStatus.IN_PROGRESS,
-            started_at=datetime.now(),
-            completed_by=started_by
+            task_id=task_id, status=InspectionTaskStatus.IN_PROGRESS, started_at=datetime.now(), completed_by=started_by
         )
 
     async def mark_task_complete(
@@ -275,7 +246,7 @@ class InspectionScheduler:
         task_id: str,
         completed_by: str,
         completion_notes: Optional[str] = None,
-        actual_duration_minutes: Optional[int] = None
+        actual_duration_minutes: Optional[int] = None,
     ) -> Optional[InspectionTask]:
         """Mark an inspection task as completed."""
         return await self.repository.update_task_status(
@@ -284,50 +255,34 @@ class InspectionScheduler:
             completed_date=datetime.now(),
             completed_by=completed_by,
             completion_notes=completion_notes,
-            actual_duration_minutes=actual_duration_minutes
+            actual_duration_minutes=actual_duration_minutes,
         )
 
     async def reschedule_task(
-        self,
-        task_id: str,
-        new_due_date: datetime,
-        reason: str,
-        rescheduled_by: str
+        self, task_id: str, new_due_date: datetime, reason: str, rescheduled_by: str
     ) -> Optional[InspectionTask]:
         """Reschedule an inspection task to a new due date."""
         # Create a note about the rescheduling
         notes = f"Rescheduled by {rescheduled_by}. Reason: {reason}"
 
         return await self.repository.update_task_scheduling(
-            task_id=task_id,
-            new_due_date=new_due_date,
-            scheduling_notes=notes
+            task_id=task_id, new_due_date=new_due_date, scheduling_notes=notes
         )
 
-    async def cancel_task(
-        self,
-        task_id: str,
-        cancellation_reason: str,
-        cancelled_by: str
-    ) -> Optional[InspectionTask]:
+    async def cancel_task(self, task_id: str, cancellation_reason: str, cancelled_by: str) -> Optional[InspectionTask]:
         """Cancel an inspection task."""
         return await self.repository.update_task_status(
             task_id=task_id,
             status=InspectionTaskStatus.CANCELLED,
-            completion_notes=f"Cancelled by {cancelled_by}. Reason: {cancellation_reason}"
+            completion_notes=f"Cancelled by {cancelled_by}. Reason: {cancellation_reason}",
         )
 
     async def update_task_assignment(
-        self,
-        task_id: str,
-        assigned_to: str,
-        assigned_by: str
+        self, task_id: str, assigned_to: str, assigned_by: str
     ) -> Optional[InspectionTask]:
         """Reassign an inspection task to a different technician."""
         return await self.repository.update_task_assignment(
-            task_id=task_id,
-            assigned_to=assigned_to,
-            assigned_by=assigned_by
+            task_id=task_id, assigned_to=assigned_to, assigned_by=assigned_by
         )
 
     async def bulk_generate_tasks(self, equipment_ids: List[str]) -> Dict[str, Any]:
@@ -340,12 +295,7 @@ class InspectionScheduler:
         Returns:
             Summary of generated tasks
         """
-        results = {
-            "total_equipment": len(equipment_ids),
-            "generated_tasks": 0,
-            "skipped_equipment": 0,
-            "errors": []
-        }
+        results = {"total_equipment": len(equipment_ids), "generated_tasks": 0, "skipped_equipment": 0, "errors": []}
 
         for equipment_id in equipment_ids:
             try:
@@ -356,12 +306,11 @@ class InspectionScheduler:
                     results["skipped_equipment"] += 1
 
             except Exception as e:
-                results["errors"].append({
-                    "equipment_id": equipment_id,
-                    "error": str(e)
-                })
+                results["errors"].append({"equipment_id": equipment_id, "error": str(e)})
 
-        logger.info(f"Bulk generation complete: {results['generated_tasks']} tasks for {results['total_equipment']} equipment")
+        logger.info(
+            f"Bulk generation complete: {results['generated_tasks']} tasks for {results['total_equipment']} equipment"
+        )
         return results
 
     async def get_inspection_calendar(
@@ -369,7 +318,7 @@ class InspectionScheduler:
         start_date: datetime,
         end_date: datetime,
         assigned_to: Optional[str] = None,
-        equipment_id: Optional[str] = None
+        equipment_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Get inspection tasks formatted for calendar display.
@@ -384,10 +333,7 @@ class InspectionScheduler:
             List of calendar events
         """
         tasks = await self.repository.get_tasks_in_date_range(
-            start_date=start_date,
-            end_date=end_date,
-            assigned_to=assigned_to,
-            equipment_id=equipment_id
+            start_date=start_date, end_date=end_date, assigned_to=assigned_to, equipment_id=equipment_id
         )
 
         calendar_events = []
@@ -396,14 +342,12 @@ class InspectionScheduler:
                 "id": task.id,
                 "title": task.task_name,
                 "start": task.scheduled_date.isoformat(),
-                "end": (task.scheduled_date + timedelta(
-                    minutes=task.estimated_duration_minutes or 60
-                )).isoformat(),
+                "end": (task.scheduled_date + timedelta(minutes=task.estimated_duration_minutes or 60)).isoformat(),
                 "status": task.status,
                 "priority": task.priority,
                 "equipment_id": task.equipment_id,
                 "assigned_to": task.assigned_to,
-                "is_critical": task.is_critical
+                "is_critical": task.is_critical,
             }
             calendar_events.append(event)
 
@@ -426,10 +370,7 @@ class InspectionScheduler:
         stats["overdue_tasks"] = len(overdue_tasks)
 
         # Add completion rate (last 30 days)
-        completed_last_30 = await self.repository.get_completed_task_count(
-            equipment_id=equipment_id,
-            days_back=30
-        )
+        completed_last_30 = await self.repository.get_completed_task_count(equipment_id=equipment_id, days_back=30)
         stats["completed_last_30_days"] = completed_last_30
 
         return stats

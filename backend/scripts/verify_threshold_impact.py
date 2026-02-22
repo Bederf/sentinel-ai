@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).parent.parent / '.env')
+load_dotenv(Path(__file__).parent.parent / ".env")
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
@@ -16,6 +16,7 @@ try:
 
     # Force refresh to get new thresholds
     from app.services.health_threshold_service import clear_health_threshold_cache
+
     clear_health_threshold_cache()
 
     print("=" * 70)
@@ -23,10 +24,9 @@ try:
     print("=" * 70)
 
     # Get all equipment
-    equipment_result = client.table('equipment').select(
-        'code, name, type, health_score, status',
-        count='exact'
-    ).execute()
+    equipment_result = (
+        client.table("equipment").select("code, name, type, health_score, status", count="exact").execute()
+    )
 
     print(f"\nTotal equipment: {equipment_result.count}")
 
@@ -37,16 +37,16 @@ try:
     warning_count = 0
     critical_count = 0
 
-    for eq in (equipment_result.data or []):
-        health = eq.get('health_score', 50)
+    for eq in equipment_result.data or []:
+        health = eq.get("health_score", 50)
         status = get_health_status(health)
 
-        if status == 'healthy':
+        if status == "healthy":
             healthy_count += 1
-        elif status == 'warning':
+        elif status == "warning":
             warning_count += 1
             at_risk_count += 1
-        elif status == 'critical':
+        elif status == "critical":
             critical_count += 1
             at_risk_count += 1
 
@@ -73,4 +73,5 @@ try:
 except Exception as e:
     print(f"Error: {e}")
     import traceback
+
     traceback.print_exc()

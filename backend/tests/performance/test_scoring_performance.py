@@ -134,7 +134,7 @@ class TestScoringPerformance:
         avg_per_rec = (elapsed * 1000) / iterations
         assert avg_per_rec < 1.0, f"Average time per recommendation: {avg_per_rec:.3f}ms"
 
-        print(f"✓ Scored {iterations} single recommendations in {elapsed*1000:.2f}ms ({avg_per_rec:.4f}ms each)")
+        print(f"✓ Scored {iterations} single recommendations in {elapsed * 1000:.2f}ms ({avg_per_rec:.4f}ms each)")
 
     def test_ranking_maintains_linear_complexity(self):
         """Test that ranking performance scales linearly with recommendation count."""
@@ -173,7 +173,7 @@ class TestScoringPerformance:
             elapsed = time.time() - start
             times.append(elapsed)
 
-            print(f"  {size} recommendations: {elapsed*1000:.2f}ms")
+            print(f"  {size} recommendations: {elapsed * 1000:.2f}ms")
 
         # Verify roughly linear scaling
         # Time for 500 should be roughly 5x time for 100, with some tolerance
@@ -230,7 +230,7 @@ class TestScoringPerformance:
             rec = {
                 "action": "random_action",
                 "comfort_impact": random.uniform(-100, 100),  # Way beyond normal
-                "cost_impact": random.uniform(-1000, 1000),   # Way beyond normal
+                "cost_impact": random.uniform(-1000, 1000),  # Way beyond normal
                 "health_impact": random.uniform(-100, 100),
                 "energy_impact": random.uniform(-500, 500),
                 "maintenance_impact": random.uniform(-100, 100),

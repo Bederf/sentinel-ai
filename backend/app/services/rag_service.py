@@ -1,4 +1,5 @@
 """RAG (Retrieval-Augmented Generation) service combining vector search with LLM."""
+
 from typing import Optional, Dict, Any
 import logging
 
@@ -56,25 +57,13 @@ Keep the language practical and technical but accessible to field technicians.""
         self._supabase_client = supabase_client
 
     async def get_context(
-        self,
-        query: str,
-        equipment_type: Optional[str] = None,
-        n_results: int = 5,
-        use_hybrid: bool = True
+        self, query: str, equipment_type: Optional[str] = None, n_results: int = 5, use_hybrid: bool = True
     ) -> str:
         """Retrieve relevant context for a query."""
         if use_hybrid:
-            results = self.vector_db.hybrid_search(
-                query=query,
-                n_results=n_results,
-                equipment_type=equipment_type
-            )
+            results = self.vector_db.hybrid_search(query=query, n_results=n_results, equipment_type=equipment_type)
         else:
-            results = self.vector_db.search(
-                query=query,
-                n_results=n_results,
-                equipment_type=equipment_type
-            )
+            results = self.vector_db.search(query=query, n_results=n_results, equipment_type=equipment_type)
 
         if not results:
             return "No relevant documentation found."
@@ -83,18 +72,14 @@ Keep the language practical and technical but accessible to field technicians.""
         context_parts = []
         for r in results:
             source = f"[{r.get('document_title', 'Unknown')}]"
-            content = r.get('content', '')
-            score = r.get('similarity', r.get('hybrid_score', 0))
+            content = r.get("content", "")
+            score = r.get("similarity", r.get("hybrid_score", 0))
             context_parts.append(f"{source} (relevance: {score:.2f})\n{content}")
 
         return "\n\n---\n\n".join(context_parts)
 
     async def query(
-        self,
-        query: str,
-        equipment_type: Optional[str] = None,
-        use_hybrid: bool = True,
-        use_local_llm: bool = True
+        self, query: str, equipment_type: Optional[str] = None, use_hybrid: bool = True, use_local_llm: bool = True
     ) -> Dict[str, Any]:
         """Query the RAG system and generate response."""
         # Get relevant context
@@ -122,14 +107,10 @@ Keep the language practical and technical but accessible to field technicians.""
             "response": response,
             "context_used": context,
             "equipment_type": equipment_type,
-            "llm_used": "ollama" if use_local_llm else "none"
+            "llm_used": "ollama" if use_local_llm else "none",
         }
 
-    async def explain_prediction(
-        self,
-        equipment_id: str,
-        prediction: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def explain_prediction(self, equipment_id: str, prediction: Dict[str, Any]) -> Dict[str, Any]:
         """Generate natural language explanation for a prediction."""
         equipment_type = prediction.get("equipment_type", "unknown")
 
@@ -138,28 +119,26 @@ Keep the language practical and technical but accessible to field technicians.""
         rag_context = await self.get_context(query, equipment_type, n_results=3)
 
         # Also search knowledge base
-        knowledge = self.vector_db.search_knowledge(
-            query=query,
-            equipment_type=equipment_type,
-            n_results=2
-        )
+        knowledge = self.vector_db.search_knowledge(query=query, equipment_type=equipment_type, n_results=2)
 
         # Add knowledge to context
         if knowledge:
             knowledge_text = "\n\n**Related Knowledge Base Entries:**\n"
             for k in knowledge:
                 knowledge_text += f"- {k.get('title')}: {k.get('description')}\n"
-                if k.get('solution'):
+                if k.get("solution"):
                     knowledge_text += f"  Solution: {k.get('solution')}\n"
             rag_context += knowledge_text
 
         # Format contributing factors
         factors = prediction.get("contributing_factors", [])
         if factors:
-            factors_text = "\n".join([
-                f"- {f.get('factor', f.get('name', 'Unknown'))}: {f.get('importance', f.get('weight', 0)):.1%} importance"
-                for f in factors[:5]
-            ])
+            factors_text = "\n".join(
+                [
+                    f"- {f.get('factor', f.get('name', 'Unknown'))}: {f.get('importance', f.get('weight', 0)):.1%} importance"
+                    for f in factors[:5]
+                ]
+            )
         else:
             factors_text = "No specific factors identified"
 
@@ -174,7 +153,7 @@ Keep the language practical and technical but accessible to field technicians.""
             anomaly_score=prediction.get("anomaly_score", 0),
             risk_level=prediction.get("risk_level", "Unknown"),
             contributing_factors=factors_text,
-            rag_context=rag_context
+            rag_context=rag_context,
         )
 
         # Check if Ollama is available
@@ -192,25 +171,22 @@ Keep the language practical and technical but accessible to field technicians.""
             "prediction_summary": {
                 "failure_probability": prediction.get("failure_probability_30d"),
                 "predicted_failure": prediction.get("predicted_failure"),
-                "risk_level": prediction.get("risk_level")
+                "risk_level": prediction.get("risk_level"),
             },
             "context_sources": rag_context[:500] + "..." if len(rag_context) > 500 else rag_context,
-            "llm_available": ollama_available
+            "llm_available": ollama_available,
         }
 
-    def _log_query(
-        self,
-        query: str,
-        equipment_type: Optional[str],
-        context_word_count: int
-    ):
+    def _log_query(self, query: str, equipment_type: Optional[str], context_word_count: int):
         """Log RAG query for analytics (non-blocking)."""
         try:
-            self._supabase_client.table('rag_queries').insert({
-                'query_text': query,
-                'equipment_type': equipment_type,
-                'chunks_retrieved': context_word_count // 100,  # Approximate
-            }).execute()
+            self._supabase_client.table("rag_queries").insert(
+                {
+                    "query_text": query,
+                    "equipment_type": equipment_type,
+                    "chunks_retrieved": context_word_count // 100,  # Approximate
+                }
+            ).execute()
         except Exception as e:
             logger.warning(f"Failed to log RAG query: {e}")
 

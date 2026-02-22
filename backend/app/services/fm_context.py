@@ -38,10 +38,7 @@ class FMContextService:
 
         for site in sites:
             site_equipment = [e for e in equipment if e.get("site_id") == site["id"]]
-            site_alerts = [
-                a for a in alerts
-                if a.get("site_id") == site["id"] and a.get("status") == "active"
-            ]
+            site_alerts = [a for a in alerts if a.get("site_id") == site["id"] and a.get("status") == "active"]
             lines.append(
                 f"| {site['id']} | {site['name']} | {site['region']} | "
                 f"{site['type']} | {site['sqm']} | {len(site_equipment)} | {len(site_alerts)} |"
@@ -76,10 +73,13 @@ class FMContextService:
         lines.append("|--------------|------|------|------|--------|--------|--------------|")
 
         # Focus on equipment with issues first
-        equipment_sorted = sorted(equipment, key=lambda e: (
-            0 if e.get("status") == "critical" else (1 if e.get("status") == "warning" else 2),
-            e.get("health_score", 100)
-        ))
+        equipment_sorted = sorted(
+            equipment,
+            key=lambda e: (
+                0 if e.get("status") == "critical" else (1 if e.get("status") == "warning" else 2),
+                e.get("health_score", 100),
+            ),
+        )
 
         # Limit to top 20 for context size
         for eq in equipment_sorted[:20]:
@@ -221,8 +221,12 @@ class FMContextService:
             # Evidence summary
             evidence = pred.get("evidence", {})
             lines.append("**Evidence:**")
-            lines.append(f"- Repeat work orders: {evidence.get('repeat_work_orders', 0)} in {evidence.get('repeat_period_months', 0)} months")
-            lines.append(f"- Asset age: {evidence.get('asset_age_years', 0)} years (expected life: {evidence.get('expected_life_years', 0)} years)")
+            lines.append(
+                f"- Repeat work orders: {evidence.get('repeat_work_orders', 0)} in {evidence.get('repeat_period_months', 0)} months"
+            )
+            lines.append(
+                f"- Asset age: {evidence.get('asset_age_years', 0)} years (expected life: {evidence.get('expected_life_years', 0)} years)"
+            )
 
             # Top contributing factors
             lines.append("**Top Contributing Factors:**")
@@ -236,7 +240,9 @@ class FMContextService:
             lines.append("**Financial Impact:**")
             lines.append(f"- Repair cost: R{financial.get('repair_cost_zar', 0):,.0f}")
             lines.append(f"- Potential loss: R{financial.get('potential_loss_zar', 0):,.0f}")
-            lines.append(f"- Potential savings: R{financial.get('potential_loss_zar', 0) - financial.get('repair_cost_zar', 0):,.0f}")
+            lines.append(
+                f"- Potential savings: R{financial.get('potential_loss_zar', 0) - financial.get('repair_cost_zar', 0):,.0f}"
+            )
 
             # Cost impact breakdown
             cost_impact = pred.get("costImpact")

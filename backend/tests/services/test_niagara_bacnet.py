@@ -31,6 +31,7 @@ import app.services.niagara.bacnet_client as bacnet_module
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def client():
     """Create a fresh BACnet client instance."""
@@ -74,6 +75,7 @@ async def started_client(client, mock_bac0):
 # ---------------------------------------------------------------------------
 # Lifecycle tests
 # ---------------------------------------------------------------------------
+
 
 class TestClientLifecycle:
     """Tests for client start/stop operations."""
@@ -156,6 +158,7 @@ class TestClientLifecycle:
 # Device discovery tests
 # ---------------------------------------------------------------------------
 
+
 class TestDeviceDiscovery:
     """Tests for BACnet device discovery."""
 
@@ -203,6 +206,7 @@ class TestDeviceDiscovery:
 # Point read tests
 # ---------------------------------------------------------------------------
 
+
 class TestPointRead:
     """Tests for point read operations."""
 
@@ -247,15 +251,14 @@ class TestPointRead:
 # Point write tests
 # ---------------------------------------------------------------------------
 
+
 class TestPointWrite:
     """Tests for point write operations."""
 
     @pytest.mark.asyncio
     async def test_write_point_succeeds(self, started_client, mock_bac0):
         """Write should call BAC0 write with correct format."""
-        result = await started_client.write_point(
-            1234, "analogValue", 0, 22.5, priority=8
-        )
+        result = await started_client.write_point(1234, "analogValue", 0, 22.5, priority=8)
         assert result is True
         mock_bac0.write.assert_called()
 
@@ -275,6 +278,7 @@ class TestPointWrite:
 # ---------------------------------------------------------------------------
 # Point list / cache tests
 # ---------------------------------------------------------------------------
+
 
 class TestPointListDiscovery:
     """Tests for point list discovery and caching."""
@@ -323,9 +327,7 @@ class TestPointListDiscovery:
             ("analogValue", 1),
         ]
 
-        points = await started_client.read_point_list(
-            1234, object_types=["analogValue"]
-        )
+        points = await started_client.read_point_list(1234, object_types=["analogValue"])
         assert len(points) == 2
         assert all(p.object_type == "analogValue" for p in points)
 
@@ -333,6 +335,7 @@ class TestPointListDiscovery:
 # ---------------------------------------------------------------------------
 # COV subscription tests
 # ---------------------------------------------------------------------------
+
 
 class TestCOVSubscriptions:
     """Tests for Change-of-Value subscriptions."""
@@ -382,12 +385,8 @@ class TestCOVSubscriptions:
     async def test_list_subscriptions(self, started_client, mock_bac0):
         """Should list active subscriptions."""
         cb = MagicMock()
-        sub1 = await started_client.subscribe_to_points(
-            1234, [("analogValue", 0)], cb
-        )
-        sub2 = await started_client.subscribe_to_points(
-            1234, [("binaryValue", 1)], cb
-        )
+        sub1 = await started_client.subscribe_to_points(1234, [("analogValue", 0)], cb)
+        sub2 = await started_client.subscribe_to_points(1234, [("binaryValue", 1)], cb)
 
         active = started_client.list_subscriptions()
         assert len(active) == 2
@@ -442,6 +441,7 @@ class TestCOVSubscriptions:
 # Retry logic tests
 # ---------------------------------------------------------------------------
 
+
 class TestRetryLogic:
     """Tests for retry and error handling."""
 
@@ -486,6 +486,7 @@ class TestRetryLogic:
 # Utility tests
 # ---------------------------------------------------------------------------
 
+
 class TestUtility:
     """Tests for utility methods."""
 
@@ -504,20 +505,17 @@ class TestUtility:
 
     def test_discovered_point_writable_flag(self):
         """Output and value types should be writable."""
-        writable_point = DiscoveredPoint(
-            object_type="analogOutput", instance=0, writable=True
-        )
+        writable_point = DiscoveredPoint(object_type="analogOutput", instance=0, writable=True)
         assert writable_point.writable
 
-        readonly_point = DiscoveredPoint(
-            object_type="analogInput", instance=0, writable=False
-        )
+        readonly_point = DiscoveredPoint(object_type="analogInput", instance=0, writable=False)
         assert not readonly_point.writable
 
 
 # ---------------------------------------------------------------------------
 # Singleton factory tests
 # ---------------------------------------------------------------------------
+
 
 class TestSingletonFactory:
     """Tests for the singleton factory function."""

@@ -116,19 +116,18 @@ class EmergencyControlsService:
         self._reason = reason
 
         # Record in history
-        self._history.append({
-            "action": "activate",
-            "old_mode": old_mode.value,
-            "new_mode": mode.value,
-            "activated_by": activated_by,
-            "reason": reason,
-            "timestamp": self._activated_at.isoformat(),
-        })
-
-        logger.warning(
-            f"Emergency control ACTIVATED: mode={mode.value} "
-            f"by={activated_by} reason={reason}"
+        self._history.append(
+            {
+                "action": "activate",
+                "old_mode": old_mode.value,
+                "new_mode": mode.value,
+                "activated_by": activated_by,
+                "reason": reason,
+                "timestamp": self._activated_at.isoformat(),
+            }
         )
+
+        logger.warning(f"Emergency control ACTIVATED: mode={mode.value} by={activated_by} reason={reason}")
 
         return self.status
 
@@ -146,23 +145,20 @@ class EmergencyControlsService:
         deactivated_at = datetime.utcnow()
 
         # Record in history
-        self._history.append({
-            "action": "deactivate",
-            "old_mode": old_mode.value,
-            "new_mode": EmergencyMode.NORMAL.value,
-            "deactivated_by": deactivated_by,
-            "timestamp": deactivated_at.isoformat(),
-            "duration_seconds": (
-                (deactivated_at - self._activated_at).total_seconds()
-                if self._activated_at
-                else 0
-            ),
-        })
-
-        logger.info(
-            f"Emergency control DEACTIVATED: was={old_mode.value} "
-            f"by={deactivated_by}"
+        self._history.append(
+            {
+                "action": "deactivate",
+                "old_mode": old_mode.value,
+                "new_mode": EmergencyMode.NORMAL.value,
+                "deactivated_by": deactivated_by,
+                "timestamp": deactivated_at.isoformat(),
+                "duration_seconds": (
+                    (deactivated_at - self._activated_at).total_seconds() if self._activated_at else 0
+                ),
+            }
         )
+
+        logger.info(f"Emergency control DEACTIVATED: was={old_mode.value} by={deactivated_by}")
 
         self._activated_at = None
         self._activated_by = None

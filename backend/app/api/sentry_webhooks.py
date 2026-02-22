@@ -225,8 +225,7 @@ async def reset_equipment_fault(
         return {
             "success": False,
             "blocked": True,
-            "reason": f"{eq_type} equipment cannot be remotely reset for safety reasons. "
-            f"Create a work order instead.",
+            "reason": f"{eq_type} equipment cannot be remotely reset for safety reasons. Create a work order instead.",
             "equipment_code": equipment_code,
         }
 

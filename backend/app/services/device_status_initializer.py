@@ -54,8 +54,7 @@ class DeviceStatusInitializer:
             other_count = await self._init_other_devices(site_id, building_id)
 
             logger.info(
-                f"Initialized devices for {site_id}: "
-                f"solar={solar_count}, hvac={hvac_count}, other={other_count}"
+                f"Initialized devices for {site_id}: solar={solar_count}, hvac={hvac_count}, other={other_count}"
             )
 
             return {
@@ -155,9 +154,13 @@ class DeviceStatusInitializer:
             if not self.client:
                 return 0
 
-            response = self.client.table("equipment").select("id, code, type").eq(
-                "building_id", building_id
-            ).in_("type", ["VAV", "AHU", "FCU", "CHILLER"]).execute()
+            response = (
+                self.client.table("equipment")
+                .select("id, code, type")
+                .eq("building_id", building_id)
+                .in_("type", ["VAV", "AHU", "FCU", "CHILLER"])
+                .execute()
+            )
 
             devices = response.data or []
             updated = 0
@@ -185,9 +188,7 @@ class DeviceStatusInitializer:
                 return 0
 
             # Mark all existing equipment as online with default status
-            response = self.client.table("equipment").select("id, code, type").eq(
-                "building_id", building_id
-            ).execute()
+            response = self.client.table("equipment").select("id, code, type").eq("building_id", building_id).execute()
 
             devices = response.data or []
             updated = 0

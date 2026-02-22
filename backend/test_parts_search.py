@@ -4,6 +4,7 @@ Parts Search Test Script
 
 Tests the parts supplier search functionality of EquipmentLookup service.
 """
+
 import asyncio
 import sys
 import os
@@ -70,13 +71,15 @@ async def test_parts_search():
     original_search = lookup._search_supplier
 
     async def mock_search(*args, **kwargs):
-        return [{
-            "supplier": "Test Supplier",
-            "name": "Test Part",
-            "price": "R1000",
-            "lead_time": "In stock",
-            "available": True
-        }]
+        return [
+            {
+                "supplier": "Test Supplier",
+                "name": "Test Part",
+                "price": "R1000",
+                "lead_time": "In stock",
+                "available": True,
+            }
+        ]
 
     lookup._search_supplier = mock_search
 

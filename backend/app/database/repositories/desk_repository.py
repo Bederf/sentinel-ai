@@ -25,7 +25,7 @@ class DeskRepository:
                 return query.execute()
             except Exception as e:
                 error_msg = str(e)
-                if '429' in error_msg or 'rate limit' in error_msg.lower():
+                if "429" in error_msg or "rate limit" in error_msg.lower():
                     last_error = e
                     if attempt < max_retries:
                         logger.warning(f"Rate limit hit, retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
@@ -49,10 +49,10 @@ class DeskRepository:
         Returns:
             List of desks
         """
-        query = self.client.table('desks').select("*")
+        query = self.client.table("desks").select("*")
 
         if building_id:
-            query = query.eq('building_id', building_id)
+            query = query.eq("building_id", building_id)
 
         response = query.execute()
         return response.data
@@ -71,20 +71,23 @@ class DeskRepository:
             return []
 
         # Join with hvac_zones to get zone_id string
-        response = self.client.table('desks').select(
-            "*, hvac_zones(zone_id, zone_name)"
-        ).eq('building_id', building_uuid).execute()
+        response = (
+            self.client.table("desks")
+            .select("*, hvac_zones(zone_id, zone_name)")
+            .eq("building_id", building_uuid)
+            .execute()
+        )
 
         # Flatten hvac_zones data into desk dict
         desks = []
         for desk in response.data:
-            hvac_zone = desk.pop('hvac_zones', None)
+            hvac_zone = desk.pop("hvac_zones", None)
             if hvac_zone:
-                desk['zone_id'] = hvac_zone.get('zone_id', '')
-                desk['zone_name'] = hvac_zone.get('zone_name', '')
+                desk["zone_id"] = hvac_zone.get("zone_id", "")
+                desk["zone_name"] = hvac_zone.get("zone_name", "")
             else:
-                desk['zone_id'] = ''
-                desk['zone_name'] = ''
+                desk["zone_id"] = ""
+                desk["zone_name"] = ""
             desks.append(desk)
 
         return desks
@@ -98,9 +101,7 @@ class DeskRepository:
         Returns:
             Desk data or None if not found
         """
-        response = self.client.table('desks').select("*").eq(
-            'desk_id', desk_id
-        ).execute()
+        response = self.client.table("desks").select("*").eq("desk_id", desk_id).execute()
 
         if response.data:
             return response.data[0]
@@ -115,9 +116,7 @@ class DeskRepository:
         Returns:
             Desk data or None if not found
         """
-        response = self.client.table('desks').select("*").eq(
-            'id', uuid
-        ).execute()
+        response = self.client.table("desks").select("*").eq("id", uuid).execute()
 
         if response.data:
             return response.data[0]
@@ -132,9 +131,7 @@ class DeskRepository:
         Returns:
             List of desks in the zone
         """
-        response = self.client.table('desks').select("*").eq(
-            'hvac_zone_id', hvac_zone_id
-        ).execute()
+        response = self.client.table("desks").select("*").eq("hvac_zone_id", hvac_zone_id).execute()
 
         return response.data
 
@@ -152,9 +149,7 @@ class DeskRepository:
         if not building_uuid:
             return []
 
-        response = self.client.table('desks').select("*").eq(
-            'building_id', building_uuid
-        ).eq('floor', floor).execute()
+        response = self.client.table("desks").select("*").eq("building_id", building_uuid).eq("floor", floor).execute()
 
         return response.data
 
@@ -175,20 +170,20 @@ class DeskRepository:
         normalized = normalized.replace("desk ", "").strip()
 
         # Build query
-        query = self.client.table('desks').select("*")
+        query = self.client.table("desks").select("*")
 
         if building_code:
             building_uuid = self.get_building_uuid(building_code)
             if building_uuid:
-                query = query.eq('building_id', building_uuid)
+                query = query.eq("building_id", building_uuid)
 
         # Try exact match first
-        response = query.ilike('desk_id', normalized).execute()
+        response = query.ilike("desk_id", normalized).execute()
         if response.data:
             return response.data[0]
 
         # Try suffix match (e.g., '201' matches 'L12-D201')
-        response = query.ilike('desk_id', f'%{normalized}').execute()
+        response = query.ilike("desk_id", f"%{normalized}").execute()
         if response.data:
             return response.data[0]
 
@@ -203,12 +198,10 @@ class DeskRepository:
         Returns:
             Building UUID or None
         """
-        response = self.client.table('buildings').select('id').eq(
-            'code', building_code
-        ).execute()
+        response = self.client.table("buildings").select("id").eq("code", building_code).execute()
 
         if response.data:
-            return response.data[0]['id']
+            return response.data[0]["id"]
         return None
 
     def get_hvac_zone_uuid(self, zone_id: str) -> Optional[str]:
@@ -220,12 +213,10 @@ class DeskRepository:
         Returns:
             Zone UUID or None
         """
-        response = self.client.table('hvac_zones').select('id').eq(
-            'zone_id', zone_id
-        ).execute()
+        response = self.client.table("hvac_zones").select("id").eq("zone_id", zone_id).execute()
 
         if response.data:
-            return response.data[0]['id']
+            return response.data[0]["id"]
         return None
 
     def upsert(self, desk_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -237,10 +228,7 @@ class DeskRepository:
         Returns:
             Upserted desk data
         """
-        response = self.client.table('desks').upsert(
-            desk_data,
-            on_conflict='desk_id'
-        ).execute()
+        response = self.client.table("desks").upsert(desk_data, on_conflict="desk_id").execute()
         return response.data[0] if response.data else {}
 
     def upsert_many(self, desks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -255,10 +243,7 @@ class DeskRepository:
         if not desks:
             return []
 
-        response = self.client.table('desks').upsert(
-            desks,
-            on_conflict='desk_id'
-        ).execute()
+        response = self.client.table("desks").upsert(desks, on_conflict="desk_id").execute()
         return response.data
 
     def create(self, desk_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -270,7 +255,7 @@ class DeskRepository:
         Returns:
             Created desk
         """
-        response = self.client.table('desks').insert(desk_data).execute()
+        response = self.client.table("desks").insert(desk_data).execute()
         return response.data[0]
 
     def update(self, desk_id: str, desk_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -283,9 +268,7 @@ class DeskRepository:
         Returns:
             Updated desk or None if not found
         """
-        response = self.client.table('desks').update(
-            desk_data
-        ).eq('desk_id', desk_id).execute()
+        response = self.client.table("desks").update(desk_data).eq("desk_id", desk_id).execute()
 
         if response.data:
             return response.data[0]
@@ -300,9 +283,7 @@ class DeskRepository:
         Returns:
             True if deleted, False if not found
         """
-        response = self.client.table('desks').delete().eq(
-            'desk_id', desk_id
-        ).execute()
+        response = self.client.table("desks").delete().eq("desk_id", desk_id).execute()
 
         return len(response.data) > 0
 
@@ -319,9 +300,7 @@ class DeskRepository:
         if not building_uuid:
             return 0
 
-        response = self.client.table('desks').delete().eq(
-            'building_id', building_uuid
-        ).execute()
+        response = self.client.table("desks").delete().eq("building_id", building_uuid).execute()
 
         return len(response.data)
 
@@ -335,9 +314,12 @@ class DeskRepository:
             Desk with related zone data or None
         """
         # Get desk with HVAC zone join
-        response = self.client.table('desks').select(
-            "*, hvac_zones(zone_id, zone_name, current_temp, setpoint, status)"
-        ).eq('desk_id', desk_id).execute()
+        response = (
+            self.client.table("desks")
+            .select("*, hvac_zones(zone_id, zone_name, current_temp, setpoint, status)")
+            .eq("desk_id", desk_id)
+            .execute()
+        )
 
         if response.data:
             return response.data[0]
@@ -352,7 +334,7 @@ class DeskRepository:
         Returns:
             List of desks in the building
         """
-        query = self.client.table('desks').select("*").eq('building_id', building_id)
+        query = self.client.table("desks").select("*").eq("building_id", building_id)
         response = self._execute_with_retry(query)
         return response.data
 
@@ -366,15 +348,13 @@ class DeskRepository:
         Returns:
             List of desks in the zone
         """
-        response = self.client.table('desks').select("*").eq(
-            'building_id', building_id
-        ).eq('zone_id', zone_id).execute()
+        response = (
+            self.client.table("desks").select("*").eq("building_id", building_id).eq("zone_id", zone_id).execute()
+        )
 
         return response.data
 
-    def get_centroids_for_zones(
-        self, building_id: str, zones: List[str]
-    ) -> Dict[str, Dict[str, float]]:
+    def get_centroids_for_zones(self, building_id: str, zones: List[str]) -> Dict[str, Dict[str, float]]:
         """Get centroids for specific zones from desk positions.
 
         Args:
@@ -388,11 +368,11 @@ class DeskRepository:
         centroids = {}
 
         for zone_id in zones:
-            zone_desks = [d for d in all_desks if d.get('zone_id') == zone_id]
+            zone_desks = [d for d in all_desks if d.get("zone_id") == zone_id]
 
             if zone_desks:
-                avg_x = sum(float(d.get('x_coord', 0)) for d in zone_desks) / len(zone_desks)
-                avg_z = sum(float(d.get('z_coord', 0)) for d in zone_desks) / len(zone_desks)
-                centroids[zone_id] = {'x': round(avg_x, 2), 'z': round(avg_z, 2)}
+                avg_x = sum(float(d.get("x_coord", 0)) for d in zone_desks) / len(zone_desks)
+                avg_z = sum(float(d.get("z_coord", 0)) for d in zone_desks) / len(zone_desks)
+                centroids[zone_id] = {"x": round(avg_x, 2), "z": round(avg_z, 2)}
 
         return centroids

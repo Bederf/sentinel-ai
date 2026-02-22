@@ -45,9 +45,7 @@ class RejectionRecord:
             "action_type": self.action_type,
             "target_equipment": self.target_equipment,
             "reason": self.reason,
-            "rejected_at": self.rejected_at.isoformat()
-            if isinstance(self.rejected_at, datetime)
-            else self.rejected_at,
+            "rejected_at": self.rejected_at.isoformat() if isinstance(self.rejected_at, datetime) else self.rejected_at,
         }
 
     @classmethod
@@ -102,9 +100,7 @@ class EquipmentConstraint:
             "constraint_type": self.constraint_type,
             "value": self.value,
             "reason": self.reason,
-            "created_at": self.created_at.isoformat()
-            if isinstance(self.created_at, datetime)
-            else self.created_at,
+            "created_at": self.created_at.isoformat() if isinstance(self.created_at, datetime) else self.created_at,
         }
 
     @classmethod
@@ -165,32 +161,22 @@ class RejectionLearningService:
 
             await self.repo.create(rejection)
 
-            logger.info(
-                f"Recorded rejection for {rec.action_type} on {rec.target_equipment}: {reason}"
-            )
+            logger.info(f"Recorded rejection for {rec.action_type} on {rec.target_equipment}: {reason}")
 
             # Check for pattern: 3+ rejections in 30 days
-            recent_rejections = await self.repo.get_recent(
-                rec.site_id, rec.action_type, days=30
-            )
+            recent_rejections = await self.repo.get_recent(rec.site_id, rec.action_type, days=30)
 
-            logger.info(
-                f"Found {len(recent_rejections)} rejections for {rec.action_type} in past 30 days"
-            )
+            logger.info(f"Found {len(recent_rejections)} rejections for {rec.action_type} in past 30 days")
 
             if len(recent_rejections) >= 3:
-                logger.info(
-                    f"Pattern detected! Adding constraint after {len(recent_rejections)} rejections"
-                )
+                logger.info(f"Pattern detected! Adding constraint after {len(recent_rejections)} rejections")
                 # Pattern detected - add constraint
                 await self._add_action_constraint(rec, recent_rejections)
 
         except Exception as e:
             logger.error(f"Error processing rejection: {e}")
 
-    async def _add_action_constraint(
-        self, rec: Recommendation, recent_rejections: List[RejectionRecord]
-    ) -> None:
+    async def _add_action_constraint(self, rec: Recommendation, recent_rejections: List[RejectionRecord]) -> None:
         """Add constraint to prevent similar rejected actions.
 
         Example: 3 rejections of "lower setpoint below 22°C on Floor 3"
@@ -206,11 +192,7 @@ class RejectionLearningService:
             # Parse rejection patterns
             if "setpoint" in rec.action_type.lower():
                 # Extract zone from target equipment
-                zone_id = (
-                    rec.target_equipment.split(":")[0]
-                    if ":" in rec.target_equipment
-                    else "all"
-                )
+                zone_id = rec.target_equipment.split(":")[0] if ":" in rec.target_equipment else "all"
 
                 # Find the setpoint value being rejected
                 rejected_value = rec.action.get("value")
@@ -235,9 +217,7 @@ class RejectionLearningService:
         except Exception as e:
             logger.error(f"Error adding action constraint: {e}")
 
-    async def _save_constraint(
-        self, site_id: str, constraint: EquipmentConstraint
-    ) -> None:
+    async def _save_constraint(self, site_id: str, constraint: EquipmentConstraint) -> None:
         """Save constraint to site profile.
 
         Args:

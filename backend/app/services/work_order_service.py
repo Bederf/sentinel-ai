@@ -27,6 +27,7 @@ def load_json(filename: str) -> list[dict]:
 @dataclass
 class WorkOrder:
     """Work order data class."""
+
     id: str
     site_id: str
     site_name: str
@@ -70,7 +71,7 @@ class WorkOrder:
 **Priority:** {self.priority.upper()}
 **Category:** {self.category}
 **Reported By:** {self.reported_by}
-**Created:** {self.created_at[:16].replace('T', ' ')}
+**Created:** {self.created_at[:16].replace("T", " ")}
 **Status:** {self.status.upper()}
 
 This work order has been logged for action by the maintenance team.
@@ -79,27 +80,54 @@ This work order has been logged for action by the maintenance team.
 
 # Keywords that suggest a maintenance issue / work order need
 MAINTENANCE_KEYWORDS = [
-    "broken", "not working", "malfunction", "fault", "error",
-    "noise", "noisy", "grinding", "squeaking", "rattling",
-    "leak", "leaking", "dripping", "water",
-    "hot", "cold", "warm", "freezing", "temperature issue",
-    "smell", "odor", "burning",
-    "repair", "fix", "service", "maintenance needed",
-    "down", "offline", "stopped", "won't start",
-    "flickering", "dim", "buzzing",
-    "damaged", "cracked", "bent",
+    "broken",
+    "not working",
+    "malfunction",
+    "fault",
+    "error",
+    "noise",
+    "noisy",
+    "grinding",
+    "squeaking",
+    "rattling",
+    "leak",
+    "leaking",
+    "dripping",
+    "water",
+    "hot",
+    "cold",
+    "warm",
+    "freezing",
+    "temperature issue",
+    "smell",
+    "odor",
+    "burning",
+    "repair",
+    "fix",
+    "service",
+    "maintenance needed",
+    "down",
+    "offline",
+    "stopped",
+    "won't start",
+    "flickering",
+    "dim",
+    "buzzing",
+    "damaged",
+    "cracked",
+    "bent",
 ]
 
 # Equipment patterns
 EQUIPMENT_PATTERNS = [
-    r"(ahu[-\s]?\d+)",           # AHU-1, AHU 1
-    r"(ch[-\s]?\d+)",            # CH-1, Chiller 1
-    r"(ups[-\s]?\d+)",           # UPS-1
-    r"(gen[-\s]?\d+)",           # GEN-1, Generator 1
-    r"(fcu[-\s]?\d+)",           # FCU-001
-    r"(ac[-\s]?\d+)",            # AC-1
-    r"(crac[-\s]?\d+)",          # CRAC-1
-    r"(eqp[-\s]?\d+)",           # Equipment ID
+    r"(ahu[-\s]?\d+)",  # AHU-1, AHU 1
+    r"(ch[-\s]?\d+)",  # CH-1, Chiller 1
+    r"(ups[-\s]?\d+)",  # UPS-1
+    r"(gen[-\s]?\d+)",  # GEN-1, Generator 1
+    r"(fcu[-\s]?\d+)",  # FCU-001
+    r"(ac[-\s]?\d+)",  # AC-1
+    r"(crac[-\s]?\d+)",  # CRAC-1
+    r"(eqp[-\s]?\d+)",  # Equipment ID
     r"(hvac|air\s*con|chiller|generator|ups|boiler)",  # Generic equipment types
 ]
 

@@ -148,11 +148,11 @@ _DEMO_USERS = {
         "full_name": "Compliance Auditor",
         "role": SentinelRole.AUDITOR,
     },
-    # Wardew Automation Specialist
-    "grant@wardew.co.za": {
-        "user_id": "wardew-grant-001",
-        "email": "grant@wardew.co.za",
-        "full_name": "Grant - Wardew",
+    # Grant Demo - Automation Specialist
+    "grant@grantdemo.co.za": {
+        "user_id": "grant-demo-001",
+        "email": "grant@grantdemo.co.za",
+        "full_name": "Grant - Demo",
         "role": SentinelRole.OPERATOR,  # Operator access for production demo
     },
     # Solar/BESS Demo User
@@ -359,10 +359,10 @@ async def login_with_email(request: Request, email: str):
             "session_id": session_id,
         }
 
-        # Auto-start demo for Grant (grant@wardew.co.za) - 365-day annual simulation
+        # Auto-start demo for Grant (grant@grantdemo.co.za) - 365-day annual simulation
         # When Grant logs in, his demo scenario auto-starts with data from ZERO
         # The simulation runs 365 days compressed into 30 minutes real time
-        if email == "grant@wardew.co.za":
+        if email == "grant@grantdemo.co.za":
             try:
                 from app.database.supabase_client import Supabase
 

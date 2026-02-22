@@ -15,78 +15,47 @@ class TestEquipmentIDConversion:
 
     def test_simple_chiller_conversion(self, converter):
         """Test simple chiller naming: CH-1 → S002-CHILLER-B1-001"""
-        result = converter.convert_bms_to_v2(
-            bms_id="CH-1",
-            equipment_type="chiller",
-            site_id="site-002"
-        )
+        result = converter.convert_bms_to_v2(bms_id="CH-1", equipment_type="chiller", site_id="site-002")
         assert result == "S002-CHILLER-B1-001"
 
     def test_vav_with_zone_number(self, converter):
         """Test VAV with zone number: VAV-L1-05 → S002-VAV-L1-E"""
         zone_mapping = {"05": "E"}
         result = converter.convert_bms_to_v2(
-            bms_id="VAV-L1-05",
-            equipment_type="vav",
-            site_id="site-002",
-            zone_mapping=zone_mapping
+            bms_id="VAV-L1-05", equipment_type="vav", site_id="site-002", zone_mapping=zone_mapping
         )
         assert result == "S002-VAV-L1-E"
 
     def test_legacy_sandton_format(self, converter):
         """Test legacy Sandton format: 011-stc-ahu-001 → S002-AHU-L0-01"""
-        result = converter.convert_bms_to_v2(
-            bms_id="011-stc-ahu-001",
-            equipment_type="ahu",
-            site_id="site-002"
-        )
+        result = converter.convert_bms_to_v2(bms_id="011-stc-ahu-001", equipment_type="ahu", site_id="site-002")
         # Should extract AHU type and default floor/zone
         assert "CHILLER" in result or "AHU" in result
 
     def test_fcu_with_letter_zone(self, converter):
         """Test FCU with letter zone: FCU-L2-A → S002-FCU-L2-A"""
-        result = converter.convert_bms_to_v2(
-            bms_id="FCU-L2-A",
-            equipment_type="fcu",
-            site_id="site-002"
-        )
+        result = converter.convert_bms_to_v2(bms_id="FCU-L2-A", equipment_type="fcu", site_id="site-002")
         assert result == "S002-FCU-L2-A"
 
     def test_ground_floor(self, converter):
         """Test ground floor parsing: AHU-G-01 → S002-AHU-G-A (zone 01 maps to A)"""
-        result = converter.convert_bms_to_v2(
-            bms_id="AHU-G-01",
-            equipment_type="ahu",
-            site_id="site-002"
-        )
+        result = converter.convert_bms_to_v2(bms_id="AHU-G-01", equipment_type="ahu", site_id="site-002")
         # 01 is automatically converted to A using the zone mapping
         assert result == "S002-AHU-G-A"
 
     def test_generator_conversion(self, converter):
         """Test generator: GEN-B1-001 → S002-GEN-B1-001"""
-        result = converter.convert_bms_to_v2(
-            bms_id="GEN-B1-001",
-            equipment_type="gen",
-            site_id="site-002"
-        )
+        result = converter.convert_bms_to_v2(bms_id="GEN-B1-001", equipment_type="gen", site_id="site-002")
         assert result == "S002-GEN-B1-001"
 
     def test_different_site(self, converter):
         """Test different site: CH-1 at site-013 → S013-CHILLER-B1-001"""
-        result = converter.convert_bms_to_v2(
-            bms_id="CH-1",
-            equipment_type="chiller",
-            site_id="site-013"
-        )
+        result = converter.convert_bms_to_v2(bms_id="CH-1", equipment_type="chiller", site_id="site-013")
         assert result == "S013-CHILLER-B1-001"
 
     def test_uppercase_type_input(self, converter):
         """Test uppercase equipment type: CH-1 with type='CHILLER'"""
-        result = converter.convert_bms_to_v2(
-            bms_id="CH-1",
-            equipment_type="CHILLER",
-            site_id="site-002"
-        )
+        result = converter.convert_bms_to_v2(bms_id="CH-1", equipment_type="CHILLER", site_id="site-002")
         assert result == "S002-CHILLER-B1-001"
 
 
@@ -265,10 +234,7 @@ class TestIntegration:
         results = []
         for point in bms_points:
             converted = converter.convert_bms_to_v2(
-                bms_id=point["id"],
-                equipment_type=point["type"],
-                site_id="site-002",
-                zone_mapping={"05": "E"}
+                bms_id=point["id"], equipment_type=point["type"], site_id="site-002", zone_mapping={"05": "E"}
             )
             results.append(converted)
 
@@ -289,10 +255,7 @@ class TestIntegration:
             ("UPS-B1-001", "ups"),
         ]
 
-        results = [
-            converter.convert_bms_to_v2(bms_id, type_, "site-002")
-            for bms_id, type_ in equipment_list
-        ]
+        results = [converter.convert_bms_to_v2(bms_id, type_, "site-002") for bms_id, type_ in equipment_list]
 
         assert len(results) == 5
         # Note: CH-1 and CH-2 both convert to same ID (sequence number assignment happens at discovery level)

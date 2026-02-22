@@ -32,11 +32,13 @@ class ConditionAssessmentRepository:
             return []
 
         try:
-            result = self.client.table("condition_assessments").select(
-                "*"
-            ).eq("building_id", building_id).order(
-                "assessment_date", desc=True
-            ).execute()
+            result = (
+                self.client.table("condition_assessments")
+                .select("*")
+                .eq("building_id", building_id)
+                .order("assessment_date", desc=True)
+                .execute()
+            )
 
             return result.data or []
 
@@ -44,10 +46,7 @@ class ConditionAssessmentRepository:
             logger.error(f"Error getting assessments for building {building_id}: {e}")
             return []
 
-    def get_latest_for_equipment(
-        self,
-        equipment_id: str
-    ) -> Optional[Dict[str, Any]]:
+    def get_latest_for_equipment(self, equipment_id: str) -> Optional[Dict[str, Any]]:
         """
         Get the most recent assessment for a specific equipment item.
 
@@ -61,20 +60,21 @@ class ConditionAssessmentRepository:
             return None
 
         try:
-            result = self.client.table("condition_assessments").select(
-                "*"
-            ).eq("equipment_id", equipment_id).order(
-                "assessment_date", desc=True
-            ).limit(1).execute()
+            result = (
+                self.client.table("condition_assessments")
+                .select("*")
+                .eq("equipment_id", equipment_id)
+                .order("assessment_date", desc=True)
+                .limit(1)
+                .execute()
+            )
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
             return None
 
         except Exception as e:
-            logger.error(
-                f"Error getting latest assessment for equipment {equipment_id}: {e}"
-            )
+            logger.error(f"Error getting latest assessment for equipment {equipment_id}: {e}")
             return None
 
     def create(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -92,9 +92,7 @@ class ConditionAssessmentRepository:
             return None
 
         try:
-            result = self.client.table("condition_assessments").insert(
-                data
-            ).execute()
+            result = self.client.table("condition_assessments").insert(data).execute()
 
             if result.data and len(result.data) > 0:
                 created = result.data[0]
@@ -112,9 +110,7 @@ class ConditionAssessmentRepository:
             return None
 
         try:
-            result = self.client.table("condition_assessments").select(
-                "*"
-            ).eq("id", assessment_id).execute()
+            result = self.client.table("condition_assessments").select("*").eq("id", assessment_id).execute()
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
@@ -138,25 +134,21 @@ class ConditionAssessmentRepository:
             return []
 
         try:
-            result = self.client.table("condition_assessments").select(
-                "*"
-            ).eq("contract_id", contract_id).order(
-                "assessment_date", desc=True
-            ).execute()
+            result = (
+                self.client.table("condition_assessments")
+                .select("*")
+                .eq("contract_id", contract_id)
+                .order("assessment_date", desc=True)
+                .execute()
+            )
 
             return result.data or []
 
         except Exception as e:
-            logger.error(
-                f"Error getting assessments for contract {contract_id}: {e}"
-            )
+            logger.error(f"Error getting assessments for contract {contract_id}: {e}")
             return []
 
-    def update(
-        self,
-        assessment_id: str,
-        data: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def update(self, assessment_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Update an assessment.
 
@@ -171,9 +163,7 @@ class ConditionAssessmentRepository:
             return None
 
         try:
-            result = self.client.table("condition_assessments").update(
-                data
-            ).eq("id", assessment_id).execute()
+            result = self.client.table("condition_assessments").update(data).eq("id", assessment_id).execute()
 
             if result.data and len(result.data) > 0:
                 return result.data[0]

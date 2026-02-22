@@ -12,6 +12,7 @@ from typing import Optional
 
 class Intent(str, Enum):
     """Supported query intents for local LLM routing."""
+
     WHY_PREDICTION = "why_prediction"
     MAINTENANCE_DUE = "maintenance_due"
     COMPARE_EQUIPMENT = "compare_equipment"
@@ -24,6 +25,7 @@ class Intent(str, Enum):
 @dataclass
 class ClassifiedQuery:
     """Result of intent classification with extracted entities."""
+
     intent: Intent
     confidence: float
     equipment_ids: list[str] = field(default_factory=list)
@@ -33,10 +35,7 @@ class ClassifiedQuery:
 
 
 # Equipment ID v2.0 pattern: S###-TYPE-FLOOR-ZONE
-_EQUIPMENT_ID_PATTERN = re.compile(
-    r'\b(S\d{3}-[A-Z]+-[A-Z0-9]+-[A-Z0-9]+)\b',
-    re.IGNORECASE
-)
+_EQUIPMENT_ID_PATTERN = re.compile(r"\b(S\d{3}-[A-Z]+-[A-Z0-9]+-[A-Z0-9]+)\b", re.IGNORECASE)
 
 # Equipment type keywords
 _EQUIPMENT_TYPES = {
@@ -68,13 +67,13 @@ _EQUIPMENT_TYPES = {
 
 # Time range patterns
 _TIME_PATTERNS = {
-    r'\b(?:last|past)\s+(\d+)\s+days?\b': "days",
-    r'\b(?:last|past)\s+(\d+)\s+hours?\b': "hours",
-    r'\b(?:last|past)\s+(\d+)\s+weeks?\b': "weeks",
-    r'\b(?:last|past)\s+month\b': "30d",
-    r'\b(?:last|past)\s+week\b': "7d",
-    r'\b(?:this|today)\b': "1d",
-    r'\b(?:next)\s+(\d+)\s+days?\b': "future_days",
+    r"\b(?:last|past)\s+(\d+)\s+days?\b": "days",
+    r"\b(?:last|past)\s+(\d+)\s+hours?\b": "hours",
+    r"\b(?:last|past)\s+(\d+)\s+weeks?\b": "weeks",
+    r"\b(?:last|past)\s+month\b": "30d",
+    r"\b(?:last|past)\s+week\b": "7d",
+    r"\b(?:this|today)\b": "1d",
+    r"\b(?:next)\s+(\d+)\s+days?\b": "future_days",
 }
 
 
@@ -88,67 +87,86 @@ class IntentClassifier:
     # Intent patterns ordered by specificity (most specific first)
     _INTENT_PATTERNS: list[tuple[Intent, list[re.Pattern], float]] = [
         # WHY_PREDICTION: Asking about prediction reasoning
-        (Intent.WHY_PREDICTION, [
-            re.compile(r'why\s+(?:is|does|will|did|has)', re.I),
-            re.compile(r'what\s+(?:caused|causes|is causing)', re.I),
-            re.compile(r'explain\s+(?:the\s+)?(?:prediction|forecast|failure)', re.I),
-            re.compile(r'reason\s+(?:for|behind)', re.I),
-            re.compile(r'root\s+cause', re.I),
-            re.compile(r'what.+?going\s+(?:wrong|on)\s+with', re.I),
-            re.compile(r'why.+?(?:failing|degrading|declining)', re.I),
-        ], 0.85),
-
+        (
+            Intent.WHY_PREDICTION,
+            [
+                re.compile(r"why\s+(?:is|does|will|did|has)", re.I),
+                re.compile(r"what\s+(?:caused|causes|is causing)", re.I),
+                re.compile(r"explain\s+(?:the\s+)?(?:prediction|forecast|failure)", re.I),
+                re.compile(r"reason\s+(?:for|behind)", re.I),
+                re.compile(r"root\s+cause", re.I),
+                re.compile(r"what.+?going\s+(?:wrong|on)\s+with", re.I),
+                re.compile(r"why.+?(?:failing|degrading|declining)", re.I),
+            ],
+            0.85,
+        ),
         # EXPLAIN_ANOMALY: Asking about unusual readings or anomalies
-        (Intent.EXPLAIN_ANOMALY, [
-            re.compile(r'\banomal(?:y|ies|ous)\b', re.I),
-            re.compile(r'unusual\s+(?:reading|value|pattern|behavior)', re.I),
-            re.compile(r'abnormal', re.I),
-            re.compile(r'spike\s+in', re.I),
-            re.compile(r'(?:sudden|unexpected)\s+(?:change|drop|increase|rise)', re.I),
-            re.compile(r'out\s+of\s+(?:range|spec|normal)', re.I),
-            re.compile(r'deviation', re.I),
-        ], 0.85),
-
+        (
+            Intent.EXPLAIN_ANOMALY,
+            [
+                re.compile(r"\banomal(?:y|ies|ous)\b", re.I),
+                re.compile(r"unusual\s+(?:reading|value|pattern|behavior)", re.I),
+                re.compile(r"abnormal", re.I),
+                re.compile(r"spike\s+in", re.I),
+                re.compile(r"(?:sudden|unexpected)\s+(?:change|drop|increase|rise)", re.I),
+                re.compile(r"out\s+of\s+(?:range|spec|normal)", re.I),
+                re.compile(r"deviation", re.I),
+            ],
+            0.85,
+        ),
         # MAINTENANCE_DUE: Asking about maintenance schedules or needs
-        (Intent.MAINTENANCE_DUE, [
-            re.compile(r'(?:when|what)\s+(?:is\s+)?(?:the\s+)?(?:next\s+)?maintenance', re.I),
-            re.compile(r'(?:maintenance|service)\s+(?:due|schedule|needed|required)', re.I),
-            re.compile(r'(?:need|require)s?\s+(?:service|repair|maintenance)', re.I),
-            re.compile(r'remaining\s+(?:useful\s+)?life', re.I),
-            re.compile(r'(?:rul|end\s+of\s+life)', re.I),
-            re.compile(r'how\s+(?:long|much\s+longer).+?(?:last|run)', re.I),
-            re.compile(r'should\s+(?:i|we)\s+(?:service|replace|repair)', re.I),
-            re.compile(r'spare\s+parts?', re.I),
-        ], 0.85),
-
+        (
+            Intent.MAINTENANCE_DUE,
+            [
+                re.compile(r"(?:when|what)\s+(?:is\s+)?(?:the\s+)?(?:next\s+)?maintenance", re.I),
+                re.compile(r"(?:maintenance|service)\s+(?:due|schedule|needed|required)", re.I),
+                re.compile(r"(?:need|require)s?\s+(?:service|repair|maintenance)", re.I),
+                re.compile(r"remaining\s+(?:useful\s+)?life", re.I),
+                re.compile(r"(?:rul|end\s+of\s+life)", re.I),
+                re.compile(r"how\s+(?:long|much\s+longer).+?(?:last|run)", re.I),
+                re.compile(r"should\s+(?:i|we)\s+(?:service|replace|repair)", re.I),
+                re.compile(r"spare\s+parts?", re.I),
+            ],
+            0.85,
+        ),
         # COMPARE_EQUIPMENT: Comparing multiple pieces of equipment
-        (Intent.COMPARE_EQUIPMENT, [
-            re.compile(r'compare\b', re.I),
-            re.compile(r'(?:difference|comparison)\s+between', re.I),
-            re.compile(r'versus|vs\.?\b', re.I),
-            re.compile(r'which\s+.+?\s+(?:is\s+)?(?:better|worse|healthier|more reliable)', re.I),
-            re.compile(r'side\s+by\s+side', re.I),
-        ], 0.85),
-
+        (
+            Intent.COMPARE_EQUIPMENT,
+            [
+                re.compile(r"compare\b", re.I),
+                re.compile(r"(?:difference|comparison)\s+between", re.I),
+                re.compile(r"versus|vs\.?\b", re.I),
+                re.compile(r"which\s+.+?\s+(?:is\s+)?(?:better|worse|healthier|more reliable)", re.I),
+                re.compile(r"side\s+by\s+side", re.I),
+            ],
+            0.85,
+        ),
         # SHOW_TRENDS: Requesting trend or historical data
-        (Intent.SHOW_TRENDS, [
-            re.compile(r'(?:show|display|plot|graph)\s+(?:me\s+)?(?:the\s+)?trend', re.I),
-            re.compile(r'(?:trend|history|historical)\s+(?:for|of|data)', re.I),
-            re.compile(r'(?:over\s+)?(?:the\s+)?(?:last|past)\s+\d+\s+(?:day|week|month)', re.I),
-            re.compile(r'how\s+has\s+.+?(?:changed|trended|performed)', re.I),
-            re.compile(r'performance\s+(?:over\s+)?time', re.I),
-            re.compile(r'degradation\s+(?:curve|trend|rate)', re.I),
-        ], 0.80),
-
+        (
+            Intent.SHOW_TRENDS,
+            [
+                re.compile(r"(?:show|display|plot|graph)\s+(?:me\s+)?(?:the\s+)?trend", re.I),
+                re.compile(r"(?:trend|history|historical)\s+(?:for|of|data)", re.I),
+                re.compile(r"(?:over\s+)?(?:the\s+)?(?:last|past)\s+\d+\s+(?:day|week|month)", re.I),
+                re.compile(r"how\s+has\s+.+?(?:changed|trended|performed)", re.I),
+                re.compile(r"performance\s+(?:over\s+)?time", re.I),
+                re.compile(r"degradation\s+(?:curve|trend|rate)", re.I),
+            ],
+            0.80,
+        ),
         # EQUIPMENT_STATUS: Asking about current status/health
-        (Intent.EQUIPMENT_STATUS, [
-            re.compile(r'(?:what\s+is|what\'s)\s+(?:the\s+)?(?:status|health|condition)', re.I),
-            re.compile(r'(?:status|health|condition)\s+(?:of|for)', re.I),
-            re.compile(r'how\s+(?:is|are)\s+.+?(?:doing|performing|running)', re.I),
-            re.compile(r'(?:is|are)\s+.+?(?:running|working|ok|healthy)', re.I),
-            re.compile(r'(?:current|latest)\s+(?:reading|value|state)', re.I),
-            re.compile(r'health\s+score', re.I),
-        ], 0.75),
+        (
+            Intent.EQUIPMENT_STATUS,
+            [
+                re.compile(r"(?:what\s+is|what\'s)\s+(?:the\s+)?(?:status|health|condition)", re.I),
+                re.compile(r"(?:status|health|condition)\s+(?:of|for)", re.I),
+                re.compile(r"how\s+(?:is|are)\s+.+?(?:doing|performing|running)", re.I),
+                re.compile(r"(?:is|are)\s+.+?(?:running|working|ok|healthy)", re.I),
+                re.compile(r"(?:current|latest)\s+(?:reading|value|state)", re.I),
+                re.compile(r"health\s+score", re.I),
+            ],
+            0.75,
+        ),
     ]
 
     def classify(self, query: str) -> ClassifiedQuery:

@@ -19,8 +19,16 @@ from app.middleware.rate_limiter import limiter
 from app.models.module_registry import ModuleType
 from app.database.repositories.security_repository import SecurityRepository
 from app.models.security import (
-    AccessEvent, AccessStatus, AccessType, Visitor, SecurityAlert,
-    VisitorStatus, AlertType, AlertSeverity, AlertStatus, SecurityOverview
+    AccessEvent,
+    AccessStatus,
+    AccessType,
+    Visitor,
+    SecurityAlert,
+    VisitorStatus,
+    AlertType,
+    AlertSeverity,
+    AlertStatus,
+    SecurityOverview,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,8 +50,10 @@ router = APIRouter(
 # Request Models
 # ============================================================================
 
+
 class RegisterVisitorRequest(BaseModel):
     """Request to register new visitor."""
+
     name: str
     company: str
     host_contact: str
@@ -53,6 +63,7 @@ class RegisterVisitorRequest(BaseModel):
 
 class CreateAccessEventRequest(BaseModel):
     """Request to record access event (from access control system webhook)."""
+
     access_point_id: str
     card_id: str
     person_name: str
@@ -63,6 +74,7 @@ class CreateAccessEventRequest(BaseModel):
 
 class CreateAlertRequest(BaseModel):
     """Request to create security alert."""
+
     alert_type: str
     location: str
     building_id: str
@@ -73,6 +85,7 @@ class CreateAlertRequest(BaseModel):
 # ============================================================================
 # Overview & Summary Endpoints
 # ============================================================================
+
 
 @limiter.limit("30/minute")
 @router.get("/overview")
@@ -113,7 +126,7 @@ async def get_security_overview(request: Request, site: str = Query(..., descrip
             open_alerts=len(open_alerts),
             after_hours_access_count=len(after_hours),
             system_status="online",
-            last_updated=datetime.now()
+            last_updated=datetime.now(),
         ).dict()
 
     except Exception as e:
@@ -155,15 +168,15 @@ async def get_security_status(request: Request, site: str = Query(..., descripti
                 "readers_online": True,
                 "alert_system": "active",
                 "visitor_management": "active",
-                "access_logs": "syncing"
+                "access_logs": "syncing",
             },
             "metrics": {
                 "events_today": len(today_events),
                 "active_visitors": len(active_visitors),
                 "open_alerts": len(open_alerts),
-                "after_hours_access": after_hours_count
+                "after_hours_access": after_hours_count,
             },
-            "last_updated": datetime.now().isoformat()
+            "last_updated": datetime.now().isoformat(),
         }
     except Exception as e:
         logger.error(f"Error fetching security status for {site}: {e}")
@@ -173,6 +186,7 @@ async def get_security_status(request: Request, site: str = Query(..., descripti
 # ============================================================================
 # Access Events Endpoints
 # ============================================================================
+
 
 @limiter.limit("30/minute")
 @router.get("/events")
@@ -188,11 +202,7 @@ async def get_access_events(
         repo = SecurityRepository()
         events = repo.list_events(site, limit=limit, after_hours=after_hours, location=location)
 
-        return {
-            "site": site,
-            "event_count": len(events),
-            "events": events
-        }
+        return {"site": site, "event_count": len(events), "events": events}
     except Exception as e:
         logger.error(f"Error fetching access events for {site}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -229,7 +239,7 @@ async def record_access_event(request: Request, data: CreateAccessEventRequest, 
             person_name=data.person_name,
             status=AccessStatus(data.status),
             access_type=AccessType(data.access_type),
-            location=data.location
+            location=data.location,
         )
 
         repo = SecurityRepository()
@@ -247,7 +257,7 @@ async def get_access_anomalies(
     request: Request,
     site: str = Query(..., description="Building site code"),
     limit: int = Query(50, ge=1, le=1000),
-    days_back: int = Query(7, ge=1, le=90, description="Number of days to analyze")
+    days_back: int = Query(7, ge=1, le=90, description="Number of days to analyze"),
 ):
     """Detect and return anomalous access events.
 
@@ -271,15 +281,17 @@ async def get_access_anomalies(
             try:
                 event_time = datetime.fromisoformat(timestamp_str)
                 if repo._is_after_hours(timestamp_str):
-                    anomalies.append({
-                        "type": "after_hours_access",
-                        "event_id": event.get("event_id"),
-                        "timestamp": timestamp_str,
-                        "location": event.get("location"),
-                        "person": event.get("person_name"),
-                        "severity": "medium",
-                        "description": f"Access outside business hours at {event.get('location')}"
-                    })
+                    anomalies.append(
+                        {
+                            "type": "after_hours_access",
+                            "event_id": event.get("event_id"),
+                            "timestamp": timestamp_str,
+                            "location": event.get("location"),
+                            "person": event.get("person_name"),
+                            "severity": "medium",
+                            "description": f"Access outside business hours at {event.get('location')}",
+                        }
+                    )
             except (ValueError, TypeError):
                 pass
 
@@ -292,13 +304,15 @@ async def get_access_anomalies(
 
         for location, count in location_failures.items():
             if count > 3:  # Threshold: more than 3 failures
-                anomalies.append({
-                    "type": "high_failure_rate",
-                    "location": location,
-                    "failure_count": count,
-                    "severity": "high" if count > 5 else "medium",
-                    "description": f"{count} failed access attempts at {location}"
-                })
+                anomalies.append(
+                    {
+                        "type": "high_failure_rate",
+                        "location": location,
+                        "failure_count": count,
+                        "severity": "high" if count > 5 else "medium",
+                        "description": f"{count} failed access attempts at {location}",
+                    }
+                )
 
         # Sort by severity and return limited set
         severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
@@ -309,7 +323,7 @@ async def get_access_anomalies(
             "anomaly_count": len(anomalies),
             "anomalies": anomalies[:limit],
             "period_days": days_back,
-            "analysis_timestamp": datetime.now().isoformat()
+            "analysis_timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
         logger.error(f"Error detecting anomalies for {site}: {e}")
@@ -320,6 +334,7 @@ async def get_access_anomalies(
 # Access Points Endpoints
 # ============================================================================
 
+
 @limiter.limit("30/minute")
 @router.get("/access-points")
 async def get_access_points(request: Request, site: str = Query(...)):
@@ -328,11 +343,7 @@ async def get_access_points(request: Request, site: str = Query(...)):
         repo = SecurityRepository()
         points = repo.get_access_points(site)
 
-        return {
-            "site": site,
-            "point_count": len(points),
-            "access_points": points
-        }
+        return {"site": site, "point_count": len(points), "access_points": points}
     except Exception as e:
         logger.error(f"Error fetching access points for {site}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -353,10 +364,7 @@ async def get_access_point_details(request: Request, point_id: str):
         all_events = repo.list_events(point["building_id"], limit=500)
         recent_events = [e for e in all_events if e["access_point_id"] == point_id][:20]
 
-        return {
-            "point": point,
-            "recent_events": recent_events
-        }
+        return {"point": point, "recent_events": recent_events}
     except HTTPException:
         raise
     except Exception as e:
@@ -368,6 +376,7 @@ async def get_access_point_details(request: Request, point_id: str):
 # Visitors Endpoints
 # ============================================================================
 
+
 @limiter.limit("30/minute")
 @router.get("/visitors")
 async def get_visitors(request: Request, site: str = Query(...), limit: int = Query(50)):
@@ -376,11 +385,7 @@ async def get_visitors(request: Request, site: str = Query(...), limit: int = Qu
         repo = SecurityRepository()
         visitors = repo.list_visitors(site, limit=limit)
 
-        return {
-            "site": site,
-            "visitor_count": len(visitors),
-            "visitors": visitors
-        }
+        return {"site": site, "visitor_count": len(visitors), "visitors": visitors}
     except Exception as e:
         logger.error(f"Error fetching visitors for {site}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -398,17 +403,13 @@ async def register_visitor(request: Request, data: RegisterVisitorRequest, site:
             host_contact=data.host_contact,
             access_points=data.access_points,
             status=VisitorStatus.PENDING,
-            purpose=data.purpose
+            purpose=data.purpose,
         )
 
         repo = SecurityRepository()
         result = repo.create_event(visitor)  # Store visitor using event system
 
-        return {
-            "visitor_id": visitor.visitor_id,
-            "status": "registered",
-            "name": visitor.name
-        }
+        return {"visitor_id": visitor.visitor_id, "status": "registered", "name": visitor.name}
     except Exception as e:
         logger.error(f"Error registering visitor: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -469,24 +470,21 @@ async def revoke_visitor(request: Request, visitor_id: str):
 # Alerts Endpoints
 # ============================================================================
 
+
 @limiter.limit("30/minute")
 @router.get("/alerts")
 async def get_alerts(
     request: Request,
     site: str = Query(...),
     severity: Optional[str] = Query(None, description="Filter by severity: critical, warning, info"),
-    limit: int = Query(50)
+    limit: int = Query(50),
 ):
     """Get security alerts with optional severity filtering."""
     try:
         repo = SecurityRepository()
         alerts = repo.get_alerts(site, severity=severity, limit=limit)
 
-        return {
-            "site": site,
-            "alert_count": len(alerts),
-            "alerts": alerts
-        }
+        return {"site": site, "alert_count": len(alerts), "alerts": alerts}
     except Exception as e:
         logger.error(f"Error fetching alerts for {site}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -504,7 +502,7 @@ async def create_alert(request: Request, data: CreateAlertRequest):
             building_id=data.building_id,
             severity=AlertSeverity(data.severity),
             status=AlertStatus.OPEN,
-            description=data.description
+            description=data.description,
         )
 
         repo = SecurityRepository()
@@ -538,6 +536,7 @@ async def acknowledge_alert(request: Request, alert_id: str, acknowledged_by: st
 # ============================================================================
 # Cross-Module Integration Endpoints
 # ============================================================================
+
 
 @limiter.limit("30/minute")
 @router.get("/occupancy")
@@ -583,83 +582,97 @@ async def get_occupancy_recommendations(request: Request, site: str = Query(...,
 
         # Occupancy-based HVAC recommendations
         if total_occupancy == 0:
-            recommendations.append({
-                "module": "hvac",
-                "type": "energy_savings",
-                "priority": "high",
-                "action": "reduce_setpoint",
-                "value": 2,
-                "unit": "°C",
-                "description": "Building unoccupied - reduce heating/cooling setpoint by 2°C for energy savings",
-                "estimated_savings": "15-20%"
-            })
+            recommendations.append(
+                {
+                    "module": "hvac",
+                    "type": "energy_savings",
+                    "priority": "high",
+                    "action": "reduce_setpoint",
+                    "value": 2,
+                    "unit": "°C",
+                    "description": "Building unoccupied - reduce heating/cooling setpoint by 2°C for energy savings",
+                    "estimated_savings": "15-20%",
+                }
+            )
         elif total_occupancy < 10:
-            recommendations.append({
-                "module": "hvac",
-                "type": "comfort_optimization",
-                "priority": "medium",
-                "action": "adjust_to_comfort",
-                "value": 22,
-                "unit": "°C",
-                "description": "Low occupancy - set comfort temperature to 22°C",
-                "confidence": 0.85
-            })
+            recommendations.append(
+                {
+                    "module": "hvac",
+                    "type": "comfort_optimization",
+                    "priority": "medium",
+                    "action": "adjust_to_comfort",
+                    "value": 22,
+                    "unit": "°C",
+                    "description": "Low occupancy - set comfort temperature to 22°C",
+                    "confidence": 0.85,
+                }
+            )
         elif total_occupancy > 50:
-            recommendations.append({
-                "module": "hvac",
-                "type": "comfort_optimization",
-                "priority": "high",
-                "action": "increase_ventilation",
-                "description": "High occupancy detected - increase fresh air ventilation",
-                "co2_concern": True
-            })
+            recommendations.append(
+                {
+                    "module": "hvac",
+                    "type": "comfort_optimization",
+                    "priority": "high",
+                    "action": "increase_ventilation",
+                    "description": "High occupancy detected - increase fresh air ventilation",
+                    "co2_concern": True,
+                }
+            )
 
         # Occupancy-based lighting recommendations
         if total_occupancy == 0:
-            recommendations.append({
-                "module": "lighting",
-                "type": "energy_savings",
-                "priority": "high",
-                "action": "turn_off",
-                "description": "Building unoccupied - turn off all non-essential lighting",
-                "estimated_savings": "80-90%"
-            })
+            recommendations.append(
+                {
+                    "module": "lighting",
+                    "type": "energy_savings",
+                    "priority": "high",
+                    "action": "turn_off",
+                    "description": "Building unoccupied - turn off all non-essential lighting",
+                    "estimated_savings": "80-90%",
+                }
+            )
         else:
             # Calculate average occupancy per zone
             avg_occupancy_per_zone = total_occupancy / max(len(by_zone), 1)
 
             # Recommend dimming if occupancy is low
             if avg_occupancy_per_zone < 2:
-                recommendations.append({
-                    "module": "lighting",
-                    "type": "energy_savings",
-                    "priority": "medium",
-                    "action": "dim_to_percent",
-                    "value": 30,
-                    "description": "Low occupancy per zone - dim lighting to 30% for energy savings",
-                    "estimated_savings": "40-50%"
-                })
+                recommendations.append(
+                    {
+                        "module": "lighting",
+                        "type": "energy_savings",
+                        "priority": "medium",
+                        "action": "dim_to_percent",
+                        "value": 30,
+                        "description": "Low occupancy per zone - dim lighting to 30% for energy savings",
+                        "estimated_savings": "40-50%",
+                    }
+                )
             else:
-                recommendations.append({
-                    "module": "lighting",
-                    "type": "comfort_optimization",
-                    "priority": "low",
-                    "action": "enable_daylight_harvesting",
-                    "description": "Enable daylight harvesting for occupied zones"
-                })
+                recommendations.append(
+                    {
+                        "module": "lighting",
+                        "type": "comfort_optimization",
+                        "priority": "low",
+                        "action": "enable_daylight_harvesting",
+                        "description": "Enable daylight harvesting for occupied zones",
+                    }
+                )
 
         # Zone-specific recommendations
         for zone, count in by_zone.items():
             if count > 20:
-                recommendations.append({
-                    "module": "hvac",
-                    "type": "comfort_optimization",
-                    "priority": "medium",
-                    "zone": zone,
-                    "action": "increase_ventilation",
-                    "description": f"Zone {zone} has {count} people - increase ventilation",
-                    "affected_equipment": ["VAV", "AHU"]
-                })
+                recommendations.append(
+                    {
+                        "module": "hvac",
+                        "type": "comfort_optimization",
+                        "priority": "medium",
+                        "zone": zone,
+                        "action": "increase_ventilation",
+                        "description": f"Zone {zone} has {count} people - increase ventilation",
+                        "affected_equipment": ["VAV", "AHU"],
+                    }
+                )
 
         return {
             "site": site,
@@ -668,7 +681,7 @@ async def get_occupancy_recommendations(request: Request, site: str = Query(...,
             "recommendations": recommendations,
             "by_floor": by_floor,
             "by_zone": by_zone,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
         logger.error(f"Error generating occupancy recommendations for {site}: {e}")

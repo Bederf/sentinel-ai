@@ -10,9 +10,15 @@ from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 
 from app.models.integration import (
-    FileFormat, Severity, AlarmState,
-    FormatDetectionResult, ParseResult, ParsedAlarm, ParsedTrend,
-    ParseValidationError, ParseValidationWarning,
+    FileFormat,
+    Severity,
+    AlarmState,
+    FormatDetectionResult,
+    ParseResult,
+    ParsedAlarm,
+    ParsedTrend,
+    ParseValidationError,
+    ParseValidationWarning,
     ColumnMapping,
 )
 
@@ -21,36 +27,36 @@ class LogParserService:
     """Service for parsing and normalizing BMS log files."""
 
     # Common column name patterns for auto-detection
-    TIMESTAMP_PATTERNS = ['time', 'timestamp', 'date', 'datetime', 'date/time', 'date_time']
-    POINT_ID_PATTERNS = ['point', 'pointid', 'point_id', 'object', 'item', 'item reference', 'source']
-    ALARM_CODE_PATTERNS = ['alarm type', 'alarmtype', 'type', 'event', 'eventtype', 'alarm_code', 'code']
-    DESCRIPTION_PATTERNS = ['description', 'message', 'alarm message', 'text', 'messagetext']
-    VALUE_PATTERNS = ['value', 'alarm value', 'reading', 'actual']
-    THRESHOLD_PATTERNS = ['limit', 'threshold', 'setpoint', 'sp']
-    SEVERITY_PATTERNS = ['priority', 'severity', 'level', 'importance']
-    STATE_PATTERNS = ['status', 'state', 'condition']
-    ACK_BY_PATTERNS = ['operator', 'user', 'ack by', 'acknowledged by', 'acknowledgedby']
-    NOTES_PATTERNS = ['action', 'notes', 'comment', 'annotation', 'remarks']
+    TIMESTAMP_PATTERNS = ["time", "timestamp", "date", "datetime", "date/time", "date_time"]
+    POINT_ID_PATTERNS = ["point", "pointid", "point_id", "object", "item", "item reference", "source"]
+    ALARM_CODE_PATTERNS = ["alarm type", "alarmtype", "type", "event", "eventtype", "alarm_code", "code"]
+    DESCRIPTION_PATTERNS = ["description", "message", "alarm message", "text", "messagetext"]
+    VALUE_PATTERNS = ["value", "alarm value", "reading", "actual"]
+    THRESHOLD_PATTERNS = ["limit", "threshold", "setpoint", "sp"]
+    SEVERITY_PATTERNS = ["priority", "severity", "level", "importance"]
+    STATE_PATTERNS = ["status", "state", "condition"]
+    ACK_BY_PATTERNS = ["operator", "user", "ack by", "acknowledged by", "acknowledgedby"]
+    NOTES_PATTERNS = ["action", "notes", "comment", "annotation", "remarks"]
 
     # Vendor detection patterns
     VENDOR_PATTERNS = {
-        'honeywell': [r'NAE\d+/', r'\.SAT$', r'\.RAT$', r'EBI'],
-        'siemens': [r'Building\d+\.Floor', r'Desigo'],
-        'jci': [r'Metasys', r'/SAT$', r'/RAT$'],
-        'schneider': [r'BMS/', r'EcoStruxure'],
+        "honeywell": [r"NAE\d+/", r"\.SAT$", r"\.RAT$", r"EBI"],
+        "siemens": [r"Building\d+\.Floor", r"Desigo"],
+        "jci": [r"Metasys", r"/SAT$", r"/RAT$"],
+        "schneider": [r"BMS/", r"EcoStruxure"],
     }
 
     # Date format patterns to try
     DATE_FORMATS = [
-        '%Y-%m-%d %H:%M:%S',      # ISO: 2026-01-28 14:32:15
-        '%Y-%m-%dT%H:%M:%S',      # ISO-T: 2026-01-28T14:32:15
-        '%Y-%m-%dT%H:%M:%SZ',     # ISO-Z: 2026-01-28T14:32:15Z
-        '%d/%m/%Y %H:%M:%S',      # SA: 28/01/2026 14:32:15
-        '%d/%m/%Y %H:%M',         # SA short: 28/01/2026 14:32
-        '%m/%d/%Y %H:%M:%S',      # US: 01/28/2026 14:32:15
-        '%m/%d/%Y %I:%M:%S %p',   # US 12hr: 01/28/2026 02:32:15 PM
-        '%d.%m.%Y %H:%M:%S',      # EU: 28.01.2026 14:32:15
-        '%d-%m-%Y %H:%M:%S',      # Alt: 28-01-2026 14:32:15
+        "%Y-%m-%d %H:%M:%S",  # ISO: 2026-01-28 14:32:15
+        "%Y-%m-%dT%H:%M:%S",  # ISO-T: 2026-01-28T14:32:15
+        "%Y-%m-%dT%H:%M:%SZ",  # ISO-Z: 2026-01-28T14:32:15Z
+        "%d/%m/%Y %H:%M:%S",  # SA: 28/01/2026 14:32:15
+        "%d/%m/%Y %H:%M",  # SA short: 28/01/2026 14:32
+        "%m/%d/%Y %H:%M:%S",  # US: 01/28/2026 14:32:15
+        "%m/%d/%Y %I:%M:%S %p",  # US 12hr: 01/28/2026 02:32:15 PM
+        "%d.%m.%Y %H:%M:%S",  # EU: 28.01.2026 14:32:15
+        "%d-%m-%Y %H:%M:%S",  # Alt: 28-01-2026 14:32:15
     ]
 
     def detect_format(self, content: str, filename: str = "") -> FormatDetectionResult:
@@ -79,15 +85,13 @@ class LogParserService:
         date_end = None
 
         if date_column:
-            date_format, date_start, date_end = self._detect_date_format(
-                [r.get(date_column, '') for r in rows[:100]]
-            )
+            date_format, date_start, date_end = self._detect_date_format([r.get(date_column, "") for r in rows[:100]])
 
         # Detect vendor from point IDs
         point_column = self._find_column(columns, self.POINT_ID_PATTERNS)
         vendor = None
         if point_column:
-            sample_points = [r.get(point_column, '') for r in rows[:50]]
+            sample_points = [r.get(point_column, "") for r in rows[:50]]
             vendor = self._detect_vendor(sample_points)
 
         # Suggest column mappings
@@ -111,8 +115,8 @@ class LogParserService:
         content: str,
         mappings: List[ColumnMapping],
         date_format: str,
-        delimiter: str = ',',
-        timezone: str = 'Africa/Johannesburg',
+        delimiter: str = ",",
+        timezone: str = "Africa/Johannesburg",
     ) -> ParseResult:
         """Parse alarm log file using configured mappings."""
 
@@ -134,12 +138,7 @@ class LogParserService:
                     if not alarm.asset_id:
                         unmatched_points.add(alarm.point_id)
             except ValueError as e:
-                errors.append(ParseValidationError(
-                    row=idx,
-                    field='row',
-                    message=str(e),
-                    value=None
-                ))
+                errors.append(ParseValidationError(row=idx, field="row", message=str(e), value=None))
 
         return ParseResult(
             total_rows=len(rows),
@@ -157,7 +156,7 @@ class LogParserService:
         content: str,
         mappings: List[ColumnMapping],
         date_format: str,
-        delimiter: str = ',',
+        delimiter: str = ",",
     ) -> ParseResult:
         """Parse trend log file using configured mappings."""
 
@@ -177,12 +176,7 @@ class LogParserService:
                     if not trend.asset_id:
                         unmatched_points.add(trend.point_id)
             except ValueError as e:
-                errors.append(ParseValidationError(
-                    row=idx,
-                    field='row',
-                    message=str(e),
-                    value=None
-                ))
+                errors.append(ParseValidationError(row=idx, field="row", message=str(e), value=None))
 
         return ParseResult(
             total_rows=len(rows),
@@ -205,11 +199,11 @@ class LogParserService:
         """Parse a single alarm row."""
 
         # Get timestamp (required)
-        ts_mapping = mappings.get('timestamp')
+        ts_mapping = mappings.get("timestamp")
         if not ts_mapping:
             raise ValueError("No timestamp mapping configured")
 
-        ts_value = row.get(ts_mapping.source_column, '').strip()
+        ts_value = row.get(ts_mapping.source_column, "").strip()
         if not ts_value:
             return None
 
@@ -218,23 +212,23 @@ class LogParserService:
             raise ValueError(f"Cannot parse timestamp: {ts_value}")
 
         # Get point ID (required)
-        point_mapping = mappings.get('point_id')
+        point_mapping = mappings.get("point_id")
         if not point_mapping:
             raise ValueError("No point_id mapping configured")
 
-        point_id = row.get(point_mapping.source_column, '').strip()
+        point_id = row.get(point_mapping.source_column, "").strip()
         if not point_id:
             return None
 
         # Optional fields
-        alarm_code = self._get_mapped_value(row, mappings, 'alarm_code')
-        description = self._get_mapped_value(row, mappings, 'description')
-        value = self._parse_float(self._get_mapped_value(row, mappings, 'value'))
-        threshold = self._parse_float(self._get_mapped_value(row, mappings, 'threshold'))
-        severity_raw = self._get_mapped_value(row, mappings, 'severity')
-        state_raw = self._get_mapped_value(row, mappings, 'state')
-        ack_by = self._get_mapped_value(row, mappings, 'acknowledged_by')
-        notes = self._get_mapped_value(row, mappings, 'notes')
+        alarm_code = self._get_mapped_value(row, mappings, "alarm_code")
+        description = self._get_mapped_value(row, mappings, "description")
+        value = self._parse_float(self._get_mapped_value(row, mappings, "value"))
+        threshold = self._parse_float(self._get_mapped_value(row, mappings, "threshold"))
+        severity_raw = self._get_mapped_value(row, mappings, "severity")
+        state_raw = self._get_mapped_value(row, mappings, "state")
+        ack_by = self._get_mapped_value(row, mappings, "acknowledged_by")
+        notes = self._get_mapped_value(row, mappings, "notes")
 
         # Normalize severity
         severity = self._normalize_severity(severity_raw) if severity_raw else None
@@ -265,11 +259,11 @@ class LogParserService:
     ) -> Optional[ParsedTrend]:
         """Parse a single trend row."""
 
-        ts_mapping = mappings.get('timestamp')
+        ts_mapping = mappings.get("timestamp")
         if not ts_mapping:
             raise ValueError("No timestamp mapping configured")
 
-        ts_value = row.get(ts_mapping.source_column, '').strip()
+        ts_value = row.get(ts_mapping.source_column, "").strip()
         if not ts_value:
             return None
 
@@ -277,28 +271,28 @@ class LogParserService:
         if not recorded_at:
             raise ValueError(f"Cannot parse timestamp: {ts_value}")
 
-        point_mapping = mappings.get('point_id')
+        point_mapping = mappings.get("point_id")
         if not point_mapping:
             raise ValueError("No point_id mapping configured")
 
-        point_id = row.get(point_mapping.source_column, '').strip()
+        point_id = row.get(point_mapping.source_column, "").strip()
         if not point_id:
             return None
 
-        value_str = self._get_mapped_value(row, mappings, 'value')
+        value_str = self._get_mapped_value(row, mappings, "value")
         value = self._parse_float(value_str)
         if value is None:
             return None
 
-        unit = self._get_mapped_value(row, mappings, 'unit')
-        quality = self._get_mapped_value(row, mappings, 'quality') or 'good'
+        unit = self._get_mapped_value(row, mappings, "unit")
+        quality = self._get_mapped_value(row, mappings, "quality") or "good"
 
         return ParsedTrend(
             recorded_at=recorded_at,
             point_id=point_id,
             value=value,
             unit=unit,
-            quality=quality.lower() if quality in ['Good', 'Bad', 'Uncertain'] else 'good',
+            quality=quality.lower() if quality in ["Good", "Bad", "Uncertain"] else "good",
         )
 
     def _get_mapped_value(
@@ -311,25 +305,25 @@ class LogParserService:
         mapping = mappings.get(field)
         if not mapping:
             return None
-        value = row.get(mapping.source_column, '').strip()
+        value = row.get(mapping.source_column, "").strip()
         return value if value else None
 
     def _detect_file_format(self, content: str, filename: str) -> FileFormat:
         """Detect file format from extension or content."""
-        ext = Path(filename).suffix.lower() if filename else ''
+        ext = Path(filename).suffix.lower() if filename else ""
 
-        if ext in ['.json']:
+        if ext in [".json"]:
             return FileFormat.JSON
-        if ext in ['.xlsx', '.xls']:
+        if ext in [".xlsx", ".xls"]:
             return FileFormat.EXCEL
-        if ext in ['.xml']:
+        if ext in [".xml"]:
             return FileFormat.XML
 
         # Check content
         content_start = content[:100].strip()
-        if content_start.startswith('{') or content_start.startswith('['):
+        if content_start.startswith("{") or content_start.startswith("["):
             return FileFormat.JSON
-        if content_start.startswith('<?xml'):
+        if content_start.startswith("<?xml"):
             return FileFormat.XML
 
         return FileFormat.CSV
@@ -352,8 +346,8 @@ class LogParserService:
 
             return FormatDetectionResult(
                 file_format=FileFormat.JSON,
-                delimiter='',
-                date_format='YYYY-MM-DD HH:MI:SS',
+                delimiter="",
+                date_format="YYYY-MM-DD HH:MI:SS",
                 columns=columns,
                 row_count=row_count,
                 sample_rows=sample_rows,
@@ -364,23 +358,20 @@ class LogParserService:
 
     def _detect_delimiter(self, content: str) -> str:
         """Detect CSV delimiter."""
-        first_line = content.split('\n')[0]
+        first_line = content.split("\n")[0]
 
         # Count occurrences
-        comma_count = first_line.count(',')
-        semicolon_count = first_line.count(';')
-        tab_count = first_line.count('\t')
+        comma_count = first_line.count(",")
+        semicolon_count = first_line.count(";")
+        tab_count = first_line.count("\t")
 
         if semicolon_count > comma_count and semicolon_count > tab_count:
-            return ';'
+            return ";"
         if tab_count > comma_count:
-            return '\t'
-        return ','
+            return "\t"
+        return ","
 
-    def _detect_date_format(
-        self,
-        date_values: List[str]
-    ) -> Tuple[str, Optional[datetime], Optional[datetime]]:
+    def _detect_date_format(self, date_values: List[str]) -> Tuple[str, Optional[datetime], Optional[datetime]]:
         """Detect date format from sample values."""
 
         for fmt in self.DATE_FORMATS:
@@ -399,20 +390,20 @@ class LogParserService:
 
             if matches > len(date_values) * 0.8:  # 80% match threshold
                 # Convert to our format string
-                format_str = fmt.replace('%Y', 'YYYY').replace('%m', 'MM').replace('%d', 'DD')
-                format_str = format_str.replace('%H', 'HH').replace('%M', 'MI').replace('%S', 'SS')
-                format_str = format_str.replace('%I', 'HH').replace('%p', 'AM')
+                format_str = fmt.replace("%Y", "YYYY").replace("%m", "MM").replace("%d", "DD")
+                format_str = format_str.replace("%H", "HH").replace("%M", "MI").replace("%S", "SS")
+                format_str = format_str.replace("%I", "HH").replace("%p", "AM")
 
                 date_start = min(parsed_dates) if parsed_dates else None
                 date_end = max(parsed_dates) if parsed_dates else None
 
                 return format_str, date_start, date_end
 
-        return 'YYYY-MM-DD HH:MI:SS', None, None
+        return "YYYY-MM-DD HH:MI:SS", None, None
 
     def _detect_vendor(self, point_ids: List[str]) -> Optional[str]:
         """Detect BMS vendor from point ID patterns."""
-        combined = ' '.join(point_ids)
+        combined = " ".join(point_ids)
 
         for vendor, patterns in self.VENDOR_PATTERNS.items():
             for pattern in patterns:
@@ -434,16 +425,16 @@ class LogParserService:
         mappings = {}
 
         patterns = [
-            ('timestamp', self.TIMESTAMP_PATTERNS),
-            ('point_id', self.POINT_ID_PATTERNS),
-            ('alarm_code', self.ALARM_CODE_PATTERNS),
-            ('description', self.DESCRIPTION_PATTERNS),
-            ('value', self.VALUE_PATTERNS),
-            ('threshold', self.THRESHOLD_PATTERNS),
-            ('severity', self.SEVERITY_PATTERNS),
-            ('state', self.STATE_PATTERNS),
-            ('acknowledged_by', self.ACK_BY_PATTERNS),
-            ('notes', self.NOTES_PATTERNS),
+            ("timestamp", self.TIMESTAMP_PATTERNS),
+            ("point_id", self.POINT_ID_PATTERNS),
+            ("alarm_code", self.ALARM_CODE_PATTERNS),
+            ("description", self.DESCRIPTION_PATTERNS),
+            ("value", self.VALUE_PATTERNS),
+            ("threshold", self.THRESHOLD_PATTERNS),
+            ("severity", self.SEVERITY_PATTERNS),
+            ("state", self.STATE_PATTERNS),
+            ("acknowledged_by", self.ACK_BY_PATTERNS),
+            ("notes", self.NOTES_PATTERNS),
         ]
 
         for sentinel_field, field_patterns in patterns:
@@ -471,7 +462,7 @@ class LogParserService:
         if not value:
             return None
         try:
-            return float(value.replace(',', '.'))
+            return float(value.replace(",", "."))
         except (ValueError, TypeError):
             return None
 
@@ -482,13 +473,13 @@ class LogParserService:
 
         v = value.upper().strip()
 
-        if v in ['1', 'CRITICAL', 'URGENT', 'EMERGENCY', 'LIFE_SAFETY']:
+        if v in ["1", "CRITICAL", "URGENT", "EMERGENCY", "LIFE_SAFETY"]:
             return Severity.CRITICAL
-        if v in ['2', 'HIGH', 'MAJOR', 'IMPORTANT']:
+        if v in ["2", "HIGH", "MAJOR", "IMPORTANT"]:
             return Severity.HIGH
-        if v in ['3', 'MEDIUM', 'MODERATE', 'NORMAL', 'MINOR']:
+        if v in ["3", "MEDIUM", "MODERATE", "NORMAL", "MINOR"]:
             return Severity.MEDIUM
-        if v in ['4', 'LOW', 'INFO', 'ADVISORY', 'STATUS']:
+        if v in ["4", "LOW", "INFO", "ADVISORY", "STATUS"]:
             return Severity.LOW
 
         return None
@@ -500,11 +491,11 @@ class LogParserService:
 
         v = value.upper().strip()
 
-        if v in ['ACTIVE', 'ON', 'ALARM', 'TRIGGERED', 'RAISED']:
+        if v in ["ACTIVE", "ON", "ALARM", "TRIGGERED", "RAISED"]:
             return AlarmState.ACTIVE
-        if v in ['ACKNOWLEDGED', 'ACK', 'ACKED']:
+        if v in ["ACKNOWLEDGED", "ACK", "ACKED"]:
             return AlarmState.ACKNOWLEDGED
-        if v in ['CLEARED', 'CLEAR', 'OFF', 'NORMAL', 'RESOLVED', 'RETURNED']:
+        if v in ["CLEARED", "CLEAR", "OFF", "NORMAL", "RESOLVED", "RETURNED"]:
             return AlarmState.CLEARED
 
         return None

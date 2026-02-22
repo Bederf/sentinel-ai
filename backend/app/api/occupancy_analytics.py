@@ -19,7 +19,7 @@ router = APIRouter(prefix="/occupancy/analytics", tags=["occupancy-analytics"])
 @router.get("/hourly-trend")
 async def get_hourly_occupancy_trend(
     building_id: str = Query("site-002"),
-    days: int = Query(1, ge=1, le=30, description="Number of days to return (1-30)")
+    days: int = Query(1, ge=1, le=30, description="Number of days to return (1-30)"),
 ):
     """
     Get hourly occupancy trend for the building.
@@ -69,7 +69,7 @@ async def get_hourly_occupancy_trend(
                 hour=hour,
                 day_of_week=0,  # Monday
                 is_weekend=False,
-                zone_type=zone_type
+                zone_type=zone_type,
             )
             occupancy_by_hour.append(round(occupancy_percent, 1))
 
@@ -95,15 +95,13 @@ async def get_hourly_occupancy_trend(
             "offpeak_hours": offpeak_hours,
             "peak_avg_occupancy": round(peak_avg, 1),
             "offpeak_avg_occupancy": round(offpeak_avg, 1),
-            "peak_hours_text": f"{min(peak_hours)}:00-{max(peak_hours)+1}:00" if peak_hours else "N/A"
-        }
+            "peak_hours_text": f"{min(peak_hours)}:00-{max(peak_hours) + 1}:00" if peak_hours else "N/A",
+        },
     }
 
 
 @router.get("/zone-utilization")
-async def get_zone_utilization(
-    building_id: str = Query("site-002")
-):
+async def get_zone_utilization(building_id: str = Query("site-002")):
     """
     Get current zone utilization metrics.
 
@@ -153,10 +151,7 @@ async def get_zone_utilization(
 
     for zone in zones_config:
         occupancy_percent = calculate_zone_occupancy(
-            hour=hour,
-            day_of_week=day_of_week,
-            is_weekend=is_weekend,
-            zone_type=zone["type"]
+            hour=hour, day_of_week=day_of_week, is_weekend=is_weekend, zone_type=zone["type"]
         )
 
         current_occupancy = max(0, int(zone["max_occupancy"] * occupancy_percent / 100))
@@ -171,31 +166,29 @@ async def get_zone_utilization(
         else:
             status = "normal"
 
-        zones_data.append({
-            "zone_id": zone["zone_id"],
-            "zone_name": zone["zone_name"],
-            "floor": zone["floor"],
-            "max_occupancy": zone["max_occupancy"],
-            "current_occupancy": current_occupancy,
-            "utilization_percent": round(occupancy_percent, 1),
-            "status": status
-        })
+        zones_data.append(
+            {
+                "zone_id": zone["zone_id"],
+                "zone_name": zone["zone_name"],
+                "floor": zone["floor"],
+                "max_occupancy": zone["max_occupancy"],
+                "current_occupancy": current_occupancy,
+                "utilization_percent": round(occupancy_percent, 1),
+                "status": status,
+            }
+        )
 
     return {
         "building_id": building_id,
         "timestamp": now.isoformat(),
         "zones": zones_data,
         "total_occupancy": sum(z["current_occupancy"] for z in zones_data),
-        "average_utilization_percent": round(
-            sum(z["utilization_percent"] for z in zones_data) / len(zones_data), 1
-        )
+        "average_utilization_percent": round(sum(z["utilization_percent"] for z in zones_data) / len(zones_data), 1),
     }
 
 
 @router.get("/peak-hours")
-async def get_peak_hours(
-    building_id: str = Query("site-002")
-):
+async def get_peak_hours(building_id: str = Query("site-002")):
     """
     Get peak hour analysis for the building.
 
@@ -216,10 +209,7 @@ async def get_peak_hours(
         }
     """
     # Get hourly trend to analyze peaks
-    trend_response = await get_hourly_occupancy_trend(
-        building_id=building_id,
-        days=1
-    )
+    trend_response = await get_hourly_occupancy_trend(building_id=building_id, days=1)
 
     peak_hours = trend_response["daily_pattern"]["peak_hours"]
     offpeak_hours = trend_response["daily_pattern"]["offpeak_hours"]
@@ -230,7 +220,7 @@ async def get_peak_hours(
     recommendations = []
 
     if peak_hours:
-        peak_hours_str = f"{min(peak_hours)}:00-{max(peak_hours)+1}:00"
+        peak_hours_str = f"{min(peak_hours)}:00-{max(peak_hours) + 1}:00"
         recommendations.append(f"Peak occupancy {peak_hours_str} ({peak_avg}% avg) - optimize HVAC/lighting")
 
     if offpeak_avg < 20:
@@ -249,6 +239,6 @@ async def get_peak_hours(
         "peak_occupancy_avg": round(peak_avg, 1),
         "offpeak_occupancy_avg": round(offpeak_avg, 1),
         "occupancy_differential": round(peak_avg - offpeak_avg, 1),
-        "peak_hours_text": f"{min(peak_hours):02d}:00-{max(peak_hours)+1:02d}:00" if peak_hours else "N/A",
-        "recommendations": recommendations
+        "peak_hours_text": f"{min(peak_hours):02d}:00-{max(peak_hours) + 1:02d}:00" if peak_hours else "N/A",
+        "recommendations": recommendations,
     }

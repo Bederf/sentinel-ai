@@ -15,8 +15,10 @@ from pydantic import BaseModel, Field
 # Enums
 # ============================================================================
 
+
 class InspectionScheduleFrequency(str, Enum):
     """Frequency types for inspection schedules."""
+
     WEEKLY = "weekly"
     MONTHLY = "monthly"
     QUARTERLY = "quarterly"
@@ -26,6 +28,7 @@ class InspectionScheduleFrequency(str, Enum):
 
 class InspectionTaskStatus(str, Enum):
     """Status of inspection tasks."""
+
     SCHEDULED = "scheduled"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
@@ -35,6 +38,7 @@ class InspectionTaskStatus(str, Enum):
 
 class InspectionPriority(str, Enum):
     """Priority levels for inspections."""
+
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
@@ -43,6 +47,7 @@ class InspectionPriority(str, Enum):
 
 class InspectionOverallStatus(str, Enum):
     """Overall status of inspection results."""
+
     PASS = "pass"
     FAIL = "fail"
     PARTIAL = "partial"
@@ -50,6 +55,7 @@ class InspectionOverallStatus(str, Enum):
 
 class DeficiencySeverity(str, Enum):
     """Severity levels for deficiencies."""
+
     MINOR = "minor"
     MAJOR = "major"
     CRITICAL = "critical"
@@ -58,6 +64,7 @@ class DeficiencySeverity(str, Enum):
 
 class DeficiencyCategory(str, Enum):
     """Categories for deficiencies."""
+
     MECHANICAL = "mechanical"
     ELECTRICAL = "electrical"
     OPERATIONAL = "operational"
@@ -68,8 +75,10 @@ class DeficiencyCategory(str, Enum):
 # Inspection Schedule Models
 # ============================================================================
 
+
 class InspectionScheduleBase(BaseModel):
     """Base model for inspection schedules."""
+
     equipment_id: str = Field(..., description="Equipment to inspect")
     element_id: Optional[str] = Field(None, description="Specific element to inspect (optional)")
 
@@ -95,11 +104,13 @@ class InspectionScheduleBase(BaseModel):
 
 class InspectionScheduleCreate(InspectionScheduleBase):
     """Model for creating inspection schedule."""
+
     created_by: str = Field(..., description="Who created the schedule")
 
 
 class InspectionSchedule(InspectionScheduleBase):
     """Model for inspection schedule record."""
+
     id: str = Field(..., description="Schedule ID")
     created_at: datetime
     updated_at: datetime
@@ -116,7 +127,7 @@ class InspectionSchedule(InspectionScheduleBase):
                 "assigned_to": "John Smith",
                 "required_skills": ["generator_maintenance", "vibration_analysis"],
                 "is_active": True,
-                "created_by": "system"
+                "created_by": "system",
             }
         }
 
@@ -125,8 +136,10 @@ class InspectionSchedule(InspectionScheduleBase):
 # Inspection Checklist Template Models
 # ============================================================================
 
+
 class InspectionChecklistTemplateBase(BaseModel):
     """Base model for inspection checklist templates."""
+
     template_name: str = Field(..., description="Name of the template")
     equipment_type: str = Field(..., description="Equipment type this template applies to")
     inspection_type: str = Field(..., description="Type of inspection: routine, preventive, corrective")
@@ -146,11 +159,13 @@ class InspectionChecklistTemplateBase(BaseModel):
 
 class InspectionChecklistTemplateCreate(InspectionChecklistTemplateBase):
     """Model for creating checklist template."""
+
     created_by: str = Field(..., description="Who created the template")
 
 
 class InspectionChecklistTemplate(InspectionChecklistTemplateBase):
     """Model for checklist template record."""
+
     id: str = Field(..., description="Template ID")
     created_at: datetime
     updated_at: datetime
@@ -160,8 +175,10 @@ class InspectionChecklistTemplate(InspectionChecklistTemplateBase):
 # Inspection Task Models
 # ============================================================================
 
+
 class InspectionTaskBase(BaseModel):
     """Base model for inspection tasks."""
+
     schedule_id: Optional[str] = Field(None, description="Source schedule ID")
 
     task_name: str = Field(..., description="Name of the inspection task")
@@ -194,11 +211,13 @@ class InspectionTaskBase(BaseModel):
 
 class InspectionTaskCreate(InspectionTaskBase):
     """Model for creating inspection task."""
+
     pass
 
 
 class InspectionTask(InspectionTaskBase):
     """Model for inspection task record."""
+
     id: str = Field(..., description="Task ID")
     created_at: datetime
     updated_at: datetime
@@ -216,7 +235,7 @@ class InspectionTask(InspectionTaskBase):
                 "status": "scheduled",
                 "priority": "high",
                 "is_critical": True,
-                "estimated_duration_minutes": 90
+                "estimated_duration_minutes": 90,
             }
         }
 
@@ -225,8 +244,10 @@ class InspectionTask(InspectionTaskBase):
 # Inspection Result Models
 # ============================================================================
 
+
 class InspectionResultBase(BaseModel):
     """Base model for inspection results."""
+
     task_id: str = Field(..., description="Source task ID")
     inspected_by: str = Field(..., description="Who performed the inspection")
     inspection_date: datetime = Field(default_factory=datetime.now, description="Inspection date")
@@ -253,11 +274,13 @@ class InspectionResultBase(BaseModel):
 
 class InspectionResultCreate(InspectionResultBase):
     """Model for creating inspection result."""
+
     equipment_id: str = Field(..., description="Equipment inspected")
 
 
 class InspectionResult(InspectionResultBase):
     """Model for inspection result record."""
+
     id: str = Field(..., description="Result ID")
     equipment_id: str = Field(..., description="Equipment inspected")
     created_at: datetime
@@ -273,23 +296,18 @@ class InspectionResult(InspectionResultBase):
                 "inspection_date": "2026-03-01T10:30:00Z",
                 "overall_status": "pass",
                 "item_results": [
-                    {
-                        "item_id": "gen_001",
-                        "status": "pass",
-                        "measurement_value": "Normal",
-                        "notes": "Oil level OK"
-                    },
+                    {"item_id": "gen_001", "status": "pass", "measurement_value": "Normal", "notes": "Oil level OK"},
                     {
                         "item_id": "gen_002",
                         "status": "fail",
                         "measurement_value": "Leak present",
                         "notes": "Oil leak at gasket worsened",
-                        "photos": ["https://storage.example.com/leak.jpg"]
-                    }
+                        "photos": ["https://storage.example.com/leak.jpg"],
+                    },
                 ],
                 "deficiencies_found": 1,
                 "critical_findings": 0,
-                "general_notes": "Generator running well except for oil leak"
+                "general_notes": "Generator running well except for oil leak",
             }
         }
 
@@ -298,8 +316,10 @@ class InspectionResult(InspectionResultBase):
 # Inspection Deficiency Models
 # ============================================================================
 
+
 class InspectionDeficiencyBase(BaseModel):
     """Base model for inspection deficiencies."""
+
     result_id: str = Field(..., description="Source result ID")
     task_id: str = Field(..., description="Source task ID")
     equipment_id: str = Field(..., description="Equipment with deficiency")
@@ -333,11 +353,13 @@ class InspectionDeficiencyBase(BaseModel):
 
 class InspectionDeficiencyCreate(InspectionDeficiencyBase):
     """Model for creating inspection deficiency."""
+
     reported_by: str = Field(..., description="Who reported the deficiency")
 
 
 class InspectionDeficiency(InspectionDeficiencyBase):
     """Model for inspection deficiency record."""
+
     id: str = Field(..., description="Deficiency ID")
     reported_by: str = Field(..., description="Who reported the deficiency")
     reported_date: datetime
@@ -361,7 +383,7 @@ class InspectionDeficiency(InspectionDeficiencyBase):
                 "estimated_repair_hours": 4,
                 "is_resolved": False,
                 "reported_by": "John Smith",
-                "reported_date": "2026-03-01T10:30:00Z"
+                "reported_date": "2026-03-01T10:30:00Z",
             }
         }
 
@@ -370,8 +392,10 @@ class InspectionDeficiency(InspectionDeficiencyBase):
 # Inspection Measurement Models
 # ============================================================================
 
+
 class InspectionMeasurementBase(BaseModel):
     """Base model for inspection measurements."""
+
     result_id: str = Field(..., description="Source inspection result ID")
     task_id: str = Field(..., description="Source inspection task ID")
     equipment_id: str = Field(..., description="Equipment being measured")
@@ -395,11 +419,13 @@ class InspectionMeasurementBase(BaseModel):
 
 class InspectionMeasurementCreate(InspectionMeasurementBase):
     """Model for creating inspection measurement."""
+
     pass
 
 
 class InspectionMeasurement(InspectionMeasurementBase):
     """Model for inspection measurement record."""
+
     id: str = Field(..., description="Measurement ID")
     created_at: datetime
 
@@ -418,7 +444,7 @@ class InspectionMeasurement(InspectionMeasurementBase):
                 "measured_by": "John Smith",
                 "baseline_value": 3.2,
                 "baseline_deviation_percent": 9.4,
-                "deviation_status": "normal"
+                "deviation_status": "normal",
             }
         }
 
@@ -427,14 +453,17 @@ class InspectionMeasurement(InspectionMeasurementBase):
 # Request/Response Models
 # ============================================================================
 
+
 class InspectionTaskAssignmentRequest(BaseModel):
     """Request to assign inspection task."""
+
     assigned_to: str = Field(..., description="Technician to assign to")
     assigned_by: str = Field(..., description="Who is assigning")
 
 
 class InspectionTaskRescheduleRequest(BaseModel):
     """Request to reschedule inspection task."""
+
     new_due_date: datetime = Field(..., description="New due date")
     reason: str = Field(..., description="Reason for rescheduling")
     rescheduled_by: str = Field(..., description="Who is rescheduling")
@@ -442,6 +471,7 @@ class InspectionTaskRescheduleRequest(BaseModel):
 
 class InspectionTaskCompleteRequest(BaseModel):
     """Request to complete inspection task."""
+
     completed_by: str = Field(..., description="Who completed the inspection")
     completion_notes: Optional[str] = Field(None, description="Completion notes")
     actual_duration_minutes: Optional[int] = Field(None, description="Actual duration in minutes")
@@ -449,6 +479,7 @@ class InspectionTaskCompleteRequest(BaseModel):
 
 class InspectionCalendarRequest(BaseModel):
     """Request for inspection calendar."""
+
     start_date: datetime = Field(..., description="Calendar start date")
     end_date: datetime = Field(..., description="Calendar end date")
     assigned_to: Optional[str] = Field(None, description="Filter by technician")
@@ -457,6 +488,7 @@ class InspectionCalendarRequest(BaseModel):
 
 class BulkTaskGenerationRequest(BaseModel):
     """Request for bulk task generation."""
+
     equipment_ids: List[str] = Field(..., description="List of equipment IDs")
     baseline_type: str = Field(default="periodic", description="Type of baseline to use")
 
@@ -465,8 +497,10 @@ class BulkTaskGenerationRequest(BaseModel):
 # Summary Models
 # ============================================================================
 
+
 class InspectionOverviewResponse(BaseModel):
     """Response with inspection overview statistics."""
+
     equipment_id: str
     equipment_name: str
     equipment_type: str
@@ -482,6 +516,7 @@ class InspectionOverviewResponse(BaseModel):
 
 class InspectionTaskSummary(BaseModel):
     """Summary of inspection task statistics."""
+
     total_tasks_generated: int
     tasks_by_status: Dict[str, int]
     overdue_tasks: int
@@ -492,6 +527,7 @@ class InspectionTaskSummary(BaseModel):
 
 class InspectionDeficiencySummary(BaseModel):
     """Summary of deficiency statistics."""
+
     total_deficiencies: int
     by_severity: Dict[str, int]
     resolved: int
@@ -502,8 +538,10 @@ class InspectionDeficiencySummary(BaseModel):
 # Mobile Inspection Submission Models
 # ============================================================================
 
+
 class InspectionPhoto(BaseModel):
     """Photo attachment for inspection."""
+
     file_url: str = Field(..., description="URL to uploaded photo")
     file_name: str = Field(..., description="Original file name")
     description: Optional[str] = Field(None, description="Photo description/context")
@@ -512,6 +550,7 @@ class InspectionPhoto(BaseModel):
 
 class InspectionSubmission(BaseModel):
     """Mobile inspection submission request."""
+
     equipment_id: str = Field(..., description="Equipment being inspected")
     template_id: str = Field(..., description="Checklist template ID")
     checklist_responses: Dict[str, Any] = Field(..., description="Item ID to response mapping")
@@ -529,24 +568,25 @@ class InspectionSubmission(BaseModel):
                 "checklist_responses": {
                     "compressor_condition": "ok",
                     "refrigerant_pressure": {"value": 12.5, "notes": "Normal range"},
-                    "oil_level": "ok"
+                    "oil_level": "ok",
                 },
                 "photos": [
                     {
                         "file_url": "https://storage.example.com/photo1.jpg",
                         "file_name": "compressor_photo.jpg",
-                        "description": "Compressor visual inspection"
+                        "description": "Compressor visual inspection",
                     }
                 ],
                 "duration_minutes": 25,
                 "notes": "Equipment running smoothly",
-                "submitted_by": "John Smith"
+                "submitted_by": "John Smith",
             }
         }
 
 
 class InspectionScheduleSummary(BaseModel):
     """Simplified schedule for mobile display."""
+
     id: str
     equipment_id: str
     schedule_name: str

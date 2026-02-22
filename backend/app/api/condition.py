@@ -50,11 +50,10 @@ router = APIRouter(prefix="/api/condition", tags=["condition"])
     "/trends/{equipment_id}",
     response_model=EquipmentTrendSummary,
     summary="Get equipment trend summary",
-    description="Returns trend analysis for all monitored elements of an equipment item."
+    description="Returns trend analysis for all monitored elements of an equipment item.",
 )
 async def get_equipment_trends(
-    equipment_id: str,
-    days: int = Query(default=90, ge=1, le=365, description="History window in days")
+    equipment_id: str, days: int = Query(default=90, ge=1, le=365, description="History window in days")
 ):
     """Get trend analysis for all elements of an equipment."""
     try:
@@ -63,22 +62,19 @@ async def get_equipment_trends(
         return summary
     except Exception as e:
         logger.error(f"Error calculating trends for {equipment_id}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error calculating trends: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error calculating trends: {str(e)}")
 
 
 @router.get(
     "/trends/{equipment_id}/{element_name}",
     response_model=ElementTrend,
     summary="Get element trend detail",
-    description="Returns detailed trend for a specific element of an equipment item."
+    description="Returns detailed trend for a specific element of an equipment item.",
 )
 async def get_element_trend(
     equipment_id: str,
     element_name: str,
-    days: int = Query(default=90, ge=1, le=365, description="History window in days")
+    days: int = Query(default=90, ge=1, le=365, description="History window in days"),
 ):
     """Get detailed trend for a specific element."""
     try:
@@ -92,7 +88,7 @@ async def get_element_trend(
                 measurement_type="unknown",
                 data_points=[],
                 trend_direction=TrendDirection.STABLE,
-                days_of_data=0
+                days_of_data=0,
             )
 
         # Calculate degradation rate and trend
@@ -102,9 +98,7 @@ async def get_element_trend(
 
         days_span = 0
         if len(points) >= 2:
-            days_span = int(
-                (points[-1].timestamp - points[0].timestamp).total_seconds() / 86400.0
-            )
+            days_span = int((points[-1].timestamp - points[0].timestamp).total_seconds() / 86400.0)
 
         # Infer measurement type from first point's unit
         measurement_type = _infer_measurement_type(points[0].unit if points else "")
@@ -117,26 +111,22 @@ async def get_element_trend(
             degradation_rate_per_day=rate.rate_per_day,
             trend_direction=direction,
             r_squared=rate.confidence,
-            days_of_data=days_span
+            days_of_data=days_span,
         )
 
     except Exception as e:
         logger.error(f"Error calculating trend for {equipment_id}/{element_name}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error calculating element trend: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error calculating element trend: {str(e)}")
 
 
 @router.get(
     "/degradation-rates/{equipment_id}",
     response_model=List[DegradationRate],
     summary="Get degradation rates",
-    description="Returns degradation rates for all monitored elements of an equipment item."
+    description="Returns degradation rates for all monitored elements of an equipment item.",
 )
 async def get_degradation_rates(
-    equipment_id: str,
-    days: int = Query(default=90, ge=1, le=365, description="History window in days")
+    equipment_id: str, days: int = Query(default=90, ge=1, le=365, description="History window in days")
 ):
     """Get degradation rates for all elements."""
     try:
@@ -151,7 +141,7 @@ async def get_degradation_rates(
                     rate_per_day=trend.degradation_rate_per_day,
                     rate_per_month=trend.degradation_rate_per_day * 30.0,
                     unit=trend.data_points[0].unit if trend.data_points else "",
-                    confidence=trend.r_squared or 0.0
+                    confidence=trend.r_squared or 0.0,
                 )
                 rates.append(rate)
 
@@ -159,17 +149,14 @@ async def get_degradation_rates(
 
     except Exception as e:
         logger.error(f"Error calculating degradation rates for {equipment_id}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error calculating degradation rates: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error calculating degradation rates: {str(e)}")
 
 
 @router.post(
     "/analyze-changes",
     response_model=EquipmentTrendSummary,
     summary="Analyze equipment changes",
-    description="Runs full trend analysis and returns results. Matches ROADMAP spec endpoint."
+    description="Runs full trend analysis and returns results. Matches ROADMAP spec endpoint.",
 )
 async def analyze_changes(request: AnalyzeChangesRequest):
     """Run full analysis and return results."""
@@ -178,9 +165,7 @@ async def analyze_changes(request: AnalyzeChangesRequest):
 
         if request.element_name:
             # Analyze single element, return as summary with one trend
-            points = await service.get_element_history(
-                request.equipment_id, request.element_name, days=90
-            )
+            points = await service.get_element_history(request.equipment_id, request.element_name, days=90)
 
             if not points:
                 return EquipmentTrendSummary(
@@ -188,7 +173,7 @@ async def analyze_changes(request: AnalyzeChangesRequest):
                     element_trends=[],
                     overall_trend_direction=TrendDirection.STABLE,
                     condition_score=100.0,
-                    message=f"No data found for element {request.element_name}"
+                    message=f"No data found for element {request.element_name}",
                 )
 
             rate = service.calculate_degradation_rate(points)
@@ -197,9 +182,7 @@ async def analyze_changes(request: AnalyzeChangesRequest):
 
             days_span = 0
             if len(points) >= 2:
-                days_span = int(
-                    (points[-1].timestamp - points[0].timestamp).total_seconds() / 86400.0
-                )
+                days_span = int((points[-1].timestamp - points[0].timestamp).total_seconds() / 86400.0)
 
             measurement_type = _infer_measurement_type(points[0].unit if points else "")
 
@@ -211,7 +194,7 @@ async def analyze_changes(request: AnalyzeChangesRequest):
                 degradation_rate_per_day=rate.rate_per_day,
                 trend_direction=direction,
                 r_squared=rate.confidence,
-                days_of_data=days_span
+                days_of_data=days_span,
             )
 
             score = 100.0
@@ -223,12 +206,12 @@ async def analyze_changes(request: AnalyzeChangesRequest):
             return EquipmentTrendSummary(
                 equipment_id=request.equipment_id,
                 element_trends=[trend],
-                worst_element=request.element_name if direction in (
-                    TrendDirection.DEGRADING, TrendDirection.RAPID_DEGRADING
-                ) else None,
+                worst_element=request.element_name
+                if direction in (TrendDirection.DEGRADING, TrendDirection.RAPID_DEGRADING)
+                else None,
                 overall_trend_direction=direction,
                 condition_score=score,
-                message=f"Analysis complete for {request.element_name}: {direction.value}"
+                message=f"Analysis complete for {request.element_name}: {direction.value}",
             )
 
         else:
@@ -238,25 +221,23 @@ async def analyze_changes(request: AnalyzeChangesRequest):
 
     except Exception as e:
         logger.error(f"Error analyzing changes for {request.equipment_id}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error analyzing changes: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error analyzing changes: {str(e)}")
 
 
 # ============================================================================
 # RUL Prediction Endpoints (Phase 56-02)
 # ============================================================================
 
+
 @router.get(
     "/rul/{equipment_id}",
     response_model=EquipmentRUL,
     summary="Get equipment RUL prediction",
-    description="Returns Remaining Useful Life prediction for all elements of an equipment item."
+    description="Returns Remaining Useful Life prediction for all elements of an equipment item.",
 )
 async def get_equipment_rul(
     equipment_id: str,
-    days: int = Query(default=90, ge=1, le=365, description="History window in days for trend calculation")
+    days: int = Query(default=90, ge=1, le=365, description="History window in days for trend calculation"),
 ):
     """Get RUL prediction for equipment."""
     try:
@@ -265,21 +246,17 @@ async def get_equipment_rul(
         return rul
     except Exception as e:
         logger.error(f"Error calculating RUL for {equipment_id}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error calculating RUL: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error calculating RUL: {str(e)}")
 
 
 @router.get(
     "/recommendations/{equipment_id}",
     response_model=List[ServiceRecommendation],
     summary="Get service recommendations",
-    description="Returns prioritized service recommendations for degrading elements."
+    description="Returns prioritized service recommendations for degrading elements.",
 )
 async def get_recommendations(
-    equipment_id: str,
-    days: int = Query(default=90, ge=1, le=365, description="History window in days")
+    equipment_id: str, days: int = Query(default=90, ge=1, le=365, description="History window in days")
 ):
     """Get service recommendations for equipment."""
     try:
@@ -288,24 +265,20 @@ async def get_recommendations(
         return recommendations
     except Exception as e:
         logger.error(f"Error generating recommendations for {equipment_id}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error generating recommendations: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error generating recommendations: {str(e)}")
 
 
 @router.get(
     "/fleet-risk",
     response_model=List[EquipmentRUL],
     summary="Get fleet-wide risk overview",
-    description="Returns RUL for all equipment, sorted by days until first threshold ascending."
+    description="Returns RUL for all equipment, sorted by days until first threshold ascending.",
 )
 async def get_fleet_risk(
     risk_level: Optional[str] = Query(
-        default=None,
-        description="Filter by minimum risk level (low, medium, high, critical)"
+        default=None, description="Filter by minimum risk level (low, medium, high, critical)"
     ),
-    limit: int = Query(default=20, ge=1, le=100, description="Maximum results to return")
+    limit: int = Query(default=20, ge=1, le=100, description="Maximum results to return"),
 ):
     """Get fleet-wide RUL risk overview."""
     try:
@@ -341,20 +314,13 @@ async def get_fleet_risk(
 
         # Filter by minimum risk level if specified
         if risk_level:
-            risk_order = {
-                "low": 0, "medium": 1, "high": 2, "critical": 3
-            }
+            risk_order = {"low": 0, "medium": 1, "high": 2, "critical": 3}
             min_level = risk_order.get(risk_level.lower(), 0)
-            all_ruls = [
-                r for r in all_ruls
-                if risk_order.get(r.overall_risk_level.value, 0) >= min_level
-            ]
+            all_ruls = [r for r in all_ruls if risk_order.get(r.overall_risk_level.value, 0) >= min_level]
 
         # Sort by days_until_first_threshold ascending (None = infinity at end)
         all_ruls.sort(
-            key=lambda r: (
-                r.days_until_first_threshold if r.days_until_first_threshold is not None else float("inf")
-            )
+            key=lambda r: r.days_until_first_threshold if r.days_until_first_threshold is not None else float("inf")
         )
 
         # Apply limit
@@ -362,15 +328,13 @@ async def get_fleet_risk(
 
     except Exception as e:
         logger.error(f"Error calculating fleet risk: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error calculating fleet risk: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error calculating fleet risk: {str(e)}")
 
 
 # ============================================================================
 # Service Optimization Endpoints (Phase 56-03)
 # ============================================================================
+
 
 @router.post(
     "/optimize-service-schedule",
@@ -380,7 +344,7 @@ async def get_fleet_risk(
         "Returns optimized maintenance schedule for specified equipment or full fleet. "
         "Compares condition-based timing against fixed-schedule approach. "
         "Matches ROADMAP spec endpoint."
-    )
+    ),
 )
 async def optimize_service_schedule(request: OptimizeScheduleRequest):
     """Optimize service schedule for fleet or specific equipment."""
@@ -393,10 +357,7 @@ async def optimize_service_schedule(request: OptimizeScheduleRequest):
         return schedule
     except Exception as e:
         logger.error(f"Error optimizing service schedule: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error optimizing service schedule: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error optimizing service schedule: {str(e)}")
 
 
 @router.get(
@@ -406,7 +367,7 @@ async def optimize_service_schedule(request: OptimizeScheduleRequest):
     description=(
         "Returns utilization percentages for all monitored elements of an equipment item. "
         "Shows how much of each component's usable life has been consumed."
-    )
+    ),
 )
 async def get_utilization(equipment_id: str):
     """Get asset utilization for all elements of equipment."""
@@ -416,18 +377,12 @@ async def get_utilization(equipment_id: str):
 
         if not utilizations:
             # Return empty list with informative log
-            logger.info(
-                f"No utilization data for {equipment_id} - "
-                f"no inspection data or thresholds available"
-            )
+            logger.info(f"No utilization data for {equipment_id} - no inspection data or thresholds available")
 
         return utilizations
     except Exception as e:
         logger.error(f"Error calculating utilization for {equipment_id}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error calculating utilization: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error calculating utilization: {str(e)}")
 
 
 @router.get(
@@ -437,16 +392,13 @@ async def get_utilization(equipment_id: str):
     description=(
         "Compares fixed-schedule vs condition-based maintenance costs for equipment. "
         "Shows potential savings from adopting condition-based approach."
-    )
+    ),
 )
 async def get_cost_comparison(
     equipment_id: str,
     fixed_interval_days: int = Query(
-        default=90,
-        ge=7,
-        le=365,
-        description="Fixed-schedule interval in days for comparison (default 90 = quarterly)"
-    )
+        default=90, ge=7, le=365, description="Fixed-schedule interval in days for comparison (default 90 = quarterly)"
+    ),
 ):
     """Compare fixed vs condition-based maintenance costs."""
     try:
@@ -458,15 +410,13 @@ async def get_cost_comparison(
         return comparison
     except Exception as e:
         logger.error(f"Error comparing costs for {equipment_id}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error comparing maintenance costs: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error comparing maintenance costs: {str(e)}")
 
 
 # ============================================================================
 # Helper Functions
 # ============================================================================
+
 
 def _infer_measurement_type(unit: str) -> str:
     """Infer measurement type from unit string."""

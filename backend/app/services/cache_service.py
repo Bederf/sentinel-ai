@@ -40,10 +40,10 @@ class CacheService:
     """Redis-backed cache service with fallback to no-op when unavailable."""
 
     # TTL presets by data type (seconds)
-    TTL_STATIC = 600      # 10 min - rarely changes (safety rules, config)
-    TTL_SEMI_STATIC = 300 # 5 min - changes occasionally (buildings, equipment list)
-    TTL_DYNAMIC = 60      # 1 min - changes frequently (alerts, predictions)
-    TTL_REALTIME = 15     # 15 sec - near-realtime (device state)
+    TTL_STATIC = 600  # 10 min - rarely changes (safety rules, config)
+    TTL_SEMI_STATIC = 300  # 5 min - changes occasionally (buildings, equipment list)
+    TTL_DYNAMIC = 60  # 1 min - changes frequently (alerts, predictions)
+    TTL_REALTIME = 15  # 15 sec - near-realtime (device state)
 
     def __init__(self):
         self._client = None
@@ -61,6 +61,7 @@ class CacheService:
 
         try:
             import redis
+
             self._client = redis.from_url(
                 settings.redis_url,
                 decode_responses=True,
@@ -114,12 +115,7 @@ class CacheService:
             logger.debug(f"Cache get error for {key}: {e}")
             return None
 
-    def set(
-        self,
-        key: str,
-        value: Any,
-        ttl: Optional[int] = None
-    ) -> bool:
+    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
         """Set value in cache.
 
         Args:
@@ -189,12 +185,7 @@ class CacheService:
             logger.debug(f"Cache delete_pattern error for {pattern}: {e}")
             return 0
 
-    def get_or_set(
-        self,
-        key: str,
-        factory: Callable[[], Any],
-        ttl: Optional[int] = None
-    ) -> Any:
+    def get_or_set(self, key: str, factory: Callable[[], Any], ttl: Optional[int] = None) -> Any:
         """Get from cache or compute and store.
 
         Args:
@@ -219,12 +210,7 @@ class CacheService:
 
         return value
 
-    async def get_or_set_async(
-        self,
-        key: str,
-        factory: Callable[[], Any],
-        ttl: Optional[int] = None
-    ) -> Any:
+    async def get_or_set_async(self, key: str, factory: Callable[[], Any], ttl: Optional[int] = None) -> Any:
         """Async version of get_or_set.
 
         Args:
@@ -242,6 +228,7 @@ class CacheService:
 
         # Compute value (await if coroutine)
         import asyncio
+
         if asyncio.iscoroutinefunction(factory):
             value = await factory()
         else:
@@ -253,11 +240,7 @@ class CacheService:
 
         return value
 
-    def cached(
-        self,
-        key_template: str,
-        ttl: Optional[int] = None
-    ) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def cached(self, key_template: str, ttl: Optional[int] = None) -> Callable[[Callable[P, R]], Callable[P, R]]:
         """Decorator for caching function results.
 
         Args:
@@ -269,11 +252,13 @@ class CacheService:
             def get_equipment(building_id: str):
                 return repo.query(...)
         """
+
         def decorator(func: Callable[P, R]) -> Callable[P, R]:
             @wraps(func)
             def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                 # Build cache key from template and arguments
                 import inspect
+
                 sig = inspect.signature(func)
                 bound = sig.bind(*args, **kwargs)
                 bound.apply_defaults()
@@ -294,23 +279,22 @@ class CacheService:
                 return result
 
             return wrapper
+
         return decorator
 
-    def cached_async(
-        self,
-        key_template: str,
-        ttl: Optional[int] = None
-    ) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def cached_async(self, key_template: str, ttl: Optional[int] = None) -> Callable[[Callable[P, R]], Callable[P, R]]:
         """Async decorator for caching function results.
 
         Args:
             key_template: Key template with {param} placeholders
             ttl: Time-to-live in seconds
         """
+
         def decorator(func: Callable[P, R]) -> Callable[P, R]:
             @wraps(func)
             async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                 import inspect
+
                 sig = inspect.signature(func)
                 bound = sig.bind(*args, **kwargs)
                 bound.apply_defaults()
@@ -331,6 +315,7 @@ class CacheService:
                 return result
 
             return wrapper
+
         return decorator
 
     def get_stats(self) -> dict:

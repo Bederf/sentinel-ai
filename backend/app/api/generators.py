@@ -57,6 +57,7 @@ async def get_generator_health(generator_id: str):
 
 # === Generator Groups ===
 
+
 @router.get("/groups/list")
 async def list_groups(
     site_id: Optional[str] = Query(None, description="Filter by site"),
@@ -102,6 +103,7 @@ async def get_group_fuel_status(group_id: str):
 
 # === Diesel Tanks ===
 
+
 @router.get("/tanks/list")
 async def list_tanks():
     """List all diesel tanks."""
@@ -125,6 +127,7 @@ async def get_tank(tank_id: str):
 
 # === SCADA Overview ===
 
+
 @router.get("/scada/{site_id}")
 async def get_scada_overview(site_id: str):
     """Get SCADA-style overview for control room display."""
@@ -143,6 +146,7 @@ async def get_site_health_summary(site_id: str):
 
 # === Simulation (Demo) ===
 
+
 @router.post("/simulate/{event}")
 async def simulate_event(event: str):
     """Simulate state changes for demo purposes.
@@ -154,8 +158,7 @@ async def simulate_event(event: str):
     """
     if event not in ("load_shedding", "mains_restored", "normal"):
         raise HTTPException(
-            status_code=400,
-            detail=f"Invalid event: {event}. Use: load_shedding, mains_restored, normal"
+            status_code=400, detail=f"Invalid event: {event}. Use: load_shedding, mains_restored, normal"
         )
 
     service = get_generator_service()

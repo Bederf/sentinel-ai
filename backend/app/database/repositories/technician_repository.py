@@ -32,10 +32,7 @@ class TechnicianRepository:
 
         try:
             # Call the Supabase function
-            result = self.client.rpc(
-                'get_technician_for_equipment',
-                {'p_equipment_id': equipment_id}
-            ).execute()
+            result = self.client.rpc("get_technician_for_equipment", {"p_equipment_id": equipment_id}).execute()
 
             if result.data and len(result.data) > 0:
                 tech = result.data[0]
@@ -45,7 +42,7 @@ class TechnicianRepository:
                     "email": tech.get("technician_email"),
                     "phone": tech.get("technician_phone"),
                     "telegram_id": tech.get("technician_telegram_id"),
-                    "specialty": tech.get("specialty")
+                    "specialty": tech.get("specialty"),
                 }
 
             return None
@@ -67,58 +64,58 @@ class TechnicianRepository:
         Returns the matched specialty or 'general' as fallback.
         """
         try:
-            parts = equipment_code.upper().split('-')
+            parts = equipment_code.upper().split("-")
             if len(parts) < 2:
                 logger.warning(f"Cannot parse {equipment_code}: insufficient parts ({len(parts)})")
-                return 'general'
+                return "general"
 
             # Map equipment type to specialty
             # Based on official naming conventions (docs/02-architecture/naming-conventions.md)
             type_to_specialty = {
                 # HVAC (v2.0 naming)
-                'CHILLER': 'hvac',
-                'AHU': 'hvac',
-                'FCU': 'hvac',
-                'VAV': 'hvac',
-                'SPLIT': 'hvac',
-                'CT': 'hvac',      # Cooling Tower
-                'CRAC': 'hvac',
-                'PUMP': 'hvac',    # PUMP is HVAC (not plumbing) per Phase 79
+                "CHILLER": "hvac",
+                "AHU": "hvac",
+                "FCU": "hvac",
+                "VAV": "hvac",
+                "SPLIT": "hvac",
+                "CT": "hvac",  # Cooling Tower
+                "CRAC": "hvac",
+                "PUMP": "hvac",  # PUMP is HVAC (not plumbing) per Phase 79
                 # DALI Lighting (v2.0 naming)
-                'DALI': 'dali',
-                'LUM': 'dali',     # Luminaire
+                "DALI": "dali",
+                "LUM": "dali",  # Luminaire
                 # Energy/Electrical (v2.0 naming)
-                'GEN': 'electrical',
-                'TX': 'electrical',   # Transformer
-                'UPS': 'electrical',
-                'ATS': 'electrical',  # Automatic Transfer Switch
-                'MSB': 'electrical',  # Main Switchboard
-                'MTR': 'electrical',  # Power Meter
-                'PFC': 'electrical',  # Power Factor Correction
-                'FDR': 'electrical',  # Feeder
-                'MV': 'electrical',   # Medium Voltage
-                'DB': 'electrical',   # Distribution Board
+                "GEN": "electrical",
+                "TX": "electrical",  # Transformer
+                "UPS": "electrical",
+                "ATS": "electrical",  # Automatic Transfer Switch
+                "MSB": "electrical",  # Main Switchboard
+                "MTR": "electrical",  # Power Meter
+                "PFC": "electrical",  # Power Factor Correction
+                "FDR": "electrical",  # Feeder
+                "MV": "electrical",  # Medium Voltage
+                "DB": "electrical",  # Distribution Board
                 # Additional electrical types from hospital naming
-                'KEF': 'electrical',  # Kitchen Exhaust Fan
-                'JACE': 'electrical', # Building automation controller
+                "KEF": "electrical",  # Kitchen Exhaust Fan
+                "JACE": "electrical",  # Building automation controller
                 # Medical equipment
-                'COLD': 'general',    # Cold storage (vaccine/blood)
-                'BOILER': 'hvac',     # Boiler (hot water heating)
-                'LIFT': 'general',    # Elevators (structural/safety)
-                'MEDGAS': 'general',  # Medical gas systems
+                "COLD": "general",  # Cold storage (vaccine/blood)
+                "BOILER": "hvac",  # Boiler (hot water heating)
+                "LIFT": "general",  # Elevators (structural/safety)
+                "MEDGAS": "general",  # Medical gas systems
                 # Sensors (monitored by general)
-                'TS': 'general',      # Temperature Sensor
-                'CO2': 'general',     # CO2 Sensor
-                'OCC': 'general',     # Occupancy Sensor
-                'DLS': 'general',     # Daylight Sensor
+                "TS": "general",  # Temperature Sensor
+                "CO2": "general",  # CO2 Sensor
+                "OCC": "general",  # Occupancy Sensor
+                "DLS": "general",  # Daylight Sensor
                 # Plumbing (legacy - now PUMP is HVAC)
-                'TANK': 'plumbing',
-                'BORE': 'plumbing',
+                "TANK": "plumbing",
+                "BORE": "plumbing",
                 # Fire (v2.0 naming)
-                'FIRE': 'fire',
+                "FIRE": "fire",
                 # Security (v2.0 naming)
-                'ACC': 'security',    # Access Control
-                'CCTV': 'security',
+                "ACC": "security",  # Access Control
+                "CCTV": "security",
             }
 
             # Try parsing in order of likelihood
@@ -131,11 +128,11 @@ class TechnicianRepository:
                 return type_to_specialty[parts[3]]
 
             # Strategy 3: Fallback to general
-            return 'general'
+            return "general"
 
         except Exception as e:
             logger.error(f"Error parsing {equipment_code}: {e}")
-            return 'general'
+            return "general"
 
     async def get_technician_for_equipment_code(self, equipment_code: str) -> Optional[Dict[str, Any]]:
         """
@@ -156,9 +153,7 @@ class TechnicianRepository:
 
         try:
             # First get equipment ID and building_id from code
-            eq_result = self.client.table("equipment").select(
-                "id, building_id"
-            ).eq("code", equipment_code).execute()
+            eq_result = self.client.table("equipment").select("id, building_id").eq("code", equipment_code).execute()
 
             if not eq_result.data or len(eq_result.data) == 0:
                 logger.warning(f"Equipment not found: {equipment_code}")
@@ -173,36 +168,46 @@ class TechnicianRepository:
             logger.debug(f"Parsed equipment {equipment_code} → specialty={specialty}")
 
             # Get technician for this building and specialty
-            result = self.client.table("site_technicians").select(
-                "specialty, technicians(id, name, email, phone, telegram_id)"
-            ).eq("building_id", building_id).eq("specialty", specialty).eq(
-                "is_primary", True
-            ).execute()
+            result = (
+                self.client.table("site_technicians")
+                .select("specialty, technicians(id, name, email, phone, telegram_id)")
+                .eq("building_id", building_id)
+                .eq("specialty", specialty)
+                .eq("is_primary", True)
+                .execute()
+            )
 
-            logger.debug(f"Site_technicians query for specialty={specialty}: found {len(result.data) if result.data else 0} results")
+            logger.debug(
+                f"Site_technicians query for specialty={specialty}: found {len(result.data) if result.data else 0} results"
+            )
 
             if result.data and len(result.data) > 0:
                 assignment = result.data[0]
                 tech = assignment.get("technicians", {})
-                logger.debug(f"Found technician {tech.get('name')} for {equipment_code} (specialty={assignment.get('specialty')})")
+                logger.debug(
+                    f"Found technician {tech.get('name')} for {equipment_code} (specialty={assignment.get('specialty')})"
+                )
                 return {
                     "id": tech.get("id"),
                     "name": tech.get("name"),
                     "email": tech.get("email"),
                     "phone": tech.get("phone"),
                     "telegram_id": tech.get("telegram_id"),
-                    "specialty": assignment.get("specialty")
+                    "specialty": assignment.get("specialty"),
                 }
 
             logger.debug(f"No technician found for specialty={specialty}, trying fallback to 'general'")
 
             # Fallback to 'general' specialty
-            if specialty != 'general':
-                result = self.client.table("site_technicians").select(
-                    "specialty, technicians(id, name, email, phone, telegram_id)"
-                ).eq("building_id", building_id).eq("specialty", "general").eq(
-                    "is_primary", True
-                ).execute()
+            if specialty != "general":
+                result = (
+                    self.client.table("site_technicians")
+                    .select("specialty, technicians(id, name, email, phone, telegram_id)")
+                    .eq("building_id", building_id)
+                    .eq("specialty", "general")
+                    .eq("is_primary", True)
+                    .execute()
+                )
 
                 if result.data and len(result.data) > 0:
                     assignment = result.data[0]
@@ -213,7 +218,7 @@ class TechnicianRepository:
                         "email": tech.get("email"),
                         "phone": tech.get("phone"),
                         "telegram_id": tech.get("telegram_id"),
-                        "specialty": assignment.get("specialty")
+                        "specialty": assignment.get("specialty"),
                     }
 
             return None
@@ -245,9 +250,12 @@ class TechnicianRepository:
             return []
 
         try:
-            result = self.client.table("site_technicians").select(
-                "*, technicians(id, code, name, email, phone)"
-            ).eq("building_id", building_id).execute()
+            result = (
+                self.client.table("site_technicians")
+                .select("*, technicians(id, code, name, email, phone)")
+                .eq("building_id", building_id)
+                .execute()
+            )
 
             return result.data or []
 

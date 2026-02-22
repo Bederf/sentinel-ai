@@ -34,19 +34,21 @@ router = APIRouter(
                 default_site_id="site-002",
             )
         )
-    ]
+    ],
 )
 logger = logging.getLogger(__name__)
 
 
 class GreenStarUpdateRequest(BaseModel):
     """Request to update a Green Star category score."""
+
     achieved_points: int
     notes: Optional[str] = None
 
 
 class ConfigUpdateRequest(BaseModel):
     """Request to update sustainability config."""
+
     building_sqm: Optional[float] = None
     occupancy_capacity: Optional[int] = None
     target_reduction_pct: Optional[float] = None
@@ -113,16 +115,13 @@ async def get_emissions_breakdown(site_id: str):
             "by_system": current.breakdown_by_system,
             "scope_percentages": {
                 "scope1_pct": round(
-                    (current.scope1_kg_co2 / current.total_kg_co2 * 100)
-                    if current.total_kg_co2 > 0 else 0, 1
+                    (current.scope1_kg_co2 / current.total_kg_co2 * 100) if current.total_kg_co2 > 0 else 0, 1
                 ),
                 "scope2_pct": round(
-                    (current.scope2_kg_co2 / current.total_kg_co2 * 100)
-                    if current.total_kg_co2 > 0 else 0, 1
+                    (current.scope2_kg_co2 / current.total_kg_co2 * 100) if current.total_kg_co2 > 0 else 0, 1
                 ),
                 "scope3_pct": round(
-                    (current.scope3_kg_co2 / current.total_kg_co2 * 100)
-                    if current.total_kg_co2 > 0 else 0, 1
+                    (current.scope3_kg_co2 / current.total_kg_co2 * 100) if current.total_kg_co2 > 0 else 0, 1
                 ),
             },
         }
@@ -201,8 +200,10 @@ async def update_sustainability_config(
 # Phase 29-01: New emissions and ESG API endpoints
 # =====================================================
 
+
 class EmissionsUpdateRequest(BaseModel):
     """Request to record emissions data."""
+
     source_type: str
     month: date
     value: float
@@ -231,13 +232,15 @@ async def get_monthly_emissions(
             start_date = end_date - timedelta(days=365)
 
         # Query emissions_sources, group by month and scope
-        response = supabase.table("emissions_sources").select(
-            "measurement_date,scope,co2e_kg"
-        ).eq("building_id", building_id).gte(
-            "measurement_date", start_date.isoformat()
-        ).lte(
-            "measurement_date", end_date.isoformat()
-        ).order("measurement_date").execute()
+        response = (
+            supabase.table("emissions_sources")
+            .select("measurement_date,scope,co2e_kg")
+            .eq("building_id", building_id)
+            .gte("measurement_date", start_date.isoformat())
+            .lte("measurement_date", end_date.isoformat())
+            .order("measurement_date")
+            .execute()
+        )
 
         if not response.data:
             return {
@@ -266,18 +269,13 @@ async def get_monthly_emissions(
             monthly[month]["total_kg_co2e"] += co2e
 
         # Calculate intensity if floor area available
-        building = supabase.table("buildings").select(
-            "floor_area_m2"
-        ).eq("id", building_id).execute()
+        building = supabase.table("buildings").select("floor_area_m2").eq("id", building_id).execute()
 
         floor_area = building.data[0]["floor_area_m2"] if building.data else None
 
         for month_data in monthly.values():
             if floor_area and floor_area > 0:
-                month_data["intensity_kg_per_m2"] = round(
-                    month_data["total_kg_co2e"] / floor_area / 30,
-                    4
-                )
+                month_data["intensity_kg_per_m2"] = round(month_data["total_kg_co2e"] / floor_area / 30, 4)
 
         return {
             "status": "success",
@@ -318,13 +316,14 @@ async def get_emissions_summary(building_id: str):
             }
 
         # Get source breakdown
-        response = supabase.table("emissions_sources").select(
-            "source_type,co2e_kg"
-        ).eq("building_id", building_id).gte(
-            "measurement_date", year_start.isoformat()
-        ).lte(
-            "measurement_date", year_end.isoformat()
-        ).execute()
+        response = (
+            supabase.table("emissions_sources")
+            .select("source_type,co2e_kg")
+            .eq("building_id", building_id)
+            .gte("measurement_date", year_start.isoformat())
+            .lte("measurement_date", year_end.isoformat())
+            .execute()
+        )
 
         sources_breakdown = {}
         for row in response.data:
@@ -376,13 +375,16 @@ async def get_emissions_by_source(
 
         # Last N months
         today = date.today()
-        start_date = today - timedelta(days=months*30)
+        start_date = today - timedelta(days=months * 30)
 
-        response = supabase.table("emissions_sources").select(
-            "source_type,co2e_kg,scope"
-        ).eq("building_id", building_id).gte(
-            "measurement_date", start_date.isoformat()
-        ).order("co2e_kg", desc=True).execute()
+        response = (
+            supabase.table("emissions_sources")
+            .select("source_type,co2e_kg,scope")
+            .eq("building_id", building_id)
+            .gte("measurement_date", start_date.isoformat())
+            .order("co2e_kg", desc=True)
+            .execute()
+        )
 
         sources = {}
         for row in response.data:
@@ -432,9 +434,7 @@ async def get_emissions_benchmark(building_id: str):
         today = date.today()
         year_start = date(today.year, 1, 1)
 
-        building_intensity = calculator.calculate_carbon_intensity(
-            building_id, year_start, today
-        )
+        building_intensity = calculator.calculate_carbon_intensity(building_id, year_start, today)
 
         if not building_intensity:
             return {
@@ -457,10 +457,13 @@ async def get_emissions_benchmark(building_id: str):
             "portfolio_avg_intensity": sa_benchmark,
             "industry_avg_intensity": sa_benchmark,
             "percentile": round(percentile, 0),
-            "rating": "excellent" if percentile >= 80
-                else "good" if percentile >= 60
-                else "average" if percentile >= 40
-                else "needs_improvement",
+            "rating": "excellent"
+            if percentile >= 80
+            else "good"
+            if percentile >= 60
+            else "average"
+            if percentile >= 40
+            else "needs_improvement",
             "timestamp": date.today().isoformat(),
         }
 
@@ -517,20 +520,20 @@ async def get_certifications(building_id: str):
     try:
         supabase = get_supabase_client()
 
-        response = supabase.table("certification_progress").select(
-            "*"
-        ).eq("building_id", building_id).execute()
+        response = supabase.table("certification_progress").select("*").eq("building_id", building_id).execute()
 
         certs = []
         for row in response.data:
-            certs.append({
-                "cert_type": row["cert_type"],
-                "current_score": row["current_score"],
-                "target_score": row["target_score"],
-                "pct_progress": row.get("pct_progress", 0),
-                "status": row["status"],
-                "categories": row.get("categories", []),
-            })
+            certs.append(
+                {
+                    "cert_type": row["cert_type"],
+                    "current_score": row["current_score"],
+                    "target_score": row["target_score"],
+                    "pct_progress": row.get("pct_progress", 0),
+                    "status": row["status"],
+                    "categories": row.get("categories", []),
+                }
+            )
 
         if not certs:
             return {
@@ -565,26 +568,28 @@ async def update_emissions(
 
         # Validate source type
         valid_sources = [
-            "generator_diesel", "generator_lpg", "grid_electricity",
-            "water_supply", "waste_landfill", "employee_commute"
+            "generator_diesel",
+            "generator_lpg",
+            "grid_electricity",
+            "water_supply",
+            "waste_landfill",
+            "employee_commute",
         ]
         if request.source_type not in valid_sources:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid source_type. Must be one of: {valid_sources}"
-            )
+            raise HTTPException(status_code=400, detail=f"Invalid source_type. Must be one of: {valid_sources}")
 
         # Get emission factor
-        factors_response = supabase.table("emission_factors").select(
-            "factor_value"
-        ).eq("source_type", request.source_type).eq(
-            "unit", request.unit
-        ).execute()
+        factors_response = (
+            supabase.table("emission_factors")
+            .select("factor_value")
+            .eq("source_type", request.source_type)
+            .eq("unit", request.unit)
+            .execute()
+        )
 
         if not factors_response.data:
             raise HTTPException(
-                status_code=400,
-                detail=f"Unknown source_type/unit combination: {request.source_type}/{request.unit}"
+                status_code=400, detail=f"Unknown source_type/unit combination: {request.source_type}/{request.unit}"
             )
 
         co2_factor = factors_response.data[0]["factor_value"]
@@ -596,9 +601,9 @@ async def update_emissions(
             "measurement_date": request.month.isoformat(),
             "monthly_value": request.value,
             "unit": request.unit,
-            "scope": 1 if request.source_type.startswith("generator") else (
-                2 if "electricity" in request.source_type else 3
-            ),
+            "scope": 1
+            if request.source_type.startswith("generator")
+            else (2 if "electricity" in request.source_type else 3),
             "co2_factor": co2_factor,
             "data_quality": "measured",
         }
@@ -658,11 +663,13 @@ async def get_emissions_forecast(building_id: str):
 
             projected = monthly_baseline * seasonal_factor * (1 - reduction_rate * month)
 
-            forecast.append({
-                "month": f"{today.year:04d}-{month:02d}",
-                "projected_kg_co2e": round(projected, 2),
-                "baseline_trend": round(monthly_baseline * seasonal_factor, 2),
-            })
+            forecast.append(
+                {
+                    "month": f"{today.year:04d}-{month:02d}",
+                    "projected_kg_co2e": round(projected, 2),
+                    "baseline_trend": round(monthly_baseline * seasonal_factor, 2),
+                }
+            )
 
         return {
             "status": "success",

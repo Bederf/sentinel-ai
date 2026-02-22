@@ -12,6 +12,7 @@ router = APIRouter()
 
 class NotesUpdateRequest(BaseModel):
     """Request to update equipment notes."""
+
     notes: str = Field(..., description="New notes content")
     changed_by: str = Field(..., description="User making the change")
     change_reason: Optional[str] = Field(None, description="Reason for change")
@@ -19,6 +20,7 @@ class NotesUpdateRequest(BaseModel):
 
 class NetworkInfoUpdateRequest(BaseModel):
     """Request to update network info."""
+
     ip_address: Optional[str] = None
     mac_address: Optional[str] = None
     gateway_ip: Optional[str] = None
@@ -32,6 +34,7 @@ class NetworkInfoUpdateRequest(BaseModel):
 
 class DeviceInfoUpdateRequest(BaseModel):
     """Request to update device info."""
+
     gtin: Optional[str] = Field(None, description="Global Trade Item Number")
     serial_number: Optional[str] = None
     manufacturer: Optional[str] = None
@@ -44,6 +47,7 @@ class DeviceInfoUpdateRequest(BaseModel):
 
 class OperatingDataUpdateRequest(BaseModel):
     """Request to update operating data."""
+
     lamp_hours: Optional[int] = None
     power_cycles: Optional[int] = None
     total_runtime_hours: Optional[float] = None
@@ -55,6 +59,7 @@ class OperatingDataUpdateRequest(BaseModel):
 
 class CommissioningInfoRequest(BaseModel):
     """Request to set commissioning info."""
+
     commissioning_date: Optional[str] = Field(None, description="Date commissioned (YYYY-MM-DD)")
     warranty_expiry: Optional[str] = Field(None, description="Warranty expiry (YYYY-MM-DD)")
 
@@ -88,10 +93,7 @@ async def get_equipment_metadata(equipment_id: str) -> dict:
 
 
 @router.patch("/equipment/{equipment_id}/notes")
-async def update_equipment_notes(
-    equipment_id: str,
-    request: NotesUpdateRequest
-) -> dict:
+async def update_equipment_notes(equipment_id: str, request: NotesUpdateRequest) -> dict:
     """Update equipment notes.
 
     Creates an audit trail entry for the change.
@@ -110,21 +112,16 @@ async def update_equipment_notes(
             equipment_id=equipment_id,
             notes=request.notes,
             changed_by=request.changed_by,
-            change_reason=request.change_reason
+            change_reason=request.change_reason,
         )
-        return {
-            "status": "success",
-            "equipment": equipment,
-            "message": "Notes updated successfully"
-        }
+        return {"status": "success", "equipment": equipment, "message": "Notes updated successfully"}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/equipment/{equipment_id}/notes/history")
 async def get_notes_history(
-    equipment_id: str,
-    limit: int = Query(20, ge=1, le=100, description="Max records to return")
+    equipment_id: str, limit: int = Query(20, ge=1, le=100, description="Max records to return")
 ) -> dict:
     """Get notes change history for equipment.
 
@@ -140,18 +137,11 @@ async def get_notes_history(
     repo = EquipmentMetadataRepository()
     history = repo.get_notes_history(equipment_id, limit=limit)
 
-    return {
-        "equipment_id": equipment_id,
-        "history": history,
-        "count": len(history)
-    }
+    return {"equipment_id": equipment_id, "history": history, "count": len(history)}
 
 
 @router.patch("/equipment/{equipment_id}/network-info")
-async def update_network_info(
-    equipment_id: str,
-    request: NetworkInfoUpdateRequest
-) -> dict:
+async def update_network_info(equipment_id: str, request: NetworkInfoUpdateRequest) -> dict:
     """Update equipment network information.
 
     Args:
@@ -165,8 +155,16 @@ async def update_network_info(
 
     # Build network_info dict from non-None fields
     network_info = {}
-    for field in ['ip_address', 'mac_address', 'gateway_ip', 'dali_line',
-                  'dali_address', 'bacnet_device_id', 'bacnet_network', 'modbus_address']:
+    for field in [
+        "ip_address",
+        "mac_address",
+        "gateway_ip",
+        "dali_line",
+        "dali_address",
+        "bacnet_device_id",
+        "bacnet_network",
+        "modbus_address",
+    ]:
         value = getattr(request, field, None)
         if value is not None:
             network_info[field] = value
@@ -175,25 +173,14 @@ async def update_network_info(
         raise HTTPException(status_code=400, detail="No network info fields provided")
 
     try:
-        equipment = repo.update_network_info(
-            equipment_id=equipment_id,
-            network_info=network_info,
-            merge=request.merge
-        )
-        return {
-            "status": "success",
-            "equipment": equipment,
-            "message": "Network info updated successfully"
-        }
+        equipment = repo.update_network_info(equipment_id=equipment_id, network_info=network_info, merge=request.merge)
+        return {"status": "success", "equipment": equipment, "message": "Network info updated successfully"}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.patch("/equipment/{equipment_id}/device-info")
-async def update_device_info(
-    equipment_id: str,
-    request: DeviceInfoUpdateRequest
-) -> dict:
+async def update_device_info(equipment_id: str, request: DeviceInfoUpdateRequest) -> dict:
     """Update equipment device information.
 
     Args:
@@ -207,8 +194,15 @@ async def update_device_info(
 
     # Build device_info dict from non-None fields
     device_info = {}
-    for field in ['gtin', 'serial_number', 'manufacturer', 'model',
-                  'firmware_version', 'hardware_version', 'device_type']:
+    for field in [
+        "gtin",
+        "serial_number",
+        "manufacturer",
+        "model",
+        "firmware_version",
+        "hardware_version",
+        "device_type",
+    ]:
         value = getattr(request, field, None)
         if value is not None:
             device_info[field] = value
@@ -217,25 +211,14 @@ async def update_device_info(
         raise HTTPException(status_code=400, detail="No device info fields provided")
 
     try:
-        equipment = repo.update_device_info(
-            equipment_id=equipment_id,
-            device_info=device_info,
-            merge=request.merge
-        )
-        return {
-            "status": "success",
-            "equipment": equipment,
-            "message": "Device info updated successfully"
-        }
+        equipment = repo.update_device_info(equipment_id=equipment_id, device_info=device_info, merge=request.merge)
+        return {"status": "success", "equipment": equipment, "message": "Device info updated successfully"}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.patch("/equipment/{equipment_id}/operating-data")
-async def update_operating_data(
-    equipment_id: str,
-    request: OperatingDataUpdateRequest
-) -> dict:
+async def update_operating_data(equipment_id: str, request: OperatingDataUpdateRequest) -> dict:
     """Update equipment operating data.
 
     Args:
@@ -249,8 +232,7 @@ async def update_operating_data(
 
     # Build operating_data dict from non-None fields
     operating_data = {}
-    for field in ['lamp_hours', 'power_cycles', 'total_runtime_hours',
-                  'last_fault', 'fault_count', 'energy_kwh']:
+    for field in ["lamp_hours", "power_cycles", "total_runtime_hours", "last_fault", "fault_count", "energy_kwh"]:
         value = getattr(request, field, None)
         if value is not None:
             operating_data[field] = value
@@ -260,24 +242,15 @@ async def update_operating_data(
 
     try:
         equipment = repo.update_operating_data(
-            equipment_id=equipment_id,
-            operating_data=operating_data,
-            merge=request.merge
+            equipment_id=equipment_id, operating_data=operating_data, merge=request.merge
         )
-        return {
-            "status": "success",
-            "equipment": equipment,
-            "message": "Operating data updated successfully"
-        }
+        return {"status": "success", "equipment": equipment, "message": "Operating data updated successfully"}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.patch("/equipment/{equipment_id}/commissioning")
-async def set_commissioning_info(
-    equipment_id: str,
-    request: CommissioningInfoRequest
-) -> dict:
+async def set_commissioning_info(equipment_id: str, request: CommissioningInfoRequest) -> dict:
     """Set equipment commissioning and warranty dates.
 
     Args:
@@ -296,13 +269,9 @@ async def set_commissioning_info(
         equipment = repo.set_commissioning_info(
             equipment_id=equipment_id,
             commissioning_date=request.commissioning_date,
-            warranty_expiry=request.warranty_expiry
+            warranty_expiry=request.warranty_expiry,
         )
-        return {
-            "status": "success",
-            "equipment": equipment,
-            "message": "Commissioning info updated successfully"
-        }
+        return {"status": "success", "equipment": equipment, "message": "Commissioning info updated successfully"}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -310,7 +279,7 @@ async def set_commissioning_info(
 @router.get("/equipment/search/network")
 async def search_by_network_info(
     key: str = Query(..., description="Network info key (e.g., ip_address, mac_address)"),
-    value: str = Query(..., description="Value to search for")
+    value: str = Query(..., description="Value to search for"),
 ) -> dict:
     """Search equipment by network info field.
 
@@ -324,9 +293,4 @@ async def search_by_network_info(
     repo = EquipmentMetadataRepository()
     results = repo.search_by_network_info(key, value)
 
-    return {
-        "search_key": key,
-        "search_value": value,
-        "results": results,
-        "count": len(results)
-    }
+    return {"search_key": key, "search_value": value, "results": results, "count": len(results)}

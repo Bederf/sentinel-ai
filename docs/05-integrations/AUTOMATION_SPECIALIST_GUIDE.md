@@ -513,7 +513,7 @@ GET /api/predictions/site/S002
 # 1. Obtain token (one-time setup)
 POST /api/auth/token
 {
-  "email": "integration@wardew.com",
+  "email": "integration@grantdemo.com",
   "password": "secure-password"
 }
 

@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 class DALIDeviceType(IntEnum):
     """DALI-2 device types (IEC 62386-102)."""
+
     FLUORESCENT = 0
     EMERGENCY = 1
     DISCHARGE_HID = 2
@@ -44,6 +45,7 @@ class DALIDeviceType(IntEnum):
 @dataclass
 class DALIDeviceInfo:
     """Discovered DALI device information."""
+
     dali_address: int
     device_type: int
     device_type_name: str = ""
@@ -67,7 +69,7 @@ class DALIDeviceInfo:
     def __post_init__(self):
         if not self.device_type_name and self.device_type is not None:
             try:
-                self.device_type_name = DALIDeviceType(self.device_type).name.replace('_', ' ').title()
+                self.device_type_name = DALIDeviceType(self.device_type).name.replace("_", " ").title()
             except ValueError:
                 self.device_type_name = f"Unknown ({self.device_type})"
 
@@ -94,6 +96,7 @@ class DALIDeviceInfo:
 @dataclass
 class DALIGatewayInfo:
     """DALI gateway/controller information."""
+
     ip_address: str
     mac_address: Optional[str] = None
     firmware_version: Optional[str] = None
@@ -158,7 +161,7 @@ class DALIDiscoveryService:
         username: Optional[str] = None,
         password: Optional[str] = None,
         port: Optional[int] = None,
-        timeout: float = 10.0
+        timeout: float = 10.0,
     ):
         """Initialize DALI discovery service.
 
@@ -221,11 +224,7 @@ class DALIDiscoveryService:
 
         if not data:
             # Try to at least verify gateway is reachable
-            return DALIGatewayInfo(
-                ip_address=self.gateway_ip,
-                online=False,
-                last_poll=datetime.utcnow().isoformat()
-            )
+            return DALIGatewayInfo(ip_address=self.gateway_ip, online=False, last_poll=datetime.utcnow().isoformat())
 
         # Parse response based on gateway type
         if self.gateway_type == "tridonic":
@@ -238,7 +237,7 @@ class DALIDiscoveryService:
                 dali_lines=data.get("dali_lines", 1),
                 total_devices=data.get("device_count", 0),
                 online=True,
-                last_poll=datetime.utcnow().isoformat()
+                last_poll=datetime.utcnow().isoformat(),
             )
         else:
             # Generic parsing
@@ -251,7 +250,7 @@ class DALIDiscoveryService:
                 dali_lines=data.get("dali_lines", data.get("lines", 1)),
                 total_devices=data.get("device_count", data.get("total_devices", 0)),
                 online=True,
-                last_poll=datetime.utcnow().isoformat()
+                last_poll=datetime.utcnow().isoformat(),
             )
 
     async def discover_devices(self, dali_line: int = 1) -> list[DALIDeviceInfo]:
@@ -301,10 +300,7 @@ class DALIDiscoveryService:
         Returns:
             Device info or None
         """
-        endpoint = self.endpoints["device_info_endpoint"].format(
-            line=dali_line,
-            address=dali_address
-        )
+        endpoint = self.endpoints["device_info_endpoint"].format(line=dali_line, address=dali_address)
 
         data = await self._request(endpoint)
 
@@ -314,10 +310,7 @@ class DALIDiscoveryService:
         return self._parse_device_info(data, dali_line, dali_address)
 
     def _parse_device_info(
-        self,
-        data: dict,
-        dali_line: int,
-        dali_address: Optional[int] = None
+        self, data: dict, dali_line: int, dali_address: Optional[int] = None
     ) -> Optional[DALIDeviceInfo]:
         """Parse device info from gateway response.
 
@@ -348,10 +341,7 @@ class DALIDiscoveryService:
         )
 
     async def discover_and_save(
-        self,
-        equipment_code: str,
-        dali_line: int = 1,
-        dali_address: Optional[int] = None
+        self, equipment_code: str, dali_line: int = 1, dali_address: Optional[int] = None
     ) -> dict:
         """Discover device info and save to equipment metadata.
 
@@ -425,7 +415,7 @@ class DALIDiscoveryService:
                     "actual_level": device.actual_level,
                     "min_level": device.min_level,
                     "max_level": device.max_level,
-                }
+                },
             )
             result["saved"] = True
             result["status"] = "success"
@@ -473,12 +463,7 @@ class SimulatedDALIDiscovery:
     }
 
     @classmethod
-    def generate_device_info(
-        cls,
-        equipment_code: str,
-        device_type: str = "led_panel",
-        dali_address: int = 1
-    ) -> dict:
+    def generate_device_info(cls, equipment_code: str, device_type: str = "led_panel", dali_address: int = 1) -> dict:
         """Generate simulated device info.
 
         Args:
@@ -526,5 +511,5 @@ class SimulatedDALIDiscovery:
                 "min_level": 10,
                 "max_level": 254,
                 "power_cycles": lamp_hours // 8,  # Approximate
-            }
+            },
         }

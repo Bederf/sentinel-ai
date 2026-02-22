@@ -23,6 +23,7 @@ router = APIRouter()
 
 class UploadResponse(BaseModel):
     """Upload response model."""
+
     success: bool
     message: str
     filename: str
@@ -31,6 +32,7 @@ class UploadResponse(BaseModel):
 
 class DataStatusResponse(BaseModel):
     """Data status response model."""
+
     work_orders: int
     assets: int
     sites: int
@@ -70,17 +72,11 @@ async def upload_csv(
     filename = f"{file_type}.csv"
 
     if filename not in ALLOWED_FILES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid file type. Allowed: {list(ALLOWED_FILES.keys())}"
-        )
+        raise HTTPException(status_code=400, detail=f"Invalid file type. Allowed: {list(ALLOWED_FILES.keys())}")
 
     # Validate file extension
     if not file.filename.endswith(".csv"):
-        raise HTTPException(
-            status_code=400,
-            detail="Only CSV files are allowed"
-        )
+        raise HTTPException(status_code=400, detail="Only CSV files are allowed")
 
     # Save the file
     filepath = DATA_DIR / filename
@@ -112,10 +108,7 @@ async def upload_csv(
         )
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error uploading file: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
 
 
 @router.get("/data-status", response_model=DataStatusResponse)
@@ -171,10 +164,7 @@ async def download_csv(file_type: str):
     filepath = DATA_DIR / filename
 
     if not filepath.exists():
-        raise HTTPException(
-            status_code=404,
-            detail=f"File {filename} not found"
-        )
+        raise HTTPException(status_code=404, detail=f"File {filename} not found")
 
     with open(filepath, "r") as f:
         content = f.read()

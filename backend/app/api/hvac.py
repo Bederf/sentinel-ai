@@ -40,23 +40,28 @@ HEALTH_CONFIG_PATH = DATA_DIR / "health_calculation_config.json"
 
 # ========== Request/Response Models ==========
 
+
 class SetpointRequest(BaseModel):
     """Request to change zone temperature setpoint."""
+
     setpoint: float = Field(..., ge=16, le=28, description="Temperature setpoint in °C")
 
 
 class ChillerControlRequest(BaseModel):
     """Request to control chiller on/off."""
+
     action: str = Field(..., pattern="^(on|off)$", description="Turn chiller on or off")
 
 
 class ChillerSetpointRequest(BaseModel):
     """Request to change chiller CHW supply temperature setpoint."""
+
     setpoint: float = Field(..., ge=5, le=12, description="CHW supply temperature setpoint in °C")
 
 
 class ZoneResponse(BaseModel):
     """Zone details with equipment and sensors."""
+
     zone_id: str
     zone_name: str
     floor: str
@@ -76,6 +81,7 @@ class ZoneResponse(BaseModel):
 
 
 # ========== Helper Functions ==========
+
 
 def load_json(path: Path) -> list | dict:
     """Load JSON data from file (for config files only)."""
@@ -102,7 +108,7 @@ def get_equipment_from_supabase(site_id: Optional[str] = None, equipment_type: O
             equipment = equipment_repo.get_all()
 
         if equipment_type:
-            equipment = [e for e in equipment if e.get('type') == equipment_type]
+            equipment = [e for e in equipment if e.get("type") == equipment_type]
 
         return equipment
     except Exception as e:
@@ -127,7 +133,7 @@ def get_zones_from_supabase(site_id: Optional[str] = None, floor: Optional[str] 
             zones = zone_repo.get_all()
 
         if floor:
-            zones = [z for z in zones if z.get('floor') == floor]
+            zones = [z for z in zones if z.get("floor") == floor]
 
         return zones
     except Exception as e:
@@ -261,10 +267,10 @@ def calculate_equipment_health(equipment: dict) -> dict:
 
     # Calculate weighted total
     total_score = (
-        factors["age"]["score"] * weights.get("age_factor", 0.2) +
-        factors["service"]["score"] * weights.get("service_compliance", 0.3) +
-        factors["runtime"]["score"] * weights.get("runtime_hours", 0.2) +
-        factors["fault_history"]["score"] * weights.get("fault_history", 0.3)
+        factors["age"]["score"] * weights.get("age_factor", 0.2)
+        + factors["service"]["score"] * weights.get("service_compliance", 0.3)
+        + factors["runtime"]["score"] * weights.get("runtime_hours", 0.2)
+        + factors["fault_history"]["score"] * weights.get("fault_history", 0.3)
     )
 
     return {
@@ -276,6 +282,7 @@ def calculate_equipment_health(equipment: dict) -> dict:
 
 
 # ========== HVAC Overview ==========
+
 
 @router.get("/overview/{site_id}")
 async def get_hvac_overview(site_id: str):
@@ -318,35 +325,41 @@ async def get_hvac_overview(site_id: str):
     alerts = []
     for zone in zones:
         if zone.get("status") == "fault":
-            alerts.append({
-                "type": "zone_fault",
-                "priority": "high",
-                "title": f"Zone Fault: {zone.get('zone_name')}",
-                "description": f"FCU {zone.get('fcu_id')} reporting fault status",
-                "zone_id": zone.get("zone_id"),
-            })
+            alerts.append(
+                {
+                    "type": "zone_fault",
+                    "priority": "high",
+                    "title": f"Zone Fault: {zone.get('zone_name')}",
+                    "description": f"FCU {zone.get('fcu_id')} reporting fault status",
+                    "zone_id": zone.get("zone_id"),
+                }
+            )
         deviation = abs(zone.get("current_temp", 22) - zone.get("setpoint", 22))
         if deviation > 2:
-            alerts.append({
-                "type": "temp_deviation",
-                "priority": "medium" if deviation < 4 else "high",
-                "title": f"Temperature Deviation: {zone.get('zone_name')}",
-                "description": f"Current {zone.get('current_temp')}°C vs setpoint {zone.get('setpoint')}°C ({deviation:.1f}°C off)",
-                "zone_id": zone.get("zone_id"),
-            })
+            alerts.append(
+                {
+                    "type": "temp_deviation",
+                    "priority": "medium" if deviation < 4 else "high",
+                    "title": f"Temperature Deviation: {zone.get('zone_name')}",
+                    "description": f"Current {zone.get('current_temp')}°C vs setpoint {zone.get('setpoint')}°C ({deviation:.1f}°C off)",
+                    "zone_id": zone.get("zone_id"),
+                }
+            )
 
     # Get configured thresholds for alert generation
     thresholds = get_health_thresholds()
 
     for eq in hvac_equipment:
         if eq.get("health_score", 85) < thresholds["warning"]:
-            alerts.append({
-                "type": "equipment_health",
-                "priority": "high" if eq.get("health_score", 85) < thresholds["critical"] else "medium",
-                "title": f"Low Health: {eq.get('name')}",
-                "description": f"Health score {eq.get('health_score')}% - service may be required",
-                "equipment_id": eq.get("id"),
-            })
+            alerts.append(
+                {
+                    "type": "equipment_health",
+                    "priority": "high" if eq.get("health_score", 85) < thresholds["critical"] else "medium",
+                    "title": f"Low Health: {eq.get('name')}",
+                    "description": f"Health score {eq.get('health_score')}% - service may be required",
+                    "equipment_id": eq.get("id"),
+                }
+            )
 
     return {
         "site_id": site_id,
@@ -356,12 +369,14 @@ async def get_hvac_overview(site_id: str):
         "overall_health": overall_health,
         "health_status": get_health_status(overall_health),
         "alerts": alerts[:10],  # Top 10 alerts
-        "chillers_running": sum(1 for e in hvac_equipment
-                                if e.get("type") == "chiller" and e.get("status") == "normal"),
+        "chillers_running": sum(
+            1 for e in hvac_equipment if e.get("type") == "chiller" and e.get("status") == "normal"
+        ),
     }
 
 
 # ========== Zones ==========
+
 
 @router.get("/zones")
 async def list_zones(
@@ -378,12 +393,14 @@ async def list_zones(
         min_temp, max_temp = get_zone_limits(zone_id)
         deviation = zone.get("current_temp", 22) - zone.get("setpoint", 22)
 
-        result.append({
-            **zone,
-            "temp_min": min_temp,
-            "temp_max": max_temp,
-            "temp_deviation": round(deviation, 1),
-        })
+        result.append(
+            {
+                **zone,
+                "temp_min": min_temp,
+                "temp_max": max_temp,
+                "temp_deviation": round(deviation, 1),
+            }
+        )
 
     return {
         "zones": result,
@@ -430,8 +447,7 @@ async def set_zone_temperature(zone_id: str, request: SetpointRequest):
     min_temp, max_temp = get_zone_limits(zone_id)
     if request.setpoint < min_temp or request.setpoint > max_temp:
         raise HTTPException(
-            status_code=400,
-            detail=f"Setpoint {request.setpoint}°C outside allowed range {min_temp}-{max_temp}°C"
+            status_code=400, detail=f"Setpoint {request.setpoint}°C outside allowed range {min_temp}-{max_temp}°C"
         )
 
     # Update zone setpoint in Supabase
@@ -452,6 +468,7 @@ async def set_zone_temperature(zone_id: str, request: SetpointRequest):
 
 # ========== Equipment ==========
 
+
 @router.get("/equipment")
 async def list_equipment(
     site_id: Optional[str] = Query(None, description="Filter by site"),
@@ -470,12 +487,14 @@ async def list_equipment(
     enriched = []
     for eq in result:
         health = calculate_equipment_health(eq)
-        enriched.append({
-            **eq,
-            "calculated_health": health["health_score"],
-            "health_status": health["status"],
-            "health_factors": health["factors"],
-        })
+        enriched.append(
+            {
+                **eq,
+                "calculated_health": health["health_score"],
+                "health_status": health["status"],
+                "health_factors": health["factors"],
+            }
+        )
 
     return {
         "equipment": enriched,
@@ -506,6 +525,7 @@ async def get_equipment(equipment_id: str):
 
 # ========== Chillers ==========
 
+
 @router.get("/chillers")
 async def list_chillers(site_id: Optional[str] = Query(None)):
     """List all chillers with status and health."""
@@ -514,12 +534,14 @@ async def list_chillers(site_id: Optional[str] = Query(None)):
     result = []
     for chiller in equipment:
         health = calculate_equipment_health(chiller)
-        result.append({
-            **chiller,
-            "calculated_health": health["health_score"],
-            "health_status": health["status"],
-            "is_running": chiller.get("status") == "normal",
-        })
+        result.append(
+            {
+                **chiller,
+                "calculated_health": health["health_score"],
+                "health_status": health["status"],
+                "is_running": chiller.get("status") == "normal",
+            }
+        )
 
     return {
         "chillers": result,
@@ -596,7 +618,7 @@ async def set_chiller_setpoint(chiller_id: str, request: ChillerSetpointRequest)
     if request.setpoint < min_setpoint or request.setpoint > max_setpoint:
         raise HTTPException(
             status_code=400,
-            detail=f"Setpoint {request.setpoint}°C outside allowed range {min_setpoint}-{max_setpoint}°C"
+            detail=f"Setpoint {request.setpoint}°C outside allowed range {min_setpoint}-{max_setpoint}°C",
         )
 
     # Update metadata with new setpoint
@@ -607,10 +629,9 @@ async def set_chiller_setpoint(chiller_id: str, request: ChillerSetpointRequest)
     # Update in Supabase
     try:
         from app.database.supabase_client import get_supabase_client
+
         client = get_supabase_client()
-        response = client.table("equipment").update(
-            {"metadata": metadata}
-        ).eq("id", chiller["id"]).execute()
+        response = client.table("equipment").update({"metadata": metadata}).eq("id", chiller["id"]).execute()
 
         if not response.data:
             raise HTTPException(status_code=500, detail="Failed to update chiller setpoint")
@@ -660,6 +681,7 @@ async def get_chiller_setpoint(chiller_id: str):
 
 
 # ========== Thermal Runway ==========
+
 
 @router.get("/thermal-runway/{site_id}")
 async def get_thermal_runway(site_id: str):
@@ -735,14 +757,16 @@ async def get_thermal_runway(site_id: str):
         },
         "outage_period": {
             "start": time_points[4],  # 2 hours in
-            "end": time_points[9],    # 4.5 hours in
+            "end": time_points[9],  # 4.5 hours in
         },
         "metrics": {
             "runway_without": runway_without,
             "runway_with": runway_with,
             "comfort_breach_time": breach_time,
             "recovery_time": time_points[11] if len(time_points) > 11 else "N/A",
-            "improvement_percent": round((runway_with - runway_without) / runway_without * 100, 0) if runway_without > 0 else 0,
+            "improvement_percent": round((runway_with - runway_without) / runway_without * 100, 0)
+            if runway_without > 0
+            else 0,
         },
         "current_conditions": {
             "avg_temperature": round(avg_temp, 1),
@@ -753,6 +777,7 @@ async def get_thermal_runway(site_id: str):
 
 
 # ========== Safety Limits ==========
+
 
 @router.get("/safety-limits")
 async def get_hvac_safety_limits():

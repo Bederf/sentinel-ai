@@ -21,6 +21,7 @@ def _get_tf():
     global _tf, _keras
     if _tf is None:
         import tensorflow as tf
+
         _tf = tf
         _keras = tf.keras
 
@@ -40,7 +41,7 @@ class SensorLSTM:
         n_outputs: int = 3,
         lstm_units: Tuple[int, int, int] = (128, 64, 32),
         dropout_rate: float = 0.2,
-        learning_rate: float = 0.001
+        learning_rate: float = 0.001,
     ):
         """
         Initialize LSTM model.
@@ -66,50 +67,37 @@ class SensorLSTM:
         """Build the LSTM model architecture."""
         tf, keras = _get_tf()
 
-        model = keras.Sequential([
-            # Input layer
-            keras.layers.InputLayer(input_shape=(self.window_size, self.n_features)),
-
-            # First LSTM layer - return sequences for stacking
-            keras.layers.LSTM(
-                self.lstm_units[0],
-                return_sequences=True,
-                kernel_regularizer=keras.regularizers.l2(0.001)
-            ),
-            keras.layers.BatchNormalization(),
-            keras.layers.Dropout(self.dropout_rate),
-
-            # Second LSTM layer
-            keras.layers.LSTM(
-                self.lstm_units[1],
-                return_sequences=True,
-                kernel_regularizer=keras.regularizers.l2(0.001)
-            ),
-            keras.layers.BatchNormalization(),
-            keras.layers.Dropout(self.dropout_rate),
-
-            # Third LSTM layer - return final state only
-            keras.layers.LSTM(
-                self.lstm_units[2],
-                return_sequences=False,
-                kernel_regularizer=keras.regularizers.l2(0.001)
-            ),
-            keras.layers.BatchNormalization(),
-            keras.layers.Dropout(self.dropout_rate),
-
-            # Dense layers
-            keras.layers.Dense(32, activation="relu"),
-            keras.layers.Dropout(self.dropout_rate / 2),
-
-            # Output layer: predict values at each horizon
-            keras.layers.Dense(self.n_outputs)
-        ])
-
-        model.compile(
-            optimizer=keras.optimizers.Adam(learning_rate=self.learning_rate),
-            loss="mse",
-            metrics=["mae"]
+        model = keras.Sequential(
+            [
+                # Input layer
+                keras.layers.InputLayer(input_shape=(self.window_size, self.n_features)),
+                # First LSTM layer - return sequences for stacking
+                keras.layers.LSTM(
+                    self.lstm_units[0], return_sequences=True, kernel_regularizer=keras.regularizers.l2(0.001)
+                ),
+                keras.layers.BatchNormalization(),
+                keras.layers.Dropout(self.dropout_rate),
+                # Second LSTM layer
+                keras.layers.LSTM(
+                    self.lstm_units[1], return_sequences=True, kernel_regularizer=keras.regularizers.l2(0.001)
+                ),
+                keras.layers.BatchNormalization(),
+                keras.layers.Dropout(self.dropout_rate),
+                # Third LSTM layer - return final state only
+                keras.layers.LSTM(
+                    self.lstm_units[2], return_sequences=False, kernel_regularizer=keras.regularizers.l2(0.001)
+                ),
+                keras.layers.BatchNormalization(),
+                keras.layers.Dropout(self.dropout_rate),
+                # Dense layers
+                keras.layers.Dense(32, activation="relu"),
+                keras.layers.Dropout(self.dropout_rate / 2),
+                # Output layer: predict values at each horizon
+                keras.layers.Dense(self.n_outputs),
+            ]
         )
+
+        model.compile(optimizer=keras.optimizers.Adam(learning_rate=self.learning_rate), loss="mse", metrics=["mae"])
 
         self.model = model
         logger.info(f"Built LSTM model: {self.lstm_units} units, {self.n_features} features")
@@ -125,7 +113,7 @@ class SensorLSTM:
         epochs: int = 100,
         batch_size: int = 32,
         patience: int = 10,
-        verbose: int = 1
+        verbose: int = 1,
     ) -> Dict[str, Any]:
         """
         Train the LSTM model.
@@ -153,26 +141,27 @@ class SensorLSTM:
                 monitor="val_loss" if X_val is not None else "loss",
                 patience=patience,
                 restore_best_weights=True,
-                verbose=verbose
+                verbose=verbose,
             ),
             keras.callbacks.ReduceLROnPlateau(
                 monitor="val_loss" if X_val is not None else "loss",
                 factor=0.5,
                 patience=patience // 2,
                 min_lr=1e-6,
-                verbose=verbose
-            )
+                verbose=verbose,
+            ),
         ]
 
         validation_data = (X_val, y_val) if X_val is not None else None
 
         history = self.model.fit(
-            X_train, y_train,
+            X_train,
+            y_train,
             validation_data=validation_data,
             epochs=epochs,
             batch_size=batch_size,
             callbacks=callbacks,
-            verbose=verbose
+            verbose=verbose,
         )
 
         self.history = history.history
@@ -181,8 +170,7 @@ class SensorLSTM:
         final_loss = history.history["loss"][-1]
         final_mae = history.history["mae"][-1]
         logger.info(
-            f"Training complete: loss={final_loss:.4f}, mae={final_mae:.4f}, "
-            f"epochs={len(history.history['loss'])}"
+            f"Training complete: loss={final_loss:.4f}, mae={final_mae:.4f}, epochs={len(history.history['loss'])}"
         )
 
         return self.history
@@ -202,11 +190,7 @@ class SensorLSTM:
 
         return self.model.predict(X, verbose=0)
 
-    def evaluate(
-        self,
-        X_test: np.ndarray,
-        y_test: np.ndarray
-    ) -> Dict[str, float]:
+    def evaluate(self, X_test: np.ndarray, y_test: np.ndarray) -> Dict[str, float]:
         """
         Evaluate model on test data.
 
@@ -250,6 +234,7 @@ class SensorLSTM:
             return "Model not built"
 
         import io
+
         stream = io.StringIO()
         self.model.summary(print_fn=lambda x: stream.write(x + "\n"))
         return stream.getvalue()
@@ -262,5 +247,5 @@ class SensorLSTM:
             "n_outputs": self.n_outputs,
             "lstm_units": self.lstm_units,
             "dropout_rate": self.dropout_rate,
-            "learning_rate": self.learning_rate
+            "learning_rate": self.learning_rate,
         }

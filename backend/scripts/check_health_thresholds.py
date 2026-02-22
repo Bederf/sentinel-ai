@@ -6,7 +6,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import json
 
-load_dotenv(Path(__file__).parent.parent / '.env')
+load_dotenv(Path(__file__).parent.parent / ".env")
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
@@ -26,9 +26,9 @@ try:
     # Show JSON file settings
     print("\n[2] JSON Settings File (backend/app/data/settings.json):")
     try:
-        with open(Path(__file__).parent.parent / 'app/data/settings.json') as f:
+        with open(Path(__file__).parent.parent / "app/data/settings.json") as f:
             settings = json.load(f)
-            json_thresholds = settings.get('healthThresholds', {})
+            json_thresholds = settings.get("healthThresholds", {})
             print(f"  healthy: {json_thresholds.get('healthy', 'NOT SET')}")
             print(f"  warning: {json_thresholds.get('warning', 'NOT SET')}")
             print(f"  critical: {json_thresholds.get('critical', 'NOT SET')}")
@@ -39,9 +39,7 @@ try:
     print("\n[3] Supabase system_settings Table:")
     client = get_supabase_client()
     try:
-        result = client.table('system_settings').select('key, value').eq(
-            'key', 'health_thresholds'
-        ).execute()
+        result = client.table("system_settings").select("key, value").eq("key", "health_thresholds").execute()
         if result.data:
             print(f"  Found: {result.data[0]['value']}")
         else:
@@ -68,4 +66,5 @@ try:
 except Exception as e:
     print(f"Error: {e}")
     import traceback
+
     traceback.print_exc()

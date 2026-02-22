@@ -25,7 +25,9 @@ logger = logging.getLogger(__name__)
 # Water consumption parameters
 BASELINE_OCCUPANT_USAGE_LITERS_PER_DAY = 45.0  # Sanitary fixtures
 INTERNAL_ZONE_COUNT = 18  # From HVAC zones
-BASELINE_WATER_PER_ZONE = (BASELINE_OCCUPANT_USAGE_LITERS_PER_DAY * 100) / 24  # Per hour, per zone (assume 100 occupants)
+BASELINE_WATER_PER_ZONE = (
+    BASELINE_OCCUPANT_USAGE_LITERS_PER_DAY * 100
+) / 24  # Per hour, per zone (assume 100 occupants)
 OCCUPANCY_WATER_SCALING = 0.40  # Occupancy affects 40% of water usage
 
 # Seasonal and weather factors
@@ -233,7 +235,7 @@ class WaterConsumptionEngine:
         if total_daily_liters > JOHANNESBURG_TIER_1_LITERS / 30.0:
             tier_2_usage = min(
                 total_daily_liters - (JOHANNESBURG_TIER_1_LITERS / 30.0),
-                (JOHANNESBURG_TIER_2_LITERS - JOHANNESBURG_TIER_1_LITERS) / 30.0
+                (JOHANNESBURG_TIER_2_LITERS - JOHANNESBURG_TIER_1_LITERS) / 30.0,
             )
             tier_2_cost = tier_2_usage * JOHANNESBURG_TIER_2_RATE_R_PER_LITER
 

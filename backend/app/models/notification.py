@@ -16,6 +16,7 @@ from enum import Enum
 
 class ChannelType(str, Enum):
     """Supported notification channels."""
+
     TELEGRAM = "telegram"
     WHATSAPP = "whatsapp"
     SMS = "sms"
@@ -23,6 +24,7 @@ class ChannelType(str, Enum):
 
 class NotificationStatus(str, Enum):
     """Delivery status for a notification."""
+
     PENDING = "pending"
     SENT = "sent"
     DELIVERED = "delivered"
@@ -31,6 +33,7 @@ class NotificationStatus(str, Enum):
 
 class AlertLevel(str, Enum):
     """Alert severity levels."""
+
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
@@ -42,17 +45,18 @@ class TechnicianNotificationChannel:
 
     One row per technician per channel (e.g., Tech A has Telegram + SMS, Tech B has WhatsApp only).
     """
+
     id: UUID
     technician_id: UUID
     channel_type: ChannelType
 
     # Contact details (one populated based on channel_type)
-    telegram_id: Optional[str] = None          # Telegram user ID (e.g., "123456789")
-    whatsapp_number: Optional[str] = None      # WhatsApp phone (e.g., "+27123456789")
-    sms_number: Optional[str] = None           # SMS phone (e.g., "+27123456789")
+    telegram_id: Optional[str] = None  # Telegram user ID (e.g., "123456789")
+    whatsapp_number: Optional[str] = None  # WhatsApp phone (e.g., "+27123456789")
+    sms_number: Optional[str] = None  # SMS phone (e.g., "+27123456789")
 
     # Verification
-    is_verified: bool = False                  # Has technician confirmed this channel works?
+    is_verified: bool = False  # Has technician confirmed this channel works?
     verified_at: Optional[datetime] = None
     verification_attempts: int = 0
 
@@ -81,15 +85,16 @@ class TechnicianNotificationPreferences:
     One row per technician (unique technician_id).
     Stores: which channels to use, preferred channel, alert thresholds, quiet hours, etc.
     """
+
     id: UUID
     technician_id: UUID
 
     # Channel selection
-    preferred_channel: ChannelType = ChannelType.TELEGRAM      # Primary choice
+    preferred_channel: ChannelType = ChannelType.TELEGRAM  # Primary choice
     enabled_channels: list[ChannelType] = field(default_factory=lambda: [ChannelType.TELEGRAM])  # Send to all of these
 
     # Alert severity threshold
-    alert_level_min: AlertLevel = AlertLevel.WARNING           # Only notify on warning+
+    alert_level_min: AlertLevel = AlertLevel.WARNING  # Only notify on warning+
 
     # Quiet hours (do not disturb: 22:00-06:00 default)
     quiet_hours_enabled: bool = True
@@ -141,6 +146,7 @@ class NotificationDeliveryLog:
 
     Used for: debugging, compliance, delivery statistics, retry logic.
     """
+
     id: UUID
 
     # References (optional for orphan handling)
@@ -148,18 +154,18 @@ class NotificationDeliveryLog:
     technician_id: UUID = field(default_factory=UUID)
 
     # Notification content
-    notification_type: str = ""                # 'work_order_assigned', 'alert', 'update', 'test'
+    notification_type: str = ""  # 'work_order_assigned', 'alert', 'update', 'test'
     title: str = ""
     body: str = ""
 
     # Delivery method
     channel_type: ChannelType = ChannelType.TELEGRAM
-    recipient_identifier: str = ""             # Phone number, Telegram ID, etc.
+    recipient_identifier: str = ""  # Phone number, Telegram ID, etc.
 
     # Delivery status
     status: NotificationStatus = NotificationStatus.PENDING
     error_message: Optional[str] = None
-    error_code: Optional[str] = None           # 'invalid_number', 'rate_limit', 'auth_failed', etc.
+    error_code: Optional[str] = None  # 'invalid_number', 'rate_limit', 'auth_failed', etc.
 
     # Tracking
     external_message_id: Optional[str] = None  # Provider's message ID
@@ -167,7 +173,7 @@ class NotificationDeliveryLog:
     delivered_at: Optional[datetime] = None
 
     # Provider details
-    provider: str = ""                         # 'sentrybot', 'meta', 'bulksms'
+    provider: str = ""  # 'sentrybot', 'meta', 'bulksms'
     provider_response: dict = field(default_factory=dict)
 
     # Retry tracking

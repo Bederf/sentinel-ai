@@ -24,8 +24,10 @@ router = APIRouter()
 #  Request / Response models
 # --------------------------------------------------------------------- #
 
+
 class ExecuteCommandRequest(BaseModel):
     """Body for POST /api/remote/commands/execute."""
+
     device_id: str = Field(..., description="Target device ID")
     command_type: str = Field(
         ...,
@@ -43,6 +45,7 @@ class ExecuteCommandRequest(BaseModel):
 
 class BatchCommandItem(BaseModel):
     """Single command within a batch request."""
+
     device_id: str
     command_type: str
     point: Optional[str] = None
@@ -51,6 +54,7 @@ class BatchCommandItem(BaseModel):
 
 class BatchCommandRequest(BaseModel):
     """Body for POST /api/remote/commands/batch."""
+
     commands: List[BatchCommandItem] = Field(..., min_length=1, description="Commands to execute atomically")
     reason: str = Field("", description="Reason for the batch")
 
@@ -58,6 +62,7 @@ class BatchCommandRequest(BaseModel):
 # --------------------------------------------------------------------- #
 #  Helper: extract user from headers
 # --------------------------------------------------------------------- #
+
 
 def _extract_user(request: Request):
     """Extract user_id and user_role from request headers.
@@ -73,6 +78,7 @@ def _extract_user(request: Request):
 # --------------------------------------------------------------------- #
 #  Endpoints
 # --------------------------------------------------------------------- #
+
 
 @router.post("/commands/execute", response_model=dict)
 async def execute_command(body: ExecuteCommandRequest, request: Request):
@@ -151,9 +157,7 @@ async def get_command_history(
     Returns the most recent commands, newest first.
     """
     svc = get_remote_command_service()
-    return svc.get_command_history(
-        user_id=user_id, device_id=device_id, limit=limit
-    )
+    return svc.get_command_history(user_id=user_id, device_id=device_id, limit=limit)
 
 
 @router.post("/commands/batch", response_model=dict)
@@ -174,37 +178,39 @@ async def execute_batch_commands(body: BatchCommandRequest, request: Request):
         from app.services.auth_service import get_authorization_service
 
         auth_svc = get_authorization_service()
-        required_level = COMMAND_AUTHORIZATION.get(
-            cmd.command_type, AuthorizationLevel.ENGINEER
-        )
+        required_level = COMMAND_AUTHORIZATION.get(cmd.command_type, AuthorizationLevel.ENGINEER)
         if not auth_svc.check_authorization(user_role, required_level):
-            validation_errors.append({
-                "index": idx,
-                "device_id": cmd.device_id,
-                "error": f"Insufficient authorization for {cmd.command_type}",
-            })
+            validation_errors.append(
+                {
+                    "index": idx,
+                    "device_id": cmd.device_id,
+                    "error": f"Insufficient authorization for {cmd.command_type}",
+                }
+            )
             continue
 
         # Check rate limit (peek only -- don't record yet)
         rate = svc._check_rate_limit(user_id)
         if rate["blocked"]:
-            validation_errors.append({
-                "index": idx,
-                "device_id": cmd.device_id,
-                "error": rate["message"],
-            })
+            validation_errors.append(
+                {
+                    "index": idx,
+                    "device_id": cmd.device_id,
+                    "error": rate["message"],
+                }
+            )
             continue
 
         # Check command-specific guardrails
-        validation = await svc._validate_command(
-            cmd.device_id, cmd.command_type, cmd.point, cmd.value, user_role
-        )
+        validation = await svc._validate_command(cmd.device_id, cmd.command_type, cmd.point, cmd.value, user_role)
         if not validation["allowed"]:
-            validation_errors.append({
-                "index": idx,
-                "device_id": cmd.device_id,
-                "error": validation["error"],
-            })
+            validation_errors.append(
+                {
+                    "index": idx,
+                    "device_id": cmd.device_id,
+                    "error": validation["error"],
+                }
+            )
 
     # If any validation failed, reject the whole batch
     if validation_errors:
@@ -227,12 +233,14 @@ async def execute_batch_commands(body: BatchCommandRequest, request: Request):
             value=cmd.value,
             reason=body.reason,
         )
-        results.append({
-            "command_id": result.get("command_id"),
-            "device_id": cmd.device_id,
-            "success": result.get("success", False),
-            "error": result.get("error"),
-        })
+        results.append(
+            {
+                "command_id": result.get("command_id"),
+                "device_id": cmd.device_id,
+                "success": result.get("success", False),
+                "error": result.get("error"),
+            }
+        )
 
     all_ok = all(r["success"] for r in results)
     return {

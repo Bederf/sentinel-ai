@@ -234,12 +234,15 @@ class TestPerformanceMonitorMetrics:
             }
         ]
 
-        with patch(
-            "app.database.repositories.prediction_repository.PredictionRepository",
-            return_value=mock_pred_instance,
-        ), patch(
-            "app.database.repositories.alert_repository.AlertRepository",
-            return_value=mock_alert_instance,
+        with (
+            patch(
+                "app.database.repositories.prediction_repository.PredictionRepository",
+                return_value=mock_pred_instance,
+            ),
+            patch(
+                "app.database.repositories.alert_repository.AlertRepository",
+                return_value=mock_alert_instance,
+            ),
         ):
             result = monitor.evaluate_predictions(days_back=7)
 

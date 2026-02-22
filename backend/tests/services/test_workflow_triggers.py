@@ -43,7 +43,7 @@ class TestWorkflowTriggerEngine:
             equipment_id="chiller-001",
             anomaly_type="vibration",
             description="High vibration detected",
-            probability=0.85
+            probability=0.85,
         )
 
         result = await trigger_engine.on_ml_anomaly("chiller-001", anomaly)
@@ -62,14 +62,14 @@ class TestWorkflowTriggerEngine:
             equipment_id="chiller-001",
             anomaly_type="vibration",
             description="High vibration",
-            probability=0.85
+            probability=0.85,
         )
         anomaly2 = AnomalyAlert(
             id="anomaly-002",
             equipment_id="chiller-001",
             anomaly_type="temperature",
             description="High temperature",
-            probability=0.9
+            probability=0.9,
         )
 
         # First anomaly creates inspection
@@ -97,7 +97,7 @@ class TestWorkflowTriggerEngine:
                 equipment_id=f"eq-{probability}",
                 anomaly_type="vibration",
                 description="Test",
-                probability=probability
+                probability=probability,
             )
             result = await engine.on_ml_anomaly(f"eq-{probability}", anomaly)
             assert result.details["priority"] == expected_priority
@@ -113,7 +113,7 @@ class TestWorkflowTriggerEngine:
             equipment_id="chiller-001",
             baseline_id="bl-001",
             max_deviation_percent=10.0,
-            deviating_metrics={"vibration": 10.0}
+            deviating_metrics={"vibration": 10.0},
         )
 
         result = await trigger_engine.on_baseline_deviation("chiller-001", comparison)
@@ -128,7 +128,7 @@ class TestWorkflowTriggerEngine:
             equipment_id="chiller-001",
             baseline_id="bl-001",
             max_deviation_percent=17.0,
-            deviating_metrics={"vibration": 17.0, "current": 15.5}
+            deviating_metrics={"vibration": 17.0, "current": 15.5},
         )
 
         result = await trigger_engine.on_baseline_deviation("chiller-001", comparison)
@@ -145,7 +145,7 @@ class TestWorkflowTriggerEngine:
             equipment_id="chiller-001",
             baseline_id="bl-001",
             max_deviation_percent=25.0,
-            deviating_metrics={"vibration": 25.0}
+            deviating_metrics={"vibration": 25.0},
         )
 
         result = await trigger_engine.on_baseline_deviation("chiller-001", comparison)
@@ -172,7 +172,7 @@ class TestWorkflowTriggerEngine:
             recommended_action="Replace bearings",
             estimated_repair_cost_min=5000.0,
             estimated_repair_cost_max=8000.0,
-            estimated_repair_hours=4.0
+            estimated_repair_hours=4.0,
         )
 
         result = await trigger_engine.on_critical_deficiency(deficiency)
@@ -193,7 +193,7 @@ class TestWorkflowTriggerEngine:
             severity="safety",
             deficiency_title="Leak detected near electrical",
             deficiency_description="Water leak near control panel",
-            recommended_action="Isolate and repair immediately"
+            recommended_action="Isolate and repair immediately",
         )
 
         result = await trigger_engine.on_critical_deficiency(deficiency)
@@ -211,7 +211,7 @@ class TestWorkflowTriggerEngine:
             severity="minor",
             deficiency_title="Filter slightly dirty",
             deficiency_description="Filter at 60% capacity",
-            recommended_action="Schedule replacement"
+            recommended_action="Schedule replacement",
         )
 
         result = await trigger_engine.on_critical_deficiency(deficiency)
@@ -227,14 +227,12 @@ class TestWorkflowTriggerEngine:
     async def test_repair_completed_schedules_inspection(self, trigger_engine):
         """Test that repair completion schedules post-repair inspection."""
         result = await trigger_engine.on_repair_completed(
-            work_order_id="WO-001",
-            equipment_id="chiller-001",
-            completion_data={"notes": "Bearings replaced"}
+            work_order_id="WO-001", equipment_id="chiller-001", completion_data={"notes": "Bearings replaced"}
         )
 
         assert result.success is True
         assert result.trigger_type == TriggerType.REPAIR_COMPLETED
-        assert result.action_taken == "scheduled_post_repair_inspection"
+        assert result.action_taken == "initiated_post_repair_workflow"
         assert "baseline_task_id" in result.details
         assert "inspection_task_id" in result.details
         assert "validation_scheduled" in result.details
@@ -242,11 +240,7 @@ class TestWorkflowTriggerEngine:
     @pytest.mark.asyncio
     async def test_repair_completed_creates_baseline_task(self, trigger_engine):
         """Test that repair completion creates baseline capture task."""
-        await trigger_engine.on_repair_completed(
-            work_order_id="WO-002",
-            equipment_id="pump-001",
-            completion_data={}
-        )
+        await trigger_engine.on_repair_completed(work_order_id="WO-002", equipment_id="pump-001", completion_data={})
 
         tasks = trigger_engine.get_pending_baseline_tasks("pump-001")
         assert len(tasks) >= 1
@@ -259,25 +253,17 @@ class TestWorkflowTriggerEngine:
     @pytest.mark.asyncio
     async def test_effectiveness_validation_successful(self, trigger_engine):
         """Test successful repair validation."""
-        pre_baseline = {
-            "baseline_values": {
-                "vibration_rms": 3.5,
-                "motor_current": 180.0
-            }
-        }
+        pre_baseline = {"baseline_values": {"vibration_rms": 3.5, "motor_current": 180.0}}
         post_baseline = {
             "baseline_values": {
                 "vibration_rms": 1.2,  # 66% improvement
-                "motor_current": 90.0  # 50% improvement
+                "motor_current": 90.0,  # 50% improvement
             }
         }
         # Average improvement: (66 + 50) / 2 = 58%, which is > 50%
 
         result = await trigger_engine.validate_repair_effectiveness(
-            equipment_id="chiller-001",
-            work_order_id="WO-001",
-            pre_baseline=pre_baseline,
-            post_baseline=post_baseline
+            equipment_id="chiller-001", work_order_id="WO-001", pre_baseline=pre_baseline, post_baseline=post_baseline
         )
 
         assert result.success is True
@@ -288,24 +274,16 @@ class TestWorkflowTriggerEngine:
     @pytest.mark.asyncio
     async def test_effectiveness_validation_failed(self, trigger_engine):
         """Test failed repair validation creates follow-up."""
-        pre_baseline = {
-            "baseline_values": {
-                "vibration_rms": 3.5,
-                "motor_current": 152.0
-            }
-        }
+        pre_baseline = {"baseline_values": {"vibration_rms": 3.5, "motor_current": 152.0}}
         post_baseline = {
             "baseline_values": {
                 "vibration_rms": 3.0,  # Only 14% improvement
-                "motor_current": 150.0  # Only 1.3% improvement
+                "motor_current": 150.0,  # Only 1.3% improvement
             }
         }
 
         result = await trigger_engine.validate_repair_effectiveness(
-            equipment_id="chiller-002",
-            work_order_id="WO-002",
-            pre_baseline=pre_baseline,
-            post_baseline=post_baseline
+            equipment_id="chiller-002", work_order_id="WO-002", pre_baseline=pre_baseline, post_baseline=post_baseline
         )
 
         assert result.success is True
@@ -320,10 +298,7 @@ class TestWorkflowTriggerEngine:
         post_baseline = {"baseline_values": {"vibration": 1.0}}
 
         result = await trigger_engine.validate_repair_effectiveness(
-            equipment_id="pump-001",
-            work_order_id="WO-003",
-            pre_baseline=pre_baseline,
-            post_baseline=post_baseline
+            equipment_id="pump-001", work_order_id="WO-003", pre_baseline=pre_baseline, post_baseline=post_baseline
         )
 
         assert result.details["ml_feedback_recorded"] is True
@@ -332,10 +307,7 @@ class TestWorkflowTriggerEngine:
     async def test_effectiveness_validation_missing_baselines(self, trigger_engine):
         """Test error handling for missing baselines."""
         result = await trigger_engine.validate_repair_effectiveness(
-            equipment_id="ahu-001",
-            work_order_id="WO-004",
-            pre_baseline={},
-            post_baseline={}
+            equipment_id="ahu-001", work_order_id="WO-004", pre_baseline={}, post_baseline={}
         )
 
         assert result.success is False
@@ -349,11 +321,7 @@ class TestWorkflowTriggerEngine:
     async def test_get_pending_inspections(self, trigger_engine):
         """Test retrieving pending inspections."""
         anomaly = AnomalyAlert(
-            id="anomaly-test",
-            equipment_id="test-eq-001",
-            anomaly_type="vibration",
-            description="Test",
-            probability=0.8
+            id="anomaly-test", equipment_id="test-eq-001", anomaly_type="vibration", description="Test", probability=0.8
         )
         await trigger_engine.on_ml_anomaly("test-eq-001", anomaly)
 
@@ -364,11 +332,7 @@ class TestWorkflowTriggerEngine:
     async def test_get_trigger_history(self, trigger_engine):
         """Test retrieving trigger history."""
         anomaly = AnomalyAlert(
-            id="anomaly-hist",
-            equipment_id="hist-eq-001",
-            anomaly_type="vibration",
-            description="Test",
-            probability=0.8
+            id="anomaly-hist", equipment_id="hist-eq-001", anomaly_type="vibration", description="Test", probability=0.8
         )
         await trigger_engine.on_ml_anomaly("hist-eq-001", anomaly)
 
@@ -386,7 +350,7 @@ class TestWorkflowTriggerEngine:
             equipment_id="eff-eq-001",
             work_order_id="WO-EFF-001",
             pre_baseline=pre_baseline,
-            post_baseline=post_baseline
+            post_baseline=post_baseline,
         )
 
         result = trigger_engine.get_effectiveness_result("WO-EFF-001")
@@ -418,7 +382,7 @@ class TestTriggerChain:
             equipment_id="chain-chiller",
             anomaly_type="vibration",
             description="High vibration detected",
-            probability=0.85
+            probability=0.85,
         )
         result1 = await engine.on_ml_anomaly("chain-chiller", anomaly)
         assert result1.success is True
@@ -431,7 +395,7 @@ class TestTriggerChain:
             severity="critical",
             deficiency_title="Bearing failure",
             deficiency_description="Bearing wear beyond tolerance",
-            recommended_action="Replace bearings"
+            recommended_action="Replace bearings",
         )
         result2 = await engine.on_critical_deficiency(deficiency)
         assert result2.success is True
@@ -439,9 +403,7 @@ class TestTriggerChain:
 
         # Step 3: Repair completed
         result3 = await engine.on_repair_completed(
-            work_order_id=work_order_id,
-            equipment_id="chain-chiller",
-            completion_data={"notes": "Bearings replaced"}
+            work_order_id=work_order_id, equipment_id="chain-chiller", completion_data={"notes": "Bearings replaced"}
         )
         assert result3.success is True
 
@@ -450,7 +412,7 @@ class TestTriggerChain:
             equipment_id="chain-chiller",
             work_order_id=work_order_id,
             pre_baseline={"baseline_values": {"vibration": 3.5}},
-            post_baseline={"baseline_values": {"vibration": 1.0}}
+            post_baseline={"baseline_values": {"vibration": 1.0}},
         )
         assert result4.success is True
         assert result4.details["repair_successful"] is True
@@ -469,7 +431,7 @@ class TestTriggerChain:
             equipment_id="fail-chiller",
             work_order_id="WO-FAIL",
             pre_baseline={"baseline_values": {"vibration": 3.5}},
-            post_baseline={"baseline_values": {"vibration": 3.2}}  # Only 8.5% improvement
+            post_baseline={"baseline_values": {"vibration": 3.2}},  # Only 8.5% improvement
         )
 
         assert result.details["repair_successful"] is False

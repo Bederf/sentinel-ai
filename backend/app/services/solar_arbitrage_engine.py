@@ -8,8 +8,8 @@ Tariff source: City Power Johannesburg Commercial TOU rates from
   backend/app/data/solar/tariffs/city_power_2026.json
 
 BESS constraints (Site-002 LUNA2000-200KWH-2H1):
-  - Capacity: 500 kWh usable
-  - Max charge/discharge: 250 kW (0.5C)
+  - Capacity: 200 kWh usable
+  - Max charge/discharge: 100 kW (0.5C)
   - Min SOC: 10%  (protect cell longevity)
   - Max SOC: 95%  (prevent overcharge)
 
@@ -238,8 +238,8 @@ class SolarArbitrageEngine:
     """
 
     # BESS constraints (from Site-002 LUNA2000-200KWH-2H1 config)
-    BESS_CAPACITY_KWH = 500.0  # Huawei LUNA2000-200KWH-2H1
-    BESS_RATED_POWER_KW = 250.0  # 0.5C rate
+    BESS_CAPACITY_KWH = 200.0  # Huawei LUNA2000-200KWH-2H1
+    BESS_RATED_POWER_KW = 100.0  # 0.5C rate
     BESS_MIN_SOC_PCT = 10.0
     BESS_MAX_SOC_PCT = 95.0
     BESS_ROUND_TRIP_EFF = 0.90

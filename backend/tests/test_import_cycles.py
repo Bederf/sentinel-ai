@@ -62,14 +62,15 @@ def test_no_circular_imports_in_services():
 
     # If there are failures, check if they're circular import errors
     circular_import_failures = [
-        (path, error) for path, error in failures
+        (path, error)
+        for path, error in failures
         if "circular import" in error.lower() or "partially initialized" in error.lower()
     ]
 
     if circular_import_failures:
         pytest.fail(
-            f"Circular import errors detected in {len(circular_import_failures)} module(s):\n" +
-            "\n".join(f"  - {path}: {error}" for path, error in circular_import_failures)
+            f"Circular import errors detected in {len(circular_import_failures)} module(s):\n"
+            + "\n".join(f"  - {path}: {error}" for path, error in circular_import_failures)
         )
 
 
@@ -160,6 +161,6 @@ def test_api_imports():
 
     if circular_failures:
         pytest.fail(
-            "Circular import errors detected in API modules:\n" +
-            "\n".join(f"  - {path}: {error}" for path, error in circular_failures)
+            "Circular import errors detected in API modules:\n"
+            + "\n".join(f"  - {path}: {error}" for path, error in circular_failures)
         )

@@ -15,10 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 async def search_documentation(
-    query: str,
-    n_results: int = 5,
-    building_id: str | None = None,
-    similarity_threshold: float = 0.3
+    query: str, n_results: int = 5, building_id: str | None = None, similarity_threshold: float = 0.3
 ) -> list[dict[str, Any]]:
     """
     Search indexed documentation for relevant content using hybrid search.
@@ -50,14 +47,16 @@ async def search_documentation(
             n_results=n_results,
             equipment_type=None,  # Search all documentation
             building_id=building_id,  # Filter to building or include system docs
-            keyword_weight=0.4,   # Give keyword matching significant weight
-            semantic_weight=0.6   # Still favor semantic for natural language queries
+            keyword_weight=0.4,  # Give keyword matching significant weight
+            semantic_weight=0.6,  # Still favor semantic for natural language queries
         )
 
         # Filter to only documentation type if needed
         # Note: hybrid_search doesn't filter by document_type, so we include all results
 
-        logger.info(f"Documentation search for '{query[:50]}...' in building {building_id or 'all'} returned {len(results)} results")
+        logger.info(
+            f"Documentation search for '{query[:50]}...' in building {building_id or 'all'} returned {len(results)} results"
+        )
         return results
 
     except Exception as e:
@@ -85,11 +84,11 @@ def get_doc_rag_system_prompt(doc_results: list[dict[str, Any]]) -> str:
     if doc_results:
         doc_sections = []
         for i, doc in enumerate(doc_results, 1):
-            title = doc.get('document_title', doc.get('title', 'Documentation'))
-            section = doc.get('section_title', '')
-            content = doc.get('content', '')
+            title = doc.get("document_title", doc.get("title", "Documentation"))
+            section = doc.get("section_title", "")
+            content = doc.get("content", "")
             # Handle both hybrid_score (from hybrid search) and similarity (from semantic search)
-            score = doc.get('hybrid_score') or doc.get('similarity', 0)
+            score = doc.get("hybrid_score") or doc.get("similarity", 0)
             # Handle case where score might be a string
             if isinstance(score, str):
                 try:

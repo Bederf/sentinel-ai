@@ -115,9 +115,7 @@ async def get_violations(
             query = query.eq("system_id", system_id)
 
         # Time window filter
-        cutoff_time = (
-            datetime.now(timezone.utc) - timedelta(hours=hours)
-        ).isoformat()
+        cutoff_time = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
         query = query.gte("timestamp", cutoff_time)
 
         if severity:
@@ -386,9 +384,7 @@ async def get_compliance_report(
             }
 
         # Query compliance_log
-        query = supabase.table("compliance_log").select(
-            "severity, parameter, auto_action, resolved, timestamp"
-        )
+        query = supabase.table("compliance_log").select("severity, parameter, auto_action, resolved, timestamp")
 
         if system_id:
             query = query.eq("system_id", system_id)
@@ -404,11 +400,7 @@ async def get_compliance_report(
         critical_violations = len([v for v in violations if v["severity"] == "critical"])
         resolved_violations = len([v for v in violations if v.get("resolved")])
 
-        resolution_rate = (
-            (resolved_violations / total_violations * 100)
-            if total_violations > 0
-            else 100.0
-        )
+        resolution_rate = (resolved_violations / total_violations * 100) if total_violations > 0 else 100.0
 
         # Count by parameter
         violations_by_parameter = {}
@@ -422,16 +414,14 @@ async def get_compliance_report(
             action = v.get("auto_action", "none")
             actions_count[action] = actions_count.get(action, 0) + 1
 
-        most_common_actions = sorted(
-            actions_count.items(), key=lambda x: x[1], reverse=True
-        )[:5]
+        most_common_actions = sorted(actions_count.items(), key=lambda x: x[1], reverse=True)[:5]
 
         # Compliance score: 100 - (critical% * 20 + unresolved% * 10)
         critical_pct = (critical_violations / total_violations * 100) if total_violations > 0 else 0
-        unresolved_pct = ((total_violations - resolved_violations) / total_violations * 100) if total_violations > 0 else 0
-        compliance_score = max(
-            0, 100 - (critical_pct * 0.2 + unresolved_pct * 0.1)
+        unresolved_pct = (
+            ((total_violations - resolved_violations) / total_violations * 100) if total_violations > 0 else 0
         )
+        compliance_score = max(0, 100 - (critical_pct * 0.2 + unresolved_pct * 0.1))
 
         return {
             "period": month,
@@ -481,18 +471,22 @@ async def override_auto_response(
         # Log override event
         supabase = get_supabase_client()
         if supabase:
-            expires_at = (
-                datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
-            ).isoformat()
+            expires_at = (datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)).isoformat()
 
             try:
-                await supabase.table("grid_overrides").insert({
-                    "system_id": system_id,
-                    "action": action,
-                    "initiated_at": datetime.now(timezone.utc).isoformat(),
-                    "expires_at": expires_at,
-                    "manual_override": True,
-                }).execute()
+                await (
+                    supabase.table("grid_overrides")
+                    .insert(
+                        {
+                            "system_id": system_id,
+                            "action": action,
+                            "initiated_at": datetime.now(timezone.utc).isoformat(),
+                            "expires_at": expires_at,
+                            "manual_override": True,
+                        }
+                    )
+                    .execute()
+                )
             except Exception as e:
                 # Table might not exist, just log the override in memory
                 logger.warning(f"Could not persist override to Supabase: {e}")
@@ -502,9 +496,7 @@ async def override_auto_response(
             "action": action,
             "system_id": system_id,
             "duration_seconds": duration_seconds,
-            "expires_at": (
-                datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
-            ).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)).isoformat(),
         }
 
     except Exception as e:
@@ -513,4 +505,5 @@ async def override_auto_response(
 
 # Logging imports at the end
 import logging
+
 logger = logging.getLogger(__name__)

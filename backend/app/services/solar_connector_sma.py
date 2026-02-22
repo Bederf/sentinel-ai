@@ -37,34 +37,34 @@ logger = logging.getLogger(__name__)
 SMA_TRIPOWER_REGISTERS: Dict[str, tuple] = {
     # (address, count, type, scale_factor, unit)
     # SMA uses SunSpec model 101/103 for inverter data
-    "model":              (30053, 8, "str",    1,     ""),
-    "serial":             (30057, 8, "str",    1,     ""),
-    "firmware":           (30059, 8, "str",    1,     ""),
-    "rated_power":        (30231, 2, "u32",    1,     "W"),
-    "dc_power_total":     (30773, 2, "i32",    1,     "W"),
-    "ac_power_total":     (30775, 2, "i32",    1,     "W"),
+    "model": (30053, 8, "str", 1, ""),
+    "serial": (30057, 8, "str", 1, ""),
+    "firmware": (30059, 8, "str", 1, ""),
+    "rated_power": (30231, 2, "u32", 1, "W"),
+    "dc_power_total": (30773, 2, "i32", 1, "W"),
+    "ac_power_total": (30775, 2, "i32", 1, "W"),
     # DC inputs (SMA Tripower Core1 has 6 MPPT inputs)
-    "dc_voltage_a":       (30771, 2, "u32",    100,   "V"),
-    "dc_current_a":       (30769, 2, "u32",    1000,  "A"),
-    "dc_voltage_b":       (30959, 2, "u32",    100,   "V"),
-    "dc_current_b":       (30957, 2, "u32",    1000,  "A"),
-    "dc_voltage_c":       (30961, 2, "u32",    100,   "V"),
-    "dc_current_c":       (30963, 2, "u32",    1000,  "A"),
+    "dc_voltage_a": (30771, 2, "u32", 100, "V"),
+    "dc_current_a": (30769, 2, "u32", 1000, "A"),
+    "dc_voltage_b": (30959, 2, "u32", 100, "V"),
+    "dc_current_b": (30957, 2, "u32", 1000, "A"),
+    "dc_voltage_c": (30961, 2, "u32", 100, "V"),
+    "dc_current_c": (30963, 2, "u32", 1000, "A"),
     # AC outputs (3-phase)
-    "ac_voltage_l1":      (30783, 2, "u32",    100,   "V"),
-    "ac_voltage_l2":      (30785, 2, "u32",    100,   "V"),
-    "ac_voltage_l3":      (30787, 2, "u32",    100,   "V"),
-    "ac_current_total":   (30795, 2, "u32",    1000,  "A"),
-    "frequency":          (30803, 2, "u32",    100,   "Hz"),
-    "power_factor":       (30805, 2, "i32",    1000,  ""),
-    "inverter_temp":      (30953, 2, "i32",    10,    "C"),
+    "ac_voltage_l1": (30783, 2, "u32", 100, "V"),
+    "ac_voltage_l2": (30785, 2, "u32", 100, "V"),
+    "ac_voltage_l3": (30787, 2, "u32", 100, "V"),
+    "ac_current_total": (30795, 2, "u32", 1000, "A"),
+    "frequency": (30803, 2, "u32", 100, "Hz"),
+    "power_factor": (30805, 2, "i32", 1000, ""),
+    "inverter_temp": (30953, 2, "i32", 10, "C"),
     # Status and yields
-    "status":             (30201, 2, "u32",    1,     ""),
-    "error_code":         (30213, 2, "u32",    1,     ""),
-    "daily_yield":        (30535, 2, "u32",    1,     "Wh"),
-    "total_yield":        (30529, 4, "u64",    1,     "Wh"),
+    "status": (30201, 2, "u32", 1, ""),
+    "error_code": (30213, 2, "u32", 1, ""),
+    "daily_yield": (30535, 2, "u32", 1, "Wh"),
+    "total_yield": (30529, 4, "u64", 1, "Wh"),
     # Grid relay status
-    "grid_relay":         (30217, 2, "u32",    1,     ""),
+    "grid_relay": (30217, 2, "u32", 1, ""),
 }
 
 # SMA status code mapping
@@ -75,9 +75,9 @@ SMA_STATUS_MAP = {
     455: "warning",
     307: "standby",
     308: "starting",
-    309: "online",          # "MPP" tracking
-    310: "online",          # "Throttled" due to temperature
-    311: "online",          # "Shutdown" by grid
+    309: "online",  # "MPP" tracking
+    310: "online",  # "Throttled" due to temperature
+    311: "online",  # "Shutdown" by grid
     381: "derating",
 }
 
@@ -120,10 +120,7 @@ class SimulatedSMAConnector(SolarConnector):
             last_poll=datetime.now(timezone.utc).isoformat(),
             error_count=0,
         )
-        logger.info(
-            f"SMA simulated connector online — "
-            f"{len(self._inverter_configs)} inverters"
-        )
+        logger.info(f"SMA simulated connector online — {len(self._inverter_configs)} inverters")
         return True
 
     async def disconnect(self) -> None:
@@ -204,18 +201,20 @@ class SimulatedSMAConnector(SolarConnector):
                 imp = (panel_rating_w / 41.0) * solar_factor * variance
                 dc_power = (vmp * imp / 1000) if solar_factor > 0 else 0
 
-                strings.append(SolarString(
-                    string_id=string_id,
-                    inverter_id=inverter_id,
-                    mppt_tracker=mppt,
-                    panel_count=panels_on_string,
-                    panel_model=cfg.get("panel_model", "JA Solar JAM72S30-410/MR"),
-                    panel_rating_w=panel_rating_w,
-                    dc_voltage_v=round(vmp, 1),
-                    dc_current_a=round(imp, 2),
-                    dc_power_kw=round(dc_power, 3),
-                    irradiance_w_m2=round(1000 * solar_factor * variance, 0),
-                ))
+                strings.append(
+                    SolarString(
+                        string_id=string_id,
+                        inverter_id=inverter_id,
+                        mppt_tracker=mppt,
+                        panel_count=panels_on_string,
+                        panel_model=cfg.get("panel_model", "JA Solar JAM72S30-410/MR"),
+                        panel_rating_w=panel_rating_w,
+                        dc_voltage_v=round(vmp, 1),
+                        dc_current_a=round(imp, 2),
+                        dc_power_kw=round(dc_power, 3),
+                        irradiance_w_m2=round(1000 * solar_factor * variance, 0),
+                    )
+                )
         return strings
 
     async def read_bess(self, container_id: str) -> None:
@@ -265,50 +264,58 @@ class SimulatedSMAConnector(SolarConnector):
         for inv_id in self._inverter_configs:
             inv = await self.read_inverter(inv_id)
             if inv:
-                readings.append(NormalisedReading(
-                    equipment_id=inv_id,
-                    equipment_type="inverter",
-                    reading_type="power",
-                    value=inv.ac_power_kw,
-                    unit="kW",
-                    quality=QualityFlag.GOOD,
-                    source=DataSource.SIMULATED,
-                    timestamp=now.isoformat(),
-                ))
-                readings.append(NormalisedReading(
-                    equipment_id=inv_id,
-                    equipment_type="inverter",
-                    reading_type="energy",
-                    value=inv.daily_yield_kwh,
-                    unit="kWh",
-                    quality=QualityFlag.GOOD,
-                    source=DataSource.SIMULATED,
-                    timestamp=now.isoformat(),
-                ))
-                readings.append(NormalisedReading(
-                    equipment_id=inv_id,
-                    equipment_type="inverter",
-                    reading_type="temperature",
-                    value=inv.temp_c,
-                    unit="C",
-                    quality=QualityFlag.GOOD,
-                    source=DataSource.SIMULATED,
-                    timestamp=now.isoformat(),
-                ))
+                readings.append(
+                    NormalisedReading(
+                        equipment_id=inv_id,
+                        equipment_type="inverter",
+                        reading_type="power",
+                        value=inv.ac_power_kw,
+                        unit="kW",
+                        quality=QualityFlag.GOOD,
+                        source=DataSource.SIMULATED,
+                        timestamp=now.isoformat(),
+                    )
+                )
+                readings.append(
+                    NormalisedReading(
+                        equipment_id=inv_id,
+                        equipment_type="inverter",
+                        reading_type="energy",
+                        value=inv.daily_yield_kwh,
+                        unit="kWh",
+                        quality=QualityFlag.GOOD,
+                        source=DataSource.SIMULATED,
+                        timestamp=now.isoformat(),
+                    )
+                )
+                readings.append(
+                    NormalisedReading(
+                        equipment_id=inv_id,
+                        equipment_type="inverter",
+                        reading_type="temperature",
+                        value=inv.temp_c,
+                        unit="C",
+                        quality=QualityFlag.GOOD,
+                        source=DataSource.SIMULATED,
+                        timestamp=now.isoformat(),
+                    )
+                )
 
         for meter_id in self._meter_configs:
             meter = await self.read_meter(meter_id)
             if meter:
-                readings.append(NormalisedReading(
-                    equipment_id=meter_id,
-                    equipment_type="meter",
-                    reading_type="power",
-                    value=meter.active_power_kw,
-                    unit="kW",
-                    quality=QualityFlag.GOOD,
-                    source=DataSource.SIMULATED,
-                    timestamp=now.isoformat(),
-                ))
+                readings.append(
+                    NormalisedReading(
+                        equipment_id=meter_id,
+                        equipment_type="meter",
+                        reading_type="power",
+                        value=meter.active_power_kw,
+                        unit="kW",
+                        quality=QualityFlag.GOOD,
+                        source=DataSource.SIMULATED,
+                        timestamp=now.isoformat(),
+                    )
+                )
 
         return readings
 

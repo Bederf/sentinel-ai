@@ -68,7 +68,7 @@ def is_public_holiday(dt: datetime) -> bool:
     holidays = [
         (12, 25),  # Christmas
         (12, 26),  # Day of Goodwill
-        (1, 1),    # New Year
+        (1, 1),  # New Year
     ]
     return (dt.month, dt.day) in holidays
 
@@ -403,15 +403,17 @@ def generate_sensors(equipment: list[dict]) -> list[dict]:
         templates = sensor_templates.get(eq_type, [])
 
         for template in templates:
-            sensors.append({
-                "id": f"sensor-{sensor_id:04d}",
-                "equipment_id": eq["id"],
-                "site_id": eq["site_id"],
-                "type": template["type"],
-                "unit": template["unit"],
-                "location": template["location"],
-                "name": f"{eq['name']} {template['type'].replace('_', ' ').title()}",
-            })
+            sensors.append(
+                {
+                    "id": f"sensor-{sensor_id:04d}",
+                    "equipment_id": eq["id"],
+                    "site_id": eq["site_id"],
+                    "type": template["type"],
+                    "unit": template["unit"],
+                    "location": template["location"],
+                    "name": f"{eq['name']} {template['type'].replace('_', ' ').title()}",
+                }
+            )
             sensor_id += 1
 
     return sensors
@@ -501,9 +503,7 @@ def generate_readings(
 
             elif sensor["type"] == "fuel_consumption":
                 base_consumption = 15.0  # L/hr
-                value = generate_fuel_consumption(
-                    current, base_consumption, occupancy, eq["id"], day_index
-                )
+                value = generate_fuel_consumption(current, base_consumption, occupancy, eq["id"], day_index)
 
             elif sensor["type"] == "battery_voltage":
                 value = round(random.gauss(220, 2), 1)
@@ -539,11 +539,13 @@ def generate_readings(
                 value = round(random.gauss(50, 10), 1)
 
             if value is not None:
-                readings.append({
-                    "sensor_id": sensor["id"],
-                    "timestamp": current.isoformat(),
-                    "value": value,
-                })
+                readings.append(
+                    {
+                        "sensor_id": sensor["id"],
+                        "timestamp": current.isoformat(),
+                        "value": value,
+                    }
+                )
 
             current += timedelta(hours=1)
             if current.hour == 0:

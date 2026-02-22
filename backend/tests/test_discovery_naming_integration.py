@@ -262,9 +262,7 @@ class TestZoneGeneration:
 class TestApprovalAndActivation:
     """Test approval workflow with naming conversion."""
 
-    def test_approval_creates_v2_equipment_models(
-        self, mapping_service, sample_classified_points
-    ):
+    def test_approval_creates_v2_equipment_models(self, mapping_service, sample_classified_points):
         """Test that approval generates equipment models with v2.0 IDs."""
         # Map points
         mappings = mapping_service.map_points_to_equipment(
@@ -289,9 +287,7 @@ class TestApprovalAndActivation:
             # Format: {site_id}-{v2_id}
             assert "S002" in equipment_id or "site-002" in equipment_id
 
-    def test_zones_generated_on_approval(
-        self, mapping_service, sample_classified_points
-    ):
+    def test_zones_generated_on_approval(self, mapping_service, sample_classified_points):
         """Test that zones.json is generated during approval."""
         # Map and approve
         mappings = mapping_service.map_points_to_equipment(
@@ -309,9 +305,7 @@ class TestApprovalAndActivation:
 class TestEndToEndWorkflow:
     """Test complete end-to-end discovery and naming workflow."""
 
-    def test_full_discovery_workflow(
-        self, mapping_service, sample_classified_points
-    ):
+    def test_full_discovery_workflow(self, mapping_service, sample_classified_points):
         """Test complete workflow from discovery to approval."""
         site_id = "site-002"
         discovery_id = "discovery-e2e-001"
@@ -353,9 +347,7 @@ class TestEndToEndWorkflow:
             assert "-" in equipment_id
             assert any(c.isdigit() for c in equipment_id.split("-")[0])  # S### has digits
 
-    def test_metadata_preservation_end_to_end(
-        self, mapping_service, sample_classified_points
-    ):
+    def test_metadata_preservation_end_to_end(self, mapping_service, sample_classified_points):
         """Test that important metadata is preserved throughout workflow."""
         mappings = mapping_service.map_points_to_equipment(
             sample_classified_points,
@@ -373,9 +365,7 @@ class TestEndToEndWorkflow:
 class TestConverterIntegration:
     """Test converter integration with mapping service."""
 
-    def test_converter_handles_all_point_types(
-        self, converter, mapping_service, sample_classified_points
-    ):
+    def test_converter_handles_all_point_types(self, converter, mapping_service, sample_classified_points):
         """Test that converter integrates with all point types."""
         # Should not raise for any equipment type in sample
         mappings = mapping_service.map_points_to_equipment(
@@ -384,25 +374,17 @@ class TestConverterIntegration:
         )
 
         assert len(mappings) == 3
-        assert all(
-            m.equipment_id.startswith("S002-") for m in mappings.values()
-        )
+        assert all(m.equipment_id.startswith("S002-") for m in mappings.values())
 
-    def test_converter_idempotent(
-        self, converter
-    ):
+    def test_converter_idempotent(self, converter):
         """Test that converter produces consistent results."""
         bms_id = "VAV-L1-05"
         equipment_type = "vav"
         site_id = "site-002"
         zone_mapping = {"05": "E"}
 
-        result1 = converter.convert_bms_to_v2(
-            bms_id, equipment_type, site_id, zone_mapping
-        )
-        result2 = converter.convert_bms_to_v2(
-            bms_id, equipment_type, site_id, zone_mapping
-        )
+        result1 = converter.convert_bms_to_v2(bms_id, equipment_type, site_id, zone_mapping)
+        result2 = converter.convert_bms_to_v2(bms_id, equipment_type, site_id, zone_mapping)
 
         assert result1 == result2 == "S002-VAV-L1-E"
 

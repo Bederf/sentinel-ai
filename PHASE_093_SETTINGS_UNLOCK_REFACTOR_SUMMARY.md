@@ -146,7 +146,7 @@ After deployment, verify by testing:
 - [ ] Should NOT see unlock buttons on individual sections
 
 ### Test 2: Demo User Access
-- [ ] Login as demo user (grant@wardew.co.za or bederf@protonmail.com)
+- [ ] Login as demo user (grant@grantdemo.co.za or bederf@protonmail.com)
 - [ ] Navigate to Settings
 - [ ] Verify "Unlock to Edit" button appears
 

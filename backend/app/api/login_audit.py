@@ -28,6 +28,7 @@ router = APIRouter(prefix="/api/admin/login-audit", tags=["login-audit"])
 
 class LoginRecord(BaseModel):
     """A single login audit record."""
+
     id: str
     user_email: str
     user_id: Optional[str] = None
@@ -42,12 +43,14 @@ class LoginRecord(BaseModel):
 
 class LoginListResponse(BaseModel):
     """Response with list of login records."""
+
     total: int
     records: List[LoginRecord]
 
 
 class LoginStatsResponse(BaseModel):
     """Login statistics response."""
+
     period_hours: int
     total: int
     successful: int
@@ -58,6 +61,7 @@ class LoginStatsResponse(BaseModel):
 
 class SuspiciousActivityResponse(BaseModel):
     """Suspicious activity detection response."""
+
     period_hours: int
     failed_ips: List[dict]
     multi_ip_users: List[dict]

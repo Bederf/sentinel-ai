@@ -27,8 +27,10 @@ limiter = Limiter(key_func=get_remote_address)
 
 # ---- Response Models ----
 
+
 class SafetySummary(BaseModel):
     """Safety status summary for site equipment."""
+
     total: int = Field(..., description="Total equipment count")
     safe: int = Field(..., description="Safe equipment count")
     warning: int = Field(..., description="Equipment with warnings")
@@ -38,6 +40,7 @@ class SafetySummary(BaseModel):
 
 class AlertSummary(BaseModel):
     """Alert count by severity."""
+
     critical: int = Field(default=0)
     warning: int = Field(default=0)
     info: int = Field(default=0)
@@ -45,6 +48,7 @@ class AlertSummary(BaseModel):
 
 class PredictionSummary(BaseModel):
     """Prediction summary."""
+
     high_risk: int = Field(default=0, description="High risk predictions")
     medium_risk: int = Field(default=0, description="Medium risk predictions")
     low_risk: int = Field(default=0, description="Low risk predictions")
@@ -52,12 +56,14 @@ class PredictionSummary(BaseModel):
 
 class EnergySummary(BaseModel):
     """Energy metrics summary."""
+
     current_kw: float = Field(default=0.0)
     today_kwh: float = Field(default=0.0)
 
 
 class SiteSummary(BaseModel):
     """Complete site summary with aggregated data."""
+
     site_id: str
     site_name: str
     equipment_count: int
@@ -71,6 +77,7 @@ class SiteSummary(BaseModel):
 
 class AlertItem(BaseModel):
     """Alert item for alerts list."""
+
     id: str
     equipment_id: str
     equipment_name: str
@@ -81,6 +88,7 @@ class AlertItem(BaseModel):
 
 class SiteAlerts(BaseModel):
     """Paginated alerts for a site."""
+
     site_id: str
     alerts: List[AlertItem]
     total_count: int
@@ -90,11 +98,12 @@ class SiteAlerts(BaseModel):
 
 # ---- Endpoints ----
 
+
 @router.get(
     "/sites/{site_id}/summary",
     response_model=SiteSummary,
     summary="Get site summary",
-    description="Fetch complete aggregated site data (equipment, safety, alerts, predictions) in a single request."
+    description="Fetch complete aggregated site data (equipment, safety, alerts, predictions) in a single request.",
 )
 @limiter.limit("600/minute")
 async def get_site_summary(request: Request, site_id: str) -> SiteSummary:
@@ -146,7 +155,7 @@ async def get_site_summary(request: Request, site_id: str) -> SiteSummary:
         equipment_by_type: Dict[str, int] = {}
         safety_counts = {"total": equipment_count, "safe": 0, "warning": 0, "blocked": 0, "alarm": 0}
 
-        for equipment in (equipment_list or []):
+        for equipment in equipment_list or []:
             eq_type = equipment.get("type", "unknown")
             equipment_by_type[eq_type] = equipment_by_type.get(eq_type, 0) + 1
 
@@ -181,7 +190,7 @@ async def get_site_summary(request: Request, site_id: str) -> SiteSummary:
         # Get alerts for this site
         alerts = alert_repo.get_active_by_building(building_uuid)
         alert_counts = {"critical": 0, "warning": 0, "info": 0}
-        for alert in (alerts or []):
+        for alert in alerts or []:
             severity = alert.get("severity", "info").lower()
             if severity in alert_counts:
                 alert_counts[severity] += 1
@@ -193,7 +202,7 @@ async def get_site_summary(request: Request, site_id: str) -> SiteSummary:
             prediction_repo = PredictionRepository()
             predictions = prediction_repo.get_active_by_building(building_uuid)
             prediction_counts = {"high_risk": 0, "medium_risk": 0, "low_risk": 0}
-            for pred in (predictions or []):
+            for pred in predictions or []:
                 risk_level = pred.get("risk_level", "low").lower()
                 if risk_level == "high":
                     prediction_counts["high_risk"] += 1
@@ -213,7 +222,7 @@ async def get_site_summary(request: Request, site_id: str) -> SiteSummary:
             safety=SafetySummary(**safety_counts),
             alerts=AlertSummary(**alert_counts),
             predictions=PredictionSummary(**prediction_counts),
-            last_updated=datetime.now(timezone.utc).isoformat()
+            last_updated=datetime.now(timezone.utc).isoformat(),
         )
     except HTTPException:
         raise
@@ -226,15 +235,10 @@ async def get_site_summary(request: Request, site_id: str) -> SiteSummary:
     "/sites/{site_id}/alerts",
     response_model=SiteAlerts,
     summary="Get site alerts",
-    description="Fetch paginated alerts for a site."
+    description="Fetch paginated alerts for a site.",
 )
 @limiter.limit("600/minute")
-async def get_site_alerts(
-    request: Request,
-    site_id: str,
-    offset: int = 0,
-    limit: int = 50
-) -> SiteAlerts:
+async def get_site_alerts(request: Request, site_id: str, offset: int = 0, limit: int = 50) -> SiteAlerts:
     """Get alerts for a site.
 
     Args:
@@ -252,13 +256,7 @@ async def get_site_alerts(
         raise HTTPException(status_code=400, detail="Limit cannot exceed 100")
 
     try:
-        return SiteAlerts(
-            site_id=site_id,
-            alerts=[],
-            total_count=0,
-            offset=offset,
-            limit=limit
-        )
+        return SiteAlerts(site_id=site_id, alerts=[], total_count=0, offset=offset, limit=limit)
     except Exception as e:
         logger.error(f"Error getting site alerts: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -268,7 +266,7 @@ async def get_site_alerts(
     "/sites/{site_id}/predictions",
     response_model=PredictionSummary,
     summary="Get site predictions summary",
-    description="Fetch predictions summary for a site."
+    description="Fetch predictions summary for a site.",
 )
 @limiter.limit("600/minute")
 async def get_site_predictions(request: Request, site_id: str) -> PredictionSummary:

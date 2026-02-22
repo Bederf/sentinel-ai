@@ -64,10 +64,7 @@ class NiagaraAdapter(VendorAdapter):
         parts = self.parse_equipment_id(device_id)
 
         # Get device type prefix
-        device_prefix = self.DEVICE_TYPE_PREFIXES.get(
-            device_type.lower(),
-            device_type.replace("_", "").title()
-        )
+        device_prefix = self.DEVICE_TYPE_PREFIXES.get(device_type.lower(), device_type.replace("_", "").title())
 
         # Format sequence number
         seq = parts.get("zone", "01")

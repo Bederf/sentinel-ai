@@ -315,8 +315,8 @@ class SolarDemandService:
     NMD_CRITICAL_PCT = 95.0  # Critical when demand exceeds 95% of NMD
 
     # BESS parameters (Huawei LUNA2000, from site-002_config.json)
-    BESS_CAPACITY_KWH = 500.0
-    BESS_RATED_POWER_KW = 250.0  # 0.5C rate
+    BESS_CAPACITY_KWH = 200.0
+    BESS_RATED_POWER_KW = 100.0  # 0.5C rate
     BESS_MIN_SOC_PCT = 10.0
 
     # Building profile (Site-002 Sandton office tower)
@@ -512,10 +512,10 @@ class SolarDemandService:
 
     @staticmethod
     def _simulated_solar_generation(hour: float) -> float:
-        """Simulate solar generation (kW) for 946 kWp Site-002 installation.
+        """Simulate solar generation (kW) for 297 kWp Site-002 installation.
 
-        Bell curve peaking at ~750 kW at solar noon (12:30 SAST).
-        946 kWp x ~80% performance ratio = ~757 kW peak output.
+        Bell curve peaking at ~238 kW at solar noon (12:30 SAST).
+        297 kWp x ~80% performance ratio = ~238 kW peak output.
         """
         if hour < 6 or hour > 19:
             return 0.0
@@ -523,7 +523,7 @@ class SolarDemandService:
         # Bell curve centered on 12.5 (solar noon SAST)
         peak_hour = 12.5
         spread = 3.5  # hours of significant generation either side
-        peak_kw = 750.0  # 946 kWp x 80% PR
+        peak_kw = 238.0  # 297 kWp x 80% PR
 
         generation = peak_kw * math.exp(-0.5 * ((hour - peak_hour) / spread) ** 2)
         noise = random.uniform(0.92, 1.08)  # cloud cover variation

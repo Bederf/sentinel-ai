@@ -5,74 +5,77 @@ Check equipment data availability in JSON fallback files.
 This script verifies what equipment data exists in JSON files,
 which the API should use if Supabase is empty or unavailable.
 """
+
 import json
 from pathlib import Path
 
-DATA_PATH = Path('/opt/bms-intelligence/backend/app/data')
-BUILDINGS_PATH = DATA_PATH / 'buildings'
+DATA_PATH = Path("/opt/bms-intelligence/backend/app/data")
+BUILDINGS_PATH = DATA_PATH / "buildings"
+
 
 def count_json_equipment(site_code: str) -> dict:
     """Count equipment available in JSON files for a site."""
     site_path = BUILDINGS_PATH / site_code
-    equipment_dir = site_path / 'equipment'
+    equipment_dir = site_path / "equipment"
 
     counts = {
-        'equipment_files': 0,
-        'hvac_zones': 0,
-        'generators': 0,
-        'energy_centre': 0,
-        'dali_controllers': 0,
+        "equipment_files": 0,
+        "hvac_zones": 0,
+        "generators": 0,
+        "energy_centre": 0,
+        "dali_controllers": 0,
     }
 
     # Count individual equipment files
     if equipment_dir.exists():
-        counts['equipment_files'] = len(list(equipment_dir.glob('*.json')))
+        counts["equipment_files"] = len(list(equipment_dir.glob("*.json")))
 
     # Count HVAC zones
-    zones_file = site_path / 'zones.json'
+    zones_file = site_path / "zones.json"
     if zones_file.exists():
         try:
             with open(zones_file) as f:
                 zones = json.load(f)
-                counts['hvac_zones'] = len(zones) if isinstance(zones, list) else 0
+                counts["hvac_zones"] = len(zones) if isinstance(zones, list) else 0
         except:
             pass
 
     # Count generators
-    gen_file = site_path / 'generators.json'
+    gen_file = site_path / "generators.json"
     if gen_file.exists():
         try:
             with open(gen_file) as f:
                 gen_data = json.load(f)
-                counts['generators'] = (
-                    len(gen_data.get('generators', [])) +
-                    len(gen_data.get('groups', [])) +
-                    len(gen_data.get('diesel_tanks', []))
+                counts["generators"] = (
+                    len(gen_data.get("generators", []))
+                    + len(gen_data.get("groups", []))
+                    + len(gen_data.get("diesel_tanks", []))
                 )
         except:
             pass
 
     # Count energy centre
-    ec_file = site_path / 'energy_centre.json'
+    ec_file = site_path / "energy_centre.json"
     if ec_file.exists():
         try:
             with open(ec_file) as f:
                 ec_data = json.load(f)
-                counts['energy_centre'] = (
-                    (1 if ec_data.get('energy_centre') else 0) +
-                    len(ec_data.get('mv_incomers', [])) +
-                    len(ec_data.get('transformers', [])) +
-                    len(ec_data.get('lv_switchboards', [])) +
-                    len(ec_data.get('ats_units', [])) +
-                    len(ec_data.get('power_meters', [])) +
-                    len(ec_data.get('pfc_banks', [])) +
-                    len(ec_data.get('ups_systems', [])) +
-                    len(ec_data.get('feeders', []))
+                counts["energy_centre"] = (
+                    (1 if ec_data.get("energy_centre") else 0)
+                    + len(ec_data.get("mv_incomers", []))
+                    + len(ec_data.get("transformers", []))
+                    + len(ec_data.get("lv_switchboards", []))
+                    + len(ec_data.get("ats_units", []))
+                    + len(ec_data.get("power_meters", []))
+                    + len(ec_data.get("pfc_banks", []))
+                    + len(ec_data.get("ups_systems", []))
+                    + len(ec_data.get("feeders", []))
                 )
         except:
             pass
 
     return counts
+
 
 print("=" * 80)
 print("JSON EQUIPMENT FALLBACK DATA AVAILABILITY")
@@ -80,10 +83,7 @@ print("=" * 80)
 
 # List all sites
 if BUILDINGS_PATH.exists():
-    sites = sorted([
-        d.name for d in BUILDINGS_PATH.iterdir()
-        if d.is_dir() and not d.name.startswith('_')
-    ])
+    sites = sorted([d.name for d in BUILDINGS_PATH.iterdir() if d.is_dir() and not d.name.startswith("_")])
 
     print(f"\nFound {len(sites)} sites:")
     print()
@@ -92,8 +92,8 @@ if BUILDINGS_PATH.exists():
 
     for site_code in sites:
         counts = count_json_equipment(site_code)
-        total = sum(v for k, v in counts.items() if k != 'equipment_files')
-        total += counts['equipment_files']
+        total = sum(v for k, v in counts.items() if k != "equipment_files")
+        total += counts["equipment_files"]
 
         print(f"  {site_code}:")
         print(f"    Equipment files:  {counts['equipment_files']:3d}")
@@ -113,9 +113,9 @@ if BUILDINGS_PATH.exists():
     # Specific detail for site-002
     print("\nDETAIL: site-002 Equipment Files")
     print("-" * 80)
-    site_002_equip = BUILDINGS_PATH / 'site-002' / 'equipment'
+    site_002_equip = BUILDINGS_PATH / "site-002" / "equipment"
     if site_002_equip.exists():
-        files = sorted(list(site_002_equip.glob('*.json')))
+        files = sorted(list(site_002_equip.glob("*.json")))
         print(f"Total files: {len(files)}")
         print("\nFirst 10 files:")
         for f in files[:10]:

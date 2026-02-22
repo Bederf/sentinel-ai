@@ -218,12 +218,8 @@ class TestRejectionLearning:
         )
 
         # Mock the repository to return 1 rejection
-        with patch.object(
-            learning_service.repo, "create", new_callable=AsyncMock
-        ) as mock_create:
-            with patch.object(
-                learning_service.repo, "get_recent", new_callable=AsyncMock
-            ) as mock_get_recent:
+        with patch.object(learning_service.repo, "create", new_callable=AsyncMock) as mock_create:
+            with patch.object(learning_service.repo, "get_recent", new_callable=AsyncMock) as mock_get_recent:
                 mock_get_recent.return_value = []
 
                 await learning_service.process_rejection(rec, "Too cold")
@@ -273,12 +269,8 @@ class TestRejectionLearning:
         )
 
         # Mock the repository
-        with patch.object(
-            learning_service.repo, "create", new_callable=AsyncMock
-        ) as mock_create:
-            with patch.object(
-                learning_service.repo, "get_recent", new_callable=AsyncMock
-            ) as mock_get_recent:
+        with patch.object(learning_service.repo, "create", new_callable=AsyncMock) as mock_create:
+            with patch.object(learning_service.repo, "get_recent", new_callable=AsyncMock) as mock_get_recent:
                 # Return 3 previous rejections to trigger pattern (>= 3)
                 mock_get_recent.return_value = [
                     previous_rejection1,
@@ -459,12 +451,8 @@ class TestFeedbackLoopIntegration:
         ]
 
         # Mock repository
-        with patch.object(
-            learning_service.repo, "create", new_callable=AsyncMock
-        ):
-            with patch.object(
-                learning_service.repo, "get_recent", new_callable=AsyncMock
-            ) as mock_get_recent:
+        with patch.object(learning_service.repo, "create", new_callable=AsyncMock):
+            with patch.object(learning_service.repo, "get_recent", new_callable=AsyncMock) as mock_get_recent:
                 # Return all 3 rejections to trigger pattern (>= 3)
                 mock_get_recent.return_value = rejection_records
 

@@ -194,9 +194,7 @@ class EnergyConsumptionRepository:
 
         # Use upsert to handle duplicate dates
         response = (
-            self.client.table("energy_consumption_history")
-            .upsert(data, on_conflict="building_id,date")
-            .execute()
+            self.client.table("energy_consumption_history").upsert(data, on_conflict="building_id,date").execute()
         )
 
         return response.data[0]
@@ -217,9 +215,7 @@ class EnergyConsumptionRepository:
             return []
 
         response = (
-            self.client.table("energy_consumption_history")
-            .upsert(records, on_conflict="building_id,date")
-            .execute()
+            self.client.table("energy_consumption_history").upsert(records, on_conflict="building_id,date").execute()
         )
 
         return response.data
@@ -236,12 +232,7 @@ class EnergyConsumptionRepository:
         Returns:
             Number of records deleted
         """
-        response = (
-            self.client.table("energy_consumption_history")
-            .delete()
-            .eq("building_id", building_id)
-            .execute()
-        )
+        response = self.client.table("energy_consumption_history").delete().eq("building_id", building_id).execute()
 
         return len(response.data)
 

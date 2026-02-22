@@ -192,19 +192,19 @@ class SolarSelfConsumptionService:
     """Self-consumption optimisation: maximise on-site solar use.
 
     Coordinates with BESS dispatch to ensure excess solar charges the
-    battery rather than being exported. For Site-002 (946 kWp PV,
-    500 kWh BESS), target is >95% self-consumption.
+    battery rather than being exported. For Site-002 (297 kWp PV,
+    200 kWh BESS), target is >95% self-consumption.
     """
 
     # Site-002 reference parameters
-    PV_CAPACITY_KWP = 946.0  # 550 roof + 396 carport
-    BESS_CAPACITY_KWH = 500.0  # Huawei LUNA2000-200KWH-2H1
-    BESS_RATED_POWER_KW = 250.0  # 0.5C rate
+    PV_CAPACITY_KWP = 297.0  # 4 × 100 kVA rooftop inverters
+    BESS_CAPACITY_KWH = 200.0  # Huawei LUNA2000-200KWH-2H1
+    BESS_RATED_POWER_KW = 100.0  # 0.5C rate
     BESS_EFFICIENCY = 0.90
     BASE_LOAD_KW = 1800.0
 
     # Export limits (SSEG Category B)
-    EXPORT_LIMIT_KW = 946.0  # SSEG Category B max export
+    EXPORT_LIMIT_KW = 297.0  # SSEG Category B max export
     EXPORT_LIMIT_TYPE = "capped"  # zero_export / capped / unlimited
 
     def __init__(self):
@@ -232,12 +232,12 @@ class SolarSelfConsumptionService:
 
     @staticmethod
     def _solar_generation_kw(hour: float) -> float:
-        """Simulate 946 kWp solar generation for JHB latitude."""
+        """Simulate 297 kWp solar generation for JHB latitude."""
         if hour < 6 or hour > 19:
             return 0.0
         peak_hour = 12.5
         spread = 3.5
-        peak_kw = 780.0  # ~82% performance ratio on 946 kWp
+        peak_kw = 244.0  # ~82% performance ratio on 297 kWp
         gen = peak_kw * math.exp(-0.5 * ((hour - peak_hour) / spread) ** 2)
         return max(0, gen * random.uniform(0.93, 1.07))
 

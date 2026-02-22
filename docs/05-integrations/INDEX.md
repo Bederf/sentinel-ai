@@ -298,8 +298,16 @@ For questions:
 | HVAC_DALI_INTEGRATION.md | 1.0 | Feb 14, 2026 | Complete |
 | HVAC_DALI_QUICKREF.md | 1.0 | Feb 14, 2026 | Complete |
 | HVAC_DALI_ARCHITECTURE.md | 1.0 | Feb 14, 2026 | Complete |
-| INDEX.md (this file) | 1.0 | Feb 14, 2026 | Complete |
+| INDEX.md (this file) | 1.1 | Feb 22, 2026 | Complete |
+| sentry-desk-complaint-agent-spec.md | 1.0 | Feb 22, 2026 | Complete |
 
 ---
 
-**Happy integrating!** 🏢⚡
+## Agent Specifications
+
+### [Sentry Desk Complaint Agent Spec](sentry-desk-complaint-agent-spec.md)
+- **Length**: Full specification (14 sections)
+- **Audience**: Developers, integrators, architects
+- **Covers**: Goals, workflows, tools, data sources, complaint types, AI tier system, context/memory, events/state, error handling, metrics, open questions
+
+See also: [AI Recommendation Agent Spec](../08-ai-ml/ai-recommendation-agent-spec.md) for the backend PARASITE autonomous recommendation system.

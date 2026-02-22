@@ -33,9 +33,9 @@ class PhyphoxParser:
         Returns:
             Parsed sensor data with computed features
         """
-        if filename.endswith('.json'):
+        if filename.endswith(".json"):
             return self._parse_json(data)
-        elif filename.endswith('.csv'):
+        elif filename.endswith(".csv"):
             return self._parse_csv(data)
         else:
             # Try to detect format
@@ -47,9 +47,9 @@ class PhyphoxParser:
     def _parse_csv(self, data: bytes) -> Dict[str, Any]:
         """Parse phyphox CSV export."""
         try:
-            text = data.decode('utf-8')
+            text = data.decode("utf-8")
         except UnicodeDecodeError:
-            text = data.decode('latin-1')
+            text = data.decode("latin-1")
 
         reader = csv.reader(io.StringIO(text))
         rows = list(reader)
@@ -59,9 +59,9 @@ class PhyphoxParser:
         data_rows = rows[1:] if len(rows) > 1 else []
 
         # Detect measurement type from headers
-        if any('Acceleration' in h or 'acc' in h.lower() for h in headers):
+        if any("Acceleration" in h or "acc" in h.lower() for h in headers):
             return self._parse_acceleration_csv(headers, data_rows)
-        elif any('Frequency' in h or 'freq' in h.lower() for h in headers):
+        elif any("Frequency" in h or "freq" in h.lower() for h in headers):
             return self._parse_spectrum_csv(headers, data_rows)
         else:
             return self._parse_generic_csv(headers, data_rows)
@@ -69,10 +69,10 @@ class PhyphoxParser:
     def _parse_acceleration_csv(self, headers: List[str], rows: List[List[str]]) -> Dict[str, Any]:
         """Parse acceleration time-series data."""
         # Find column indices
-        time_idx = next((i for i, h in enumerate(headers) if 'time' in h.lower()), 0)
-        x_idx = next((i for i, h in enumerate(headers) if 'x' in h.lower()), 1)
-        y_idx = next((i for i, h in enumerate(headers) if 'y' in h.lower()), 2)
-        z_idx = next((i for i, h in enumerate(headers) if 'z' in h.lower()), 3)
+        time_idx = next((i for i, h in enumerate(headers) if "time" in h.lower()), 0)
+        x_idx = next((i for i, h in enumerate(headers) if "x" in h.lower()), 1)
+        y_idx = next((i for i, h in enumerate(headers) if "y" in h.lower()), 2)
+        z_idx = next((i for i, h in enumerate(headers) if "z" in h.lower()), 3)
 
         times = []
         acc_x, acc_y, acc_z = [], [], []
@@ -88,10 +88,10 @@ class PhyphoxParser:
 
         if not times:
             return {
-                'measurement_type': 'vibration',
-                'source': 'csv_export',
-                'error': 'No valid data rows parsed',
-                'confidence': 0.0
+                "measurement_type": "vibration",
+                "source": "csv_export",
+                "error": "No valid data rows parsed",
+                "confidence": 0.0,
             }
 
         # Compute features
@@ -112,22 +112,22 @@ class PhyphoxParser:
         sample_rate_calc = 1.0 / np.mean(np.diff(times)) if len(times) > 1 else 0
 
         return {
-            'measurement_type': 'vibration',
-            'source': 'csv_export',
-            'duration_s': float(duration),
-            'sample_count': len(times),
-            'sample_rate_hz': float(sample_rate_calc),
-            'rms_x_ms2': float(np.sqrt(np.mean(acc_x_arr**2))),
-            'rms_y_ms2': float(np.sqrt(np.mean(acc_y_arr**2))),
-            'rms_z_ms2': float(np.sqrt(np.mean(acc_z_arr**2))),
-            'rms_total_ms2': float(np.sqrt(np.mean(acc_total**2))),
-            'peak_total_ms2': float(np.max(np.abs(acc_total))),
+            "measurement_type": "vibration",
+            "source": "csv_export",
+            "duration_s": float(duration),
+            "sample_count": len(times),
+            "sample_rate_hz": float(sample_rate_calc),
+            "rms_x_ms2": float(np.sqrt(np.mean(acc_x_arr**2))),
+            "rms_y_ms2": float(np.sqrt(np.mean(acc_y_arr**2))),
+            "rms_z_ms2": float(np.sqrt(np.mean(acc_z_arr**2))),
+            "rms_total_ms2": float(np.sqrt(np.mean(acc_total**2))),
+            "peak_total_ms2": float(np.max(np.abs(acc_total))),
             **spectrum,  # Add spectrum data (peak_frequencies_hz, dominant_frequency_hz, etc.)
-            'raw_data': {
-                'time': times[:100],  # First 100 samples for preview
-                'acc_total': acc_total[:100].tolist()
+            "raw_data": {
+                "time": times[:100],  # First 100 samples for preview
+                "acc_total": acc_total[:100].tolist(),
             },
-            'confidence': 0.9  # High confidence for CSV data
+            "confidence": 0.9,  # High confidence for CSV data
         }
 
     def _compute_spectrum(self, signal: np.ndarray, sample_rate: float) -> Dict[str, Any]:
@@ -143,7 +143,7 @@ class PhyphoxParser:
 
         # Compute FFT
         fft = np.fft.rfft(signal_windowed)
-        freqs = np.fft.rfftfreq(n, 1/sample_rate)
+        freqs = np.fft.rfftfreq(n, 1 / sample_rate)
         magnitudes = np.abs(fft) * 2 / n
 
         # Find peaks
@@ -164,12 +164,12 @@ class PhyphoxParser:
         spectrum_shape = self._classify_spectrum_shape(magnitudes, peak_indices)
 
         return {
-            'peak_frequencies_hz': peak_freqs[:10],  # Top 10 peaks
-            'peak_amplitudes_ms2': peak_amps[:10],
-            'dominant_frequency_hz': dominant_freq,
-            'dominant_amplitude_ms2': dominant_amp,
-            'frequency_resolution_hz': float(freqs[1] - freqs[0]) if len(freqs) > 1 else 0,
-            'spectrum_shape': spectrum_shape
+            "peak_frequencies_hz": peak_freqs[:10],  # Top 10 peaks
+            "peak_amplitudes_ms2": peak_amps[:10],
+            "dominant_frequency_hz": dominant_freq,
+            "dominant_amplitude_ms2": dominant_amp,
+            "frequency_resolution_hz": float(freqs[1] - freqs[0]) if len(freqs) > 1 else 0,
+            "spectrum_shape": spectrum_shape,
         }
 
     def _find_peaks(self, data: np.ndarray, threshold_ratio: float = 0.1) -> np.ndarray:
@@ -177,7 +177,7 @@ class PhyphoxParser:
         threshold = np.max(data) * threshold_ratio
         peaks = []
         for i in range(1, len(data) - 1):
-            if data[i] > data[i-1] and data[i] > data[i+1] and data[i] > threshold:
+            if data[i] > data[i - 1] and data[i] > data[i + 1] and data[i] > threshold:
                 peaks.append(i)
 
         # Sort by amplitude (descending) and return indices
@@ -189,74 +189,64 @@ class PhyphoxParser:
     def _classify_spectrum_shape(self, magnitudes: np.ndarray, peak_indices: np.ndarray) -> str:
         """Classify the spectrum shape based on peak distribution."""
         if len(peak_indices) == 0:
-            return 'random'
+            return "random"
 
         # Calculate energy concentration
         if len(magnitudes) > 0:
             total_energy = np.sum(magnitudes**2)
-            peak_energy = np.sum(magnitudes[peak_indices]**2) if len(peak_indices) > 0 else 0
+            peak_energy = np.sum(magnitudes[peak_indices] ** 2) if len(peak_indices) > 0 else 0
             concentration = peak_energy / total_energy if total_energy > 0 else 0
 
             if concentration > 0.8:
                 # Most energy in peaks - check for harmonics
                 if len(peak_indices) >= 3:
-                    return 'harmonic'
+                    return "harmonic"
                 else:
-                    return 'narrowband'
+                    return "narrowband"
             elif concentration > 0.5:
-                return 'narrowband'
+                return "narrowband"
             else:
-                return 'broadband'
+                return "broadband"
 
-        return 'random'
+        return "random"
 
     def _parse_json(self, data: bytes) -> Dict[str, Any]:
         """Parse phyphox JSON export."""
-        content = json.loads(data.decode('utf-8'))
+        content = json.loads(data.decode("utf-8"))
 
         # phyphox JSON structure varies by experiment
         # Common structure has 'sets' with data arrays
-        if 'sets' in content:
+        if "sets" in content:
             return self._parse_phyphox_json_sets(content)
 
-        return {
-            'measurement_type': 'unknown',
-            'source': 'json_export',
-            'raw_content': content,
-            'confidence': 0.5
-        }
+        return {"measurement_type": "unknown", "source": "json_export", "raw_content": content, "confidence": 0.5}
 
     def _parse_phyphox_json_sets(self, content: Dict) -> Dict[str, Any]:
         """Parse phyphox JSON with sets structure."""
-        sets = content.get('sets', [])
+        sets = content.get("sets", [])
 
         # Look for acceleration data
         for data_set in sets:
-            name = data_set.get('name', '').lower()
-            if 'acc' in name or 'linear' in name:
+            name = data_set.get("name", "").lower()
+            if "acc" in name or "linear" in name:
                 # Found acceleration data
-                data_values = data_set.get('data', [])
+                data_values = data_set.get("data", [])
                 if data_values:
                     # Process similar to CSV
                     return {
-                        'measurement_type': 'vibration',
-                        'source': 'json_export',
-                        'data_points': len(data_values),
-                        'raw_set': data_set,
-                        'confidence': 0.7
+                        "measurement_type": "vibration",
+                        "source": "json_export",
+                        "data_points": len(data_values),
+                        "raw_set": data_set,
+                        "confidence": 0.7,
                     }
 
-        return {
-            'measurement_type': 'unknown',
-            'source': 'json_export',
-            'sets_found': len(sets),
-            'confidence': 0.5
-        }
+        return {"measurement_type": "unknown", "source": "json_export", "sets_found": len(sets), "confidence": 0.5}
 
     def _parse_spectrum_csv(self, headers: List[str], rows: List[List[str]]) -> Dict[str, Any]:
         """Parse pre-computed spectrum CSV (frequency vs amplitude)."""
-        freq_idx = next((i for i, h in enumerate(headers) if 'freq' in h.lower()), 0)
-        amp_idx = next((i for i, h in enumerate(headers) if 'amp' in h.lower() or 'mag' in h.lower()), 1)
+        freq_idx = next((i for i, h in enumerate(headers) if "freq" in h.lower()), 0)
+        amp_idx = next((i for i, h in enumerate(headers) if "amp" in h.lower() or "mag" in h.lower()), 1)
 
         freqs, amps = [], []
         for row in rows:
@@ -268,10 +258,10 @@ class PhyphoxParser:
 
         if not freqs:
             return {
-                'measurement_type': 'spectrum',
-                'source': 'csv_export',
-                'error': 'No valid data rows parsed',
-                'confidence': 0.0
+                "measurement_type": "spectrum",
+                "source": "csv_export",
+                "error": "No valid data rows parsed",
+                "confidence": 0.0,
             }
 
         freqs_arr = np.array(freqs)
@@ -279,25 +269,25 @@ class PhyphoxParser:
         peak_indices = self._find_peaks(amps_arr)
 
         return {
-            'measurement_type': 'spectrum',
-            'source': 'csv_export',
-            'peak_frequencies_hz': freqs_arr[peak_indices].tolist()[:10],
-            'peak_amplitudes': amps_arr[peak_indices].tolist()[:10],
-            'dominant_frequency_hz': float(freqs_arr[np.argmax(amps_arr)]),
-            'dominant_amplitude': float(np.max(amps_arr)),
-            'frequency_range_hz': {'min': float(freqs_arr.min()), 'max': float(freqs_arr.max())},
-            'confidence': 0.9
+            "measurement_type": "spectrum",
+            "source": "csv_export",
+            "peak_frequencies_hz": freqs_arr[peak_indices].tolist()[:10],
+            "peak_amplitudes": amps_arr[peak_indices].tolist()[:10],
+            "dominant_frequency_hz": float(freqs_arr[np.argmax(amps_arr)]),
+            "dominant_amplitude": float(np.max(amps_arr)),
+            "frequency_range_hz": {"min": float(freqs_arr.min()), "max": float(freqs_arr.max())},
+            "confidence": 0.9,
         }
 
     def _parse_generic_csv(self, headers: List[str], rows: List[List[str]]) -> Dict[str, Any]:
         """Parse unknown CSV format."""
         return {
-            'measurement_type': 'unknown',
-            'source': 'csv_export',
-            'headers': headers,
-            'row_count': len(rows),
-            'sample_data': rows[:5],
-            'confidence': 0.3
+            "measurement_type": "unknown",
+            "source": "csv_export",
+            "headers": headers,
+            "row_count": len(rows),
+            "sample_data": rows[:5],
+            "confidence": 0.3,
         }
 
 

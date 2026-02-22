@@ -134,22 +134,26 @@ async def upload_document(
     document_code = f"USER-DOC-{building_id[:8]}-{uuid.uuid4().hex[:8]}".upper()
 
     try:
-        doc_record = client.table("documents").insert(
-            {
-                "id": document_id,
-                "code": document_code,
-                "title": doc_title,
-                "document_type": document_type,
-                "equipment_type": "general",  # User-uploaded docs are general
-                "source": "user_upload",
-                "source_file_path": storage_path,
-                "full_text": extracted_text,
-                "summary": extracted_text[:500],  # First 500 chars as summary
-                "file_size_bytes": metadata["size_bytes"],
-                "building_id": building_id,
-                "indexing_status": "pending",
-            }
-        ).execute()
+        doc_record = (
+            client.table("documents")
+            .insert(
+                {
+                    "id": document_id,
+                    "code": document_code,
+                    "title": doc_title,
+                    "document_type": document_type,
+                    "equipment_type": "general",  # User-uploaded docs are general
+                    "source": "user_upload",
+                    "source_file_path": storage_path,
+                    "full_text": extracted_text,
+                    "summary": extracted_text[:500],  # First 500 chars as summary
+                    "file_size_bytes": metadata["size_bytes"],
+                    "building_id": building_id,
+                    "indexing_status": "pending",
+                }
+            )
+            .execute()
+        )
 
         if not doc_record.data:
             raise Exception("Failed to create document record")
@@ -169,9 +173,7 @@ async def upload_document(
         )
 
         # Update chunks with building_id
-        client.table("document_chunks").update({"building_id": building_id}).eq(
-            "document_id", document_id
-        ).execute()
+        client.table("document_chunks").update({"building_id": building_id}).eq("document_id", document_id).execute()
 
         logger.info(f"Successfully indexed document {document_id} with {chunk_count} chunks for building {building_id}")
 

@@ -134,6 +134,9 @@ class Settings(BaseSettings):
     parasite_max_auto_executions_per_hour: int = 10  # Rate limit for Tier 3 actions
     parasite_bacnet_priority: int = 8  # BACnet priority array slot (8 = PARASITE level)
 
+    # AEGIS BESS Writer (Phase 0: disabled; Phase 1: enable after ops CONFIRM)
+    aegis_bess_writer_enabled: bool = False
+
     # EskomSePush API (load shedding data)
     eskomsepush_api_token: str = ""
     eskomsepush_area_id: str = ""  # Area ID from EskomSePush (use /areas_search to find)
@@ -172,6 +175,20 @@ class Settings(BaseSettings):
     optimization_tier2_min: float = 0.60  # Below this -> tier1_advisory, above -> tier2_approval
     optimization_tier3_min: float = 0.85  # Above this -> tier3_auto_execute
     optimization_fcu_confidence_cap: float = 0.45  # FCU actions capped at this confidence
+
+    # MCP Authentication (Phase 81 - MCP SSE Security)
+    mcp_auth_token: str = ""  # Shared MCP authentication token
+    mcp_auth_token_previous: str = ""  # Previous token for rotation grace period
+    mcp_auth_token_max_age_hours: int = 0  # 0 = no expiry; >0 = enforce max age
+
+    # MCP Rate Limiting (Phase P4 - Abuse Prevention)
+    mcp_read_rate_limit: int = 60  # Read tool calls per minute per identity
+    mcp_mutate_rate_limit: int = 10  # Mutate tool calls per minute per identity
+    mcp_tool_timeout_seconds: int = 30  # Default tool execution timeout
+
+    # JWT Token Claims (MCP SSE B1 - Issuer/Audience validation)
+    jwt_issuer: str = "sentinel.bms"  # JWT iss claim
+    jwt_audience: str = "sentinel.bms"  # JWT aud claim
 
     @property
     def resolved_ingestion_mode(self) -> IngestionMode:

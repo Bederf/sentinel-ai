@@ -22,6 +22,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 @dataclass
 class ConceptJobCard:
     """Concept Evolution job card/work order."""
+
     job_card_no: str
     task_ref: str
     priority: str  # P1, P2, P3, P4
@@ -61,12 +62,7 @@ class ConceptJobCard:
     @property
     def priority_level(self) -> str:
         """Convert P1-P4 to severity levels."""
-        mapping = {
-            "P1": "critical",
-            "P2": "high",
-            "P3": "medium",
-            "P4": "low"
-        }
+        mapping = {"P1": "critical", "P2": "high", "P3": "medium", "P4": "low"}
         return mapping.get(self.priority, "medium")
 
     @property
@@ -75,9 +71,17 @@ class ConceptJobCard:
         if not self.tech_notes:
             return False
         warning_keywords = [
-            "URGENT", "CRITICAL", "WILL fail", "RECOMMEND",
-            "WARNING", "same issue", "again", "recurring",
-            "EXACTLY same", "catastrophic", "emergency"
+            "URGENT",
+            "CRITICAL",
+            "WILL fail",
+            "RECOMMEND",
+            "WARNING",
+            "same issue",
+            "again",
+            "recurring",
+            "EXACTLY same",
+            "catastrophic",
+            "emergency",
         ]
         notes_upper = self.tech_notes.upper()
         return any(kw.upper() in notes_upper for kw in warning_keywords)
@@ -86,6 +90,7 @@ class ConceptJobCard:
 @dataclass
 class ConceptAsset:
     """Concept Evolution asset record."""
+
     asset_code: str
     asset_desc: str
     asset_category: str
@@ -318,23 +323,17 @@ class ConceptDataLoader:
     def get_repeat_calls(self, asset_code: str, months: int = 12) -> list[ConceptJobCard]:
         """Get repeat calls for an asset within time period."""
         cutoff = datetime.now().replace(
-            year=datetime.now().year - (months // 12),
-            month=max(1, datetime.now().month - (months % 12))
+            year=datetime.now().year - (months // 12), month=max(1, datetime.now().month - (months % 12))
         )
         return [
-            jc for jc in self.job_cards
-            if jc.asset_code == asset_code
-            and jc.repeat_call
-            and jc.logged_date
-            and jc.logged_date >= cutoff
+            jc
+            for jc in self.job_cards
+            if jc.asset_code == asset_code and jc.repeat_call and jc.logged_date and jc.logged_date >= cutoff
         ]
 
     def get_warning_job_cards(self, asset_code: str) -> list[ConceptJobCard]:
         """Get job cards with technician warning flags."""
-        return [
-            jc for jc in self.job_cards
-            if jc.asset_code == asset_code and jc.has_warning_flags
-        ]
+        return [jc for jc in self.job_cards if jc.asset_code == asset_code and jc.has_warning_flags]
 
     def calculate_health_score(self, asset_code: str) -> dict:
         """
@@ -392,34 +391,48 @@ class ConceptDataLoader:
                 "base_condition": {"score": base_score, "weight": "40%", "raw": asset.condition_score},
                 "repeat_calls": {"score": repeat_score, "weight": "25%", "count": len(repeat_calls)},
                 "ppm_compliance": {"score": ppm_score, "weight": "15%"},
-                "age_factor": {"score": age_score, "weight": "10%", "age": asset.age_years, "expected": asset.expected_life_years},
+                "age_factor": {
+                    "score": age_score,
+                    "weight": "10%",
+                    "age": asset.age_years,
+                    "expected": asset.expected_life_years,
+                },
                 "warning_flags": {"score": warning_score, "weight": "10%", "count": len(warnings)},
             },
-            "risk_level": "Critical" if total_score < 40 else "High" if total_score < 60 else "Medium" if total_score < 80 else "Low",
+            "risk_level": "Critical"
+            if total_score < 40
+            else "High"
+            if total_score < 60
+            else "Medium"
+            if total_score < 80
+            else "Low",
             "recommendations": self._generate_recommendations(asset, repeat_calls, warnings),
         }
 
     def _generate_recommendations(
-        self,
-        asset: ConceptAsset,
-        repeat_calls: list[ConceptJobCard],
-        warnings: list[ConceptJobCard]
+        self, asset: ConceptAsset, repeat_calls: list[ConceptJobCard], warnings: list[ConceptJobCard]
     ) -> list[str]:
         """Generate maintenance recommendations based on health factors."""
         recommendations = []
 
         if asset.is_beyond_life:
-            recommendations.append(f"Asset is {asset.age_years - asset.expected_life_years} years beyond expected life. Plan replacement.")
+            recommendations.append(
+                f"Asset is {asset.age_years - asset.expected_life_years} years beyond expected life. Plan replacement."
+            )
 
         if len(repeat_calls) >= 3:
-            recommendations.append(f"{len(repeat_calls)} repeat calls in 12 months indicates systemic issue. Root cause analysis recommended.")
+            recommendations.append(
+                f"{len(repeat_calls)} repeat calls in 12 months indicates systemic issue. Root cause analysis recommended."
+            )
 
         if warnings:
             latest_warning = max(warnings, key=lambda x: x.logged_date or datetime.min)
             recommendations.append(f"Technician flagged: {latest_warning.tech_notes[:100]}...")
 
         if asset.condition_score < 50:
-            recommendations.append(f"Condition score {asset.condition_score}/100 is poor. Comprehensive inspection needed.")
+            recommendations.append(
+                f"Condition score {asset.condition_score}/100 is poor. Comprehensive inspection needed."
+            )
 
         if not recommendations:
             recommendations.append("Asset in acceptable condition. Continue regular PPM schedule.")

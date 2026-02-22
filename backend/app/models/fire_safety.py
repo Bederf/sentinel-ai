@@ -12,8 +12,10 @@ from pydantic import BaseModel, Field
 
 # --- Enums ---
 
+
 class FireZoneType(str, Enum):
     """Types of fire zones."""
+
     CORRIDOR = "corridor"
     OFFICE = "office"
     STAIRWELL = "stairwell"
@@ -25,6 +27,7 @@ class FireZoneType(str, Enum):
 
 class AlarmType(str, Enum):
     """Types of fire alarms."""
+
     SMOKE = "smoke"
     HEAT = "heat"
     MANUAL = "manual"
@@ -34,6 +37,7 @@ class AlarmType(str, Enum):
 
 class AlarmSeverity(str, Enum):
     """Fire alarm severity levels."""
+
     FIRE = "fire"
     PRE_ALARM = "pre_alarm"
     FAULT = "fault"
@@ -42,6 +46,7 @@ class AlarmSeverity(str, Enum):
 
 class DamperStatusEnum(str, Enum):
     """Smoke damper status values."""
+
     OPEN = "open"
     CLOSED = "closed"
     TRANSIT = "transit"
@@ -51,6 +56,7 @@ class DamperStatusEnum(str, Enum):
 
 class FanStatus(str, Enum):
     """Pressurization fan status values."""
+
     OFF = "off"
     RUNNING = "running"
     FAULT = "fault"
@@ -58,6 +64,7 @@ class FanStatus(str, Enum):
 
 class PanelStatus(str, Enum):
     """Fire alarm panel status."""
+
     NORMAL = "normal"
     ALARM = "alarm"
     FAULT = "fault"
@@ -66,6 +73,7 @@ class PanelStatus(str, Enum):
 
 class HealthStatus(str, Enum):
     """Overall system health status."""
+
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     CRITICAL = "critical"
@@ -73,6 +81,7 @@ class HealthStatus(str, Enum):
 
 class CauseEffectTargetType(str, Enum):
     """Target types for cause-effect matrix."""
+
     HVAC = "hvac"
     DAMPER = "damper"
     PRESSURIZATION = "pressurization"
@@ -81,8 +90,10 @@ class CauseEffectTargetType(str, Enum):
 
 # --- Models ---
 
+
 class FireZone(BaseModel):
     """Fire zone definition with detector counts."""
+
     zone_id: str
     zone_name: str
     floor: str
@@ -95,6 +106,7 @@ class FireZone(BaseModel):
 
 class FireAlarm(BaseModel):
     """Active or historical fire alarm event."""
+
     alarm_id: str
     zone_id: str
     alarm_type: AlarmType
@@ -110,6 +122,7 @@ class FireAlarm(BaseModel):
 
 class DamperStatus(BaseModel):
     """Smoke damper position and health status."""
+
     damper_id: str
     equipment_id: Optional[str] = None
     zone_id: Optional[str] = None
@@ -122,6 +135,7 @@ class DamperStatus(BaseModel):
 
 class StairwellPressure(BaseModel):
     """Stairwell pressurization fan and pressure readings."""
+
     stairwell_id: str
     floor: str = ""
     current_pressure_pa: float = 0.0
@@ -132,6 +146,7 @@ class StairwellPressure(BaseModel):
 
 class CauseEffectEffect(BaseModel):
     """Single effect action in the cause-effect matrix."""
+
     target_type: CauseEffectTargetType
     target_id: str
     action: str
@@ -141,6 +156,7 @@ class CauseEffectEffect(BaseModel):
 
 class CauseEffectEntry(BaseModel):
     """Cause-effect matrix entry mapping triggers to actions."""
+
     trigger_zone: str
     trigger_type: str
     effects: List[CauseEffectEffect] = []
@@ -148,6 +164,7 @@ class CauseEffectEntry(BaseModel):
 
 class FireSystemStatus(BaseModel):
     """Aggregate fire system status."""
+
     panel_status: PanelStatus = PanelStatus.NORMAL
     active_alarms: List[FireAlarm] = []
     zone_count: int = 0
@@ -160,6 +177,7 @@ class FireSystemStatus(BaseModel):
 
 class FireSystemHealth(BaseModel):
     """Fire system health summary."""
+
     panel_comms: str = "ok"  # ok, fault
     battery_status: str = "ok"  # ok, low, critical
     detector_faults: int = 0

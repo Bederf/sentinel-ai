@@ -45,7 +45,7 @@ class OCRService:
         equipment_id: str,
         service_type: str,
         service_record_id: str,
-        media_type: str = "image/jpeg"
+        media_type: str = "image/jpeg",
     ) -> Dict[str, Any]:
         """
         Main entry point - runs full 3-stage pipeline.
@@ -79,32 +79,26 @@ class OCRService:
 
         try:
             # Stage 1: OCR extraction
-            stage1_result = await self._stage1_ocr_extraction(
-                image_data, equipment_id, service_type, media_type
-            )
+            stage1_result = await self._stage1_ocr_extraction(image_data, equipment_id, service_type, media_type)
 
             if not stage1_result.get("success"):
                 return {
                     "status": "failed",
                     "error": stage1_result.get("error", "OCR extraction failed"),
-                    "pipeline_info": {"stage1_confidence": 0.0}
+                    "pipeline_info": {"stage1_confidence": 0.0},
                 }
 
             # Stage 2: Template validation
-            stage2_result = await self._stage2_template_validation(
-                stage1_result["data"], equipment_id, service_type
-            )
+            stage2_result = await self._stage2_template_validation(stage1_result["data"], equipment_id, service_type)
 
             # Stage 3: AI enhancement (fill gaps, handle corrections)
-            stage3_result = await self._stage3_ai_enhancement(
-                stage2_result, equipment_id, service_type
-            )
+            stage3_result = await self._stage3_ai_enhancement(stage2_result, equipment_id, service_type)
 
             # Determine final status
             final_status = self._determine_final_status(
                 stage1_result.get("confidence", 0),
                 stage2_result.get("validation_score", 0),
-                stage2_result.get("issues", [])
+                stage2_result.get("issues", []),
             )
 
             return {
@@ -115,8 +109,8 @@ class OCRService:
                     "stage1_confidence": stage1_result.get("confidence", 0),
                     "stage2_validation_score": stage2_result.get("validation_score", 0),
                     "stage3_enhanced": stage3_result.get("enhanced", False),
-                    "issues": stage2_result.get("issues", [])
-                }
+                    "issues": stage2_result.get("issues", []),
+                },
             }
 
         except Exception as e:
@@ -127,11 +121,7 @@ class OCRService:
             gc.collect()  # Memory cleanup after processing
 
     async def _stage1_ocr_extraction(
-        self,
-        image_data: bytes,
-        equipment_id: str,
-        service_type: str,
-        media_type: str
+        self, image_data: bytes, equipment_id: str, service_type: str, media_type: str
     ) -> Dict[str, Any]:
         """Stage 1: Extract structured data from service sheet using Claude Vision."""
         logger.info(f"Stage 1: Starting OCR extraction for equipment {equipment_id}")
@@ -187,31 +177,23 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
                             {"type": "text", "text": prompt},
                             {
                                 "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": media_type,
-                                    "data": image_b64
-                                }
-                            }
-                        ]
+                                "source": {"type": "base64", "media_type": media_type, "data": image_b64},
+                            },
+                        ],
                     }
-                ]
+                ],
             )
 
             # Parse JSON response
             response_text = response.content[0].text
 
             # Try to extract JSON from response (may be wrapped in markdown)
-            json_match = re.search(r'\{[\s\S]*\}', response_text)
+            json_match = re.search(r"\{[\s\S]*\}", response_text)
             if json_match:
                 data = json.loads(json_match.group())
                 confidence = data.get("overall_confidence", 0.7)
                 logger.info(f"Stage 1 complete: confidence={confidence:.2f}")
-                return {
-                    "success": True,
-                    "data": data,
-                    "confidence": confidence
-                }
+                return {"success": True, "data": data, "confidence": confidence}
             else:
                 logger.warning("Could not parse JSON from Claude response")
                 return {"success": False, "error": "Invalid response format"}
@@ -224,10 +206,7 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
             return {"success": False, "error": str(e)}
 
     async def _stage2_template_validation(
-        self,
-        extracted_data: Dict[str, Any],
-        equipment_id: str,
-        service_type: str
+        self, extracted_data: Dict[str, Any], equipment_id: str, service_type: str
     ) -> Dict[str, Any]:
         """Stage 2: Validate extracted data against equipment template."""
         logger.info(f"Stage 2: Validating against template for {equipment_id}")
@@ -248,7 +227,7 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
             return {
                 "data": extracted_data,
                 "validation_score": 0.5,
-                "issues": [{"field": "_template", "message": "No template found", "severity": "warning"}]
+                "issues": [{"field": "_template", "message": "No template found", "severity": "warning"}],
             }
 
         validated_data = {}
@@ -264,11 +243,9 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
             confidence = self._find_confidence(extracted_data, rule_name)
 
             if value is None and rule.get("required", False):
-                issues.append({
-                    "field": rule_name,
-                    "message": f"Missing required field: {rule_name}",
-                    "severity": "error"
-                })
+                issues.append(
+                    {"field": rule_name, "message": f"Missing required field: {rule_name}", "severity": "error"}
+                )
             elif value is not None:
                 # Type coercion and validation
                 try:
@@ -277,15 +254,10 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
                         "value": coerced,
                         "confidence": confidence,
                         "unit": rule.get("unit", ""),
-                        "valid": True
+                        "valid": True,
                     }
                 except ValueError as e:
-                    issues.append({
-                        "field": rule_name,
-                        "message": str(e),
-                        "severity": "error",
-                        "raw_value": value
-                    })
+                    issues.append({"field": rule_name, "message": str(e), "severity": "error", "raw_value": value})
 
         # Copy other extracted data that doesn't have validation rules
         for key in ["equipment_code", "service_date", "technician", "hour_meter", "notes"]:
@@ -309,7 +281,7 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
             "data": validated_data,
             "validation_score": validation_score,
             "issues": issues,
-            "template_used": f"{equipment_type}/{service_type}"
+            "template_used": f"{equipment_type}/{service_type}",
         }
 
     def _find_extracted_value(self, data: Dict[str, Any], field_name: str) -> Any:
@@ -361,7 +333,7 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
             if isinstance(value, (int, float)):
                 num = float(value)
             else:
-                cleaned = re.sub(r'[^0-9.\-]', '', str(value))
+                cleaned = re.sub(r"[^0-9.\-]", "", str(value))
                 num = float(cleaned) if cleaned else 0.0
 
             # Range validation
@@ -393,10 +365,7 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
         return str(value)  # Default to string
 
     async def _stage3_ai_enhancement(
-        self,
-        stage2_result: Dict[str, Any],
-        equipment_id: str,
-        service_type: str
+        self, stage2_result: Dict[str, Any], equipment_id: str, service_type: str
     ) -> Dict[str, Any]:
         """Stage 3: AI enhancement to fill gaps and suggest corrections."""
         logger.info("Stage 3: Starting AI enhancement")
@@ -405,11 +374,7 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
 
         # If no issues, return Stage 2 data as-is
         if not issues:
-            return {
-                "final_data": stage2_result["data"],
-                "enhanced": False,
-                "corrections_needed": []
-            }
+            return {"final_data": stage2_result["data"], "enhanced": False, "corrections_needed": []}
 
         try:
             # Build context for AI to fill gaps
@@ -426,29 +391,20 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
                     enhanced_data[field] = {
                         "value": raw,
                         "confidence": 0.3,  # Low confidence for AI-corrected
-                        "needs_verification": True
+                        "needs_verification": True,
                     }
 
-            return {
-                "final_data": enhanced_data,
-                "enhanced": True,
-                "corrections_needed": error_fields
-            }
+            return {"final_data": enhanced_data, "enhanced": True, "corrections_needed": error_fields}
 
         except Exception as e:
             logger.warning(f"Stage 3 enhancement failed: {e}, using Stage 2 data")
             return {
                 "final_data": stage2_result["data"],
                 "enhanced": False,
-                "corrections_needed": [i["field"] for i in issues if i["severity"] == "error"]
+                "corrections_needed": [i["field"] for i in issues if i["severity"] == "error"],
             }
 
-    def _determine_final_status(
-        self,
-        ocr_confidence: float,
-        validation_score: float,
-        issues: List[Dict]
-    ) -> str:
+    def _determine_final_status(self, ocr_confidence: float, validation_score: float, issues: List[Dict]) -> str:
         """Determine final status based on pipeline results."""
         error_count = len([i for i in issues if i["severity"] == "error"])
 

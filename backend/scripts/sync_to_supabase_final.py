@@ -56,17 +56,19 @@ def prepare_zones(zones: List[Dict], building_id: str) -> List[Dict]:
     """Prepare zones for Supabase insert."""
     result = []
     for zone in zones:
-        result.append({
-            "id": str(uuid.uuid4()),
-            "building_id": building_id,
-            "zone_id": zone["zone_id"],
-            "zone_name": zone.get("zone_name", zone["zone_id"]),
-            "floor": zone["floor"],
-            "zone_type": zone.get("zone_type", "open_office"),
-            "typical_occupancy": zone.get("typical_occupancy"),
-            "area_sqm": zone.get("area_sqm"),
-            "zone_letter": zone.get("zone_letter"),
-        })
+        result.append(
+            {
+                "id": str(uuid.uuid4()),
+                "building_id": building_id,
+                "zone_id": zone["zone_id"],
+                "zone_name": zone.get("zone_name", zone["zone_id"]),
+                "floor": zone["floor"],
+                "zone_type": zone.get("zone_type", "open_office"),
+                "typical_occupancy": zone.get("typical_occupancy"),
+                "area_sqm": zone.get("area_sqm"),
+                "zone_letter": zone.get("zone_letter"),
+            }
+        )
     return result
 
 
@@ -74,16 +76,18 @@ def prepare_desks(desks: List[Dict], building_id: str) -> List[Dict]:
     """Prepare desks for Supabase insert."""
     result = []
     for desk in desks:
-        result.append({
-            "desk_id": desk["desk_id"],
-            "building_id": building_id,
-            "floor": desk["floor"],
-            "zone_id": desk["zone_id"],
-            "context": desk.get("context", "open_plan"),
-            "x_coord": float(desk.get("x_coord", 0.0)),
-            "z_coord": float(desk.get("z_coord", 0.0)),
-            "y_coord": 0.0,
-        })
+        result.append(
+            {
+                "desk_id": desk["desk_id"],
+                "building_id": building_id,
+                "floor": desk["floor"],
+                "zone_id": desk["zone_id"],
+                "context": desk.get("context", "open_plan"),
+                "x_coord": float(desk.get("x_coord", 0.0)),
+                "z_coord": float(desk.get("z_coord", 0.0)),
+                "y_coord": 0.0,
+            }
+        )
     return result
 
 
@@ -146,10 +150,7 @@ def sync_to_supabase(building_code: str, dry_run: bool = False):
         print("\n📤 Syncing to Supabase...")
 
         print(f"   Upserting {len(zones_prepared)} zones...")
-        response = client.table("zones").upsert(
-            zones_prepared,
-            on_conflict="building_id,zone_id"
-        ).execute()
+        response = client.table("zones").upsert(zones_prepared, on_conflict="building_id,zone_id").execute()
         zones_synced = len(response.data) if response.data else 0
         print(f"   ✓ {zones_synced} zones synced")
 
@@ -164,10 +165,7 @@ def sync_to_supabase(building_code: str, dry_run: bool = False):
             batch = desks_prepared[start:end]
 
             print(f"   Batch {batch_idx + 1}/{num_batches}: {len(batch)} desks...")
-            response = client.table("desks").upsert(
-                batch,
-                on_conflict="desk_id"
-            ).execute()
+            response = client.table("desks").upsert(batch, on_conflict="desk_id").execute()
             synced = len(response.data) if response.data else 0
             total_synced += synced
             print(f"   ✓ {synced} desks synced")
@@ -184,19 +182,14 @@ def sync_to_supabase(building_code: str, dry_run: bool = False):
     except Exception as e:
         print(f"  ✗ Sync failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Sync corrected zones and desks to Supabase"
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Preview sync without actually writing to Supabase"
-    )
+    parser = argparse.ArgumentParser(description="Sync corrected zones and desks to Supabase")
+    parser.add_argument("--dry-run", action="store_true", help="Preview sync without actually writing to Supabase")
     args = parser.parse_args()
 
     success = sync_to_supabase("site-002", dry_run=args.dry_run)

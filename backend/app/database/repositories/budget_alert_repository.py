@@ -24,9 +24,11 @@ class BudgetAlertRepository:
             return None
 
         try:
-            result = self.client.table("budget_alerts").upsert(
-                data, on_conflict="contract_id,period_year,period_month,severity,equipment_type"
-            ).execute()
+            result = (
+                self.client.table("budget_alerts")
+                .upsert(data, on_conflict="contract_id,period_year,period_month,severity,equipment_type")
+                .execute()
+            )
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
@@ -42,16 +44,19 @@ class BudgetAlertRepository:
         year: Optional[int] = None,
         month: Optional[int] = None,
         status: Optional[str] = None,
-        severity: Optional[str] = None
+        severity: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """List alerts for a contract with optional filters."""
         if not self.client:
             return []
 
         try:
-            query = self.client.table("budget_alerts").select("*").eq(
-                "contract_id", contract_id
-            ).order("created_at", desc=True)
+            query = (
+                self.client.table("budget_alerts")
+                .select("*")
+                .eq("contract_id", contract_id)
+                .order("created_at", desc=True)
+            )
 
             if year:
                 query = query.eq("period_year", year)
@@ -69,19 +74,13 @@ class BudgetAlertRepository:
             logger.error(f"Error listing budget alerts: {e}")
             return []
 
-    def update_status(
-        self,
-        alert_id: str,
-        status: str
-    ) -> Optional[Dict[str, Any]]:
+    def update_status(self, alert_id: str, status: str) -> Optional[Dict[str, Any]]:
         """Update alert status (open, acknowledged, resolved)."""
         if not self.client:
             return None
 
         try:
-            result = self.client.table("budget_alerts").update(
-                {"status": status}
-            ).eq("id", alert_id).execute()
+            result = self.client.table("budget_alerts").update({"status": status}).eq("id", alert_id).execute()
 
             if result.data and len(result.data) > 0:
                 return result.data[0]

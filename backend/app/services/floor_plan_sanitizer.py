@@ -34,6 +34,7 @@ class FloorPlanSanitizer:
         """Check if pytesseract and tesseract-ocr are available."""
         try:
             import pytesseract
+
             return True
         except ImportError:
             logger.warning("pytesseract not available. Text removal will be basic.")
@@ -256,9 +257,7 @@ class FloorPlanSanitizer:
             logger.warning(f"Text extraction for lookup failed: {e}")
             return {}
 
-    def reidentify_equipment_config(
-        self, extracted_config: Dict, lookup_table: Optional[Dict]
-    ) -> Dict:
+    def reidentify_equipment_config(self, extracted_config: Dict, lookup_table: Optional[Dict]) -> Dict:
         """
         Re-apply identifying information to extracted config after API response.
 
@@ -294,9 +293,7 @@ class FloorPlanSanitizer:
                 eq_x, eq_y = equipment.get("x", 0), equipment.get("y", 0)
 
                 # Find closest text region
-                closest_region = self._find_closest_text_region(
-                    (eq_x, eq_y), lookup_table
-                )
+                closest_region = self._find_closest_text_region((eq_x, eq_y), lookup_table)
 
                 if closest_region:
                     # Add zone/room name if close enough
@@ -310,9 +307,7 @@ class FloorPlanSanitizer:
             logger.warning(f"Re-identification failed: {e}")
             return extracted_config
 
-    def _find_closest_text_region(
-        self, position: Tuple[int, int], lookup_table: Dict
-    ) -> Optional[Dict]:
+    def _find_closest_text_region(self, position: Tuple[int, int], lookup_table: Dict) -> Optional[Dict]:
         """Find closest text region to given position."""
         closest = None
         min_distance = float("inf")
@@ -337,9 +332,7 @@ class FloorPlanSanitizer:
 
         return closest
 
-    def build_room_lookup_from_floor_plan(
-        self, image_path_or_bytes: str | bytes
-    ) -> Dict[str, Dict]:
+    def build_room_lookup_from_floor_plan(self, image_path_or_bytes: str | bytes) -> Dict[str, Dict]:
         """
         Build lookup table from floor plan that stays on-device.
 

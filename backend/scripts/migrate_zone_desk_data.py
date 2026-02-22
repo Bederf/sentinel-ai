@@ -75,7 +75,7 @@ def calculate_desk_coordinates(
     - R: 12.5m (roof)
     """
     # Zone X offset (5 zones × 6m each = 30m floor width)
-    zone_offset_x = (ord(zone_letter) - ord('A')) * 6.0
+    zone_offset_x = (ord(zone_letter) - ord("A")) * 6.0
 
     # Desk grid position within zone (4 rows × 5 cols = 20 desks)
     row = desk_index_in_zone // 5
@@ -318,7 +318,9 @@ def verify_insertion(supabase_client: Any, building_id: str) -> bool:
 
     # Check zone centroids via the view
     try:
-        centroids_response = supabase_client.table("zone_centroids").select("*").eq("building_id", building_id).execute()
+        centroids_response = (
+            supabase_client.table("zone_centroids").select("*").eq("building_id", building_id).execute()
+        )
         centroid_count = len(centroids_response.data)
         print(f"✓ Zone centroids available: {centroid_count} zones with centroids")
     except Exception as e:
@@ -328,9 +330,7 @@ def verify_insertion(supabase_client: Any, building_id: str) -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Migrate site zone and desk data from backup JSON to Supabase"
-    )
+    parser = argparse.ArgumentParser(description="Migrate site zone and desk data from backup JSON to Supabase")
     parser.add_argument("--site", required=True, help="Site ID (e.g., site-002)")
     parser.add_argument("--dry-run", action="store_true", help="Preview migration without modifying database")
 
@@ -341,9 +341,9 @@ def main():
     zones_backup = data_dir / "zones.json.bak"
     desks_backup = data_dir / "desks.json.bak"
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Zone & Desk Migration for {args.site}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     # Check files exist
     if not zones_backup.exists():
@@ -406,11 +406,11 @@ def main():
     # Verify
     verify_insertion(supabase_client, building_uuid)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("✓ Migration complete!")
     print(f"  {len(zones)} zones → Supabase")
     print(f"  {len(desks)} desks → Supabase")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
 
 if __name__ == "__main__":

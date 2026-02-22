@@ -7,19 +7,20 @@ from pydantic import BaseModel, Field
 
 class OptimizationProfile(BaseModel):
     """Defines weight distribution for analyzing simulation results."""
+
     name: str
     description: str
     weights: Dict[str, float] = Field(
         description="Weight factors: runtime, comfort, cost, maintenance, energy (sum to 1.0)"
     )
     thresholds: Dict[str, float] = Field(
-        default_factory=dict,
-        description="Profile-specific thresholds (e.g. max_comfort_deviation_c)"
+        default_factory=dict, description="Profile-specific thresholds (e.g. max_comfort_deviation_c)"
     )
 
 
 class SimulationRunRecord(BaseModel):
     """Metadata for a single simulation run."""
+
     run_id: str
     scenario: str
     building_code: str
@@ -33,6 +34,7 @@ class SimulationRunRecord(BaseModel):
 
 class SimulationEvent(BaseModel):
     """A single event from a simulation JSONL log."""
+
     timestamp: str
     simulated_hour: int
     event_type: str
@@ -45,6 +47,7 @@ class SimulationEvent(BaseModel):
 
 class SimulationMetrics(BaseModel):
     """Computed metrics from simulation events."""
+
     total_events: int = 0
     total_faults: int = 0
     faults_repaired: int = 0
@@ -62,25 +65,20 @@ class SimulationMetrics(BaseModel):
 
 class ProfileAnalysisResult(BaseModel):
     """Analysis result for a single optimization profile."""
+
     profile_name: str
     overall_score: float = Field(description="Weighted score 0-100")
-    component_scores: Dict[str, float] = Field(
-        description="Individual dimension scores"
-    )
+    component_scores: Dict[str, float] = Field(description="Individual dimension scores")
     recommendations: List[str] = Field(default_factory=list)
-    flags: List[str] = Field(
-        default_factory=list,
-        description="Threshold violations or notable findings"
-    )
+    flags: List[str] = Field(default_factory=list, description="Threshold violations or notable findings")
 
 
 class SimulationAnalysisReport(BaseModel):
     """Full analysis report for a simulation run."""
+
     run_id: str
     scenario: str
     building_code: str
     analyzed_at: str
     metrics: SimulationMetrics
-    profile_results: Dict[str, ProfileAnalysisResult] = Field(
-        description="Analysis results keyed by profile name"
-    )
+    profile_results: Dict[str, ProfileAnalysisResult] = Field(description="Analysis results keyed by profile name")

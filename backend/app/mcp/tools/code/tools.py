@@ -32,28 +32,28 @@ TOOLS = [
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "Search query: file pattern (e.g., '*.tsx', 'components/**/*.py'), keyword, or symbol name"
+                    "description": "Search query: file pattern (e.g., '*.tsx', 'components/**/*.py'), keyword, or symbol name",
                 },
                 "search_type": {
                     "type": "string",
                     "enum": ["file", "content", "symbol"],
-                    "description": "Type of search: 'file' for glob patterns, 'content' for keyword/regex, 'symbol' for function/class names"
+                    "description": "Type of search: 'file' for glob patterns, 'content' for keyword/regex, 'symbol' for function/class names",
                 },
                 "base_path": {
                     "type": "string",
-                    "description": "Optional subdirectory to search in (e.g., 'frontend/src', 'backend/app')"
+                    "description": "Optional subdirectory to search in (e.g., 'frontend/src', 'backend/app')",
                 },
                 "is_regex": {
                     "type": "boolean",
-                    "description": "If true and search_type='content', treat query as regex pattern"
+                    "description": "If true and search_type='content', treat query as regex pattern",
                 },
                 "limit": {
                     "type": "integer",
-                    "description": "Maximum results to return (default: 50 for files, 20 for content)"
-                }
+                    "description": "Maximum results to return (default: 50 for files, 20 for content)",
+                },
             },
-            "required": ["query", "search_type"]
-        }
+            "required": ["query", "search_type"],
+        },
     },
     {
         "name": "code_fetch",
@@ -63,11 +63,11 @@ TOOLS = [
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Relative path to file from codebase root (e.g., 'frontend/src/components/Dashboard.tsx')"
+                    "description": "Relative path to file from codebase root (e.g., 'frontend/src/components/Dashboard.tsx')",
                 }
             },
-            "required": ["path"]
-        }
+            "required": ["path"],
+        },
     },
     {
         "name": "code_structure",
@@ -77,26 +77,24 @@ TOOLS = [
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Optional subdirectory to explore (e.g., 'frontend/src', 'backend')"
+                    "description": "Optional subdirectory to explore (e.g., 'frontend/src', 'backend')",
                 },
-                "depth": {
-                    "type": "integer",
-                    "description": "Maximum directory depth to traverse (default: 2)"
-                },
+                "depth": {"type": "integer", "description": "Maximum directory depth to traverse (default: 2)"},
                 "exclude_patterns": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Glob patterns to exclude (e.g., ['*.log', '__pycache__'])"
-                }
-            }
-        }
-    }
+                    "description": "Glob patterns to exclude (e.g., ['*.log', '__pycache__'])",
+                },
+            },
+        },
+    },
 ]
 
 
 # =============================================================================
 # Tool Handler Functions
 # =============================================================================
+
 
 async def code_search(**kwargs) -> Dict[str, Any]:
     """
@@ -120,46 +118,34 @@ async def code_search(**kwargs) -> Dict[str, Any]:
 
     try:
         if search_type == "file":
-            results = search_files_by_pattern(
-                pattern=query,
-                base_path=base_path,
-                limit=limit or 50
-            )
+            results = search_files_by_pattern(pattern=query, base_path=base_path, limit=limit or 50)
             return {
                 "search_type": "file",
                 "query": query,
                 "base_path": base_path or "root",
                 "result_count": len(results),
-                "results": results
+                "results": results,
             }
 
         elif search_type == "content":
-            results = search_file_contents(
-                query=query,
-                base_path=base_path,
-                is_regex=is_regex,
-                limit=limit or 20
-            )
+            results = search_file_contents(query=query, base_path=base_path, is_regex=is_regex, limit=limit or 20)
             return {
                 "search_type": "content",
                 "query": query,
                 "is_regex": is_regex,
                 "base_path": base_path or "root",
                 "result_count": len(results),
-                "results": results
+                "results": results,
             }
 
         elif search_type == "symbol":
-            results = search_symbols(
-                symbol_name=query,
-                base_path=base_path
-            )
+            results = search_symbols(symbol_name=query, base_path=base_path)
             return {
                 "search_type": "symbol",
                 "query": query,
                 "base_path": base_path or "root",
                 "result_count": len(results),
-                "results": results
+                "results": results,
             }
 
     except Exception as e:
@@ -197,11 +183,7 @@ async def code_structure(**kwargs) -> Dict[str, Any]:
     exclude_patterns = kwargs.get("exclude_patterns")
 
     try:
-        result = build_directory_tree(
-            base_path=path,
-            depth=depth,
-            exclude_patterns=exclude_patterns
-        )
+        result = build_directory_tree(base_path=path, depth=depth, exclude_patterns=exclude_patterns)
         return result
     except Exception as e:
         logger.error(f"code_structure error: {e}", exc_info=True)
@@ -211,6 +193,7 @@ async def code_structure(**kwargs) -> Dict[str, Any]:
 # =============================================================================
 # Registry Functions
 # =============================================================================
+
 
 def get_code_tools() -> List[Dict[str, Any]]:
     """

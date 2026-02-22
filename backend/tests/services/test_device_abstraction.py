@@ -25,22 +25,22 @@ class TestDeviceManager:
         manager = DeviceManager()
 
         # Core methods
-        assert hasattr(manager, 'initialize')
-        assert hasattr(manager, 'add_device')
-        assert hasattr(manager, 'get_device')
-        assert hasattr(manager, 'list_devices')
-        assert hasattr(manager, 'get_adapter')
+        assert hasattr(manager, "initialize")
+        assert hasattr(manager, "add_device")
+        assert hasattr(manager, "get_device")
+        assert hasattr(manager, "list_devices")
+        assert hasattr(manager, "get_adapter")
 
         # Read/write methods
-        assert hasattr(manager, 'read_device_value')
-        assert hasattr(manager, 'write_device_value')
+        assert hasattr(manager, "read_device_value")
+        assert hasattr(manager, "write_device_value")
 
         # Status methods
-        assert hasattr(manager, 'get_device_status')
-        assert hasattr(manager, 'get_device_safety_status')
+        assert hasattr(manager, "get_device_status")
+        assert hasattr(manager, "get_device_safety_status")
 
         # Lifecycle methods
-        assert hasattr(manager, 'shutdown')
+        assert hasattr(manager, "shutdown")
 
     @pytest.mark.asyncio
     async def test_list_devices_returns_list(self):
@@ -100,11 +100,13 @@ class TestDeviceInterface:
     def test_device_adapter_base_class_exists(self):
         """Test DeviceAdapter base class exists."""
         from app.services.device_abstraction import DeviceAdapter
+
         assert DeviceAdapter is not None
 
     def test_device_interface_exists(self):
         """Test DeviceInterface ABC exists."""
         from app.services.device_abstraction import DeviceInterface
+
         assert DeviceInterface is not None
 
 
@@ -115,6 +117,7 @@ class TestMockDeviceAdapter:
     def test_mock_adapter_exists(self):
         """Test MockDeviceAdapter exists."""
         from app.services.mock_devices import MockDeviceAdapter
+
         assert MockDeviceAdapter is not None
 
 
@@ -146,7 +149,7 @@ class TestDeviceManagerOperations:
                     "writable": True,
                     "priority": 8,
                 }
-            }
+            },
         }
 
         try:

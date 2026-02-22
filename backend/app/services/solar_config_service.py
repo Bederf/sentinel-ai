@@ -2,7 +2,7 @@
 Solar & BESS Configuration Service — Single source of truth for site solar/BESS/tariff parameters.
 
 Loads configuration in priority order:
-1. site-002_config.json — BESS 500 kWh / 250 kW, PV 946 kWp, grid specs
+1. site-002_config.json — BESS 200 kWh / 100 kW, PV 297 kWp, grid specs
 2. city_power_2025_26.json — primary tariff (verified invoice rates)
 3. city_power_2026.json — deprecated fallback only
 4. energy_centre.json — max_demand_kw as NMD fallback
@@ -29,10 +29,10 @@ _BUILDINGS_DIR = _DATA_DIR / "buildings"
 class BESSConfig:
     """Battery Energy Storage System parameters."""
 
-    capacity_kwh: float = 500.0
-    rated_power_kw: float = 250.0
+    capacity_kwh: float = 200.0
+    rated_power_kw: float = 100.0
     cell_chemistry: str = "LFP"
-    rack_count: int = 3
+    rack_count: int = 2
     manufacturer: str = "huawei"
     model: str = "LUNA2000-200KWH-2H1"
     grid_export_enabled: bool = True
@@ -43,10 +43,10 @@ class BESSConfig:
 class PVConfig:
     """Photovoltaic system parameters."""
 
-    total_capacity_kwp: float = 946.0  # 550 roof + 396 carport
-    roof_capacity_kwp: float = 550.0
-    carport_capacity_kwp: float = 396.0
-    panel_count: int = 1720  # 1000 roof + 720 carport
+    total_capacity_kwp: float = 297.0  # 4 × 100 kVA inverters (roof)
+    roof_capacity_kwp: float = 297.0
+    carport_capacity_kwp: float = 0.0
+    panel_count: int = 540
 
 
 @dataclass(frozen=True)
@@ -54,7 +54,7 @@ class GridConfig:
     """Grid connection parameters."""
 
     nmd_limit_kva: float = 1820.0
-    max_export_kw: float = 946.0
+    max_export_kw: float = 297.0
     voltage_kv: float = 11.0
     transformer_mva: float = 1.5
     sseg_category: str = "B"
@@ -222,10 +222,10 @@ def _load_site_config(site_id: str) -> SiteConfig:
     # Build BESS config
     bess_data = solar_cfg.get("bess", {})
     bess = BESSConfig(
-        capacity_kwh=bess_data.get("capacity_kwh", 500.0),
-        rated_power_kw=bess_data.get("rated_power_kw", 250.0),
+        capacity_kwh=bess_data.get("capacity_kwh", 200.0),
+        rated_power_kw=bess_data.get("rated_power_kw", 100.0),
         cell_chemistry=bess_data.get("cell_chemistry", "LFP"),
-        rack_count=bess_data.get("rack_count", 3),
+        rack_count=bess_data.get("rack_count", 2),
         manufacturer=bess_data.get("manufacturer", "huawei"),
         model=bess_data.get("model", "LUNA2000-200KWH-2H1"),
         grid_export_enabled=bess_data.get("grid_export_enabled", True),
@@ -242,10 +242,10 @@ def _load_site_config(site_id: str) -> SiteConfig:
     carport_kwp = next((p.get("capacity_kwp", 0) for p in plants if "carport" in p.get("plant_id", "")), 0)
 
     pv = PVConfig(
-        total_capacity_kwp=total_kwp if total_kwp > 0 else 946.0,
-        roof_capacity_kwp=roof_kwp if roof_kwp > 0 else 550.0,
-        carport_capacity_kwp=carport_kwp if carport_kwp > 0 else 396.0,
-        panel_count=total_panels if total_panels > 0 else 1720,
+        total_capacity_kwp=total_kwp if total_kwp > 0 else 297.0,
+        roof_capacity_kwp=roof_kwp if roof_kwp > 0 else 297.0,
+        carport_capacity_kwp=carport_kwp,  # 0 if no carport plant present
+        panel_count=total_panels if total_panels > 0 else 540,
     )
 
     # Build grid config
@@ -259,7 +259,7 @@ def _load_site_config(site_id: str) -> SiteConfig:
 
     grid = GridConfig(
         nmd_limit_kva=nmd_fallback,
-        max_export_kw=grid_data.get("max_export_kw", 946.0),
+        max_export_kw=grid_data.get("max_export_kw", 297.0),
         voltage_kv=grid_data.get("voltage_kv", 11.0),
         transformer_mva=grid_data.get("transformer_mva", 1.5),
         sseg_category=grid_data.get("sseg_category", "B"),

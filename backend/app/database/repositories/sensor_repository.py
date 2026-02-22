@@ -20,10 +20,10 @@ class SensorRepository:
         Returns:
             List of sensors
         """
-        query = self.client.table('sensors').select("*")
+        query = self.client.table("sensors").select("*")
 
         if equipment_id:
-            query = query.eq('equipment_id', equipment_id)
+            query = query.eq("equipment_id", equipment_id)
 
         response = query.execute()
         return response.data
@@ -37,9 +37,7 @@ class SensorRepository:
         Returns:
             Sensor data or None if not found
         """
-        response = self.client.table('sensors').select("*").eq(
-            'code', sensor_id
-        ).execute()
+        response = self.client.table("sensors").select("*").eq("code", sensor_id).execute()
 
         if response.data:
             return response.data[0]
@@ -54,7 +52,7 @@ class SensorRepository:
         Returns:
             Sensor data or None if not found
         """
-        response = self.client.table('sensors').select("*").eq('id', uuid).execute()
+        response = self.client.table("sensors").select("*").eq("id", uuid).execute()
 
         if response.data:
             return response.data[0]
@@ -69,9 +67,7 @@ class SensorRepository:
         Returns:
             List of sensors
         """
-        response = self.client.table('sensors').select("*").eq(
-            'equipment_id', equipment_uuid
-        ).execute()
+        response = self.client.table("sensors").select("*").eq("equipment_id", equipment_uuid).execute()
 
         return response.data
 
@@ -84,9 +80,7 @@ class SensorRepository:
         Returns:
             List of sensors
         """
-        response = self.client.table('sensors').select("*").eq(
-            'type', sensor_type
-        ).execute()
+        response = self.client.table("sensors").select("*").eq("type", sensor_type).execute()
 
         return response.data
 
@@ -99,7 +93,7 @@ class SensorRepository:
         Returns:
             Created sensor
         """
-        response = self.client.table('sensors').insert(sensor_data).execute()
+        response = self.client.table("sensors").insert(sensor_data).execute()
         return response.data[0]
 
     def update(self, sensor_id: str, sensor_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -116,9 +110,7 @@ class SensorRepository:
         if not sensor:
             return None
 
-        response = self.client.table('sensors').update(
-            sensor_data
-        ).eq('id', sensor['id']).execute()
+        response = self.client.table("sensors").update(sensor_data).eq("id", sensor["id"]).execute()
 
         if response.data:
             return response.data[0]
@@ -137,8 +129,6 @@ class SensorRepository:
         if not sensor:
             return False
 
-        response = self.client.table('sensors').delete().eq(
-            'id', sensor['id']
-        ).execute()
+        response = self.client.table("sensors").delete().eq("id", sensor["id"]).execute()
 
         return len(response.data) > 0

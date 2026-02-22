@@ -30,18 +30,13 @@ class WorkflowEventRepository:
             return None
 
     def list(
-        self,
-        equipment_id: Optional[str] = None,
-        trigger_type: Optional[str] = None,
-        limit: int = 100
+        self, equipment_id: Optional[str] = None, trigger_type: Optional[str] = None, limit: int = 100
     ) -> List[Dict[str, Any]]:
         if not self.client:
             return []
 
         try:
-            query = self.client.table("workflow_events").select("*").order(
-                "created_at", desc=True
-            ).limit(limit)
+            query = self.client.table("workflow_events").select("*").order("created_at", desc=True).limit(limit)
             if equipment_id:
                 query = query.eq("equipment_id", equipment_id)
             if trigger_type:

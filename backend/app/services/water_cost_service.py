@@ -74,7 +74,7 @@ class WaterCostService:
 
             # Persist cost record
             try:
-                if hasattr(self.cost_repo, 'client') and self.cost_repo.client:
+                if hasattr(self.cost_repo, "client") and self.cost_repo.client:
                     response = self.cost_repo.client.table("water_costs").insert(cost.to_dict()).execute()
                     if response.data:
                         return WaterCost.from_dict(response.data[0])
@@ -115,11 +115,15 @@ class WaterCostService:
 
             # Get consumption records
             try:
-                if hasattr(self.consumption_repo, 'client') and self.consumption_repo.client:
-                    response = self.consumption_repo.client.table("water_consumption").select("*")\
-                        .eq("site", site)\
-                        .gte("timestamp", start_date.isoformat())\
-                        .lte("timestamp", end_date.isoformat()).execute()
+                if hasattr(self.consumption_repo, "client") and self.consumption_repo.client:
+                    response = (
+                        self.consumption_repo.client.table("water_consumption")
+                        .select("*")
+                        .eq("site", site)
+                        .gte("timestamp", start_date.isoformat())
+                        .lte("timestamp", end_date.isoformat())
+                        .execute()
+                    )
                     records = response.data or []
                 else:
                     records = []
@@ -215,11 +219,15 @@ class WaterCostService:
 
             # Get consumption records
             try:
-                if hasattr(self.consumption_repo, 'client') and self.consumption_repo.client:
-                    response = self.consumption_repo.client.table("water_consumption").select("*")\
-                        .eq("site", site)\
-                        .gte("timestamp", start_date.isoformat())\
-                        .lte("timestamp", end_date.isoformat()).execute()
+                if hasattr(self.consumption_repo, "client") and self.consumption_repo.client:
+                    response = (
+                        self.consumption_repo.client.table("water_consumption")
+                        .select("*")
+                        .eq("site", site)
+                        .gte("timestamp", start_date.isoformat())
+                        .lte("timestamp", end_date.isoformat())
+                        .execute()
+                    )
                     records = response.data or []
                 else:
                     records = []
@@ -305,11 +313,15 @@ class WaterCostService:
 
             # Get all costs for site in period
             try:
-                if hasattr(self.cost_repo, 'client') and self.cost_repo.client:
-                    response = self.cost_repo.client.table("water_costs").select("*")\
-                        .eq("site", site)\
-                        .gte("period_date", start_date.isoformat())\
-                        .lte("period_date", end_date.isoformat()).execute()
+                if hasattr(self.cost_repo, "client") and self.cost_repo.client:
+                    response = (
+                        self.cost_repo.client.table("water_costs")
+                        .select("*")
+                        .eq("site", site)
+                        .gte("period_date", start_date.isoformat())
+                        .lte("period_date", end_date.isoformat())
+                        .execute()
+                    )
                     costs = response.data or []
                 else:
                     costs = []
@@ -334,17 +346,17 @@ class WaterCostService:
             # Format and rank
             result = []
             for zone, data in sorted(zone_totals.items(), key=lambda x: x[1]["cost"], reverse=True):
-                cost_per_liter = (
-                    data["cost"] / data["consumption"] if data["consumption"] > 0 else 0
+                cost_per_liter = data["cost"] / data["consumption"] if data["consumption"] > 0 else 0
+                result.append(
+                    {
+                        "zone_id": zone,
+                        "consumption_liters": round(data["consumption"], 2),
+                        "total_cost": round(data["cost"], 2),
+                        "cost_per_liter": round(cost_per_liter, 4),
+                        "records": data["count"],
+                        "rank": len(result) + 1,
+                    }
                 )
-                result.append({
-                    "zone_id": zone,
-                    "consumption_liters": round(data["consumption"], 2),
-                    "total_cost": round(data["cost"], 2),
-                    "cost_per_liter": round(cost_per_liter, 4),
-                    "records": data["count"],
-                    "rank": len(result) + 1,
-                })
 
             return result
 

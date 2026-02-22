@@ -26,6 +26,7 @@ def _get_registry():
     global _registry
     if _registry is None:
         from ml.registry import get_model_registry
+
         _registry = get_model_registry()
     return _registry
 
@@ -61,6 +62,7 @@ class SurvivalService:
         """Get data prep instance."""
         if self._data_prep is None:
             from ml.survival.data_prep import SurvivalDataPrep
+
             self._data_prep = SurvivalDataPrep()
         return self._data_prep
 
@@ -77,11 +79,7 @@ class SurvivalService:
         try:
             model = self._load_model()
         except ValueError as e:
-            return {
-                "equipment_id": equipment_id,
-                "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
-            }
+            return {"equipment_id": equipment_id, "error": str(e), "timestamp": datetime.utcnow().isoformat()}
 
         # Load equipment data
         data_prep = self._get_data_prep()
@@ -98,7 +96,7 @@ class SurvivalService:
             return {
                 "equipment_id": equipment_id,
                 "error": f"Equipment not found: {equipment_id}",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
         # Get features
@@ -111,7 +109,7 @@ class SurvivalService:
             return {
                 "equipment_id": equipment_id,
                 "error": "pandas is required for predictions",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
         features_df = pd.DataFrame([features])
@@ -146,18 +144,18 @@ class SurvivalService:
             "failure_probability": {
                 "30d": round(failure_prob_30d, 3),
                 "60d": round(float(survival_probs["failure_prob_60d"].values[0]), 3),
-                "90d": round(float(survival_probs["failure_prob_90d"].values[0]), 3)
+                "90d": round(float(survival_probs["failure_prob_90d"].values[0]), 3),
             },
             "survival_probability": {
                 "30d": round(float(survival_probs["survival_30d"].values[0]), 3),
                 "60d": round(float(survival_probs["survival_60d"].values[0]), 3),
-                "90d": round(float(survival_probs["survival_90d"].values[0]), 3)
+                "90d": round(float(survival_probs["survival_90d"].values[0]), 3),
             },
             "hazard_ratio": round(float(partial_hazard), 2),
             "remaining_useful_life_days": int(rul_days),
             "risk_level": risk_level,
             "contributing_factors": contributing_factors,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
     def _classify_risk(self, failure_prob_30d: float) -> str:
@@ -196,27 +194,28 @@ class SurvivalService:
                 continue
 
             if hr > 1.2 and value > 0:  # Significant risk factor
-                contributions.append({
-                    "factor": feature,
-                    "hazard_ratio": round(float(hr), 2),
-                    "value": round(float(value), 2),
-                    "p_value": round(float(p_value), 3),
-                    "impact": "increases_risk"
-                })
+                contributions.append(
+                    {
+                        "factor": feature,
+                        "hazard_ratio": round(float(hr), 2),
+                        "value": round(float(value), 2),
+                        "p_value": round(float(p_value), 3),
+                        "impact": "increases_risk",
+                    }
+                )
             elif hr < 0.8 and value > 0:  # Protective factor
-                contributions.append({
-                    "factor": feature,
-                    "hazard_ratio": round(float(hr), 2),
-                    "value": round(float(value), 2),
-                    "p_value": round(float(p_value), 3),
-                    "impact": "decreases_risk"
-                })
+                contributions.append(
+                    {
+                        "factor": feature,
+                        "hazard_ratio": round(float(hr), 2),
+                        "value": round(float(value), 2),
+                        "p_value": round(float(p_value), 3),
+                        "impact": "decreases_risk",
+                    }
+                )
 
         # Sort by absolute deviation from 1.0 and return top 5
-        contributions.sort(
-            key=lambda x: abs(x["hazard_ratio"] - 1.0),
-            reverse=True
-        )
+        contributions.sort(key=lambda x: abs(x["hazard_ratio"] - 1.0), reverse=True)
 
         return contributions[:5]
 
@@ -238,31 +237,30 @@ class SurvivalService:
                 risk_counts[risk_level] += 1
 
                 if risk_level in ["critical", "high"]:
-                    high_risk_equipment.append({
-                        "equipment_id": eq["id"],
-                        "equipment_type": eq["type"],
-                        "equipment_name": eq.get("name", ""),
-                        "risk_level": risk_level,
-                        "failure_prob_30d": pred["failure_probability"]["30d"],
-                        "rul_days": pred["remaining_useful_life_days"],
-                        "hazard_ratio": pred["hazard_ratio"]
-                    })
+                    high_risk_equipment.append(
+                        {
+                            "equipment_id": eq["id"],
+                            "equipment_type": eq["type"],
+                            "equipment_name": eq.get("name", ""),
+                            "risk_level": risk_level,
+                            "failure_prob_30d": pred["failure_probability"]["30d"],
+                            "rul_days": pred["remaining_useful_life_days"],
+                            "hazard_ratio": pred["hazard_ratio"],
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Error predicting equipment {eq.get('id')}: {e}")
                 continue
 
         # Sort by failure probability
-        high_risk_equipment.sort(
-            key=lambda x: x["failure_prob_30d"],
-            reverse=True
-        )
+        high_risk_equipment.sort(key=lambda x: x["failure_prob_30d"], reverse=True)
 
         return {
             "total_equipment": len(equipment_list),
             "risk_distribution": risk_counts,
             "high_risk_count": risk_counts["critical"] + risk_counts["high"],
             "high_risk_equipment": high_risk_equipment[:20],  # Top 20
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
     def get_hazard_ratios(self) -> List[Dict]:
@@ -291,7 +289,7 @@ class SurvivalService:
                 "c_index": model_info["metrics"].get("c_index"),
                 "n_samples": model_info["metrics"].get("n_samples"),
                 "n_events": model_info["metrics"].get("n_events"),
-                "trained_at": model_info.get("metadata", {}).get("trained_at")
+                "trained_at": model_info.get("metadata", {}).get("trained_at"),
             }
 
             return summary

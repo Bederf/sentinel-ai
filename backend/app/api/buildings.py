@@ -35,8 +35,9 @@ def _normalize_device_id(device_id: str) -> str:
     Converts 'site-002-xxx' to 'S002-xxx' format.
     """
     import re
+
     # Match 'site-NNN-' prefix and convert to 'SNNN-'
-    match = re.match(r'^site-(\d+)-(.+)$', device_id, re.IGNORECASE)
+    match = re.match(r"^site-(\d+)-(.+)$", device_id, re.IGNORECASE)
     if match:
         site_num = match.group(1).zfill(3)  # Zero-pad to 3 digits
         rest = match.group(2)
@@ -108,6 +109,8 @@ def _is_device_controllable(device_id: str, equipment_points: dict) -> bool:
         logger.debug(f"Could not check device_manager for {device_id}: {e}")
 
     return False
+
+
 router = APIRouter(prefix="/api/buildings", tags=["Building Management"])
 
 # Data path
@@ -116,6 +119,7 @@ DATA_PATH = Path(__file__).parent.parent / "data" / "buildings"
 
 class BuildingCreate(BaseModel):
     """Request model for creating a building."""
+
     id: str
     name: str
     display_name: Optional[str] = None
@@ -127,6 +131,7 @@ class BuildingCreate(BaseModel):
 
 class BuildingUpdate(BaseModel):
     """Request model for updating a building."""
+
     name: Optional[str] = None
     display_name: Optional[str] = None
     address: Optional[str] = None
@@ -158,9 +163,12 @@ async def list_buildings(current_user: dict = None) -> dict:
     if current_user and current_user.get("email"):
         try:
             supabase = Supabase.instance()
-            response = supabase.table("user_site_access").select(
-                "building_id"
-            ).eq("user_email", current_user["email"]).execute()
+            response = (
+                supabase.table("user_site_access")
+                .select("building_id")
+                .eq("user_email", current_user["email"])
+                .execute()
+            )
 
             if response.data:
                 accessible_building_ids = set(str(row["building_id"]) for row in response.data)
@@ -244,10 +252,7 @@ async def create_building(building: BuildingCreate) -> dict:
 
     # Check if already exists
     if building_path.exists():
-        raise HTTPException(
-            status_code=409,
-            detail=f"Building '{building.id}' already exists"
-        )
+        raise HTTPException(status_code=409, detail=f"Building '{building.id}' already exists")
 
     # Create folder structure
     building_path.mkdir(parents=True, exist_ok=True)
@@ -260,14 +265,15 @@ async def create_building(building: BuildingCreate) -> dict:
         "address": building.address,
         "timezone": building.timezone,
         "floors": building.floors,
-        "features": building.features or {
+        "features": building.features
+        or {
             "hvac": True,
             "dali": False,
             "desk_diagnosis": True,
         },
         "metadata": {
             "created_at": "auto",
-        }
+        },
     }
 
     with open(building_path / "building.json", "w") as f:
@@ -292,7 +298,7 @@ async def create_building(building: BuildingCreate) -> dict:
             f"POST /api/buildings/{building.id}/desks - Upload desk data",
             f"POST /api/buildings/{building.id}/zones - Upload zone data",
             f"POST /api/buildings/{building.id}/activate - Activate building",
-        ]
+        ],
     }
 
 
@@ -471,10 +477,7 @@ async def delete_building(building_id: str, confirm: bool = False) -> dict:
     site_code = BUILDING_TO_SITE.get(building_id, building_id)
 
     if not confirm:
-        raise HTTPException(
-            status_code=400,
-            detail="Add ?confirm=true to confirm deletion"
-        )
+        raise HTTPException(status_code=400, detail="Add ?confirm=true to confirm deletion")
 
     building_path = DATA_PATH / site_code
 
@@ -553,6 +556,7 @@ async def get_equipment_summary(building_id: str) -> dict:
     # Try Supabase first
     try:
         from app.database.repositories.building_repository import BuildingRepository
+
         repo = BuildingRepository()
         summary = repo.get_asset_summary_by_code(building_id)
 
@@ -658,10 +662,7 @@ async def get_equipment_summary(building_id: str) -> dict:
             dali_data = json.load(f)
             # Count controllers for this site
             controllers = dali_data.get("controllers", [])
-            counts["dali_controllers"] = len([
-                c for c in controllers
-                if c.get("site_id") == building_id
-            ])
+            counts["dali_controllers"] = len([c for c in controllers if c.get("site_id") == building_id])
 
     # Calculate total
     total = sum(counts.values())
@@ -710,10 +711,12 @@ async def get_building_equipment(building_id: str) -> dict:
     else:
         # If building_id looks like a UUID, look it up in buildings table
         import uuid
+
         try:
             uuid.UUID(building_id)  # Validate UUID format
             # It's a UUID, so look it up to get the code
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
             building_result = client.table("buildings").select("id, code").eq("id", building_id).execute()
             if building_result.data:
@@ -726,12 +729,14 @@ async def get_building_equipment(building_id: str) -> dict:
     # Try Supabase first
     try:
         from app.database.repositories.equipment_repository import EquipmentRepository
+
         repo = EquipmentRepository()
         equipment_data = repo.get_by_building_code(site_code)
 
         if equipment_data:
             # Get building info from Supabase (needed in the loop)
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
 
             # Only query if we don't already have building_uuid
@@ -748,6 +753,7 @@ async def get_building_equipment(building_id: str) -> dict:
             if building_uuid:
                 try:
                     from app.database.repositories.alert_repository import AlertRepository
+
                     alert_repo = AlertRepository()
                     active_alerts = alert_repo.get_active_by_building(building_uuid)
                     for alert in active_alerts:
@@ -813,29 +819,28 @@ async def get_building_equipment(building_id: str) -> dict:
                         status = "warning"
                         health = min(health, 60)
 
-                equipment_list.append({
-                    "id": eq.get("code", eq.get("id")),
-                    "code": eq.get("code"),
-                    "name": eq.get("name"),
-                    "equipment_type": eq_type,  # Frontend expects equipment_type, not type
-                    "type": eq_type,  # Keep for backward compatibility
-                    "category": category,
-                    "status": status,
-                    "health_score": health,
-                    "location": eq.get("location", ""),
-                    "building_id": site_code,
-                    "building_name": building_name,
-                    "site_id": building_id,  # API parameter (e.g., "site-002" or "sandton")
-                    "details": {
-                        "manufacturer": eq.get("manufacturer"),
-                        "model": eq.get("model"),
-                        "metadata": eq.get("metadata", {}),
-                    },
-                    "controllable": _is_device_controllable(
-                        eq.get("code", eq.get("id", "")),
-                        eq.get("points", {})
-                    ),
-                })
+                equipment_list.append(
+                    {
+                        "id": eq.get("code", eq.get("id")),
+                        "code": eq.get("code"),
+                        "name": eq.get("name"),
+                        "equipment_type": eq_type,  # Frontend expects equipment_type, not type
+                        "type": eq_type,  # Keep for backward compatibility
+                        "category": category,
+                        "status": status,
+                        "health_score": health,
+                        "location": eq.get("location", ""),
+                        "building_id": site_code,
+                        "building_name": building_name,
+                        "site_id": building_id,  # API parameter (e.g., "site-002" or "sandton")
+                        "details": {
+                            "manufacturer": eq.get("manufacturer"),
+                            "model": eq.get("model"),
+                            "metadata": eq.get("metadata", {}),
+                        },
+                        "controllable": _is_device_controllable(eq.get("code", eq.get("id", "")), eq.get("points", {})),
+                    }
+                )
 
                 # Update category stats
                 if category not in categories:
@@ -916,25 +921,27 @@ async def get_building_equipment(building_id: str) -> dict:
             zones = json.load(f)
             for zone in zones:
                 status, health = get_status_health(zone.get("status", "idle"))
-                equipment_list.append({
-                    "id": zone.get("zone_id"),
-                    "name": zone.get("zone_name"),
-                    "type": "hvac_zone",
-                    "category": "HVAC",
-                    "status": status,
-                    "health_score": health,
-                    "location": f"Floor {zone.get('floor', 'N/A')}",
-                    "building_id": site_code,
-                    "building_name": building.name,
-                    "site_id": building_id,
-                    "details": {
-                        "current_temp": zone.get("current_temp"),
-                        "setpoint": zone.get("setpoint"),
-                        "fcu_id": zone.get("fcu_id"),
-                        "ahu_id": zone.get("ahu_id"),
-                    },
-                    "controllable": True,
-                })
+                equipment_list.append(
+                    {
+                        "id": zone.get("zone_id"),
+                        "name": zone.get("zone_name"),
+                        "type": "hvac_zone",
+                        "category": "HVAC",
+                        "status": status,
+                        "health_score": health,
+                        "location": f"Floor {zone.get('floor', 'N/A')}",
+                        "building_id": site_code,
+                        "building_name": building.name,
+                        "site_id": building_id,
+                        "details": {
+                            "current_temp": zone.get("current_temp"),
+                            "setpoint": zone.get("setpoint"),
+                            "fcu_id": zone.get("fcu_id"),
+                            "ahu_id": zone.get("ahu_id"),
+                        },
+                        "controllable": True,
+                    }
+                )
 
     # 2. Generators
     gen_file = building_path / "generators.json"
@@ -947,68 +954,74 @@ async def get_building_equipment(building_id: str) -> dict:
                 level_pct = tank.get("current_level_pct", 0)
                 status = "normal" if level_pct > 25 else ("warning" if level_pct > 10 else "critical")
                 health = min(100, level_pct + 20)
-                equipment_list.append({
-                    "id": tank.get("tank_id"),
-                    "name": tank.get("name"),
-                    "type": "diesel_tank",
-                    "category": "Generator Plant",
-                    "status": status,
-                    "health_score": health,
-                    "location": tank.get("location", ""),
-                    "building_id": site_code,
-                    "building_name": building.name,
-                    "site_id": building_id,
-                    "details": {
-                        "capacity_liters": tank.get("capacity_liters"),
-                        "current_level_pct": level_pct,
-                    },
-                    "controllable": False,
-                })
+                equipment_list.append(
+                    {
+                        "id": tank.get("tank_id"),
+                        "name": tank.get("name"),
+                        "type": "diesel_tank",
+                        "category": "Generator Plant",
+                        "status": status,
+                        "health_score": health,
+                        "location": tank.get("location", ""),
+                        "building_id": site_code,
+                        "building_name": building.name,
+                        "site_id": building_id,
+                        "details": {
+                            "capacity_liters": tank.get("capacity_liters"),
+                            "current_level_pct": level_pct,
+                        },
+                        "controllable": False,
+                    }
+                )
 
             # Generator groups
             for group in gen_data.get("groups", []):
                 status, health = get_status_health("online" if group.get("generators_running", 0) > 0 else "standby")
-                equipment_list.append({
-                    "id": group.get("group_id"),
-                    "name": group.get("name"),
-                    "type": "generator_group",
-                    "category": "Generator Plant",
-                    "status": status,
-                    "health_score": health,
-                    "location": group.get("location", ""),
-                    "building_id": site_code,
-                    "building_name": building.name,
-                    "site_id": building_id,
-                    "details": {
-                        "generators_running": group.get("generators_running"),
-                        "total_load_kw": group.get("total_load_kw"),
-                        "ats_position": group.get("ats_position"),
-                    },
-                    "controllable": False,
-                })
+                equipment_list.append(
+                    {
+                        "id": group.get("group_id"),
+                        "name": group.get("name"),
+                        "type": "generator_group",
+                        "category": "Generator Plant",
+                        "status": status,
+                        "health_score": health,
+                        "location": group.get("location", ""),
+                        "building_id": site_code,
+                        "building_name": building.name,
+                        "site_id": building_id,
+                        "details": {
+                            "generators_running": group.get("generators_running"),
+                            "total_load_kw": group.get("total_load_kw"),
+                            "ats_position": group.get("ats_position"),
+                        },
+                        "controllable": False,
+                    }
+                )
 
             # Generators
             for gen in gen_data.get("generators", []):
                 status, health = get_status_health(gen.get("status", "standby"))
-                equipment_list.append({
-                    "id": gen.get("generator_id"),
-                    "name": gen.get("name"),
-                    "type": "generator",
-                    "category": "Generator Plant",
-                    "status": status,
-                    "health_score": health,
-                    "location": gen.get("location", ""),
-                    "building_id": site_code,
-                    "building_name": building.name,
-                    "site_id": building_id,
-                    "details": {
-                        "rated_power_kw": gen.get("rated_power_kw"),
-                        "engine_running": gen.get("engine_running"),
-                        "on_load": gen.get("on_load"),
-                        "output_power_kw": gen.get("output_power_kw"),
-                    },
-                    "controllable": True,
-                })
+                equipment_list.append(
+                    {
+                        "id": gen.get("generator_id"),
+                        "name": gen.get("name"),
+                        "type": "generator",
+                        "category": "Generator Plant",
+                        "status": status,
+                        "health_score": health,
+                        "location": gen.get("location", ""),
+                        "building_id": site_code,
+                        "building_name": building.name,
+                        "site_id": building_id,
+                        "details": {
+                            "rated_power_kw": gen.get("rated_power_kw"),
+                            "engine_running": gen.get("engine_running"),
+                            "on_load": gen.get("on_load"),
+                            "output_power_kw": gen.get("output_power_kw"),
+                        },
+                        "controllable": True,
+                    }
+                )
 
     # 3. Energy Centre
     ec_file = building_path / "energy_centre.json"
@@ -1019,180 +1032,196 @@ async def get_building_equipment(building_id: str) -> dict:
             # MV Incomers
             for incomer in ec_data.get("mv_incomers", []):
                 status, health = get_status_health("online" if incomer.get("healthy") else "fault")
-                equipment_list.append({
-                    "id": incomer.get("incomer_id"),
-                    "name": incomer.get("name"),
-                    "type": "mv_incomer",
-                    "category": "Energy Centre",
-                    "status": status,
-                    "health_score": health,
-                    "location": incomer.get("location", ""),
-                    "building_id": site_code,
-                    "building_name": building.name,
-                    "site_id": building_id,
-                    "details": {
-                        "voltage_kv": incomer.get("voltage_kv"),
-                        "power_kw": incomer.get("power_kw"),
-                        "breaker_state": incomer.get("breaker_state"),
-                    },
-                    "controllable": False,
-                })
+                equipment_list.append(
+                    {
+                        "id": incomer.get("incomer_id"),
+                        "name": incomer.get("name"),
+                        "type": "mv_incomer",
+                        "category": "Energy Centre",
+                        "status": status,
+                        "health_score": health,
+                        "location": incomer.get("location", ""),
+                        "building_id": site_code,
+                        "building_name": building.name,
+                        "site_id": building_id,
+                        "details": {
+                            "voltage_kv": incomer.get("voltage_kv"),
+                            "power_kw": incomer.get("power_kw"),
+                            "breaker_state": incomer.get("breaker_state"),
+                        },
+                        "controllable": False,
+                    }
+                )
 
             # Transformers
             for tx in ec_data.get("transformers", []):
                 status, health = get_status_health("online" if tx.get("healthy") else "fault")
-                equipment_list.append({
-                    "id": tx.get("transformer_id"),
-                    "name": tx.get("name"),
-                    "type": "transformer",
-                    "category": "Energy Centre",
-                    "status": status,
-                    "health_score": health,
-                    "location": tx.get("location", ""),
-                    "building_id": site_code,
-                    "building_name": building.name,
-                    "site_id": building_id,
-                    "details": {
-                        "rated_power_kva": tx.get("rated_power_kva"),
-                        "load_percent": tx.get("load_percent"),
-                        "oil_temp_c": tx.get("oil_temp_c"),
-                    },
-                    "controllable": False,
-                })
+                equipment_list.append(
+                    {
+                        "id": tx.get("transformer_id"),
+                        "name": tx.get("name"),
+                        "type": "transformer",
+                        "category": "Energy Centre",
+                        "status": status,
+                        "health_score": health,
+                        "location": tx.get("location", ""),
+                        "building_id": site_code,
+                        "building_name": building.name,
+                        "site_id": building_id,
+                        "details": {
+                            "rated_power_kva": tx.get("rated_power_kva"),
+                            "load_percent": tx.get("load_percent"),
+                            "oil_temp_c": tx.get("oil_temp_c"),
+                        },
+                        "controllable": False,
+                    }
+                )
 
             # LV Switchboards
             for sb in ec_data.get("lv_switchboards", []):
                 status, health = get_status_health("online" if sb.get("healthy") else "fault")
-                equipment_list.append({
-                    "id": sb.get("switchboard_id"),
-                    "name": sb.get("name"),
-                    "type": "lv_switchboard",
-                    "category": "Energy Centre",
-                    "status": status,
-                    "health_score": health,
-                    "location": sb.get("location", ""),
-                    "building_id": site_code,
-                    "building_name": building.name,
-                    "site_id": building_id,
-                    "details": {
-                        "total_load_kw": sb.get("total_load_kw"),
-                        "bus_voltage_v": sb.get("bus_voltage_v"),
-                    },
-                    "controllable": False,
-                })
+                equipment_list.append(
+                    {
+                        "id": sb.get("switchboard_id"),
+                        "name": sb.get("name"),
+                        "type": "lv_switchboard",
+                        "category": "Energy Centre",
+                        "status": status,
+                        "health_score": health,
+                        "location": sb.get("location", ""),
+                        "building_id": site_code,
+                        "building_name": building.name,
+                        "site_id": building_id,
+                        "details": {
+                            "total_load_kw": sb.get("total_load_kw"),
+                            "bus_voltage_v": sb.get("bus_voltage_v"),
+                        },
+                        "controllable": False,
+                    }
+                )
 
             # ATS Units
             for ats in ec_data.get("ats_units", []):
                 # ATS health: check if both interlocks are OK and at least one power source is available
                 is_healthy = (
-                    ats.get("mechanical_interlock_ok", False) and
-                    ats.get("electrical_interlock_ok", False) and
-                    (ats.get("mains_available", False) or ats.get("generator_available", False))
+                    ats.get("mechanical_interlock_ok", False)
+                    and ats.get("electrical_interlock_ok", False)
+                    and (ats.get("mains_available", False) or ats.get("generator_available", False))
                 )
                 status, health = get_status_health("online" if is_healthy else "fault")
-                equipment_list.append({
-                    "id": ats.get("ats_id"),
-                    "name": ats.get("name"),
-                    "type": "ats",
-                    "category": "Energy Centre",
-                    "status": status,
-                    "health_score": health,
-                    "location": ats.get("location", ""),
-                    "building_id": site_code,
-                    "building_name": building.name,
-                    "site_id": building_id,
-                    "details": {
-                        "position": ats.get("position"),
-                        "mode": ats.get("mode"),
-                    },
-                    "controllable": True,
-                })
+                equipment_list.append(
+                    {
+                        "id": ats.get("ats_id"),
+                        "name": ats.get("name"),
+                        "type": "ats",
+                        "category": "Energy Centre",
+                        "status": status,
+                        "health_score": health,
+                        "location": ats.get("location", ""),
+                        "building_id": site_code,
+                        "building_name": building.name,
+                        "site_id": building_id,
+                        "details": {
+                            "position": ats.get("position"),
+                            "mode": ats.get("mode"),
+                        },
+                        "controllable": True,
+                    }
+                )
 
             # Power Meters
             for meter in ec_data.get("power_meters", []):
-                equipment_list.append({
-                    "id": meter.get("meter_id"),
-                    "name": meter.get("name"),
-                    "type": "power_meter",
-                    "category": "Energy Centre",
-                    "status": "normal",
-                    "health": 95,
-                    "location": meter.get("location", ""),
-                    "building_id": site_code,
-                    "building_name": building.name,
-                    "site_id": building_id,
-                    "details": {
-                        "power_kw": meter.get("power_kw"),
-                        "energy_kwh": meter.get("energy_kwh_total"),
-                    },
-                    "controllable": False,
-                })
+                equipment_list.append(
+                    {
+                        "id": meter.get("meter_id"),
+                        "name": meter.get("name"),
+                        "type": "power_meter",
+                        "category": "Energy Centre",
+                        "status": "normal",
+                        "health": 95,
+                        "location": meter.get("location", ""),
+                        "building_id": site_code,
+                        "building_name": building.name,
+                        "site_id": building_id,
+                        "details": {
+                            "power_kw": meter.get("power_kw"),
+                            "energy_kwh": meter.get("energy_kwh_total"),
+                        },
+                        "controllable": False,
+                    }
+                )
 
             # PFC Banks
             for pfc in ec_data.get("pfc_banks", []):
                 status, health = get_status_health("online" if pfc.get("healthy") else "fault")
-                equipment_list.append({
-                    "id": pfc.get("pfc_id"),
-                    "name": pfc.get("name"),
-                    "type": "pfc_bank",
-                    "category": "Energy Centre",
-                    "status": status,
-                    "health_score": health,
-                    "location": pfc.get("location", ""),
-                    "building_id": site_code,
-                    "building_name": building.name,
-                    "site_id": building_id,
-                    "details": {
-                        "power_factor": pfc.get("power_factor"),
-                        "stages_active": pfc.get("stages_active"),
-                    },
-                    "controllable": True,
-                })
+                equipment_list.append(
+                    {
+                        "id": pfc.get("pfc_id"),
+                        "name": pfc.get("name"),
+                        "type": "pfc_bank",
+                        "category": "Energy Centre",
+                        "status": status,
+                        "health_score": health,
+                        "location": pfc.get("location", ""),
+                        "building_id": site_code,
+                        "building_name": building.name,
+                        "site_id": building_id,
+                        "details": {
+                            "power_factor": pfc.get("power_factor"),
+                            "stages_active": pfc.get("stages_active"),
+                        },
+                        "controllable": True,
+                    }
+                )
 
             # UPS Systems
             for ups in ec_data.get("ups_systems", []):
                 status, health = get_status_health(ups.get("status", "online"))
-                equipment_list.append({
-                    "id": ups.get("ups_id"),
-                    "name": ups.get("name"),
-                    "type": "ups",
-                    "category": "Energy Centre",
-                    "status": status,
-                    "health_score": health,
-                    "location": ups.get("location", ""),
-                    "building_id": site_code,
-                    "building_name": building.name,
-                    "site_id": building_id,
-                    "details": {
-                        "rated_power_kva": ups.get("rated_power_kva"),
-                        "load_percent": ups.get("load_percent"),
-                        "battery_pct": ups.get("battery_pct"),
-                        "runtime_minutes": ups.get("runtime_minutes"),
-                    },
-                    "controllable": False,
-                })
+                equipment_list.append(
+                    {
+                        "id": ups.get("ups_id"),
+                        "name": ups.get("name"),
+                        "type": "ups",
+                        "category": "Energy Centre",
+                        "status": status,
+                        "health_score": health,
+                        "location": ups.get("location", ""),
+                        "building_id": site_code,
+                        "building_name": building.name,
+                        "site_id": building_id,
+                        "details": {
+                            "rated_power_kva": ups.get("rated_power_kva"),
+                            "load_percent": ups.get("load_percent"),
+                            "battery_pct": ups.get("battery_pct"),
+                            "runtime_minutes": ups.get("runtime_minutes"),
+                        },
+                        "controllable": False,
+                    }
+                )
 
             # Feeders
             for feeder in ec_data.get("feeders", []):
                 status, health = get_status_health("online" if feeder.get("breaker_state") == "closed" else "offline")
-                equipment_list.append({
-                    "id": feeder.get("feeder_id"),
-                    "name": feeder.get("name"),
-                    "type": "feeder",
-                    "category": "Energy Centre",
-                    "status": status,
-                    "health_score": health,
-                    "location": feeder.get("location", ""),
-                    "building_id": site_code,
-                    "building_name": building.name,
-                    "site_id": building_id,
-                    "details": {
-                        "rated_current_a": feeder.get("rated_current_a"),
-                        "current_a": feeder.get("current_a"),
-                        "destination": feeder.get("destination"),
-                    },
-                    "controllable": True,
-                })
+                equipment_list.append(
+                    {
+                        "id": feeder.get("feeder_id"),
+                        "name": feeder.get("name"),
+                        "type": "feeder",
+                        "category": "Energy Centre",
+                        "status": status,
+                        "health_score": health,
+                        "location": feeder.get("location", ""),
+                        "building_id": site_code,
+                        "building_name": building.name,
+                        "site_id": building_id,
+                        "details": {
+                            "rated_current_a": feeder.get("rated_current_a"),
+                            "current_a": feeder.get("current_a"),
+                            "destination": feeder.get("destination"),
+                        },
+                        "controllable": True,
+                    }
+                )
 
     # 4. DALI Controllers
     # Map building_id to site_id for DALI data
@@ -1207,24 +1236,26 @@ async def get_building_equipment(building_id: str) -> dict:
             if dali_data.get("site_id") == site_id:
                 for controller in dali_data.get("controllers", []):
                     status, health = get_status_health(controller.get("status", "online"))
-                    equipment_list.append({
-                        "id": controller.get("controller_id"),
-                        "name": controller.get("name"),
-                        "type": "dali_controller",
-                        "category": "Lighting",
-                        "status": status,
-                        "health_score": health,
-                        "location": controller.get("location", ""),
-                        "building_id": site_code,
-                        "building_name": building.name,
-                        "site_id": building_id,
-                        "details": {
-                            "ip_address": controller.get("ip_address"),
-                            "channels": controller.get("channels"),
-                            "firmware": controller.get("firmware_version"),
-                        },
-                        "controllable": True,
-                    })
+                    equipment_list.append(
+                        {
+                            "id": controller.get("controller_id"),
+                            "name": controller.get("name"),
+                            "type": "dali_controller",
+                            "category": "Lighting",
+                            "status": status,
+                            "health_score": health,
+                            "location": controller.get("location", ""),
+                            "building_id": site_code,
+                            "building_name": building.name,
+                            "site_id": building_id,
+                            "details": {
+                                "ip_address": controller.get("ip_address"),
+                                "channels": controller.get("channels"),
+                                "firmware": controller.get("firmware_version"),
+                            },
+                            "controllable": True,
+                        }
+                    )
 
     # 5. Equipment from building equipment directory (Niagara discovery)
     equipment_dir = building_path / "equipment"
@@ -1243,39 +1274,53 @@ async def get_building_equipment(building_id: str) -> dict:
                 eq_type_raw = eq.get("equipment_type", eq.get("device_type", "unknown"))
                 eq_type = _normalize_equipment_type(eq_code, eq_type_raw)
                 type_to_category = {
-                    "ahu": "HVAC", "fcu": "HVAC", "vav": "HVAC", "chiller": "HVAC",
-                    "cooling_tower": "HVAC", "pump": "HVAC", "boiler": "HVAC",
-                    "hvac": "HVAC", "split_unit": "HVAC",
+                    "ahu": "HVAC",
+                    "fcu": "HVAC",
+                    "vav": "HVAC",
+                    "chiller": "HVAC",
+                    "cooling_tower": "HVAC",
+                    "pump": "HVAC",
+                    "boiler": "HVAC",
+                    "hvac": "HVAC",
+                    "split_unit": "HVAC",
                     "generator": "Generator Plant",
-                    "ups": "Energy Centre", "transformer": "Energy Centre",
-                    "ats": "Energy Centre", "power_meter": "Energy Centre", "meter": "Energy Centre",
-                    "dali_controller": "Lighting", "dali_zone": "Lighting", "luminaire": "Lighting",
+                    "ups": "Energy Centre",
+                    "transformer": "Energy Centre",
+                    "ats": "Energy Centre",
+                    "power_meter": "Energy Centre",
+                    "meter": "Energy Centre",
+                    "dali_controller": "Lighting",
+                    "dali_zone": "Lighting",
+                    "luminaire": "Lighting",
                     "lighting": "Lighting",
-                    "sensor": "Sensors", "zone": "Building Systems",
+                    "sensor": "Sensors",
+                    "zone": "Building Systems",
                 }
                 category = type_to_category.get(eq_type.lower(), "Other")
                 status, health = get_status_health(eq.get("status", "normal"))
 
-                equipment_list.append({
-                    "id": eq_id,
-                    "code": eq_code,
-                    "name": eq.get("name", eq_id),
-                    "equipment_type": eq_type,  # Frontend expects equipment_type
-                    "type": eq_type,  # Keep for backward compatibility
-                    "category": category,
-                    "status": status,
-                    "health_score": health,
-                    "location": eq.get("location", ""),
-                    "building_id": site_code,
-                    "building_name": building.name,
-                    "site_id": building_id,
-                    "details": {
-                        "manufacturer": eq.get("manufacturer"),
-                        "model": eq.get("model"),
-                        "metadata": eq.get("metadata", {}),
-                    },
-                    "controllable": _is_device_controllable(eq_id, eq.get("points", {})),
-                })
+                equipment_list.append(
+                    {
+                        "id": eq_id,
+                        "code": eq_code,
+                        "name": eq.get("name", eq_id),
+                        "equipment_type": eq_type,  # Frontend expects equipment_type
+                        "type": eq_type,  # Keep for backward compatibility
+                        "category": category,
+                        "status": status,
+                        "health_score": health,
+                        "location": eq.get("location", ""),
+                        "building_id": site_code,
+                        "building_name": building.name,
+                        "site_id": building_id,
+                        "details": {
+                            "manufacturer": eq.get("manufacturer"),
+                            "model": eq.get("model"),
+                            "metadata": eq.get("metadata", {}),
+                        },
+                        "controllable": _is_device_controllable(eq_id, eq.get("points", {})),
+                    }
+                )
                 existing_ids.add(eq_id)
             except Exception as e:
                 logger.warning(f"Failed to load equipment from {eq_file}: {e}")
@@ -1326,28 +1371,27 @@ async def get_building_equipment(building_id: str) -> dict:
                     category = type_to_category.get(eq_type, "Other")
                     status, health = get_status_health(eq.get("status", "normal"))
 
-                    equipment_list.append({
-                        "id": eq.get("id"),
-                        "code": eq_code,
-                        "name": eq.get("name"),
-                        "equipment_type": eq_type,  # Frontend expects equipment_type
-                        "type": eq_type,  # Keep for backward compatibility
-                        "category": category,
-                        "status": status,
-                        "health_score": health,
-                        "location": eq.get("location", ""),
-                        "building_id": site_code,
-                        "building_name": building.name,
-                        "site_id": building_id,
-                        "details": {
-                            "manufacturer": eq.get("manufacturer"),
-                            "model": eq.get("model"),
-                        },
-                        "controllable": _is_device_controllable(
-                            eq.get("id", ""),
-                            eq.get("points", {})
-                        ),
-                    })
+                    equipment_list.append(
+                        {
+                            "id": eq.get("id"),
+                            "code": eq_code,
+                            "name": eq.get("name"),
+                            "equipment_type": eq_type,  # Frontend expects equipment_type
+                            "type": eq_type,  # Keep for backward compatibility
+                            "category": category,
+                            "status": status,
+                            "health_score": health,
+                            "location": eq.get("location", ""),
+                            "building_id": site_code,
+                            "building_name": building.name,
+                            "site_id": building_id,
+                            "details": {
+                                "manufacturer": eq.get("manufacturer"),
+                                "model": eq.get("model"),
+                            },
+                            "controllable": _is_device_controllable(eq.get("id", ""), eq.get("points", {})),
+                        }
+                    )
 
     # Summary by category
     categories = {}

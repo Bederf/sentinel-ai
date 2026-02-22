@@ -330,7 +330,7 @@ Add auto-start logic in `backend/app/api/auth.py` in the `login` endpoint:
 
 ```python
 # After successful login, check for demo users:
-if email == "grant@wardew.co.za":
+if email == "grant@grantdemo.co.za":
     try:
         orchestrator = get_lifecycle_orchestrator()
         orchestrator.reset()
@@ -390,7 +390,7 @@ Here's how Grant's 7-day demo is configured:
 
 **Auto-Start Configuration** (auth.py):
 ```python
-if email == "grant@wardew.co.za":
+if email == "grant@grantdemo.co.za":
     orchestrator = get_lifecycle_orchestrator()
     orchestrator.reset()
     orchestrator.run_scenario(

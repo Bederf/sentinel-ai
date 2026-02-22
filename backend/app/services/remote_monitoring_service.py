@@ -102,12 +102,14 @@ class RemoteMonitoringService:
                 ss = safety_status.get("overall_status", "safe")
                 if ss in ("critical", "alarm"):
                     devices_in_alarm += 1
-                    active_alarms.append({
-                        "device_id": device.id,
-                        "device_name": device.name,
-                        "status": ss,
-                        "violations": safety_status.get("violations", []),
-                    })
+                    active_alarms.append(
+                        {
+                            "device_id": device.id,
+                            "device_name": device.name,
+                            "status": ss,
+                            "violations": safety_status.get("violations", []),
+                        }
+                    )
                 elif ss == "warning":
                     devices_in_warning += 1
             except Exception:
@@ -197,7 +199,9 @@ class RemoteMonitoringService:
                             "value": val.value,
                             "unit": val.unit,
                             "quality": val.quality if hasattr(val, "quality") else "good",
-                            "timestamp": val.timestamp.isoformat() if hasattr(val, "timestamp") and val.timestamp else datetime.now().isoformat(),
+                            "timestamp": val.timestamp.isoformat()
+                            if hasattr(val, "timestamp") and val.timestamp
+                            else datetime.now().isoformat(),
                         }
                     except Exception as exc:
                         readings[pname] = {"error": str(exc)}
@@ -412,9 +416,7 @@ class RemoteMonitoringService:
         Returns:
             List of session summaries (most recent first).
         """
-        user_sessions = [
-            s for s in self._sessions.values() if s.user_id == user_id
-        ]
+        user_sessions = [s for s in self._sessions.values() if s.user_id == user_id]
         user_sessions.sort(key=lambda s: s.started_at, reverse=True)
 
         return [

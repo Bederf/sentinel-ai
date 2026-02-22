@@ -32,10 +32,7 @@ class ChatMetadata(BaseModel):
     routing_reason: str
 
 
-async def generate_hybrid_sse_stream(
-    user_message: str,
-    use_tools: bool = False
-) -> AsyncGenerator[str, None]:
+async def generate_hybrid_sse_stream(user_message: str, use_tools: bool = False) -> AsyncGenerator[str, None]:
     """
     Generate SSE-formatted stream from Hybrid AI (Ollama or Claude).
 
@@ -71,11 +68,9 @@ async def hybrid_chat(request: HybridChatRequest):
     Returns:
         StreamingResponse with SSE stream
     """
+
     async def stream():
-        async for chunk in generate_hybrid_sse_stream(
-            request.message,
-            request.use_tools
-        ):
+        async for chunk in generate_hybrid_sse_stream(request.message, request.use_tools):
             yield chunk
 
     return StreamingResponse(
@@ -84,7 +79,7 @@ async def hybrid_chat(request: HybridChatRequest):
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-        }
+        },
     )
 
 
@@ -104,9 +99,6 @@ async def get_hybrid_stats():
         "claude_queries": 0,
         "total_cost": 0.0,
         "savings_vs_all_claude": 0.0,
-        "routing_distribution": {
-            "tier1_local": 0.0,
-            "tier2_cloud": 0.0
-        },
-        "note": "Stats tracking not yet implemented"
+        "routing_distribution": {"tier1_local": 0.0, "tier2_cloud": 0.0},
+        "note": "Stats tracking not yet implemented",
     }

@@ -24,22 +24,15 @@ from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(
-    prefix="/api/parasite",
-    tags=["parasite"]
-)
+router = APIRouter(prefix="/api/parasite", tags=["parasite"])
 
 
-@router.get(
-    "/decisions",
-    response_model=Dict[str, Any],
-    summary="List recent PARASITE decisions"
-)
+@router.get("/decisions", response_model=Dict[str, Any], summary="List recent PARASITE decisions")
 async def list_decisions(
     site_id: Optional[str] = Query(None, description="Filter by site ID"),
     tier: Optional[str] = Query(None, description="Filter by tier (tier1/tier2/tier3)"),
     limit: int = Query(50, ge=1, le=200, description="Number of decisions to return"),
-    auth: AuthContext = Depends(require_auth)
+    auth: AuthContext = Depends(require_auth),
 ) -> Dict[str, Any]:
     """List recent PARASITE decisions with optional filtering.
 
@@ -62,44 +55,26 @@ async def list_decisions(
         filtered_decisions = all_decisions
 
         if site_id:
-            filtered_decisions = [
-                d for d in filtered_decisions
-                if d.get("site_id") == site_id
-            ]
+            filtered_decisions = [d for d in filtered_decisions if d.get("site_id") == site_id]
 
         if tier:
-            filtered_decisions = [
-                d for d in filtered_decisions
-                if d.get("tier") == tier
-            ]
+            filtered_decisions = [d for d in filtered_decisions if d.get("tier") == tier]
 
         # Build response
         return {
             "decisions": filtered_decisions[:limit],
             "total": len(filtered_decisions),
-            "filters_applied": {
-                "site_id": site_id,
-                "tier": tier,
-                "limit": limit
-            }
+            "filters_applied": {"site_id": site_id, "tier": tier, "limit": limit},
         }
 
     except Exception as e:
         logger.error(f"Error listing decisions: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving decisions: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error retrieving decisions: {str(e)}")
 
 
-@router.get(
-    "/decisions/{decision_id}",
-    response_model=Dict[str, Any],
-    summary="Get single decision with full context"
-)
+@router.get("/decisions/{decision_id}", response_model=Dict[str, Any], summary="Get single decision with full context")
 async def get_decision(
-    decision_id: str = Path(..., description="ID of decision to retrieve"),
-    auth: AuthContext = Depends(require_auth)
+    decision_id: str = Path(..., description="ID of decision to retrieve"), auth: AuthContext = Depends(require_auth)
 ) -> Dict[str, Any]:
     """Get a single PARASITE decision with complete context.
 
@@ -116,10 +91,7 @@ async def get_decision(
         decision = await parasite_repo.get_decision_by_id(decision_id)
 
         if not decision:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Decision {decision_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Decision {decision_id} not found")
 
         return decision
 
@@ -127,20 +99,12 @@ async def get_decision(
         raise
     except Exception as e:
         logger.error(f"Error retrieving decision {decision_id}: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving decision: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error retrieving decision: {str(e)}")
 
 
-@router.get(
-    "/stats",
-    response_model=Dict[str, Any],
-    summary="Aggregated decision statistics"
-)
+@router.get("/stats", response_model=Dict[str, Any], summary="Aggregated decision statistics")
 async def get_stats(
-    site_id: str = Query(..., description="Site ID (required)"),
-    auth: AuthContext = Depends(require_auth)
+    site_id: str = Query(..., description="Site ID (required)"), auth: AuthContext = Depends(require_auth)
 ) -> Dict[str, Any]:
     """Get aggregated PARASITE decision statistics for a site.
 
@@ -156,17 +120,14 @@ async def get_stats(
 
         # Get all decisions for this site (last 30 days)
         thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).isoformat()
-        decisions = await parasite_repo.get_decisions_by_site(
-            site_id=site_id,
-            since=thirty_days_ago
-        )
+        decisions = await parasite_repo.get_decisions_by_site(site_id=site_id, since=thirty_days_ago)
 
         # Calculate statistics
         total = len(decisions)
         by_tier = {
             "tier1": len([d for d in decisions if d.get("tier") == "tier1"]),
             "tier2": len([d for d in decisions if d.get("tier") == "tier2"]),
-            "tier3": len([d for d in decisions if d.get("tier") == "tier3"])
+            "tier3": len([d for d in decisions if d.get("tier") == "tier3"]),
         }
 
         # Count rollbacks
@@ -187,25 +148,16 @@ async def get_stats(
             "rollback_rate": round(rollback_rate, 3),
             "cov_success_rate": round(cov_success_rate, 3),
             "outcome_match_rate": round(outcome_match_rate, 3),
-            "period": "last_30_days"
+            "period": "last_30_days",
         }
 
     except Exception as e:
         logger.error(f"Error calculating stats for {site_id}: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error calculating statistics: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error calculating statistics: {str(e)}")
 
 
-@router.get(
-    "/routing-config",
-    response_model=Dict[str, Any],
-    summary="Current routing configuration"
-)
-async def get_routing_config(
-    auth: AuthContext = Depends(require_operator)
-) -> Dict[str, Any]:
+@router.get("/routing-config", response_model=Dict[str, Any], summary="Current routing configuration")
+async def get_routing_config(auth: AuthContext = Depends(require_operator)) -> Dict[str, Any]:
     """Get current PARASITE routing configuration.
 
     Requires OPERATOR role.
@@ -222,32 +174,20 @@ async def get_routing_config(
         return {
             "parasite_enabled": settings.parasite_enabled,
             "tier3_enabled": settings.parasite_tier3_enabled,
-            "thresholds": {
-                "tier2": settings.parasite_tier2_threshold,
-                "tier3": settings.parasite_tier3_threshold
-            },
+            "thresholds": {"tier2": settings.parasite_tier2_threshold, "tier3": settings.parasite_tier3_threshold},
             "rate_limit": getattr(settings, "parasite_rate_limit_per_hour", 10),
             "cov_timeout": settings.parasite_cov_verification_timeout_seconds,
             "auto_rollback_enabled": settings.parasite_auto_rollback_enabled,
-            "outcome_measurement_window_seconds": getattr(settings, "parasite_outcome_measurement_window", 600)
+            "outcome_measurement_window_seconds": getattr(settings, "parasite_outcome_measurement_window", 600),
         }
 
     except Exception as e:
         logger.error(f"Error retrieving routing config: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving configuration: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error retrieving configuration: {str(e)}")
 
 
-@router.get(
-    "/health",
-    response_model=Dict[str, Any],
-    summary="PARASITE system health"
-)
-async def get_health(
-    auth: AuthContext = Depends(require_auth)
-) -> Dict[str, Any]:
+@router.get("/health", response_model=Dict[str, Any], summary="PARASITE system health")
+async def get_health(auth: AuthContext = Depends(require_auth)) -> Dict[str, Any]:
     """Get PARASITE system health status.
 
     Args:
@@ -271,10 +211,9 @@ async def get_health(
         # Count auto-executions in last hour
         one_hour_ago = (datetime.utcnow() - timedelta(hours=1)).isoformat()
         recent_executions = await parasite_repo.get_decisions_since(one_hour_ago)
-        auto_executions_this_hour = len([
-            d for d in recent_executions
-            if d.get("decision_type") in ["tier3_auto_execute", "auto_rollback"]
-        ])
+        auto_executions_this_hour = len(
+            [d for d in recent_executions if d.get("decision_type") in ["tier3_auto_execute", "auto_rollback"]]
+        )
 
         # Get last decision timestamp
         all_recent = await parasite_repo.get_recent_decisions(limit=1)
@@ -286,12 +225,9 @@ async def get_health(
             "auto_executions_this_hour": auto_executions_this_hour,
             "last_decision_at": last_decision_at,
             "tier3_enabled": settings.parasite_tier3_enabled,
-            "auto_rollback_enabled": settings.parasite_auto_rollback_enabled
+            "auto_rollback_enabled": settings.parasite_auto_rollback_enabled,
         }
 
     except Exception as e:
         logger.error(f"Error retrieving health status: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving health status: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error retrieving health status: {str(e)}")

@@ -17,21 +17,38 @@ logger = logging.getLogger(__name__)
 
 # Equipment types tracked in fleet
 FLEET_EQUIPMENT_TYPES = [
-    "CHILLER", "AHU", "FCU", "VAV", "GEN", "UPS", "PUMP", "CT", "DALI",
+    "CHILLER",
+    "AHU",
+    "FCU",
+    "VAV",
+    "GEN",
+    "UPS",
+    "PUMP",
+    "CT",
+    "DALI",
 ]
 
 # Failure types aggregated
 FAILURE_TYPES = [
-    "compressor_failure", "bearing_wear", "refrigerant_leak",
-    "filter_blockage", "motor_overload", "belt_wear",
-    "electrical_fault", "sensor_drift", "valve_stuck",
-    "fan_imbalance", "coil_fouling", "control_failure",
+    "compressor_failure",
+    "bearing_wear",
+    "refrigerant_leak",
+    "filter_blockage",
+    "motor_overload",
+    "belt_wear",
+    "electrical_fault",
+    "sensor_drift",
+    "valve_stuck",
+    "fan_imbalance",
+    "coil_fouling",
+    "control_failure",
 ]
 
 
 @dataclass
 class FailurePattern:
     """An aggregated failure pattern across the fleet."""
+
     equipment_type: str
     failure_type: str
     count: int = 0
@@ -46,6 +63,7 @@ class FailurePattern:
 @dataclass
 class FleetBenchmark:
     """Benchmarking data for comparing site against fleet."""
+
     equipment_type: str
     fleet_avg_health: float
     fleet_avg_mtbf_days: float  # Mean time between failures
@@ -295,10 +313,7 @@ class FleetAggregator:
         patterns = list(self._failure_patterns.values())
 
         if equipment_type:
-            patterns = [
-                p for p in patterns
-                if p.equipment_type.upper() == equipment_type.upper()
-            ]
+            patterns = [p for p in patterns if p.equipment_type.upper() == equipment_type.upper()]
 
         # Sort by count descending (most common failures first)
         patterns.sort(key=lambda p: p.count, reverse=True)
@@ -353,17 +368,19 @@ class FleetAggregator:
                 adjusted_count = max(1, int(adjusted_count * (1 - reduction_factor)))
                 adjusted_sites -= 1
 
-            matches.append({
-                "equipment_type": pattern.equipment_type,
-                "failure_type": pattern.failure_type,
-                "fleet_occurrences": adjusted_count,
-                "avg_age_at_failure_years": round(pattern.avg_age_at_failure_years, 1),
-                "precursor_pattern": pattern.common_precursors,
-                "avg_days_warning": max(7, int(pattern.avg_health_at_detection / 2)),
-                "avg_repair_cost_zar": round(pattern.avg_repair_cost_zar, 0),
-                "confidence": min(0.95, 0.5 + (adjusted_count / 100)),
-                "other_sites_count": adjusted_sites,
-            })
+            matches.append(
+                {
+                    "equipment_type": pattern.equipment_type,
+                    "failure_type": pattern.failure_type,
+                    "fleet_occurrences": adjusted_count,
+                    "avg_age_at_failure_years": round(pattern.avg_age_at_failure_years, 1),
+                    "precursor_pattern": pattern.common_precursors,
+                    "avg_days_warning": max(7, int(pattern.avg_health_at_detection / 2)),
+                    "avg_repair_cost_zar": round(pattern.avg_repair_cost_zar, 0),
+                    "confidence": min(0.95, 0.5 + (adjusted_count / 100)),
+                    "other_sites_count": adjusted_sites,
+                }
+            )
 
         # Sort by occurrences
         matches.sort(key=lambda m: m["fleet_occurrences"], reverse=True)
@@ -377,16 +394,10 @@ class FleetAggregator:
         total_patterns = len(self._failure_patterns)
         total_occurrences = sum(p.count for p in self._failure_patterns.values())
         total_sites = len(self._site_data)
-        total_equipment = sum(
-            s["equipment_count"] for s in self._site_data.values()
-        )
-        avg_fleet_health = (
-            sum(s["avg_health"] for s in self._site_data.values()) / max(total_sites, 1)
-        )
+        total_equipment = sum(s["equipment_count"] for s in self._site_data.values())
+        avg_fleet_health = sum(s["avg_health"] for s in self._site_data.values()) / max(total_sites, 1)
         total_alerts = sum(s["open_alerts"] for s in self._site_data.values())
-        total_maintenance = sum(
-            s["monthly_maintenance_zar"] for s in self._site_data.values()
-        )
+        total_maintenance = sum(s["monthly_maintenance_zar"] for s in self._site_data.values())
 
         # Equipment type distribution
         type_distribution = {}
@@ -395,9 +406,7 @@ class FleetAggregator:
             if eq_type not in type_distribution:
                 type_distribution[eq_type] = {"failures": 0, "total_cost_zar": 0}
             type_distribution[eq_type]["failures"] += pattern.count
-            type_distribution[eq_type]["total_cost_zar"] += (
-                pattern.count * pattern.avg_repair_cost_zar
-            )
+            type_distribution[eq_type]["total_cost_zar"] += pattern.count * pattern.avg_repair_cost_zar
 
         # Top failure patterns
         top_patterns = sorted(
@@ -444,10 +453,7 @@ class FleetAggregator:
         benchmarks = list(self._benchmarks.values())
 
         if equipment_type:
-            benchmarks = [
-                b for b in benchmarks
-                if b.equipment_type.upper() == equipment_type.upper()
-            ]
+            benchmarks = [b for b in benchmarks if b.equipment_type.upper() == equipment_type.upper()]
 
         return [
             {
@@ -489,9 +495,7 @@ class FleetAggregator:
             }
 
         # Average across requested benchmarks
-        avg_fleet_health = (
-            sum(b["fleet_avg_health"] for b in benchmarks) / len(benchmarks)
-        )
+        avg_fleet_health = sum(b["fleet_avg_health"] for b in benchmarks) / len(benchmarks)
         best_health = max(b["fleet_best_health"] for b in benchmarks)
         worst_health = min(b["fleet_worst_health"] for b in benchmarks)
 
@@ -532,12 +536,8 @@ class FleetAggregator:
         Returns distribution of equipment by risk level across fleet.
         """
         # Derive from site data and failure patterns
-        total_equipment = sum(
-            s["equipment_count"] for s in self._site_data.values()
-        )
-        total_critical = sum(
-            s["critical_equipment"] for s in self._site_data.values()
-        )
+        total_equipment = sum(s["equipment_count"] for s in self._site_data.values())
+        total_critical = sum(s["critical_equipment"] for s in self._site_data.values())
         total_alerts = sum(s["open_alerts"] for s in self._site_data.values())
 
         # Approximate distribution
@@ -566,10 +566,7 @@ class FleetAggregator:
                     "percentage": round(max(0, low_pct), 1),
                 },
             },
-            "sites_with_critical": sum(
-                1 for s in self._site_data.values()
-                if s["critical_equipment"] > 0
-            ),
+            "sites_with_critical": sum(1 for s in self._site_data.values() if s["critical_equipment"] > 0),
             "total_sites": len(self._site_data),
         }
 

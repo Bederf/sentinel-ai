@@ -67,9 +67,7 @@ class MetricsCalculator:
                     "current": planning_accuracy,
                     "target": SUCCESS_TARGETS["maintenance_planning_accuracy"],
                     "unit": "%",
-                    "met": (
-                        planning_accuracy >= SUCCESS_TARGETS["maintenance_planning_accuracy"]
-                    ),
+                    "met": (planning_accuracy >= SUCCESS_TARGETS["maintenance_planning_accuracy"]),
                     "description": "Accuracy of maintenance scheduling predictions",
                 },
                 "false_positive_rate": {
@@ -96,9 +94,7 @@ class MetricsCalculator:
                     "description": "Average advance warning before failure",
                 },
             },
-            "overall_score": self._calculate_overall_score(
-                failure_reduction, planning_accuracy, false_positive_rate
-            ),
+            "overall_score": self._calculate_overall_score(failure_reduction, planning_accuracy, false_positive_rate),
             "targets_met": sum(
                 1
                 for m in [
@@ -174,11 +170,7 @@ class MetricsCalculator:
         Returns:
             Comprehensive performance report.
         """
-        end_date = (
-            datetime.fromisoformat(report_date)
-            if report_date
-            else datetime.now()
-        )
+        end_date = datetime.fromisoformat(report_date) if report_date else datetime.now()
 
         if period == "weekly":
             start_date = end_date - timedelta(days=7)
@@ -215,18 +207,10 @@ class MetricsCalculator:
             "alert_summary": alert_summary,
             "prediction_outcomes": {
                 "total": len(self._prediction_outcomes),
-                "correct": sum(
-                    1 for o in self._prediction_outcomes if o["correct"]
-                ),
-                "true_positives": sum(
-                    1 for o in self._prediction_outcomes if o["true_positive"]
-                ),
-                "false_positives": sum(
-                    1 for o in self._prediction_outcomes if o["false_positive"]
-                ),
-                "false_negatives": sum(
-                    1 for o in self._prediction_outcomes if o["false_negative"]
-                ),
+                "correct": sum(1 for o in self._prediction_outcomes if o["correct"]),
+                "true_positives": sum(1 for o in self._prediction_outcomes if o["true_positive"]),
+                "false_positives": sum(1 for o in self._prediction_outcomes if o["false_positive"]),
+                "false_negatives": sum(1 for o in self._prediction_outcomes if o["false_negative"]),
             },
             "recommendations": self._generate_recommendations(current_metrics),
         }
@@ -249,17 +233,13 @@ class MetricsCalculator:
         """
         try:
             from app.database.repositories.alert_repository import AlertRepository
+
             repo = AlertRepository()
             alerts = repo.get_all(building_code="site-002")
 
-            total_failures = sum(
-                1 for a in alerts if a.get("severity") in ("high", "critical")
-            )
+            total_failures = sum(1 for a in alerts if a.get("severity") in ("high", "critical"))
             predicted_failures = sum(
-                1
-                for a in alerts
-                if a.get("severity") in ("high", "critical")
-                and a.get("predicted", False)
+                1 for a in alerts if a.get("severity") in ("high", "critical") and a.get("predicted", False)
             )
 
             if total_failures == 0:
@@ -289,9 +269,7 @@ class MetricsCalculator:
         """
         if self._prediction_outcomes:
             fp = sum(1 for o in self._prediction_outcomes if o["false_positive"])
-            total_positive = sum(
-                1 for o in self._prediction_outcomes if o["predicted_failure"]
-            )
+            total_positive = sum(1 for o in self._prediction_outcomes if o["predicted_failure"])
             return round((fp / max(total_positive, 1)) * 100, 1)
 
         return 7.3  # Demo seeded: below 10% target
@@ -344,13 +322,9 @@ class MetricsCalculator:
         """
         # Normalize each metric to 0-100 based on target
         fr_score = min((failure_reduction / SUCCESS_TARGETS["unplanned_failure_reduction"]) * 100, 100)
-        pa_score = min(
-            (planning_accuracy / SUCCESS_TARGETS["maintenance_planning_accuracy"]) * 100, 100
-        )
+        pa_score = min((planning_accuracy / SUCCESS_TARGETS["maintenance_planning_accuracy"]) * 100, 100)
         # FP rate is inverse - lower is better
-        fp_score = max(
-            (1.0 - false_positive_rate / SUCCESS_TARGETS["false_positive_rate"]) * 100, 0
-        )
+        fp_score = max((1.0 - false_positive_rate / SUCCESS_TARGETS["false_positive_rate"]) * 100, 0)
 
         # Weighted average
         score = (fr_score * 0.35) + (pa_score * 0.40) + (fp_score * 0.25)
@@ -360,6 +334,7 @@ class MetricsCalculator:
         """Get summary of current drift status."""
         try:
             from ml.monitoring.drift import get_drift_detector
+
             detector = get_drift_detector()
             result = detector.detect_all_drift()
             return result.get("summary", {})
@@ -370,6 +345,7 @@ class MetricsCalculator:
         """Get model health summary."""
         try:
             from ml.monitoring.performance_monitor import get_performance_monitor
+
             monitor = get_performance_monitor()
             return monitor.get_model_health_summary().get("summary", {})
         except Exception:
@@ -379,14 +355,13 @@ class MetricsCalculator:
         """Get ML alert summary."""
         try:
             from ml.monitoring.alerts import get_ml_alert_manager
+
             manager = get_ml_alert_manager()
             return manager.get_alert_summary()
         except Exception:
             return {"error": "alert_manager_unavailable"}
 
-    def _generate_recommendations(
-        self, metrics: Dict[str, Any]
-    ) -> List[Dict[str, str]]:
+    def _generate_recommendations(self, metrics: Dict[str, Any]) -> List[Dict[str, str]]:
         """Generate actionable recommendations based on metrics.
 
         Args:
@@ -401,48 +376,56 @@ class MetricsCalculator:
         # Check failure reduction
         fr = m.get("unplanned_failure_reduction", {})
         if not fr.get("met", True):
-            recommendations.append({
-                "priority": "high",
-                "area": "failure_reduction",
-                "action": (
-                    f"Failure reduction at {fr.get('current', 0)}% "
-                    f"(target: {fr.get('target', 40)}%). "
-                    "Consider expanding monitoring coverage and adjusting thresholds."
-                ),
-            })
+            recommendations.append(
+                {
+                    "priority": "high",
+                    "area": "failure_reduction",
+                    "action": (
+                        f"Failure reduction at {fr.get('current', 0)}% "
+                        f"(target: {fr.get('target', 40)}%). "
+                        "Consider expanding monitoring coverage and adjusting thresholds."
+                    ),
+                }
+            )
 
         # Check planning accuracy
         pa = m.get("maintenance_planning_accuracy", {})
         if not pa.get("met", True):
-            recommendations.append({
-                "priority": "high",
-                "area": "planning_accuracy",
-                "action": (
-                    f"Planning accuracy at {pa.get('current', 0)}% "
-                    f"(target: {pa.get('target', 80)}%). "
-                    "Review prediction calibration and retraining schedules."
-                ),
-            })
+            recommendations.append(
+                {
+                    "priority": "high",
+                    "area": "planning_accuracy",
+                    "action": (
+                        f"Planning accuracy at {pa.get('current', 0)}% "
+                        f"(target: {pa.get('target', 80)}%). "
+                        "Review prediction calibration and retraining schedules."
+                    ),
+                }
+            )
 
         # Check false positive rate
         fpr = m.get("false_positive_rate", {})
         if not fpr.get("met", True):
-            recommendations.append({
-                "priority": "medium",
-                "area": "false_positives",
-                "action": (
-                    f"False positive rate at {fpr.get('current', 0)}% "
-                    f"(target: <{fpr.get('target', 10)}%). "
-                    "Adjust anomaly detection thresholds or retrain models."
-                ),
-            })
+            recommendations.append(
+                {
+                    "priority": "medium",
+                    "area": "false_positives",
+                    "action": (
+                        f"False positive rate at {fpr.get('current', 0)}% "
+                        f"(target: <{fpr.get('target', 10)}%). "
+                        "Adjust anomaly detection thresholds or retrain models."
+                    ),
+                }
+            )
 
         if not recommendations:
-            recommendations.append({
-                "priority": "info",
-                "area": "general",
-                "action": "All success targets are being met. Continue monitoring.",
-            })
+            recommendations.append(
+                {
+                    "priority": "info",
+                    "area": "general",
+                    "action": "All success targets are being met. Continue monitoring.",
+                }
+            )
 
         return recommendations
 

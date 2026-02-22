@@ -78,7 +78,7 @@ async def process_sensor_data(
     file: UploadFile = File(...),
     equipment_id: str = Form(...),
     measurement_type: str = Form("vibration"),
-    service_record_id: Optional[str] = Form(None)
+    service_record_id: Optional[str] = Form(None),
 ):
     """
     Process phyphox screenshot or export file.
@@ -101,16 +101,16 @@ async def process_sensor_data(
         filename=file.filename,
         equipment_id=equipment_id,
         service_record_id=service_record_id,
-        measurement_type=measurement_type
+        measurement_type=measurement_type,
     )
 
     # Generate report
-    result['report'] = reporter.generate_report(result, equipment_id)
+    result["report"] = reporter.generate_report(result, equipment_id)
 
     # Store recording for trend analysis
     recording_id = f"{equipment_id}-{datetime.utcnow().isoformat()}"
-    result['recording_id'] = recording_id
-    result['created_at'] = datetime.utcnow().isoformat()
+    result["recording_id"] = recording_id
+    result["created_at"] = datetime.utcnow().isoformat()
 
     if equipment_id not in _recordings:
         _recordings[equipment_id] = []
@@ -119,10 +119,8 @@ async def process_sensor_data(
     # Compare to baseline if available
     if equipment_id in _baselines:
         comparator = get_baseline_comparator()
-        comparison = comparator.compare_to_baseline(
-            result, _baselines[equipment_id], measurement_type
-        )
-        result['baseline_comparison'] = comparison
+        comparison = comparator.compare_to_baseline(result, _baselines[equipment_id], measurement_type)
+        result["baseline_comparison"] = comparison
 
     return result
 
@@ -133,7 +131,7 @@ async def sentry_phyphox_webhook(
     equipment_id: str = Form(...),
     chat_id: str = Form(...),
     measurement_type: str = Form("vibration"),
-    service_record_id: Optional[str] = Form(None)
+    service_record_id: Optional[str] = Form(None),
 ):
     """
     Webhook for Sentry bot to submit phyphox data.
@@ -148,11 +146,11 @@ async def sentry_phyphox_webhook(
         filename=file.filename,
         equipment_id=equipment_id,
         service_record_id=service_record_id,
-        measurement_type=measurement_type
+        measurement_type=measurement_type,
     )
 
     # Store recording
-    result['created_at'] = datetime.utcnow().isoformat()
+    result["created_at"] = datetime.utcnow().isoformat()
     if equipment_id not in _recordings:
         _recordings[equipment_id] = []
     _recordings[equipment_id].append(result)
@@ -161,15 +159,11 @@ async def sentry_phyphox_webhook(
     baseline_info = ""
     if equipment_id in _baselines:
         comparator = get_baseline_comparator()
-        comparison = comparator.compare_to_baseline(
-            result, _baselines[equipment_id], measurement_type
-        )
-        result['baseline_comparison'] = comparison
+        comparison = comparator.compare_to_baseline(result, _baselines[equipment_id], measurement_type)
+        result["baseline_comparison"] = comparison
 
-        if comparison.get('alerts'):
-            baseline_info = reporter.generate_comparison_report(
-                comparison, equipment_id
-            )
+        if comparison.get("alerts"):
+            baseline_info = reporter.generate_comparison_report(comparison, equipment_id)
 
     # Generate Telegram message
     report = reporter.generate_report(result, equipment_id)
@@ -181,22 +175,20 @@ async def sentry_phyphox_webhook(
     return {
         "success": True,
         "telegram_message": report,
-        "anomalies": result.get('anomalies', {}),
-        "requires_followup": result.get('anomalies', {}).get('severity') in ('medium', 'high'),
-        "chat_id": chat_id
+        "anomalies": result.get("anomalies", {}),
+        "requires_followup": result.get("anomalies", {}).get("severity") in ("medium", "high"),
+        "chat_id": chat_id,
     }
 
 
 @router.get("/instructions/{measurement_type}")
 async def get_technician_instructions(
     measurement_type: str,
-    equipment_type: Optional[str] = Query(None, description="Equipment type for specific guidance")
+    equipment_type: Optional[str] = Query(None, description="Equipment type for specific guidance"),
 ):
     """Get phyphox instructions for technicians."""
     handler = get_phyphox_handler()
-    return {
-        "instructions": handler.get_technician_instructions(measurement_type, equipment_type)
-    }
+    return {"instructions": handler.get_technician_instructions(measurement_type, equipment_type)}
 
 
 @router.post("/baseline/{equipment_id}")
@@ -206,7 +198,7 @@ async def capture_baseline(
     measurement_type: str = Form("vibration"),
     condition: str = Form("good"),
     technician: Optional[str] = Form(None),
-    notes: Optional[str] = Form(None)
+    notes: Optional[str] = Form(None),
 ):
     """
     Capture baseline reading for equipment (during onboarding/condition inspection).
@@ -218,25 +210,22 @@ async def capture_baseline(
 
     # Process the phyphox data
     result = await handler.process_phyphox_data(
-        file_data=file_data,
-        filename=file.filename,
-        equipment_id=equipment_id,
-        measurement_type=measurement_type
+        file_data=file_data, filename=file.filename, equipment_id=equipment_id, measurement_type=measurement_type
     )
 
     # Build baseline record
     baseline = {
-        'equipment_id': equipment_id,
-        'captured_at': datetime.utcnow().isoformat(),
-        'captured_by': technician,
-        'condition_at_capture': condition,
-        'notes': notes,
-        'vibration_rms_ms2': result.get('rms_total_ms2') or result.get('rms_value'),
-        'vibration_peak_frequencies_hz': result.get('peak_frequencies_hz'),
-        'dominant_frequency_hz': result.get('dominant_frequency_hz'),
-        'audio_noise_floor_db': result.get('overall_level_db'),
-        'full_data': result,
-        'is_active': True
+        "equipment_id": equipment_id,
+        "captured_at": datetime.utcnow().isoformat(),
+        "captured_by": technician,
+        "condition_at_capture": condition,
+        "notes": notes,
+        "vibration_rms_ms2": result.get("rms_total_ms2") or result.get("rms_value"),
+        "vibration_peak_frequencies_hz": result.get("peak_frequencies_hz"),
+        "dominant_frequency_hz": result.get("dominant_frequency_hz"),
+        "audio_noise_floor_db": result.get("overall_level_db"),
+        "full_data": result,
+        "is_active": True,
     }
 
     # Store baseline (in-memory for demo)
@@ -250,7 +239,7 @@ async def capture_baseline(
         "message": f"Baseline captured for equipment {equipment_id}",
         "baseline": baseline,
         "report": report,
-        "next_steps": "Future readings will be compared against this baseline"
+        "next_steps": "Future readings will be compared against this baseline",
     }
 
 
@@ -259,17 +248,13 @@ async def get_baseline(equipment_id: str):
     """Get current baseline for equipment."""
     _load_demo_data()  # Ensure demo data is loaded
     if equipment_id in _baselines:
-        return {
-            "equipment_id": equipment_id,
-            "baseline": _baselines[equipment_id],
-            "has_baseline": True
-        }
+        return {"equipment_id": equipment_id, "baseline": _baselines[equipment_id], "has_baseline": True}
 
     return {
         "equipment_id": equipment_id,
         "baseline": None,
         "has_baseline": False,
-        "message": "No baseline captured yet"
+        "message": "No baseline captured yet",
     }
 
 
@@ -285,8 +270,7 @@ async def delete_baseline(equipment_id: str):
 
 @router.get("/trend/{equipment_id}")
 async def get_equipment_trend(
-    equipment_id: str,
-    limit: int = Query(10, description="Number of recent readings to analyze")
+    equipment_id: str, limit: int = Query(10, description="Number of recent readings to analyze")
 ):
     _load_demo_data()  # Ensure demo data is loaded
     """Get trend analysis for equipment based on historical readings."""
@@ -295,7 +279,7 @@ async def get_equipment_trend(
             "equipment_id": equipment_id,
             "trend": "insufficient_data",
             "message": "Need 2+ readings for trend analysis",
-            "readings_count": len(_recordings.get(equipment_id, []))
+            "readings_count": len(_recordings.get(equipment_id, [])),
         }
 
     comparator = get_baseline_comparator()
@@ -306,10 +290,7 @@ async def get_equipment_trend(
 
     trend = comparator.generate_trend_report(equipment_id, recordings, baseline)
 
-    return {
-        "equipment_id": equipment_id,
-        **trend
-    }
+    return {"equipment_id": equipment_id, **trend}
 
 
 @router.post("/score")
@@ -318,7 +299,7 @@ async def calculate_condition_score(
     asset_class: str = Form("generator"),
     equipment_profile: str = Form("generator_default"),
     file: Optional[UploadFile] = File(None),
-    use_latest: bool = Form(True)
+    use_latest: bool = Form(True),
 ):
     """
     Calculate condition score for equipment.
@@ -332,10 +313,7 @@ async def calculate_condition_score(
     if file:
         file_data = await file.read()
         reading = await handler.process_phyphox_data(
-            file_data=file_data,
-            filename=file.filename,
-            equipment_id=equipment_id,
-            measurement_type="vibration"
+            file_data=file_data, filename=file.filename, equipment_id=equipment_id, measurement_type="vibration"
         )
     elif use_latest and equipment_id in _recordings and _recordings[equipment_id]:
         reading = _recordings[equipment_id][-1]
@@ -347,32 +325,24 @@ async def calculate_condition_score(
 
     # Calculate score
     result = scorer.calculate_score(
-        reading=reading,
-        baseline=baseline,
-        equipment_profile=equipment_profile,
-        asset_class=asset_class
+        reading=reading, baseline=baseline, equipment_profile=equipment_profile, asset_class=asset_class
     )
 
     # Add Telegram-formatted output
-    result['telegram_message'] = scorer.format_for_telegram(result, equipment_id)
+    result["telegram_message"] = scorer.format_for_telegram(result, equipment_id)
 
     return result
 
 
 @router.get("/recordings/{equipment_id}")
 async def get_recordings(
-    equipment_id: str,
-    limit: int = Query(20, description="Maximum number of recordings to return")
+    equipment_id: str, limit: int = Query(20, description="Maximum number of recordings to return")
 ):
     """Get historical recordings for equipment."""
     _load_demo_data()  # Ensure demo data is loaded
     recordings = _recordings.get(equipment_id, [])
 
-    return {
-        "equipment_id": equipment_id,
-        "total_count": len(recordings),
-        "recordings": recordings[-limit:]
-    }
+    return {"equipment_id": equipment_id, "total_count": len(recordings), "recordings": recordings[-limit:]}
 
 
 @router.get("/health")
@@ -383,5 +353,5 @@ async def health_check():
         "status": "healthy",
         "baselines_count": len(_baselines),
         "recordings_count": sum(len(r) for r in _recordings.values()),
-        "equipment_with_data": list(_recordings.keys())
+        "equipment_with_data": list(_recordings.keys()),
     }

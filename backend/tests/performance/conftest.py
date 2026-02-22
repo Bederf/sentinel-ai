@@ -9,6 +9,7 @@ import pytest
 try:
     # Try to import from pytest-benchmark
     from pytest_benchmark.fixture import BenchmarkFixture
+
     HAS_BENCHMARK = True
 except ImportError:
     HAS_BENCHMARK = False

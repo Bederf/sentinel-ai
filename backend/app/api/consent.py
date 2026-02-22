@@ -33,8 +33,10 @@ router = APIRouter(prefix="/consent", tags=["consent"])
 # Request / Response models
 # ---------------------------------------------------------------------------
 
+
 class RecordConsentRequest(BaseModel):
     """Request to record a new consent decision."""
+
     data_subject_id: str = Field(..., description="Phone number or user identifier (will be hashed)")
     platform: str = Field(..., description="Platform: whatsapp, telegram, or web")
     consent_type: str = Field(..., description="Consent type: pi_processing, data_retention, or cross_border_transfer")
@@ -46,6 +48,7 @@ class RecordConsentRequest(BaseModel):
 
 class WithdrawConsentRequest(BaseModel):
     """Request to withdraw consent."""
+
     data_subject_id: str = Field(..., description="Phone number or user identifier")
     consent_type: str = Field(..., description="Consent type to withdraw")
     metadata: Optional[dict] = Field(None, description="Withdrawal metadata (reason)")
@@ -53,6 +56,7 @@ class WithdrawConsentRequest(BaseModel):
 
 class ConsentCheckResponse(BaseModel):
     """Response for consent check."""
+
     data_subject_id: str
     consent_type: str
     has_consent: bool
@@ -60,6 +64,7 @@ class ConsentCheckResponse(BaseModel):
 
 class ConsentStatsResponse(BaseModel):
     """Aggregate consent statistics."""
+
     total_records: int
     active_consents: int
     withdrawals: int
@@ -71,6 +76,7 @@ class ConsentStatsResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.post("/record", response_model=dict)
 async def record_consent(request: RecordConsentRequest):

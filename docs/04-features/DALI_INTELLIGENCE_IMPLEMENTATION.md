@@ -2,7 +2,7 @@
 
 ## Overview
 
-Complete implementation of the DALI Intelligence Dashboard Card for Grant (Wardew installer). The dashboard demonstrates ROI of Tridonic DALI lighting systems integrated with SENTINEL AI optimization.
+Complete implementation of the DALI Intelligence Dashboard Card for Grant. The dashboard demonstrates ROI of Tridonic DALI lighting systems integrated with SENTINEL AI optimization.
 
 ## ✅ Completed Components
 
@@ -59,7 +59,7 @@ Complete implementation of the DALI Intelligence Dashboard Card for Grant (Warde
 ```typescript
 {
   id: 'dali-intelligence',
-  name: 'DALI Intelligence: Wardew Tridonic',
+  name: 'DALI Intelligence: Tridonic',
   description: '365-day simulation showing occupancy, daylight, and AI learning',
   icon: <Lightbulb className="w-4 h-4" />,
   category: 'section',
@@ -179,7 +179,7 @@ Expected response: JSON with summary, daily_data (122 entries), monthly_data (12
 
 ## 📈 Demo Narrative
 
-For Grant (Wardew installer):
+For Grant (Demo Account):
 
 > "This simulation shows your Tridonic DALI system's ROI over one year at Sandton Office.
 >
@@ -274,6 +274,6 @@ For Grant (Wardew installer):
 ---
 
 **Status:** ✅ Ready for Testing (manual Dashboard integration needed)
-**Owner:** Grant (Wardew) Demo
+**Owner:** Grant (Demo Account)
 **Created:** 2026-02-14
 **Version:** 1.0

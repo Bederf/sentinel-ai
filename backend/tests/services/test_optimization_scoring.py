@@ -55,7 +55,7 @@ class TestOptimizationScoringIntegration:
                 "runtime": 0.10,
                 "energy": 0.20,
                 "maintenance": 0.20,
-            }
+            },
         }
 
         # Score the recommendations
@@ -122,7 +122,7 @@ class TestOptimizationScoringIntegration:
                 "runtime": 0.10,
                 "energy": 0.20,
                 "maintenance": 0.20,
-            }
+            },
         }
 
         scored = optimizer._score_and_rank_recommendations(mock_rec, comfort_profile)
@@ -195,7 +195,7 @@ class TestOptimizationScoringIntegration:
                 "runtime": 0.10,
                 "energy": 0.20,
                 "maintenance": 0.20,
-            }
+            },
         }
 
         # Cost profile
@@ -207,7 +207,7 @@ class TestOptimizationScoringIntegration:
                 "runtime": 0.10,
                 "energy": 0.30,
                 "maintenance": 0.10,
-            }
+            },
         }
 
         # Asset-sweating profile
@@ -219,7 +219,7 @@ class TestOptimizationScoringIntegration:
                 "cost": 0.15,
                 "maintenance": 0.10,
                 "energy": 0.30,
-            }
+            },
         }
 
         # Score with different profiles
@@ -232,7 +232,7 @@ class TestOptimizationScoringIntegration:
                 confidence=test_recs.confidence,
                 reasoning=test_recs.reasoning,
             ),
-            comfort_profile
+            comfort_profile,
         )
 
         cost_ranked = optimizer._score_and_rank_recommendations(
@@ -244,7 +244,7 @@ class TestOptimizationScoringIntegration:
                 confidence=test_recs.confidence,
                 reasoning=test_recs.reasoning,
             ),
-            cost_profile
+            cost_profile,
         )
 
         sweat_ranked = optimizer._score_and_rank_recommendations(
@@ -256,7 +256,7 @@ class TestOptimizationScoringIntegration:
                 confidence=test_recs.confidence,
                 reasoning=test_recs.reasoning,
             ),
-            sweat_profile
+            sweat_profile,
         )
 
         # Extract ranking order
@@ -311,7 +311,7 @@ class TestOptimizationScoringIntegration:
                 "runtime": 0.2,
                 "energy": 0.2,
                 "maintenance": 0.2,
-            }
+            },
         }
 
         scored = optimizer._score_and_rank_recommendations(original_rec, test_profile)

@@ -11,6 +11,7 @@ from typing import List, Dict, Any, Optional
 
 class ControllerStatus(str, Enum):
     """Status of a DALI controller."""
+
     ONLINE = "online"
     OFFLINE = "offline"
     ERROR = "error"
@@ -19,6 +20,7 @@ class ControllerStatus(str, Enum):
 
 class SensorType(str, Enum):
     """Type of DALI sensor."""
+
     PIR = "pir"
     PIR_DAYLIGHT = "pir_daylight"
     DAYLIGHT_ONLY = "daylight"
@@ -27,6 +29,7 @@ class SensorType(str, Enum):
 
 class LuminaireType(str, Enum):
     """Type of luminaire."""
+
     LED_DOWNLIGHT = "led_downlight"
     LED_PANEL = "led_panel"
     LED_STRIP = "led_strip"

@@ -10,9 +10,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from app.models.safety_rules import (
-    SafetyRule, RuleSeverity, TemperatureRangeRule
-)
+from app.models.safety_rules import SafetyRule, RuleSeverity, TemperatureRangeRule
 from app.models.device import Device, DeviceType
 
 logger = logging.getLogger(__name__)
@@ -35,6 +33,7 @@ class SafetyEngine:
         """Lazy load SafetyRulesRepository."""
         if self._repository is None:
             from app.database.repositories.safety_rules_repository import SafetyRulesRepository
+
             self._repository = SafetyRulesRepository()
         return self._repository
 
@@ -101,7 +100,7 @@ class SafetyEngine:
             rules_data = [rule.to_dict() for rule in self.rules.values()]
 
             # Save to JSON file as backup
-            with open(SAFETY_RULES_FILE, 'w') as f:
+            with open(SAFETY_RULES_FILE, "w") as f:
                 json.dump(rules_data, f, indent=2)
 
             logger.info(f"Saved {len(rules_data)} safety rules to {SAFETY_RULES_FILE}")
@@ -266,12 +265,16 @@ class SafetyEngine:
         applicable_rules = []
         specific_rule_types = set()  # Track rule types that have specific point rules
 
-        logger.debug(f"get_rules_for_device called: device={device.id}, device_type={device.device_type}, point={point_name}")
+        logger.debug(
+            f"get_rules_for_device called: device={device.id}, device_type={device.device_type}, point={point_name}"
+        )
         logger.debug(f"Total rules in engine: {len(self.rules)}")
 
         # First pass: collect all matching rules and identify specific rules
         for rule in self.rules.values():
-            logger.debug(f"Checking rule {rule.id}: enabled={rule.enabled}, rule_device_type={rule.device_type}, rule_point={rule.point_name}")
+            logger.debug(
+                f"Checking rule {rule.id}: enabled={rule.enabled}, rule_device_type={rule.device_type}, rule_point={rule.point_name}"
+            )
 
             if not rule.enabled:
                 logger.debug("  -> Skipped: rule disabled")
@@ -348,9 +351,7 @@ class SafetyEngine:
                 if temp < min_allowed or temp > max_allowed:
                     return {
                         "allowed": False,
-                        "reasons": [
-                            f"Temperature {temp}°C is outside safe range ({min_allowed}-{max_allowed}°C)"
-                        ],
+                        "reasons": [f"Temperature {temp}°C is outside safe range ({min_allowed}-{max_allowed}°C)"],
                         "warnings": [],
                         "alarms": [],
                         "rule_results": [],
@@ -385,9 +386,7 @@ class SafetyEngine:
                     if temp < 16.0 or temp > 28.0:
                         return {
                             "allowed": False,
-                            "reasons": [
-                                f"Temperature {temp}°C is outside safe range (16-28°C)"
-                            ],
+                            "reasons": [f"Temperature {temp}°C is outside safe range (16-28°C)"],
                             "warnings": [],
                             "alarms": [],
                             "rule_results": [],

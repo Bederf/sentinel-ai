@@ -107,6 +107,7 @@ async def get_profile_analysis(request: Request, run_id: str, profile: str):
 
 class CustomProfileWeights(BaseModel):
     """Custom profile weights for re-analysis."""
+
     name: str = "custom"
     description: str = "Custom analysis profile"
     weights: dict = Field(description="Weight factors: runtime, comfort, cost, maintenance, energy")

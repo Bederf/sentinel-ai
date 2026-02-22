@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).parent.parent / '.env')
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -19,7 +19,7 @@ try:
     print("=" * 70)
 
     # Get all buildings with their equipment_count
-    result = client.table('buildings').select('code, name, equipment_count').execute()
+    result = client.table("buildings").select("code, name, equipment_count").execute()
 
     print("\nBuildings in Supabase:\n")
     for building in result.data:
@@ -30,14 +30,12 @@ try:
     print("=" * 70 + "\n")
 
     for building in result.data:
-        building_code = building['code']
-        building_id = building['id']
-        stored_count = building.get('equipment_count', 0)
+        building_code = building["code"]
+        building_id = building["id"]
+        stored_count = building.get("equipment_count", 0)
 
         # Count actual equipment
-        eq_result = client.table('equipment').select('id', count='exact').eq(
-            'building_id', building_id
-        ).execute()
+        eq_result = client.table("equipment").select("id", count="exact").eq("building_id", building_id).execute()
         actual_count = eq_result.count or 0
 
         match = "✓" if stored_count == actual_count else "❌"
@@ -51,5 +49,6 @@ try:
 except Exception as e:
     print(f"❌ Error: {e}")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)

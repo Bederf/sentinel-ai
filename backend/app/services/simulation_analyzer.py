@@ -26,10 +26,7 @@ def _load_profiles() -> Dict[str, OptimizationProfile]:
     if not PROFILES_PATH.exists():
         return {}
     data = json.loads(PROFILES_PATH.read_text())
-    return {
-        key: OptimizationProfile(**val)
-        for key, val in data.get("profiles", {}).items()
-    }
+    return {key: OptimizationProfile(**val) for key, val in data.get("profiles", {}).items()}
 
 
 class SimulationAnalyzer:
@@ -158,34 +155,32 @@ class SimulationAnalyzer:
                     metrics.setpoint_changes += 1
                     details = evt.get("details", {})
                     if "temperature" in details or "setpoint" in details:
-                        metrics.comfort_deviations.append({
-                            "hour": hour,
-                            "equipment_id": equip_id,
-                            "details": details,
-                        })
+                        metrics.comfort_deviations.append(
+                            {
+                                "hour": hour,
+                                "equipment_id": equip_id,
+                                "details": details,
+                            }
+                        )
 
                 # Track equipment activity as proxy for runtime.
                 # Only count events that carry an equipment_id.
                 # Excluded: building_wake, peak_load, occupancy_increase
                 # (building-level events that never have equipment_id).
                 if equip_id and etype in (
-                    "ai_optimization", "setpoint_change",
-                    "equipment_fault", "repair_completed",
+                    "ai_optimization",
+                    "setpoint_change",
+                    "equipment_fault",
+                    "repair_completed",
                 ):
-                    metrics.equipment_runtime_hours[equip_id] = (
-                        metrics.equipment_runtime_hours.get(equip_id, 0) + 1
-                    )
+                    metrics.equipment_runtime_hours[equip_id] = metrics.equipment_runtime_hours.get(equip_id, 0) + 1
 
         if repair_durations:
-            metrics.mean_time_to_repair_hours = round(
-                sum(repair_durations) / len(repair_durations), 2
-            )
+            metrics.mean_time_to_repair_hours = round(sum(repair_durations) / len(repair_durations), 2)
 
         return metrics
 
-    def score_profile(
-        self, metrics: SimulationMetrics, profile: OptimizationProfile
-    ) -> ProfileAnalysisResult:
+    def score_profile(self, metrics: SimulationMetrics, profile: OptimizationProfile) -> ProfileAnalysisResult:
         """Score simulation metrics against an optimization profile."""
         weights = profile.weights
         thresholds = profile.thresholds
@@ -196,9 +191,7 @@ class SimulationAnalyzer:
         # Runtime score (0-100): higher utilization = higher score
         total_equip = max(len(metrics.equipment_runtime_hours), 1)
         avg_runtime = (
-            sum(metrics.equipment_runtime_hours.values()) / total_equip
-            if metrics.equipment_runtime_hours
-            else 0
+            sum(metrics.equipment_runtime_hours.values()) / total_equip if metrics.equipment_runtime_hours else 0
         )
         runtime_score = min(100, (avg_runtime / 16.0) * 100)  # 16h as baseline
         scores["runtime"] = round(runtime_score, 1)
@@ -236,10 +229,7 @@ class SimulationAnalyzer:
         scores["maintenance"] = round(maint_score, 1)
 
         if "max_acceptable_mttr_hours" in thresholds and mttr > thresholds["max_acceptable_mttr_hours"]:
-            flags.append(
-                f"MTTR {mttr:.1f}h exceeds threshold "
-                f"{thresholds['max_acceptable_mttr_hours']}h"
-            )
+            flags.append(f"MTTR {mttr:.1f}h exceeds threshold {thresholds['max_acceptable_mttr_hours']}h")
             recommendations.append("Improve technician response time or pre-position parts")
 
         # Energy score (0-100): optimization actions help, faults hurt
@@ -250,8 +240,7 @@ class SimulationAnalyzer:
 
         # Weighted overall score
         overall = sum(
-            scores.get(dim, 0) * weights.get(dim, 0)
-            for dim in ("runtime", "comfort", "cost", "maintenance", "energy")
+            scores.get(dim, 0) * weights.get(dim, 0) for dim in ("runtime", "comfort", "cost", "maintenance", "energy")
         )
 
         return ProfileAnalysisResult(

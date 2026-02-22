@@ -14,6 +14,7 @@ from datetime import date
 
 class SLATier(str, Enum):
     """Service Level Agreement tiers with different response times and uptime targets."""
+
     basic = "basic"  # 99% uptime, 24hr response
     standard = "standard"  # 99.5% uptime, 8hr response
     premium = "premium"  # 99.9% uptime, 4hr response
@@ -22,6 +23,7 @@ class SLATier(str, Enum):
 
 class ConditionFactor(BaseModel):
     """Equipment condition assessment factor for pricing adjustments."""
+
     equipment_id: str
     overall_score: int = Field(..., ge=1, le=5, description="Condition score 1-5 from assessment")
     age_years: float = Field(..., ge=0, description="Equipment age in years")
@@ -31,14 +33,20 @@ class ConditionFactor(BaseModel):
 
 class RiskBuffer(BaseModel):
     """ML failure prediction risk buffer for pricing."""
+
     equipment_id: str
-    failure_probability: Decimal = Field(..., ge=Decimal("0"), le=Decimal("1"), description="Failure probability from ML (0-1)")
+    failure_probability: Decimal = Field(
+        ..., ge=Decimal("0"), le=Decimal("1"), description="Failure probability from ML (0-1)"
+    )
     health_score: int = Field(..., ge=0, le=100, description="Health score 0-100")
-    risk_buffer_pct: Decimal = Field(default=Decimal("0"), ge=Decimal("0"), le=Decimal("50"), description="Risk buffer percentage 0-50%")
+    risk_buffer_pct: Decimal = Field(
+        default=Decimal("0"), ge=Decimal("0"), le=Decimal("50"), description="Risk buffer percentage 0-50%"
+    )
 
 
 class PricingCalculation(BaseModel):
     """Complete pricing calculation with all adjustments and breakdowns."""
+
     contract_id: Optional[str] = None
     building_id: str
     equipment_list: List[str]
@@ -67,6 +75,7 @@ class PricingCalculation(BaseModel):
 
 class QuoteRequest(BaseModel):
     """Request for pricing quote calculation."""
+
     building_id: str
     equipment_codes: List[str] = Field(..., min_length=1, description="List of equipment codes to quote")
     sla_tier: SLATier
@@ -76,6 +85,7 @@ class QuoteRequest(BaseModel):
 
 class QuoteResponse(BaseModel):
     """Response from pricing quote calculation."""
+
     request_id: str
     recommended_fee_zar: Decimal = Field(..., description="Recommended monthly fee")
     fee_range_zar: Dict[str, Decimal] = Field(..., description="Min, target, max fee range")
@@ -94,24 +104,25 @@ class QuoteResponse(BaseModel):
 
 class WhatIfScenario(BaseModel):
     """Scenario override for pricing what-if analysis."""
+
     name: str
     sla_tier: Optional[SLATier] = None
     add_equipment_codes: List[str] = Field(default_factory=list)
     condition_score_delta: int = Field(default=0, ge=-4, le=4, description="Adjust condition score by +/-")
     risk_buffer_multiplier: Decimal = Field(default=Decimal("1.0"), ge=Decimal("0.5"), le=Decimal("2.0"))
-    target_margin_pct: Optional[Decimal] = Field(
-        default=None, ge=Decimal("0"), le=Decimal("100")
-    )
+    target_margin_pct: Optional[Decimal] = Field(default=None, ge=Decimal("0"), le=Decimal("100"))
 
 
 class WhatIfRequest(BaseModel):
     """Request containing base quote and scenarios."""
+
     base: QuoteRequest
     scenarios: List[WhatIfScenario] = Field(default_factory=list)
 
 
 class WhatIfScenarioResult(BaseModel):
     """Result for a what-if scenario."""
+
     name: str
     recommended_fee_zar: Decimal
     delta_zar: Decimal
@@ -123,12 +134,14 @@ class WhatIfScenarioResult(BaseModel):
 
 class WhatIfResponse(BaseModel):
     """Response for what-if analysis."""
+
     base_quote: QuoteResponse
     scenarios: List[WhatIfScenarioResult]
 
 
 class RenewalPricingRequest(BaseModel):
     """Request for renewal pricing recommendation."""
+
     contract_id: str
     year: int = Field(..., ge=2000, le=2100)
     sla_tier: Optional[SLATier] = None
@@ -136,6 +149,7 @@ class RenewalPricingRequest(BaseModel):
 
 class RenewalPricingResponse(BaseModel):
     """Renewal pricing recommendation response."""
+
     contract_id: str
     year: int
     current_monthly_fee_zar: Decimal
@@ -149,6 +163,7 @@ class RenewalPricingResponse(BaseModel):
 
 class PricingBenchmarkResponse(BaseModel):
     """Benchmarking response for similar contracts."""
+
     contract_id: str
     similar_contracts: int
     average_monthly_fee_zar: Decimal
@@ -158,6 +173,7 @@ class PricingBenchmarkResponse(BaseModel):
 
 class EquipmentTypePricing(BaseModel):
     """Equipment-type specific pricing template data."""
+
     equipment_type: str
     monthly_base_cost: Decimal
     typical_monthly_breakdown: Dict[str, Decimal]
@@ -168,6 +184,7 @@ class EquipmentTypePricing(BaseModel):
 
 class MarginTarget(BaseModel):
     """Target margin settings by SLA tier."""
+
     sla_tier: SLATier
     margin_pct: Decimal
     multiplier: Decimal = Field(..., description="SLA premium multiplier")
@@ -175,15 +192,16 @@ class MarginTarget(BaseModel):
 
 class PricingConfig(BaseModel):
     """Global pricing configuration."""
+
     enabled: bool = True
     default_margin_pct: Decimal = Decimal("25")
     condition_multipliers: Dict[int, Decimal] = Field(
         default_factory=lambda: {
             5: Decimal("1.0"),  # Excellent - no adjustment
             4: Decimal("1.25"),  # Good
-            3: Decimal("1.5"),   # Fair
+            3: Decimal("1.5"),  # Fair
             2: Decimal("1.75"),  # Poor
-            1: Decimal("2.0")    # Critical
+            1: Decimal("2.0"),  # Critical
         }
     )
     age_multipliers: Dict[str, Decimal] = Field(
@@ -192,7 +210,7 @@ class PricingConfig(BaseModel):
             "5-10": Decimal("1.1"),
             "10-15": Decimal("1.2"),
             "15-20": Decimal("1.3"),
-            "20+": Decimal("1.5")
+            "20+": Decimal("1.5"),
         }
     )
     sla_multipliers: Dict[str, Decimal] = Field(
@@ -200,7 +218,7 @@ class PricingConfig(BaseModel):
             "basic": Decimal("1.0"),
             "standard": Decimal("1.15"),
             "premium": Decimal("1.3"),
-            "enterprise": Decimal("1.5")
+            "enterprise": Decimal("1.5"),
         }
     )
     margin_targets: List[MarginTarget] = Field(
@@ -208,13 +226,14 @@ class PricingConfig(BaseModel):
             MarginTarget(sla_tier=SLATier.basic, margin_pct=Decimal("20"), multiplier=Decimal("1.0")),
             MarginTarget(sla_tier=SLATier.standard, margin_pct=Decimal("25"), multiplier=Decimal("1.15")),
             MarginTarget(sla_tier=SLATier.premium, margin_pct=Decimal("30"), multiplier=Decimal("1.3")),
-            MarginTarget(sla_tier=SLATier.enterprise, margin_pct=Decimal("35"), multiplier=Decimal("1.5"))
+            MarginTarget(sla_tier=SLATier.enterprise, margin_pct=Decimal("35"), multiplier=Decimal("1.5")),
         ]
     )
 
 
 class RenewalQuote(BaseModel):
     """Renewal quote with fee recommendations and drivers."""
+
     original_monthly_fee: Decimal
     recommended_monthly_fee: Decimal
     fee_change_pct: Decimal
@@ -225,6 +244,7 @@ class RenewalQuote(BaseModel):
 
 class ContractComparable(BaseModel):
     """Comparable contract for benchmarking."""
+
     contract_id: str
     equipment_types: List[str]
     monthly_fee: Decimal
@@ -234,6 +254,7 @@ class ContractComparable(BaseModel):
 
 class RenegotiationOption(BaseModel):
     """Single renegotiation option analysis."""
+
     option_type: str = Field(..., description="maintain|invest|expand")
     description: str
     recommended_fee: Decimal
@@ -244,12 +265,14 @@ class RenegotiationOption(BaseModel):
 
 class RenegotiationOptions(BaseModel):
     """Request for renegotiation analysis."""
+
     contract_id: str
     option_type: str = Field(..., description="maintain|invest|expand")
 
 
 class RenegotiationAnalysis(BaseModel):
     """Comprehensive renegotiation analysis."""
+
     contract_id: str
     options: List[RenegotiationOption]
     recommended_option: str
@@ -258,6 +281,7 @@ class RenegotiationAnalysis(BaseModel):
 
 class PricingHistory(BaseModel):
     """Track all quotes generated."""
+
     id: Optional[str] = None
     contract_id: str
     quote_fee_zar: Decimal = Field(..., description="Quote amount in ZAR")
@@ -270,6 +294,7 @@ class PricingHistory(BaseModel):
 
 class QuotePerformance(BaseModel):
     """Track actual vs quoted costs."""
+
     id: Optional[str] = None
     quote_id: str
     actual_costs_zar: Optional[Decimal] = None
@@ -280,6 +305,7 @@ class QuotePerformance(BaseModel):
 
 class WinLossAnalysis(BaseModel):
     """Track quote acceptance/rejection."""
+
     id: Optional[str] = None
     quote_id: str
     outcome: str = Field(..., description="won|lost|pending")
@@ -290,6 +316,7 @@ class WinLossAnalysis(BaseModel):
 
 class BenchmarkData(BaseModel):
     """Market benchmark data for comparables."""
+
     id: Optional[str] = None
     equipment_type: str
     sla_tier: str

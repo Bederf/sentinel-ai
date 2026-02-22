@@ -180,8 +180,7 @@ class BmsIngestionDemo:
         print(f"\nPOST {self.base_url}/api/niagara/mappings/{self.discovery_id}/approve")
 
         response = self.client.post(
-            f"/api/niagara/mappings/{self.discovery_id}/approve",
-            params={"approved_by": "demo_script"}
+            f"/api/niagara/mappings/{self.discovery_id}/approve", params={"approved_by": "demo_script"}
         )
 
         if response.status_code != 200:
@@ -226,9 +225,7 @@ class BmsIngestionDemo:
             print(f"\n⚠ API check failed: {e}, checking filesystem...")
 
         # Check filesystem
-        building_file = (
-            Path(__file__).parent.parent / "app" / "data" / "buildings" / SITE_ID / "building.json"
-        )
+        building_file = Path(__file__).parent.parent / "app" / "data" / "buildings" / SITE_ID / "building.json"
         equipment_dir = building_file.parent / "equipment"
 
         if building_file.exists():
@@ -310,6 +307,7 @@ class BmsIngestionDemo:
             except Exception as e:
                 print(f"\n❌ Exception in {step_name}: {e}")
                 import traceback
+
                 traceback.print_exc()
                 results[step_name] = f"❌ ERROR: {e}"
                 break
@@ -347,6 +345,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Fatal error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

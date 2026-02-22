@@ -14,13 +14,14 @@ from app.services.workflow_orchestrator import (
     WorkflowState,
     OnboardAssetRequest,
     MLAnomalyTrigger,
-    RepairValidationRequest
+    RepairValidationRequest,
 )
 
 
 # ============================================================================
 # Scenario 1: Happy Path - Full Lifecycle
 # ============================================================================
+
 
 class TestHappyPathScenario:
     """
@@ -60,12 +61,12 @@ class TestHappyPathScenario:
                         "chw_supply_temp": 7.2,
                         "motor_current": 145.2,
                         "vibration_rms": 1.8,
-                        "bearing_temp": 45.1
-                    }
+                        "bearing_temp": 45.1,
+                    },
                 }
             ],
             captured_by="Mike Chen",
-            notes="Commissioning baseline - all values normal"
+            notes="Commissioning baseline - all values normal",
         )
 
         onboard_response = await orchestrator.onboard_asset(onboard_request)
@@ -93,6 +94,7 @@ class TestHappyPathScenario:
 # ============================================================================
 # Scenario 2: ML Anomaly Path
 # ============================================================================
+
 
 class TestMLAnomalyScenario:
     """
@@ -126,13 +128,10 @@ class TestMLAnomalyScenario:
                     "equipment_id": "chiller-anomaly-001",
                     "equipment_type": "chiller",
                     "name": "Anomaly Detection Chiller",
-                    "baseline_values": {
-                        "vibration_rms": 1.8,
-                        "motor_current": 145.2
-                    }
+                    "baseline_values": {"vibration_rms": 1.8, "motor_current": 145.2},
                 }
             ],
-            captured_by="Mike Chen"
+            captured_by="Mike Chen",
         )
 
         await orchestrator.onboard_asset(onboard_request)
@@ -147,7 +146,7 @@ class TestMLAnomalyScenario:
             probability=0.85,
             timeframe="7 days",
             ml_explanation="Bearing vibration up 111% from baseline (1.8 → 4.2 mm/s). Frequency analysis confirms bearing defect.",
-            priority="high"
+            priority="high",
         )
 
         inspection_response = await orchestrator.trigger_inspection_from_anomaly(anomaly_trigger)
@@ -174,7 +173,7 @@ class TestMLAnomalyScenario:
             equipment_id="chiller-anomaly-001",
             work_order_id="WO-2026-0847",
             pre_repair_baseline_id="bl-pre-anomaly-001",
-            post_repair_baseline_id="bl-post-anomaly-001"
+            post_repair_baseline_id="bl-post-anomaly-001",
         )
 
         validation_response = await orchestrator.validate_repair_effectiveness(validation_request)
@@ -193,6 +192,7 @@ class TestMLAnomalyScenario:
 # ============================================================================
 # Scenario 3: Baseline Deviation Path
 # ============================================================================
+
 
 class TestBaselineDeviationScenario:
     """
@@ -224,13 +224,10 @@ class TestBaselineDeviationScenario:
                     "equipment_id": "chiller-deviation-001",
                     "equipment_type": "chiller",
                     "name": "Baseline Deviation Chiller",
-                    "baseline_values": {
-                        "vibration_rms": 1.8,
-                        "motor_current": 145.2
-                    }
+                    "baseline_values": {"vibration_rms": 1.8, "motor_current": 145.2},
                 }
             ],
-            captured_by="Mike Chen"
+            captured_by="Mike Chen",
         )
 
         await orchestrator.onboard_asset(onboard_request)
@@ -249,7 +246,7 @@ class TestBaselineDeviationScenario:
                 probability=0.72,
                 timeframe="14 days",
                 ml_explanation=f"Baseline vibration deviation: {deviation_percent}% above normal (1.8 → 2.5 mm/s)",
-                priority="medium"
+                priority="medium",
             )
 
             response = await orchestrator.trigger_inspection_from_anomaly(anomaly_trigger)
@@ -263,6 +260,7 @@ class TestBaselineDeviationScenario:
 # ============================================================================
 # Scenario 4: Failed Repair Path
 # ============================================================================
+
 
 class TestFailedRepairScenario:
     """
@@ -291,7 +289,7 @@ class TestFailedRepairScenario:
             equipment_id="chiller-failed-001",
             work_order_id="WO-2026-0848",
             pre_repair_baseline_id="bl-pre-failed",
-            post_repair_baseline_id="bl-post-failed"
+            post_repair_baseline_id="bl-post-failed",
         )
 
         # Mock poor improvement (simulated failed repair)
@@ -313,7 +311,7 @@ class TestFailedRepairScenario:
                 probability=1.0,
                 timeframe="immediate",
                 ml_explanation=f"Repair validation failed: only {validation_response.effectiveness['score']:.1f}% improvement",
-                priority="critical"
+                priority="critical",
             )
 
             response = await orchestrator.trigger_inspection_from_anomaly(follow_up_trigger)
@@ -323,6 +321,7 @@ class TestFailedRepairScenario:
 # ============================================================================
 # Scenario 5: Multi-Equipment Path
 # ============================================================================
+
 
 class TestMultiEquipmentScenario:
     """
@@ -343,56 +342,70 @@ class TestMultiEquipmentScenario:
         orchestrator = get_workflow_orchestrator()
 
         # Equipment 1: Healthy
-        await orchestrator.onboard_asset(OnboardAssetRequest(
-            site_id="multi-site",
-            site_name="Multi Equipment Site",
-            site_address="456 Multi St",
-            equipment=[{
-                "equipment_id": "chiller-healthy-001",
-                "equipment_type": "chiller",
-                "name": "Healthy Chiller",
-                "baseline_values": {"vibration_rms": 1.8}
-            }],
-            captured_by="Mike Chen"
-        ))
+        await orchestrator.onboard_asset(
+            OnboardAssetRequest(
+                site_id="multi-site",
+                site_name="Multi Equipment Site",
+                site_address="456 Multi St",
+                equipment=[
+                    {
+                        "equipment_id": "chiller-healthy-001",
+                        "equipment_type": "chiller",
+                        "name": "Healthy Chiller",
+                        "baseline_values": {"vibration_rms": 1.8},
+                    }
+                ],
+                captured_by="Mike Chen",
+            )
+        )
 
         # Equipment 2: Anomaly detected
-        await orchestrator.onboard_asset(OnboardAssetRequest(
-            site_id="multi-site",
-            site_name="Multi Equipment Site",
-            site_address="456 Multi St",
-            equipment=[{
-                "equipment_id": "chiller-issue-001",
-                "equipment_type": "chiller",
-                "name": "Issue Chiller",
-                "baseline_values": {"vibration_rms": 2.5}
-            }],
-            captured_by="Mike Chen"
-        ))
+        await orchestrator.onboard_asset(
+            OnboardAssetRequest(
+                site_id="multi-site",
+                site_name="Multi Equipment Site",
+                site_address="456 Multi St",
+                equipment=[
+                    {
+                        "equipment_id": "chiller-issue-001",
+                        "equipment_type": "chiller",
+                        "name": "Issue Chiller",
+                        "baseline_values": {"vibration_rms": 2.5},
+                    }
+                ],
+                captured_by="Mike Chen",
+            )
+        )
 
-        await orchestrator.trigger_inspection_from_anomaly(MLAnomalyTrigger(
-            equipment_id="chiller-issue-001",
-            trigger_source="ml_anomaly",
-            anomaly_type="vibration",
-            probability=0.72,
-            timeframe="14 days",
-            ml_explanation="Bearing vibration elevated",
-            priority="high"
-        ))
+        await orchestrator.trigger_inspection_from_anomaly(
+            MLAnomalyTrigger(
+                equipment_id="chiller-issue-001",
+                trigger_source="ml_anomaly",
+                anomaly_type="vibration",
+                probability=0.72,
+                timeframe="14 days",
+                ml_explanation="Bearing vibration elevated",
+                priority="high",
+            )
+        )
 
         # Equipment 3: Repair in progress
-        await orchestrator.onboard_asset(OnboardAssetRequest(
-            site_id="multi-site",
-            site_name="Multi Equipment Site",
-            site_address="456 Multi St",
-            equipment=[{
-                "equipment_id": "chiller-repair-001",
-                "equipment_type": "chiller",
-                "name": "Repair Chiller",
-                "baseline_values": {"vibration_rms": 1.8}
-            }],
-            captured_by="Mike Chen"
-        ))
+        await orchestrator.onboard_asset(
+            OnboardAssetRequest(
+                site_id="multi-site",
+                site_name="Multi Equipment Site",
+                site_address="456 Multi St",
+                equipment=[
+                    {
+                        "equipment_id": "chiller-repair-001",
+                        "equipment_type": "chiller",
+                        "name": "Repair Chiller",
+                        "baseline_values": {"vibration_rms": 1.8},
+                    }
+                ],
+                captured_by="Mike Chen",
+            )
+        )
 
         orchestrator._set_state("chiller-repair-001", WorkflowState.REPAIR_IN_PROGRESS)
 
@@ -410,6 +423,7 @@ class TestMultiEquipmentScenario:
 # Performance Tests
 # ============================================================================
 
+
 class TestWorkflowPerformance:
     """Performance tests for workflow scenarios"""
 
@@ -421,46 +435,52 @@ class TestWorkflowPerformance:
         async def run_full_lifecycle(equipment_id: str):
             """Run complete lifecycle for one equipment"""
             # Onboard
-            await orchestrator.onboard_asset(OnboardAssetRequest(
-                site_id="perf-test",
-                site_name="Performance Site",
-                site_address="789 Perf St",
-                equipment=[{
-                    "equipment_id": equipment_id,
-                    "equipment_type": "chiller",
-                    "name": f"Perf Chiller {equipment_id}",
-                    "baseline_values": {"vibration_rms": 1.8}
-                }],
-                captured_by="Test User"
-            ))
+            await orchestrator.onboard_asset(
+                OnboardAssetRequest(
+                    site_id="perf-test",
+                    site_name="Performance Site",
+                    site_address="789 Perf St",
+                    equipment=[
+                        {
+                            "equipment_id": equipment_id,
+                            "equipment_type": "chiller",
+                            "name": f"Perf Chiller {equipment_id}",
+                            "baseline_values": {"vibration_rms": 1.8},
+                        }
+                    ],
+                    captured_by="Test User",
+                )
+            )
 
             # Trigger anomaly
-            await orchestrator.trigger_inspection_from_anomaly(MLAnomalyTrigger(
-                equipment_id=equipment_id,
-                trigger_source="ml_anomaly",
-                anomaly_type="vibration",
-                probability=0.85,
-                timeframe="7 days",
-                ml_explanation="Test anomaly",
-                priority="high"
-            ))
+            await orchestrator.trigger_inspection_from_anomaly(
+                MLAnomalyTrigger(
+                    equipment_id=equipment_id,
+                    trigger_source="ml_anomaly",
+                    anomaly_type="vibration",
+                    probability=0.85,
+                    timeframe="7 days",
+                    ml_explanation="Test anomaly",
+                    priority="high",
+                )
+            )
 
             # Validate repair
             orchestrator._set_state(equipment_id, WorkflowState.POST_REPAIR_BASELINE)
-            await orchestrator.validate_repair_effectiveness(RepairValidationRequest(
-                equipment_id=equipment_id,
-                work_order_id=f"WO-{equipment_id}",
-                pre_repair_baseline_id=f"bl-pre-{equipment_id}",
-                post_repair_baseline_id=f"bl-post-{equipment_id}"
-            ))
+            await orchestrator.validate_repair_effectiveness(
+                RepairValidationRequest(
+                    equipment_id=equipment_id,
+                    work_order_id=f"WO-{equipment_id}",
+                    pre_repair_baseline_id=f"bl-pre-{equipment_id}",
+                    post_repair_baseline_id=f"bl-post-{equipment_id}",
+                )
+            )
 
         # Run 10 lifecycles concurrently
         equipment_ids = [f"perf-{i:03d}" for i in range(10)]
         start = datetime.now()
 
-        await asyncio.gather(*[
-            run_full_lifecycle(eid) for eid in equipment_ids
-        ])
+        await asyncio.gather(*[run_full_lifecycle(eid) for eid in equipment_ids])
 
         duration = (datetime.now() - start).total_seconds()
 

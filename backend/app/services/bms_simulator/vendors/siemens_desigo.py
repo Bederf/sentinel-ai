@@ -63,7 +63,7 @@ class SiemensDesigoAdapter(VendorAdapter):
         """
         # Parse equipment ID
         parts = self.parse_equipment_id(device_id)
-        site_code = SITE_CODE_MAP.get(f"site-{parts['site'][1:]}", parts['site'])
+        site_code = SITE_CODE_MAP.get(f"site-{parts['site'][1:]}", parts["site"])
         floor_code = FLOOR_CODE_MAP.get(floor, floor)
 
         # Get device type code

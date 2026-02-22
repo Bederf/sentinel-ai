@@ -169,9 +169,7 @@ async def add_service_observation(
     repository: ServiceRecordRepository = Depends(),
 ):
     """Add a text observation to service record."""
-    observation_data = await repository.add_observation(
-        record_id, {"observation_type": "text", "content": note}
-    )
+    observation_data = await repository.add_observation(record_id, {"observation_type": "text", "content": note})
     return observation_data
 
 
@@ -256,7 +254,5 @@ async def get_ml_template(
     """Get ML data collection template for equipment type and service."""
     template = template_service.get_template(equipment_type, service_type.value)
     if not template:
-        raise HTTPException(
-            status_code=404, detail="Template not found for equipment type and service"
-        )
+        raise HTTPException(status_code=404, detail="Template not found for equipment type and service")
     return template

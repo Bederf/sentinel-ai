@@ -18,25 +18,24 @@ router = APIRouter()
 
 # Constants
 LIGHTING_POWER_PER_ZONE = {
-    "workspace": 1.5,      # kW per zone (1500W typical)
-    "meeting": 0.8,        # kW per meeting room
-    "support": 0.5,        # kW per support area (kitchen, etc)
-    "utility": 0.3,        # kW per utility area
-    "entry": 0.6,          # kW per reception
-    "corridor": 0.4,       # kW per corridor segment
+    "workspace": 1.5,  # kW per zone (1500W typical)
+    "meeting": 0.8,  # kW per meeting room
+    "support": 0.5,  # kW per support area (kitchen, etc)
+    "utility": 0.3,  # kW per utility area
+    "entry": 0.6,  # kW per reception
+    "corridor": 0.4,  # kW per corridor segment
 }
 
 HVAC_BASELINE_POWER = 25.0  # kW baseline when occupied
-HVAC_SETBACK_POWER = 8.0    # kW when unoccupied (maintenance mode)
+HVAC_SETBACK_POWER = 8.0  # kW when unoccupied (maintenance mode)
 
-ELECTRICITY_RATE = 5.0      # R/kWh (South Africa commercial rate)
-CARBON_INTENSITY = 0.35     # kg CO₂/kWh (SA grid)
+ELECTRICITY_RATE = 5.0  # R/kWh (South Africa commercial rate)
+CARBON_INTENSITY = 0.35  # kg CO₂/kWh (SA grid)
 
 
 @router.get("/occupancy-energy/correlation")
 async def get_correlation_data(
-    building_id: str = "bld-002",
-    date: Optional[str] = Query(None, description="ISO date for analysis")
+    building_id: str = "bld-002", date: Optional[str] = Query(None, description="ISO date for analysis")
 ):
     """
     Get time-series correlation between occupancy and energy consumption.
@@ -48,7 +47,9 @@ async def get_correlation_data(
     - Wasted energy (difference)
     - Cost of waste
     """
-    sim_date = datetime.fromisoformat(date) if date else datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    sim_date = (
+        datetime.fromisoformat(date) if date else datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    )
 
     correlation_data = []
 
@@ -77,16 +78,18 @@ async def get_correlation_data(
         cost_waste = wasted_kwh * ELECTRICITY_RATE
         carbon_waste = wasted_kwh * CARBON_INTENSITY
 
-        correlation_data.append({
-            "hour": hour,
-            "time": current_hour.strftime("%H:00"),
-            "occupancy_percent": round(occ_percent, 1),
-            "actual_kwh": round(actual_kwh, 2),
-            "optimal_kwh": round(optimal_kwh, 2),
-            "wasted_kwh": round(wasted_kwh, 2),
-            "cost_waste_r": round(cost_waste, 2),
-            "carbon_waste_kg": round(carbon_waste, 3),
-        })
+        correlation_data.append(
+            {
+                "hour": hour,
+                "time": current_hour.strftime("%H:00"),
+                "occupancy_percent": round(occ_percent, 1),
+                "actual_kwh": round(actual_kwh, 2),
+                "optimal_kwh": round(optimal_kwh, 2),
+                "wasted_kwh": round(wasted_kwh, 2),
+                "cost_waste_r": round(cost_waste, 2),
+                "carbon_waste_kg": round(carbon_waste, 3),
+            }
+        )
 
     total_wasted = sum(d["wasted_kwh"] for d in correlation_data)
     total_cost = sum(d["cost_waste_r"] for d in correlation_data)
@@ -102,15 +105,12 @@ async def get_correlation_data(
             "total_carbon_wasted_kg": round(total_carbon, 2),
             "peak_waste_hour": max(correlation_data, key=lambda x: x["wasted_kwh"])["hour"],
             "peak_waste_kwh": max(d["wasted_kwh"] for d in correlation_data),
-        }
+        },
     }
 
 
 @router.get("/occupancy-energy/scenarios")
-async def get_lights_left_on_scenarios(
-    building_id: str = "bld-002",
-    date: Optional[str] = Query(None)
-):
+async def get_lights_left_on_scenarios(building_id: str = "bld-002", date: Optional[str] = Query(None)):
     """
     Get "Lights Left On" cost impact scenarios.
 
@@ -119,7 +119,9 @@ async def get_lights_left_on_scenarios(
     2. Lights stay on after hours (common case)
     3. Lights scale with occupancy (optimal case)
     """
-    sim_date = datetime.fromisoformat(date) if date else datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    sim_date = (
+        datetime.fromisoformat(date) if date else datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    )
 
     total_lighting_power = sum(LIGHTING_POWER_PER_ZONE.values())
 
@@ -186,15 +188,12 @@ async def get_lights_left_on_scenarios(
             "optimal_cost_r": round(cost_optimal * 365, 2),
             "annual_savings_worst_r": round((cost_24_7 - cost_optimal) * 365, 2),
             "annual_savings_common_r": round((cost_after_hours - cost_optimal) * 365, 2),
-        }
+        },
     }
 
 
 @router.get("/occupancy-energy/savings-potential")
-async def get_savings_potential(
-    building_id: str = "bld-002",
-    date: Optional[str] = Query(None)
-):
+async def get_savings_potential(building_id: str = "bld-002", date: Optional[str] = Query(None)):
     """
     Get HVAC and Lighting savings breakdown.
 
@@ -203,7 +202,9 @@ async def get_savings_potential(
     2. Occupancy-scaled Lighting (DALI daylight harvesting)
     3. Combined savings (both optimizations)
     """
-    sim_date = datetime.fromisoformat(date) if date else datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    sim_date = (
+        datetime.fromisoformat(date) if date else datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    )
 
     # Calculate baseline (current state): HVAC at constant 80%, lights scale with occupancy
     baseline_hvac_daily = (HVAC_BASELINE_POWER * 0.8) * 24
@@ -298,7 +299,7 @@ async def get_savings_potential(
             "optimized_cost_r": round(optimized_cost * 365, 2),
             "annual_savings_r": round(combined_total_cost * 365, 2),
             "annual_carbon_reduction_kg": round(combined_total_carbon * 365, 2),
-        }
+        },
     }
 
 

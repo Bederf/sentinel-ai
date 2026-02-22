@@ -21,10 +21,9 @@ router = APIRouter(prefix="/user/entitlements", tags=["user-entitlements"])
 
 # ==================== User Entitlements Endpoints ====================
 
+
 @router.get("")
-async def get_current_user_entitlements(
-    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))
-) -> dict:
+async def get_current_user_entitlements(auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))) -> dict:
     """Get current user's module entitlements.
 
     Returns the modules the user has paid for or been granted access to.
@@ -48,15 +47,12 @@ async def get_current_user_entitlements(
         "user_email": auth.email or "unknown",
         "entitlements": auth.entitlements,
         "preset": matching_preset,
-        "messaging": matching_preset and PRESET_ENTITLEMENTS[matching_preset].get("messaging", "")
+        "messaging": matching_preset and PRESET_ENTITLEMENTS[matching_preset].get("messaging", ""),
     }
 
 
 @router.get("/{user_email}")
-async def get_user_entitlements(
-    user_email: str,
-    auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))
-) -> dict:
+async def get_user_entitlements(user_email: str, auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))) -> dict:
     """Get entitlements for a specific user (admin only).
 
     Args:
@@ -73,10 +69,7 @@ async def get_user_entitlements(
     entitlements_profile = await repo.get_user_entitlements(user_email)
 
     if not entitlements_profile:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No entitlements found for {user_email}"
-        )
+        raise HTTPException(status_code=404, detail=f"No entitlements found for {user_email}")
 
     # Check which preset matches
     matching_preset = None
@@ -89,15 +82,13 @@ async def get_user_entitlements(
         "user_email": entitlements_profile.user_email,
         "entitlements": entitlements_profile.entitlements,
         "preset": matching_preset,
-        "messaging": matching_preset and PRESET_ENTITLEMENTS[matching_preset].get("messaging", "")
+        "messaging": matching_preset and PRESET_ENTITLEMENTS[matching_preset].get("messaging", ""),
     }
 
 
 @router.post("/{user_email}")
 async def set_user_entitlements(
-    user_email: str,
-    modules: List[str],
-    auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))
+    user_email: str, modules: List[str], auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))
 ) -> dict:
     """Set modules for a user (admin only).
 
@@ -116,15 +107,13 @@ async def set_user_entitlements(
     return {
         "user_email": entitlements_profile.user_email,
         "entitlements": entitlements_profile.entitlements,
-        "status": "updated"
+        "status": "updated",
     }
 
 
 @router.post("/{user_email}/preset/{preset_name}")
 async def apply_preset_to_user(
-    user_email: str,
-    preset_name: str,
-    auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))
+    user_email: str, preset_name: str, auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))
 ) -> dict:
     """Apply a preset (grant, bederf, full) to a user (admin only).
 
@@ -142,8 +131,7 @@ async def apply_preset_to_user(
     """
     if preset_name not in PRESET_ENTITLEMENTS:
         raise HTTPException(
-            status_code=400,
-            detail=f"Unknown preset: {preset_name}. Available: {list(PRESET_ENTITLEMENTS.keys())}"
+            status_code=400, detail=f"Unknown preset: {preset_name}. Available: {list(PRESET_ENTITLEMENTS.keys())}"
         )
 
     repo = get_user_entitlements_repository()
@@ -151,8 +139,7 @@ async def apply_preset_to_user(
 
     preset_data = PRESET_ENTITLEMENTS[preset_name]
     logger.info(
-        f"Admin {auth.email} applied preset '{preset_name}' to {user_email}: "
-        f"{entitlements_profile.entitlements}"
+        f"Admin {auth.email} applied preset '{preset_name}' to {user_email}: {entitlements_profile.entitlements}"
     )
 
     return {
@@ -161,7 +148,7 @@ async def apply_preset_to_user(
         "preset": preset_name,
         "preset_name": preset_data["name"],
         "messaging": preset_data.get("messaging", ""),
-        "status": "applied"
+        "status": "applied",
     }
 
 
@@ -185,12 +172,14 @@ async def get_available_presets() -> dict:
     """
     presets = []
     for preset_id, preset_data in PRESET_ENTITLEMENTS.items():
-        presets.append({
-            "id": preset_id,
-            "name": preset_data.get("name"),
-            "description": preset_data.get("description"),
-            "modules": preset_data.get("modules", []),
-            "messaging": preset_data.get("messaging", "")
-        })
+        presets.append(
+            {
+                "id": preset_id,
+                "name": preset_data.get("name"),
+                "description": preset_data.get("description"),
+                "modules": preset_data.get("modules", []),
+                "messaging": preset_data.get("messaging", ""),
+            }
+        )
 
     return {"presets": presets}

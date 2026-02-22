@@ -17,6 +17,7 @@ from typing import Dict, List, Optional
 
 try:
     import pandas as pd
+
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
@@ -105,11 +106,7 @@ class TrainingDataService:
         try:
             with open(equipment_path, "r") as f:
                 equipment = json.load(f)
-            return [
-                eq["id"]
-                for eq in equipment
-                if eq.get("type", "").lower() == equipment_type.lower()
-            ]
+            return [eq["id"] for eq in equipment if eq.get("type", "").lower() == equipment_type.lower()]
         except Exception as e:
             logger.error(f"Failed to load equipment: {e}")
             return []
@@ -252,10 +249,7 @@ class TrainingDataService:
         df[label_col] = df.apply(check_failure, axis=1)
 
         positive_count = df[label_col].sum()
-        logger.info(
-            f"Added labels: {positive_count} positive samples "
-            f"({100 * positive_count / len(df):.1f}%)"
-        )
+        logger.info(f"Added labels: {positive_count} positive samples ({100 * positive_count / len(df):.1f}%)")
 
         return df
 
@@ -332,8 +326,7 @@ class TrainingDataService:
         self._save_registry()
 
         logger.info(
-            f"Saved dataset {registry_key}: {len(df)} rows, "
-            f"{len(feature_names)} features, {file_size / 1024:.1f} KB"
+            f"Saved dataset {registry_key}: {len(df)} rows, {len(feature_names)} features, {file_size / 1024:.1f} KB"
         )
 
         return metadata

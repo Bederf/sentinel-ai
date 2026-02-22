@@ -21,14 +21,11 @@ from typing import Dict, List, Any
 import logging
 
 # Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Add backend to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.database.supabase_client import get_supabase_client
 
@@ -75,10 +72,7 @@ def prepare_building_for_supabase(building_data: Dict[str, Any]) -> Dict[str, An
     }
 
 
-def prepare_equipment_for_supabase(
-    equipment_data: Dict[str, Any],
-    building_uuid: str
-) -> Dict[str, Any]:
+def prepare_equipment_for_supabase(equipment_data: Dict[str, Any], building_uuid: str) -> Dict[str, Any]:
     """Transform equipment JSON to Supabase schema."""
 
     # Extract equipment type from equipment_id
@@ -115,9 +109,9 @@ def prepare_equipment_for_supabase(
 def seed_site(site_id: str, client) -> bool:
     """Seed a single site to Supabase."""
     try:
-        logger.info(f"\n{'='*60}")
+        logger.info(f"\n{'=' * 60}")
         logger.info(f"Seeding {site_id}...")
-        logger.info(f"{'='*60}")
+        logger.info(f"{'=' * 60}")
 
         # Load building data
         logger.info(f"Loading building data for {site_id}...")
@@ -125,18 +119,18 @@ def seed_site(site_id: str, client) -> bool:
         building_supabase = prepare_building_for_supabase(building_data)
 
         # Check if building already exists
-        existing = client.table('buildings').select('id').eq('code', site_id).execute()
+        existing = client.table("buildings").select("id").eq("code", site_id).execute()
         if existing.data:
             logger.warning(f"Building {site_id} already exists in Supabase. Skipping...")
-            building_uuid = existing.data[0]['id']
+            building_uuid = existing.data[0]["id"]
         else:
             # Insert building
             logger.info(f"Inserting building {site_id}...")
-            response = client.table('buildings').insert(building_supabase).execute()
+            response = client.table("buildings").insert(building_supabase).execute()
             if not response.data:
                 logger.error(f"Failed to insert building {site_id}")
                 return False
-            building_uuid = response.data[0]['id']
+            building_uuid = response.data[0]["id"]
             logger.info(f"✅ Building inserted: {site_id} (UUID: {building_uuid})")
 
         # Load and insert equipment
@@ -148,15 +142,13 @@ def seed_site(site_id: str, client) -> bool:
             equipment_supabase = prepare_equipment_for_supabase(equipment_data, building_uuid)
 
             # Check if equipment already exists
-            existing = client.table('equipment').select('id').eq(
-                'code', equipment_supabase['code']
-            ).execute()
+            existing = client.table("equipment").select("id").eq("code", equipment_supabase["code"]).execute()
 
             if existing.data:
                 logger.debug(f"  Equipment {equipment_supabase['code']} already exists. Skipping...")
             else:
                 try:
-                    response = client.table('equipment').insert(equipment_supabase).execute()
+                    response = client.table("equipment").insert(equipment_supabase).execute()
                     if response.data:
                         logger.debug(f"  [{i}/{len(equipment_list)}] ✅ {equipment_supabase['code']}")
                     else:
@@ -170,6 +162,7 @@ def seed_site(site_id: str, client) -> bool:
     except Exception as e:
         logger.error(f"❌ Error seeding {site_id}: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -188,12 +181,12 @@ def main():
         if not seed_site(site_id, client):
             success = False
 
-    logger.info(f"\n{'='*60}")
+    logger.info(f"\n{'=' * 60}")
     if success:
         logger.info("✅ ALL SITES SEEDED SUCCESSFULLY!")
     else:
         logger.error("❌ Some sites failed to seed. Check logs above.")
-    logger.info(f"{'='*60}\n")
+    logger.info(f"{'=' * 60}\n")
 
     return 0 if success else 1
 

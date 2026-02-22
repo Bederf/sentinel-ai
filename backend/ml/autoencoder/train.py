@@ -31,11 +31,7 @@ logger = logging.getLogger(__name__)
 class AutoencoderTrainer:
     """Training pipeline for autoencoder anomaly detection models."""
 
-    def __init__(
-        self,
-        model_dir: str = None,
-        window_size: int = 24
-    ):
+    def __init__(self, model_dir: str = None, window_size: int = 24):
         """
         Initialize trainer.
 
@@ -60,7 +56,7 @@ class AutoencoderTrainer:
         test_size: float = 0.2,
         latent_dim: int = 16,
         use_demo_data: bool = True,
-        verbose: int = 1
+        verbose: int = 1,
     ) -> Dict[str, Any]:
         """
         Train autoencoder for a specific equipment type.
@@ -83,8 +79,7 @@ class AutoencoderTrainer:
         # Get sensor configuration
         if equipment_type not in AUTOENCODER_SENSOR_CONFIGS:
             raise ValueError(
-                f"Unknown equipment type: {equipment_type}. "
-                f"Available: {list(AUTOENCODER_SENSOR_CONFIGS.keys())}"
+                f"Unknown equipment type: {equipment_type}. Available: {list(AUTOENCODER_SENSOR_CONFIGS.keys())}"
             )
 
         config = AUTOENCODER_SENSOR_CONFIGS[equipment_type]
@@ -100,17 +95,14 @@ class AutoencoderTrainer:
                     n_hours=5000,  # More data for training
                     n_features=n_features,
                     n_anomalies=10,
-                    anomaly_magnitude=3.0
+                    anomaly_magnitude=3.0,
                 )
             else:
                 raise NotImplementedError("Real data loading not yet implemented")
 
         except Exception as e:
             logger.warning(f"Could not load real data: {e}. Using demo data.")
-            X_normal, X_all, anomaly_indices = data_prep.generate_demo_data(
-                n_hours=3000,
-                n_features=n_features
-            )
+            X_normal, X_all, anomaly_indices = data_prep.generate_demo_data(n_hours=3000, n_features=n_features)
 
         logger.info(f"Normal data shape: {X_normal.shape}")
 
@@ -121,7 +113,7 @@ class AutoencoderTrainer:
         X_train, X_val = train_test_split(
             X_normal,
             test_size=test_size,
-            shuffle=True  # OK to shuffle for autoencoder
+            shuffle=True,  # OK to shuffle for autoencoder
         )
 
         # Scale data
@@ -134,25 +126,19 @@ class AutoencoderTrainer:
             n_features=n_features,
             latent_dim=latent_dim,
             lstm_units=(64, 32),
-            dropout_rate=0.2
+            dropout_rate=0.2,
         )
         model.build()
 
         # Train
         history = model.train(
-            X_train_scaled, X_val_scaled,
-            epochs=epochs,
-            batch_size=batch_size,
-            patience=10,
-            verbose=verbose
+            X_train_scaled, X_val_scaled, epochs=epochs, batch_size=batch_size, patience=10, verbose=verbose
         )
 
         # Evaluate anomaly detection on test data
         if len(anomaly_indices) > 0:
             X_all_scaled = data_prep.transform(X_all)
-            detection_metrics = self._evaluate_detection(
-                model, X_all_scaled, anomaly_indices
-            )
+            detection_metrics = self._evaluate_detection(model, X_all_scaled, anomaly_indices)
         else:
             detection_metrics = {}
 
@@ -174,7 +160,7 @@ class AutoencoderTrainer:
             "val_error_mean": float(val_errors.mean()),
             "val_error_std": float(val_errors.std()),
             "val_error_max": float(val_errors.max()),
-            **detection_metrics
+            **detection_metrics,
         }
 
         # Register model
@@ -193,9 +179,9 @@ class AutoencoderTrainer:
                 "validation_samples": len(X_val),
                 "epochs_trained": len(history["loss"]),
                 "threshold_percentile": model.threshold_percentile,
-                "use_demo_data": use_demo_data
+                "use_demo_data": use_demo_data,
             },
-            auto_activate=True
+            auto_activate=True,
         )
 
         training_time = (datetime.now() - start_time).total_seconds()
@@ -209,7 +195,7 @@ class AutoencoderTrainer:
             "metrics": metrics,
             "training_time_seconds": training_time,
             "epochs_trained": len(history["loss"]),
-            "threshold": model.threshold
+            "threshold": model.threshold,
         }
 
         logger.info(
@@ -222,10 +208,7 @@ class AutoencoderTrainer:
         return result
 
     def _evaluate_detection(
-        self,
-        model: SensorAutoencoder,
-        X_all: np.ndarray,
-        anomaly_indices: List[int]
+        self, model: SensorAutoencoder, X_all: np.ndarray, anomaly_indices: List[int]
     ) -> Dict[str, float]:
         """
         Evaluate anomaly detection performance.
@@ -263,39 +246,26 @@ class AutoencoderTrainer:
             "true_positives": int(true_positives),
             "false_positives": int(false_positives),
             "false_negatives": int(false_negatives),
-            "total_anomalies": len(anomaly_indices)
+            "total_anomalies": len(anomaly_indices),
         }
 
-    def train_all(
-        self,
-        epochs: int = 100,
-        use_demo_data: bool = True
-    ) -> List[Dict[str, Any]]:
+    def train_all(self, epochs: int = 100, use_demo_data: bool = True) -> List[Dict[str, Any]]:
         """Train models for all equipment types."""
         results = []
 
         for eq_type in AUTOENCODER_SENSOR_CONFIGS.keys():
             try:
-                result = self.train_equipment_type(
-                    eq_type,
-                    epochs=epochs,
-                    use_demo_data=use_demo_data
-                )
+                result = self.train_equipment_type(eq_type, epochs=epochs, use_demo_data=use_demo_data)
                 results.append(result)
             except Exception as e:
                 logger.error(f"Failed to train {eq_type}: {e}")
-                results.append({
-                    "equipment_type": eq_type,
-                    "error": str(e)
-                })
+                results.append({"equipment_type": eq_type, "error": str(e)})
 
         # Summary
         successful = [r for r in results if "error" not in r]
         failed = [r for r in results if "error" in r]
 
-        logger.info(
-            f"Training complete: {len(successful)} successful, {len(failed)} failed"
-        )
+        logger.info(f"Training complete: {len(successful)} successful, {len(failed)} failed")
 
         return results
 
@@ -303,48 +273,17 @@ class AutoencoderTrainer:
 def main():
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="Train autoencoder anomaly detection models")
-    parser.add_argument(
-        "--equipment-type", "-e",
-        type=str,
-        help="Equipment type to train (chiller, ahu, generator)"
-    )
-    parser.add_argument(
-        "--all", "-a",
-        action="store_true",
-        help="Train all equipment types"
-    )
-    parser.add_argument(
-        "--epochs",
-        type=int,
-        default=50,
-        help="Maximum training epochs (default: 50)"
-    )
-    parser.add_argument(
-        "--latent-dim",
-        type=int,
-        default=16,
-        help="Latent space dimension (default: 16)"
-    )
-    parser.add_argument(
-        "--demo-data",
-        action="store_true",
-        default=True,
-        help="Use synthetic demo data"
-    )
-    parser.add_argument(
-        "--verbose", "-v",
-        type=int,
-        default=1,
-        help="Verbosity level"
-    )
+    parser.add_argument("--equipment-type", "-e", type=str, help="Equipment type to train (chiller, ahu, generator)")
+    parser.add_argument("--all", "-a", action="store_true", help="Train all equipment types")
+    parser.add_argument("--epochs", type=int, default=50, help="Maximum training epochs (default: 50)")
+    parser.add_argument("--latent-dim", type=int, default=16, help="Latent space dimension (default: 16)")
+    parser.add_argument("--demo-data", action="store_true", default=True, help="Use synthetic demo data")
+    parser.add_argument("--verbose", "-v", type=int, default=1, help="Verbosity level")
 
     args = parser.parse_args()
 
     # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     trainer = AutoencoderTrainer()
 
@@ -356,8 +295,7 @@ def main():
                 print(f"  {r['equipment_type']}: FAILED - {r['error']}")
             else:
                 print(
-                    f"  {r['equipment_type']}: threshold={r['threshold']:.6f}, "
-                    f"F1={r['metrics'].get('f1_score', 'N/A')}"
+                    f"  {r['equipment_type']}: threshold={r['threshold']:.6f}, F1={r['metrics'].get('f1_score', 'N/A')}"
                 )
 
     elif args.equipment_type:
@@ -366,7 +304,7 @@ def main():
             epochs=args.epochs,
             latent_dim=args.latent_dim,
             use_demo_data=args.demo_data,
-            verbose=args.verbose
+            verbose=args.verbose,
         )
         print(f"\n=== Training Result: {args.equipment_type} ===")
         print(f"  Model ID: {result['model_id']}")

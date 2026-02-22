@@ -19,7 +19,7 @@ from app.database.supabase_client import get_supabase_client
 logger = logging.getLogger(__name__)
 
 # Path to trained model files
-MODELS_DIR = os.path.join(os.path.dirname(__file__), '..', 'ml', 'models')
+MODELS_DIR = os.path.join(os.path.dirname(__file__), "..", "ml", "models")
 
 
 class NiagaraMLInference:
@@ -43,10 +43,7 @@ class NiagaraMLInference:
         return self._registry
 
     async def get_prediction_with_confidence(
-        self,
-        equipment_code: str,
-        min_confidence: float = 0.70,
-        tier: int = 2
+        self, equipment_code: str, min_confidence: float = 0.70, tier: int = 2
     ) -> Optional[Dict[str, Any]]:
         """
         Generate prediction with confidence score for equipment.
@@ -94,11 +91,7 @@ class NiagaraMLInference:
                 return None
 
             # Run inference
-            confidence = await self._run_inference(
-                equipment_type,
-                features,
-                model_config
-            )
+            confidence = await self._run_inference(equipment_type, features, model_config)
 
             if confidence is None:
                 logger.warning(f"Inference failed for {equipment_code}")
@@ -108,9 +101,9 @@ class NiagaraMLInference:
             threshold = await registry.get_threshold_value(equipment_type, tier)
             if threshold is None or confidence < threshold:
                 logger.debug(
-                    f"Confidence {confidence:.2%} below threshold "
-                    f"{threshold:.2%} for {equipment_code} (tier {tier})"
-                    if threshold else f"Confidence {confidence:.2%} but no threshold configured"
+                    f"Confidence {confidence:.2%} below threshold {threshold:.2%} for {equipment_code} (tier {tier})"
+                    if threshold
+                    else f"Confidence {confidence:.2%} but no threshold configured"
                 )
                 return None
 
@@ -140,11 +133,7 @@ class NiagaraMLInference:
             return None
 
     async def get_predictions_for_site(
-        self,
-        site_code: str,
-        min_confidence: float = 0.70,
-        tier: int = 2,
-        equipment_types: Optional[List[str]] = None
+        self, site_code: str, min_confidence: float = 0.70, tier: int = 2, equipment_types: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Generate predictions for all equipment at a site.
@@ -167,7 +156,7 @@ class NiagaraMLInference:
                 "predictions_generated": 0,
                 "predictions_filtered": 0,
                 "timestamp": datetime.now().isoformat(),
-            }
+            },
         }
 
         try:
@@ -196,11 +185,7 @@ class NiagaraMLInference:
                 results["summary"]["with_models"] += 1
 
                 # Generate prediction
-                prediction = await self.get_prediction_with_confidence(
-                    equipment_code,
-                    min_confidence,
-                    tier
-                )
+                prediction = await self.get_prediction_with_confidence(equipment_code, min_confidence, tier)
 
                 if prediction:
                     results["predictions"].append(prediction)
@@ -232,7 +217,7 @@ class NiagaraMLInference:
             Equipment type or None if format invalid
         """
         try:
-            parts = equipment_code.split('-')
+            parts = equipment_code.split("-")
             if len(parts) < 2:
                 return None
             # Second part is the equipment type
@@ -243,9 +228,7 @@ class NiagaraMLInference:
     async def _get_equipment_data(self, equipment_code: str) -> Optional[Dict[str, Any]]:
         """Get equipment record from database."""
         try:
-            response = self.supabase.table("equipment").select("*").eq(
-                "code", equipment_code
-            ).single().execute()
+            response = self.supabase.table("equipment").select("*").eq("code", equipment_code).single().execute()
             return response.data if response.data else None
         except Exception as e:
             logger.warning(f"Could not fetch equipment {equipment_code}: {str(e)}")
@@ -254,18 +237,18 @@ class NiagaraMLInference:
     async def _get_site_equipment(self, site_code: str) -> List[Dict[str, Any]]:
         """Get all equipment for a site."""
         try:
-            response = self.supabase.table("equipment").select(
-                "*, building:buildings(code)"
-            ).eq("building.code", site_code).execute()
+            response = (
+                self.supabase.table("equipment")
+                .select("*, building:buildings(code)")
+                .eq("building.code", site_code)
+                .execute()
+            )
             return response.data or []
         except Exception as e:
             logger.warning(f"Could not fetch equipment for site {site_code}: {str(e)}")
             return []
 
-    async def _prepare_features(
-        self,
-        equipment: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    async def _prepare_features(self, equipment: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Prepare features for ML inference.
 
@@ -282,20 +265,26 @@ class NiagaraMLInference:
 
             # Get last 7 days of sensor readings
             seven_days_ago = (datetime.now() - timedelta(days=7)).isoformat()
-            readings_response = self.supabase.table("sensor_readings").select(
-                "value, timestamp"
-            ).eq("equipment_id", equipment_id).gte(
-                "timestamp", seven_days_ago
-            ).order("timestamp", desc=True).limit(1000).execute()
+            readings_response = (
+                self.supabase.table("sensor_readings")
+                .select("value, timestamp")
+                .eq("equipment_id", equipment_id)
+                .gte("timestamp", seven_days_ago)
+                .order("timestamp", desc=True)
+                .limit(1000)
+                .execute()
+            )
 
             readings = readings_response.data or []
 
             # Get recent alerts
-            alerts_response = self.supabase.table("alerts").select(
-                "severity, timestamp"
-            ).eq("equipment_id", equipment_id).gte(
-                "timestamp", seven_days_ago
-            ).execute()
+            alerts_response = (
+                self.supabase.table("alerts")
+                .select("severity, timestamp")
+                .eq("equipment_id", equipment_id)
+                .gte("timestamp", seven_days_ago)
+                .execute()
+            )
 
             alerts = alerts_response.data or []
 
@@ -327,7 +316,7 @@ class NiagaraMLInference:
             install_date_str = equipment.get("install_date")
             if not install_date_str:
                 return 0
-            install_date = datetime.fromisoformat(install_date_str.replace('Z', '+00:00'))
+            install_date = datetime.fromisoformat(install_date_str.replace("Z", "+00:00"))
             return (datetime.now(install_date.tzinfo) - install_date).days
         except Exception:
             return 0
@@ -363,18 +352,13 @@ class NiagaraMLInference:
             last_service = equipment.get("last_service_date")
             if not last_service:
                 return False
-            last_service_dt = datetime.fromisoformat(last_service.replace('Z', '+00:00'))
+            last_service_dt = datetime.fromisoformat(last_service.replace("Z", "+00:00"))
             days_since = (datetime.now(last_service_dt.tzinfo) - last_service_dt).days
             return days_since <= 30
         except Exception:
             return False
 
-    async def _run_inference(
-        self,
-        equipment_type: str,
-        features: Dict[str, Any],
-        model_config
-    ) -> Optional[float]:
+    async def _run_inference(self, equipment_type: str, features: Dict[str, Any], model_config) -> Optional[float]:
         """
         Run ML model inference.
 
@@ -408,14 +392,10 @@ class NiagaraMLInference:
             alert_factor = min(alert_count / 10, 0.25)  # Up to 25% boost
             critical_factor = critical_alerts * 0.10  # 10% per critical alert
 
-            confidence = min(
-                0.99,
-                max(0.20, base_confidence + health_factor + alert_factor + critical_factor)
-            )
+            confidence = min(0.99, max(0.20, base_confidence + health_factor + alert_factor + critical_factor))
 
             logger.debug(
-                f"Inference {equipment_type}: health={health_score}, "
-                f"alerts={alert_count}, confidence={confidence:.2%}"
+                f"Inference {equipment_type}: health={health_score}, alerts={alert_count}, confidence={confidence:.2%}"
             )
 
             return confidence

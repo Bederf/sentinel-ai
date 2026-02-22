@@ -3,6 +3,8 @@
 Implements Supabase + JSON fallback pattern for storing and retrieving autonomous
 PARASITE decisions through the complete audit trail lifecycle: decision creation,
 execution, COV verification, outcome measurement, and rollback tracking.
+
+Schema: see app.models.parasite_decision.ParasiteDecision for full field list.
 """
 
 import json
@@ -12,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from app.config.settings import settings
+from app.models.parasite_decision import _safe_json_value
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +27,21 @@ class ParasiteDecisionRepository:
 
     Manages autonomous decision records with Supabase as primary storage and
     JSON files as fallback. Supports querying by site, equipment, tier, and time.
+
+    All records are validated for JSON-serializability before persistence.
     """
 
-    def __init__(self):
-        """Initialize the repository."""
+    def __init__(self, json_path: Optional[Path] = None):
+        """Initialize the repository.
+
+        Args:
+            json_path: Override path for JSON storage. Used by tests to
+                      avoid writing to the shared production file.
+        """
         self._client = None
         self._use_json = settings.use_json_storage
         self._decisions: Dict[str, Dict[str, Any]] = {}
+        self._json_path = json_path  # None = use default DATA_DIR path
 
     @property
     def client(self):
@@ -41,35 +52,70 @@ class ParasiteDecisionRepository:
 
                 self._client = get_supabase_client()
             except Exception as e:
-                logger.warning(
-                    f"Failed to get Supabase client, using JSON fallback: {e}"
-                )
+                logger.warning(f"Failed to get Supabase client, using JSON fallback: {e}")
                 self._use_json = True
         return self._client
+
+    def _validate_record(self, decision: Dict) -> None:
+        """Validate that all values in a decision record are JSON-serializable.
+
+        Raises TypeError if any value would corrupt the store (coroutines,
+        mocks, non-serializable objects).
+        """
+        for key in ("original_value", "target_value", "actual_value", "cov_tolerance"):
+            if key in decision:
+                _safe_json_value(decision[key])
+
+    def _normalize_point_name(self, decision: Dict) -> None:
+        """Ensure point_name is canonical, control_point is alias.
+
+        point_name is the canonical field name. control_point is kept
+        for backward compatibility but always mirrors point_name.
+        """
+        pn = decision.get("point_name")
+        cp = decision.get("control_point")
+        if pn is None and cp is not None:
+            decision["point_name"] = cp
+        elif cp is None and pn is not None:
+            decision["control_point"] = pn
 
     async def record_decision(self, decision: Dict) -> Dict:
         """Insert new decision record.
 
+        Accepts both legacy dicts (from existing call sites) and new-format
+        dicts with mode/gate/safety context fields. Missing fields are stored
+        as null — callers add context incrementally.
+
         Args:
-            decision: Decision dictionary with keys: recommendation_id, site_id, equipment_code,
-                     decision_type, tier, confidence_score, contributing_factors, decision_details,
-                     control_point, original_value, target_value
+            decision: Decision dictionary. See ParasiteDecision for full field list.
 
         Returns:
-            Created decision record with id and timestamps
+            Created decision record with id and timestamps.
 
         Raises:
-            Exception: If creation fails
+            TypeError: If any value is not JSON-serializable (coroutine, mock, etc.)
+            Exception: If creation fails.
         """
         try:
-            # Ensure id and created_at
+            # Validate serialization safety
+            self._validate_record(decision)
+
+            # Normalize point_name / control_point
+            self._normalize_point_name(decision)
+
+            # Ensure id and timestamps
             if "id" not in decision:
                 import uuid
+
                 decision["id"] = str(uuid.uuid4())
             if "created_at" not in decision:
                 decision["created_at"] = datetime.utcnow().isoformat()
             if "updated_at" not in decision:
                 decision["updated_at"] = datetime.utcnow().isoformat()
+
+            # Default write_attempt_count
+            if "write_attempt_count" not in decision:
+                decision["write_attempt_count"] = 1
 
             if not self._use_json and self.client:
                 # Save to Supabase
@@ -83,12 +129,19 @@ class ParasiteDecisionRepository:
             self._save_all()
             return decision
 
+        except TypeError:
+            # Re-raise serialization errors without wrapping
+            raise
         except Exception as e:
             logger.error(f"Error recording PARASITE decision: {e}")
             raise
 
     async def update_outcome(
-        self, decision_id: str, outcome: Dict, matched: bool
+        self,
+        decision_id: str,
+        outcome: Dict,
+        matched: bool,
+        measured_impact: Optional[Dict[str, Any]] = None,
     ) -> Dict:
         """Update decision with measured outcome.
 
@@ -96,12 +149,11 @@ class ParasiteDecisionRepository:
             decision_id: Decision ID
             outcome: Outcome measurements dictionary
             matched: Whether outcome matched prediction
+            measured_impact: Optional structured impact measurements
+                           (energy_kwh, comfort_delta, runtime_delta, cost)
 
         Returns:
-            Updated decision record
-
-        Raises:
-            Exception: If update fails
+            Updated decision record.
         """
         try:
             update_data = {
@@ -110,6 +162,8 @@ class ParasiteDecisionRepository:
                 "outcome_measured_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat(),
             }
+            if measured_impact is not None:
+                update_data["measured_impact"] = measured_impact
 
             if not self._use_json and self.client:
                 result = await self._supabase_update(decision_id, update_data)
@@ -136,10 +190,7 @@ class ParasiteDecisionRepository:
             reason: Reason for rollback
 
         Returns:
-            Updated decision record
-
-        Raises:
-            Exception: If update fails
+            Updated decision record.
         """
         try:
             update_data = {
@@ -167,7 +218,12 @@ class ParasiteDecisionRepository:
             raise
 
     async def update_cov_status(
-        self, decision_id: str, verified: bool, actual_value: str
+        self,
+        decision_id: str,
+        verified: bool,
+        actual_value: Any,
+        cov_latency_ms: Optional[int] = None,
+        cov_tolerance: Any = None,
     ) -> Dict:
         """Update COV verification result.
 
@@ -175,19 +231,25 @@ class ParasiteDecisionRepository:
             decision_id: Decision ID
             verified: Whether COV was verified
             actual_value: Actual value read back from device
+            cov_latency_ms: Time taken for COV verification in milliseconds
+            cov_tolerance: Tolerance used for COV comparison
 
         Returns:
-            Updated decision record
-
-        Raises:
-            Exception: If update fails
+            Updated decision record.
         """
         try:
-            update_data = {
+            _safe_json_value(actual_value)
+            _safe_json_value(cov_tolerance)
+
+            update_data: Dict[str, Any] = {
                 "cov_verified": verified,
                 "actual_value": actual_value,
                 "updated_at": datetime.utcnow().isoformat(),
             }
+            if cov_latency_ms is not None:
+                update_data["cov_latency_ms"] = cov_latency_ms
+            if cov_tolerance is not None:
+                update_data["cov_tolerance"] = cov_tolerance
 
             if not self._use_json and self.client:
                 result = await self._supabase_update(decision_id, update_data)
@@ -206,9 +268,7 @@ class ParasiteDecisionRepository:
             logger.error(f"Error updating COV status for decision {decision_id}: {e}")
             raise
 
-    async def get_decisions_for_equipment(
-        self, equipment_code: str, limit: int = 50
-    ) -> List[Dict]:
+    async def get_decisions_for_equipment(self, equipment_code: str, limit: int = 50) -> List[Dict]:
         """Query decisions by equipment.
 
         Args:
@@ -216,35 +276,24 @@ class ParasiteDecisionRepository:
             limit: Maximum number to return
 
         Returns:
-            List of decisions for equipment, newest first
+            List of decisions for equipment, newest first.
         """
         try:
             if not self._use_json and self.client:
-                recs = await self._supabase_query(
-                    filters={"equipment_code": equipment_code}, limit=limit
-                )
+                recs = await self._supabase_query(filters={"equipment_code": equipment_code}, limit=limit)
                 return recs
 
             # Fall back to JSON
             self._load_all()
-            matching = [
-                dec
-                for dec in self._decisions.values()
-                if dec.get("equipment_code") == equipment_code
-            ]
-            # Sort by created_at DESC (newest first)
+            matching = [dec for dec in self._decisions.values() if dec.get("equipment_code") == equipment_code]
             matching.sort(key=lambda d: d.get("created_at", ""), reverse=True)
             return matching[:limit]
 
         except Exception as e:
-            logger.error(
-                f"Error querying decisions for equipment {equipment_code}: {e}"
-            )
+            logger.error(f"Error querying decisions for equipment {equipment_code}: {e}")
             return []
 
-    async def get_decisions_for_site(
-        self, site_id: str, limit: int = 50
-    ) -> List[Dict]:
+    async def get_decisions_for_site(self, site_id: str, limit: int = 50) -> List[Dict]:
         """Query decisions by site.
 
         Args:
@@ -252,23 +301,16 @@ class ParasiteDecisionRepository:
             limit: Maximum number to return
 
         Returns:
-            List of decisions for site, newest first
+            List of decisions for site, newest first.
         """
         try:
             if not self._use_json and self.client:
-                recs = await self._supabase_query(
-                    filters={"site_id": site_id}, limit=limit
-                )
+                recs = await self._supabase_query(filters={"site_id": site_id}, limit=limit)
                 return recs
 
             # Fall back to JSON
             self._load_all()
-            matching = [
-                dec
-                for dec in self._decisions.values()
-                if dec.get("site_id") == site_id
-            ]
-            # Sort by created_at DESC (newest first)
+            matching = [dec for dec in self._decisions.values() if dec.get("site_id") == site_id]
             matching.sort(key=lambda d: d.get("created_at", ""), reverse=True)
             return matching[:limit]
 
@@ -276,9 +318,7 @@ class ParasiteDecisionRepository:
             logger.error(f"Error querying decisions for site {site_id}: {e}")
             return []
 
-    async def get_decisions_by_tier(
-        self, tier: str, limit: int = 50
-    ) -> List[Dict]:
+    async def get_decisions_by_tier(self, tier: str, limit: int = 50) -> List[Dict]:
         """Query decisions by tier.
 
         Args:
@@ -286,23 +326,16 @@ class ParasiteDecisionRepository:
             limit: Maximum number to return
 
         Returns:
-            List of decisions in tier, newest first
+            List of decisions in tier, newest first.
         """
         try:
             if not self._use_json and self.client:
-                recs = await self._supabase_query(
-                    filters={"tier": tier}, limit=limit
-                )
+                recs = await self._supabase_query(filters={"tier": tier}, limit=limit)
                 return recs
 
             # Fall back to JSON
             self._load_all()
-            matching = [
-                dec
-                for dec in self._decisions.values()
-                if dec.get("tier") == tier
-            ]
-            # Sort by created_at DESC (newest first)
+            matching = [dec for dec in self._decisions.values() if dec.get("tier") == tier]
             matching.sort(key=lambda d: d.get("created_at", ""), reverse=True)
             return matching[:limit]
 
@@ -317,7 +350,7 @@ class ParasiteDecisionRepository:
             limit: Maximum number to return
 
         Returns:
-            List of most recent decisions
+            List of most recent decisions.
         """
         try:
             if not self._use_json and self.client:
@@ -327,7 +360,6 @@ class ParasiteDecisionRepository:
             # Fall back to JSON
             self._load_all()
             decisions = list(self._decisions.values())
-            # Sort by created_at DESC (newest first)
             decisions.sort(key=lambda d: d.get("created_at", ""), reverse=True)
             return decisions[:limit]
 
@@ -342,7 +374,7 @@ class ParasiteDecisionRepository:
             site_id: Site identifier
 
         Returns:
-            Dictionary with stats: count_by_tier, rollback_rate, cov_success_rate
+            Dictionary with stats: count_by_tier, rollback_rate, cov_success_rate.
         """
         try:
             decisions = await self.get_decisions_for_site(site_id, limit=1000)
@@ -355,20 +387,12 @@ class ParasiteDecisionRepository:
                     tier_counts[tier] += 1
 
             # Calculate rollback rate
-            rolled_back = sum(
-                1 for dec in decisions if dec.get("rolled_back", False)
-            )
-            rollback_rate = (
-                (rolled_back / len(decisions)) if decisions else 0
-            )
+            rolled_back = sum(1 for dec in decisions if dec.get("rolled_back", False))
+            rollback_rate = (rolled_back / len(decisions)) if decisions else 0
 
             # Calculate COV success rate
-            cov_verified = sum(
-                1 for dec in decisions if dec.get("cov_verified", False)
-            )
-            cov_success_rate = (
-                (cov_verified / len(decisions)) if decisions else 0
-            )
+            cov_verified = sum(1 for dec in decisions if dec.get("cov_verified", False))
+            cov_success_rate = (cov_verified / len(decisions)) if decisions else 0
 
             return {
                 "total_decisions": len(decisions),
@@ -392,37 +416,23 @@ class ParasiteDecisionRepository:
             logger.error(f"Supabase insert failed: {e}")
             return None
 
-    async def _supabase_update(
-        self, decision_id: str, update_data: Dict
-    ) -> Optional[Dict]:
+    async def _supabase_update(self, decision_id: str, update_data: Dict) -> Optional[Dict]:
         """Update decision in Supabase."""
         try:
             if not self.client:
                 return None
-            result = (
-                self.client.table("parasite_decisions")
-                .update(update_data)
-                .eq("id", decision_id)
-                .execute()
-            )
+            result = self.client.table("parasite_decisions").update(update_data).eq("id", decision_id).execute()
             return result.data[0] if result.data else None
         except Exception as e:
             logger.error(f"Supabase update failed: {e}")
             return None
 
-    async def _supabase_query(
-        self, filters: Optional[Dict] = None, limit: int = 50
-    ) -> List[Dict]:
+    async def _supabase_query(self, filters: Optional[Dict] = None, limit: int = 50) -> List[Dict]:
         """Query decisions from Supabase."""
         try:
             if not self.client:
                 return []
-            query = (
-                self.client.table("parasite_decisions")
-                .select("*")
-                .order("created_at", desc=True)
-                .limit(limit)
-            )
+            query = self.client.table("parasite_decisions").select("*").order("created_at", desc=True).limit(limit)
 
             # Apply filters if provided
             if filters:
@@ -435,9 +445,15 @@ class ParasiteDecisionRepository:
             logger.error(f"Supabase query failed: {e}")
             return []
 
+    def _get_json_path(self) -> Path:
+        """Get the JSON file path, supporting test overrides."""
+        if self._json_path is not None:
+            return self._json_path
+        return DATA_DIR / "parasite_decisions.json"
+
     def _load_all(self) -> None:
         """Load all decisions from JSON (fallback)."""
-        filepath = DATA_DIR / "parasite_decisions.json"
+        filepath = self._get_json_path()
         if filepath.exists():
             try:
                 with open(filepath) as f:
@@ -451,7 +467,7 @@ class ParasiteDecisionRepository:
 
     def _save_all(self) -> None:
         """Save all decisions to JSON (fallback)."""
-        filepath = DATA_DIR / "parasite_decisions.json"
+        filepath = self._get_json_path()
         try:
             filepath.parent.mkdir(parents=True, exist_ok=True)
             with open(filepath, "w") as f:

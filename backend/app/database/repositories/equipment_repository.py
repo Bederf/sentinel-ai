@@ -33,7 +33,7 @@ class EquipmentRepository:
                 return query.execute()
             except Exception as e:
                 error_msg = str(e)
-                if '429' in error_msg or 'rate limit' in error_msg.lower():
+                if "429" in error_msg or "rate limit" in error_msg.lower():
                     last_error = e
                     if attempt < max_retries:
                         logger.warning(f"Rate limit hit, retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
@@ -57,10 +57,10 @@ class EquipmentRepository:
         Returns:
             List of equipment items
         """
-        query = self.client.table('equipment').select("*")
+        query = self.client.table("equipment").select("*")
 
         if building_id:
-            query = query.eq('building_id', building_id)
+            query = query.eq("building_id", building_id)
 
         response = query.execute()
         return response.data
@@ -74,9 +74,7 @@ class EquipmentRepository:
         Returns:
             Equipment data or None if not found
         """
-        response = self.client.table('equipment').select("*").eq(
-            'code', equipment_id
-        ).execute()
+        response = self.client.table("equipment").select("*").eq("code", equipment_id).execute()
 
         if response.data:
             return response.data[0]
@@ -91,7 +89,7 @@ class EquipmentRepository:
         Returns:
             Equipment data or None if not found
         """
-        response = self.client.table('equipment').select("*").eq('id', uuid).execute()
+        response = self.client.table("equipment").select("*").eq("id", uuid).execute()
 
         if response.data:
             return response.data[0]
@@ -107,16 +105,16 @@ class EquipmentRepository:
             List of equipment items
         """
         # First get the building UUID (with retry)
-        building_query = self.client.table('buildings').select('id').eq('code', building_code)
+        building_query = self.client.table("buildings").select("id").eq("code", building_code)
         building_response = self._execute_with_retry(building_query)
 
         if not building_response.data:
             return []
 
-        building_uuid = building_response.data[0]['id']
+        building_uuid = building_response.data[0]["id"]
 
         # Get equipment for this building (with retry)
-        equipment_query = self.client.table('equipment').select("*").eq('building_id', building_uuid)
+        equipment_query = self.client.table("equipment").select("*").eq("building_id", building_uuid)
         equipment_response = self._execute_with_retry(equipment_query)
 
         return equipment_response.data
@@ -130,9 +128,7 @@ class EquipmentRepository:
         Returns:
             List of equipment items
         """
-        response = self.client.table('equipment').select("*").eq(
-            'type', equipment_type
-        ).execute()
+        response = self.client.table("equipment").select("*").eq("type", equipment_type).execute()
 
         return response.data
 
@@ -142,9 +138,7 @@ class EquipmentRepository:
         Returns:
             List of critical equipment items
         """
-        response = self.client.table('equipment').select("*").eq(
-            'status', 'critical'
-        ).execute()
+        response = self.client.table("equipment").select("*").eq("status", "critical").execute()
 
         return response.data
 
@@ -158,9 +152,7 @@ class EquipmentRepository:
             List of equipment with low health
         """
         # Note: Supabase uses lt for less than
-        response = self.client.table('equipment').select("*").lt(
-            'health_score', threshold
-        ).execute()
+        response = self.client.table("equipment").select("*").lt("health_score", threshold).execute()
 
         return response.data
 
@@ -173,7 +165,7 @@ class EquipmentRepository:
         Returns:
             Created equipment
         """
-        response = self.client.table('equipment').insert(equipment_data).execute()
+        response = self.client.table("equipment").insert(equipment_data).execute()
         return response.data[0]
 
     def update(self, equipment_id: str, equipment_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -190,19 +182,13 @@ class EquipmentRepository:
         if not equipment:
             return None
 
-        response = self.client.table('equipment').update(
-            equipment_data
-        ).eq('id', equipment['id']).execute()
+        response = self.client.table("equipment").update(equipment_data).eq("id", equipment["id"]).execute()
 
         if response.data:
             return response.data[0]
         return None
 
-    def update_operating_data(
-        self,
-        equipment_id: str,
-        point_values: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def update_operating_data(self, equipment_id: str, point_values: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update equipment operating_data with new point values.
 
         Merges new point values into existing operating_data JSONB column.
@@ -235,10 +221,12 @@ class EquipmentRepository:
 
         # Update database
         try:
-            response = self.client.table('equipment').update({
-                "operating_data": current_data,
-                "updated_at": datetime.now().isoformat()
-            }).eq('id', equipment['id']).execute()
+            response = (
+                self.client.table("equipment")
+                .update({"operating_data": current_data, "updated_at": datetime.now().isoformat()})
+                .eq("id", equipment["id"])
+                .execute()
+            )
 
             if response.data:
                 return response.data[0]
@@ -250,7 +238,8 @@ class EquipmentRepository:
     def _is_uuid(self, value: str) -> bool:
         """Check if value looks like a UUID."""
         import re
-        uuid_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+
+        uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
         return bool(re.match(uuid_pattern, value, re.IGNORECASE))
 
     def delete(self, equipment_id: str) -> bool:
@@ -266,9 +255,7 @@ class EquipmentRepository:
         if not equipment:
             return False
 
-        response = self.client.table('equipment').delete().eq(
-            'id', equipment['id']
-        ).execute()
+        response = self.client.table("equipment").delete().eq("id", equipment["id"]).execute()
 
         return len(response.data) > 0
 
@@ -282,7 +269,7 @@ class EquipmentRepository:
         Returns:
             Updated equipment or None if not found
         """
-        return self.update(equipment_id, {'status': status})
+        return self.update(equipment_id, {"status": status})
 
     def update_health_score(self, equipment_id: str, health_score: int) -> Optional[Dict[str, Any]]:
         """Update equipment health score.
@@ -294,8 +281,7 @@ class EquipmentRepository:
         Returns:
             Updated equipment or None if not found
         """
-        return self.update(equipment_id, {'health_score': health_score})
-
+        return self.update(equipment_id, {"health_score": health_score})
 
     def update_service_provider(
         self,
@@ -319,13 +305,13 @@ class EquipmentRepository:
         """
         update_data = {}
         if provider_name is not None:
-            update_data['service_provider_name'] = provider_name
+            update_data["service_provider_name"] = provider_name
         if provider_email is not None:
-            update_data['service_provider_email'] = provider_email
+            update_data["service_provider_email"] = provider_email
         if provider_phone is not None:
-            update_data['service_provider_phone'] = provider_phone
+            update_data["service_provider_phone"] = provider_phone
         if provider_specialty is not None:
-            update_data['service_provider_specialty'] = provider_specialty
+            update_data["service_provider_specialty"] = provider_specialty
 
         if not update_data:
             return self.get_by_id(equipment_id)
@@ -341,9 +327,7 @@ class EquipmentRepository:
         Returns:
             List of equipment items
         """
-        response = self.client.table('equipment').select("*").eq(
-            'service_provider_email', email
-        ).execute()
+        response = self.client.table("equipment").select("*").eq("service_provider_email", email).execute()
 
         return response.data
 
@@ -356,9 +340,7 @@ class EquipmentRepository:
         Returns:
             List of equipment items
         """
-        response = self.client.table('equipment').select("*").eq(
-            'service_provider_specialty', specialty
-        ).execute()
+        response = self.client.table("equipment").select("*").eq("service_provider_specialty", specialty).execute()
 
         return response.data
 

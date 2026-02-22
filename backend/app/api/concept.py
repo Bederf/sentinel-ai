@@ -65,7 +65,7 @@ async def get_assets(
                 "replacement_cost": a.replacement_cost,
             }
             for a in assets
-        ]
+        ],
     }
 
 
@@ -160,7 +160,7 @@ async def get_asset_job_cards(
                 "has_warning": jc.has_warning_flags,
             }
             for jc in job_cards[:limit]
-        ]
+        ],
     }
 
 
@@ -211,7 +211,7 @@ async def get_job_cards(
                 "has_warning": jc.has_warning_flags,
             }
             for jc in job_cards[:limit]
-        ]
+        ],
     }
 
 
@@ -225,10 +225,7 @@ async def get_assets_at_risk():
     """
     at_risk = concept_loader.get_assets_at_risk()
 
-    return {
-        "total_at_risk": len(at_risk),
-        "assets": at_risk
-    }
+    return {"total_at_risk": len(at_risk), "assets": at_risk}
 
 
 @router.get("/buildings/{building_code}/summary")
@@ -285,5 +282,5 @@ async def get_concept_stats():
             "beyond_expected_life": beyond_life,
             "total_replacement_value": sum(a.replacement_cost for a in assets),
             "annual_maint_budget": sum(a.annual_maint_cost for a in assets),
-        }
+        },
     }

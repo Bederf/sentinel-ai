@@ -13,6 +13,7 @@ Validates:
 """
 
 import asyncio
+import time
 import uuid
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
@@ -396,8 +397,12 @@ class TestP5QueryParamTokenInProduction:
 
         ctx = _operator_ctx()
         ticket = str(uuid.uuid4())
-        # Create already-expired ticket
-        _MCP_TICKETS[ticket] = (datetime.utcnow() - timedelta(seconds=60), ctx)
+        # Create already-used ticket (simulates expiry)
+        _MCP_TICKETS[ticket] = {
+            "auth_ctx": ctx,
+            "created_at": time.time() - 60,
+            "used": True,
+        }
 
         result = _validate_mcp_ticket(ticket)
         assert result is None
@@ -550,8 +555,11 @@ class TestP8ApprovalPath:
         assert validate_approval_token("write_device_point", token) is False
 
     @pytest.mark.asyncio
-    async def test_high_risk_tool_without_approval_returns_approval_required(self):
+    @patch("app.services.module_registry_service.module_registry")
+    async def test_high_risk_tool_without_approval_returns_approval_required(self, mock_registry):
         """High-risk tool via SSE without approval token → approval_required."""
+        mock_registry.is_module_active.return_value = True
+
         from app.mcp.simbiot_server import SIMBIOTMCPServer
 
         server = SIMBIOTMCPServer()

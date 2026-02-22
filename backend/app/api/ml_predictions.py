@@ -23,8 +23,10 @@ router = APIRouter(prefix="/api/ml", tags=["ml"])
 
 # === Pydantic Models ===
 
+
 class PredictionResponse(BaseModel):
     """LSTM prediction response."""
+
     equipment_id: str
     equipment_type: str
     predictions: dict  # {"24h": float, "48h": float, "72h": float}
@@ -38,6 +40,7 @@ class PredictionResponse(BaseModel):
 
 class AnomalyResponse(BaseModel):
     """Anomaly detection response."""
+
     equipment_id: str
     equipment_type: Optional[str] = None
     is_anomaly: Optional[bool] = None
@@ -55,12 +58,14 @@ class AnomalyResponse(BaseModel):
 
 class TrainRequest(BaseModel):
     """Training request."""
+
     epochs: int = 50
     use_demo_data: bool = True
 
 
 class TrainResponse(BaseModel):
     """Training response."""
+
     status: str
     message: str
     model_id: Optional[str] = None
@@ -69,6 +74,7 @@ class TrainResponse(BaseModel):
 
 class ModelInfo(BaseModel):
     """Model information."""
+
     model_id: str
     model_type: str
     equipment_type: str
@@ -79,11 +85,12 @@ class ModelInfo(BaseModel):
 
 # === LSTM Prediction Endpoints ===
 
+
 @router.get("/predictions/lstm/{equipment_id}", response_model=PredictionResponse)
 async def get_lstm_prediction(
     equipment_id: str,
     equipment_type: str = Query(..., description="Equipment type (chiller, ahu, generator, etc.)"),
-    include_explanation: bool = Query(False, description="Include natural language explanation")
+    include_explanation: bool = Query(False, description="Include natural language explanation"),
 ):
     """
     Get 24/48/72 hour predictions for an equipment.
@@ -109,9 +116,9 @@ async def get_lstm_prediction(
                 equipment_type=equipment_type,
                 predictions=result["predictions"],
                 confidence=result["confidence"],
-                include_rag_context=True
+                include_rag_context=True,
             )
-            result["explanation"] = asdict(explanation) if hasattr(explanation, '__dict__') else explanation
+            result["explanation"] = asdict(explanation) if hasattr(explanation, "__dict__") else explanation
 
             # Generate maintenance recommendations
             recommender = MaintenanceRecommender()
@@ -119,7 +126,7 @@ async def get_lstm_prediction(
                 equipment_id=equipment_id,
                 equipment_type=equipment_type,
                 predictions=result["predictions"],
-                confidence=result["confidence"]
+                confidence=result["confidence"],
             )
             result["maintenance_recommendations"] = recommendations
 
@@ -136,7 +143,7 @@ async def get_prediction_trend(
     equipment_id: str,
     equipment_type: str = Query(..., description="Equipment type"),
     hours_history: int = Query(168, description="Hours of history to include"),
-    include_explanation: bool = Query(False, description="Include trend explanation")
+    include_explanation: bool = Query(False, description="Include trend explanation"),
 ):
     """
     Get historical + predicted trend data for visualization.
@@ -160,9 +167,9 @@ async def get_prediction_trend(
                 equipment_id=equipment_id,
                 equipment_type=equipment_type,
                 historical_data=result.get("historical", []),
-                predictions=result.get("predictions", {})
+                predictions=result.get("predictions", {}),
             )
-            result["explanation"] = asdict(explanation) if hasattr(explanation, '__dict__') else explanation
+            result["explanation"] = asdict(explanation) if hasattr(explanation, "__dict__") else explanation
         except Exception as e:
             result["explanation"] = {"error": f"Failed to generate trend explanation: {str(e)}"}
 
@@ -170,9 +177,7 @@ async def get_prediction_trend(
 
 
 @router.post("/predictions/batch")
-async def get_batch_predictions(
-    equipment_list: List[dict]
-):
+async def get_batch_predictions(equipment_list: List[dict]):
     """
     Get predictions for multiple equipment.
 
@@ -184,10 +189,7 @@ async def get_batch_predictions(
     results = []
 
     for eq in equipment_list:
-        result = service.predict(
-            eq.get("equipment_id"),
-            eq.get("equipment_type")
-        )
+        result = service.predict(eq.get("equipment_id"), eq.get("equipment_type"))
         results.append(result)
 
     return results
@@ -195,11 +197,12 @@ async def get_batch_predictions(
 
 # === Anomaly Detection Endpoints ===
 
+
 @router.get("/anomalies/equipment/{equipment_id}", response_model=AnomalyResponse)
 async def check_equipment_anomaly(
     equipment_id: str,
     equipment_type: str = Query(..., description="Equipment type"),
-    include_explanation: bool = Query(False, description="Include anomaly explanation")
+    include_explanation: bool = Query(False, description="Include anomaly explanation"),
 ):
     """
     Check if equipment is exhibiting anomalous behavior.
@@ -229,16 +232,14 @@ async def check_equipment_anomaly(
                 equipment_type=equipment_type,
                 anomaly_score=result.get("anomaly_score"),
                 severity=result.get("severity"),
-                include_rag_context=True
+                include_rag_context=True,
             )
-            result["explanation"] = asdict(explanation) if hasattr(explanation, '__dict__') else explanation
+            result["explanation"] = asdict(explanation) if hasattr(explanation, "__dict__") else explanation
 
             # Search for related fault patterns if anomaly detected
             if result.get("is_anomaly"):
                 fault_results = await rag_service.search_faults(
-                    query=f"{equipment_type} anomaly {result.get('severity')}",
-                    equipment_type=equipment_type,
-                    limit=5
+                    query=f"{equipment_type} anomaly {result.get('severity')}", equipment_type=equipment_type, limit=5
                 )
                 result["related_faults"] = [doc.get("title", "Unknown") for doc in fault_results.get("results", [])]
 
@@ -260,9 +261,7 @@ async def check_equipment_anomaly(
 
 
 @router.get("/anomalies/all")
-async def check_all_anomalies(
-    limit: int = Query(20, description="Maximum results to return")
-):
+async def check_all_anomalies(limit: int = Query(20, description="Maximum results to return")):
     """
     Get anomaly status for all monitored equipment.
 
@@ -293,7 +292,7 @@ async def get_anomaly_alerts():
 async def get_anomaly_history(
     equipment_id: str,
     equipment_type: str = Query(..., description="Equipment type"),
-    days: int = Query(7, description="Days of history")
+    days: int = Query(7, description="Days of history"),
 ):
     """
     Get anomaly score history for trending analysis.
@@ -308,11 +307,12 @@ async def get_anomaly_history(
 
 # === Model Management Endpoints ===
 
+
 @router.get("/models", response_model=List[ModelInfo])
 async def list_models(
     model_type: Optional[str] = Query(None, description="Filter by model type (lstm, autoencoder)"),
     equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
-    status: Optional[str] = Query(None, description="Filter by status (active, inactive)")
+    status: Optional[str] = Query(None, description="Filter by status (active, inactive)"),
 ):
     """
     List all registered ML models.
@@ -370,25 +370,20 @@ async def compare_models(model_type: str, equipment_type: str):
 
 # === Training Endpoints ===
 
+
 @router.post("/train/lstm/{equipment_type}", response_model=TrainResponse)
-async def train_lstm_model(
-    equipment_type: str,
-    request: TrainRequest,
-    background_tasks: BackgroundTasks
-):
+async def train_lstm_model(equipment_type: str, request: TrainRequest, background_tasks: BackgroundTasks):
     """
     Train a new LSTM forecasting model.
 
     Training runs in background. Check /models endpoint for status.
     """
+
     def train_task():
         from ml.lstm.train import LSTMTrainer
+
         trainer = LSTMTrainer()
-        return trainer.train_equipment_type(
-            equipment_type,
-            epochs=request.epochs,
-            use_demo_data=request.use_demo_data
-        )
+        return trainer.train_equipment_type(equipment_type, epochs=request.epochs, use_demo_data=request.use_demo_data)
 
     # For demo, run synchronously (in production, use background task)
     try:
@@ -397,31 +392,25 @@ async def train_lstm_model(
             status="completed",
             message=f"LSTM model trained for {equipment_type}",
             model_id=result.get("model_id"),
-            metrics=result.get("metrics")
+            metrics=result.get("metrics"),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/train/autoencoder/{equipment_type}", response_model=TrainResponse)
-async def train_autoencoder_model(
-    equipment_type: str,
-    request: TrainRequest,
-    background_tasks: BackgroundTasks
-):
+async def train_autoencoder_model(equipment_type: str, request: TrainRequest, background_tasks: BackgroundTasks):
     """
     Train a new autoencoder anomaly detection model.
 
     Training runs in background. Check /models endpoint for status.
     """
+
     def train_task():
         from ml.autoencoder.train import AutoencoderTrainer
+
         trainer = AutoencoderTrainer()
-        return trainer.train_equipment_type(
-            equipment_type,
-            epochs=request.epochs,
-            use_demo_data=request.use_demo_data
-        )
+        return trainer.train_equipment_type(equipment_type, epochs=request.epochs, use_demo_data=request.use_demo_data)
 
     try:
         result = train_task()
@@ -429,34 +418,27 @@ async def train_autoencoder_model(
             status="completed",
             message=f"Autoencoder trained for {equipment_type}",
             model_id=result.get("model_id"),
-            metrics=result.get("metrics")
+            metrics=result.get("metrics"),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/train/all")
-async def train_all_models(
-    request: TrainRequest
-):
+async def train_all_models(request: TrainRequest):
     """
     Train all model types for all equipment types.
 
     This is a long-running operation. In production, would run in background.
     """
-    results = {
-        "lstm": [],
-        "autoencoder": []
-    }
+    results = {"lstm": [], "autoencoder": []}
 
     # Train LSTM models
     try:
         from ml.lstm.train import LSTMTrainer
+
         trainer = LSTMTrainer()
-        lstm_results = trainer.train_all(
-            epochs=request.epochs,
-            use_demo_data=request.use_demo_data
-        )
+        lstm_results = trainer.train_all(epochs=request.epochs, use_demo_data=request.use_demo_data)
         results["lstm"] = lstm_results
     except Exception as e:
         results["lstm"] = [{"error": str(e)}]
@@ -464,11 +446,9 @@ async def train_all_models(
     # Train autoencoder models
     try:
         from ml.autoencoder.train import AutoencoderTrainer
+
         trainer = AutoencoderTrainer()
-        ae_results = trainer.train_all(
-            epochs=request.epochs,
-            use_demo_data=request.use_demo_data
-        )
+        ae_results = trainer.train_all(epochs=request.epochs, use_demo_data=request.use_demo_data)
         results["autoencoder"] = ae_results
     except Exception as e:
         results["autoencoder"] = [{"error": str(e)}]
@@ -477,6 +457,7 @@ async def train_all_models(
 
 
 # === Health Check ===
+
 
 @router.get("/health")
 async def ml_health_check():
@@ -498,14 +479,16 @@ async def ml_health_check():
         "active_models": len(active_models),
         "lstm_models_active": len(lstm_active),
         "autoencoder_models_active": len(ae_active),
-        "equipment_types_covered": list(set(m["equipment_type"] for m in active_modules))
+        "equipment_types_covered": list(set(m["equipment_type"] for m in active_modules)),
     }
 
 
 # === Maintenance Recommendations Endpoints ===
 
+
 class MaintenanceRecommendationRequest(BaseModel):
     """Request for generating maintenance recommendations."""
+
     equipment_id: str
     equipment_type: str
     include_historical: bool = True
@@ -514,6 +497,7 @@ class MaintenanceRecommendationRequest(BaseModel):
 
 class MaintenanceRecommendationResponse(BaseModel):
     """Response with maintenance recommendations."""
+
     equipment_id: str
     equipment_type: str
     recommendations: List[dict]
@@ -540,7 +524,7 @@ async def generate_maintenance_recommendations(request: MaintenanceRecommendatio
             equipment_id=request.equipment_id,
             equipment_type=request.equipment_type,
             include_historical=request.include_historical,
-            urgency_filter=request.urgency_filter
+            urgency_filter=request.urgency_filter,
         )
 
         return MaintenanceRecommendationResponse(
@@ -550,7 +534,7 @@ async def generate_maintenance_recommendations(request: MaintenanceRecommendatio
             total_estimated_time=result.get("total_estimated_time", 0.0),
             total_estimated_cost=result.get("total_estimated_cost", 0.0),
             priority_breakdown=result.get("priority_breakdown", {}),
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.utcnow().isoformat(),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(e)}")
@@ -572,7 +556,7 @@ async def get_maintenance_priorities(equipment_type: str):
         return {
             "equipment_type": equipment_type,
             "priority_framework": framework,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -582,7 +566,7 @@ async def get_maintenance_priorities(equipment_type: str):
 async def get_maintenance_history(
     equipment_id: str,
     days: int = Query(30, description="Days of history"),
-    include_outcomes: bool = Query(True, description="Include action outcomes")
+    include_outcomes: bool = Query(True, description="Include action outcomes"),
 ):
     """
     Get historical maintenance actions and their outcomes.
@@ -595,15 +579,13 @@ async def get_maintenance_history(
 
     try:
         history = await recommender.get_maintenance_history(
-            equipment_id=equipment_id,
-            days=days,
-            include_outcomes=include_outcomes
+            equipment_id=equipment_id, days=days, include_outcomes=include_outcomes
         )
         return {
             "equipment_id": equipment_id,
             "history": history,
             "total_actions": len(history),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -617,7 +599,7 @@ async def submit_maintenance_feedback(
     outcome: str,
     actual_time_hours: Optional[float] = None,
     actual_cost: Optional[float] = None,
-    notes: Optional[str] = None
+    notes: Optional[str] = None,
 ):
     """
     Submit feedback on maintenance recommendations.
@@ -637,14 +619,14 @@ async def submit_maintenance_feedback(
             outcome=outcome,
             actual_time_hours=actual_time_hours,
             actual_cost=actual_cost,
-            notes=notes
+            notes=notes,
         )
 
         return {
             "status": "success",
             "message": "Feedback recorded successfully",
             "equipment_id": equipment_id,
-            "recommendation_id": recommendation_id
+            "recommendation_id": recommendation_id,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

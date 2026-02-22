@@ -28,6 +28,7 @@ except ImportError:
 # Custom exceptions
 # ---------------------------------------------------------------------------
 
+
 class BACnetException(Exception):
     """Base exception for BACnet operations."""
 
@@ -38,21 +39,25 @@ class BACnetException(Exception):
 
 class BACnetTimeoutError(BACnetException):
     """Raised when a BACnet operation times out."""
+
     pass
 
 
 class BACnetDeviceNotFoundError(BACnetException):
     """Raised when a BACnet device cannot be found on the network."""
+
     pass
 
 
 class BACnetWriteError(BACnetException):
     """Raised when a BACnet write operation fails."""
+
     pass
 
 
 class BACnetReadError(BACnetException):
     """Raised when a BACnet read operation fails."""
+
     pass
 
 
@@ -60,8 +65,10 @@ class BACnetReadError(BACnetException):
 # BACnet object type mapping
 # ---------------------------------------------------------------------------
 
+
 class BACnetObjectType(str, Enum):
     """Standard BACnet object types."""
+
     ANALOG_INPUT = "analogInput"
     ANALOG_OUTPUT = "analogOutput"
     ANALOG_VALUE = "analogValue"
@@ -96,6 +103,7 @@ BACNET_TYPE_ABBREVIATIONS = {
 # ---------------------------------------------------------------------------
 # Discovered device / point data classes
 # ---------------------------------------------------------------------------
+
 
 class DiscoveredDevice:
     """A BACnet device discovered via WhoIs/IAm."""
@@ -164,6 +172,7 @@ class DiscoveredPoint:
 # COV subscription tracker
 # ---------------------------------------------------------------------------
 
+
 class COVSubscription:
     """Tracks a Change-of-Value subscription."""
 
@@ -212,6 +221,7 @@ class COVSubscription:
 # ---------------------------------------------------------------------------
 # Main BACnet client
 # ---------------------------------------------------------------------------
+
 
 class NiagaraBACnetClient:
     """BACnet/IP client for Tridium Niagara integration.
@@ -264,9 +274,7 @@ class NiagaraBACnetClient:
             return
 
         if _BAC0 is None:
-            logger.error(
-                "BAC0 library not installed. Install with: pip install BAC0"
-            )
+            logger.error("BAC0 library not installed. Install with: pip install BAC0")
             raise BACnetException("BAC0 library not installed")
 
         try:
@@ -275,8 +283,7 @@ class NiagaraBACnetClient:
                 kwargs["ip"] = self._ip
 
             logger.info(
-                f"Starting BAC0 BACnet/IP client on port {self._port}"
-                + (f" bound to {self._ip}" if self._ip else "")
+                f"Starting BAC0 BACnet/IP client on port {self._port}" + (f" bound to {self._ip}" if self._ip else "")
             )
             self._bacnet = _BAC0.lite(**kwargs)
             self._started = True
@@ -318,9 +325,7 @@ class NiagaraBACnetClient:
     # Device discovery
     # ------------------------------------------------------------------
 
-    async def discover_devices(
-        self, timeout: float = DISCOVERY_TIMEOUT_SECONDS
-    ) -> List[DiscoveredDevice]:
+    async def discover_devices(self, timeout: float = DISCOVERY_TIMEOUT_SECONDS) -> List[DiscoveredDevice]:
         """Discover BACnet devices on the network using WhoIs/IAm.
 
         Args:
@@ -334,9 +339,7 @@ class NiagaraBACnetClient:
         logger.info(f"Discovering BACnet devices (timeout={timeout}s)...")
         try:
             raw_devices = await asyncio.wait_for(
-                asyncio.get_event_loop().run_in_executor(
-                    None, self._bacnet.whois
-                ),
+                asyncio.get_event_loop().run_in_executor(None, self._bacnet.whois),
                 timeout=timeout,
             )
         except asyncio.TimeoutError:
@@ -412,18 +415,14 @@ class NiagaraBACnetClient:
         self._ensure_started()
 
         read_string = f"{device_id} {object_type},{instance} {property_name}"
-        return await self._retry_operation(
-            self._do_read, read_string, device_id=device_id
-        )
+        return await self._retry_operation(self._do_read, read_string, device_id=device_id)
 
     async def _do_read(self, read_string: str) -> Any:
         """Execute a single BAC0 read operation."""
         try:
             if os.getenv("TESTING", "").lower() == "true":
                 return self._bacnet.read(read_string)
-            result = await asyncio.get_event_loop().run_in_executor(
-                None, self._bacnet.read, read_string
-            )
+            result = await asyncio.get_event_loop().run_in_executor(None, self._bacnet.read, read_string)
             return result
         except Exception as e:
             raise BACnetReadError(f"Read failed for '{read_string}': {e}")
@@ -491,9 +490,7 @@ class NiagaraBACnetClient:
             )
         except Exception as e:
             logger.error(f"Failed to read object list from device {device_id}: {e}")
-            raise BACnetException(
-                f"Failed to read object list: {e}", device_id=str(device_id)
-            )
+            raise BACnetException(f"Failed to read object list: {e}", device_id=str(device_id))
 
         points: List[DiscoveredPoint] = []
         if raw_list and isinstance(raw_list, (list, tuple)):
@@ -511,9 +508,7 @@ class NiagaraBACnetClient:
         logger.info(f"Discovered {len(points)} points on device {device_id}")
         return points
 
-    def _parse_object_reference(
-        self, device_id: int, obj_ref: Any
-    ) -> Optional[DiscoveredPoint]:
+    def _parse_object_reference(self, device_id: int, obj_ref: Any) -> Optional[DiscoveredPoint]:
         """Parse a BACnet object reference from the objectList."""
         if isinstance(obj_ref, (tuple, list)) and len(obj_ref) >= 2:
             obj_type = str(obj_ref[0])
@@ -527,9 +522,12 @@ class NiagaraBACnetClient:
 
         # Determine if writable based on object type
         writable = obj_type in (
-            "analogOutput", "analogValue",
-            "binaryOutput", "binaryValue",
-            "multiStateOutput", "multiStateValue",
+            "analogOutput",
+            "analogValue",
+            "binaryOutput",
+            "binaryValue",
+            "multiStateOutput",
+            "multiStateValue",
         )
 
         return DiscoveredPoint(
@@ -583,25 +581,16 @@ class NiagaraBACnetClient:
             raise ValueError(f"BACnet priority must be 1-16, got {priority}")
 
         # BAC0 write format: "address objectType instance presentValue value - priority"
-        write_string = (
-            f"{device_id} {object_type},{instance} presentValue {value} - {priority}"
-        )
+        write_string = f"{device_id} {object_type},{instance} presentValue {value} - {priority}"
 
-        await self._retry_operation(
-            self._do_write, write_string, device_id=device_id
-        )
-        logger.info(
-            f"Wrote {object_type},{instance} = {value} (priority {priority}) "
-            f"on device {device_id}"
-        )
+        await self._retry_operation(self._do_write, write_string, device_id=device_id)
+        logger.info(f"Wrote {object_type},{instance} = {value} (priority {priority}) on device {device_id}")
         return True
 
     async def _do_write(self, write_string: str) -> bool:
         """Execute a single BAC0 write operation."""
         try:
-            await asyncio.get_event_loop().run_in_executor(
-                None, self._bacnet.write, write_string
-            )
+            await asyncio.get_event_loop().run_in_executor(None, self._bacnet.write, write_string)
             return True
         except Exception as e:
             raise BACnetWriteError(f"Write failed for '{write_string}': {e}")
@@ -626,17 +615,10 @@ class NiagaraBACnetClient:
         """
         self._ensure_started()
 
-        write_string = (
-            f"{device_id} {object_type},{instance} presentValue null - {priority}"
-        )
+        write_string = f"{device_id} {object_type},{instance} presentValue null - {priority}"
         try:
-            await asyncio.get_event_loop().run_in_executor(
-                None, self._bacnet.write, write_string
-            )
-            logger.info(
-                f"Released priority {priority} on {object_type},{instance} "
-                f"device {device_id}"
-            )
+            await asyncio.get_event_loop().run_in_executor(None, self._bacnet.write, write_string)
+            logger.info(f"Released priority {priority} on {object_type},{instance} device {device_id}")
             return True
         except Exception as e:
             logger.error(f"Failed to release priority: {e}")
@@ -683,9 +665,7 @@ class NiagaraBACnetClient:
             raise BACnetException(f"COV subscription failed: {e}")
 
         # Start automatic renewal task
-        sub._renewal_task = asyncio.create_task(
-            self._cov_renewal_loop(sub)
-        )
+        sub._renewal_task = asyncio.create_task(self._cov_renewal_loop(sub))
 
         self._subscriptions[subscription_id] = sub
         logger.info(
@@ -703,13 +683,9 @@ class NiagaraBACnetClient:
             # Wrap in executor for thread safety
             for obj_type, instance in sub.points:
                 read_str = f"{sub.device_id} {obj_type},{instance} presentValue"
-                await asyncio.get_event_loop().run_in_executor(
-                    None, self._bacnet.read, read_str
-                )
+                await asyncio.get_event_loop().run_in_executor(None, self._bacnet.read, read_str)
         except ImportError:
-            logger.warning(
-                "BAC0 COV module not available - subscription will use polling fallback"
-            )
+            logger.warning("BAC0 COV module not available - subscription will use polling fallback")
         except Exception as e:
             logger.warning(f"COV creation error (will retry on renewal): {e}")
 
@@ -729,9 +705,7 @@ class NiagaraBACnetClient:
                     await self._create_bacnet_cov(sub)
                     logger.debug(f"Renewed COV subscription {sub.subscription_id}")
                 except Exception as e:
-                    logger.warning(
-                        f"COV renewal failed for {sub.subscription_id}: {e}"
-                    )
+                    logger.warning(f"COV renewal failed for {sub.subscription_id}: {e}")
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -801,14 +775,12 @@ class NiagaraBACnetClient:
             except asyncio.TimeoutError as e:
                 last_error = e
                 logger.warning(
-                    f"Timeout on attempt {attempt}/{max_retries}"
-                    + (f" for device {device_id}" if device_id else "")
+                    f"Timeout on attempt {attempt}/{max_retries}" + (f" for device {device_id}" if device_id else "")
                 )
             except Exception as e:
                 last_error = e
                 logger.warning(
-                    f"Attempt {attempt}/{max_retries} failed: {e}"
-                    + (f" (device {device_id})" if device_id else "")
+                    f"Attempt {attempt}/{max_retries} failed: {e}" + (f" (device {device_id})" if device_id else "")
                 )
 
             if attempt < max_retries:
@@ -816,16 +788,10 @@ class NiagaraBACnetClient:
                 await asyncio.sleep(delay)
 
         # All retries exhausted
-        error_msg = (
-            f"Operation failed after {max_retries} attempts: {last_error}"
-        )
+        error_msg = f"Operation failed after {max_retries} attempts: {last_error}"
         if isinstance(last_error, asyncio.TimeoutError):
-            raise BACnetTimeoutError(
-                error_msg, device_id=str(device_id) if device_id else None
-            )
-        raise BACnetException(
-            error_msg, device_id=str(device_id) if device_id else None
-        )
+            raise BACnetTimeoutError(error_msg, device_id=str(device_id) if device_id else None)
+        raise BACnetException(error_msg, device_id=str(device_id) if device_id else None)
 
     # ------------------------------------------------------------------
     # Utility / info
@@ -854,9 +820,7 @@ class NiagaraBACnetClient:
 
         for bacnet_prop, key in properties:
             try:
-                value = await self.read_point(
-                    device_id, "device", device_id, property_name=bacnet_prop
-                )
+                value = await self.read_point(device_id, "device", device_id, property_name=bacnet_prop)
                 info[key] = value
             except Exception:
                 info[key] = None
@@ -869,9 +833,7 @@ class NiagaraBACnetClient:
             "started": self._started,
             "port": self._port,
             "ip": self._ip,
-            "active_subscriptions": len(
-                [s for s in self._subscriptions.values() if s.active]
-            ),
+            "active_subscriptions": len([s for s in self._subscriptions.values() if s.active]),
             "cached_devices": len(self._point_cache),
         }
 

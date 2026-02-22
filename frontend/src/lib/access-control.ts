@@ -5,7 +5,7 @@
  * Used to provide restricted demo experiences for specific clients.
  *
  * Two layers of access control:
- * 1. COMPANY_DEMO_CONFIGS: Domain-based restrictions (e.g., wardew.co.za)
+ * 1. COMPANY_DEMO_CONFIGS: Domain-based restrictions (e.g., grantdemo.co.za)
  * 2. USER_DEMO_CONFIGS: Exact email-based restrictions (e.g., bederf@protonmail.com)
  *
  * Priority: USER_DEMO_CONFIGS > COMPANY_DEMO_CONFIGS > unrestricted
@@ -45,8 +45,8 @@ export const USER_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
  * Does NOT apply if the user has a USER_DEMO_CONFIG entry.
  */
 export const COMPANY_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
-  'wardew.co.za': {
-    companyName: 'Wardew',
+  'grantdemo.co.za': {
+    companyName: 'Grant Demo',
     demoFocus: 'dali-lighting',
     allowedViews: [
       'dashboard',           // Base: always visible
@@ -125,7 +125,7 @@ export function getUserViewMode(email: string): 'auditor' | 'operator' | 'admin'
  * Get the default view to show when user logs in.
  * DEFAULT LANDING PAGE: 'dashboard' (not AI Chat)
  *
- * Wardew (wardew.co.za) users override this and default to 'occupancy'.
+ * Grant Demo (grantdemo.co.za) users override this and default to 'occupancy'.
  * Bederf protonmail users default to 'dashboard'.
  * All other users default to 'dashboard'.
  */

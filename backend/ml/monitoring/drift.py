@@ -63,6 +63,7 @@ def _generate_training_stats(equipment_type: str) -> Dict[str, List[float]]:
     For demo, we generate realistic baseline distributions.
     """
     import random
+
     random.seed(hash(equipment_type) % 2**31)
 
     base_distributions = {
@@ -100,9 +101,7 @@ def _generate_training_stats(equipment_type: str) -> Dict[str, List[float]]:
     return base_distributions.get(equipment_type, default)
 
 
-def _generate_current_stats(
-    equipment_type: str, drift_amount: float = 0.0
-) -> Dict[str, List[float]]:
+def _generate_current_stats(equipment_type: str, drift_amount: float = 0.0) -> Dict[str, List[float]]:
     """Generate simulated current distribution statistics.
 
     Args:
@@ -110,6 +109,7 @@ def _generate_current_stats(
         drift_amount: Amount of drift to inject (0.0 = no drift, 1.0 = significant).
     """
     import random
+
     random.seed(int(datetime.now().timestamp()) % 2**31)
 
     training = _generate_training_stats(equipment_type)
@@ -123,9 +123,7 @@ def _generate_current_stats(
         drifted_mean = mean + (std * drift_amount * 1.5)
         drifted_std = std * (1.0 + drift_amount * 0.5)
 
-        current[feature] = [
-            random.gauss(drifted_mean, drifted_std) for _ in range(80)
-        ]
+        current[feature] = [random.gauss(drifted_mean, drifted_std) for _ in range(80)]
 
     return current
 
@@ -261,9 +259,7 @@ class DriftDetector:
         """Return recent drift detection results."""
         return self._detection_history[-limit:]
 
-    def set_training_baseline(
-        self, equipment_type: str, features: Dict[str, List[float]]
-    ) -> None:
+    def set_training_baseline(self, equipment_type: str, features: Dict[str, List[float]]) -> None:
         """Store training-time feature distributions as baseline.
 
         In production, called after model training completes.
@@ -287,6 +283,7 @@ class DriftDetector:
         """
         try:
             from ml.monitoring.performance_monitor import get_performance_monitor
+
             monitor = get_performance_monitor()
             result = monitor.evaluate_predictions(days_back=days)
             metrics = result.get("metrics", {})

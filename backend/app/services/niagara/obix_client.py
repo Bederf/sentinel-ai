@@ -32,21 +32,25 @@ OBIX_VALUE_TYPES = {"real", "int", "bool", "str", "enum", "abstime", "reltime", 
 
 class OBIXAuthenticationError(Exception):
     """Raised when authentication with Niagara fails."""
+
     pass
 
 
 class OBIXConnectionError(Exception):
     """Raised when connection to Niagara server fails."""
+
     pass
 
 
 class OBIXPointNotFoundError(Exception):
     """Raised when a requested point path is not found."""
+
     pass
 
 
 class OBIXParseError(Exception):
     """Raised when oBIX XML response cannot be parsed."""
+
     pass
 
 
@@ -172,25 +176,17 @@ class OBIXClient:
                 return True
             elif response.status_code == 401:
                 self._authenticated = False
-                raise OBIXAuthenticationError(
-                    "Invalid credentials for Niagara server"
-                )
+                raise OBIXAuthenticationError("Invalid credentials for Niagara server")
             else:
                 self._authenticated = False
-                raise OBIXAuthenticationError(
-                    f"Unexpected response from login: {response.status_code}"
-                )
+                raise OBIXAuthenticationError(f"Unexpected response from login: {response.status_code}")
 
         except requests.exceptions.ConnectionError as e:
             self._authenticated = False
-            raise OBIXConnectionError(
-                f"Cannot connect to Niagara server at {self.base_url}: {e}"
-            ) from e
+            raise OBIXConnectionError(f"Cannot connect to Niagara server at {self.base_url}: {e}") from e
         except requests.exceptions.Timeout as e:
             self._authenticated = False
-            raise OBIXConnectionError(
-                f"Connection timeout to {self.base_url}: {e}"
-            ) from e
+            raise OBIXConnectionError(f"Connection timeout to {self.base_url}: {e}") from e
 
     def _request(self, method: str, path: str, **kwargs) -> requests.Response:
         """
@@ -213,13 +209,9 @@ class OBIXClient:
                 return response
 
             except requests.exceptions.ConnectionError as e:
-                raise OBIXConnectionError(
-                    f"Connection error: {e}"
-                ) from e
+                raise OBIXConnectionError(f"Connection error: {e}") from e
             except requests.exceptions.Timeout as e:
-                raise OBIXConnectionError(
-                    f"Request timeout: {e}"
-                ) from e
+                raise OBIXConnectionError(f"Request timeout: {e}") from e
 
         # Should not reach here, but just in case
         raise OBIXConnectionError("Max retries exceeded")
@@ -245,9 +237,7 @@ class OBIXClient:
             raise OBIXPointNotFoundError(f"Point not found: {point_path}")
 
         if response.status_code != 200:
-            raise OBIXConnectionError(
-                f"Unexpected status {response.status_code} reading {point_path}"
-            )
+            raise OBIXConnectionError(f"Unexpected status {response.status_code} reading {point_path}")
 
         return self._parse_point_response(response.content, point_path)
 
@@ -286,9 +276,7 @@ class OBIXClient:
             raise OBIXPointNotFoundError(f"History not found: {history_path}")
 
         if response.status_code != 200:
-            raise OBIXConnectionError(
-                f"Unexpected status {response.status_code} reading history {history_path}"
-            )
+            raise OBIXConnectionError(f"Unexpected status {response.status_code} reading history {history_path}")
 
         return self._parse_history_response(response.content)
 
@@ -325,23 +313,15 @@ class OBIXClient:
         response = self._request("GET", obix_path, params=params)
 
         if response.status_code != 200:
-            raise OBIXConnectionError(
-                f"Unexpected status {response.status_code} reading alarms"
-            )
+            raise OBIXConnectionError(f"Unexpected status {response.status_code} reading alarms")
 
         alarms = self._parse_alarm_response(response.content)
 
         # Apply client-side filters
         if severity_filter:
-            alarms = [
-                a for a in alarms
-                if a.get("severity", "").lower() == severity_filter.lower()
-            ]
+            alarms = [a for a in alarms if a.get("severity", "").lower() == severity_filter.lower()]
         if priority_filter is not None:
-            alarms = [
-                a for a in alarms
-                if a.get("priority") == priority_filter
-            ]
+            alarms = [a for a in alarms if a.get("priority") == priority_filter]
 
         return alarms
 
@@ -658,9 +638,15 @@ def get_obix_client() -> OBIXClient:
         port = int(os.environ.get("NIAGARA_OBIX_PORT", "0")) or settings.niagara_obix_port or 80
         username = os.environ.get("NIAGARA_OBIX_USERNAME") or settings.niagara_obix_username or ""
         password = os.environ.get("NIAGARA_OBIX_PASSWORD") or settings.niagara_obix_password or ""
-        use_https = os.environ.get("NIAGARA_OBIX_HTTPS", "").lower() in ("true", "1", "yes") or settings.niagara_obix_https
+        use_https = (
+            os.environ.get("NIAGARA_OBIX_HTTPS", "").lower() in ("true", "1", "yes") or settings.niagara_obix_https
+        )
         timeout = int(os.environ.get("NIAGARA_OBIX_TIMEOUT", "0")) or settings.niagara_obix_timeout or 30
-        verify_ssl = os.environ.get("NIAGARA_OBIX_VERIFY_SSL", "").lower() not in ("false", "0", "no") if os.environ.get("NIAGARA_OBIX_VERIFY_SSL") else settings.niagara_obix_verify_ssl
+        verify_ssl = (
+            os.environ.get("NIAGARA_OBIX_VERIFY_SSL", "").lower() not in ("false", "0", "no")
+            if os.environ.get("NIAGARA_OBIX_VERIFY_SSL")
+            else settings.niagara_obix_verify_ssl
+        )
 
         protocol = "https" if use_https else "http"
         base_url = f"{protocol}://{host}:{port}"

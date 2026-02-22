@@ -4,7 +4,7 @@ from ml.explanations.evaluation import (
     ExplanationEvaluator,
     ExplanationMetrics,
     HumanEvaluationTemplate,
-    format_evaluation_results
+    format_evaluation_results,
 )
 
 
@@ -34,22 +34,19 @@ Need to check refrigerant levels and repair any leaks found.
                 "description": "Check refrigerant levels",
                 "urgency": "HIGH",
                 "estimated_time_hours": 2.0,
-                "estimated_cost": 1500.0
+                "estimated_cost": 1500.0,
             }
         ]
 
         context_docs = [
-            {
-                "title": "Refrigerant Leak Detection",
-                "content": "Check pressures and look for visible signs"
-            }
+            {"title": "Refrigerant Leak Detection", "content": "Check pressures and look for visible signs"}
         ]
 
         metrics = evaluator.evaluate_explanation(
             predicted_explanation=predicted,
             reference_explanation=reference,
             generated_actions=actions,
-            context_documents=context_docs
+            context_documents=context_docs,
         )
 
         assert isinstance(metrics, ExplanationMetrics)
@@ -67,10 +64,7 @@ Need to check refrigerant levels and repair any leaks found.
 Normal operation, no issues detected.
 """
 
-        metrics = evaluator.evaluate_explanation(
-            predicted_explanation=predicted,
-            reference_explanation=None
-        )
+        metrics = evaluator.evaluate_explanation(predicted_explanation=predicted, reference_explanation=None)
 
         assert isinstance(metrics, ExplanationMetrics)
         # ROUGE/BLEU should be None without reference
@@ -85,12 +79,7 @@ Normal operation, no issues detected.
 
         # Test with complete actions
         complete_actions = [
-            {
-                "description": "Complete action",
-                "urgency": "HIGH",
-                "estimated_time_hours": 2.0,
-                "estimated_cost": 1000.0
-            }
+            {"description": "Complete action", "urgency": "HIGH", "estimated_time_hours": 2.0, "estimated_cost": 1000.0}
         ]
 
         score_complete = evaluator._calculate_actionability(complete_actions)
@@ -100,7 +89,7 @@ Normal operation, no issues detected.
         partial_actions = [
             {
                 "description": "Partial action",
-                "urgency": "HIGH"
+                "urgency": "HIGH",
                 # Missing time and cost
             }
         ]
@@ -121,12 +110,9 @@ Normal operation, no issues detected.
         context_docs = [
             {
                 "title": "Chiller Maintenance Guide",
-                "content": "Refrigerant leak detection is important for chiller maintenance"
+                "content": "Refrigerant leak detection is important for chiller maintenance",
             },
-            {
-                "title": "HVAC Procedures",
-                "content": "Regular inspection prevents major failures"
-            }
+            {"title": "HVAC Procedures", "content": "Regular inspection prevents major failures"},
         ]
 
         score = evaluator._calculate_factuality(explanation, context_docs)
@@ -175,7 +161,10 @@ High pressure observed. Might be overcharge.
         assert score_short < 0.6
 
         # Test too long
-        long = "This is a very long explanation that goes on and on with many unnecessary words and redundant information that makes it difficult to read and understand quickly. " * 10
+        long = (
+            "This is a very long explanation that goes on and on with many unnecessary words and redundant information that makes it difficult to read and understand quickly. "
+            * 10
+        )
         score_long = evaluator._calculate_conciseness(long)
         assert score_long < 0.6
 
@@ -230,17 +219,11 @@ class TestMetricFormatting:
         """Test formatting evaluation results."""
         metrics_list = [
             ExplanationMetrics(
-                actionability_score=0.8,
-                factuality_score=0.7,
-                completeness_score=0.9,
-                conciseness_score=0.85
+                actionability_score=0.8, factuality_score=0.7, completeness_score=0.9, conciseness_score=0.85
             ),
             ExplanationMetrics(
-                actionability_score=0.7,
-                factuality_score=0.75,
-                completeness_score=0.8,
-                conciseness_score=0.8
-            )
+                actionability_score=0.7, factuality_score=0.75, completeness_score=0.8, conciseness_score=0.8
+            ),
         ]
 
         results = format_evaluation_results(metrics_list)
@@ -264,7 +247,7 @@ class TestMetricFormatting:
         metrics_list = [
             ExplanationMetrics(actionability_score=0.8, factuality_score=None),
             ExplanationMetrics(actionability_score=0.7, factuality_score=0.9),
-            ExplanationMetrics(actionability_score=None, factuality_score=0.85)
+            ExplanationMetrics(actionability_score=None, factuality_score=0.85),
         ]
 
         results = format_evaluation_results(metrics_list)
@@ -284,11 +267,7 @@ class TestMetricsDataClass:
 
     def test_metrics_to_dict(self):
         """Test converting metrics to dictionary."""
-        metrics = ExplanationMetrics(
-            actionability_score=0.8,
-            factuality_score=0.7,
-            usefulness_rating=4.5
-        )
+        metrics = ExplanationMetrics(actionability_score=0.8, factuality_score=0.7, usefulness_rating=4.5)
 
         result_dict = metrics.to_dict()
 

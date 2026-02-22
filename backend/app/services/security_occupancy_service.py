@@ -20,10 +20,10 @@ _instance: Optional["SecurityOccupancyService"] = None
 
 # Default thresholds for cross-module recommendations (fallback if profile not available)
 OCCUPANCY_EMPTY_THRESHOLD = 0  # 0 people = empty zone
-OCCUPANCY_LOW_THRESHOLD = 3    # Below this, zone considered low-occupancy
-HVAC_RELAXATION_OFFSET = 2.0   # Degrees to relax setpoint for empty zones
-LIGHTING_DIM_LEVEL = 20        # % brightness for empty zones
-LIGHTING_LOW_LEVEL = 50        # % brightness for low-occupancy zones
+OCCUPANCY_LOW_THRESHOLD = 3  # Below this, zone considered low-occupancy
+HVAC_RELAXATION_OFFSET = 2.0  # Degrees to relax setpoint for empty zones
+LIGHTING_DIM_LEVEL = 20  # % brightness for empty zones
+LIGHTING_LOW_LEVEL = 50  # % brightness for low-occupancy zones
 
 
 class SecurityOccupancyService:
@@ -138,7 +138,9 @@ class SecurityOccupancyService:
 
     # --- Cross-module coordination ---
 
-    def check_hvac_adjustment(self, zone_id: str, thresholds: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    def check_hvac_adjustment(
+        self, zone_id: str, thresholds: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
         """Check if HVAC setpoint should be relaxed based on occupancy.
 
         Uses profile-driven thresholds if provided, otherwise uses defaults.
@@ -181,7 +183,9 @@ class SecurityOccupancyService:
             }
         return None
 
-    def check_lighting_adjustment(self, zone_id: str, thresholds: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    def check_lighting_adjustment(
+        self, zone_id: str, thresholds: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
         """Check if lighting should be dimmed based on occupancy.
 
         Uses profile-driven thresholds if provided, otherwise uses defaults.
@@ -268,6 +272,7 @@ class SecurityOccupancyService:
         """Try to get DALI PIR sensor data for combined occupancy."""
         try:
             from app.services.dali_service import get_dali_service
+
             dali = get_dali_service()
             zones = dali.get_zones()
             if zones:
@@ -332,9 +337,7 @@ class SecurityOccupancyService:
 
                     # For demo: simulate HVAC/lighting activation
                     hvac_activation = self._simulate_hvac_activation(zone_id, event_time)
-                    lighting_activation = self._simulate_lighting_activation(
-                        zone_id, event_time
-                    )
+                    lighting_activation = self._simulate_lighting_activation(zone_id, event_time)
 
                     if hvac_activation or lighting_activation:
                         anomaly = {
@@ -343,9 +346,7 @@ class SecurityOccupancyService:
                             "badge_event": event,
                             "hvac_correlation": hvac_activation,
                             "lighting_correlation": lighting_activation,
-                            "energy_impact": self._estimate_energy_impact(
-                                hvac_activation, lighting_activation
-                            ),
+                            "energy_impact": self._estimate_energy_impact(hvac_activation, lighting_activation),
                             "recommendation": self._generate_after_hours_recommendation(
                                 event, hvac_activation, lighting_activation
                             ),
@@ -355,9 +356,7 @@ class SecurityOccupancyService:
 
         return after_hours_events
 
-    def _simulate_hvac_activation(
-        self, zone_id: str, event_time: datetime
-    ) -> Optional[Dict]:
+    def _simulate_hvac_activation(self, zone_id: str, event_time: datetime) -> Optional[Dict]:
         """Simulate HVAC zone activation for demo mode."""
         # Convert CCURE zone to HVAC zone ID
         hvac_zone_id = zone_id.replace("CCURE-ZN", "HVAC-ZN")
@@ -371,9 +370,7 @@ class SecurityOccupancyService:
             "mode": "cooling",
         }
 
-    def _simulate_lighting_activation(
-        self, zone_id: str, event_time: datetime
-    ) -> Optional[Dict]:
+    def _simulate_lighting_activation(self, zone_id: str, event_time: datetime) -> Optional[Dict]:
         """Simulate lighting zone activation for demo mode."""
         # Convert CCURE zone to DALI zone ID
         lighting_zone_id = zone_id.replace("CCURE-ZN", "DALI-ZN")
@@ -387,9 +384,7 @@ class SecurityOccupancyService:
             "occupancy_detected": True,
         }
 
-    def _estimate_energy_impact(
-        self, hvac_activation: Optional[Dict], lighting_activation: Optional[Dict]
-    ) -> str:
+    def _estimate_energy_impact(self, hvac_activation: Optional[Dict], lighting_activation: Optional[Dict]) -> str:
         """Estimate energy impact of after-hours activation."""
         total_kwh = 0
 

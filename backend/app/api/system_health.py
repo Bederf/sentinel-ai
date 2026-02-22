@@ -15,8 +15,10 @@ service = SystemHealthService()
 
 # ==================== Response Models ====================
 
+
 class ComponentHealth(BaseModel):
     """Health status of a system component."""
+
     name: str
     status: str  # "healthy", "degraded", "critical"
     score: int = Field(..., ge=0, le=100)
@@ -26,6 +28,7 @@ class ComponentHealth(BaseModel):
 
 class SystemHealthSnapshot(BaseModel):
     """Current system health snapshot."""
+
     timestamp: str
     overall_status: str  # "healthy", "degraded", "critical"
     overall_score: int = Field(..., ge=0, le=100)
@@ -36,6 +39,7 @@ class SystemHealthSnapshot(BaseModel):
 
 class DiagnosticResult(BaseModel):
     """SIMBIOT diagnostic result."""
+
     diagnostic_id: str
     timestamp: str
     target: str
@@ -54,6 +58,7 @@ class DiagnosticResult(BaseModel):
 
 class ErrorLog(BaseModel):
     """System error log entry."""
+
     id: str
     timestamp: str
     category: str  # "bms", "api", "database", "service", "other"
@@ -67,6 +72,7 @@ class ErrorLog(BaseModel):
 
 class ErrorLogResponse(BaseModel):
     """Paginated error logs response."""
+
     total: int
     logs: List[ErrorLog]
     page: int
@@ -75,6 +81,7 @@ class ErrorLogResponse(BaseModel):
 
 class HealthHistoryData(BaseModel):
     """Historical health data for trend analysis."""
+
     range: str  # "24h", "7d", "30d"
     snapshots: List[dict]
     metrics: dict
@@ -83,11 +90,13 @@ class HealthHistoryData(BaseModel):
 
 class DiagnosticsRequest(BaseModel):
     """Request to run diagnostics."""
+
     target: str = "full_system"  # "full_system", "building:{code}", "component:{name}"
     building_code: Optional[str] = None
 
 
 # ==================== Endpoints ====================
+
 
 @router.get("/health", response_model=SystemHealthSnapshot)
 async def get_current_health():
@@ -281,6 +290,7 @@ async def get_error_logs(
 
 # ==================== Internal Endpoints ====================
 
+
 @router.post("/error-logs/log")
 async def log_error(
     category: str,
@@ -334,9 +344,19 @@ async def trigger_store_snapshot(background_tasks: BackgroundTasks):
     Returns:
         {"task_started": true}
     """
+
     async def store_task():
         snapshot = await service.get_current_health()
         await service.store_health_snapshot(snapshot)
 
     background_tasks.add_task(store_task)
     return {"task_started": True}
+
+
+@router.get("/monitoring")
+async def get_monitoring_snapshot(building_id: Optional[str] = Query(None)):
+    """Unified monitoring snapshot — ingestion, control, alerts, quality gate."""
+    from app.services.monitoring_service import MonitoringService
+
+    svc = MonitoringService()
+    return await svc.get_snapshot(building_id=building_id)

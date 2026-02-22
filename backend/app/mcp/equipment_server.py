@@ -34,11 +34,9 @@ def get_lookup() -> EquipmentLookup:
 # MCP Tool Functions
 # ============================================================================
 
+
 async def lookup_fault_code_tool(
-    manufacturer: str,
-    fault_code: str,
-    model: Optional[str] = None,
-    equipment_type: Optional[str] = None
+    manufacturer: str, fault_code: str, model: Optional[str] = None, equipment_type: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Look up a fault code for specific equipment and get diagnosis, fix, and parts.
@@ -64,27 +62,19 @@ async def lookup_fault_code_tool(
 
     try:
         result = await lookup.lookup_fault_code(
-            manufacturer=manufacturer,
-            fault_code=fault_code,
-            model=model,
-            equipment_type=equipment_type
+            manufacturer=manufacturer, fault_code=fault_code, model=model, equipment_type=equipment_type
         )
         return result
     except Exception as e:
         logger.error(f"lookup_fault_code_tool failed: {e}")
-        return {
-            "error": str(e),
-            "fault": None,
-            "manufacturer": manufacturer,
-            "model": model
-        }
+        return {"error": str(e), "fault": None, "manufacturer": manufacturer, "model": model}
 
 
 async def lookup_parts_tool(
     part_number: Optional[str] = None,
     part_description: Optional[str] = None,
     manufacturer: Optional[str] = None,
-    include_alternatives: bool = True
+    include_alternatives: bool = True,
 ) -> List[Dict[str, Any]]:
     """
     Search for parts across South African suppliers.
@@ -118,16 +108,14 @@ async def lookup_parts_tool(
                 if manufacturer and not lookup._supplier_relevant(supplier, manufacturer):
                     continue
 
-                supplier_results = await lookup._search_supplier(
-                    supplier, part_number, manufacturer or "", None
-                )
+                supplier_results = await lookup._search_supplier(supplier, part_number, manufacturer or "", None)
 
                 if supplier_results:
                     part_result = {
                         "part_name": part_number,
                         "part_number": part_number,
                         "manufacturer": manufacturer,
-                        "suppliers": supplier_results
+                        "suppliers": supplier_results,
                     }
 
                     if include_alternatives:
@@ -149,7 +137,7 @@ async def lookup_parts_tool(
                 "motor": "Motor Assembly",
                 "pump": "Pump Assembly",
                 "board": "Control Board",
-                "igbt": "IGBT Module"
+                "igbt": "IGBT Module",
             }
 
             matched_parts = set()
@@ -166,18 +154,12 @@ async def lookup_parts_tool(
                     if manufacturer and not lookup._supplier_relevant(supplier, manufacturer):
                         continue
                     try:
-                        supplier_results = await lookup._search_supplier(
-                            supplier, part_name, manufacturer or "", None
-                        )
+                        supplier_results = await lookup._search_supplier(supplier, part_name, manufacturer or "", None)
                         suppliers_list.extend(supplier_results)
                     except Exception:
                         pass
 
-                results.append({
-                    "part_name": part_name,
-                    "manufacturer": manufacturer,
-                    "suppliers": suppliers_list[:5]
-                })
+                results.append({"part_name": part_name, "manufacturer": manufacturer, "suppliers": suppliers_list[:5]})
 
         return results if results else [{"part_name": part_number or part_description, "suppliers": []}]
 
@@ -187,9 +169,7 @@ async def lookup_parts_tool(
 
 
 async def search_equipment_issue_tool(
-    query: str,
-    manufacturer: Optional[str] = None,
-    model: Optional[str] = None
+    query: str, manufacturer: Optional[str] = None, model: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Natural language search for equipment issues.
@@ -224,9 +204,9 @@ async def search_equipment_issue_tool(
     try:
         # Extract fault code patterns
         fault_patterns = [
-            r'(?:fault|error|code|alarm)\s*[:#]?\s*([a-zA-Z0-9_-]+)',
-            r'([A-Z]+[_-]?\d+)',
-            r'(?:^|\s)([EFAUHLueh]\d+)(?:\s|$)',
+            r"(?:fault|error|code|alarm)\s*[:#]?\s*([a-zA-Z0-9_-]+)",
+            r"([A-Z]+[_-]?\d+)",
+            r"(?:^|\s)([EFAUHLueh]\d+)(?:\s|$)",
         ]
 
         fault_code = None
@@ -253,7 +233,7 @@ async def search_equipment_issue_tool(
                     "manufacturer": manufacturer,
                     "model": model,
                     "parts": result.get("parts", []),
-                    "forum_solutions": result.get("forum_solutions", [])
+                    "forum_solutions": result.get("forum_solutions", []),
                 }
 
         # Keyword-based search
@@ -267,28 +247,26 @@ async def search_equipment_issue_tool(
             "tripping": "Check for overcurrent, short circuit, ground fault",
             "won't start": "Check power supply, contactor, capacitor, control board",
             "short cycling": "Check refrigerant charge, thermostat, pressure switches",
-            "freezing": "Check airflow, refrigerant charge, expansion valve"
+            "freezing": "Check airflow, refrigerant charge, expansion valve",
         }
 
         suggestions = []
         for keyword, solution in problem_keywords.items():
             if keyword in query_lower:
-                suggestions.append({
-                    "problem": keyword.replace("_", " ").title(),
-                    "solution": solution,
-                    "source": "General troubleshooting guide"
-                })
+                suggestions.append(
+                    {
+                        "problem": keyword.replace("_", " ").title(),
+                        "solution": solution,
+                        "source": "General troubleshooting guide",
+                    }
+                )
 
         # Forum search URLs
         search_query = f"{manufacturer or ''} {model or ''} {query}".strip()
         forums = []
         for forum in lookup.FORUM_SOURCES:
             forum_url = forum["url"] + forum["search_url"].format(query=search_query.replace(" ", "+"))
-            forums.append({
-                "source": forum["name"],
-                "url": forum_url,
-                "description": forum.get("description", "")
-            })
+            forums.append({"source": forum["name"], "url": forum_url, "description": forum.get("description", "")})
 
         return {
             "query_type": "keyword",
@@ -296,16 +274,12 @@ async def search_equipment_issue_tool(
             "model": model,
             "suggestions": suggestions,
             "forum_solutions": forums,
-            "note": "Try including a fault code for more specific results" if not suggestions else None
+            "note": "Try including a fault code for more specific results" if not suggestions else None,
         }
 
     except Exception as e:
         logger.error(f"search_equipment_issue_tool failed: {e}")
-        return {
-            "error": str(e),
-            "query_type": "error",
-            "query": query
-        }
+        return {"error": str(e), "query_type": "error", "query": query}
 
 
 # ============================================================================
@@ -321,23 +295,14 @@ MCP_TOOLS = [
             "properties": {
                 "manufacturer": {
                     "type": "string",
-                    "description": "Equipment manufacturer (e.g., Carrier, Trane, Daikin, ABB)"
+                    "description": "Equipment manufacturer (e.g., Carrier, Trane, Daikin, ABB)",
                 },
-                "fault_code": {
-                    "type": "string",
-                    "description": "Fault code (e.g., E4, FAULT_001, ALARM_1)"
-                },
-                "model": {
-                    "type": "string",
-                    "description": "Equipment model (e.g., 30XA, RTAC)"
-                },
-                "equipment_type": {
-                    "type": "string",
-                    "description": "Equipment type (chiller, ahu, vsd)"
-                }
+                "fault_code": {"type": "string", "description": "Fault code (e.g., E4, FAULT_001, ALARM_1)"},
+                "model": {"type": "string", "description": "Equipment model (e.g., 30XA, RTAC)"},
+                "equipment_type": {"type": "string", "description": "Equipment type (chiller, ahu, vsd)"},
             },
-            "required": ["manufacturer", "fault_code"]
-        }
+            "required": ["manufacturer", "fault_code"],
+        },
     },
     {
         "name": "lookup_parts",
@@ -345,25 +310,16 @@ MCP_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "part_number": {
-                    "type": "string",
-                    "description": "OEM or generic part number"
-                },
-                "part_description": {
-                    "type": "string",
-                    "description": "Part description to search"
-                },
-                "manufacturer": {
-                    "type": "string",
-                    "description": "Filter by manufacturer"
-                },
+                "part_number": {"type": "string", "description": "OEM or generic part number"},
+                "part_description": {"type": "string", "description": "Part description to search"},
+                "manufacturer": {"type": "string", "description": "Filter by manufacturer"},
                 "include_alternatives": {
                     "type": "boolean",
-                    "description": "Include generic alternatives (default: true)"
-                }
+                    "description": "Include generic alternatives (default: true)",
+                },
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "search_equipment_issue",
@@ -371,28 +327,23 @@ MCP_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Natural language search query"
-                },
+                "query": {"type": "string", "description": "Natural language search query"},
                 "manufacturer": {
                     "type": "string",
-                    "description": "Filter by manufacturer (optional, auto-detected from query)"
+                    "description": "Filter by manufacturer (optional, auto-detected from query)",
                 },
-                "model": {
-                    "type": "string",
-                    "description": "Filter by model"
-                }
+                "model": {"type": "string", "description": "Filter by model"},
             },
-            "required": ["query"]
-        }
-    }
+            "required": ["query"],
+        },
+    },
 ]
 
 
 # ============================================================================
 # MCP Server Class
 # ============================================================================
+
 
 class EquipmentMCPServer:
     """
@@ -412,7 +363,7 @@ class EquipmentMCPServer:
         self.tool_handlers = {
             "lookup_fault_code": lookup_fault_code_tool,
             "lookup_parts": lookup_parts_tool,
-            "search_equipment_issue": search_equipment_issue_tool
+            "search_equipment_issue": search_equipment_issue_tool,
         }
 
     def list_tools(self) -> List[Dict[str, Any]]:

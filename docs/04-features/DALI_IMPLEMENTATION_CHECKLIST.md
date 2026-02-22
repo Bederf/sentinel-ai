@@ -145,7 +145,7 @@ curl http://localhost:9095/api/dali/simulation?site_id=site-002
    - 2 breakdown cards
 
 5. Click "Customize" button (top right):
-   - Find "DALI Intelligence: Wardew Tridonic"
+   - Find "DALI Intelligence: Tridonic"
    - Toggle on/off
    - Verify it appears/disappears on dashboard
 

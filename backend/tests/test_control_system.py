@@ -76,18 +76,20 @@ class TestSafetyInterlocks:
             for rule in safety_engine.rules.values()
         )
         if not has_temp_rule:
-            await safety_engine.add_rule({
-                "id": "temp_hvac_setpoint_range",
-                "name": "HVAC Setpoint Safe Range",
-                "rule_type": "temperature_range",
-                "severity": "block",
-                "description": "HVAC setpoint must be within 16-28°C",
-                "device_type": "hvac",
-                "point_name": "setpoint",
-                "min_temp": 16.0,
-                "max_temp": 28.0,
-                "unit": "°C",
-            })
+            await safety_engine.add_rule(
+                {
+                    "id": "temp_hvac_setpoint_range",
+                    "name": "HVAC Setpoint Safe Range",
+                    "rule_type": "temperature_range",
+                    "severity": "block",
+                    "description": "HVAC setpoint must be within 16-28°C",
+                    "device_type": "hvac",
+                    "point_name": "setpoint",
+                    "min_temp": 16.0,
+                    "max_temp": 28.0,
+                    "unit": "°C",
+                }
+            )
 
     def test_get_safety_rules(self, client):
         """Test getting safety rules from API."""
@@ -118,11 +120,7 @@ class TestSafetyInterlocks:
             if device is None:
                 pytest.skip("No HVAC device available for safety validation")
             # Use a safe temperature value within 16-28C range
-            validation_request = {
-                "device_id": device["id"],
-                "point_name": "setpoint",
-                "value": 22.0
-            }
+            validation_request = {"device_id": device["id"], "point_name": "setpoint", "value": 22.0}
             response = client.post("/api/safety/validate", json=validation_request)
             assert response.status_code == 200
             result = response.json()
@@ -145,7 +143,7 @@ class TestSafetyInterlocks:
             validation_request = {
                 "device_id": device["id"],
                 "point_name": "setpoint",
-                "value": 40.0  # Above safe limit
+                "value": 40.0,  # Above safe limit
             }
             response = client.post("/api/safety/validate", json=validation_request)
             assert response.status_code == 200
@@ -202,7 +200,7 @@ class TestAuditLogging:
                 "allowed": True,
                 "reasons": [],
                 "warnings": [],
-            }
+            },
         )
 
         # Verify log was created
@@ -233,16 +231,9 @@ class TestControlIntegration:
         if len(devices) > 0:
             device = devices[0]
             # Control with a safe temperature value
-            control_data = {
-                "point": "setpoint",
-                "value": 22.0,
-                "priority": 8
-            }
+            control_data = {"point": "setpoint", "value": 22.0, "priority": 8}
 
-            response = client.post(
-                f"/api/devices/{device['id']}/control",
-                json=control_data
-            )
+            response = client.post(f"/api/devices/{device['id']}/control", json=control_data)
             # May succeed or fail depending on device state
             assert response.status_code in [200, 400, 500, 503]
 

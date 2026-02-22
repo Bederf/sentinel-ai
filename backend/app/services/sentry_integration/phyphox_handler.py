@@ -27,6 +27,7 @@ class PhyphoxHandler:
         """Lazy load PhyphoxAnalyzer."""
         if self._analyzer is None:
             from app.services.phyphox_analyzer import PhyphoxAnalyzer
+
             self._analyzer = PhyphoxAnalyzer()
         return self._analyzer
 
@@ -35,6 +36,7 @@ class PhyphoxHandler:
         """Lazy load PhyphoxParser."""
         if self._parser is None:
             from app.services.phyphox_parser import PhyphoxParser
+
             self._parser = PhyphoxParser()
         return self._parser
 
@@ -44,7 +46,7 @@ class PhyphoxHandler:
         filename: str,
         equipment_id: str,
         service_record_id: Optional[str] = None,
-        measurement_type: str = "vibration"
+        measurement_type: str = "vibration",
     ) -> Dict[str, Any]:
         """
         Process phyphox screenshot or export file.
@@ -61,19 +63,19 @@ class PhyphoxHandler:
         """
         # Determine input type
         filename_lower = filename.lower()
-        is_image = filename_lower.endswith(('.jpg', '.jpeg', '.png', '.webp'))
+        is_image = filename_lower.endswith((".jpg", ".jpeg", ".png", ".webp"))
 
         if is_image:
             # Screenshot -> Vision API extraction
             logger.info(f"Processing phyphox screenshot for equipment {equipment_id}")
 
             # Detect media type
-            if filename_lower.endswith('.png'):
-                media_type = 'image/png'
-            elif filename_lower.endswith('.webp'):
-                media_type = 'image/webp'
+            if filename_lower.endswith(".png"):
+                media_type = "image/png"
+            elif filename_lower.endswith(".webp"):
+                media_type = "image/webp"
             else:
-                media_type = 'image/jpeg'
+                media_type = "image/jpeg"
 
             result = await self.analyzer.analyze_spectrum_screenshot(
                 file_data, measurement_type, equipment_id, media_type
@@ -84,57 +86,59 @@ class PhyphoxHandler:
             result = self.parser.parse_export(file_data, filename)
 
         # Add metadata
-        result['equipment_id'] = equipment_id
-        result['service_record_id'] = service_record_id
-        result['filename'] = filename
+        result["equipment_id"] = equipment_id
+        result["service_record_id"] = service_record_id
+        result["filename"] = filename
 
         # Run anomaly detection
         anomalies = await self._detect_anomalies(result, measurement_type)
-        result['anomalies'] = anomalies
+        result["anomalies"] = anomalies
 
         return result
 
     async def _detect_anomalies(self, data: Dict[str, Any], measurement_type: str) -> Dict[str, Any]:
         """Run anomaly detection on extracted data."""
-        anomalies = {
-            'detected': [],
-            'severity': 'normal',
-            'confidence': 0.0
-        }
+        anomalies = {"detected": [], "severity": "normal", "confidence": 0.0}
 
         # Skip anomaly detection if we got an error
-        if data.get('error'):
+        if data.get("error"):
             return anomalies
 
         try:
-            if measurement_type == 'vibration':
+            if measurement_type == "vibration":
                 # Check for bearing defects
                 from app.services.bearing_analyzer import BearingAnalyzer
+
                 bearing_analyzer = BearingAnalyzer()
                 bearing_result = bearing_analyzer.analyze(data)
 
-                if bearing_result.get('defect_detected'):
-                    anomalies['detected'].append({
-                        'type': 'bearing_defect',
-                        'subtype': bearing_result.get('defect_type'),
-                        'confidence': bearing_result.get('confidence', 0),
-                        'frequency_hz': bearing_result.get('defect_frequency'),
-                        'details': bearing_result.get('analysis_details', {})
-                    })
+                if bearing_result.get("defect_detected"):
+                    anomalies["detected"].append(
+                        {
+                            "type": "bearing_defect",
+                            "subtype": bearing_result.get("defect_type"),
+                            "confidence": bearing_result.get("confidence", 0),
+                            "frequency_hz": bearing_result.get("defect_frequency"),
+                            "details": bearing_result.get("analysis_details", {}),
+                        }
+                    )
 
-            elif measurement_type == 'audio':
+            elif measurement_type == "audio":
                 # Check for engine knock
                 from app.services.knock_detector import KnockDetector
+
                 knock_detector = KnockDetector()
                 knock_result = knock_detector.analyze(data)
 
-                if knock_result.get('knock_detected'):
-                    anomalies['detected'].append({
-                        'type': 'engine_knock',
-                        'confidence': knock_result.get('confidence', 0),
-                        'frequency_hz': knock_result.get('knock_frequency'),
-                        'details': knock_result.get('analysis_details', {})
-                    })
+                if knock_result.get("knock_detected"):
+                    anomalies["detected"].append(
+                        {
+                            "type": "engine_knock",
+                            "confidence": knock_result.get("confidence", 0),
+                            "frequency_hz": knock_result.get("knock_frequency"),
+                            "details": knock_result.get("analysis_details", {}),
+                        }
+                    )
 
         except ImportError as e:
             logger.warning(f"Anomaly detection not available: {e}")
@@ -142,22 +146,20 @@ class PhyphoxHandler:
             logger.error(f"Anomaly detection failed: {e}")
 
         # Set overall severity
-        if anomalies['detected']:
-            max_confidence = max(a['confidence'] for a in anomalies['detected'])
-            anomalies['confidence'] = max_confidence
+        if anomalies["detected"]:
+            max_confidence = max(a["confidence"] for a in anomalies["detected"])
+            anomalies["confidence"] = max_confidence
             if max_confidence > 0.8:
-                anomalies['severity'] = 'high'
+                anomalies["severity"] = "high"
             elif max_confidence > 0.5:
-                anomalies['severity'] = 'medium'
+                anomalies["severity"] = "medium"
             else:
-                anomalies['severity'] = 'low'
+                anomalies["severity"] = "low"
 
         return anomalies
 
     def get_technician_instructions(
-        self,
-        measurement_type: str = "vibration",
-        equipment_type: Optional[str] = None
+        self, measurement_type: str = "vibration", equipment_type: Optional[str] = None
     ) -> str:
         """
         Get instructions to send to technician via Sentry.

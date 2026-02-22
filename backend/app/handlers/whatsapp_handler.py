@@ -28,7 +28,7 @@ class WhatsAppHandler:
             config_paths = [
                 "backend/app/data/technicians_whatsapp.json",
                 "/opt/bms-intelligence/backend/app/data/technicians_whatsapp.json",
-                "app/data/technicians_whatsapp.json"
+                "app/data/technicians_whatsapp.json",
             ]
 
             for config_path in config_paths:
@@ -40,7 +40,7 @@ class WhatsAppHandler:
                             mapping[tech["id"]] = {
                                 "phone": tech.get("whatsapp_number"),
                                 "name": tech.get("name", "Unknown"),
-                                "specialty": tech.get("specialty", "general")
+                                "specialty": tech.get("specialty", "general"),
                             }
                         logger.info(f"Loaded {len(mapping)} technicians from {config_path}")
                         return mapping
@@ -52,11 +52,7 @@ class WhatsAppHandler:
             logger.error(f"Error loading technician mapping: {e}")
             return {}
 
-    async def send_work_order_assignment(
-        self,
-        work_order: Dict[str, Any],
-        technician_id: str
-    ) -> bool:
+    async def send_work_order_assignment(self, work_order: Dict[str, Any], technician_id: str) -> bool:
         """
         Notify technician of work order assignment via WhatsApp.
 
@@ -85,11 +81,11 @@ class WhatsAppHandler:
 
         message = f"""{priority_emoji} *Work Order Assigned*
 
-*ID*: {work_order.get('id', 'N/A')}
+*ID*: {work_order.get("id", "N/A")}
 *Priority*: {priority}
-*Equipment*: {work_order.get('equipment_code', 'N/A')}
-*Location*: {work_order.get('location', 'N/A')}
-*Description*: {work_order.get('description', 'No description')}"""
+*Equipment*: {work_order.get("equipment_code", "N/A")}
+*Location*: {work_order.get("location", "N/A")}
+*Description*: {work_order.get("description", "No description")}"""
 
         try:
             result = await self.service.send_text_message(phone, message)
@@ -100,11 +96,7 @@ class WhatsAppHandler:
             logger.error(f"Error sending work order via WhatsApp: {e}")
             return False
 
-    async def send_critical_alert(
-        self,
-        alert: Dict[str, Any],
-        recipient_ids: List[str]
-    ) -> int:
+    async def send_critical_alert(self, alert: Dict[str, Any], recipient_ids: List[str]) -> int:
         """
         Send critical alert to multiple technicians/managers.
 
@@ -122,10 +114,10 @@ class WhatsAppHandler:
         count = 0
         message = f"""🚨 *CRITICAL ALERT*
 
-*Type*: {alert.get('type', 'System')}
-*Equipment*: {alert.get('equipment_code', 'Unknown')}
-*Severity*: {alert.get('severity', 'High')}
-*Details*: {alert.get('description', 'No details')}
+*Type*: {alert.get("type", "System")}
+*Equipment*: {alert.get("equipment_code", "Unknown")}
+*Severity*: {alert.get("severity", "High")}
+*Details*: {alert.get("description", "No details")}
 
 ⚠️ Immediate action required!"""
 
@@ -146,11 +138,7 @@ class WhatsAppHandler:
         return count
 
     async def send_daily_summary(
-        self,
-        facility_id: str,
-        facility_name: str,
-        summary: Dict[str, Any],
-        manager_id: Optional[str] = None
+        self, facility_id: str, facility_name: str, summary: Dict[str, Any], manager_id: Optional[str] = None
     ) -> bool:
         """Send daily operations summary to facility manager."""
         if not self.enabled:
@@ -175,12 +163,12 @@ class WhatsAppHandler:
 
 *Facility*: {facility_name}
 
-*Occupancy*: {summary.get('avg_occupancy', 0)}% average
-*Energy*: {summary.get('energy_kwh', 0)} kWh used
-*Equipment Status*: {summary.get('healthy_count', 0)}/{summary.get('total_count', 0)} healthy
-*Alerts*: {summary.get('critical_count', 0)} critical, {summary.get('warning_count', 0)} warnings
+*Occupancy*: {summary.get("avg_occupancy", 0)}% average
+*Energy*: {summary.get("energy_kwh", 0)} kWh used
+*Equipment Status*: {summary.get("healthy_count", 0)}/{summary.get("total_count", 0)} healthy
+*Alerts*: {summary.get("critical_count", 0)} critical, {summary.get("warning_count", 0)} warnings
 
-*Recommendation*: {summary.get('recommendation', 'All systems nominal')}"""
+*Recommendation*: {summary.get("recommendation", "All systems nominal")}"""
 
         try:
             result = await self.service.send_text_message(phone, message)
@@ -191,11 +179,7 @@ class WhatsAppHandler:
             logger.error(f"Error sending daily summary: {e}")
             return False
 
-    async def send_status_update(
-        self,
-        to_id: str,
-        status_text: str
-    ) -> bool:
+    async def send_status_update(self, to_id: str, status_text: str) -> bool:
         """Send general status update message."""
         if not self.enabled:
             return False
@@ -225,7 +209,7 @@ class WhatsAppHandler:
         return {
             "enabled": self.enabled,
             "technicians_configured": len(self.technician_mapping),
-            "service_status": self.service.get_status()
+            "service_status": self.service.get_status(),
         }
 
 

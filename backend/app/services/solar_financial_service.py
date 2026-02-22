@@ -16,7 +16,7 @@ Carbon offset:
   - Diesel CO2 avoided: litres x 2.68 kg/L
 
 For demo: generates 3 months of retrospective financial reports
-with realistic savings for Site-002 946 kWp (550 roof + 396 carport).
+with realistic savings for Site-002 297 kWp rooftop array.
 """
 
 import logging
@@ -57,7 +57,7 @@ DEMAND_CHARGE_ZAR_KVA = 395.48  # City Power LPU-TOU 2025/26 verified
 GENERATOR_CONSUMPTION_L_HR = 30.0
 
 # Site-002 installed capacity
-_CAPACITY_KWP = 946.0  # Site-002: 550 roof + 396 carport
+_CAPACITY_KWP = 297.0  # Site-002: 4 × 100 kVA rooftop inverters
 
 
 # === Data models ===
@@ -197,30 +197,31 @@ class CarbonReport:
 class SolarFinancialService:
     """Financial reporting for solar installations."""
 
-    # Monthly demo data for Site-002 (946 kWp, JHB)
+    # Monthly demo data for Site-002 (297 kWp, JHB)
     # Realistic for SA commercial installation
     DEMO_MONTHLY_DATA = {
         # (month, year) -> (generation_kwh, pr, gen_hours_avoided, ls_events)
+        # 297 kWp × ~5.5 PSH × days × PR = ~40-44k kWh/month in JHB summer
         (12, 2025): {
-            "generation_kwh": 485_200,
+            "generation_kwh": 43_400,
             "pr": 0.815,
             "gen_hours_avoided": 24,
             "ls_events": 12,
-            "peak_shaving_kw": 210,
+            "peak_shaving_kw": 85,
         },
         (1, 2026): {
-            "generation_kwh": 502_800,
+            "generation_kwh": 42_800,
             "pr": 0.822,
             "gen_hours_avoided": 18,
             "ls_events": 9,
-            "peak_shaving_kw": 195,
+            "peak_shaving_kw": 78,
         },
         (2, 2026): {
-            "generation_kwh": 468_500,
+            "generation_kwh": 36_200,
             "pr": 0.808,
             "gen_hours_avoided": 22,
             "ls_events": 11,
-            "peak_shaving_kw": 220,
+            "peak_shaving_kw": 90,
         },
     }
 
@@ -346,7 +347,7 @@ class SolarFinancialService:
         num_months = len(months_data) or 1
         avg_monthly = cumulative_savings / num_months
 
-        # SENTINEL licence fee (demo estimate for a 946 kWp site)
+        # SENTINEL licence fee (demo estimate for a 297 kWp site)
         licence_fee = 85_000.0  # R85K/month
 
         roi = ((avg_monthly - licence_fee) / licence_fee * 100) if licence_fee > 0 else 0
@@ -438,7 +439,7 @@ class SolarFinancialService:
             "pr": round(0.80 + random.uniform(0, 0.03), 3),
             "gen_hours_avoided": round(15 + random.uniform(0, 15)),
             "ls_events": round(8 + random.uniform(0, 8)),
-            "peak_shaving_kw": round(180 + random.uniform(0, 60)),
+            "peak_shaving_kw": round(60 + random.uniform(0, 35)),
         }
 
 

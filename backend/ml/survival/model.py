@@ -38,12 +38,7 @@ class SurvivalModel:
         self.baseline_survival = None
         self._is_fitted = False
 
-    def train(
-        self,
-        data,
-        duration_col: str = "duration",
-        event_col: str = "event"
-    ) -> Dict:
+    def train(self, data, duration_col: str = "duration", event_col: str = "event") -> Dict:
         """
         Train Cox PH model.
 
@@ -80,12 +75,7 @@ class SurvivalModel:
 
         # Fit model
         logger.info(f"Training Cox PH model with {len(training_data)} samples, {len(self.feature_cols)} features")
-        self.model.fit(
-            training_data,
-            duration_col=duration_col,
-            event_col=event_col,
-            show_progress=False
-        )
+        self.model.fit(training_data, duration_col=duration_col, event_col=event_col, show_progress=False)
 
         # Store baseline survival function
         self.baseline_survival = self.model.baseline_survival_
@@ -94,11 +84,12 @@ class SurvivalModel:
         # Calculate metrics
         try:
             from lifelines.utils import concordance_index
+
             predictions = self.model.predict_partial_hazard(training_data)
             c_index = concordance_index(
                 training_data[duration_col],
                 -predictions,  # Negative for hazard ranking
-                training_data[event_col]
+                training_data[event_col],
             )
         except Exception as e:
             logger.warning(f"Could not calculate c-index: {e}")
@@ -142,22 +133,20 @@ class SurvivalModel:
         ci_lower_vals = summary[ci_lower_col].values if ci_lower_col else None
         ci_upper_vals = summary[ci_upper_col].values if ci_upper_col else None
 
-        hazard_ratios = pd.DataFrame({
-            "feature": self.feature_cols,
-            "hazard_ratio": np.exp(self.model.params_.values),
-            "coef": self.model.params_.values,
-            "p_value": summary["p"].values,
-            "ci_lower": np.exp(ci_lower_vals) if ci_lower_vals is not None else None,
-            "ci_upper": np.exp(ci_upper_vals) if ci_upper_vals is not None else None
-        }).sort_values("hazard_ratio", ascending=False)
+        hazard_ratios = pd.DataFrame(
+            {
+                "feature": self.feature_cols,
+                "hazard_ratio": np.exp(self.model.params_.values),
+                "coef": self.model.params_.values,
+                "p_value": summary["p"].values,
+                "ci_lower": np.exp(ci_lower_vals) if ci_lower_vals is not None else None,
+                "ci_upper": np.exp(ci_upper_vals) if ci_upper_vals is not None else None,
+            }
+        ).sort_values("hazard_ratio", ascending=False)
 
         return hazard_ratios
 
-    def predict_survival_probability(
-        self,
-        features,
-        times: List[int] = None
-    ) -> "pd.DataFrame":
+    def predict_survival_probability(self, features, times: List[int] = None) -> "pd.DataFrame":
         """
         Predict survival probability at specific times.
 
@@ -260,7 +249,7 @@ class SurvivalModel:
             "feature_cols": self.feature_cols,
             "baseline_survival": self.baseline_survival,
             "is_fitted": self._is_fitted,
-            "saved_at": datetime.now().isoformat()
+            "saved_at": datetime.now().isoformat(),
         }
 
         Path(path).parent.mkdir(parents=True, exist_ok=True)

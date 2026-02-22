@@ -48,6 +48,7 @@ router = APIRouter(prefix="/api/repair-effectiveness", tags=["repair-effectivene
 # API Endpoints
 # ============================================================================
 
+
 @router.post("/validate", response_model=EffectivenessScore)
 async def validate_repair_effectiveness(
     request: RepairEffectivenessRequest,
@@ -66,12 +67,11 @@ async def validate_repair_effectiveness(
         result = await service.validate_repair(
             equipment_id=request.equipment_id,
             work_order_id=request.work_order_id,
-            post_readings=request.post_repair_readings
+            post_readings=request.post_repair_readings,
         )
 
         logger.info(
-            f"Repair validation: {request.equipment_id}, "
-            f"WO {request.work_order_id}, score={result.effectiveness_score}"
+            f"Repair validation: {request.equipment_id}, WO {request.work_order_id}, score={result.effectiveness_score}"
         )
 
         return result
@@ -96,11 +96,7 @@ async def record_repair_outcome(outcome: RepairOutcome):
 
         await service.record_repair_outcome(outcome)
 
-        return {
-            "status": "recorded",
-            "work_order_id": outcome.work_order_id,
-            "equipment_id": outcome.equipment_id
-        }
+        return {"status": "recorded", "work_order_id": outcome.work_order_id, "equipment_id": outcome.equipment_id}
 
     except Exception as e:
         logger.error(f"Error recording repair outcome: {e}")
@@ -177,11 +173,9 @@ async def get_effectiveness_summary():
 # Follow-up & Cost-Benefit Endpoints (Phase 57, Plan 03)
 # ============================================================================
 
+
 @router.get("/followups", response_model=List[FollowupTask])
-async def get_followups(
-    equipment_id: Optional[str] = None,
-    status: Optional[str] = None
-) -> List[FollowupTask]:
+async def get_followups(equipment_id: Optional[str] = None, status: Optional[str] = None) -> List[FollowupTask]:
     """
     Get pending follow-up tasks.
 
@@ -190,10 +184,7 @@ async def get_followups(
     """
     try:
         scheduler = get_followup_scheduler()
-        return scheduler.get_pending_followups(
-            equipment_id=equipment_id,
-            status=status
-        )
+        return scheduler.get_pending_followups(equipment_id=equipment_id, status=status)
     except Exception as e:
         logger.error(f"Error getting followups: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -215,10 +206,7 @@ async def get_cost_benefit(work_order_id: str) -> CostBenefitAnalysis:
             if analysis.work_order_id == work_order_id:
                 return analysis
 
-        raise HTTPException(
-            status_code=404,
-            detail=f"No cost-benefit analysis found for work order {work_order_id}"
-        )
+        raise HTTPException(status_code=404, detail=f"No cost-benefit analysis found for work order {work_order_id}")
     except HTTPException:
         raise
     except Exception as e:
@@ -239,11 +227,7 @@ async def get_escalation_status(equipment_id: str):
         escalation = scheduler.check_escalation(equipment_id)
 
         if escalation is None:
-            return {
-                "escalation_level": 0,
-                "message": "No escalation needed",
-                "equipment_id": equipment_id
-            }
+            return {"escalation_level": 0, "message": "No escalation needed", "equipment_id": equipment_id}
 
         return escalation
     except Exception as e:

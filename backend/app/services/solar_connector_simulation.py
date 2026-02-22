@@ -92,7 +92,7 @@ class SimulatedSolarConnector(SolarConnector):
         for i in range(4):
             strings.append(
                 SolarString(
-                    string_id=f"{inverter_id}_s{i+1}",
+                    string_id=f"{inverter_id}_s{i + 1}",
                     inverter_id=inverter_id,
                     voltage_v=500 + i * 10,
                     current_a=10 + i,
@@ -184,40 +184,42 @@ class SimulatedSolarConnector(SolarConnector):
         grid_export_kw = current_hour_data.get("grid_export_kw", 0.0)
 
         # Create readings for each component
-        readings.extend([
-            NormalisedReading(
-                source_id="inverter-001",
-                description="Main Inverter AC Power",
-                value=solar_gen_kw,
-                unit="kW",
-                quality=QualityFlag.GOOD,
-                timestamp=datetime.now(timezone.utc).isoformat(),
-            ),
-            NormalisedReading(
-                source_id="building-load",
-                description="Building Load",
-                value=building_load_kw,
-                unit="kW",
-                quality=QualityFlag.GOOD,
-                timestamp=datetime.now(timezone.utc).isoformat(),
-            ),
-            NormalisedReading(
-                source_id="grid-import",
-                description="Grid Import",
-                value=grid_import_kw,
-                unit="kW",
-                quality=QualityFlag.GOOD,
-                timestamp=datetime.now(timezone.utc).isoformat(),
-            ),
-            NormalisedReading(
-                source_id="grid-export",
-                description="Grid Export",
-                value=grid_export_kw,
-                unit="kW",
-                quality=QualityFlag.GOOD,
-                timestamp=datetime.now(timezone.utc).isoformat(),
-            ),
-        ])
+        readings.extend(
+            [
+                NormalisedReading(
+                    source_id="inverter-001",
+                    description="Main Inverter AC Power",
+                    value=solar_gen_kw,
+                    unit="kW",
+                    quality=QualityFlag.GOOD,
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                ),
+                NormalisedReading(
+                    source_id="building-load",
+                    description="Building Load",
+                    value=building_load_kw,
+                    unit="kW",
+                    quality=QualityFlag.GOOD,
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                ),
+                NormalisedReading(
+                    source_id="grid-import",
+                    description="Grid Import",
+                    value=grid_import_kw,
+                    unit="kW",
+                    quality=QualityFlag.GOOD,
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                ),
+                NormalisedReading(
+                    source_id="grid-export",
+                    description="Grid Export",
+                    value=grid_export_kw,
+                    unit="kW",
+                    quality=QualityFlag.GOOD,
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                ),
+            ]
+        )
 
         return readings
 
@@ -232,19 +234,21 @@ class SimulatedSolarConnector(SolarConnector):
         now = datetime.now()
 
         # Check cache validity
-        if (self._cache_time and
-            (now - self._cache_time).total_seconds() < self._cache_ttl_seconds):
+        if self._cache_time and (now - self._cache_time).total_seconds() < self._cache_ttl_seconds:
             return self._cache.get("sim_data")
 
         try:
             supabase = get_supabase_client()
 
             # Query for most recent simulation results for this site
-            response = supabase.table("solar_annual_simulations").select(
-                "*"
-            ).eq("site_id", self.site_id).order(
-                "created_at", desc=True
-            ).limit(1).execute()
+            response = (
+                supabase.table("solar_annual_simulations")
+                .select("*")
+                .eq("site_id", self.site_id)
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
 
             if not response.data:
                 logger.debug(f"No simulation data found for {self.site_id}")
@@ -283,7 +287,7 @@ class SimulatedSolarConnector(SolarConnector):
             # This matches what the simulation engine uses
             solar_efficiency = self._seasonal_modeler.get_solar_generation_factor(
                 current_date,
-                cloud_cover=0.2  # Assume 20% cloud cover (matching simulation)
+                cloud_cover=0.2,  # Assume 20% cloud cover (matching simulation)
             )
 
             # Solar generation curve (Gaussian-like, peaks at 12:00)

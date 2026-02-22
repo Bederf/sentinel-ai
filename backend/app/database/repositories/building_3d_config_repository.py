@@ -66,19 +66,13 @@ class Building3DConfigRepository:
             # Write to Supabase (primary)
             if self.supabase:
                 try:
-                    response = self.supabase.table("building_3d_configs").insert(
-                        payload
-                    ).execute()
+                    response = self.supabase.table("building_3d_configs").insert(payload).execute()
 
                     if response.data and len(response.data) > 0:
-                        logger.info(
-                            f"✓ Created 3D config for building {building_id} in Supabase"
-                        )
+                        logger.info(f"✓ Created 3D config for building {building_id} in Supabase")
                         return response.data[0]
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to save 3D config to Supabase: {e}. Using JSON fallback."
-                    )
+                    logger.warning(f"Failed to save 3D config to Supabase: {e}. Using JSON fallback.")
 
             # Fallback: write to JSON
             self._save_to_json(building_id, payload)
@@ -101,9 +95,9 @@ class Building3DConfigRepository:
             # Try Supabase (primary)
             if self.supabase:
                 try:
-                    response = self.supabase.table("building_3d_configs").select(
-                        "*"
-                    ).eq("building_id", building_id).execute()
+                    response = (
+                        self.supabase.table("building_3d_configs").select("*").eq("building_id", building_id).execute()
+                    )
 
                     if response.data and len(response.data) > 0:
                         return response.data[0]
@@ -164,14 +158,10 @@ class Building3DConfigRepository:
                     )
 
                     if response.data and len(response.data) > 0:
-                        logger.info(
-                            f"✓ Updated 3D config for building {building_id} in Supabase"
-                        )
+                        logger.info(f"✓ Updated 3D config for building {building_id} in Supabase")
                         return response.data[0]
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to update 3D config in Supabase: {e}. Using JSON fallback."
-                    )
+                    logger.warning(f"Failed to update 3D config in Supabase: {e}. Using JSON fallback.")
 
             # Fallback: update JSON
             updated = {**existing, **update_payload}
@@ -195,9 +185,7 @@ class Building3DConfigRepository:
             # Delete from Supabase (primary)
             if self.supabase:
                 try:
-                    self.supabase.table("building_3d_configs").delete().eq(
-                        "building_id", building_id
-                    ).execute()
+                    self.supabase.table("building_3d_configs").delete().eq("building_id", building_id).execute()
                     logger.info(f"✓ Deleted 3D config for building {building_id}")
                 except Exception as e:
                     logger.warning(f"Failed to delete from Supabase: {e}")

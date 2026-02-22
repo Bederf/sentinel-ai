@@ -12,8 +12,7 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 FEATURE_LOG_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data", "chat_queries.json"
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "chat_queries.json"
 )
 
 
@@ -25,10 +24,12 @@ def log_chat_query(query: str) -> None:
             with open(FEATURE_LOG_PATH, "r") as f:
                 entries = json.load(f)
 
-        entries.append({
-            "query": query,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        entries.append(
+            {
+                "query": query,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
         # Keep last 500 entries
         entries = entries[-500:]

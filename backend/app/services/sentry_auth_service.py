@@ -48,6 +48,7 @@ class SentryAuthService:
     def _get_from_env(key: str) -> Optional[str]:
         """Get value from environment."""
         import os
+
         return os.getenv(key)
 
     async def login(self) -> bool:
@@ -59,8 +60,7 @@ class SentryAuthService:
         """
         if not self.sentry_username or not self.sentry_password:
             logger.error(
-                "Sentry bot credentials not configured. "
-                "Set SENTRY_BOT_USERNAME and SENTRY_BOT_PASSWORD in .env"
+                "Sentry bot credentials not configured. Set SENTRY_BOT_USERNAME and SENTRY_BOT_PASSWORD in .env"
             )
             return False
 
@@ -85,19 +85,13 @@ class SentryAuthService:
                     _jwt_cache["expires_at"] = datetime.utcnow() + timedelta(seconds=expires_in)
                     _jwt_cache["last_refresh"] = datetime.utcnow()
 
-                    logger.info(
-                        f"✓ Sentry bot JWT token obtained (expires in {expires_in}s)"
-                    )
+                    logger.info(f"✓ Sentry bot JWT token obtained (expires in {expires_in}s)")
                     return True
                 elif response.status_code == 401:
-                    logger.error(
-                        f"Sentry bot login failed: Invalid credentials for {self.sentry_username}"
-                    )
+                    logger.error(f"Sentry bot login failed: Invalid credentials for {self.sentry_username}")
                     return False
                 else:
-                    logger.error(
-                        f"Sentry bot login error ({response.status_code}): {response.text}"
-                    )
+                    logger.error(f"Sentry bot login error ({response.status_code}): {response.text}")
                     return False
 
         except httpx.HTTPError as e:

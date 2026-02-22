@@ -13,8 +13,14 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 from app.models.energy_centre import (
-    EnergyCentre, ATSUnit, MVIncomer, Transformer,
-    LVSwitchboard, PowerMeter, PFCBank, UPSSystem
+    EnergyCentre,
+    ATSUnit,
+    MVIncomer,
+    Transformer,
+    LVSwitchboard,
+    PowerMeter,
+    PFCBank,
+    UPSSystem,
 )
 from app.services.generator_service import get_generator_service
 
@@ -72,44 +78,39 @@ class EnergyCentreService:
 
                 # Parse MV incomers
                 for mv in data.get("mv_incomers", []):
-                    incomer = MVIncomer(**{k: v for k, v in mv.items()
-                                          if k in MVIncomer.__dataclass_fields__})
+                    incomer = MVIncomer(**{k: v for k, v in mv.items() if k in MVIncomer.__dataclass_fields__})
                     self._mv_incomers[incomer.incomer_id] = incomer
 
                 # Parse transformers
                 for tx in data.get("transformers", []):
-                    transformer = Transformer(**{k: v for k, v in tx.items()
-                                                if k in Transformer.__dataclass_fields__})
+                    transformer = Transformer(**{k: v for k, v in tx.items() if k in Transformer.__dataclass_fields__})
                     self._transformers[transformer.transformer_id] = transformer
 
                 # Parse LV switchboards
                 for sb in data.get("lv_switchboards", []):
-                    switchboard = LVSwitchboard(**{k: v for k, v in sb.items()
-                                                  if k in LVSwitchboard.__dataclass_fields__})
+                    switchboard = LVSwitchboard(
+                        **{k: v for k, v in sb.items() if k in LVSwitchboard.__dataclass_fields__}
+                    )
                     self._switchboards[switchboard.switchboard_id] = switchboard
 
                 # Parse ATS units
                 for ats in data.get("ats_units", []):
-                    ats_unit = ATSUnit(**{k: v for k, v in ats.items()
-                                         if k in ATSUnit.__dataclass_fields__})
+                    ats_unit = ATSUnit(**{k: v for k, v in ats.items() if k in ATSUnit.__dataclass_fields__})
                     self._ats_units[ats_unit.ats_id] = ats_unit
 
                 # Parse power meters
                 for mtr in data.get("power_meters", []):
-                    meter = PowerMeter(**{k: v for k, v in mtr.items()
-                                         if k in PowerMeter.__dataclass_fields__})
+                    meter = PowerMeter(**{k: v for k, v in mtr.items() if k in PowerMeter.__dataclass_fields__})
                     self._meters[meter.meter_id] = meter
 
                 # Parse PFC banks
                 for pfc in data.get("pfc_banks", []):
-                    bank = PFCBank(**{k: v for k, v in pfc.items()
-                                     if k in PFCBank.__dataclass_fields__})
+                    bank = PFCBank(**{k: v for k, v in pfc.items() if k in PFCBank.__dataclass_fields__})
                     self._pfc_banks[bank.pfc_id] = bank
 
                 # Parse UPS systems
                 for ups in data.get("ups_systems", []):
-                    system = UPSSystem(**{k: v for k, v in ups.items()
-                                         if k in UPSSystem.__dataclass_fields__})
+                    system = UPSSystem(**{k: v for k, v in ups.items() if k in UPSSystem.__dataclass_fields__})
                     self._ups_systems[system.ups_id] = system
 
                 # Parse feeders (simple dict)
@@ -223,8 +224,7 @@ class EnergyCentreService:
 
     # === Power Meters ===
 
-    def get_meters(self, site_id: Optional[str] = None,
-                   meter_type: Optional[str] = None) -> List[PowerMeter]:
+    def get_meters(self, site_id: Optional[str] = None, meter_type: Optional[str] = None) -> List[PowerMeter]:
         """Get all power meters."""
         meters = list(self._meters.values())
         if site_id:
@@ -344,42 +344,34 @@ class EnergyCentreService:
             "site_id": site_id,
             "centre": centre.to_dict() if centre else None,
             "timestamp": datetime.now().isoformat(),
-
             "status": {
                 "mains_healthy": mains_healthy,
                 "on_generator": ats_on_gen,
                 "all_systems_normal": mains_healthy and not ats_on_gen,
             },
-
             "mv_supply": {
                 "incomers": [mv.to_dict() for mv in mv_incomers],
                 "voltage_kv": mv_incomers[0].voltage_kv if mv_incomers else 0,
                 "healthy": mains_healthy,
             },
-
             "transformers": {
                 "units": [tx.to_dict() for tx in transformers],
                 "total_capacity_kva": sum(tx.rated_power_kva for tx in transformers),
                 "total_load_kva": sum(tx.load_kva for tx in transformers),
                 "avg_load_percent": (
-                    sum(tx.load_percent for tx in transformers) / len(transformers)
-                    if transformers else 0
+                    sum(tx.load_percent for tx in transformers) / len(transformers) if transformers else 0
                 ),
             },
-
             "ats": {
                 "units": [self.get_ats_status(ats.ats_id) for ats in ats_units],
                 "current_source": "generator" if ats_on_gen else "mains",
             },
-
             "generators": gen_overview,
-
             "lv_distribution": {
                 "switchboards": [sb.to_dict() for sb in switchboards],
                 "feeders": feeders,
                 "total_power_kw": main_meter.active_power_kw if main_meter else 0,
             },
-
             "power_metering": {
                 "main": main_meter.to_dict() if main_meter else None,
                 "total_kwh": main_meter.kwh_import if main_meter else 0,
@@ -387,16 +379,13 @@ class EnergyCentreService:
                 "tariff": main_meter.tariff_type if main_meter else None,
                 "tou_period": main_meter.tou_period if main_meter else None,
             },
-
             "power_factor_correction": {
                 "banks": [pfc.to_dict() for pfc in pfc_banks],
                 "total_kvar": sum(pfc.total_kvar for pfc in pfc_banks),
                 "active_kvar": sum(pfc.active_kvar for pfc in pfc_banks),
                 "current_pf": pfc_banks[0].current_power_factor if pfc_banks else 0,
             },
-
             "ups": self.get_ups_summary(site_id),
-
             "scada_network": self._scada_config,
         }
 
@@ -421,69 +410,81 @@ class EnergyCentreService:
 
         # MV Incomer
         for mv in self.get_mv_incomers(site_id=site_id):
-            nodes.append({
-                "id": mv.incomer_id,
-                "type": "mv_incomer",
-                "label": f"Eskom {mv.nominal_voltage_kv}kV",
-                "status": "healthy" if mv.healthy else "fault",
-                "voltage": mv.voltage_kv,
-                "breaker": mv.breaker_state,
-            })
+            nodes.append(
+                {
+                    "id": mv.incomer_id,
+                    "type": "mv_incomer",
+                    "label": f"Eskom {mv.nominal_voltage_kv}kV",
+                    "status": "healthy" if mv.healthy else "fault",
+                    "voltage": mv.voltage_kv,
+                    "breaker": mv.breaker_state,
+                }
+            )
 
         # Transformers
         for tx in self.get_transformers(site_id=site_id):
-            nodes.append({
-                "id": tx.transformer_id,
-                "type": "transformer",
-                "label": f"TX {tx.rated_power_kva}kVA",
-                "status": "healthy" if tx.healthy else "fault",
-                "load_percent": tx.load_percent,
-                "temp_c": tx.winding_temp_c,
-            })
+            nodes.append(
+                {
+                    "id": tx.transformer_id,
+                    "type": "transformer",
+                    "label": f"TX {tx.rated_power_kva}kVA",
+                    "status": "healthy" if tx.healthy else "fault",
+                    "load_percent": tx.load_percent,
+                    "temp_c": tx.winding_temp_c,
+                }
+            )
 
         # ATS
         for ats in self.get_ats_units(site_id=site_id):
-            nodes.append({
-                "id": ats.ats_id,
-                "type": "ats",
-                "label": "ATS",
-                "position": ats.position,
-                "mains_breaker": ats.mains_breaker,
-                "gen_breaker": ats.gen_breaker,
-            })
+            nodes.append(
+                {
+                    "id": ats.ats_id,
+                    "type": "ats",
+                    "label": "ATS",
+                    "position": ats.position,
+                    "mains_breaker": ats.mains_breaker,
+                    "gen_breaker": ats.gen_breaker,
+                }
+            )
 
         # Generators
         gen_service = get_generator_service()
         for gen in gen_service.get_generators(site_id=site_id):
-            nodes.append({
-                "id": gen.generator_id,
-                "type": "generator",
-                "label": f"Gen {gen.rated_power_kw}kW",
-                "status": gen.status,
-                "running": gen.engine_running,
-                "on_load": gen.on_load,
-            })
+            nodes.append(
+                {
+                    "id": gen.generator_id,
+                    "type": "generator",
+                    "label": f"Gen {gen.rated_power_kw}kW",
+                    "status": gen.status,
+                    "running": gen.engine_running,
+                    "on_load": gen.on_load,
+                }
+            )
 
         # Switchboard
         for sb in self.get_switchboards(site_id=site_id):
-            nodes.append({
-                "id": sb.switchboard_id,
-                "type": "switchboard",
-                "label": "MSB",
-                "voltage": sb.voltage_l1_l2,
-                "power_kw": sb.total_power_kw,
-            })
+            nodes.append(
+                {
+                    "id": sb.switchboard_id,
+                    "type": "switchboard",
+                    "label": "MSB",
+                    "voltage": sb.voltage_l1_l2,
+                    "power_kw": sb.total_power_kw,
+                }
+            )
 
         # UPS
         for ups in self.get_ups_systems(site_id=site_id):
-            nodes.append({
-                "id": ups.ups_id,
-                "type": "ups",
-                "label": f"UPS {ups.rated_power_kva}kVA",
-                "mode": ups.mode,
-                "battery_pct": ups.battery_charge_pct,
-                "on_battery": ups.on_battery,
-            })
+            nodes.append(
+                {
+                    "id": ups.ups_id,
+                    "type": "ups",
+                    "label": f"UPS {ups.rated_power_kva}kVA",
+                    "mode": ups.mode,
+                    "battery_pct": ups.battery_charge_pct,
+                    "on_battery": ups.on_battery,
+                }
+            )
 
         return nodes
 
@@ -496,45 +497,53 @@ class EnergyCentreService:
         transformers = self.get_transformers(site_id=site_id)
         if mv_incomers and transformers:
             for tx in transformers:
-                connections.append({
-                    "from": mv_incomers[0].incomer_id,
-                    "to": tx.transformer_id,
-                    "type": "mv_cable",
-                    "energized": mv_incomers[0].healthy,
-                })
+                connections.append(
+                    {
+                        "from": mv_incomers[0].incomer_id,
+                        "to": tx.transformer_id,
+                        "type": "mv_cable",
+                        "energized": mv_incomers[0].healthy,
+                    }
+                )
 
         # Transformer → ATS (mains side)
         ats_units = self.get_ats_units(site_id=site_id)
         if transformers and ats_units:
-            connections.append({
-                "from": transformers[0].transformer_id,
-                "to": ats_units[0].ats_id,
-                "type": "lv_cable",
-                "energized": ats_units[0].mains_breaker == "closed",
-                "port": "mains",
-            })
+            connections.append(
+                {
+                    "from": transformers[0].transformer_id,
+                    "to": ats_units[0].ats_id,
+                    "type": "lv_cable",
+                    "energized": ats_units[0].mains_breaker == "closed",
+                    "port": "mains",
+                }
+            )
 
         # Generator → ATS (gen side)
         gen_service = get_generator_service()
         generators = gen_service.get_generators(site_id=site_id)
         if generators and ats_units:
-            connections.append({
-                "from": generators[0].generator_id,
-                "to": ats_units[0].ats_id,
-                "type": "lv_cable",
-                "energized": ats_units[0].gen_breaker == "closed",
-                "port": "generator",
-            })
+            connections.append(
+                {
+                    "from": generators[0].generator_id,
+                    "to": ats_units[0].ats_id,
+                    "type": "lv_cable",
+                    "energized": ats_units[0].gen_breaker == "closed",
+                    "port": "generator",
+                }
+            )
 
         # ATS → Switchboard
         switchboards = self.get_switchboards(site_id=site_id)
         if ats_units and switchboards:
-            connections.append({
-                "from": ats_units[0].ats_id,
-                "to": switchboards[0].switchboard_id,
-                "type": "busbar",
-                "energized": True,
-            })
+            connections.append(
+                {
+                    "from": ats_units[0].ats_id,
+                    "to": switchboards[0].switchboard_id,
+                    "type": "busbar",
+                    "energized": True,
+                }
+            )
 
         return connections
 

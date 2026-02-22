@@ -15,9 +15,11 @@ from app.services.cross_system_analyzer import get_cross_system_analyzer
 
 logger = logging.getLogger(__name__)
 
+
 # Suppress anthropic library stderr spam
 class StderrFilter:
     """Filter to suppress anthropic rate limit stderr spam"""
+
     def __init__(self):
         self.original_stderr = sys.stderr
 
@@ -28,6 +30,7 @@ class StderrFilter:
 
     def flush(self):
         self.original_stderr.flush()
+
 
 # Apply the filter
 sys.stderr = StderrFilter()
@@ -250,9 +253,9 @@ def build_system_prompt_with_context() -> str:
         building_occupancy = analyzer.dali.get_building_occupancy()
         lighting_context = f"""
 ## Real-Time Occupancy (from 1,315 DALI sensors)
-- Overall building occupancy: {building_occupancy['occupancy_percent']:.0f}%
-- Total sensors: {building_occupancy['total_sensors']}
-- Currently occupied: {building_occupancy['occupied_sensors']}
+- Overall building occupancy: {building_occupancy["occupancy_percent"]:.0f}%
+- Total sensors: {building_occupancy["total_sensors"]}
+- Currently occupied: {building_occupancy["occupied_sensors"]}
 
 **For comfort complaints:**
 - You can check specific zone occupancy and daylight levels
@@ -298,10 +301,7 @@ class ClaudeService:
         """Get or create Anthropic client (lazy initialization)."""
         if self._client is None:
             if not self._api_key:
-                raise ValueError(
-                    "ANTHROPIC_API_KEY not configured. "
-                    "Set it in .env or environment variables."
-                )
+                raise ValueError("ANTHROPIC_API_KEY not configured. Set it in .env or environment variables.")
             self._client = Anthropic(api_key=self._api_key)
         return self._client
 
@@ -347,15 +347,11 @@ class ClaudeService:
 
         except AuthenticationError as e:
             logger.error(f"Claude authentication error: {e}")
-            raise ValueError(
-                "Invalid ANTHROPIC_API_KEY. Please check your API key configuration."
-            ) from e
+            raise ValueError("Invalid ANTHROPIC_API_KEY. Please check your API key configuration.") from e
 
         except RateLimitError as e:
             logger.warning(f"Claude rate limit hit: {e}")
-            raise Exception(
-                "Claude API rate limit exceeded. Please try again in a moment."
-            ) from e
+            raise Exception("Claude API rate limit exceeded. Please try again in a moment.") from e
 
         except APIError as e:
             logger.error(f"Claude API error: {e}")
@@ -462,28 +458,25 @@ class ClaudeService:
 
                             logger.debug(f"Tool {tool_name} result: {result}")
 
-                            tool_results.append({
-                                "type": "tool_result",
-                                "tool_use_id": tool_use_id,
-                                "content": json.dumps(result)
-                            })
+                            tool_results.append(
+                                {"type": "tool_result", "tool_use_id": tool_use_id, "content": json.dumps(result)}
+                            )
 
                     # Add assistant's response (with tool_use) to conversation
-                    conversation.append({
-                        "role": "assistant",
-                        "content": [
-                            {"type": block.type, **block.model_dump()}
-                            if block.type == "tool_use"
-                            else {"type": "text", "text": block.text}
-                            for block in response.content
-                        ]
-                    })
+                    conversation.append(
+                        {
+                            "role": "assistant",
+                            "content": [
+                                {"type": block.type, **block.model_dump()}
+                                if block.type == "tool_use"
+                                else {"type": "text", "text": block.text}
+                                for block in response.content
+                            ],
+                        }
+                    )
 
                     # Add tool results to conversation
-                    conversation.append({
-                        "role": "user",
-                        "content": tool_results
-                    })
+                    conversation.append({"role": "user", "content": tool_results})
 
                 else:
                     # Unexpected stop reason
@@ -497,15 +490,11 @@ class ClaudeService:
 
         except AuthenticationError as e:
             logger.error(f"Claude authentication error: {e}")
-            raise ValueError(
-                "Invalid ANTHROPIC_API_KEY. Please check your API key configuration."
-            ) from e
+            raise ValueError("Invalid ANTHROPIC_API_KEY. Please check your API key configuration.") from e
 
         except RateLimitError as e:
             logger.warning(f"Claude rate limit hit: {e}")
-            raise Exception(
-                "Claude API rate limit exceeded. Please try again in a moment."
-            ) from e
+            raise Exception("Claude API rate limit exceeded. Please try again in a moment.") from e
 
         except APIError as e:
             logger.error(f"Claude API error: {e}")

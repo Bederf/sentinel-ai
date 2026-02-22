@@ -87,6 +87,7 @@ class EventType(str, Enum):
     AI_OPTIMIZATION = "ai_optimization"
     SETPOINT_CHANGE = "setpoint_change"
     SAFETY_VIOLATION = "safety_violation"
+    SHADOW_WRITE = "shadow_write"
 
 
 class OperationMode(str, Enum):
@@ -1439,40 +1440,17 @@ class LifecycleOrchestrator:
                     except Exception as e:
                         logger.warning(f"Failed to create HVAC recommendation for {eq_code}: {e}")
 
-                # ========== DALI OPTIMIZATION ==========
+                # ========== DALI/TRIDONIC — Native Controller Handles Lighting ==========
+                # Tridonic DALI-2 gateway natively handles: daylight harvesting,
+                # occupancy-based dimming, and emergency zone protection in real-time.
+                # AI should NOT duplicate these — only recommend cross-system actions
+                # that Tridonic can't do (e.g. coordinated HVAC+lighting for unoccupied zones).
                 if eq_type in ["DALI", "LUM", "DALI_CONTROLLER", "LUMINAIRE", "DALI_LUMINAIRE"]:
-                    dali_recommendation = self._generate_dali_recommendation(
-                        eq_code, eq_type, context, occupancy_percent, daylight_factor, zones_active, current_hour
+                    dali_recs.append(eq_code)  # Track for cross-system coordination
+                    logger.debug(
+                        f"DALI {eq_code}: brightness managed by Tridonic controller "
+                        f"(daylight={daylight_factor}%, occupancy={occupancy_percent}%)"
                     )
-                    if dali_recommendation:
-                        recommendations_created.append(dali_recommendation)
-                        dali_recs.append(dali_recommendation["equipment"])
-
-                        # Create control recommendation
-                        try:
-                            rec = Recommendation(
-                                site_id="S002",
-                                timestamp=datetime.utcnow(),
-                                action_type="ai_optimization",
-                                risk_level=ActionRiskLevel.LOW,
-                                target_equipment=eq_code,
-                                action={
-                                    "point": dali_recommendation["control_point"],
-                                    "value": dali_recommendation["target_value"],
-                                },
-                                reason=dali_recommendation["reason"],
-                                expected_impact={
-                                    "description": dali_recommendation["description"],
-                                    "energy_savings_percent": dali_recommendation.get("savings", 3),
-                                },
-                                confidence="high",
-                                profile=context,
-                                status=RecommendationStatus.PENDING,
-                                requires_approval=True,
-                            )
-                            await self.recommendation_repo.create(rec)
-                        except Exception as e:
-                            logger.warning(f"Failed to create DALI recommendation for {eq_code}: {e}")
 
             # ========== DEMO MODE: BESS TOU ARBITRAGE ==========
             if self.current_scenario and self.current_scenario.demo_mode:
@@ -1862,43 +1840,10 @@ class LifecycleOrchestrator:
         zones_active: int,
         hour: int,
     ) -> dict[str, Any] | None:
-        """Generate occupancy-aware + daylight-aware DALI recommendation (Tridonic luminaire control)."""
-
-        if occupancy_percent < 10:
-            # Night/security: minimal lighting
-            brightness = 20
-            reason = "Unoccupied - security lighting only"
-        elif daylight_factor > 80:
-            # Bright daylight (10am-2pm): minimize artificial lighting
-            brightness = max(20, 100 - daylight_factor)  # 20-100% inverse to daylight
-            reason = f"High daylight ({daylight_factor}%) - Tridonic harvesting reduces artificial light"
-        elif daylight_factor > 50:
-            # Good daylight: supplement with some artificial
-            brightness = 40 + (occupancy_percent / 100 * 40)  # 40-80% based on occupancy
-            reason = f"Moderate daylight ({daylight_factor}%) + occupancy {occupancy_percent}% - supplement lighting"
-        elif daylight_factor > 20:
-            # Twilight: use more artificial
-            brightness = 60 + (occupancy_percent / 100 * 30)  # 60-90%
-            reason = f"Low daylight ({daylight_factor}%) - increase artificial lighting"
-        else:
-            # Night: full artificial
-            brightness = 80 + (occupancy_percent / 100 * 20)  # 80-100%
-            reason = "Night - full artificial lighting required"
-
-        # Round to nearest 5%
-        brightness = int((brightness + 2.5) / 5) * 5
-
-        return {
-            "equipment": eq_code,
-            "control_point": "brightness_level",
-            "target_value": brightness,
-            "reason": reason,
-            "description": (
-                f"Set Tridonic brightness to {brightness}% "
-                f"(daylight {daylight_factor}%, occupancy {occupancy_percent}%)"
-            ),
-            "savings": max(2, int(100 - brightness) / 10),  # Energy savings from dimming
-        }
+        """DEPRECATED: Tridonic DALI-2 gateway handles daylight harvesting, occupancy
+        dimming, and emergency zone protection natively. AI should not duplicate these.
+        Returns None — kept for signature compatibility only."""
+        return None
 
     async def _setpoint_change(self, point: str, value: float, reason: str):
         """Simulate a setpoint change."""

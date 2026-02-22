@@ -208,6 +208,7 @@ class TierRoutingEngine:
                 "reason": reason,
             },
         )
+        _point = recommendation.get("action", {}).get("point", "unknown")
         await self.parasite_repo.record_decision(
             {
                 "site_id": site_id,
@@ -216,17 +217,24 @@ class TierRoutingEngine:
                 "decision_type": f"tier{tier_num}_{action}",
                 "tier": f"tier{tier_num}",
                 "confidence_score": confidence_score,
+                "mode": settings.resolved_ingestion_mode.value,
+                "actor": "auto_tier3" if tier_num == 3 else ("human_tier2" if tier_num == 2 else "system"),
+                "point_name": _point,
+                "control_point": _point,
+                "target_value": recommendation.get("action", {}).get("value"),
                 "contributing_factors": {
                     "confidence": confidence_score,
                     "risk_level": risk_level,
                     "threshold_source": threshold_source,
                     "tier2_threshold": tier2_threshold,
                     "tier3_threshold": tier3_threshold,
+                    # Merge domain-specific factors (e.g. AEGIS BESS audit fields)
+                    **(recommendation.get("contributing_factors") or {}),
                 },
                 "decision_details": {
                     "target_equipment": equipment_code,
                     "action_type": recommendation.get("action_type", "unknown"),
-                    "control_point": recommendation.get("action", {}).get("point", "unknown"),
+                    "control_point": _point,
                     "target_value": str(recommendation.get("action", {}).get("value", "")),
                     "reasoning": reason,
                 },

@@ -79,7 +79,7 @@ def load_alerts() -> list[dict]:
                 "device_id": device_id,  # For control dashboard navigation
                 "health_score": None,
                 "fault_codes": [],
-                "is_database": True
+                "is_database": True,
             }
             alerts.append(alert)
     except Exception:
@@ -114,7 +114,7 @@ def load_alerts() -> list[dict]:
                 "site_name": sa.get("site_name", "Sandton City Office Tower"),
                 "health_score": sa.get("health_score"),
                 "fault_codes": sa.get("fault_codes", []),
-                "is_simulation": True
+                "is_simulation": True,
             }
             alerts.append(alert)
     except Exception:
@@ -435,6 +435,7 @@ async def list_anomalies(
 
 class DiagnosticContextRequest(BaseModel):
     """Diagnostic context from zone diagnostics."""
+
     fault_type: Optional[str] = None
     fault_code: Optional[str] = None
     fault_description: Optional[str] = None
@@ -450,6 +451,7 @@ class DiagnosticContextRequest(BaseModel):
 
 class CreateAlertRequest(BaseModel):
     """Request to create a new alert."""
+
     equipment_code: str
     type: str
     severity: str  # critical, warning, info
@@ -464,11 +466,11 @@ class CreateAlertRequest(BaseModel):
 
 class CreateAlertResponse(BaseModel):
     """Response for alert creation."""
+
     id: str
     status: str
     sentry_notified: bool
     message: str
-
 
 
 async def recalculate_equipment_health_score(client, equipment_id: str):
@@ -488,9 +490,14 @@ async def recalculate_equipment_health_score(client, equipment_id: str):
 
     try:
         # Get all non-acknowledged, non-resolved alerts for this equipment
-        active_alerts = client.table("alerts").select("severity").eq(
-            "equipment_id", equipment_id
-        ).neq("status", "acknowledged").neq("status", "resolved").execute()
+        active_alerts = (
+            client.table("alerts")
+            .select("severity")
+            .eq("equipment_id", equipment_id)
+            .neq("status", "acknowledged")
+            .neq("status", "resolved")
+            .execute()
+        )
 
         # Determine new health score based on remaining active alerts
         if not active_alerts.data or len(active_alerts.data) == 0:
@@ -511,12 +518,12 @@ async def recalculate_equipment_health_score(client, equipment_id: str):
                 new_status = "normal"
 
         # Update equipment health score and status
-        client.table("equipment").update({
-            "health_score": new_health_score,
-            "status": new_status
-        }).eq("id", equipment_id).execute()
+        client.table("equipment").update({"health_score": new_health_score, "status": new_status}).eq(
+            "id", equipment_id
+        ).execute()
 
         import logging
+
         logger = logging.getLogger(__name__)
         logger.info(
             f"Recalculated equipment {equipment_id} health_score to {new_health_score} "
@@ -525,6 +532,7 @@ async def recalculate_equipment_health_score(client, equipment_id: str):
         )
     except Exception as e:
         import logging
+
         logger = logging.getLogger(__name__)
         logger.warning(f"Failed to recalculate health_score for equipment {equipment_id}: {e}")
 
@@ -544,15 +552,11 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
 
     # Get equipment by name or code
     # Try by name first (primary identifier in the API)
-    equipment = client.table("equipment").select("id, name, code").eq(
-        "name", request.equipment_code
-    ).execute()
+    equipment = client.table("equipment").select("id, name, code").eq("name", request.equipment_code).execute()
 
     # If not found by name, try by code
     if not equipment.data:
-        equipment = client.table("equipment").select("id, name, code").eq(
-            "code", request.equipment_code
-        ).execute()
+        equipment = client.table("equipment").select("id, name, code").eq("code", request.equipment_code).execute()
 
     if not equipment.data:
         raise HTTPException(status_code=404, detail=f"Equipment {request.equipment_code} not found")
@@ -563,9 +567,7 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
     # Get building_id if available (for schema compliance)
     building_id = None
     try:
-        equipment_with_building = client.table("equipment").select("building_id").eq(
-            "id", equipment_id
-        ).execute()
+        equipment_with_building = client.table("equipment").select("building_id").eq("id", equipment_id).execute()
         if equipment_with_building.data:
             building_id = equipment_with_building.data[0].get("building_id")
     except:
@@ -591,7 +593,7 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
         "severity": request.severity,
         "status": "active",
         "title": request.title,
-        "message": request.message
+        "message": request.message,
     }
 
     client.table("alerts").insert(alert_data).execute()
@@ -602,18 +604,26 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
     # - critical alert → health_score = 30 (well below 90 threshold)
     # - warning alert → health_score = 60 (below 90 threshold)
     try:
-        health_score = 30 if request.severity.lower() == "critical" else 60 if request.severity.lower() == "warning" else 85
+        health_score = (
+            30 if request.severity.lower() == "critical" else 60 if request.severity.lower() == "warning" else 85
+        )
 
-        client.table("equipment").update({
-            "health_score": health_score,
-            "status": request.severity.lower()  # Also update status to warning/critical
-        }).eq("id", eq["id"]).execute()
+        client.table("equipment").update(
+            {
+                "health_score": health_score,
+                "status": request.severity.lower(),  # Also update status to warning/critical
+            }
+        ).eq("id", eq["id"]).execute()
 
         import logging
+
         logger = logging.getLogger(__name__)
-        logger.info(f"Updated equipment {request.equipment_code} health_score to {health_score} (severity: {request.severity})")
+        logger.info(
+            f"Updated equipment {request.equipment_code} health_score to {health_score} (severity: {request.severity})"
+        )
     except Exception as e:
         import logging
+
         logger = logging.getLogger(__name__)
         logger.warning(f"Failed to update health_score for equipment {request.equipment_code}: {e}")
 
@@ -621,19 +631,23 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
     try:
         from app.services.event_emitter import get_event_emitter
         import asyncio
+
         emitter = get_event_emitter()
         # Use asyncio.create_task to emit event without blocking
-        asyncio.create_task(emitter.emit_alert_created(
-            alert_id=alert_id,
-            equipment_id=eq["id"],
-            equipment_code=request.equipment_code,
-            equipment_name=eq["name"],
-            severity=request.severity,
-            health_score=health_score,
-            message=request.message
-        ))
+        asyncio.create_task(
+            emitter.emit_alert_created(
+                alert_id=alert_id,
+                equipment_id=eq["id"],
+                equipment_code=request.equipment_code,
+                equipment_name=eq["name"],
+                severity=request.severity,
+                health_score=health_score,
+                message=request.message,
+            )
+        )
     except Exception as e:
         import logging
+
         logger = logging.getLogger(__name__)
         logger.warning(f"Failed to emit alert event: {e}")
 
@@ -650,15 +664,12 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
             "severity": request.severity,
             "message": request.message,
             "reading": request.reading,
-            "setpoint": request.setpoint
+            "setpoint": request.setpoint,
         }
         sentry_notified = alert_notifier.send_alert_sync(sentry_alert)
 
     return CreateAlertResponse(
-        id=alert_id,
-        status="active",
-        sentry_notified=sentry_notified,
-        message=f"Alert created for {eq['name']}"
+        id=alert_id, status="active", sentry_notified=sentry_notified, message=f"Alert created for {eq['name']}"
     )
 
 
@@ -678,6 +689,7 @@ async def acknowledge_alert(request: Request, alert_id: str, acknowledged_by: st
     # Handle database alerts
     try:
         from app.database.supabase_client import get_supabase_client
+
         client = get_supabase_client()
 
         # First, fetch the alert to get equipment_id
@@ -690,11 +702,18 @@ async def acknowledge_alert(request: Request, alert_id: str, acknowledged_by: st
         equipment_id = alert_data.get("equipment_id")
 
         # Update the alert status
-        result = client.table("alerts").update({
-            "status": "acknowledged",
-            "acknowledged_at": datetime.now().isoformat(),
-            "acknowledged_by": acknowledged_by
-        }).eq("id", alert_id).execute()
+        result = (
+            client.table("alerts")
+            .update(
+                {
+                    "status": "acknowledged",
+                    "acknowledged_at": datetime.now().isoformat(),
+                    "acknowledged_by": acknowledged_by,
+                }
+            )
+            .eq("id", alert_id)
+            .execute()
+        )
 
         if not result.data:
             raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
@@ -712,6 +731,7 @@ async def acknowledge_alert(request: Request, alert_id: str, acknowledged_by: st
 
 class DispatchWorkOrderRequest(BaseModel):
     """Request to dispatch work order from alert."""
+
     technician_id: str
     technician_name: str
     service_type: str = "breakdown"  # breakdown, callout
@@ -720,6 +740,7 @@ class DispatchWorkOrderRequest(BaseModel):
 
 class DispatchWorkOrderResponse(BaseModel):
     """Response for work order dispatch."""
+
     work_order_id: str
     service_record_code: str
     status: str
@@ -768,7 +789,7 @@ async def dispatch_work_order(alert_id: str, request: DispatchWorkOrderRequest):
         "priority": "high" if alert["severity"] == "critical" else "medium",
         "description": alert.get("message", ""),
         "assigned_to": request.technician_name,
-        "created_at": datetime.now().isoformat()
+        "created_at": datetime.now().isoformat(),
     }
 
     # Note: Would insert to work_orders table if it exists
@@ -790,16 +811,15 @@ async def dispatch_work_order(alert_id: str, request: DispatchWorkOrderRequest):
         "technician_id": request.technician_id,
         "technician_name": request.technician_name,
         "description": alert.get("message", ""),
-        "diagnostic_context": diag_context  # Pass context for smart data collection
+        "diagnostic_context": diag_context,  # Pass context for smart data collection
     }
 
     notified = await work_order_notifier.notify_technician(wo_data)
 
     # Update alert status
-    client.table("alerts").update({
-        "status": "dispatched",
-        "updated_at": datetime.now().isoformat()
-    }).eq("id", alert_id).execute()
+    client.table("alerts").update({"status": "dispatched", "updated_at": datetime.now().isoformat()}).eq(
+        "id", alert_id
+    ).execute()
 
     # Get service record code
     service_record_code = f"SR-{datetime.now().year}-PENDING"  # Would get from repository
@@ -809,7 +829,7 @@ async def dispatch_work_order(alert_id: str, request: DispatchWorkOrderRequest):
         service_record_code=service_record_code,
         status="dispatched",
         technician_notified=notified,
-        message=f"Work order dispatched to {request.technician_name}"
+        message=f"Work order dispatched to {request.technician_name}",
     )
 
 

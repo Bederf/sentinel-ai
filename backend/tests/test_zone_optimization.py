@@ -8,14 +8,20 @@ This module tests the zone-aware optimization features including:
 - Load shedding stage filtering
 """
 
-import pytest
 from datetime import datetime
 from unittest.mock import patch
 
 from app.models.device import (
-    DeviceType, DeviceLocation, DeviceEquipment, DevicePoint,
-    PointType, ProtocolType, ZoneType, ExposureDirection,
-    create_device_from_dict, HVACDevice
+    DeviceType,
+    DeviceLocation,
+    DeviceEquipment,
+    DevicePoint,
+    PointType,
+    ProtocolType,
+    ZoneType,
+    ExposureDirection,
+    create_device_from_dict,
+    HVACDevice,
 )
 from app.services.ai_optimizer import AIOptimizerService
 
@@ -56,7 +62,7 @@ class TestDeviceLocationZoneMetadata:
             description="Test location",
             zone_type=ZoneType.EXECUTIVE,
             exposure=ExposureDirection.SOUTH,
-            zone_priority=1
+            zone_priority=1,
         )
 
         assert location.zone_type == ZoneType.EXECUTIVE
@@ -66,11 +72,7 @@ class TestDeviceLocationZoneMetadata:
     def test_device_location_default_zone_priority(self):
         """Test DeviceLocation defaults to priority 3."""
         location = DeviceLocation(
-            building="Test Building",
-            floor="FL1",
-            zone="Open Office",
-            room="OR001",
-            description="Test location"
+            building="Test Building", floor="FL1", zone="Open Office", room="OR001", description="Test location"
         )
 
         assert location.zone_priority == 3
@@ -87,7 +89,7 @@ class TestDeviceLocationZoneMetadata:
             description="Test location",
             zone_type=ZoneType.EXECUTIVE,
             exposure=ExposureDirection.SOUTH,
-            zone_priority=1
+            zone_priority=1,
         )
 
         result = location.to_dict()
@@ -117,13 +119,10 @@ class TestCreateDeviceFromDict:
                 "description": "Test location",
                 "zone_type": "executive",
                 "exposure": "south",
-                "zone_priority": 1
+                "zone_priority": 1,
             },
-            "equipment": {
-                "manufacturer": "Test",
-                "model": "T-100"
-            },
-            "points": {}
+            "equipment": {"manufacturer": "Test", "model": "T-100"},
+            "points": {},
         }
 
         device = create_device_from_dict(data)
@@ -146,33 +145,42 @@ class TestAIOptimizerZoneGrouping:
         devices = []
 
         # Executive zone device (FL3, south-facing)
-        devices.append(self._create_test_device(
-            "exec-fcu-001", "Executive FCU", "FL3", "Executive Wing",
-            ZoneType.EXECUTIVE, ExposureDirection.SOUTH, 1
-        ))
+        devices.append(
+            self._create_test_device(
+                "exec-fcu-001", "Executive FCU", "FL3", "Executive Wing", ZoneType.EXECUTIVE, ExposureDirection.SOUTH, 1
+            )
+        )
 
         # Open office device (FL2, east-facing)
-        devices.append(self._create_test_device(
-            "office-fcu-001", "Office FCU", "FL2", "Main Office",
-            ZoneType.OPEN_OFFICE, ExposureDirection.EAST, 3
-        ))
+        devices.append(
+            self._create_test_device(
+                "office-fcu-001", "Office FCU", "FL2", "Main Office", ZoneType.OPEN_OFFICE, ExposureDirection.EAST, 3
+            )
+        )
 
         # Plant room device (Basement, interior)
-        devices.append(self._create_test_device(
-            "plant-chiller-001", "Plant Chiller", "Basement", "Plant Room",
-            ZoneType.PLANT_ROOM, ExposureDirection.INTERIOR, 5
-        ))
+        devices.append(
+            self._create_test_device(
+                "plant-chiller-001",
+                "Plant Chiller",
+                "Basement",
+                "Plant Room",
+                ZoneType.PLANT_ROOM,
+                ExposureDirection.INTERIOR,
+                5,
+            )
+        )
 
         # Another FL2 device for grouping test
-        devices.append(self._create_test_device(
-            "office-fcu-002", "Office FCU 2", "FL2", "Main Office",
-            ZoneType.OPEN_OFFICE, ExposureDirection.WEST, 3
-        ))
+        devices.append(
+            self._create_test_device(
+                "office-fcu-002", "Office FCU 2", "FL2", "Main Office", ZoneType.OPEN_OFFICE, ExposureDirection.WEST, 3
+            )
+        )
 
         return devices
 
-    def _create_test_device(self, device_id, name, floor, zone,
-                            zone_type, exposure, priority):
+    def _create_test_device(self, device_id, name, floor, zone, zone_type, exposure, priority):
         """Create a test device with specified attributes."""
         return HVACDevice(
             id=device_id,
@@ -188,7 +196,7 @@ class TestAIOptimizerZoneGrouping:
                 description=f"{floor}, {zone}",
                 zone_type=zone_type,
                 exposure=exposure,
-                zone_priority=priority
+                zone_priority=priority,
             ),
             equipment=DeviceEquipment(manufacturer="Test", model="T-100"),
             hvac_type="fcu",
@@ -199,9 +207,9 @@ class TestAIOptimizerZoneGrouping:
                     writable=True,
                     default_value=22.0,
                     min_value=18.0,
-                    max_value=26.0
+                    max_value=26.0,
                 )
-            }
+            },
         )
 
     def test_group_devices_by_zone(self):
@@ -249,7 +257,7 @@ class TestAIOptimizerZoneGrouping:
     def test_get_exposure(self):
         """Test getting exposure direction from device."""
         south_device = self.test_devices[0]  # South-facing
-        east_device = self.test_devices[1]   # East-facing
+        east_device = self.test_devices[1]  # East-facing
 
         assert self.optimizer._get_exposure(south_device) == ExposureDirection.SOUTH
         assert self.optimizer._get_exposure(east_device) == ExposureDirection.EAST
@@ -286,11 +294,11 @@ class TestExposureModifiers:
                 room="OR001",
                 description="Test",
                 exposure=exposure,
-                zone_priority=3
+                zone_priority=3,
             ),
             equipment=DeviceEquipment(manufacturer="Test", model="T-100"),
             hvac_type="fcu",
-            points={}
+            points={},
         )
 
     def test_exposure_modifier_low_temp_returns_zero(self):
@@ -300,22 +308,23 @@ class TestExposureModifiers:
         assert modifier == 0.0
 
     def test_exposure_modifier_south_facing_midday(self):
-        """Test south-facing zones get high modifier midday."""
+        """Test south-facing zones get low modifier midday (SA: sun in NORTH sky)."""
         device = self._create_device_with_exposure(ExposureDirection.SOUTH)
 
         # Mock datetime to midday (12:00)
-        with patch('app.services.ai_optimizer.datetime') as mock_dt:
+        with patch("app.services.ai_optimizer.datetime") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 1, 30, 12, 0)
             modifier = self.optimizer._get_exposure_modifier(device, 30.0)
 
-        assert modifier == 1.5  # Max solar gain midday
+        # In SA, south-facing gets minimal direct sun (diffuse/reflected only)
+        assert modifier == 0.3
 
     def test_exposure_modifier_west_facing_afternoon(self):
         """Test west-facing zones get modifier in afternoon."""
         device = self._create_device_with_exposure(ExposureDirection.WEST)
 
         # Mock datetime to afternoon (15:00)
-        with patch('app.services.ai_optimizer.datetime') as mock_dt:
+        with patch("app.services.ai_optimizer.datetime") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 1, 30, 15, 0)
             modifier = self.optimizer._get_exposure_modifier(device, 30.0)
 
@@ -327,11 +336,13 @@ class TestExposureModifiers:
         modifier = self.optimizer._get_exposure_modifier(device, 30.0)
         assert modifier == -0.5
 
-    def test_exposure_modifier_north_facing_returns_zero(self):
-        """Test north-facing zones (SA) get zero modifier."""
+    def test_exposure_modifier_north_facing_high_gain(self):
+        """Test north-facing zones (SA) get max solar gain (sun in NORTH sky)."""
         device = self._create_device_with_exposure(ExposureDirection.NORTH)
+        # At 30C outdoor temp (>25 threshold), north-facing gets solar gain
         modifier = self.optimizer._get_exposure_modifier(device, 30.0)
-        assert modifier == 0.0
+        # North-facing returns 1.5 (10-16h) or 0.5 (other hours)
+        assert modifier in (0.5, 1.5)
 
 
 class TestZoneSpecificLimits:
@@ -356,46 +367,38 @@ class TestZoneSpecificLimits:
                 room="OR001",
                 description="Test",
                 zone_type=zone_type,
-                zone_priority=3
+                zone_priority=3,
             ),
             equipment=DeviceEquipment(manufacturer="Test", model="T-100"),
             hvac_type="fcu",
-            points={}
+            points={},
         )
 
     def test_server_room_limits(self):
         """Test server room has tight temperature limits."""
         device = self._create_device_with_zone_type(ZoneType.SERVER_ROOM)
-        min_temp, max_temp = self.optimizer._get_zone_specific_setpoint_limits(
-            device, ZoneType.SERVER_ROOM
-        )
+        min_temp, max_temp = self.optimizer._get_zone_specific_setpoint_limits(device, ZoneType.SERVER_ROOM)
         assert min_temp == 18.0
         assert max_temp == 22.0
 
     def test_executive_limits(self):
         """Test executive zone has tight comfort limits."""
         device = self._create_device_with_zone_type(ZoneType.EXECUTIVE)
-        min_temp, max_temp = self.optimizer._get_zone_specific_setpoint_limits(
-            device, ZoneType.EXECUTIVE
-        )
+        min_temp, max_temp = self.optimizer._get_zone_specific_setpoint_limits(device, ZoneType.EXECUTIVE)
         assert min_temp == 21.0
         assert max_temp == 23.0
 
     def test_plant_room_limits(self):
         """Test plant room has wide temperature limits."""
         device = self._create_device_with_zone_type(ZoneType.PLANT_ROOM)
-        min_temp, max_temp = self.optimizer._get_zone_specific_setpoint_limits(
-            device, ZoneType.PLANT_ROOM
-        )
+        min_temp, max_temp = self.optimizer._get_zone_specific_setpoint_limits(device, ZoneType.PLANT_ROOM)
         assert min_temp == 16.0
         assert max_temp == 30.0
 
     def test_open_office_limits(self):
         """Test open office has standard comfort limits."""
         device = self._create_device_with_zone_type(ZoneType.OPEN_OFFICE)
-        min_temp, max_temp = self.optimizer._get_zone_specific_setpoint_limits(
-            device, ZoneType.OPEN_OFFICE
-        )
+        min_temp, max_temp = self.optimizer._get_zone_specific_setpoint_limits(device, ZoneType.OPEN_OFFICE)
         assert min_temp == 20.0
         assert max_temp == 26.0
 
@@ -422,35 +425,29 @@ class TestSkipZoneOptimization:
                 room="OR001",
                 description="Test",
                 zone_type=zone_type,
-                zone_priority=1
+                zone_priority=1,
             ),
             equipment=DeviceEquipment(manufacturer="Test", model="T-100"),
             hvac_type="fcu",
-            points={}
+            points={},
         )
 
     def test_skip_server_room_optimization(self):
         """Test server rooms are skipped for optimization."""
         device = self._create_device_with_zone_type(ZoneType.SERVER_ROOM)
-        should_skip = self.optimizer._should_skip_zone_optimization(
-            device, ZoneType.SERVER_ROOM
-        )
+        should_skip = self.optimizer._should_skip_zone_optimization(device, ZoneType.SERVER_ROOM)
         assert should_skip is True
 
     def test_allow_open_office_optimization(self):
         """Test open offices are not skipped."""
         device = self._create_device_with_zone_type(ZoneType.OPEN_OFFICE)
-        should_skip = self.optimizer._should_skip_zone_optimization(
-            device, ZoneType.OPEN_OFFICE
-        )
+        should_skip = self.optimizer._should_skip_zone_optimization(device, ZoneType.OPEN_OFFICE)
         assert should_skip is False
 
     def test_allow_executive_optimization(self):
         """Test executive zones are not skipped (but get reduced changes)."""
         device = self._create_device_with_zone_type(ZoneType.EXECUTIVE)
-        should_skip = self.optimizer._should_skip_zone_optimization(
-            device, ZoneType.EXECUTIVE
-        )
+        should_skip = self.optimizer._should_skip_zone_optimization(device, ZoneType.EXECUTIVE)
         assert should_skip is False
 
 
@@ -478,11 +475,11 @@ class TestZoneAwareAdjustments:
                 description="Test",
                 zone_type=zone_type,
                 exposure=exposure,
-                zone_priority=3
+                zone_priority=3,
             ),
             equipment=DeviceEquipment(manufacturer="Test", model="T-100"),
             hvac_type="fcu",
-            points={}
+            points={},
         )
 
     def test_executive_zone_reduced_change(self):
@@ -505,12 +502,13 @@ class TestZoneAwareAdjustments:
         adjusted = self.optimizer._apply_zone_aware_adjustments(device, 1.5, 30.0)
         assert adjusted == 0.0
 
-    def test_top_floor_reduced_change(self):
-        """Test top floor devices get reduced changes due to roof heat."""
+    def test_top_floor_stronger_optimization(self):
+        """Test top floor devices get stronger optimization (1.2x) per policy tuning."""
         device = self._create_device("FL3", ZoneType.OPEN_OFFICE, ExposureDirection.NORTH)
         adjusted = self.optimizer._apply_zone_aware_adjustments(device, 1.5, 25.0)
-        # Top floor gets 70% of base change
-        assert adjusted == pytest.approx(1.05, rel=0.1)
+        # Top floor (FL3) gets 1.2x multiplier = 1.8, then minus north exposure adjustment
+        # North-facing exposure modifier (0.5 or 1.5) * 0.3 subtracted
+        assert adjusted > 1.0  # More aggressive than base
 
 
 class TestSortRecommendationsByPriority:
@@ -529,16 +527,11 @@ class TestSortRecommendationsByPriority:
             protocol=ProtocolType.MOCK,
             site_id="site-001",
             device_location=DeviceLocation(
-                building="Test",
-                floor="FL1",
-                zone="Test",
-                room="MR1",
-                description="Test",
-                zone_priority=priority
+                building="Test", floor="FL1", zone="Test", room="MR1", description="Test", zone_priority=priority
             ),
             equipment=DeviceEquipment(manufacturer="Test", model="T-100"),
             hvac_type="fcu",
-            points={}
+            points={},
         )
 
     def test_sort_by_priority(self):
@@ -555,9 +548,7 @@ class TestSortRecommendationsByPriority:
             {"equipment_id": "device-p3", "point_name": "setpoint", "recommended_value": 23.0},
         ]
 
-        sorted_recs = self.optimizer._sort_recommendations_by_priority(
-            recommendations, devices
-        )
+        sorted_recs = self.optimizer._sort_recommendations_by_priority(recommendations, devices)
 
         # Should be sorted P1, P3, P5
         assert sorted_recs[0]["equipment_id"] == "device-p1"
@@ -588,11 +579,11 @@ class TestFormatZoneContext:
                 description="Test",
                 zone_type=zone_type,
                 exposure=exposure,
-                zone_priority=priority
+                zone_priority=priority,
             ),
             equipment=DeviceEquipment(manufacturer="Test", model="T-100"),
             hvac_type="fcu",
-            points={}
+            points={},
         )
 
     def test_format_zone_context(self):

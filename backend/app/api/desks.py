@@ -33,10 +33,7 @@ def _is_uuid(value: str) -> bool:
     Returns:
         True if value matches UUID format (8-4-4-4-12 hex pattern)
     """
-    uuid_pattern = re.compile(
-        r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-        re.IGNORECASE
-    )
+    uuid_pattern = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
     return bool(uuid_pattern.match(value))
 
 
@@ -130,7 +127,9 @@ async def get_desks(
         if floor:
             desks = [d for d in desks if d.get("floor") == floor]
 
-        logger.info(f"Retrieved {len(desks)} desks for building {building_id} (UUID: {actual_building_id}) floor {floor or 'any'}")
+        logger.info(
+            f"Retrieved {len(desks)} desks for building {building_id} (UUID: {actual_building_id}) floor {floor or 'any'}"
+        )
         return desks
     except Exception as e:
         logger.error(f"Failed to get desks for building {building_id}: {e}")
@@ -175,7 +174,9 @@ async def get_desks_by_zone(
 
         desks = desk_repo.get_by_zone_id(actual_building_id, zone_id)
 
-        logger.info(f"Retrieved {len(desks)} desks for zone {zone_id} in building {building_id} (UUID: {actual_building_id})")
+        logger.info(
+            f"Retrieved {len(desks)} desks for zone {zone_id} in building {building_id} (UUID: {actual_building_id})"
+        )
         return desks
     except Exception as e:
         logger.error(f"Failed to get desks for zone {zone_id}: {e}")

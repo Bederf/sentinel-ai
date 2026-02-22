@@ -15,6 +15,7 @@ import httpx
 BASE_URL = "http://localhost:9095"
 TIMEOUT = 30
 
+
 class Colors:
     GREEN = "\033[92m"
     RED = "\033[91m"
@@ -22,11 +23,9 @@ class Colors:
     CYAN = "\033[96m"
     END = "\033[0m"
 
+
 async def test_endpoint(
-    name: str,
-    method: str = "GET",
-    endpoint: str = "",
-    expected_fields: Optional[list] = None
+    name: str, method: str = "GET", endpoint: str = "", expected_fields: Optional[list] = None
 ) -> bool:
     """Test a single endpoint."""
     try:
@@ -73,46 +72,31 @@ async def test_endpoint(
         print(f"  {Colors.RED}Error: {e}{Colors.END}")
         return False
 
+
 async def run_all_tests() -> Dict[str, Any]:
     """Run all ML Metrics Dashboard tests."""
-    print(f"\n{Colors.CYAN}{'='*60}")
+    print(f"\n{Colors.CYAN}{'=' * 60}")
     print("ML Metrics Dashboard API Test Suite")
-    print(f"{'='*60}{Colors.END}\n")
+    print(f"{'=' * 60}{Colors.END}\n")
 
     tests = [
         # Health endpoint
-        ("Health Status", "GET", "/api/mlops/health",
-         ["status", "overall_score", "targets_met"]),
-
+        ("Health Status", "GET", "/api/mlops/health", ["status", "overall_score", "targets_met"]),
         # Metrics endpoints
-        ("Metrics", "GET", "/api/mlops/metrics",
-         ["metrics", "overall_score", "targets_met"]),
-        ("Metrics Trend", "GET", "/api/mlops/metrics/trend",
-         ["trend"]),
-
+        ("Metrics", "GET", "/api/mlops/metrics", ["metrics", "overall_score", "targets_met"]),
+        ("Metrics Trend", "GET", "/api/mlops/metrics/trend", ["trend"]),
         # Drift endpoints
-        ("All Drift Detection", "GET", "/api/mlops/drift/all",
-         ["summary", "feature_drift", "model_drift"]),
-        ("Feature Drift (chiller)", "GET", "/api/mlops/drift/feature/chiller",
-         ["equipment_type", "drift_detected"]),
-        ("Model Drift (lstm)", "GET", "/api/mlops/drift/model/lstm",
-         ["model_type", "drift_detected"]),
-        ("Drift History", "GET", "/api/mlops/drift/history",
-         ["history"]),
-
+        ("All Drift Detection", "GET", "/api/mlops/drift/all", ["summary", "feature_drift", "model_drift"]),
+        ("Feature Drift (chiller)", "GET", "/api/mlops/drift/feature/chiller", ["equipment_type", "drift_detected"]),
+        ("Model Drift (lstm)", "GET", "/api/mlops/drift/model/lstm", ["model_type", "drift_detected"]),
+        ("Drift History", "GET", "/api/mlops/drift/history", ["history"]),
         # Alert endpoints
-        ("Alerts", "GET", "/api/mlops/alerts",
-         ["alerts"]),
-        ("Alert Summary", "GET", "/api/mlops/alerts/summary",
-         ["total_alerts", "unacknowledged", "by_severity"]),
-        ("Run Alert Check", "POST", "/api/mlops/alerts/check",
-         ["new_alerts", "alerts"]),
-
+        ("Alerts", "GET", "/api/mlops/alerts", ["alerts"]),
+        ("Alert Summary", "GET", "/api/mlops/alerts/summary", ["total_alerts", "unacknowledged", "by_severity"]),
+        ("Run Alert Check", "POST", "/api/mlops/alerts/check", ["new_alerts", "alerts"]),
         # Report endpoints
-        ("Weekly Report", "GET", "/api/mlops/reports/weekly",
-         ["report_id", "period", "success_metrics"]),
-        ("Monthly Report", "GET", "/api/mlops/reports/monthly",
-         ["report_id", "period", "success_metrics"]),
+        ("Weekly Report", "GET", "/api/mlops/reports/weekly", ["report_id", "period", "success_metrics"]),
+        ("Monthly Report", "GET", "/api/mlops/reports/monthly", ["report_id", "period", "success_metrics"]),
     ]
 
     results = {"passed": 0, "failed": 0, "errors": []}
@@ -126,9 +110,9 @@ async def run_all_tests() -> Dict[str, Any]:
             results["errors"].append(name)
 
     # Print summary
-    print(f"\n{Colors.CYAN}{'='*60}")
+    print(f"\n{Colors.CYAN}{'=' * 60}")
     print("Test Summary")
-    print(f"{'='*60}{Colors.END}")
+    print(f"{'=' * 60}{Colors.END}")
     print(f"{Colors.GREEN}Passed: {results['passed']}{Colors.END}")
     print(f"{Colors.RED}Failed: {results['failed']}{Colors.END}")
 
@@ -139,6 +123,7 @@ async def run_all_tests() -> Dict[str, Any]:
 
     print()
     return results
+
 
 async def test_imports() -> bool:
     """Test that all backend modules can be imported."""
@@ -170,6 +155,7 @@ async def test_imports() -> bool:
 
     return True
 
+
 async def main():
     """Main test runner."""
     # First test imports
@@ -180,6 +166,7 @@ async def main():
 
     # Exit code
     sys.exit(0 if results["failed"] == 0 and imports_ok else 1)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

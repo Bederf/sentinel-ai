@@ -13,6 +13,7 @@ router = APIRouter(prefix="/api/cache", tags=["cache"])
 
 class CacheStatsResponse(BaseModel):
     """Cache statistics response."""
+
     connected: bool
     hits: int
     misses: int
@@ -23,6 +24,7 @@ class CacheStatsResponse(BaseModel):
 
 class CacheFlushResponse(BaseModel):
     """Response for cache flush operations."""
+
     success: bool
     message: str
     keys_deleted: Optional[int] = None
@@ -39,9 +41,7 @@ async def cache_health() -> dict:
 
 
 @router.get("/stats", response_model=CacheStatsResponse)
-async def cache_stats(
-    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))
-) -> CacheStatsResponse:
+async def cache_stats(auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))) -> CacheStatsResponse:
     """Get cache statistics (authenticated users only)."""
     stats = cache.get_stats()
     return CacheStatsResponse(**stats)
@@ -49,8 +49,7 @@ async def cache_stats(
 
 @router.post("/flush", response_model=CacheFlushResponse)
 async def flush_cache(
-    pattern: Optional[str] = None,
-    auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))
+    pattern: Optional[str] = None, auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))
 ) -> CacheFlushResponse:
     """Flush cache entries (admin only).
 
@@ -62,30 +61,22 @@ async def flush_cache(
         raise HTTPException(status_code=403, detail="Admin access required")
 
     if not cache.is_connected:
-        return CacheFlushResponse(
-            success=False,
-            message="Redis cache not connected"
-        )
+        return CacheFlushResponse(success=False, message="Redis cache not connected")
 
     if pattern:
         count = cache.delete_pattern(pattern)
         return CacheFlushResponse(
-            success=True,
-            message=f"Flushed cache entries matching: {pattern}",
-            keys_deleted=count
+            success=True, message=f"Flushed cache entries matching: {pattern}", keys_deleted=count
         )
     else:
         success = cache.flush_all()
         return CacheFlushResponse(
-            success=success,
-            message="Flushed all BMS cache entries" if success else "No entries to flush"
+            success=success, message="Flushed all BMS cache entries" if success else "No entries to flush"
         )
 
 
 @router.post("/reset-stats")
-async def reset_cache_stats(
-    auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))
-) -> dict:
+async def reset_cache_stats(auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))) -> dict:
     """Reset cache statistics counters (admin only)."""
     if auth.role != SentinelRole.ADMIN:
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -96,8 +87,7 @@ async def reset_cache_stats(
 
 @router.delete("/key/{key_name}")
 async def delete_cache_key(
-    key_name: str,
-    auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))
+    key_name: str, auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN))
 ) -> CacheFlushResponse:
     """Delete a specific cache key (admin only).
 
@@ -108,13 +98,9 @@ async def delete_cache_key(
         raise HTTPException(status_code=403, detail="Admin access required")
 
     if not cache.is_connected:
-        return CacheFlushResponse(
-            success=False,
-            message="Redis cache not connected"
-        )
+        return CacheFlushResponse(success=False, message="Redis cache not connected")
 
     success = cache.delete(key_name)
     return CacheFlushResponse(
-        success=success,
-        message=f"Deleted cache key: {key_name}" if success else f"Key not found: {key_name}"
+        success=success, message=f"Deleted cache key: {key_name}" if success else f"Key not found: {key_name}"
     )

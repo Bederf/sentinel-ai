@@ -44,9 +44,7 @@ class TestIntentClassification:
         assert result.intent == Intent.MAINTENANCE_DUE
 
     def test_compare_equipment_intent(self, classifier):
-        result = classifier.classify(
-            "Compare S002-CHILLER-B1-001 vs S002-CHILLER-B1-002"
-        )
+        result = classifier.classify("Compare S002-CHILLER-B1-001 vs S002-CHILLER-B1-002")
         assert result.intent == Intent.COMPARE_EQUIPMENT
         assert len(result.equipment_ids) == 2
 
@@ -108,9 +106,7 @@ class TestEntityExtraction:
         assert "S002-CHILLER-B1-001" in result.equipment_ids
 
     def test_extract_multiple_equipment_ids(self, classifier):
-        result = classifier.classify(
-            "Compare S002-CHILLER-B1-001 vs S002-CHILLER-B1-002"
-        )
+        result = classifier.classify("Compare S002-CHILLER-B1-001 vs S002-CHILLER-B1-002")
         assert len(result.equipment_ids) == 2
         assert "S002-CHILLER-B1-001" in result.equipment_ids
         assert "S002-CHILLER-B1-002" in result.equipment_ids

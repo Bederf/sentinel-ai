@@ -102,9 +102,9 @@ class TestDemandHistory:
         """Demo peaks should be in 1480-1850 kVA range (realistic for site-002)."""
         history = ratchet_service.get_demand_history("site-002")
         for rec in history:
-            assert (
-                1300 <= rec.peak_demand_kva <= 2000
-            ), f"Peak {rec.peak_demand_kva} kVA in {rec.year}-{rec.month:02d} out of range"
+            assert 1300 <= rec.peak_demand_kva <= 2000, (
+                f"Peak {rec.peak_demand_kva} kVA in {rec.year}-{rec.month:02d} out of range"
+            )
 
     def test_update_current_peak(self, ratchet_service):
         """Updating current peak should create/update a record."""

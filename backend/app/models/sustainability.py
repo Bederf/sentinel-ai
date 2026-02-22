@@ -19,10 +19,11 @@ from typing import Dict, List
 @dataclass
 class EmissionFactors:
     """South Africa-specific emission factors."""
-    grid_kg_co2_per_kwh: float = 1.06       # Eskom grid (2023 IRP)
-    diesel_kg_co2_per_litre: float = 2.68    # Diesel combustion
-    water_kg_co2_per_kl: float = 0.708       # Water treatment & pumping
-    waste_kg_co2_per_ton: float = 580.0      # Landfill waste
+
+    grid_kg_co2_per_kwh: float = 1.06  # Eskom grid (2023 IRP)
+    diesel_kg_co2_per_litre: float = 2.68  # Diesel combustion
+    water_kg_co2_per_kl: float = 0.708  # Water treatment & pumping
+    waste_kg_co2_per_ton: float = 580.0  # Landfill waste
     commute_kg_co2_per_person_day: float = 4.2  # Average SA commute
 
     def to_dict(self) -> Dict:
@@ -48,6 +49,7 @@ class EmissionFactors:
 @dataclass
 class EmissionsSnapshot:
     """Monthly emissions snapshot."""
+
     month: str  # YYYY-MM
     site_id: str
     scope1_kg_co2: float = 0.0  # Diesel generators
@@ -75,15 +77,14 @@ class EmissionsSnapshot:
             "diesel_litres": round(self.diesel_litres, 2),
             "carbon_intensity_kg_per_sqm": round(self.carbon_intensity_kg_per_sqm, 2),
             "energy_intensity_kwh_per_sqm": round(self.energy_intensity_kwh_per_sqm, 2),
-            "breakdown_by_system": {
-                k: round(v, 2) for k, v in self.breakdown_by_system.items()
-            },
+            "breakdown_by_system": {k: round(v, 2) for k, v in self.breakdown_by_system.items()},
         }
 
 
 @dataclass
 class GreenStarCategory:
     """Green Star SA Office v1.1 category."""
+
     category_id: str  # ENE, WAT, IEQ, etc.
     name: str
     max_points: int
@@ -116,6 +117,7 @@ class GreenStarCategory:
 @dataclass
 class GreenStarAssessment:
     """Green Star SA self-assessment tracker."""
+
     site_id: str
     tool_version: str = "Green Star SA Office v1.1"
     target_rating: str = "5-Star"
@@ -163,24 +165,23 @@ class GreenStarAssessment:
             site_id=data["site_id"],
             tool_version=data.get("tool_version", "Green Star SA Office v1.1"),
             target_rating=data.get("target_rating", "5-Star"),
-            categories=[
-                GreenStarCategory.from_dict(c) for c in data.get("categories", [])
-            ],
+            categories=[GreenStarCategory.from_dict(c) for c in data.get("categories", [])],
         )
 
 
 @dataclass
 class SustainabilityConfig:
     """Site sustainability configuration."""
+
     site_id: str
     emission_factors: EmissionFactors = field(default_factory=EmissionFactors)
     building_sqm: float = 4500.0
     occupancy_capacity: int = 150
     target_reduction_pct: float = 10.0  # Year-on-year reduction target
-    monthly_water_kl: float = 45.0      # Estimated monthly water usage
-    monthly_waste_tons: float = 2.5     # Estimated monthly waste
+    monthly_water_kl: float = 45.0  # Estimated monthly water usage
+    monthly_waste_tons: float = 2.5  # Estimated monthly waste
     working_days_per_month: int = 22
-    avg_occupancy_pct: float = 75.0     # Average occupancy percentage
+    avg_occupancy_pct: float = 75.0  # Average occupancy percentage
 
     def to_dict(self) -> Dict:
         return {
@@ -214,6 +215,7 @@ class SustainabilityConfig:
 @dataclass
 class BenchmarkComparison:
     """SA office building benchmarks."""
+
     # Energy intensity (kWh/sqm/year)
     energy_typical_kwh_per_sqm_yr: float = 170.0
     energy_efficient_kwh_per_sqm_yr: float = 120.0

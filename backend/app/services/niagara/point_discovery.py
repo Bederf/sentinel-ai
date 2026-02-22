@@ -146,20 +146,23 @@ class PointDiscoveryService:
 
         logger.info(
             "Starting point discovery %s for device %s (site %s, demo_building=%s)",
-            discovery_id, device_ip, site_id, demo_building_id,
+            discovery_id,
+            device_ip,
+            site_id,
+            demo_building_id,
         )
 
         try:
             # Phase 1: Discover points
             result.status = "discovering"
-            raw_points = await self._discover_points(
-                device_ip, device_bacnet_id, use_demo, demo_building_id
-            )
+            raw_points = await self._discover_points(device_ip, device_bacnet_id, use_demo, demo_building_id)
             result.raw_points = [p if isinstance(p, dict) else p.to_dict() for p in raw_points]
 
             logger.info(
                 "Discovery %s: found %d points on %s",
-                discovery_id, len(raw_points), device_ip,
+                discovery_id,
+                len(raw_points),
+                device_ip,
             )
 
             # Phase 2: Classify points
@@ -235,7 +238,8 @@ class PointDiscoveryService:
                 except BACnetException as e:
                     logger.warning(
                         "BACnet discovery failed for device %d: %s. %s",
-                        device_bacnet_id, e,
+                        device_bacnet_id,
+                        e,
                         "Falling back to demo data." if use_demo else "No fallback.",
                     )
                     if not use_demo:
@@ -245,9 +249,7 @@ class PointDiscoveryService:
         if use_demo or self._demo_mode:
             return self._load_demo_points(demo_building_id)
 
-        raise BACnetException(
-            f"BACnet client not running and demo mode disabled for {device_ip}"
-        )
+        raise BACnetException(f"BACnet client not running and demo mode disabled for {device_ip}")
 
     async def _discover_from_bacnet(
         self,
@@ -267,30 +269,37 @@ class PointDiscoveryService:
 
         logger.info(
             "Found %d points on device %d, reading metadata...",
-            len(raw_points), device_id,
+            len(raw_points),
+            device_id,
         )
 
         # Read detailed metadata in batches
         detailed_points: List[Dict[str, Any]] = []
 
         for i in range(0, len(raw_points), BATCH_SIZE):
-            batch = raw_points[i:i + BATCH_SIZE]
+            batch = raw_points[i : i + BATCH_SIZE]
             logger.info(
                 "Reading batch %d-%d of %d...",
-                i, min(i + BATCH_SIZE, len(raw_points)), len(raw_points),
+                i,
+                min(i + BATCH_SIZE, len(raw_points)),
+                len(raw_points),
             )
 
             for point in batch:
                 try:
                     # Read additional properties
                     name = await client.read_point(
-                        device_id, point.object_type, point.instance,
+                        device_id,
+                        point.object_type,
+                        point.instance,
                         property_name="objectName",
                     )
                     description = ""
                     try:
                         description = await client.read_point(
-                            device_id, point.object_type, point.instance,
+                            device_id,
+                            point.object_type,
+                            point.instance,
                             property_name="description",
                         )
                     except Exception:
@@ -299,7 +308,9 @@ class PointDiscoveryService:
                     units = ""
                     try:
                         units = await client.read_point(
-                            device_id, point.object_type, point.instance,
+                            device_id,
+                            point.object_type,
+                            point.instance,
                             property_name="units",
                         )
                     except Exception:
@@ -308,37 +319,45 @@ class PointDiscoveryService:
                     value = None
                     try:
                         value = await client.read_point(
-                            device_id, point.object_type, point.instance,
+                            device_id,
+                            point.object_type,
+                            point.instance,
                             property_name="presentValue",
                         )
                     except Exception:
                         pass
 
-                    detailed_points.append({
-                        "name": str(name) if name else f"{point.object_type}_{point.instance}",
-                        "description": str(description) if description else "",
-                        "object_type": point.object_type,
-                        "instance": point.instance,
-                        "units": str(units) if units else "",
-                        "present_value": value,
-                        "writable": point.writable,
-                    })
+                    detailed_points.append(
+                        {
+                            "name": str(name) if name else f"{point.object_type}_{point.instance}",
+                            "description": str(description) if description else "",
+                            "object_type": point.object_type,
+                            "instance": point.instance,
+                            "units": str(units) if units else "",
+                            "present_value": value,
+                            "writable": point.writable,
+                        }
+                    )
 
                 except BACnetException as e:
                     logger.warning(
                         "Failed to read metadata for %s:%d: %s",
-                        point.object_type, point.instance, e,
+                        point.object_type,
+                        point.instance,
+                        e,
                     )
                     # Add with minimal info
-                    detailed_points.append({
-                        "name": f"{point.object_type}_{point.instance}",
-                        "description": "",
-                        "object_type": point.object_type,
-                        "instance": point.instance,
-                        "units": "",
-                        "present_value": None,
-                        "writable": point.writable,
-                    })
+                    detailed_points.append(
+                        {
+                            "name": f"{point.object_type}_{point.instance}",
+                            "description": "",
+                            "object_type": point.object_type,
+                            "instance": point.instance,
+                            "units": "",
+                            "present_value": None,
+                            "writable": point.writable,
+                        }
+                    )
 
         return detailed_points
 
@@ -361,7 +380,8 @@ class PointDiscoveryService:
                 if points:
                     logger.info(
                         "Loaded %d demo points from %s equipment files",
-                        len(points), demo_building_id,
+                        len(points),
+                        demo_building_id,
                     )
                     return points
                 else:
@@ -372,15 +392,14 @@ class PointDiscoveryService:
             else:
                 logger.warning(
                     "Demo building %s equipment directory not found: %s, falling back to haystack_tags.json",
-                    demo_building_id, equipment_dir,
+                    demo_building_id,
+                    equipment_dir,
                 )
 
         # Fallback to haystack_tags.json
         return self._load_from_haystack_tags()
 
-    def _load_points_from_equipment_dir(
-        self, equipment_dir: Path, demo_building_id: str
-    ) -> List[Dict[str, Any]]:
+    def _load_points_from_equipment_dir(self, equipment_dir: Path, demo_building_id: str) -> List[Dict[str, Any]]:
         """Extract demo points from a building's equipment files.
 
         Args:
@@ -407,19 +426,21 @@ class PointDiscoveryService:
                     # Determine object type based on point definition
                     obj_type = point_def.get("object_type", "analogInput")
 
-                    points.append({
-                        "name": f"{eq_id}.{point_name}",
-                        "description": f"{eq_name} - {point_name.replace('_', ' ').title()}",
-                        "object_type": obj_type,
-                        "instance": instance_counter,
-                        "units": point_def.get("unit", ""),
-                        "present_value": point_def.get("default_value", 0),
-                        "writable": point_def.get("writable", False),
-                        # Extra fields to help classification
-                        "_equipment_id": eq_id,
-                        "_equipment_type": eq_type,
-                        "_point_type": point_def.get("point_type", "sensor"),
-                    })
+                    points.append(
+                        {
+                            "name": f"{eq_id}.{point_name}",
+                            "description": f"{eq_name} - {point_name.replace('_', ' ').title()}",
+                            "object_type": obj_type,
+                            "instance": instance_counter,
+                            "units": point_def.get("unit", ""),
+                            "present_value": point_def.get("default_value", 0),
+                            "writable": point_def.get("writable", False),
+                            # Extra fields to help classification
+                            "_equipment_id": eq_id,
+                            "_equipment_type": eq_type,
+                            "_point_type": point_def.get("point_type", "sensor"),
+                        }
+                    )
                     instance_counter += 1
 
             except (json.JSONDecodeError, KeyError) as e:
@@ -441,9 +462,7 @@ class PointDiscoveryService:
             logger.error("Failed to load demo points from haystack_tags.json: %s", e)
             return []
 
-    def _classify_discovered_points(
-        self, points: List[Dict[str, Any]]
-    ) -> List[ClassifiedPoint]:
+    def _classify_discovered_points(self, points: List[Dict[str, Any]]) -> List[ClassifiedPoint]:
         """Classify all discovered points using the point classifier."""
         return self._classifier.classify_points(points)
 

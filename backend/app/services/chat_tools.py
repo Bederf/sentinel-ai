@@ -1619,8 +1619,7 @@ async def diagnose_comfort_complaint(
                 diagnosis["root_cause"] = f"High CO2 ({current_co2}ppm) — poor ventilation"
                 diagnosis["confidence"] = "high"
                 diagnosis["diagnosis"] = (
-                    f"CO2 sensor {co2_id} reads {current_co2}ppm (>800ppm threshold)."
-                    f" Fresh air intake insufficient."
+                    f"CO2 sensor {co2_id} reads {current_co2}ppm (>800ppm threshold). Fresh air intake insufficient."
                 )
                 if humidity_high:
                     diagnosis["diagnosis"] += f" Humidity also elevated: {current_humidity}% ({rh_id})."
@@ -1664,7 +1663,7 @@ async def diagnose_comfort_complaint(
                 diagnosis["root_cause"] = f"Supply diffuser {diff_code} causing draft"
                 diagnosis["confidence"] = "high"
                 diagnosis["diagnosis"] = (
-                    f"Desk {desk_id} is near diffuser {diff_code}." f" VAV {vav_id} airflow may be too high."
+                    f"Desk {desk_id} is near diffuser {diff_code}. VAV {vav_id} airflow may be too high."
                 )
                 diagnosis["suggested_actions"] = [
                     f"Reduce VAV {vav_id} maximum airflow setting",
@@ -1675,7 +1674,7 @@ async def diagnose_comfort_complaint(
                 diagnosis["root_cause"] = "Window infiltration or poor seals"
                 diagnosis["confidence"] = "medium"
                 diagnosis["diagnosis"] = (
-                    f"Desk {desk_id} is near a window. Draft may be from window seals." f" Zone temp: {current_temp}°C."
+                    f"Desk {desk_id} is near a window. Draft may be from window seals. Zone temp: {current_temp}°C."
                 )
                 diagnosis["suggested_actions"] = [
                     "Inspect window seals for gaps",

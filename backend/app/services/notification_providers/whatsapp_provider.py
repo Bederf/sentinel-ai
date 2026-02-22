@@ -45,22 +45,14 @@ class WhatsAppProvider(BaseNotificationProvider):
             async with httpx.AsyncClient() as client:
                 headers = {"Authorization": f"Bearer {self.api_token}"}
                 response = await client.get(
-                    f"https://graph.instagram.com/v18.0/{self.phone_id}",
-                    headers=headers,
-                    timeout=10
+                    f"https://graph.instagram.com/v18.0/{self.phone_id}", headers=headers, timeout=10
                 )
                 return response.status_code == 200
         except Exception as e:
             logger.error(f"WhatsApp connection test failed: {e}")
             return False
 
-    async def send(
-        self,
-        recipient: str,
-        title: str,
-        body: str,
-        **kwargs
-    ) -> NotificationResult:
+    async def send(self, recipient: str, title: str, body: str, **kwargs) -> NotificationResult:
         """Send WhatsApp message via Meta Cloud API.
 
         Args:
@@ -76,7 +68,7 @@ class WhatsAppProvider(BaseNotificationProvider):
             return NotificationResult(
                 success=False,
                 error_code="not_configured",
-                error_message="WhatsApp provider not configured (missing WHATSAPP_API_TOKEN or WHATSAPP_PHONE_ID)"
+                error_message="WhatsApp provider not configured (missing WHATSAPP_API_TOKEN or WHATSAPP_PHONE_ID)",
             )
 
         try:
@@ -89,16 +81,10 @@ class WhatsAppProvider(BaseNotificationProvider):
                 "recipient_type": "individual",
                 "to": recipient,
                 "type": "text",
-                "text": {
-                    "preview_url": True,
-                    "body": message_text
-                }
+                "text": {"preview_url": True, "body": message_text},
             }
 
-            headers = {
-                "Authorization": f"Bearer {self.api_token}",
-                "Content-Type": "application/json"
-            }
+            headers = {"Authorization": f"Bearer {self.api_token}", "Content-Type": "application/json"}
 
             # Send via Meta API
             async with httpx.AsyncClient() as client:
@@ -106,18 +92,14 @@ class WhatsAppProvider(BaseNotificationProvider):
                     f"https://graph.instagram.com/v18.0/{self.phone_id}/messages",
                     json=payload,
                     headers=headers,
-                    timeout=10
+                    timeout=10,
                 )
 
                 if response.status_code == 200:
                     data = response.json()
                     message_id = data.get("messages", [{}])[0].get("id", "unknown")
                     logger.info(f"WhatsApp message sent to {recipient}, ID: {message_id}")
-                    return NotificationResult(
-                        success=True,
-                        message_id=message_id,
-                        provider_response=data
-                    )
+                    return NotificationResult(success=True, message_id=message_id, provider_response=data)
                 else:
                     error_data = response.json() if response.text else {}
                     error_msg = error_data.get("error", {}).get("message", "Unknown error")
@@ -126,19 +108,13 @@ class WhatsAppProvider(BaseNotificationProvider):
                         success=False,
                         error_code=f"http_{response.status_code}",
                         error_message=error_msg,
-                        provider_response=error_data
+                        provider_response=error_data,
                     )
 
         except httpx.TimeoutException:
             return NotificationResult(
-                success=False,
-                error_code="timeout",
-                error_message="Meta API request timed out after 10 seconds"
+                success=False, error_code="timeout", error_message="Meta API request timed out after 10 seconds"
             )
         except Exception as e:
             logger.error(f"WhatsApp provider error: {e}")
-            return NotificationResult(
-                success=False,
-                error_code="exception",
-                error_message=str(e)
-            )
+            return NotificationResult(success=False, error_code="exception", error_message=str(e))

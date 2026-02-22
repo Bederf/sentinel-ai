@@ -15,8 +15,10 @@ from pydantic import BaseModel, Field, ConfigDict
 # Enums
 # ============================================================================
 
+
 class BaselineType(str, Enum):
     """Type of baseline capture."""
+
     INITIAL = "initial"  # First baseline at equipment installation/onboarding
     PERIODIC = "periodic"  # Regular recurring baseline (e.g., annual)
     POST_REPAIR = "post_repair"  # Baseline after maintenance/repair
@@ -26,6 +28,7 @@ class BaselineType(str, Enum):
 
 class BaselineStatus(str, Enum):
     """Status of baseline record."""
+
     ACTIVE = "active"  # Current active baseline
     ARCHIVED = "archived"  # Archived baseline (kept for historical reference)
     SUPERSEDED = "superseded"  # Replaced by newer baseline
@@ -33,6 +36,7 @@ class BaselineStatus(str, Enum):
 
 class BaselineSource(str, Enum):
     """Source of baseline data."""
+
     MANUAL = "manual"  # Engineer manual measurement and entry
     BMS_AVERAGE = "bms_average"  # Averaged from BMS sensor over time period
     MOBILE_SENSOR = "mobile_sensor"  # Captured via mobile phone sensors (vibration, audio, etc.)
@@ -42,6 +46,7 @@ class BaselineSource(str, Enum):
 
 class ElementType(str, Enum):
     """Type of equipment element/component."""
+
     BEARING = "bearing"
     FILTER = "filter"
     COIL = "coil"
@@ -56,6 +61,7 @@ class ElementType(str, Enum):
 
 class MeasurementType(str, Enum):
     """Type of measurement for element baselines."""
+
     VIBRATION = "vibration"  # Vibration analysis (RMS, frequency spectrum)
     TEMPERATURE = "temperature"  # Temperature measurements (bearing, housing, oil)
     VISUAL_INSPECTION = "visual_inspection"  # Visual/tactile inspection results (wear, cracks, leaks)
@@ -66,6 +72,7 @@ class MeasurementType(str, Enum):
 
 class DeviationStatus(str, Enum):
     """Deviation status for comparison results."""
+
     NORMAL = "normal"
     WARNING = "warning"
     CRITICAL = "critical"
@@ -73,6 +80,7 @@ class DeviationStatus(str, Enum):
 
 class Criticality(str, Enum):
     """Criticality level for maintenance prioritization."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -83,22 +91,17 @@ class Criticality(str, Enum):
 # Base Models
 # ============================================================================
 
+
 class ComparisonResult(BaseModel):
     """Result of comparing a single metric to its baseline."""
+
     baseline: float = Field(..., description="Baseline value")
     current: float = Field(..., description="Current measured value")
     deviation_percent: float = Field(..., description="Deviation from baseline as percentage")
     status: DeviationStatus = Field(..., description="Deviation status (normal/warning/critical)")
 
     model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "baseline": 7.2,
-                "current": 8.5,
-                "deviation_percent": 18.1,
-                "status": "warning"
-            }
-        }
+        json_schema_extra={"example": {"baseline": 7.2, "current": 8.5, "deviation_percent": 18.1, "status": "warning"}}
     )
 
 
@@ -106,8 +109,10 @@ class ComparisonResult(BaseModel):
 # Equipment Baseline Models
 # ============================================================================
 
+
 class EquipmentBaselineBase(BaseModel):
     """Base model for equipment baseline."""
+
     equipment_id: str = Field(..., description="Equipment identifier")
     baseline_date: datetime = Field(default_factory=datetime.now, description="When baseline was captured")
     captured_by: str = Field(..., description="Engineer name or 'automated'")
@@ -122,11 +127,13 @@ class EquipmentBaselineBase(BaseModel):
 
 class EquipmentBaselineCreate(EquipmentBaselineBase):
     """Model for creating new equipment baseline."""
+
     pass
 
 
 class EquipmentBaseline(EquipmentBaselineBase):
     """Model for equipment baseline record."""
+
     id: str = Field(..., description="Baseline record ID")
     created_at: datetime
     updated_at: datetime
@@ -145,15 +152,12 @@ class EquipmentBaseline(EquipmentBaselineBase):
                     "chw_return_temp": 12.5,
                     "motor_current": 145.2,
                     "suction_pressure": 4.2,
-                    "discharge_pressure": 15.8
+                    "discharge_pressure": 15.8,
                 },
-                "measurement_conditions": {
-                    "ambient_temp": 22.0,
-                    "load_percent": 85
-                },
+                "measurement_conditions": {"ambient_temp": 22.0, "load_percent": 85},
                 "source_type": "manual",
                 "notes": "Baseline captured during peak summer conditions",
-                "attachment_urls": ["https://storage.example.com/photo1.jpg"]
+                "attachment_urls": ["https://storage.example.com/photo1.jpg"],
             }
         }
     )
@@ -163,8 +167,10 @@ class EquipmentBaseline(EquipmentBaselineBase):
 # Equipment Element Models
 # ============================================================================
 
+
 class EquipmentElementBase(BaseModel):
     """Base model for equipment element."""
+
     equipment_id: str = Field(..., description="Parent equipment identifier")
     element_id: str = Field(..., description="Element identifier (unique within equipment)")
     element_type: ElementType = Field(..., description="Type of element")
@@ -179,11 +185,13 @@ class EquipmentElementBase(BaseModel):
 
 class EquipmentElementCreate(EquipmentElementBase):
     """Model for creating equipment element."""
+
     pass
 
 
 class EquipmentElement(EquipmentElementBase):
     """Model for equipment element record."""
+
     id: str = Field(..., description="Element record ID")
     created_at: datetime
     updated_at: datetime
@@ -200,7 +208,7 @@ class EquipmentElement(EquipmentElementBase):
                 "model": "6316/C3",
                 "installation_date": "2025-01-15",
                 "expected_life_days": 2555,
-                "criticality": "high"
+                "criticality": "high",
             }
         }
     )
@@ -210,8 +218,10 @@ class EquipmentElement(EquipmentElementBase):
 # Element Baseline Models
 # ============================================================================
 
+
 class ElementBaselineBase(BaseModel):
     """Base model for element baseline."""
+
     element_id: str = Field(..., description="Element identifier")
     baseline_date: datetime = Field(default_factory=datetime.now, description="Baseline capture date")
     captured_by: str = Field(..., description="Who captured the baseline")
@@ -227,11 +237,13 @@ class ElementBaselineBase(BaseModel):
 
 class ElementBaselineCreate(ElementBaselineBase):
     """Model for creating element baseline."""
+
     pass
 
 
 class ElementBaseline(ElementBaselineBase):
     """Model for element baseline record."""
+
     id: str = Field(..., description="Baseline record ID")
     created_at: datetime
     updated_at: datetime
@@ -251,13 +263,10 @@ class ElementBaseline(ElementBaselineBase):
                     "vibration_peak": 2.1,
                     "frequency_1x": 50.0,
                     "frequency_2x": 100.0,
-                    "bearing_temp": 45.2
+                    "bearing_temp": 45.2,
                 },
-                "measurement_conditions": {
-                    "load_percent": 85,
-                    "rpm": 1450
-                },
-                "notes": "Baseline captured during normal operation conditions"
+                "measurement_conditions": {"load_percent": 85, "rpm": 1450},
+                "notes": "Baseline captured during normal operation conditions",
             }
         }
     )
@@ -267,8 +276,10 @@ class ElementBaseline(ElementBaselineBase):
 # Baseline Comparison Models
 # ============================================================================
 
+
 class BaselineComparisonBase(BaseModel):
     """Base model for baseline comparison."""
+
     comparison_type: str = Field(..., description="Type: equipment_baseline or element_baseline")
     baseline_id: str = Field(..., description="Reference to baseline record")
     equipment_id: str = Field(..., description="Equipment identifier")
@@ -285,11 +296,13 @@ class BaselineComparisonBase(BaseModel):
 
 class BaselineComparisonCreate(BaselineComparisonBase):
     """Model for creating baseline comparison."""
+
     pass
 
 
 class BaselineComparison(BaselineComparisonBase):
     """Model for baseline comparison record."""
+
     id: str = Field(..., description="Comparison record ID")
     created_at: datetime
 
@@ -306,19 +319,19 @@ class BaselineComparison(BaselineComparisonBase):
                         "baseline": 7.2,
                         "current": 8.5,
                         "deviation_percent": 18.1,
-                        "status": "warning"
+                        "status": "warning",
                     },
                     "motor_current": {
                         "baseline": 145.2,
                         "current": 168.5,
                         "deviation_percent": 16.0,
-                        "status": "warning"
-                    }
+                        "status": "warning",
+                    },
                 },
                 "overall_status": "warning",
                 "max_deviation_percent": 18.1,
                 "data_source": "bms_sensor",
-                "alert_generated": False
+                "alert_generated": False,
             }
         }
     )
@@ -328,8 +341,10 @@ class BaselineComparison(BaselineComparisonBase):
 # Response Models
 # ============================================================================
 
+
 class BaselineCaptureResponse(BaseModel):
     """Response for baseline capture operations."""
+
     success: bool
     message: str
     baseline_id: str
@@ -339,6 +354,7 @@ class BaselineCaptureResponse(BaseModel):
 
 class BaselineComparisonResponse(BaseModel):
     """Response for baseline comparison."""
+
     success: bool
     comparison_id: str
     overall_status: DeviationStatus
@@ -350,6 +366,7 @@ class BaselineComparisonResponse(BaseModel):
 
 class BaselineReportResponse(BaseModel):
     """Response for baseline report."""
+
     equipment_id: str
     active_baseline: Optional[EquipmentBaseline]
     element_baselines: List[ElementBaseline]
@@ -359,6 +376,7 @@ class BaselineReportResponse(BaseModel):
 
 class DeviationSummary(BaseModel):
     """Summary of baseline deviations."""
+
     equipment_id: str
     last_comparison_date: Optional[datetime]
     overall_status: DeviationStatus
@@ -370,8 +388,10 @@ class DeviationSummary(BaseModel):
 # Request Models
 # ============================================================================
 
+
 class ManualBaselineCaptureRequest(BaseModel):
     """Request for manual baseline capture."""
+
     captured_by: str = Field(..., description="Engineer name")
     baseline_type: BaselineType = Field(default=BaselineType.INITIAL, description="Type of baseline")
     baseline_values: Dict[str, Any] = Field(..., description="Manual measurement values")
@@ -382,6 +402,7 @@ class ManualBaselineCaptureRequest(BaseModel):
 
 class ElementBaselineCaptureRequest(BaseModel):
     """Request for element baseline capture."""
+
     element_id: str = Field(..., description="Element identifier")
     captured_by: str = Field(..., description="Engineer name")
     measurement_type: MeasurementType = Field(..., description="Type of measurement")
@@ -394,6 +415,7 @@ class ElementBaselineCaptureRequest(BaseModel):
 
 class BaselineComparisonRequest(BaseModel):
     """Request for baseline comparison."""
+
     equipment_id: str = Field(..., description="Equipment to compare")
     current_values: Optional[Dict[str, Any]] = Field(None, description="Current readings (if None, fetch from BMS)")
     data_source: str = Field(default="bms_sensor", description="Source of current values")

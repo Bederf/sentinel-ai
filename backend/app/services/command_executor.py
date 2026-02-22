@@ -29,6 +29,7 @@ def load_json(filename: str) -> list[dict]:
 @dataclass
 class CommandResult:
     """Result of a command execution."""
+
     success: bool
     command_type: str
     target: str
@@ -241,8 +242,7 @@ class CommandExecutor:
         device = hvac_devices[0]
 
         # Find temperature setpoint point
-        temp_points = [p for p in device.points.values()
-                      if "temp" in p.name.lower() and p.writable]
+        temp_points = [p for p in device.points.values() if "temp" in p.name.lower() and p.writable]
 
         if not temp_points:
             # Fall back to simulated execution
@@ -286,7 +286,7 @@ class CommandExecutor:
                     target=f"{device.name} at {site['name']}",
                     action=f"set to {temp}°C",
                     message=f"Temperature setpoint on {device.name} [{device.id}] at {site['name']} set to {temp}°C. "
-                            f"Safety validation passed: {safety_result.get('message', 'OK')}",
+                    f"Safety validation passed: {safety_result.get('message', 'OK')}",
                 )
             else:
                 return CommandResult(
@@ -320,7 +320,7 @@ class CommandExecutor:
             target=site["name"],
             action=f"set to {temp}°C",
             message=f"[SIMULATED] HVAC temperature at {site['name']} [{site['id']}] set to {temp}°C. "
-                    f"Estimated time to reach target: 15-20 minutes.",
+            f"Estimated time to reach target: 15-20 minutes.",
         )
 
     def _execute_lighting(self, command: dict) -> CommandResult:
@@ -346,7 +346,7 @@ class CommandExecutor:
             target=site["name"],
             action=action,
             message=f"[SIMULATED] Lights at {site['name']} [{site['id']}] have been {action_verb}. "
-                    f"Energy saving mode: {'disabled' if action == 'on' else 'enabled'}.",
+            f"Energy saving mode: {'disabled' if action == 'on' else 'enabled'}.",
         )
 
     def _execute_emergency(self, command: dict) -> CommandResult:
@@ -362,7 +362,7 @@ class CommandExecutor:
                 target=eq["name"],
                 action="isolated",
                 message=f"[SIMULATED] EMERGENCY: {eq['name']} [{eq['id']}] at site {eq['site_id']} has been isolated. "
-                        f"All connected systems have been notified. Manual inspection required before restart.",
+                f"All connected systems have been notified. Manual inspection required before restart.",
             )
 
         site = self._find_site(target)
@@ -373,7 +373,7 @@ class CommandExecutor:
                 target=site["name"],
                 action="isolated",
                 message=f"[SIMULATED] EMERGENCY: Site {site['name']} [{site['id']}] has been isolated. "
-                        f"All building systems set to safe mode. On-site technician dispatch recommended.",
+                f"All building systems set to safe mode. On-site technician dispatch recommended.",
             )
 
         return CommandResult(

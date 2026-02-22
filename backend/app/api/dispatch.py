@@ -34,9 +34,7 @@ router = APIRouter()
 class EvaluateDispatchRequest(BaseModel):
     """Body for POST /api/dispatch/evaluate."""
 
-    equipment_id: str = Field(
-        ..., description="Equipment ID to evaluate (v2.0 format, e.g. S002-CHILLER-B1-001)"
-    )
+    equipment_id: str = Field(..., description="Equipment ID to evaluate (v2.0 format, e.g. S002-CHILLER-B1-001)")
 
 
 class AdditionalTask(BaseModel):
@@ -55,12 +53,8 @@ class CreateDispatchRequest(BaseModel):
 
     site_id: str = Field(..., description="Target site ID (e.g. site-002)")
     equipment_id: str = Field(..., description="Primary equipment ID triggering dispatch")
-    technician_id: Optional[str] = Field(
-        None, description="Technician ID (auto-assigned if omitted)"
-    )
-    additional_tasks: Optional[List[AdditionalTask]] = Field(
-        None, description="Extra tasks to include"
-    )
+    technician_id: Optional[str] = Field(None, description="Technician ID (auto-assigned if omitted)")
+    additional_tasks: Optional[List[AdditionalTask]] = Field(None, description="Extra tasks to include")
 
 
 class CompleteTaskItem(BaseModel):
@@ -74,9 +68,7 @@ class CompleteTaskItem(BaseModel):
 class CompleteDispatchRequest(BaseModel):
     """Body for POST /api/dispatch/{dispatch_id}/complete."""
 
-    tasks_completed: Optional[List[CompleteTaskItem]] = Field(
-        None, description="Tasks completed with results"
-    )
+    tasks_completed: Optional[List[CompleteTaskItem]] = Field(None, description="Tasks completed with results")
     overall_notes: str = Field(default="", description="Overall dispatch notes")
 
 
@@ -154,9 +146,7 @@ async def get_dispatch_briefing(dispatch_id: str):
 
     dispatch = svc._active_dispatches.get(dispatch_id)
     if not dispatch:
-        raise HTTPException(
-            status_code=404, detail=f"Dispatch {dispatch_id} not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Dispatch {dispatch_id} not found")
 
     try:
         briefing = await svc.generate_site_briefing(
@@ -182,13 +172,9 @@ async def check_in_dispatch(dispatch_id: str, request: Request):
     # Get technician from dispatch (or header)
     dispatch = svc._active_dispatches.get(dispatch_id)
     if not dispatch:
-        raise HTTPException(
-            status_code=404, detail=f"Dispatch {dispatch_id} not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Dispatch {dispatch_id} not found")
 
-    technician_id = request.headers.get(
-        "X-User-Id", dispatch["technician_id"]
-    )
+    technician_id = request.headers.get("X-User-Id", dispatch["technician_id"])
 
     result = svc.check_in(dispatch_id, technician_id)
     if not result["success"]:
@@ -198,9 +184,7 @@ async def check_in_dispatch(dispatch_id: str, request: Request):
 
 
 @router.post("/{dispatch_id}/complete")
-async def complete_dispatch(
-    dispatch_id: str, body: CompleteDispatchRequest
-):
+async def complete_dispatch(dispatch_id: str, body: CompleteDispatchRequest):
     """Complete a dispatch and record metrics.
 
     Marks individual tasks as completed, then closes the dispatch.
@@ -211,9 +195,7 @@ async def complete_dispatch(
 
     dispatch = svc._active_dispatches.get(dispatch_id)
     if not dispatch:
-        raise HTTPException(
-            status_code=404, detail=f"Dispatch {dispatch_id} not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Dispatch {dispatch_id} not found")
 
     # Mark individual tasks
     if body.tasks_completed:
@@ -225,9 +207,7 @@ async def complete_dispatch(
             )
 
     # Complete the dispatch
-    result = svc.complete_dispatch(
-        dispatch_id, overall_notes=body.overall_notes
-    )
+    result = svc.complete_dispatch(dispatch_id, overall_notes=body.overall_notes)
 
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result.get("error"))

@@ -70,16 +70,12 @@ async def list_controllable_equipment(
 
     # Filter by building
     if building_id:
-        all_equipment = [
-            eq for eq in all_equipment
-            if eq.get("building_id") == building_id
-        ]
+        all_equipment = [eq for eq in all_equipment if eq.get("building_id") == building_id]
 
     # Filter by zone (via name/location)
     if zone_id:
         all_equipment = [
-            eq for eq in all_equipment
-            if zone_id in eq.get("location", "") or zone_id in eq.get("name", "")
+            eq for eq in all_equipment if zone_id in eq.get("location", "") or zone_id in eq.get("name", "")
         ]
 
     # Separate controllable from non-controllable
@@ -140,22 +136,13 @@ async def get_device_controls(equipment_code: str) -> Dict[str, Any]:
         eq_type = device_control_service.get_equipment_type(equipment_code)
 
         if not eq_type:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid equipment code: {equipment_code}"
-            )
+            raise HTTPException(status_code=400, detail=f"Invalid equipment code: {equipment_code}")
 
         # Get equipment details - filter from all equipment by code
         all_equipment = equipment_repo.get_all()
-        equipment = next(
-            (eq for eq in all_equipment if eq.get("code") == equipment_code),
-            None
-        )
+        equipment = next((eq for eq in all_equipment if eq.get("code") == equipment_code), None)
         if not equipment:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Equipment not found: {equipment_code}"
-            )
+            raise HTTPException(status_code=404, detail=f"Equipment not found: {equipment_code}")
 
         # Get control points
         control_points = device_control_service.get_control_points(equipment_code)
@@ -186,10 +173,7 @@ async def get_device_controls(equipment_code: str) -> Dict[str, Any]:
         raise
     except Exception as e:
         logger.error(f"Error in get_device_controls: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @router.post("/{equipment_code}/validate")
@@ -213,9 +197,7 @@ async def validate_control_value(
         "warnings": []
     }
     """
-    result = device_control_service.validate_control_value(
-        equipment_code, control_point, value
-    )
+    result = device_control_service.validate_control_value(equipment_code, control_point, value)
 
     return {
         "valid": result["valid"],
@@ -233,10 +215,7 @@ async def get_device_status(equipment_code: str) -> Dict[str, Any]:
     """
     equipment = equipment_repo.get_by_code(equipment_code)
     if not equipment:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Equipment not found: {equipment_code}"
-        )
+        raise HTTPException(status_code=404, detail=f"Equipment not found: {equipment_code}")
 
     return {
         "code": equipment_code,
@@ -278,31 +257,20 @@ async def recommend_control(
     }
     """
     # Validate the control value
-    validation = device_control_service.validate_control_value(
-        equipment_code, suggested_point, suggested_value
-    )
+    validation = device_control_service.validate_control_value(equipment_code, suggested_point, suggested_value)
 
     if not validation["valid"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid control value: {validation['errors']}"
-        )
+        raise HTTPException(status_code=400, detail=f"Invalid control value: {validation['errors']}")
 
     # Get equipment details for site_id
     all_equipment = equipment_repo.get_all()
-    equipment = next(
-        (eq for eq in all_equipment if eq.get("code") == equipment_code),
-        None
-    )
+    equipment = next((eq for eq in all_equipment if eq.get("code") == equipment_code), None)
     if not equipment:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Equipment not found: {equipment_code}"
-        )
+        raise HTTPException(status_code=404, detail=f"Equipment not found: {equipment_code}")
 
     # Determine site_id from equipment (format: S002-XXX, site-005-XXX, etc.)
     # Extract site prefix from equipment code
-    parts = equipment_code.split('-')
+    parts = equipment_code.split("-")
     site_id = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 and parts[0] == "site" else parts[0]
 
     # Create recommendation
@@ -336,14 +304,11 @@ async def recommend_control(
             "control_point": suggested_point,
             "target_value": suggested_value,
             "created_at": created_rec.timestamp.isoformat(),
-            "next_action": "Operator approval required"
+            "next_action": "Operator approval required",
         }
     except Exception as e:
         logger.error(f"Error creating recommendation: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to create recommendation: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to create recommendation: {str(e)}")
 
 
 @router.post("/{equipment_code}/execute")
@@ -373,30 +338,19 @@ async def execute_control(
     }
     """
     # Validate
-    validation = device_control_service.validate_control_value(
-        equipment_code, control_point, target_value
-    )
+    validation = device_control_service.validate_control_value(equipment_code, control_point, target_value)
 
     if not validation["valid"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid control value: {validation['errors']}"
-        )
+        raise HTTPException(status_code=400, detail=f"Invalid control value: {validation['errors']}")
 
     # Get equipment details
     all_equipment = equipment_repo.get_all()
-    equipment = next(
-        (eq for eq in all_equipment if eq.get("code") == equipment_code),
-        None
-    )
+    equipment = next((eq for eq in all_equipment if eq.get("code") == equipment_code), None)
     if not equipment:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Equipment not found: {equipment_code}"
-        )
+        raise HTTPException(status_code=404, detail=f"Equipment not found: {equipment_code}")
 
     # Extract site_id
-    parts = equipment_code.split('-')
+    parts = equipment_code.split("-")
     site_id = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 and parts[0] == "site" else parts[0]
 
     try:
@@ -424,7 +378,7 @@ async def execute_control(
                 "target_value": target_value,
                 "actual_value": target_value,  # TODO: Verify COV from device
                 "cov_verified": True,
-            }
+            },
         )
 
         # Save execution record
@@ -442,10 +396,7 @@ async def execute_control(
         }
     except Exception as e:
         logger.error(f"Error executing control: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to execute control: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to execute control: {str(e)}")
 
 
 @router.get("/{equipment_code}/history")
@@ -461,18 +412,12 @@ async def get_control_history(
     """
     # Get equipment to determine site_id
     all_equipment = equipment_repo.get_all()
-    equipment = next(
-        (eq for eq in all_equipment if eq.get("code") == equipment_code),
-        None
-    )
+    equipment = next((eq for eq in all_equipment if eq.get("code") == equipment_code), None)
     if not equipment:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Equipment not found: {equipment_code}"
-        )
+        raise HTTPException(status_code=404, detail=f"Equipment not found: {equipment_code}")
 
     # Extract site_id from equipment code
-    parts = equipment_code.split('-')
+    parts = equipment_code.split("-")
     site_id = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 and parts[0] == "site" else parts[0]
 
     try:
@@ -481,24 +426,23 @@ async def get_control_history(
         all_history = await rec_repo.get_history(site_id, limit=limit * 2)
 
         # Filter to this specific equipment
-        equipment_history = [
-            rec for rec in all_history
-            if rec.target_equipment == equipment_code
-        ][:limit]
+        equipment_history = [rec for rec in all_history if rec.target_equipment == equipment_code][:limit]
 
         # Format for response
         history_items = []
         for rec in equipment_history:
-            history_items.append({
-                "id": rec.id,
-                "control_point": rec.action.get("point", ""),
-                "target_value": rec.action.get("value"),
-                "status": rec.status.value if hasattr(rec.status, 'value') else str(rec.status),
-                "reason": rec.reason,
-                "approved_by": rec.approved_by,
-                "executed_at": rec.executed_at.isoformat() if rec.executed_at else None,
-                "timestamp": rec.timestamp.isoformat() if rec.timestamp else None,
-            })
+            history_items.append(
+                {
+                    "id": rec.id,
+                    "control_point": rec.action.get("point", ""),
+                    "target_value": rec.action.get("value"),
+                    "status": rec.status.value if hasattr(rec.status, "value") else str(rec.status),
+                    "reason": rec.reason,
+                    "approved_by": rec.approved_by,
+                    "executed_at": rec.executed_at.isoformat() if rec.executed_at else None,
+                    "timestamp": rec.timestamp.isoformat() if rec.timestamp else None,
+                }
+            )
 
         return {
             "equipment_code": equipment_code,
@@ -507,7 +451,4 @@ async def get_control_history(
         }
     except Exception as e:
         logger.error(f"Error querying control history: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to retrieve control history: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve control history: {str(e)}")

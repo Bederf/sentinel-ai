@@ -65,7 +65,7 @@ class TestBatchSafetyStatus:
                 "dev-1": {"severity": "SAFE", "last_checked": "2026-02-10T10:00:00Z"},
                 "dev-2": {"severity": "WARNING", "last_checked": "2026-02-10T10:00:00Z"},
             },
-            "errors": {}
+            "errors": {},
         }
 
         # Verify O(1) lookup works
@@ -75,14 +75,7 @@ class TestBatchSafetyStatus:
     @pytest.mark.unit
     def test_batch_safety_status_includes_errors(self):
         """Test that missing devices are reported in errors dict."""
-        response = {
-            "results": {
-                "dev-1": {"severity": "SAFE"}
-            },
-            "errors": {
-                "dev-missing": "Device not found"
-            }
-        }
+        response = {"results": {"dev-1": {"severity": "SAFE"}}, "errors": {"dev-missing": "Device not found"}}
 
         assert len(response["results"]) == 1
         assert len(response["errors"]) == 1
@@ -97,18 +90,10 @@ class TestBatchLatestReadings:
         """Test batch readings endpoint returns status for each device."""
         response = {
             "results": {
-                "dev-1": {
-                    "status": "online",
-                    "last_seen": "2026-02-10T10:00:00Z",
-                    "temperature": 22.5
-                },
-                "dev-2": {
-                    "status": "online",
-                    "last_seen": "2026-02-10T10:00:00Z",
-                    "brightness": 85
-                }
+                "dev-1": {"status": "online", "last_seen": "2026-02-10T10:00:00Z", "temperature": 22.5},
+                "dev-2": {"status": "online", "last_seen": "2026-02-10T10:00:00Z", "brightness": 85},
             },
-            "errors": {}
+            "errors": {},
         }
 
         assert len(response["results"]) == 2
@@ -124,14 +109,7 @@ class TestBatchLatestReadings:
     @pytest.mark.unit
     def test_batch_readings_includes_errors_for_missing(self):
         """Test that missing devices are reported in errors."""
-        response = {
-            "results": {
-                "dev-1": {"status": "online"}
-            },
-            "errors": {
-                "dev-offline": "Device not found"
-            }
-        }
+        response = {"results": {"dev-1": {"status": "online"}}, "errors": {"dev-offline": "Device not found"}}
 
         assert "dev-offline" in response["errors"]
         assert response["errors"]["dev-offline"] == "Device not found"
@@ -152,13 +130,10 @@ class TestBatchCondition:
                     "status": "online",
                     "last_seen": "2026-02-10T10:00:00Z",
                     "updated_at": "2026-02-10T10:00:00Z",
-                    "safety_status": {
-                        "severity": "SAFE",
-                        "last_checked": "2026-02-10T10:00:00Z"
-                    }
+                    "safety_status": {"severity": "SAFE", "last_checked": "2026-02-10T10:00:00Z"},
                 }
             },
-            "errors": {}
+            "errors": {},
         }
 
         device = response["results"]["dev-1"]
@@ -174,13 +149,10 @@ class TestBatchCondition:
                 "dev-1": {
                     "id": "dev-1",
                     "status": "online",
-                    "safety_status": {
-                        "severity": "WARNING",
-                        "last_checked": "2026-02-10T10:00:00Z"
-                    }
+                    "safety_status": {"severity": "WARNING", "last_checked": "2026-02-10T10:00:00Z"},
                 }
             },
-            "errors": {}
+            "errors": {},
         }
 
         assert "safety_status" in response["results"]["dev-1"]
@@ -197,45 +169,21 @@ class TestSiteSummary:
             "site_id": "site-002",
             "equipment": {
                 "total_count": 15,
-                "by_type": {
-                    "chiller": 2,
-                    "ahu": 3,
-                    "fcu": 8,
-                    "dali": 2
-                },
+                "by_type": {"chiller": 2, "ahu": 3, "fcu": 8, "dali": 2},
                 "critical_count": 0,
-                "warning_count": 1
+                "warning_count": 1,
             },
-            "safety": {
-                "devices_checked": 15,
-                "safe_devices": 14,
-                "warning_devices": 1,
-                "critical_devices": 0
-            },
+            "safety": {"devices_checked": 15, "safe_devices": 14, "warning_devices": 1, "critical_devices": 0},
             "alerts": {
                 "total_count": 3,
                 "critical_count": 0,
                 "warning_count": 2,
                 "info_count": 1,
-                "recent_alerts": [
-                    {
-                        "id": "alert-1",
-                        "severity": "warning",
-                        "created_at": "2026-02-10T10:00:00Z"
-                    }
-                ]
+                "recent_alerts": [{"id": "alert-1", "severity": "warning", "created_at": "2026-02-10T10:00:00Z"}],
             },
-            "predictions": {
-                "total_count": 2,
-                "critical_count": 0,
-                "warning_count": 1
-            },
-            "energy": {
-                "current_power_usage": 45.5,
-                "daily_consumption": 850.0,
-                "solar_generation": 120.0
-            },
-            "last_updated": "2026-02-10T10:00:00Z"
+            "predictions": {"total_count": 2, "critical_count": 0, "warning_count": 1},
+            "energy": {"current_power_usage": 45.5, "daily_consumption": 850.0, "solar_generation": 120.0},
+            "last_updated": "2026-02-10T10:00:00Z",
         }
 
         assert response["site_id"] == "site-002"
@@ -249,13 +197,7 @@ class TestSiteSummary:
         """Test that alerts are aggregated by severity."""
         response = {
             "site_id": "site-002",
-            "alerts": {
-                "total_count": 6,
-                "critical_count": 1,
-                "warning_count": 3,
-                "info_count": 2,
-                "recent_alerts": []
-            }
+            "alerts": {"total_count": 6, "critical_count": 1, "warning_count": 3, "info_count": 2, "recent_alerts": []},
         }
 
         assert response["alerts"]["total_count"] == 6
@@ -268,14 +210,7 @@ class TestSiteSummary:
         """Test that equipment is aggregated by type."""
         response = {
             "site_id": "site-002",
-            "equipment": {
-                "total_count": 10,
-                "by_type": {
-                    "chiller": 2,
-                    "ahu": 3,
-                    "fcu": 5
-                }
-            }
+            "equipment": {"total_count": 10, "by_type": {"chiller": 2, "ahu": 3, "fcu": 5}},
         }
 
         assert response["equipment"]["by_type"]["chiller"] == 2
@@ -300,7 +235,7 @@ class TestSiteAlerts:
             "alerts": [
                 {"id": "alert-1", "severity": "critical"},
                 {"id": "alert-2", "severity": "warning"},
-            ]
+            ],
         }
 
         assert response["page"] == 1
@@ -319,13 +254,15 @@ class TestSiteAlerts:
             "info_count": 18,
             "page": 1,
             "page_size": 20,
-            "alerts": []
+            "alerts": [],
         }
 
         assert response["critical_count"] == 2
         assert response["warning_count"] == 10
         assert response["info_count"] == 18
-        assert response["critical_count"] + response["warning_count"] + response["info_count"] == response["total_count"]
+        assert (
+            response["critical_count"] + response["warning_count"] + response["info_count"] == response["total_count"]
+        )
 
     @pytest.mark.unit
     def test_site_alerts_pagination(self):
@@ -335,7 +272,7 @@ class TestSiteAlerts:
             "total_count": 100,
             "page": 1,
             "page_size": 20,
-            "alerts": [{"id": f"alert-{i}"} for i in range(1, 21)]
+            "alerts": [{"id": f"alert-{i}"} for i in range(1, 21)],
         }
 
         # Page 2
@@ -343,7 +280,7 @@ class TestSiteAlerts:
             "total_count": 100,
             "page": 2,
             "page_size": 20,
-            "alerts": [{"id": f"alert-{i}"} for i in range(21, 41)]
+            "alerts": [{"id": f"alert-{i}"} for i in range(21, 41)],
         }
 
         assert len(response_p1["alerts"]) == 20
@@ -365,11 +302,7 @@ class TestBackwardCompatibility:
     def test_individual_safety_status_still_works(self):
         """Test that individual device safety status endpoint still works."""
         # Individual endpoint should still be functional
-        response = {
-            "severity": "SAFE",
-            "last_checked": "2026-02-10T10:00:00Z",
-            "device_id": "dev-1"
-        }
+        response = {"severity": "SAFE", "last_checked": "2026-02-10T10:00:00Z", "device_id": "dev-1"}
 
         assert response["severity"] == "SAFE"
         assert response["device_id"] == "dev-1"
@@ -387,7 +320,7 @@ class TestBackwardCompatibility:
             "/api/devices/{device_id}/status",
             "/api/devices/{device_id}/safety-status",
             "/api/devices/{device_id}/points",
-            "/api/devices/{device_id}/control"
+            "/api/devices/{device_id}/control",
         ]
 
         assert len(individual_endpoints) >= 5
@@ -406,7 +339,7 @@ class TestRateLimiting:
             "batch_readings": "30/minute",
             "batch_condition": "30/minute",
             "site_summary": "30/minute",
-            "site_alerts": "30/minute"
+            "site_alerts": "30/minute",
         }
 
         assert all(v == "30/minute" for v in limits.values())
@@ -437,14 +370,7 @@ class TestErrorHandling:
     @pytest.mark.unit
     def test_missing_devices_reported_in_errors(self):
         """Test that missing devices appear in errors dict, not results."""
-        response = {
-            "results": {
-                "dev-1": {"status": "online"}
-            },
-            "errors": {
-                "dev-missing": "Device not found"
-            }
-        }
+        response = {"results": {"dev-1": {"status": "online"}}, "errors": {"dev-missing": "Device not found"}}
 
         assert "dev-missing" not in response["results"]
         assert "dev-missing" in response["errors"]

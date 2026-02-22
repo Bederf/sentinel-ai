@@ -50,16 +50,22 @@ class LoginAuditRepository:
             return None
 
         try:
-            result = self.client.table("login_audit").insert({
-                "user_email": user_email.lower().strip(),
-                "user_id": user_id,
-                "user_role": user_role,
-                "source_ip": source_ip,
-                "user_agent": user_agent,
-                "is_new_user": is_new_user,
-                "success": success,
-                "failure_reason": failure_reason,
-            }).execute()
+            result = (
+                self.client.table("login_audit")
+                .insert(
+                    {
+                        "user_email": user_email.lower().strip(),
+                        "user_id": user_id,
+                        "user_role": user_role,
+                        "source_ip": source_ip,
+                        "user_agent": user_agent,
+                        "is_new_user": is_new_user,
+                        "success": success,
+                        "failure_reason": failure_reason,
+                    }
+                )
+                .execute()
+            )
 
             if result.data:
                 return result.data[0]
@@ -135,9 +141,12 @@ class LoginAuditRepository:
             cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
 
             # Get all logins in period
-            result = self.client.table("login_audit").select(
-                "user_email, success, is_new_user"
-            ).gte("login_at", cutoff).execute()
+            result = (
+                self.client.table("login_audit")
+                .select("user_email, success, is_new_user")
+                .gte("login_at", cutoff)
+                .execute()
+            )
 
             records = result.data or []
 
@@ -160,9 +169,7 @@ class LoginAuditRepository:
             logger.error(f"Error getting login stats: {e}")
             return {"total": 0, "successful": 0, "failed": 0, "new_users": 0, "unique_users": 0}
 
-    def get_user_login_history(
-        self, user_email: str, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    def get_user_login_history(self, user_email: str, limit: int = 50) -> List[Dict[str, Any]]:
         """
         Get login history for a specific user.
 
@@ -196,9 +203,12 @@ class LoginAuditRepository:
         try:
             cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
 
-            result = self.client.table("login_audit").select(
-                "user_email, source_ip, success, is_new_user"
-            ).gte("login_at", cutoff).execute()
+            result = (
+                self.client.table("login_audit")
+                .select("user_email, source_ip, success, is_new_user")
+                .gte("login_at", cutoff)
+                .execute()
+            )
 
             records = result.data or []
 
@@ -223,9 +233,7 @@ class LoginAuditRepository:
 
             # Users with 5+ different IPs
             multi_ip_users = [
-                {"email": email, "ip_count": len(ips)}
-                for email, ips in user_ips.items()
-                if len(ips) >= 5
+                {"email": email, "ip_count": len(ips)} for email, ips in user_ips.items() if len(ips) >= 5
             ]
 
             # New user surge (more than 10 new users in period)

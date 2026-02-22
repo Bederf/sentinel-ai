@@ -28,6 +28,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class OrganizationTier(str, Enum):
     """Organization tier matching organizations.tier CHECK constraint."""
+
     PLATINUM = "platinum"
     GOLD = "gold"
     SILVER = "silver"
@@ -36,6 +37,7 @@ class OrganizationTier(str, Enum):
 
 class OrganizationStatus(str, Enum):
     """Organization status matching organizations.status CHECK constraint."""
+
     ACTIVE = "active"
     SUSPENDED = "suspended"
     TERMINATED = "terminated"
@@ -43,6 +45,7 @@ class OrganizationStatus(str, Enum):
 
 class ContractStatus(str, Enum):
     """Contract lifecycle status matching contracts.status CHECK constraint."""
+
     DRAFT = "draft"
     PENDING_APPROVAL = "pending_approval"
     ACTIVE = "active"
@@ -53,6 +56,7 @@ class ContractStatus(str, Enum):
 
 class ContractType(str, Enum):
     """Contract type matching contracts.contract_type CHECK constraint."""
+
     COMPREHENSIVE = "comprehensive"
     PREVENTIVE = "preventive"
     REACTIVE = "reactive"
@@ -61,6 +65,7 @@ class ContractType(str, Enum):
 
 class SLAType(str, Enum):
     """SLA type matching sla_terms.sla_type CHECK constraint."""
+
     UPTIME = "uptime"
     RESPONSE_TIME = "response_time"
     RESOLUTION_TIME = "resolution_time"
@@ -70,6 +75,7 @@ class SLAType(str, Enum):
 
 class SLAPriority(str, Enum):
     """SLA priority level matching sla_terms.priority CHECK constraint."""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -79,6 +85,7 @@ class SLAPriority(str, Enum):
 
 class MeasurementPeriod(str, Enum):
     """Measurement period matching sla_terms.measurement_period CHECK constraint."""
+
     MONTHLY = "monthly"
     QUARTERLY = "quarterly"
     ANNUALLY = "annually"
@@ -86,6 +93,7 @@ class MeasurementPeriod(str, Enum):
 
 class PenaltyType(str, Enum):
     """Penalty type matching sla_terms.penalty_type CHECK constraint."""
+
     PERCENTAGE = "percentage"
     FIXED = "fixed"
     TIERED = "tiered"
@@ -93,6 +101,7 @@ class PenaltyType(str, Enum):
 
 class CoverageType(str, Enum):
     """Asset coverage type matching asset_contracts.coverage_type CHECK constraint."""
+
     FULL = "full"
     PARTS_ONLY = "parts_only"
     LABOR_ONLY = "labor_only"
@@ -101,6 +110,7 @@ class CoverageType(str, Enum):
 
 class CriticalityTier(str, Enum):
     """Asset criticality matching asset_contracts.criticality CHECK constraint."""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -109,6 +119,7 @@ class CriticalityTier(str, Enum):
 
 class AssessmentType(str, Enum):
     """Assessment type matching condition_assessments.assessment_type CHECK constraint."""
+
     INITIAL = "initial"
     ANNUAL = "annual"
     HANDOVER = "handover"
@@ -117,6 +128,7 @@ class AssessmentType(str, Enum):
 
 class AssessmentStatus(str, Enum):
     """Assessment status matching condition_assessments.status CHECK constraint."""
+
     DRAFT = "draft"
     SUBMITTED = "submitted"
     APPROVED = "approved"
@@ -125,6 +137,7 @@ class AssessmentStatus(str, Enum):
 
 class FailureRisk(str, Enum):
     """Failure risk level matching condition_assessments.estimated_failure_risk CHECK."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -133,6 +146,7 @@ class FailureRisk(str, Enum):
 
 class BudgetStatus(str, Enum):
     """Budget status matching budgets.status CHECK constraint."""
+
     DRAFT = "draft"
     APPROVED = "approved"
     LOCKED = "locked"
@@ -140,6 +154,7 @@ class BudgetStatus(str, Enum):
 
 class SLAPerformanceStatus(str, Enum):
     """SLA performance status matching sla_performance.status CHECK constraint."""
+
     PENDING = "pending"
     CALCULATED = "calculated"
     INVOICED = "invoiced"
@@ -149,6 +164,7 @@ class SLAPerformanceStatus(str, Enum):
 
 class ProfitabilityStatus(str, Enum):
     """Profitability status matching contract_profitability.status CHECK constraint."""
+
     PRELIMINARY = "preliminary"
     FINAL = "final"
     AUDITED = "audited"
@@ -161,6 +177,7 @@ class ProfitabilityStatus(str, Enum):
 
 class LaborCostType(str, Enum):
     """Labor cost subcategory for detailed tracking."""
+
     PLANNED_MAINTENANCE = "planned_maintenance"
     EMERGENCY_CALLOUT = "emergency_callout"
     BREAKDOWN_REPAIR = "breakdown_repair"
@@ -170,6 +187,7 @@ class LaborCostType(str, Enum):
 
 class PartsCostType(str, Enum):
     """Parts cost subcategory for detailed tracking."""
+
     SCHEDULED_REPLACEMENT = "scheduled_replacement"
     UNPLANNED_REPAIR = "unplanned_repair"
     CONSUMABLES = "consumables"
@@ -178,6 +196,7 @@ class PartsCostType(str, Enum):
 
 class CalloutType(str, Enum):
     """Callout type for billing differentiation."""
+
     BUSINESS_HOURS = "business_hours"
     AFTER_HOURS = "after_hours"
     WEEKEND = "weekend"
@@ -191,6 +210,7 @@ class CalloutType(str, Enum):
 
 class CostLineItem(BaseModel):
     """Individual cost line item for work orders and service feedback."""
+
     model_config = ConfigDict(from_attributes=True)
 
     category: str = Field(..., description="Cost category: labor, parts, subcontractor, callout")
@@ -206,16 +226,18 @@ class CostLineItem(BaseModel):
 
 class BudgetTemplate(BaseModel):
     """Budget template for equipment-type specific budget defaults."""
+
     model_config = ConfigDict(from_attributes=True)
 
-    equipment_type: str = Field(..., description="Equipment type: chiller, ahu, generator, dali_controller, power_meter")
+    equipment_type: str = Field(
+        ..., description="Equipment type: chiller, ahu, generator, dali_controller, power_meter"
+    )
     annual_hours_planned: int = Field(..., ge=0, description="Expected planned maintenance hours per year")
     callouts_per_year: int = Field(..., ge=0, description="Average emergency callouts per year")
     parts_replacement_cycle_months: int = Field(..., ge=1, description="Typical parts replacement cycle in months")
     labor_rate_zar: float = Field(..., ge=0, description="Standard labor rate per hour in ZAR")
     typical_monthly_breakdown: Dict[str, float] = Field(
-        ...,
-        description="Monthly budget breakdown by category: labor_budget_zar, parts_budget_zar, etc."
+        ..., description="Monthly budget breakdown by category: labor_budget_zar, parts_budget_zar, etc."
     )
 
 
@@ -226,6 +248,7 @@ class BudgetTemplate(BaseModel):
 
 class SLAMetricType(str, Enum):
     """SLA metric type for compliance tracking (Phase 50)."""
+
     RESPONSE_TIME = "response_time"  # Time to acknowledge
     RESOLUTION_TIME = "resolution_time"  # Time to fix
     UPTIME_PERCENTAGE = "uptime_percentage"
@@ -235,6 +258,7 @@ class SLAMetricType(str, Enum):
 
 class SLABreachSeverity(str, Enum):
     """SLA breach severity levels (Phase 50)."""
+
     MINOR = "minor"  # 10-20% breach
     MAJOR = "major"  # 20-50% breach
     CRITICAL = "critical"  # >50% breach or safety-critical failure
@@ -242,6 +266,7 @@ class SLABreachSeverity(str, Enum):
 
 class SLAComplianceStatus(str, Enum):
     """SLA compliance status for real-time monitoring (Phase 50)."""
+
     COMPLIANT = "compliant"
     WARNING = "warning"  # 90-99% compliant
     BREACH = "breach"  # <90% compliant
@@ -254,6 +279,7 @@ class SLAComplianceStatus(str, Enum):
 
 class OrganizationCreate(BaseModel):
     """Data required to create a new organization."""
+
     code: str = Field(..., description="Unique org code, e.g. 'SITE-002'")
     name: str = Field(..., description="Full legal name")
     trading_name: Optional[str] = None
@@ -272,6 +298,7 @@ class OrganizationCreate(BaseModel):
 
 class OrganizationUpdate(BaseModel):
     """Partial update for an organization."""
+
     name: Optional[str] = None
     trading_name: Optional[str] = None
     registration_number: Optional[str] = None
@@ -289,6 +316,7 @@ class OrganizationUpdate(BaseModel):
 
 class Organization(BaseModel):
     """Full organization record from database."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -317,6 +345,7 @@ class Organization(BaseModel):
 
 class ContractCreate(BaseModel):
     """Data required to create a new contract."""
+
     code: str = Field(..., description="Unique contract code, e.g. 'CON-SITE-002-2026-001'")
     organization_id: str
     building_id: str
@@ -338,6 +367,7 @@ class ContractCreate(BaseModel):
 
 class ContractUpdate(BaseModel):
     """Partial update for a contract."""
+
     contract_type: Optional[ContractType] = None
     end_date: Optional[date] = None
     auto_renew: Optional[bool] = None
@@ -358,6 +388,7 @@ class ContractUpdate(BaseModel):
 
 class Contract(BaseModel):
     """Full contract record from database."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -392,6 +423,7 @@ class Contract(BaseModel):
 
 class SLATermCreate(BaseModel):
     """Data required to create an SLA term."""
+
     contract_id: str
     sla_type: SLAType
     target_value: float
@@ -407,6 +439,7 @@ class SLATermCreate(BaseModel):
 
 class SLATermUpdate(BaseModel):
     """Partial update for an SLA term."""
+
     target_value: Optional[float] = None
     target_unit: Optional[str] = None
     priority: Optional[SLAPriority] = None
@@ -420,6 +453,7 @@ class SLATermUpdate(BaseModel):
 
 class SLATerm(BaseModel):
     """Full SLA term record from database."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -445,6 +479,7 @@ class SLATerm(BaseModel):
 
 class AssetContractCreate(BaseModel):
     """Data required to link equipment to a contract."""
+
     contract_id: str
     equipment_id: str
     allocated_fee_zar: Optional[float] = None
@@ -459,6 +494,7 @@ class AssetContractCreate(BaseModel):
 
 class AssetContract(BaseModel):
     """Full asset contract link from database."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -483,6 +519,7 @@ class AssetContract(BaseModel):
 
 class ConditionAssessmentCreate(BaseModel):
     """Data required to create a condition assessment."""
+
     code: str = Field(..., description="Unique code, e.g. 'CA-001-2026-001'")
     building_id: Optional[str] = None
     equipment_id: Optional[str] = None
@@ -507,6 +544,7 @@ class ConditionAssessmentCreate(BaseModel):
 
 class ConditionAssessment(BaseModel):
     """Full condition assessment record from database."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -544,6 +582,7 @@ class ConditionAssessment(BaseModel):
 
 class BudgetCreate(BaseModel):
     """Data required to create a budget entry."""
+
     code: str = Field(..., description="Unique code, e.g. 'BUD-SITE-002-SANDTON-2026'")
     contract_id: str
     equipment_type: Optional[str] = None
@@ -561,6 +600,7 @@ class BudgetCreate(BaseModel):
 
 class BudgetUpdate(BaseModel):
     """Partial update for a budget entry (typically actuals updates)."""
+
     labor_budget_zar: Optional[float] = None
     parts_budget_zar: Optional[float] = None
     consumables_budget_zar: Optional[float] = None
@@ -581,6 +621,7 @@ class BudgetUpdate(BaseModel):
 
 class Budget(BaseModel):
     """Full budget record from database."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -619,6 +660,7 @@ class Budget(BaseModel):
 
 class SLAPerformance(BaseModel):
     """SLA performance tracking record from database."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -643,6 +685,7 @@ class SLAPerformance(BaseModel):
 
 class SLAPerformanceWithCompliance(BaseModel):
     """Extended SLA performance with compliance tracking (Phase 50)."""
+
     model_config = ConfigDict(from_attributes=True)
 
     # Base SLAPerformance fields
@@ -676,6 +719,7 @@ class SLAPerformanceWithCompliance(BaseModel):
 
 class SLABreachEvent(BaseModel):
     """SLA breach event record for real-time tracking (Phase 50)."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: Optional[str] = None
@@ -700,6 +744,7 @@ class SLABreachEvent(BaseModel):
 
 class ContractProfitability(BaseModel):
     """Contract profitability monthly roll-up from database."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -738,6 +783,7 @@ class ContractProfitability(BaseModel):
 
 class PortfolioMetrics(BaseModel):
     """Portfolio-wide profitability metrics aggregation."""
+
     total_contracts: int
     total_revenue_zar: float
     total_cost_zar: float
@@ -752,6 +798,7 @@ class PortfolioMetrics(BaseModel):
 
 class ContractProfitabilityDetail(BaseModel):
     """Detailed per-contract profitability breakdown."""
+
     contract_id: str
     contract_name: str
     building_id: str
@@ -786,6 +833,7 @@ class ContractProfitabilityDetail(BaseModel):
 
 class ProfitabilityTrend(BaseModel):
     """Monthly profitability trend data point."""
+
     contract_id: str
     period: str  # "2026-01" format
     revenue_zar: float
@@ -797,17 +845,14 @@ class ProfitabilityTrend(BaseModel):
 
 class LossLeaderAnalysis(BaseModel):
     """Loss-making contract analysis with root causes."""
+
     contract_id: str
     contract_name: str
     loss_amount_zar: float
     loss_percentage: float
     root_causes: List[str] = Field(
-        default_factory=list,
-        description="Identified root causes, e.g., ['high_labor_costs', 'frequent_breakdowns']"
+        default_factory=list, description="Identified root causes, e.g., ['high_labor_costs', 'frequent_breakdowns']"
     )
-    recommendation: str = Field(
-        ...,
-        description="Actionable recommendation to address losses"
-    )
+    recommendation: str = Field(..., description="Actionable recommendation to address losses")
     months_in_loss: int = 1
     cumulative_loss_zar: float = 0.0

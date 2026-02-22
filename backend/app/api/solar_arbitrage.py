@@ -49,16 +49,13 @@ router = APIRouter(
 async def get_24h_price_forecast(
     request: Request,
     load_shedding_stages: Optional[str] = Query(
-        None,
-        description="Comma-separated LS stages for each hour (0-8), default all 0"
+        None, description="Comma-separated LS stages for each hour (0-8), default all 0"
     ),
     temperature_forecast: Optional[str] = Query(
-        None,
-        description="Comma-separated temperatures (°C) for each hour, default 20°C"
+        None, description="Comma-separated temperatures (°C) for each hour, default 20°C"
     ),
     solar_forecast_pct: Optional[str] = Query(
-        None,
-        description="Comma-separated solar capacity % for each hour, default 0%"
+        None, description="Comma-separated solar capacity % for each hour, default 0%"
     ),
 ):
     """Get 24-hour price forecast with all adjustments applied.
@@ -174,9 +171,7 @@ async def get_arbitrage_opportunities(
             "max_windows": max_windows,
             "response_time_ms": round(elapsed_ms, 1),
             "arbitrage_windows": [w.to_dict() for w in windows],
-            "total_daily_opportunity_r": round(
-                sum(w.net_revenue_r for w in windows), 2
-            ),
+            "total_daily_opportunity_r": round(sum(w.net_revenue_r for w in windows), 2),
         }
     except Exception as e:
         logger.error("Arbitrage opportunity analysis failed: %s", e)
@@ -462,8 +457,12 @@ async def get_revenue_kpi(
             "savings": savings.to_dict(),
             "annual_projection_r": round(annual_savings, 2),
             "cost_benefit": {
-                "daily_avg_r": round(savings.savings_zar / (365 if period == "day" else (52 if period == "week" else 30)), 2),
-                "monthly_avg_r": round(savings.savings_zar * (1 if period == "month" else (30.44 if period == "week" else 30.44)), 2),
+                "daily_avg_r": round(
+                    savings.savings_zar / (365 if period == "day" else (52 if period == "week" else 30)), 2
+                ),
+                "monthly_avg_r": round(
+                    savings.savings_zar * (1 if period == "month" else (30.44 if period == "week" else 30.44)), 2
+                ),
             },
         }
     except Exception as e:
@@ -575,6 +574,79 @@ async def get_bess_health_impact(
             "net_annual_benefit_r": round(85000.0 - (75.0 * 365), 2),
         },
     }
+
+
+# === AEGIS Dispatch Governance Endpoints ===
+
+
+@limiter.limit("20/minute")
+@router.post("/solar/arbitrage/dispatch/proposal")
+async def create_dispatch_proposal(
+    request: Request,
+    site_id: str = Query("site-002", description="Site ID"),
+):
+    """Create AEGIS dispatch proposal routed through approval pipeline.
+
+    Returns recommendation with tier routing result, quality gate status,
+    and approval requirement. All BESS dispatch actions are routed to Tier 2.
+    """
+    from app.services.aegis_bridge import run_aegis_cycle
+
+    result = await run_aegis_cycle(site_id)
+    if not result:
+        return {"status": "idle", "message": "No dispatch action needed at this time"}
+    return {
+        "status": "proposal_created",
+        "recommendation": result,
+        "requires_approval": True,
+        "tier": result.get("routing", {}).get("tier", "tier2"),
+    }
+
+
+@limiter.limit("30/minute")
+@router.get("/solar/arbitrage/dispatch/history")
+async def get_dispatch_history(
+    request: Request,
+    site_id: str = Query("site-002", description="Site ID"),
+    hours: int = Query(24, ge=1, le=168, description="Hours of history (1-168)"),
+    include_decisions: bool = Query(False, description="Include linked parasite_decisions"),
+):
+    """Persistent dispatch history from JSONL files.
+
+    Returns dispatch events that survive restarts, unlike the RAM-only log.
+    If include_decisions=True, joins recommendation IDs with parasite_decisions.
+    """
+    from app.services.solar_dispatch_service import get_solar_dispatch_service
+
+    svc = get_solar_dispatch_service()
+    events = svc.get_persistent_dispatch_log(site_id, hours=hours)
+
+    result = {
+        "site_id": site_id,
+        "hours": hours,
+        "event_count": len(events),
+        "events": events,
+    }
+
+    if include_decisions:
+        try:
+            from app.database.repositories.parasite_decision_repository import (
+                get_parasite_decision_repository,
+            )
+
+            repo = get_parasite_decision_repository()
+            decisions = await repo.get_recent_decisions(limit=50)
+            bess_decisions = [
+                d
+                for d in decisions
+                if d.get("decision_type", "").startswith("tier") and "BESS" in (d.get("equipment_code") or "").upper()
+            ]
+            result["parasite_decisions"] = bess_decisions
+        except Exception as e:
+            logger.warning("Failed to load parasite_decisions: %s", e)
+            result["parasite_decisions"] = []
+
+    return result
 
 
 # === Logging ===

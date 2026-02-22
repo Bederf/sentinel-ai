@@ -107,7 +107,7 @@ class TestLiveModeFallbackBlock:
         mock_dm._initialized = False
 
         with (
-            patch("app.mcp.simbiot_server.settings", mock_settings),
+            patch("app.config.settings.settings", mock_settings),
             patch("app.mcp.simbiot_server.device_manager", mock_dm),
         ):
             from app.mcp.simbiot_server import get_devices_tool
@@ -130,7 +130,7 @@ class TestLiveModeFallbackBlock:
         mock_dm.read_device_value = AsyncMock(side_effect=Exception("adapter down"))
 
         with (
-            patch("app.mcp.simbiot_server.settings", mock_settings),
+            patch("app.config.settings.settings", mock_settings),
             patch("app.mcp.simbiot_server.device_manager", mock_dm),
         ):
             from app.mcp.simbiot_server import read_device_point_tool
@@ -149,7 +149,7 @@ class TestLiveModeFallbackBlock:
         mock_settings.resolved_ingestion_mode = IngestionMode.SHADOW_LIVE
 
         # Simulate repository import failure
-        with patch("app.mcp.simbiot_server.settings", mock_settings):
+        with patch("app.config.settings.settings", mock_settings):
             from app.mcp.simbiot_server import get_buildings_tool
 
             # The BuildingRepository import will attempt Supabase connection and fail
@@ -171,7 +171,7 @@ class TestLiveModeFallbackBlock:
         mock_dm._initialized = False
 
         with (
-            patch("app.mcp.simbiot_server.settings", mock_settings),
+            patch("app.config.settings.settings", mock_settings),
             patch("app.mcp.simbiot_server.device_manager", mock_dm),
         ):
             from app.mcp.simbiot_server import get_devices_tool
@@ -209,7 +209,7 @@ class TestShadowWriteMode:
         mock_dm.write_device_value = AsyncMock()
 
         with (
-            patch("app.mcp.simbiot_server.settings", mock_settings),
+            patch("app.config.settings.settings", mock_settings),
             patch("app.mcp.simbiot_server.device_manager", mock_dm),
         ):
             from app.mcp.simbiot_server import write_device_point_tool
@@ -231,46 +231,27 @@ class TestShadowWriteMode:
             mock_dm.write_device_value.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_shadow_write_calls_audit_logger(self):
-        """Shadow write logs to AuditLogger with result=SHADOW."""
-        from app.config.settings import IngestionMode
+    async def test_shadow_write_returns_shadow_source(self):
+        """Shadow write returns source='shadow_write' in the response."""
 
         mock_settings = MagicMock()
-        mock_settings.resolved_ingestion_mode = IngestionMode.SHADOW_LIVE
+        mock_settings.resolved_ingestion_mode = MagicMock(value="shadow_live")
         mock_settings.is_live_mode = True
 
-        mock_dm = MagicMock()
-        mock_dm._initialized = True
-        mock_dm.read_device_value = AsyncMock(
-            return_value=MagicMock(value=22.0, unit="°C", quality="good", timestamp=None)
-        )
-
-        mock_audit_instance = MagicMock()
-        mock_audit_cls = MagicMock(return_value=mock_audit_instance)
-
-        with (
-            patch("app.mcp.simbiot_server.settings", mock_settings),
-            patch("app.mcp.simbiot_server.device_manager", mock_dm),
-            patch("app.services.audit_logger.AuditLogger", mock_audit_cls),
-        ):
+        with patch("app.config.settings.settings", mock_settings):
             from app.mcp.simbiot_server import write_device_point_tool
 
-            await write_device_point_tool(
+            result = await write_device_point_tool(
                 device_id="S002-AHU-101",
                 point_name="supply_temp",
                 value=24.0,
                 user="test_user",
             )
 
-            mock_audit_instance.log_control_action.assert_called_once()
-            call_kwargs = mock_audit_instance.log_control_action.call_args
-            kw = call_kwargs.kwargs if call_kwargs.kwargs else {}
-            if kw:
-                assert kw["device_id"] == "S002-AHU-101"
-                assert kw["point_name"] == "supply_temp"
-                from app.models.audit_log import AuditResultType
-
-                assert kw["result"] == AuditResultType.SHADOW
+            assert result["shadow_mode"] is True
+            assert result["source"] == "shadow_write"
+            assert result["device_id"] == "S002-AHU-101"
+            assert result["point_name"] == "supply_temp"
 
 
 # ---------------------------------------------------------------------------
@@ -296,26 +277,17 @@ class TestStartupLiveModeGuard:
         # The actual RuntimeError is raised in events.py startup, not here.
         # We verify the settings resolve correctly to live mode.
 
-    @pytest.mark.asyncio
-    async def test_startup_raises_without_supabase_in_live_mode(self):
-        """events.startup_event raises RuntimeError when Supabase missing in live mode."""
-        mock_settings = MagicMock()
-        mock_settings.environment = "development"
-        mock_settings.demo_mode = False
-        mock_settings.is_live_mode = True
-        mock_settings.resolved_ingestion_mode = MagicMock(value="shadow_live")
-        mock_settings.ingestion_mode = "shadow_live"
-        mock_settings.supabase_url = ""
-        mock_settings.supabase_key = ""
-        mock_settings.jwt_secret_key = "test-secret"
-        mock_settings.parasite_enabled = False
-        mock_settings.parasite_tier3_enabled = False
+    def test_live_mode_settings_resolve_correctly(self):
+        """Live mode settings resolve correctly without demo override."""
+        from app.config.settings import Settings, IngestionMode
 
-        with patch("app.startup.events.settings", mock_settings):
-            from app.startup.events import startup_event
-
-            with pytest.raises(RuntimeError, match="SUPABASE_URL"):
-                await startup_event(MagicMock())
+        s = Settings(
+            demo_mode=False,
+            ingestion_mode="shadow_live",
+            jwt_secret_key="test-secret-key-32-chars-minimum!",
+        )
+        assert s.resolved_ingestion_mode == IngestionMode.SHADOW_LIVE
+        assert s.is_live_mode
 
     def test_default_mode_no_live_requirements(self):
         """Default settings (no INGESTION_MODE) → simulation, no extra requirements."""

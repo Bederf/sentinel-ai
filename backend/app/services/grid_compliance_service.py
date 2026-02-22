@@ -105,6 +105,7 @@ LOAD_SHED_STAGES = {
 @dataclass
 class GridParameters:
     """Current grid parameters from BESS or site meter."""
+
     timestamp: str
     frequency_hz: float
     voltage_v: float  # Phase-to-phase or nominal
@@ -165,9 +166,7 @@ class MonitoringEngine:
         violations.extend(ramp_violations)
 
         # Determine overall compliance
-        critical_violations = [
-            v for v in violations if v.severity == ComplianceSeverity.CRITICAL
-        ]
+        critical_violations = [v for v in violations if v.severity == ComplianceSeverity.CRITICAL]
         compliant = len(critical_violations) == 0
 
         # Log violations to persistent storage
@@ -177,9 +176,7 @@ class MonitoringEngine:
         # Store for later reference
         self.violations = violations
 
-        next_check = (
-            now + timedelta(seconds=self.monitoring_interval_seconds)
-        ).isoformat()
+        next_check = (now + timedelta(seconds=self.monitoring_interval_seconds)).isoformat()
 
         return GridComplianceStatus(
             system_id=self.system_id,
@@ -195,9 +192,7 @@ class MonitoringEngine:
             temperature_c=25.0,
         )
 
-    def _validate_frequency(
-        self, params: GridParameters, now: datetime
-    ) -> List[ComplianceViolation]:
+    def _validate_frequency(self, params: GridParameters, now: datetime) -> List[ComplianceViolation]:
         """Validate frequency against grid code limits."""
         violations: List[ComplianceViolation] = []
         normal_band = self.frequency_bands["normal"]
@@ -230,10 +225,7 @@ class MonitoringEngine:
             violations.append(violation)
 
         # Check trip thresholds (mandatory disconnect)
-        if (
-            normal_band.trip_low_hz
-            and params.frequency_hz < normal_band.trip_low_hz
-        ):
+        if normal_band.trip_low_hz and params.frequency_hz < normal_band.trip_low_hz:
             violation = ComplianceViolation(
                 timestamp=now.isoformat(),
                 system_id=self.system_id,
@@ -247,10 +239,7 @@ class MonitoringEngine:
             )
             violations.append(violation)
 
-        if (
-            normal_band.trip_high_hz
-            and params.frequency_hz > normal_band.trip_high_hz
-        ):
+        if normal_band.trip_high_hz and params.frequency_hz > normal_band.trip_high_hz:
             violation = ComplianceViolation(
                 timestamp=now.isoformat(),
                 system_id=self.system_id,
@@ -266,9 +255,7 @@ class MonitoringEngine:
 
         return violations
 
-    def _validate_voltage(
-        self, params: GridParameters, now: datetime
-    ) -> List[ComplianceViolation]:
+    def _validate_voltage(self, params: GridParameters, now: datetime) -> List[ComplianceViolation]:
         """Validate voltage against grid code limits."""
         violations: List[ComplianceViolation] = []
         normal_band = self.voltage_bands["normal"]
@@ -301,10 +288,7 @@ class MonitoringEngine:
             violations.append(violation)
 
         # Check trip thresholds
-        if (
-            normal_band.trip_low_v
-            and params.voltage_v < normal_band.trip_low_v
-        ):
+        if normal_band.trip_low_v and params.voltage_v < normal_band.trip_low_v:
             violation = ComplianceViolation(
                 timestamp=now.isoformat(),
                 system_id=self.system_id,
@@ -318,10 +302,7 @@ class MonitoringEngine:
             )
             violations.append(violation)
 
-        if (
-            normal_band.trip_high_v
-            and params.voltage_v > normal_band.trip_high_v
-        ):
+        if normal_band.trip_high_v and params.voltage_v > normal_band.trip_high_v:
             violation = ComplianceViolation(
                 timestamp=now.isoformat(),
                 system_id=self.system_id,
@@ -337,9 +318,7 @@ class MonitoringEngine:
 
         return violations
 
-    def _validate_ramp_rate(
-        self, params: GridParameters, now: datetime
-    ) -> List[ComplianceViolation]:
+    def _validate_ramp_rate(self, params: GridParameters, now: datetime) -> List[ComplianceViolation]:
         """Validate power ramp rate against grid code limits."""
         violations: List[ComplianceViolation] = []
 
@@ -350,9 +329,7 @@ class MonitoringEngine:
         power_delta = params.ac_power_kw - params.previous_power_kw
         if params.previous_power_kw > 0:
             ramp_rate_pct_per_min = (
-                (power_delta / params.previous_power_kw)
-                * 100.0
-                * (60.0 / params.time_delta_seconds)
+                (power_delta / params.previous_power_kw) * 100.0 * (60.0 / params.time_delta_seconds)
             )
 
             # Check against normal ramp rate limit
@@ -382,18 +359,24 @@ class MonitoringEngine:
 
             # Insert into compliance_log table
             # Note: Supabase client in synchronous mode, call it directly
-            response = supabase.table("compliance_log").insert({
-                "system_id": violation.system_id,
-                "timestamp": violation.timestamp,
-                "parameter": violation.parameter,
-                "measured_value": float(violation.measured_value),
-                "limit_value": float(violation.limit_value),
-                "violation_type": violation.violation_type,
-                "severity": violation.severity,
-                "auto_action": violation.auto_action,
-                "duration_ms": violation.duration_ms,
-                "resolved": violation.resolved,
-            }).execute()
+            response = (
+                supabase.table("compliance_log")
+                .insert(
+                    {
+                        "system_id": violation.system_id,
+                        "timestamp": violation.timestamp,
+                        "parameter": violation.parameter,
+                        "measured_value": float(violation.measured_value),
+                        "limit_value": float(violation.limit_value),
+                        "violation_type": violation.violation_type,
+                        "severity": violation.severity,
+                        "auto_action": violation.auto_action,
+                        "duration_ms": violation.duration_ms,
+                        "resolved": violation.resolved,
+                    }
+                )
+                .execute()
+            )
 
             logger.debug(f"Logged violation: {violation.parameter} at {violation.system_id}")
 
@@ -440,9 +423,7 @@ class LoadShedScheduler:
             self.stage_transition_time = datetime.now(timezone.utc)
 
             # Route dispatch commands
-            dispatch_action, affected_systems = await self._route_dispatch(
-                self.previous_stage, self.current_stage
-            )
+            dispatch_action, affected_systems = await self._route_dispatch(self.previous_stage, self.current_stage)
 
             # Create event record
             event = LoadShedEvent(
@@ -482,9 +463,7 @@ class LoadShedScheduler:
 
         return 0  # No load shedding
 
-    async def _route_dispatch(
-        self, previous_stage: int, current_stage: int
-    ) -> Tuple[str, List[str]]:
+    async def _route_dispatch(self, previous_stage: int, current_stage: int) -> Tuple[str, List[str]]:
         """Route dispatch commands based on stage transition.
 
         Priority: BESS discharge → Solar curtailment → Standby
@@ -519,15 +498,21 @@ class LoadShedScheduler:
 
             # Insert into load_shed_events table
             # Note: Supabase client in synchronous mode, call it directly
-            response = supabase.table("load_shed_events").insert({
-                "timestamp": event.timestamp,
-                "frequency_hz": float(event.frequency_hz),
-                "previous_stage": event.previous_stage,
-                "current_stage": event.current_stage,
-                "dispatch_action": event.dispatch_action,
-                "affected_systems": event.affected_systems,
-                "expected_reduction_kw": float(event.expected_reduction_kw),
-            }).execute()
+            response = (
+                supabase.table("load_shed_events")
+                .insert(
+                    {
+                        "timestamp": event.timestamp,
+                        "frequency_hz": float(event.frequency_hz),
+                        "previous_stage": event.previous_stage,
+                        "current_stage": event.current_stage,
+                        "dispatch_action": event.dispatch_action,
+                        "affected_systems": event.affected_systems,
+                        "expected_reduction_kw": float(event.expected_reduction_kw),
+                    }
+                )
+                .execute()
+            )
 
             logger.debug(f"Logged load shedding stage transition: stage {event.current_stage}")
 
@@ -549,9 +534,7 @@ _monitoring_engines: Dict[str, MonitoringEngine] = {}
 _load_shed_scheduler: Optional[LoadShedScheduler] = None
 
 
-def get_monitoring_engine(
-    grid_code: str = "nrs_097_2_3", system_id: str = "solar-001"
-) -> MonitoringEngine:
+def get_monitoring_engine(grid_code: str = "nrs_097_2_3", system_id: str = "solar-001") -> MonitoringEngine:
     """Get or create a MonitoringEngine instance."""
     key = f"{grid_code}:{system_id}"
     if key not in _monitoring_engines:

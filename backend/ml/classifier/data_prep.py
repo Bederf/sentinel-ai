@@ -33,7 +33,7 @@ class ClassifierDataPrep:
         "ahu": ["fan_motor", "belt_failure", "coil_fouling", "damper_actuator", "filter_blockage"],
         "generator": ["battery_failure", "fuel_system", "starter_motor", "alternator", "cooling_system"],
         "fcu": ["fan_motor", "valve_actuator", "thermostat", "filter_blockage"],
-        "ups": ["battery_failure", "inverter", "capacitor", "overload"]
+        "ups": ["battery_failure", "inverter", "capacitor", "overload"],
     }
 
     def __init__(self):
@@ -42,10 +42,7 @@ class ClassifierDataPrep:
         self.influxdb = get_influxdb_service()
         self.equipment_repo = EquipmentRepository()
 
-    def prepare_training_data(
-        self,
-        equipment_type: str
-    ) -> Tuple[pd.DataFrame, pd.Series]:
+    def prepare_training_data(self, equipment_type: str) -> Tuple[pd.DataFrame, pd.Series]:
         """Prepare features and labels for classification.
 
         Args:
@@ -69,6 +66,7 @@ class ClassifierDataPrep:
             # Try JSON fallback
             import json
             from pathlib import Path
+
             equipment_file = Path(__file__).parent.parent.parent / "data" / "equipment.json"
             with open(equipment_file) as f:
                 all_equipment = json.load(f)
@@ -91,17 +89,10 @@ class ClassifierDataPrep:
 
             for failure in failures:
                 # Get features 7 days before failure
-                features = self._get_features_before_failure(
-                    equipment_id,
-                    failure["occurred_at"],
-                    equipment_type
-                )
+                features = self._get_features_before_failure(equipment_id, failure["occurred_at"], equipment_type)
 
                 if features and failure["failure_type"] in failure_types:
-                    sample = {
-                        **features,
-                        "label": failure["failure_type"]
-                    }
+                    sample = {**features, "label": failure["failure_type"]}
                     samples.append(sample)
 
         if len(samples) < 20:
@@ -130,6 +121,7 @@ class ClassifierDataPrep:
         # Try to get from work orders
         try:
             from app.database.repositories.work_order_repository import WorkOrderRepository
+
             wo_repo = WorkOrderRepository()
 
             # Get work orders with failure codes
@@ -138,10 +130,12 @@ class ClassifierDataPrep:
             failures = []
             for wo in work_orders:
                 if wo.get("failure_type"):
-                    failures.append({
-                        "occurred_at": datetime.fromisoformat(wo.get("created_at", datetime.now().isoformat())),
-                        "failure_type": wo["failure_type"]
-                    })
+                    failures.append(
+                        {
+                            "occurred_at": datetime.fromisoformat(wo.get("created_at", datetime.now().isoformat())),
+                            "failure_type": wo["failure_type"],
+                        }
+                    )
         except Exception as e:
             logger.debug(f"Could not load work orders: {e}. Using synthetic failures.")
 
@@ -161,6 +155,7 @@ class ClassifierDataPrep:
 
         # Random failure times in past 90 days
         import random
+
         num_failures = random.randint(3, 5)
 
         for i in range(num_failures):
@@ -174,19 +169,11 @@ class ClassifierDataPrep:
             failure_types = self.FAILURE_TYPES.get(equipment_type, ["general_failure"])
             failure_type = random.choice(failure_types)
 
-            failures.append({
-                "occurred_at": failure_time,
-                "failure_type": failure_type
-            })
+            failures.append({"occurred_at": failure_time, "failure_type": failure_type})
 
         return failures
 
-    def _get_features_before_failure(
-        self,
-        equipment_id: str,
-        failure_time: datetime,
-        equipment_type: str
-    ) -> Dict:
+    def _get_features_before_failure(self, equipment_id: str, failure_time: datetime, equipment_type: str) -> Dict:
         """Get features 7 days before failure for classification.
 
         Args:
@@ -202,9 +189,7 @@ class ClassifierDataPrep:
 
         try:
             features = self.feature_service.compute_features(
-                equipment_id=equipment_id,
-                equipment_type=equipment_type,
-                as_of=observation_time
+                equipment_id=equipment_id, equipment_type=equipment_type, as_of=observation_time
             )
 
             # Flatten nested dicts
@@ -242,46 +227,53 @@ class ClassifierDataPrep:
 
         # Equipment-specific defaults
         if equipment_type == "chiller":
-            defaults.update({
-                "kw_rating": 500,
-                "efficiency_ratio": 3.0,
-                "run_hours": 40000,
-                "start_stop_count": 500,
-            })
+            defaults.update(
+                {
+                    "kw_rating": 500,
+                    "efficiency_ratio": 3.0,
+                    "run_hours": 40000,
+                    "start_stop_count": 500,
+                }
+            )
         elif equipment_type == "ahu":
-            defaults.update({
-                "airflow_cfm": 5000,
-                "static_pressure": 2.5,
-                "belt_age_months": 12,
-            })
+            defaults.update(
+                {
+                    "airflow_cfm": 5000,
+                    "static_pressure": 2.5,
+                    "belt_age_months": 12,
+                }
+            )
         elif equipment_type == "generator":
-            defaults.update({
-                "kva_rating": 500,
-                "fuel_level_percent": 75,
-                "battery_voltage": 13.5,
-                "last_test_days": 30,
-            })
+            defaults.update(
+                {
+                    "kva_rating": 500,
+                    "fuel_level_percent": 75,
+                    "battery_voltage": 13.5,
+                    "last_test_days": 30,
+                }
+            )
         elif equipment_type == "fcu":
-            defaults.update({
-                "airflow_cfm": 500,
-                "valve_position": 50,
-                "filter_age_days": 90,
-            })
+            defaults.update(
+                {
+                    "airflow_cfm": 500,
+                    "valve_position": 50,
+                    "filter_age_days": 90,
+                }
+            )
         elif equipment_type == "ups":
-            defaults.update({
-                "kva_rating": 10,
-                "battery_age_years": 3,
-                "load_percent": 60,
-                "estimated_runtime_minutes": 30,
-            })
+            defaults.update(
+                {
+                    "kva_rating": 10,
+                    "battery_age_years": 3,
+                    "load_percent": 60,
+                    "estimated_runtime_minutes": 30,
+                }
+            )
 
         return defaults
 
     def _generate_synthetic_data(
-        self,
-        equipment_type: str,
-        failure_types: List[str],
-        n_samples: int = 100
+        self, equipment_type: str, failure_types: List[str], n_samples: int = 100
     ) -> List[Dict]:
         """Generate synthetic training data for demo purposes.
 
@@ -328,10 +320,7 @@ class ClassifierDataPrep:
                     features["battery_voltage"] = random.uniform(11.5, 12.5)  # Low voltage
                     features["battery_age_years"] = random.uniform(3, 6)
 
-                samples.append({
-                    **features,
-                    "label": failure_type
-                })
+                samples.append({**features, "label": failure_type})
 
         # Add some normal samples (no failure)
         for _ in range(20):

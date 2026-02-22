@@ -28,10 +28,7 @@ class OCRCorrectionHandler:
         self.pending_corrections: Dict[str, Dict] = {}
 
     async def start_correction_flow(
-        self,
-        service_record_id: str,
-        pipeline_result: Dict[str, Any],
-        telegram_user_id: str
+        self, service_record_id: str, pipeline_result: Dict[str, Any], telegram_user_id: str
     ) -> Dict[str, Any]:
         """
         Start correction flow for a service record that needs review.
@@ -60,7 +57,7 @@ class OCRCorrectionHandler:
             "issues": error_issues,
             "current_index": 0,
             "corrections": {},
-            "started_at": datetime.now().isoformat()
+            "started_at": datetime.now().isoformat(),
         }
 
         logger.info(f"Started correction flow for {service_record_id} with {len(error_issues)} issues")
@@ -83,7 +80,7 @@ class OCRCorrectionHandler:
                 "complete": True,
                 "final_data": self._apply_corrections(service_record_id),
                 "corrections_made": len(state["corrections"]),
-                "message": "All corrections complete!"
+                "message": "All corrections complete!",
             }
 
         issue = issues[idx]
@@ -98,16 +95,10 @@ class OCRCorrectionHandler:
             "message": issue["message"],
             "current_value": current_value,
             "prompt": prompt,
-            "progress": f"{idx + 1}/{len(issues)}"
+            "progress": f"{idx + 1}/{len(issues)}",
         }
 
-    def _format_correction_prompt(
-        self,
-        issue: Dict,
-        current_value: Any,
-        current_num: int,
-        total: int
-    ) -> str:
+    def _format_correction_prompt(self, issue: Dict, current_value: Any, current_num: int, total: int) -> str:
         """Format a user-friendly correction prompt."""
         field_name = issue["field"].replace("_", " ").title()
 
@@ -124,11 +115,7 @@ class OCRCorrectionHandler:
 
         return "\n".join(prompt_lines)
 
-    async def process_correction_response(
-        self,
-        service_record_id: str,
-        response: str
-    ) -> Dict[str, Any]:
+    async def process_correction_response(self, service_record_id: str, response: str) -> Dict[str, Any]:
         """
         Process technician's correction response.
 
@@ -157,7 +144,7 @@ class OCRCorrectionHandler:
             "original": original_value,
             "corrected": response.strip(),
             "corrected_at": datetime.now().isoformat(),
-            "corrected_by": state["telegram_user_id"]
+            "corrected_by": state["telegram_user_id"],
         }
 
         logger.info(f"Correction for {field}: '{original_value}' -> '{response.strip()}'")
@@ -184,15 +171,13 @@ class OCRCorrectionHandler:
                 "was_corrected": True,
                 "corrected_from": correction["original"],
                 "corrected_at": correction["corrected_at"],
-                "corrected_by": correction["corrected_by"]
+                "corrected_by": correction["corrected_by"],
             }
 
         # Clean up pending state
         completed_state = self.pending_corrections.pop(service_record_id)
 
-        logger.info(
-            f"Applied {len(state['corrections'])} corrections to {service_record_id}"
-        )
+        logger.info(f"Applied {len(state['corrections'])} corrections to {service_record_id}")
 
         return final_data
 
@@ -207,7 +192,7 @@ class OCRCorrectionHandler:
             "current_index": state["current_index"],
             "total_issues": len(state["issues"]),
             "corrections_made": len(state["corrections"]),
-            "started_at": state["started_at"]
+            "started_at": state["started_at"],
         }
 
     def cancel_correction_flow(self, service_record_id: str) -> bool:

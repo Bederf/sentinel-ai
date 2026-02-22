@@ -31,8 +31,10 @@ logger = logging.getLogger(__name__)
 # Data Models
 # ============================================================================
 
+
 class TriggerType(str, Enum):
     """Types of workflow triggers"""
+
     ML_ANOMALY = "ml_anomaly"
     BASELINE_DEVIATION = "baseline_deviation"
     CRITICAL_DEFICIENCY = "critical_deficiency"
@@ -42,6 +44,7 @@ class TriggerType(str, Enum):
 
 class TriggerPriority(str, Enum):
     """Trigger priority levels"""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -50,6 +53,7 @@ class TriggerPriority(str, Enum):
 
 class AnomalyAlert(BaseModel):
     """ML anomaly alert model"""
+
     id: str
     equipment_id: str
     anomaly_type: str
@@ -61,6 +65,7 @@ class AnomalyAlert(BaseModel):
 
 class BaselineComparison(BaseModel):
     """Baseline comparison result model"""
+
     equipment_id: str
     baseline_id: str
     comparison_date: datetime = Field(default_factory=datetime.now)
@@ -71,6 +76,7 @@ class BaselineComparison(BaseModel):
 
 class InspectionDeficiency(BaseModel):
     """Inspection deficiency model"""
+
     id: str
     inspection_id: str
     equipment_id: str
@@ -85,6 +91,7 @@ class InspectionDeficiency(BaseModel):
 
 class InspectionTask(BaseModel):
     """Inspection task model"""
+
     id: str = ""
     equipment_id: str
     task_name: str
@@ -103,6 +110,7 @@ class InspectionTask(BaseModel):
 
 class WorkOrderCreate(BaseModel):
     """Work order creation model"""
+
     id: str = ""
     equipment_id: str
     title: str
@@ -123,6 +131,7 @@ class WorkOrderCreate(BaseModel):
 
 class BaselineCaptureTask(BaseModel):
     """Baseline capture task model"""
+
     id: str = ""
     equipment_id: str
     baseline_type: str  # initial, pre_repair, post_repair
@@ -138,6 +147,7 @@ class BaselineCaptureTask(BaseModel):
 
 class EffectivenessResult(BaseModel):
     """Repair effectiveness validation result"""
+
     work_order_id: str
     equipment_id: str
     effectiveness_score: float
@@ -149,6 +159,7 @@ class EffectivenessResult(BaseModel):
 
 class TriggerResult(BaseModel):
     """Result from trigger execution"""
+
     success: bool
     trigger_type: TriggerType
     equipment_id: str
@@ -161,6 +172,7 @@ class TriggerResult(BaseModel):
 # ============================================================================
 # Workflow Trigger Engine
 # ============================================================================
+
 
 class WorkflowTriggerEngine:
     """
@@ -207,11 +219,7 @@ class WorkflowTriggerEngine:
     # Trigger 1: ML Anomaly → Inspection Task
     # ========================================================================
 
-    async def on_ml_anomaly(
-        self,
-        equipment_id: str,
-        anomaly: AnomalyAlert
-    ) -> TriggerResult:
+    async def on_ml_anomaly(self, equipment_id: str, anomaly: AnomalyAlert) -> TriggerResult:
         """
         Handle ML anomaly detection.
 
@@ -223,9 +231,7 @@ class WorkflowTriggerEngine:
         try:
             # 0. Dedupe guard
             is_duplicate, dedupe_details = self._is_duplicate_trigger(
-                trigger_type=TriggerType.ML_ANOMALY,
-                equipment_id=equipment_id,
-                reference_id=anomaly.id
+                trigger_type=TriggerType.ML_ANOMALY, equipment_id=equipment_id, reference_id=anomaly.id
             )
             if is_duplicate:
                 result = TriggerResult(
@@ -233,14 +239,14 @@ class WorkflowTriggerEngine:
                     trigger_type=TriggerType.ML_ANOMALY,
                     equipment_id=equipment_id,
                     action_taken="duplicate_suppressed",
-                    details={"anomaly_id": anomaly.id, **dedupe_details}
+                    details={"anomaly_id": anomaly.id, **dedupe_details},
                 )
                 await self._record_event(
                     trigger_type=TriggerType.ML_ANOMALY,
                     equipment_id=equipment_id,
                     action_taken=result.action_taken,
                     details=result.details,
-                    success=True
+                    success=True,
                 )
                 self._trigger_history.append(result)
                 return result
@@ -254,14 +260,14 @@ class WorkflowTriggerEngine:
                     trigger_type=TriggerType.ML_ANOMALY,
                     equipment_id=equipment_id,
                     action_taken="inspection_exists",
-                    details={"existing_task_id": existing.id}
+                    details={"existing_task_id": existing.id},
                 )
                 await self._record_event(
                     trigger_type=TriggerType.ML_ANOMALY,
                     equipment_id=equipment_id,
                     action_taken=result.action_taken,
                     details=result.details,
-                    success=True
+                    success=True,
                 )
                 self._trigger_history.append(result)
                 return result
@@ -273,7 +279,7 @@ class WorkflowTriggerEngine:
                 priority=self._calculate_priority(anomaly.probability),
                 scheduled_date=datetime.now() + timedelta(hours=24),
                 reason=f"ML anomaly detected: {anomaly.description}",
-                anomaly_reference=anomaly.id
+                anomaly_reference=anomaly.id,
             )
 
             # 3. Save inspection task
@@ -291,11 +297,7 @@ class WorkflowTriggerEngine:
                 trigger_type=TriggerType.ML_ANOMALY,
                 equipment_id=equipment_id,
                 action="created_inspection_task",
-                details={
-                    "anomaly_id": anomaly.id,
-                    "task_id": task.id,
-                    "probability": anomaly.probability
-                }
+                details={"anomaly_id": anomaly.id, "task_id": task.id, "probability": anomaly.probability},
             )
 
             result = TriggerResult(
@@ -306,15 +308,11 @@ class WorkflowTriggerEngine:
                 details={
                     "task_id": task.id,
                     "scheduled_date": task.scheduled_date.isoformat(),
-                    "priority": task.priority
+                    "priority": task.priority,
                 },
-                follow_up_scheduled=True
+                follow_up_scheduled=True,
             )
-            self._mark_trigger(
-                trigger_type=TriggerType.ML_ANOMALY,
-                equipment_id=equipment_id,
-                reference_id=anomaly.id
-            )
+            self._mark_trigger(trigger_type=TriggerType.ML_ANOMALY, equipment_id=equipment_id, reference_id=anomaly.id)
             await self._record_event(
                 trigger_type=TriggerType.ML_ANOMALY,
                 equipment_id=equipment_id,
@@ -323,7 +321,7 @@ class WorkflowTriggerEngine:
                     "anomaly_id": anomaly.id,
                     **result.details,
                 },
-                success=True
+                success=True,
             )
             self._trigger_history.append(result)
             return result
@@ -335,25 +333,21 @@ class WorkflowTriggerEngine:
                 equipment_id=equipment_id,
                 action_taken="error",
                 details={"error": str(e), "anomaly_id": anomaly.id},
-                success=False
+                success=False,
             )
             return TriggerResult(
                 success=False,
                 trigger_type=TriggerType.ML_ANOMALY,
                 equipment_id=equipment_id,
                 action_taken="error",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
 
     # ========================================================================
     # Trigger 2: Baseline Deviation → Maintenance Recommendation
     # ========================================================================
 
-    async def on_baseline_deviation(
-        self,
-        equipment_id: str,
-        comparison: BaselineComparison
-    ) -> TriggerResult:
+    async def on_baseline_deviation(self, equipment_id: str, comparison: BaselineComparison) -> TriggerResult:
         """
         Handle baseline deviation detection.
 
@@ -367,7 +361,7 @@ class WorkflowTriggerEngine:
             is_duplicate, dedupe_details = self._is_duplicate_trigger(
                 trigger_type=TriggerType.BASELINE_DEVIATION,
                 equipment_id=equipment_id,
-                reference_id=comparison.baseline_id
+                reference_id=comparison.baseline_id,
             )
             if is_duplicate:
                 result = TriggerResult(
@@ -378,15 +372,15 @@ class WorkflowTriggerEngine:
                     details={
                         "baseline_id": comparison.baseline_id,
                         "deviation": comparison.max_deviation_percent,
-                        **dedupe_details
-                    }
+                        **dedupe_details,
+                    },
                 )
                 await self._record_event(
                     trigger_type=TriggerType.BASELINE_DEVIATION,
                     equipment_id=equipment_id,
                     action_taken=result.action_taken,
                     details=result.details,
-                    success=True
+                    success=True,
                 )
                 self._trigger_history.append(result)
                 return result
@@ -398,25 +392,21 @@ class WorkflowTriggerEngine:
                     trigger_type=TriggerType.BASELINE_DEVIATION,
                     equipment_id=equipment_id,
                     action_taken="within_threshold",
-                    details={"deviation": comparison.max_deviation_percent}
+                    details={"deviation": comparison.max_deviation_percent},
                 )
                 await self._record_event(
                     trigger_type=TriggerType.BASELINE_DEVIATION,
                     equipment_id=equipment_id,
                     action_taken=result.action_taken,
-                    details={
-                        "baseline_id": comparison.baseline_id,
-                        **result.details
-                    },
-                    success=True
+                    details={"baseline_id": comparison.baseline_id, **result.details},
+                    success=True,
                 )
                 self._trigger_history.append(result)
                 return result
 
             # 2. Generate AI recommendation (simulated for demo)
             recommendation = await self._generate_maintenance_recommendation(
-                equipment_id=equipment_id,
-                comparison=comparison
+                equipment_id=equipment_id, comparison=comparison
             )
 
             # 3. If critical deviation, also create inspection task
@@ -426,7 +416,7 @@ class WorkflowTriggerEngine:
                     equipment_id=equipment_id,
                     task_name=f"Baseline Deviation Inspection - {equipment_id}",
                     priority="critical",
-                    reason=f"Baseline deviation {comparison.max_deviation_percent:.1f}% exceeds threshold"
+                    reason=f"Baseline deviation {comparison.max_deviation_percent:.1f}% exceeds threshold",
                 )
                 if equipment_id not in self._inspection_tasks:
                     self._inspection_tasks[equipment_id] = []
@@ -441,8 +431,8 @@ class WorkflowTriggerEngine:
                 details={
                     "deviation": comparison.max_deviation_percent,
                     "recommendation_id": recommendation.get("id"),
-                    "inspection_created": inspection_created
-                }
+                    "inspection_created": inspection_created,
+                },
             )
 
             result = TriggerResult(
@@ -453,24 +443,21 @@ class WorkflowTriggerEngine:
                 details={
                     "deviation_percent": comparison.max_deviation_percent,
                     "recommendation": recommendation,
-                    "inspection_created": inspection_created
+                    "inspection_created": inspection_created,
                 },
-                follow_up_scheduled=inspection_created
+                follow_up_scheduled=inspection_created,
             )
             self._mark_trigger(
                 trigger_type=TriggerType.BASELINE_DEVIATION,
                 equipment_id=equipment_id,
-                reference_id=comparison.baseline_id
+                reference_id=comparison.baseline_id,
             )
             await self._record_event(
                 trigger_type=TriggerType.BASELINE_DEVIATION,
                 equipment_id=equipment_id,
                 action_taken=result.action_taken,
-                details={
-                    "baseline_id": comparison.baseline_id,
-                    **result.details
-                },
-                success=True
+                details={"baseline_id": comparison.baseline_id, **result.details},
+                success=True,
             )
             self._trigger_history.append(result)
             return result
@@ -482,24 +469,21 @@ class WorkflowTriggerEngine:
                 equipment_id=equipment_id,
                 action_taken="error",
                 details={"error": str(e), "baseline_id": comparison.baseline_id},
-                success=False
+                success=False,
             )
             return TriggerResult(
                 success=False,
                 trigger_type=TriggerType.BASELINE_DEVIATION,
                 equipment_id=equipment_id,
                 action_taken="error",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
 
     # ========================================================================
     # Trigger 3: Critical Deficiency → Work Order Creation
     # ========================================================================
 
-    async def on_critical_deficiency(
-        self,
-        deficiency: InspectionDeficiency
-    ) -> TriggerResult:
+    async def on_critical_deficiency(self, deficiency: InspectionDeficiency) -> TriggerResult:
         """
         Handle critical deficiency detection.
 
@@ -512,9 +496,7 @@ class WorkflowTriggerEngine:
         try:
             # 0. Dedupe guard
             is_duplicate, dedupe_details = self._is_duplicate_trigger(
-                trigger_type=TriggerType.CRITICAL_DEFICIENCY,
-                equipment_id=equipment_id,
-                reference_id=deficiency.id
+                trigger_type=TriggerType.CRITICAL_DEFICIENCY, equipment_id=equipment_id, reference_id=deficiency.id
             )
             if is_duplicate:
                 result = TriggerResult(
@@ -522,11 +504,7 @@ class WorkflowTriggerEngine:
                     trigger_type=TriggerType.CRITICAL_DEFICIENCY,
                     equipment_id=equipment_id,
                     action_taken="duplicate_suppressed",
-                    details={
-                        "deficiency_id": deficiency.id,
-                        "severity": deficiency.severity,
-                        **dedupe_details
-                    }
+                    details={"deficiency_id": deficiency.id, "severity": deficiency.severity, **dedupe_details},
                 )
                 await self._record_event(
                     trigger_type=TriggerType.CRITICAL_DEFICIENCY,
@@ -534,7 +512,7 @@ class WorkflowTriggerEngine:
                     action_taken=result.action_taken,
                     details=result.details,
                     inspection_id=deficiency.inspection_id,
-                    success=True
+                    success=True,
                 )
                 self._trigger_history.append(result)
                 return result
@@ -546,18 +524,15 @@ class WorkflowTriggerEngine:
                     trigger_type=TriggerType.CRITICAL_DEFICIENCY,
                     equipment_id=equipment_id,
                     action_taken="below_threshold",
-                    details={"severity": deficiency.severity}
+                    details={"severity": deficiency.severity},
                 )
                 await self._record_event(
                     trigger_type=TriggerType.CRITICAL_DEFICIENCY,
                     equipment_id=equipment_id,
                     action_taken=result.action_taken,
-                    details={
-                        "deficiency_id": deficiency.id,
-                        **result.details
-                    },
+                    details={"deficiency_id": deficiency.id, **result.details},
                     inspection_id=deficiency.inspection_id,
-                    success=True
+                    success=True,
                 )
                 self._trigger_history.append(result)
                 return result
@@ -575,7 +550,7 @@ class WorkflowTriggerEngine:
                 estimated_cost_min=deficiency.estimated_repair_cost_min,
                 estimated_cost_max=deficiency.estimated_repair_cost_max,
                 estimated_hours=deficiency.estimated_repair_hours,
-                deficiency_reference=deficiency.id
+                deficiency_reference=deficiency.id,
             )
 
             # 3. Save work order
@@ -589,7 +564,7 @@ class WorkflowTriggerEngine:
                 baseline_type="pre_repair",
                 scheduled_date=datetime.now() + timedelta(hours=2),
                 reason=f"Pre-repair baseline for WO {work_order.id}",
-                work_order_reference=work_order.id
+                work_order_reference=work_order.id,
             )
             if equipment_id not in self._baseline_tasks:
                 self._baseline_tasks[equipment_id] = []
@@ -597,8 +572,7 @@ class WorkflowTriggerEngine:
 
             # 5. Send notification
             await self._send_alert(
-                f"Critical deficiency detected for {equipment_id}. "
-                f"Work order {work_order.id} created automatically."
+                f"Critical deficiency detected for {equipment_id}. Work order {work_order.id} created automatically."
             )
 
             # 6. Audit log
@@ -609,8 +583,8 @@ class WorkflowTriggerEngine:
                 details={
                     "deficiency_id": deficiency.id,
                     "work_order_id": work_order.id,
-                    "baseline_task_id": baseline_task.id
-                }
+                    "baseline_task_id": baseline_task.id,
+                },
             )
 
             result = TriggerResult(
@@ -621,26 +595,21 @@ class WorkflowTriggerEngine:
                 details={
                     "work_order_id": work_order.id,
                     "baseline_task_id": baseline_task.id,
-                    "severity": deficiency.severity
+                    "severity": deficiency.severity,
                 },
-                follow_up_scheduled=True
+                follow_up_scheduled=True,
             )
             self._mark_trigger(
-                trigger_type=TriggerType.CRITICAL_DEFICIENCY,
-                equipment_id=equipment_id,
-                reference_id=deficiency.id
+                trigger_type=TriggerType.CRITICAL_DEFICIENCY, equipment_id=equipment_id, reference_id=deficiency.id
             )
             await self._record_event(
                 trigger_type=TriggerType.CRITICAL_DEFICIENCY,
                 equipment_id=equipment_id,
                 action_taken=result.action_taken,
-                details={
-                    "deficiency_id": deficiency.id,
-                    **result.details
-                },
+                details={"deficiency_id": deficiency.id, **result.details},
                 inspection_id=deficiency.inspection_id,
                 work_order_id=work_order.id,
-                success=True
+                success=True,
             )
             self._trigger_history.append(result)
             return result
@@ -653,14 +622,14 @@ class WorkflowTriggerEngine:
                 action_taken="error",
                 details={"error": str(e), "deficiency_id": deficiency.id},
                 inspection_id=deficiency.inspection_id,
-                success=False
+                success=False,
             )
             return TriggerResult(
                 success=False,
                 trigger_type=TriggerType.CRITICAL_DEFICIENCY,
                 equipment_id=deficiency.equipment_id,
                 action_taken="error",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
 
     # ========================================================================
@@ -668,10 +637,7 @@ class WorkflowTriggerEngine:
     # ========================================================================
 
     async def on_repair_completed(
-        self,
-        work_order_id: str,
-        equipment_id: str,
-        completion_data: Dict[str, Any]
+        self, work_order_id: str, equipment_id: str, completion_data: Dict[str, Any]
     ) -> TriggerResult:
         """
         Handle work order completion.
@@ -688,7 +654,7 @@ class WorkflowTriggerEngine:
                 baseline_type="post_repair",
                 scheduled_date=datetime.now() + timedelta(hours=1),
                 reason=f"Post-repair baseline for WO {work_order_id}",
-                work_order_reference=work_order_id
+                work_order_reference=work_order_id,
             )
             if equipment_id not in self._baseline_tasks:
                 self._baseline_tasks[equipment_id] = []
@@ -701,7 +667,7 @@ class WorkflowTriggerEngine:
                 priority="high",
                 scheduled_date=datetime.now() + timedelta(hours=2),
                 reason=f"Verify repair completion for WO {work_order_id}",
-                work_order_reference=work_order_id
+                work_order_reference=work_order_id,
             )
             if equipment_id not in self._inspection_tasks:
                 self._inspection_tasks[equipment_id] = []
@@ -717,7 +683,7 @@ class WorkflowTriggerEngine:
                     work_order_id=work_order_id,
                     equipment_id=equipment_id,
                     equipment_code=equipment_code,
-                    service_type="breakdown"
+                    service_type="breakdown",
                 )
                 feedback_session_id = session.session_id
                 logger.info(f"Feedback session {feedback_session_id} started for WO {work_order_id}")
@@ -744,8 +710,8 @@ class WorkflowTriggerEngine:
                     "baseline_task_id": baseline_task.id,
                     "inspection_task_id": inspection_task.id,
                     "feedback_session_id": feedback_session_id,
-                    "validation_scheduled": validation_scheduled_time.isoformat()
-                }
+                    "validation_scheduled": validation_scheduled_time.isoformat(),
+                },
             )
 
             result = TriggerResult(
@@ -758,9 +724,9 @@ class WorkflowTriggerEngine:
                     "baseline_task_id": baseline_task.id,
                     "inspection_task_id": inspection_task.id,
                     "feedback_session_id": feedback_session_id,
-                    "validation_scheduled": validation_scheduled_time.isoformat()
+                    "validation_scheduled": validation_scheduled_time.isoformat(),
                 },
-                follow_up_scheduled=True
+                follow_up_scheduled=True,
             )
             await self._record_event(
                 trigger_type=TriggerType.REPAIR_COMPLETED,
@@ -768,7 +734,7 @@ class WorkflowTriggerEngine:
                 action_taken=result.action_taken,
                 details=result.details,
                 work_order_id=work_order_id,
-                success=True
+                success=True,
             )
             self._trigger_history.append(result)
             return result
@@ -781,14 +747,14 @@ class WorkflowTriggerEngine:
                 action_taken="error",
                 details={"error": str(e)},
                 work_order_id=work_order_id,
-                success=False
+                success=False,
             )
             return TriggerResult(
                 success=False,
                 trigger_type=TriggerType.REPAIR_COMPLETED,
                 equipment_id=equipment_id,
                 action_taken="error",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
 
     # ========================================================================
@@ -796,11 +762,7 @@ class WorkflowTriggerEngine:
     # ========================================================================
 
     async def validate_repair_effectiveness(
-        self,
-        equipment_id: str,
-        work_order_id: str,
-        pre_baseline: Dict[str, Any],
-        post_baseline: Dict[str, Any]
+        self, equipment_id: str, work_order_id: str, pre_baseline: Dict[str, Any], post_baseline: Dict[str, Any]
     ) -> TriggerResult:
         """
         Validate repair effectiveness by comparing baselines.
@@ -822,7 +784,7 @@ class WorkflowTriggerEngine:
                     trigger_type=TriggerType.REPAIR_VALIDATION,
                     equipment_id=equipment_id,
                     action_taken="missing_baselines",
-                    details={"error": "Missing pre or post repair baseline values"}
+                    details={"error": "Missing pre or post repair baseline values"},
                 )
                 await self._record_event(
                     trigger_type=TriggerType.REPAIR_VALIDATION,
@@ -830,7 +792,7 @@ class WorkflowTriggerEngine:
                     action_taken=result.action_taken,
                     details=result.details,
                     work_order_id=work_order_id,
-                    success=False
+                    success=False,
                 )
                 return result
 
@@ -845,21 +807,18 @@ class WorkflowTriggerEngine:
                         "pre_value": pre_value,
                         "post_value": post_value,
                         "improvement_percent": improvement,
-                        "back_to_baseline": abs(improvement) < self.baseline_tolerance
+                        "back_to_baseline": abs(improvement) < self.baseline_tolerance,
                     }
 
             # 3. Calculate average improvement
             if improvements:
-                avg_improvement = sum(
-                    v["improvement_percent"] for v in improvements.values()
-                ) / len(improvements)
+                avg_improvement = sum(v["improvement_percent"] for v in improvements.values()) / len(improvements)
             else:
                 avg_improvement = 0.0
 
             # 4. Determine effectiveness
             is_successful = avg_improvement > self.effectiveness_success_threshold or any(
-                v.get("improvement_percent", 0.0) > self.effectiveness_success_threshold
-                for v in improvements.values()
+                v.get("improvement_percent", 0.0) > self.effectiveness_success_threshold for v in improvements.values()
             )
             effectiveness = EffectivenessResult(
                 work_order_id=work_order_id,
@@ -867,9 +826,7 @@ class WorkflowTriggerEngine:
                 effectiveness_score=avg_improvement,
                 improvements=improvements,
                 repair_successful=is_successful,
-                back_to_baseline=all(
-                    v.get("back_to_baseline", False) for v in improvements.values()
-                )
+                back_to_baseline=all(v.get("back_to_baseline", False) for v in improvements.values()),
             )
             self._effectiveness_results[work_order_id] = effectiveness
 
@@ -881,7 +838,7 @@ class WorkflowTriggerEngine:
                     task_name=f"Failed Repair Follow-up - {equipment_id}",
                     priority="critical",
                     reason=f"Repair validation failed: only {avg_improvement:.1f}% improvement",
-                    work_order_reference=work_order_id
+                    work_order_reference=work_order_id,
                 )
                 if equipment_id not in self._inspection_tasks:
                     self._inspection_tasks[equipment_id] = []
@@ -895,9 +852,7 @@ class WorkflowTriggerEngine:
 
             # 6. Record ML feedback
             ml_feedback_recorded = await self._record_ml_feedback(
-                equipment_id=equipment_id,
-                work_order_id=work_order_id,
-                effectiveness=effectiveness
+                equipment_id=equipment_id, work_order_id=work_order_id, effectiveness=effectiveness
             )
 
             # 6b. Schedule follow-up and calculate cost-benefit
@@ -905,12 +860,13 @@ class WorkflowTriggerEngine:
             cost_benefit_calculated = False
             try:
                 from app.services.followup_scheduler import get_followup_scheduler
+
                 scheduler = get_followup_scheduler()
                 scheduler.schedule_followup(
                     equipment_id=equipment_id,
                     work_order_id=work_order_id,
                     effectiveness_score=avg_improvement,
-                    repair_successful=effectiveness.repair_successful
+                    repair_successful=effectiveness.repair_successful,
                 )
                 followup_scheduled = True
 
@@ -918,7 +874,7 @@ class WorkflowTriggerEngine:
                     work_order_id=work_order_id,
                     equipment_id=equipment_id,
                     repair_cost=0.0,
-                    effectiveness_score=avg_improvement
+                    effectiveness_score=avg_improvement,
                 )
                 cost_benefit_calculated = True
             except Exception as e:
@@ -936,8 +892,8 @@ class WorkflowTriggerEngine:
                     "follow_up_created": follow_up_created,
                     "ml_feedback_recorded": ml_feedback_recorded,
                     "followup_scheduled": followup_scheduled,
-                    "cost_benefit_calculated": cost_benefit_calculated
-                }
+                    "cost_benefit_calculated": cost_benefit_calculated,
+                },
             )
 
             result = TriggerResult(
@@ -953,20 +909,17 @@ class WorkflowTriggerEngine:
                     "follow_up_created": follow_up_created,
                     "ml_feedback_recorded": ml_feedback_recorded,
                     "followup_scheduled": followup_scheduled,
-                    "cost_benefit_calculated": cost_benefit_calculated
+                    "cost_benefit_calculated": cost_benefit_calculated,
                 },
-                follow_up_scheduled=follow_up_created or followup_scheduled
+                follow_up_scheduled=follow_up_created or followup_scheduled,
             )
             await self._record_event(
                 trigger_type=TriggerType.REPAIR_VALIDATION,
                 equipment_id=equipment_id,
                 action_taken=result.action_taken,
-                details={
-                    "work_order_id": work_order_id,
-                    **result.details
-                },
+                details={"work_order_id": work_order_id, **result.details},
                 work_order_id=work_order_id,
-                success=True
+                success=True,
             )
             self._trigger_history.append(result)
             return result
@@ -979,14 +932,14 @@ class WorkflowTriggerEngine:
                 action_taken="error",
                 details={"error": str(e)},
                 work_order_id=work_order_id,
-                success=False
+                success=False,
             )
             return TriggerResult(
                 success=False,
                 trigger_type=TriggerType.REPAIR_VALIDATION,
                 equipment_id=equipment_id,
                 action_taken="error",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
 
     # ========================================================================
@@ -1032,20 +985,14 @@ class WorkflowTriggerEngine:
         return f"{trigger_type.value}:{equipment_id}"
 
     def _reference_key(
-        self,
-        trigger_type: TriggerType,
-        equipment_id: str,
-        reference_id: Optional[str]
+        self, trigger_type: TriggerType, equipment_id: str, reference_id: Optional[str]
     ) -> Optional[str]:
         if not reference_id:
             return None
         return f"{trigger_type.value}:{equipment_id}:{reference_id}"
 
     def _is_duplicate_trigger(
-        self,
-        trigger_type: TriggerType,
-        equipment_id: str,
-        reference_id: Optional[str] = None
+        self, trigger_type: TriggerType, equipment_id: str, reference_id: Optional[str] = None
     ) -> Tuple[bool, Dict[str, Any]]:
         now = datetime.now()
         cooldown = self._cooldowns.get(trigger_type)
@@ -1057,9 +1004,7 @@ class WorkflowTriggerEngine:
                 elapsed = now - last_triggered
                 if elapsed < cooldown:
                     details["last_triggered_at"] = last_triggered.isoformat()
-                    details["cooldown_seconds_remaining"] = int(
-                        (cooldown - elapsed).total_seconds()
-                    )
+                    details["cooldown_seconds_remaining"] = int((cooldown - elapsed).total_seconds())
                     return True, details
 
         ref_key = self._reference_key(trigger_type, equipment_id, reference_id)
@@ -1070,19 +1015,12 @@ class WorkflowTriggerEngine:
                 if elapsed < cooldown:
                     details["reference_id"] = reference_id
                     details["last_reference_at"] = last_reference.isoformat()
-                    details["cooldown_seconds_remaining"] = int(
-                        (cooldown - elapsed).total_seconds()
-                    )
+                    details["cooldown_seconds_remaining"] = int((cooldown - elapsed).total_seconds())
                     return True, details
 
         return False, details
 
-    def _mark_trigger(
-        self,
-        trigger_type: TriggerType,
-        equipment_id: str,
-        reference_id: Optional[str] = None
-    ) -> None:
+    def _mark_trigger(self, trigger_type: TriggerType, equipment_id: str, reference_id: Optional[str] = None) -> None:
         now = datetime.now()
         self._last_triggered[self._cooldown_key(trigger_type, equipment_id)] = now
         ref_key = self._reference_key(trigger_type, equipment_id, reference_id)
@@ -1100,9 +1038,7 @@ class WorkflowTriggerEngine:
         return TriggerPriority.LOW.value
 
     async def _generate_maintenance_recommendation(
-        self,
-        equipment_id: str,
-        comparison: BaselineComparison
+        self, equipment_id: str, comparison: BaselineComparison
     ) -> Dict[str, Any]:
         """Generate AI maintenance recommendation."""
         # Simulated recommendation for demo
@@ -1126,20 +1062,18 @@ class WorkflowTriggerEngine:
                 "Schedule inspection within 24-48 hours",
                 "Check sensor calibration",
                 "Review recent operational changes",
-                "Compare with similar equipment"
+                "Compare with similar equipment",
             ],
-            "generated_at": datetime.now().isoformat()
+            "generated_at": datetime.now().isoformat(),
         }
 
     async def _record_ml_feedback(
-        self,
-        equipment_id: str,
-        work_order_id: str,
-        effectiveness: EffectivenessResult
+        self, equipment_id: str, work_order_id: str, effectiveness: EffectivenessResult
     ) -> bool:
         """Record repair outcome for ML training via MLFeedbackService."""
         try:
             from app.services.ml_feedback_service import get_ml_feedback_service
+
             ml_service = get_ml_feedback_service()
             ml_service.record_repair_feedback(
                 equipment_id=equipment_id,
@@ -1147,7 +1081,7 @@ class WorkflowTriggerEngine:
                 effectiveness_score=effectiveness.effectiveness_score,
                 repair_successful=effectiveness.repair_successful,
                 failure_type=None,
-                prediction_id=None
+                prediction_id=None,
             )
             return True
         except Exception as e:
@@ -1167,7 +1101,7 @@ class WorkflowTriggerEngine:
         details: Dict[str, Any],
         success: bool,
         work_order_id: Optional[str] = None,
-        inspection_id: Optional[str] = None
+        inspection_id: Optional[str] = None,
     ) -> None:
         event_payload = {
             "equipment_id": equipment_id,
@@ -1185,20 +1119,14 @@ class WorkflowTriggerEngine:
         except Exception as e:
             logger.warning(f"Workflow event logging failed (non-critical): {e}")
 
-    async def _audit_log(
-        self,
-        trigger_type: TriggerType,
-        equipment_id: str,
-        action: str,
-        details: Dict[str, Any]
-    ):
+    async def _audit_log(self, trigger_type: TriggerType, equipment_id: str, action: str, details: Dict[str, Any]):
         """Log trigger action to audit log."""
         log_entry = {
             "timestamp": datetime.now().isoformat(),
             "trigger_type": trigger_type.value,
             "equipment_id": equipment_id,
             "action": action,
-            "details": details
+            "details": details,
         }
         logger.info(f"AUDIT: {log_entry}")
 

@@ -73,31 +73,31 @@ EQUIPMENT_TYPE_OVERRIDES = {
 
 def extract_frontmatter(content: str) -> dict:
     """Extract YAML frontmatter from markdown."""
-    match = re.match(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL)
+    match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
     if not match:
         return {}
 
     frontmatter = {}
-    for line in match.group(1).split('\n'):
-        if ':' in line:
-            key, _, value = line.partition(':')
+    for line in match.group(1).split("\n"):
+        if ":" in line:
+            key, _, value = line.partition(":")
             key = key.strip()
             value = value.strip().strip('"').strip("'")
-            if value.startswith('[') and value.endswith(']'):
+            if value.startswith("[") and value.endswith("]"):
                 # Parse simple arrays
-                value = [v.strip().strip('"').strip("'") for v in value[1:-1].split(',')]
+                value = [v.strip().strip('"').strip("'") for v in value[1:-1].split(",")]
             frontmatter[key] = value
     return frontmatter
 
 
 def strip_frontmatter(content: str) -> str:
     """Remove YAML frontmatter from markdown content."""
-    return re.sub(r'^---\s*\n.*?\n---\s*\n', '', content, count=1, flags=re.DOTALL)
+    return re.sub(r"^---\s*\n.*?\n---\s*\n", "", content, count=1, flags=re.DOTALL)
 
 
 def extract_title(content: str) -> str:
     """Extract title from first H1 heading."""
-    match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
+    match = re.search(r"^#\s+(.+)$", content, re.MULTILINE)
     if match:
         return match.group(1).strip()
     return "Untitled"
@@ -107,23 +107,23 @@ def extract_summary(content: str, max_length: int = 500) -> str:
     """Extract first paragraph as summary."""
     stripped = strip_frontmatter(content)
     # Skip the title line
-    lines = stripped.strip().split('\n')
+    lines = stripped.strip().split("\n")
     summary_lines = []
     started = False
     for line in lines:
         stripped_line = line.strip()
         if not started:
-            if stripped_line and not stripped_line.startswith('#'):
+            if stripped_line and not stripped_line.startswith("#"):
                 started = True
                 summary_lines.append(stripped_line)
-        elif stripped_line == '' and summary_lines:
+        elif stripped_line == "" and summary_lines:
             break
-        elif stripped_line.startswith('#'):
+        elif stripped_line.startswith("#"):
             break
         else:
             summary_lines.append(stripped_line)
 
-    summary = ' '.join(summary_lines)
+    summary = " ".join(summary_lines)
     if len(summary) > max_length:
         summary = summary[:max_length] + "..."
     return summary
@@ -132,12 +132,12 @@ def extract_summary(content: str, max_length: int = 500) -> str:
 def extract_keywords(content: str, frontmatter: dict) -> list:
     """Extract keywords from frontmatter tags and content."""
     keywords = []
-    if isinstance(frontmatter.get('tags'), list):
-        keywords.extend(frontmatter['tags'])
+    if isinstance(frontmatter.get("tags"), list):
+        keywords.extend(frontmatter["tags"])
 
     # Add domain if present
-    if frontmatter.get('domain'):
-        keywords.append(frontmatter['domain'])
+    if frontmatter.get("domain"):
+        keywords.append(frontmatter["domain"])
 
     return list(set(keywords))
 
@@ -188,7 +188,7 @@ def content_hash(content: str) -> str:
 
 async def main():
     """Main ingestion function."""
-    force = '--force' in sys.argv
+    force = "--force" in sys.argv
 
     print("SENTINEL System Documentation RAG Ingestion")
     print("=" * 55)
@@ -206,7 +206,7 @@ async def main():
     # Collect all markdown files from docs/
     md_files = sorted(DOCS_DIR.rglob("*.md"))
     # Exclude templates directory
-    md_files = [f for f in md_files if '/_templates/' not in str(f)]
+    md_files = [f for f in md_files if "/_templates/" not in str(f)]
 
     # Also collect from extra scan directories
     extra_count = 0
@@ -222,12 +222,12 @@ async def main():
         print("\n[FORCE] Deleting existing system documentation entries...")
         try:
             # Delete chunks first (FK constraint)
-            existing_docs = client.table('documents').select('id').eq('source', 'system_docs').execute()
+            existing_docs = client.table("documents").select("id").eq("source", "system_docs").execute()
             if existing_docs.data:
-                doc_ids = [d['id'] for d in existing_docs.data]
+                doc_ids = [d["id"] for d in existing_docs.data]
                 for doc_id in doc_ids:
-                    client.table('document_chunks').delete().eq('document_id', doc_id).execute()
-                client.table('documents').delete().eq('source', 'system_docs').execute()
+                    client.table("document_chunks").delete().eq("document_id", doc_id).execute()
+                client.table("documents").delete().eq("source", "system_docs").execute()
                 print(f"   Deleted {len(doc_ids)} existing documents and their chunks")
         except Exception as e:
             print(f"   Error cleaning up: {e}")
@@ -251,7 +251,7 @@ async def main():
         equipment_type, document_type = get_doc_category(filepath)
 
         try:
-            content = filepath.read_text(encoding='utf-8')
+            content = filepath.read_text(encoding="utf-8")
         except Exception as e:
             print(f"  ERROR reading {relative}: {e}")
             errors += 1
@@ -265,7 +265,7 @@ async def main():
             continue
 
         frontmatter = extract_frontmatter(content)
-        title = frontmatter.get('title') or extract_title(text_content)
+        title = frontmatter.get("title") or extract_title(text_content)
         summary = extract_summary(content)
         keywords = extract_keywords(content, frontmatter)
         file_hash = content_hash(content)
@@ -273,7 +273,7 @@ async def main():
         # Check if document already exists
         if not force:
             try:
-                existing = client.table('documents').select('id, summary').eq('code', code).execute()
+                existing = client.table("documents").select("id, summary").eq("code", code).execute()
                 if existing.data:
                     # Check if content changed (use summary as proxy for simple hash)
                     print(f"  SKIP (exists): {relative}")
@@ -287,20 +287,20 @@ async def main():
         for attempt in range(max_retries):
             try:
                 doc_data = {
-                    'code': code,
-                    'title': title,
-                    'document_type': document_type,
-                    'equipment_type': equipment_type,
-                    'full_text': text_content,
-                    'source': 'system_docs',
-                    'summary': summary,
-                    'keywords': keywords,
-                    'indexing_status': 'pending'
+                    "code": code,
+                    "title": title,
+                    "document_type": document_type,
+                    "equipment_type": equipment_type,
+                    "full_text": text_content,
+                    "source": "system_docs",
+                    "summary": summary,
+                    "keywords": keywords,
+                    "indexing_status": "pending",
                 }
 
-                result = client.table('documents').insert(doc_data).execute()
+                result = client.table("documents").insert(doc_data).execute()
                 if result.data:
-                    doc_id = result.data[0]['id']
+                    doc_id = result.data[0]["id"]
 
                     # Chunk and embed with section-aware markdown chunking
                     # + context-enhanced embeddings (title/heading/type prepended)
@@ -318,7 +318,7 @@ async def main():
 
             except Exception as e:
                 error_msg = str(e)
-                if 'duplicate key' in error_msg:
+                if "duplicate key" in error_msg:
                     print(f"  SKIP (duplicate): {relative}")
                     skipped += 1
                     break
@@ -343,9 +343,9 @@ async def main():
 
     # Get counts
     try:
-        doc_count = client.table('documents').select('id', count='exact').execute().count or 0
-        chunk_count = client.table('document_chunks').select('id', count='exact').execute().count or 0
-        knowledge_count = client.table('equipment_knowledge').select('id', count='exact').execute().count or 0
+        doc_count = client.table("documents").select("id", count="exact").execute().count or 0
+        chunk_count = client.table("document_chunks").select("id", count="exact").execute().count or 0
+        knowledge_count = client.table("equipment_knowledge").select("id", count="exact").execute().count or 0
 
         print("\nTotal RAG content:")
         print(f"  Documents:       {doc_count}")
@@ -376,9 +376,9 @@ async def main():
         results = vector_db.search(query, n_results=3, similarity_threshold=0.2)
         if results:
             for r in results:
-                title = r.get('section_title') or r.get('document_type', 'unknown')
-                sim = r.get('similarity', 0)
-                content_preview = r.get('content', '')[:80]
+                title = r.get("section_title") or r.get("document_type", "unknown")
+                sim = r.get("similarity", 0)
+                content_preview = r.get("content", "")[:80]
                 print(f"  [{sim:.3f}] {title}: {content_preview}...")
         else:
             print("  No results found")

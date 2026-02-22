@@ -59,10 +59,7 @@ async def get_current_flow(request: Request, site: str):
         latest = svc.get_latest_consumption(site)
 
         if not latest:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No consumption data found for site '{site}'"
-            )
+            raise HTTPException(status_code=404, detail=f"No consumption data found for site '{site}'")
 
         return {
             "site": site,
@@ -141,10 +138,7 @@ async def get_current_consumption(request: Request, site: str):
         latest = svc.get_latest_consumption(site)
 
         if not latest:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No consumption data found for site '{site}'"
-            )
+            raise HTTPException(status_code=404, detail=f"No consumption data found for site '{site}'")
 
         return latest.to_dict()
 
@@ -183,10 +177,7 @@ async def get_consumption_trends(
         elif period == "month":
             start_date = end_date - timedelta(days=30)
         else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid period '{period}'. Use: day, week, month"
-            )
+            raise HTTPException(status_code=400, detail=f"Invalid period '{period}'. Use: day, week, month")
 
         # Get current period data
         current_records = repo.get_consumption_by_site(site, start_date, end_date)
@@ -353,10 +344,7 @@ async def resolve_alert(
         success = alert_svc.resolve_alert(alert_id, resolved_by, resolution_notes)
 
         if not success:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Alert '{alert_id}' not found or update failed"
-            )
+            raise HTTPException(status_code=404, detail=f"Alert '{alert_id}' not found or update failed")
 
         return {
             "alert_id": alert_id,
@@ -464,10 +452,7 @@ async def get_zone_consumption(
         result = agg_svc.get_consumption_by_zone(zone_id, start_date, end_date)
 
         if not result or result["meter_count"] == 0:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No consumption data found for zone '{zone_id}'"
-            )
+            raise HTTPException(status_code=404, detail=f"No consumption data found for zone '{zone_id}'")
 
         return result
 
@@ -511,8 +496,7 @@ async def get_floor_consumption(
 
         if not result or result["zone_count"] == 0:
             raise HTTPException(
-                status_code=404,
-                detail=f"No consumption data found for floor '{floor}' at site '{site}'"
+                status_code=404, detail=f"No consumption data found for floor '{floor}' at site '{site}'"
             )
 
         return result
@@ -583,10 +567,7 @@ async def get_zone_trend(
         result = agg_svc.zone_consumption_trend(zone_id, days=days)
 
         if not result or not result["data"]:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No trend data found for zone '{zone_id}'"
-            )
+            raise HTTPException(status_code=404, detail=f"No trend data found for zone '{zone_id}'")
 
         return result
 
@@ -726,10 +707,7 @@ async def set_alert_thresholds(
         success = await repo.set_alert_thresholds(site, threshold_dict)
 
         if not success:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to save thresholds for site {site}"
-            )
+            raise HTTPException(status_code=500, detail=f"Failed to save thresholds for site {site}")
 
         return {
             "site": site,
@@ -761,10 +739,7 @@ async def get_alert_thresholds(request: Request, site: str):
         return {
             "site": site,
             "thresholds": thresholds,
-            "default": all(
-                thresholds.get(k) == v
-                for k, v in repo._get_default_thresholds().items()
-            ),
+            "default": all(thresholds.get(k) == v for k, v in repo._get_default_thresholds().items()),
         }
 
     except Exception as e:
@@ -1221,15 +1196,17 @@ async def get_unacknowledged_water_alerts(
             if alert.severity != "warning":  # Include critical and high
                 age_minutes = (datetime.now() - alert.timestamp).total_seconds() / 60 if alert.timestamp else 0
 
-                result.append({
-                    "alert_id": alert.alert_id,
-                    "type": alert.alert_type.value if hasattr(alert.alert_type, 'value') else str(alert.alert_type),
-                    "severity": alert.severity.value if hasattr(alert.severity, 'value') else str(alert.severity),
-                    "zone_id": alert.meter_id.replace("-meter", "") if alert.meter_id else "unknown",
-                    "message": alert.description,
-                    "created_at": alert.timestamp.isoformat() if alert.timestamp else datetime.now().isoformat(),
-                    "age_minutes": int(age_minutes),
-                })
+                result.append(
+                    {
+                        "alert_id": alert.alert_id,
+                        "type": alert.alert_type.value if hasattr(alert.alert_type, "value") else str(alert.alert_type),
+                        "severity": alert.severity.value if hasattr(alert.severity, "value") else str(alert.severity),
+                        "zone_id": alert.meter_id.replace("-meter", "") if alert.meter_id else "unknown",
+                        "message": alert.description,
+                        "created_at": alert.timestamp.isoformat() if alert.timestamp else datetime.now().isoformat(),
+                        "age_minutes": int(age_minutes),
+                    }
+                )
 
         return result
 
@@ -1296,8 +1273,8 @@ async def water_work_order_status(
         start_date = datetime.now() - timedelta(days=days)
         alerts = alert_svc.get_leak_alerts(site, start_date=start_date)
 
-        completed = sum(1 for a in alerts if (hasattr(a, 'status') and a.status == "resolved"))
-        acknowledged = sum(1 for a in alerts if (hasattr(a, 'status') and a.status == "acknowledged"))
+        completed = sum(1 for a in alerts if (hasattr(a, "status") and a.status == "resolved"))
+        acknowledged = sum(1 for a in alerts if (hasattr(a, "status") and a.status == "acknowledged"))
         pending = len(alerts) - completed - acknowledged
 
         return {

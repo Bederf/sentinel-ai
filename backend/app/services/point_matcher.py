@@ -5,7 +5,9 @@ from typing import List, Dict, Optional, Tuple
 from difflib import SequenceMatcher
 
 from app.models.integration import (
-    AssetMatchResult, BulkMatchResult, MatchConfidence,
+    AssetMatchResult,
+    BulkMatchResult,
+    MatchConfidence,
     PointAssetMappingCreate,
 )
 
@@ -17,48 +19,43 @@ class PointMatcherService:
     EXTRACTION_PATTERNS = [
         # Pattern: Controller/AssetID.Parameter (Honeywell)
         # NAE01/AHU-L12-001.SAT → AHU-L12-001
-        r'^[A-Z0-9]+/([A-Z]+-[A-Z0-9-]+)\.',
-
+        r"^[A-Z0-9]+/([A-Z]+-[A-Z0-9-]+)\.",
         # Pattern: Building.Floor.Asset (Siemens)
         # Building1.Floor12.AHU_001_SAT → AHU_001
-        r'[A-Za-z]+\d*\.[A-Za-z]+\d*\.([A-Z]+_\d+)',
-
+        r"[A-Za-z]+\d*\.[A-Za-z]+\d*\.([A-Z]+_\d+)",
         # Pattern: AssetID/Parameter (JCI)
         # AHU-12-1/SAT → AHU-12-1
-        r'^([A-Z]+-\d+-\d+)/',
-
+        r"^([A-Z]+-\d+-\d+)/",
         # Pattern: System/AssetID.Parameter
         # BMS/AHU/L12/001/SAT → AHU-L12-001 (needs special handling)
-        r'/([A-Z]+)/([A-Z]?\d+)/(\d+)/',
-
+        r"/([A-Z]+)/([A-Z]?\d+)/(\d+)/",
         # Pattern: Simple AssetID.Parameter
         # CH-001.CHWST → CH-001
-        r'^([A-Z]+-\d+)\.',
-
+        r"^([A-Z]+-\d+)\.",
         # Pattern: AssetID_Parameter
         # AHU_L12_001_SAT → AHU_L12_001
-        r'^([A-Z]+_[A-Z]?\d+_\d+)_',
+        r"^([A-Z]+_[A-Z]?\d+_\d+)_",
     ]
 
     # Parameter name patterns
     PARAMETER_PATTERNS = {
-        'SAT': 'supply_air_temp',
-        'RAT': 'return_air_temp',
-        'OAT': 'outside_air_temp',
-        'CHW': 'chilled_water',
-        'CHWST': 'chw_supply_temp',
-        'CHWRT': 'chw_return_temp',
-        'FAN': 'fan_speed',
-        'FanSpd': 'fan_speed',
-        'VLV': 'valve_position',
-        'Status': 'status',
-        'Run': 'run_status',
-        'Alarm': 'alarm',
-        'DP': 'differential_pressure',
-        'FILT_DP': 'filter_dp',
-        'Amps': 'current',
-        'kW': 'power',
-        'Load': 'load_percent',
+        "SAT": "supply_air_temp",
+        "RAT": "return_air_temp",
+        "OAT": "outside_air_temp",
+        "CHW": "chilled_water",
+        "CHWST": "chw_supply_temp",
+        "CHWRT": "chw_return_temp",
+        "FAN": "fan_speed",
+        "FanSpd": "fan_speed",
+        "VLV": "valve_position",
+        "Status": "status",
+        "Run": "run_status",
+        "Alarm": "alarm",
+        "DP": "differential_pressure",
+        "FILT_DP": "filter_dp",
+        "Amps": "current",
+        "kW": "power",
+        "Load": "load_percent",
     }
 
     def extract_asset_id(self, point_id: str) -> Tuple[Optional[str], Optional[str]]:
@@ -83,7 +80,7 @@ class PointMatcherService:
                     asset_id = groups[0]
 
                 # Normalize: replace underscores with dashes, uppercase
-                asset_id = asset_id.replace('_', '-').upper()
+                asset_id = asset_id.replace("_", "-").upper()
 
                 # Extract parameter from remaining part
                 param = self._extract_parameter(point_id, asset_id)
@@ -91,9 +88,9 @@ class PointMatcherService:
                 return asset_id, param
 
         # Fallback: try to find asset-like pattern anywhere
-        fallback = re.search(r'([A-Z]{2,4}[-_][A-Z]?\d+[-_]?\d*)', point_id, re.IGNORECASE)
+        fallback = re.search(r"([A-Z]{2,4}[-_][A-Z]?\d+[-_]?\d*)", point_id, re.IGNORECASE)
         if fallback:
-            asset_id = fallback.group(1).replace('_', '-').upper()
+            asset_id = fallback.group(1).replace("_", "-").upper()
             param = self._extract_parameter(point_id, asset_id)
             return asset_id, param
 
@@ -104,16 +101,16 @@ class PointMatcherService:
         # Find what comes after the asset ID
         idx = point_id.upper().find(asset_id.upper())
         if idx >= 0:
-            remainder = point_id[idx + len(asset_id):]
+            remainder = point_id[idx + len(asset_id) :]
             # Clean up separators
-            remainder = re.sub(r'^[./_]', '', remainder)
+            remainder = re.sub(r"^[./_]", "", remainder)
             if remainder:
                 # Check against known patterns
                 for pattern, name in self.PARAMETER_PATTERNS.items():
                     if pattern.upper() in remainder.upper():
                         return name
                 # Return raw if no match
-                return remainder.split('.')[0].split('/')[0]
+                return remainder.split(".")[0].split("/")[0]
         return None
 
     def match_to_cafm(
@@ -135,8 +132,8 @@ class PointMatcherService:
         """
         if not extracted_id:
             return AssetMatchResult(
-                bms_point_id='',
-                extracted_asset_id='',
+                bms_point_id="",
+                extracted_asset_id="",
                 confidence=MatchConfidence.UNMATCHED,
             )
 
@@ -144,13 +141,13 @@ class PointMatcherService:
 
         # Try exact match first
         for asset in cafm_assets:
-            tag = asset.get('asset_tag', '').upper().strip()
+            tag = asset.get("asset_tag", "").upper().strip()
             if tag == extracted_upper:
                 return AssetMatchResult(
-                    bms_point_id='',
+                    bms_point_id="",
                     extracted_asset_id=extracted_id,
-                    cafm_asset_id=asset.get('asset_tag'),
-                    cafm_asset_description=asset.get('description'),
+                    cafm_asset_id=asset.get("asset_tag"),
+                    cafm_asset_description=asset.get("description"),
                     confidence=MatchConfidence.EXACT,
                 )
 
@@ -160,37 +157,39 @@ class PointMatcherService:
         alternatives = []
 
         for asset in cafm_assets:
-            tag = asset.get('asset_tag', '').upper().strip()
+            tag = asset.get("asset_tag", "").upper().strip()
 
             # Calculate similarity
             ratio = SequenceMatcher(None, extracted_upper, tag).ratio()
 
             if ratio > fuzzy_threshold:
-                alternatives.append({
-                    'asset_tag': asset.get('asset_tag'),
-                    'description': asset.get('description'),
-                    'similarity': round(ratio, 2),
-                })
+                alternatives.append(
+                    {
+                        "asset_tag": asset.get("asset_tag"),
+                        "description": asset.get("description"),
+                        "similarity": round(ratio, 2),
+                    }
+                )
 
                 if ratio > best_ratio:
                     best_ratio = ratio
                     best_match = asset
 
         # Sort alternatives by similarity
-        alternatives.sort(key=lambda x: x['similarity'], reverse=True)
+        alternatives.sort(key=lambda x: x["similarity"], reverse=True)
 
         if best_match and best_ratio > fuzzy_threshold:
             return AssetMatchResult(
-                bms_point_id='',
+                bms_point_id="",
                 extracted_asset_id=extracted_id,
-                cafm_asset_id=best_match.get('asset_tag'),
-                cafm_asset_description=best_match.get('description'),
+                cafm_asset_id=best_match.get("asset_tag"),
+                cafm_asset_description=best_match.get("description"),
                 confidence=MatchConfidence.FUZZY,
                 alternatives=alternatives[:5],  # Top 5 alternatives
             )
 
         return AssetMatchResult(
-            bms_point_id='',
+            bms_point_id="",
             extracted_asset_id=extracted_id,
             confidence=MatchConfidence.UNMATCHED,
             alternatives=alternatives[:5],
@@ -229,11 +228,13 @@ class PointMatcherService:
             extracted_id, param = extraction_cache[point_id]
 
             if not extracted_id:
-                matches.append(AssetMatchResult(
-                    bms_point_id=point_id,
-                    extracted_asset_id='',
-                    confidence=MatchConfidence.UNMATCHED,
-                ))
+                matches.append(
+                    AssetMatchResult(
+                        bms_point_id=point_id,
+                        extracted_asset_id="",
+                        confidence=MatchConfidence.UNMATCHED,
+                    )
+                )
                 unmatched_count += 1
                 continue
 

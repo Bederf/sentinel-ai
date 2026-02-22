@@ -1,4 +1,5 @@
 """Embedding service using sentence-transformers (local, no API costs)."""
+
 from sentence_transformers import SentenceTransformer
 from typing import List
 import logging
@@ -17,7 +18,7 @@ class EmbeddingService:
     def model(self) -> SentenceTransformer:
         if self._model is None:
             logger.info("Loading embedding model: all-MiniLM-L6-v2")
-            self._model = SentenceTransformer('all-MiniLM-L6-v2')
+            self._model = SentenceTransformer("all-MiniLM-L6-v2")
             logger.info("Embedding model loaded successfully")
         return self._model
 
@@ -32,10 +33,7 @@ class EmbeddingService:
             return []
 
         embeddings = self.model.encode(
-            texts,
-            batch_size=batch_size,
-            normalize_embeddings=True,
-            show_progress_bar=len(texts) > 100
+            texts, batch_size=batch_size, normalize_embeddings=True, show_progress_bar=len(texts) > 100
         )
         return embeddings.tolist()
 

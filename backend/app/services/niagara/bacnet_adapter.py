@@ -115,9 +115,7 @@ class NiagaraBACnetAdapter(DeviceAdapter):
         # Extract from device metadata
         device_id = self.device.metadata.get("bacnet_device_id")
         if device_id is None:
-            raise BACnetException(
-                f"Device {self.device.id} has no bacnet_device_id in metadata"
-            )
+            raise BACnetException(f"Device {self.device.id} has no bacnet_device_id in metadata")
         self._bacnet_device_id = int(device_id)
         return self._bacnet_device_id
 
@@ -190,19 +188,14 @@ class NiagaraBACnetAdapter(DeviceAdapter):
         """Read a point value via BACnet/IP."""
         point = self.device.get_point(point_name)
         if not point:
-            raise ValueError(
-                f"Point {point_name} not found on device {self.device.id}"
-            )
+            raise ValueError(f"Point {point_name} not found on device {self.device.id}")
 
         # Get BACnet addressing from point metadata
         bacnet_type = point.metadata.get("bacnet_object_type")
         bacnet_instance = point.metadata.get("bacnet_instance")
 
         if bacnet_type is None or bacnet_instance is None:
-            raise ValueError(
-                f"Point {point_name} missing BACnet metadata "
-                f"(bacnet_object_type, bacnet_instance)"
-            )
+            raise ValueError(f"Point {point_name} missing BACnet metadata (bacnet_object_type, bacnet_instance)")
 
         try:
             value = await self._client.read_point(
@@ -238,24 +231,17 @@ class NiagaraBACnetAdapter(DeviceAdapter):
                 metadata={"error": str(e)},
             )
 
-    async def _protocol_write(
-        self, point_name: str, value: Any, priority: int
-    ) -> bool:
+    async def _protocol_write(self, point_name: str, value: Any, priority: int) -> bool:
         """Write a value to a BACnet point with priority array support."""
         point = self.device.get_point(point_name)
         if not point:
-            raise ValueError(
-                f"Point {point_name} not found on device {self.device.id}"
-            )
+            raise ValueError(f"Point {point_name} not found on device {self.device.id}")
 
         bacnet_type = point.metadata.get("bacnet_object_type")
         bacnet_instance = point.metadata.get("bacnet_instance")
 
         if bacnet_type is None or bacnet_instance is None:
-            raise ValueError(
-                f"Point {point_name} missing BACnet metadata "
-                f"(bacnet_object_type, bacnet_instance)"
-            )
+            raise ValueError(f"Point {point_name} missing BACnet metadata (bacnet_object_type, bacnet_instance)")
 
         return await self._client.write_point(
             device_id=self.bacnet_device_id,
@@ -295,9 +281,7 @@ class NiagaraBACnetAdapter(DeviceAdapter):
             return points
 
         except BACnetException as e:
-            logger.error(
-                "Point scan failed for device %s: %s", self.device.id, e
-            )
+            logger.error("Point scan failed for device %s: %s", self.device.id, e)
             # Return existing points on failure
             return self.device.points
 

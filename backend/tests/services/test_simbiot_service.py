@@ -2,23 +2,16 @@
 
 import pytest
 
-from app.config.settings import settings
 from app.services.simbiot_service import SimbiotService
 
 
 @pytest.mark.asyncio
-async def test_initialise_from_settings_missing_credentials(monkeypatch):
-    """Service should explicitly disable itself when required creds are missing."""
-    monkeypatch.setattr(settings, "simbiot_api_url", "")
-    monkeypatch.setattr(settings, "simbiot_api_key", "")
-    monkeypatch.setattr(settings, "simbiot_username", "")
-    monkeypatch.setattr(settings, "simbiot_password", "")
-
+async def test_uninitialised_service_reports_disabled():
+    """Service should report not_initialised when initialise() has not been called."""
     service = SimbiotService()
-    await service.initialise_from_settings()
 
     assert service.status["enabled"] is False
-    assert service.status["reason"] == "missing_credentials"
+    assert service.status["reason"] == "not_initialised"
 
 
 @pytest.mark.asyncio

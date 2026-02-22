@@ -24,19 +24,15 @@ DEFAULT_KPI_CARDS = [
     "kpi-monitored-assets",
     "kpi-active-risks",
     "kpi-potential-savings",
-    "kpi-risk-predictions"
+    "kpi-risk-predictions",
 ]
 
-DEFAULT_SECTIONS = [
-    "kpi-row",
-    "site-protection",
-    "energy-analytics",
-    "risk-predictions"
-]
+DEFAULT_SECTIONS = ["kpi-row", "site-protection", "energy-analytics", "risk-predictions"]
 
 
 class DashboardPreferences(BaseModel):
     """Dashboard preferences model."""
+
     visible_kpi_cards: List[str] = Field(default=DEFAULT_KPI_CARDS)
     visible_sections: List[str] = Field(default=DEFAULT_SECTIONS)
     kpi_card_order: List[str] = Field(default=DEFAULT_KPI_CARDS)
@@ -47,6 +43,7 @@ class DashboardPreferences(BaseModel):
 
 class DashboardPreferencesResponse(BaseModel):
     """Dashboard preferences response with metadata."""
+
     user_id: str
     preferences: DashboardPreferences
     created_at: Optional[str] = None
@@ -62,9 +59,7 @@ def get_user_id(x_user_id: Optional[str] = None) -> str:
 
 
 @router.get("/dashboard", response_model=DashboardPreferencesResponse)
-async def get_dashboard_preferences(
-    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
-):
+async def get_dashboard_preferences(x_user_id: Optional[str] = Header(None, alias="X-User-ID")):
     """
     Get user's dashboard preferences.
 
@@ -92,31 +87,24 @@ async def get_dashboard_preferences(
                     kpi_card_order=row.get("kpi_card_order", DEFAULT_KPI_CARDS),
                     section_order=row.get("section_order", DEFAULT_SECTIONS),
                     default_energy_period=row.get("default_energy_period", 30),
-                    default_energy_site_id=row.get("default_energy_site_id")
+                    default_energy_site_id=row.get("default_energy_site_id"),
                 ),
                 created_at=row.get("created_at"),
-                updated_at=row.get("updated_at")
+                updated_at=row.get("updated_at"),
             )
 
         # Return defaults if no preferences exist
-        return DashboardPreferencesResponse(
-            user_id=user_id,
-            preferences=DashboardPreferences()
-        )
+        return DashboardPreferencesResponse(user_id=user_id, preferences=DashboardPreferences())
 
     except Exception as e:
         logger.error(f"Error loading dashboard preferences: {e}")
         # Return defaults on error (graceful degradation)
-        return DashboardPreferencesResponse(
-            user_id=user_id,
-            preferences=DashboardPreferences()
-        )
+        return DashboardPreferencesResponse(user_id=user_id, preferences=DashboardPreferences())
 
 
 @router.put("/dashboard", response_model=DashboardPreferencesResponse)
 async def update_dashboard_preferences(
-    preferences: DashboardPreferences,
-    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+    preferences: DashboardPreferences, x_user_id: Optional[str] = Header(None, alias="X-User-ID")
 ):
     """
     Update user's dashboard preferences.
@@ -141,24 +129,16 @@ async def update_dashboard_preferences(
         row = await prefs_repo.upsert(user_id, preferences)
 
         return DashboardPreferencesResponse(
-            user_id=user_id,
-            preferences=preferences,
-            created_at=row.get("created_at"),
-            updated_at=row.get("updated_at")
+            user_id=user_id, preferences=preferences, created_at=row.get("created_at"), updated_at=row.get("updated_at")
         )
 
     except Exception as e:
         logger.error(f"Error saving dashboard preferences: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to save preferences: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to save preferences: {str(e)}")
 
 
 @router.delete("/dashboard", response_model=dict)
-async def reset_dashboard_preferences(
-    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
-):
+async def reset_dashboard_preferences(x_user_id: Optional[str] = Header(None, alias="X-User-ID")):
     """
     Reset user's dashboard preferences to defaults.
 
@@ -176,18 +156,11 @@ async def reset_dashboard_preferences(
         # Delete existing preferences
         await prefs_repo.delete(user_id)
 
-        return {
-            "success": True,
-            "message": "Dashboard preferences reset to defaults",
-            "user_id": user_id
-        }
+        return {"success": True, "message": "Dashboard preferences reset to defaults", "user_id": user_id}
 
     except Exception as e:
         logger.error(f"Error resetting dashboard preferences: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to reset preferences: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to reset preferences: {str(e)}")
 
 
 @router.get("/dashboard/defaults", response_model=DashboardPreferences)

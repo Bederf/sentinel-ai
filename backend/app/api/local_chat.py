@@ -22,12 +22,14 @@ router = APIRouter()
 
 class LocalChatRequest(BaseModel):
     """Request model for local chat endpoint."""
+
     message: str
     site_id: str | None = None
 
 
 class LocalChatResponse(BaseModel):
     """Response model for local chat endpoint."""
+
     response: str
     intent: str
     confidence: float
@@ -93,7 +95,7 @@ async def local_chat_stream(request: LocalChatRequest):
             response_text = result["response"]
             chunk_size = 50
             for i in range(0, len(response_text), chunk_size):
-                chunk = response_text[i:i + chunk_size]
+                chunk = response_text[i : i + chunk_size]
                 yield f"data: {json.dumps({'type': 'content', 'text': chunk})}\n\n"
 
             yield "data: [DONE]\n\n"

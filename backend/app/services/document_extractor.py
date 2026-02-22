@@ -106,9 +106,7 @@ async def extract_text(file: UploadFile) -> Tuple[str, dict]:
     elif file_ext == ".txt":
         text = content.decode("utf-8")
     else:
-        raise ValueError(
-            f"Unsupported file type: {file_ext}. Supported types: .pdf, .docx, .txt"
-        )
+        raise ValueError(f"Unsupported file type: {file_ext}. Supported types: .pdf, .docx, .txt")
 
     # Build metadata
     metadata = {

@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/delivery", tags=["delivery_tracking"])
 
 class DeliveryStatus(str, Enum):
     """Delivery status enum."""
+
     ORDERED = "ordered"
     CONFIRMED = "confirmed"
     SHIPPED = "shipped"
@@ -30,6 +31,7 @@ class DeliveryStatus(str, Enum):
 
 class TrackingInfo(BaseModel):
     """Tracking information model."""
+
     order_id: str
     status: DeliveryStatus
     supplier: str
@@ -42,6 +44,7 @@ class TrackingInfo(BaseModel):
 
 class DeliveryTrackerResponse(BaseModel):
     """Delivery tracker response model."""
+
     order_id: str
     current_status: DeliveryStatus
     tracking_info: TrackingInfo
@@ -59,9 +62,7 @@ class DeliveryTracker:
         """Initialize delivery tracker."""
         self.tracking_status = _tracking_status
 
-    async def update_tracking(
-        self, order_id: str, tracking_info: dict
-    ) -> TrackingInfo:
+    async def update_tracking(self, order_id: str, tracking_info: dict) -> TrackingInfo:
         """
         Update delivery tracking information.
 
@@ -115,18 +116,12 @@ class DeliveryTracker:
 
         return tracking_data
 
-    async def _notify_technician(
-        self, order_id: str, tracking_info: TrackingInfo
-    ) -> None:
+    async def _notify_technician(self, order_id: str, tracking_info: TrackingInfo) -> None:
         """Notify technician of delivery status update."""
         # TODO: Send push notification or email
-        logger.info(
-            f"Technician notification: Order {order_id} status updated to {tracking_info.status.value}"
-        )
+        logger.info(f"Technician notification: Order {order_id} status updated to {tracking_info.status.value}")
 
-    async def poll_supplier_status(
-        self, order_id: str, supplier: str
-    ) -> Optional[dict]:
+    async def poll_supplier_status(self, order_id: str, supplier: str) -> Optional[dict]:
         """
         Poll supplier for order status (fallback for suppliers without webhooks).
 
@@ -146,9 +141,7 @@ _tracker = DeliveryTracker()
 
 
 @router.get("/{order_id}/tracking", response_model=DeliveryTrackerResponse)
-async def get_tracking(
-    order_id: str, auth: AuthContext = Depends(require_auth)
-) -> DeliveryTrackerResponse:
+async def get_tracking(order_id: str, auth: AuthContext = Depends(require_auth)) -> DeliveryTrackerResponse:
     """Get delivery tracking info for order."""
     tracking = _tracker.get_tracking(order_id)
     if not tracking:
@@ -201,9 +194,7 @@ async def sync_tracking(
 
 
 @router.get("/orders/pending")
-async def get_pending_orders(
-    limit: int = 50, auth: AuthContext = Depends(require_auth)
-) -> List[dict]:
+async def get_pending_orders(limit: int = 50, auth: AuthContext = Depends(require_auth)) -> List[dict]:
     """Get all pending orders for polling."""
     pending = []
     for order_id, tracking in _tracker.tracking_status.items():
@@ -237,9 +228,7 @@ async def poll_all_pending_orders() -> None:
 
     for order in pending_orders:
         try:
-            await _tracker.poll_supplier_status(
-                order["order_id"], order["supplier"]
-            )
+            await _tracker.poll_supplier_status(order["order_id"], order["supplier"])
             await asyncio.sleep(0.5)  # Rate limiting
         except Exception as e:
             logger.error(f"Error polling {order['order_id']}: {e}")

@@ -19,7 +19,7 @@ from app.models.baseline import (
     ElementBaseline,
     BaselineComparison,
     ComparisonResult,
-    DeviationStatus
+    DeviationStatus,
 )
 from app.services.influxdb_service import get_influxdb_service
 from app.database.repositories.baseline_repository import BaselineRepository
@@ -42,7 +42,7 @@ class BaselineService:
         notes: Optional[str] = None,
         measurement_conditions: Optional[Dict[str, Any]] = None,
         source_type: str = "manual",
-        attachment_urls: Optional[List[str]] = None
+        attachment_urls: Optional[List[str]] = None,
     ) -> EquipmentBaseline:
         """
         Capture a new baseline for equipment.
@@ -76,7 +76,7 @@ class BaselineService:
             measurement_conditions=measurement_conditions or {},
             source_type=source_type,
             notes=notes,
-            attachment_urls=attachment_urls or []
+            attachment_urls=attachment_urls or [],
         )
 
         logger.info(f"Captured baseline for equipment {equipment_id}: {baseline.id}")
@@ -92,7 +92,7 @@ class BaselineService:
         baseline_values: Optional[Dict[str, Any]] = None,
         notes: Optional[str] = None,
         measurement_conditions: Optional[Dict[str, Any]] = None,
-        attachment_urls: Optional[List[str]] = None
+        attachment_urls: Optional[List[str]] = None,
     ) -> ElementBaseline:
         """
         Capture baseline for a specific element (bearing, filter, etc.).
@@ -113,9 +113,7 @@ class BaselineService:
         """
         # Get or create equipment element
         element = await self.repository.get_or_create_element(
-            equipment_id=equipment_id,
-            element_id=element_id,
-            element_type=measurement_type
+            equipment_id=equipment_id, element_id=element_id, element_type=measurement_type
         )
 
         baseline = await self.repository.create_element_baseline(
@@ -126,17 +124,14 @@ class BaselineService:
             baseline_values=baseline_values or {},
             measurement_conditions=measurement_conditions or {},
             notes=notes,
-            attachment_urls=attachment_urls or []
+            attachment_urls=attachment_urls or [],
         )
 
         logger.info(f"Captured baseline for element {element_id}: {baseline.id}")
         return baseline
 
     async def compare_to_baseline(
-        self,
-        equipment_id: str,
-        current_values: Optional[Dict[str, Any]] = None,
-        data_source: str = "bms_sensor"
+        self, equipment_id: str, current_values: Optional[Dict[str, Any]] = None, data_source: str = "bms_sensor"
     ) -> BaselineComparison:
         """
         Compare current readings to stored baseline and calculate deviations.
@@ -160,8 +155,7 @@ class BaselineService:
 
         # Perform comparison
         comparison_results = self._calculate_deviations(
-            baseline_values=baseline.baseline_values,
-            current_values=current_values
+            baseline_values=baseline.baseline_values, current_values=current_values
         )
 
         # Determine overall status
@@ -175,7 +169,7 @@ class BaselineService:
             comparison_results=comparison_results,
             overall_status=overall_status,
             max_deviation_percent=max_deviation,
-            data_source=data_source
+            data_source=data_source,
         )
 
         # Generate alert if critical deviation
@@ -190,7 +184,7 @@ class BaselineService:
         equipment_id: str,
         element_id: str,
         current_values: Optional[Dict[str, Any]] = None,
-        measurement_type: str = "vibration"
+        measurement_type: str = "vibration",
     ) -> BaselineComparison:
         """
         Compare element readings to baseline.
@@ -215,14 +209,11 @@ class BaselineService:
 
         # Get current values if not provided
         if current_values is None:
-            current_values = await self._get_current_element_readings(
-                equipment_id, element_id, measurement_type
-            )
+            current_values = await self._get_current_element_readings(equipment_id, element_id, measurement_type)
 
         # Compare
         comparison_results = self._calculate_deviations(
-            baseline_values=baseline.baseline_values,
-            current_values=current_values
+            baseline_values=baseline.baseline_values, current_values=current_values
         )
 
         overall_status, max_deviation = self._assess_overall_status(comparison_results)
@@ -236,15 +227,13 @@ class BaselineService:
             comparison_results=comparison_results,
             overall_status=overall_status,
             max_deviation_percent=max_deviation,
-            data_source=baseline.measurement_type
+            data_source=baseline.measurement_type,
         )
 
         return comparison
 
     def _calculate_deviations(
-        self,
-        baseline_values: Dict[str, Any],
-        current_values: Dict[str, Any]
+        self, baseline_values: Dict[str, Any], current_values: Dict[str, Any]
     ) -> Dict[str, ComparisonResult]:
         """
         Calculate deviations between baseline and current values.
@@ -279,18 +268,12 @@ class BaselineService:
                 status = DeviationStatus.CRITICAL
 
             results[metric_name] = ComparisonResult(
-                baseline=baseline_val,
-                current=current_val,
-                deviation_percent=round(deviation, 2),
-                status=status
+                baseline=baseline_val, current=current_val, deviation_percent=round(deviation, 2), status=status
             )
 
         return results
 
-    def _assess_overall_status(
-        self,
-        comparison_results: Dict[str, ComparisonResult]
-    ) -> Tuple[str, float]:
+    def _assess_overall_status(self, comparison_results: Dict[str, ComparisonResult]) -> Tuple[str, float]:
         """
         Determine overall status from comparison results.
 
@@ -350,10 +333,7 @@ class BaselineService:
             return {}
 
     async def _get_current_element_readings(
-        self,
-        equipment_id: str,
-        element_id: str,
-        measurement_type: str
+        self, equipment_id: str, element_id: str, measurement_type: str
     ) -> Dict[str, float]:
         """Get current readings for an element."""
         try:
@@ -375,18 +355,11 @@ class BaselineService:
         # Implementation depends on existing alert infrastructure
         logger.warning(f"Critical baseline deviation detected: {comparison.equipment_id}")
 
-    async def get_baseline_history(
-        self,
-        equipment_id: str,
-        limit: int = 10
-    ) -> List[EquipmentBaseline]:
+    async def get_baseline_history(self, equipment_id: str, limit: int = 10) -> List[EquipmentBaseline]:
         """Get baseline history for equipment."""
         return await self.repository.get_equipment_baseline_history(equipment_id, limit)
 
-    async def get_baseline_report(
-        self,
-        equipment_id: str
-    ) -> Dict[str, Any]:
+    async def get_baseline_report(self, equipment_id: str) -> Dict[str, Any]:
         """
         Generate comprehensive baseline report for equipment.
 
@@ -409,7 +382,7 @@ class BaselineService:
             "baseline": baseline,
             "comparison_history": comparisons,
             "elements": elements,
-            "generated_at": datetime.now().isoformat()
+            "generated_at": datetime.now().isoformat(),
         }
 
         return report

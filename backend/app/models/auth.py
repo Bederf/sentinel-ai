@@ -21,10 +21,11 @@ class AuthLevel(str, Enum):
 
     Levels are hierarchical: ADMIN > OPERATOR > AUTHENTICATED > PUBLIC
     """
-    PUBLIC = "public"              # No auth required (health, docs)
+
+    PUBLIC = "public"  # No auth required (health, docs)
     AUTHENTICATED = "authenticated"  # Valid token required (read endpoints)
-    OPERATOR = "operator"          # Operator or above (control endpoints)
-    ADMIN = "admin"                # Admin only (configuration, simulation)
+    OPERATOR = "operator"  # Operator or above (control endpoints)
+    ADMIN = "admin"  # Admin only (configuration, simulation)
 
 
 class SentinelRole(str, Enum):
@@ -32,10 +33,11 @@ class SentinelRole(str, Enum):
 
     Roles determine what a user can do within the application.
     """
-    ADMIN = "admin"        # Full platform administration
+
+    ADMIN = "admin"  # Full platform administration
     OPERATOR = "operator"  # BMS operations, device control, optimization
     DEVELOPER = "developer"  # Development access, debugging, testing
-    AUDITOR = "auditor"    # Read-only access for compliance review
+    AUDITOR = "auditor"  # Read-only access for compliance review
 
 
 # Role hierarchy: higher roles inherit lower role permissions
@@ -62,6 +64,7 @@ class AuthContext:
     Attached to request.state.auth after successful authentication.
     Available throughout the request lifecycle.
     """
+
     user_id: str
     role: SentinelRole
     auth_method: str  # "bearer_token", "api_key", "demo_mode"
@@ -112,6 +115,7 @@ class APIKeyInfo:
 
     API keys use the prefix 'sent_sk_' to identify SENTINEL service keys.
     """
+
     key_id: str
     key_hash: str
     owner: str  # Human owner of the service account
@@ -178,13 +182,11 @@ PUBLIC_ENDPOINTS = {
 ENDPOINT_AUTH_LEVELS: List[tuple[str, AuthLevel]] = [
     # Admin-only endpoints
     ("/api/simulation/", AuthLevel.ADMIN),
-
     # Operator endpoints (control actions)
-    ("/api/devices/", AuthLevel.OPERATOR),       # Device control
-    ("/api/optimization/", AuthLevel.OPERATOR),    # Optimization actions
+    ("/api/devices/", AuthLevel.OPERATOR),  # Device control
+    ("/api/optimization/", AuthLevel.OPERATOR),  # Optimization actions
     ("/api/mcp/simbiot/call", AuthLevel.OPERATOR),  # MCP tool execution
-    ("/api/hvac/", AuthLevel.OPERATOR),            # HVAC control
-
+    ("/api/hvac/", AuthLevel.OPERATOR),  # HVAC control
     # Authenticated endpoints (read access)
     ("/api/chat", AuthLevel.AUTHENTICATED),
     ("/api/hybrid-chat", AuthLevel.AUTHENTICATED),

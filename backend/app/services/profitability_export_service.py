@@ -42,14 +42,16 @@ def export_report_csv(report: Dict[str, Any]) -> bytes:
     writer.writerow(["Asset ROI"])
     writer.writerow(["Equipment ID", "Equipment Name", "Type", "Revenue (ZAR)", "Cost (ZAR)", "ROI %"])
     for asset in assets:
-        writer.writerow([
-            asset.get("equipment_id"),
-            asset.get("equipment_name") or asset.get("equipment_code"),
-            asset.get("equipment_type"),
-            asset.get("allocated_revenue_zar"),
-            asset.get("allocated_cost_zar"),
-            asset.get("roi_percentage"),
-        ])
+        writer.writerow(
+            [
+                asset.get("equipment_id"),
+                asset.get("equipment_name") or asset.get("equipment_code"),
+                asset.get("equipment_type"),
+                asset.get("allocated_revenue_zar"),
+                asset.get("allocated_cost_zar"),
+                asset.get("roi_percentage"),
+            ]
+        )
 
     return output.getvalue().encode("utf-8")
 
@@ -93,6 +95,7 @@ def _generate_simple_pdf(lines: List[str]) -> bytes:
     """
     Minimal PDF generator supporting basic text lines.
     """
+
     def escape_pdf_text(text: str) -> str:
         return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
@@ -114,8 +117,11 @@ def _generate_simple_pdf(lines: List[str]) -> bytes:
     )
     objects.append(b"4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n")
     objects.append(
-        b"5 0 obj << /Length " + str(len(content_bytes)).encode("ascii") + b" >> stream\n" +
-        content_bytes + b"\nendstream endobj\n"
+        b"5 0 obj << /Length "
+        + str(len(content_bytes)).encode("ascii")
+        + b" >> stream\n"
+        + content_bytes
+        + b"\nendstream endobj\n"
     )
 
     offsets = []

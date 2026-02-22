@@ -22,15 +22,9 @@ class TestMCPServer:
 
     def test_mcp_tool_execution(self, test_client):
         """Test MCP tool can be executed via REST API."""
-        payload = {
-            "tool_name": "get_buildings",
-            "parameters": {}
-        }
+        payload = {"tool_name": "get_buildings", "parameters": {}}
 
-        response = test_client.post(
-            "/api/mcp/simbiot/tools/execute",
-            json=payload
-        )
+        response = test_client.post("/api/mcp/simbiot/tools/execute", json=payload)
         # 405 if endpoint only supports GET
         assert response.status_code in [200, 404, 405, 422]
 
@@ -59,9 +53,7 @@ class TestMCPServer:
         if devices_response.json():
             device_id = devices_response.json()[0]["id"]
 
-            response = test_client.get(
-                f"/api/mcp/simbiot/devices/{device_id}/points"
-            )
+            response = test_client.get(f"/api/mcp/simbiot/devices/{device_id}/points")
             assert response.status_code in [200, 404, 422]
 
     def test_mcp_write_device_point(self, test_client):
@@ -70,15 +62,9 @@ class TestMCPServer:
         if devices_response.json():
             device_id = devices_response.json()[0]["id"]
 
-            payload = {
-                "point_name": "test_point",
-                "value": 10
-            }
+            payload = {"point_name": "test_point", "value": 10}
 
-            response = test_client.post(
-                f"/api/mcp/simbiot/devices/{device_id}/write",
-                json=payload
-            )
+            response = test_client.post(f"/api/mcp/simbiot/devices/{device_id}/write", json=payload)
             # May be blocked by safety rules
             assert response.status_code in [200, 403, 404, 422]
 
@@ -116,10 +102,7 @@ class TestMCPProtocolAbstraction:
             device_id = devices_response.json()[0]["id"]
 
             # Write point - should work for any protocol
-            response = test_client.post(
-                f"/api/devices/{device_id}/control",
-                json={"point_name": "test", "value": 10}
-            )
+            response = test_client.post(f"/api/devices/{device_id}/control", json={"point_name": "test", "value": 10})
             # May fail due to safety, but protocol layer should handle it
             assert response.status_code in [200, 403, 422]
 
@@ -137,13 +120,10 @@ class TestMCPSafetyValidation:
             # Try to write an unsafe value
             payload = {
                 "point_name": "temperature_setpoint",
-                "value": 100  # Dangerously high temperature
+                "value": 100,  # Dangerously high temperature
             }
 
-            response = test_client.post(
-                f"/api/mcp/simbiot/devices/{device_id}/write",
-                json=payload
-            )
+            response = test_client.post(f"/api/mcp/simbiot/devices/{device_id}/write", json=payload)
 
             # Should be blocked by safety rules
             if response.status_code in [200, 403]:
@@ -162,10 +142,7 @@ class TestMCPSafetyValidation:
         if devices_response.json():
             device_id = devices_response.json()[0]["id"]
 
-            test_client.post(
-                f"/api/mcp/simbiot/devices/{device_id}/write",
-                json={"point_name": "test", "value": 10}
-            )
+            test_client.post(f"/api/mcp/simbiot/devices/{device_id}/write", json={"point_name": "test", "value": 10})
 
             # Check audit log
             final_audit = test_client.get("/api/audit/logs?limit=100")
@@ -182,6 +159,7 @@ class TestMCPServerDirect:
         """Test MCP server can be initialized."""
         try:
             from app.mcp.simbiot_server import SIMBIOTMCPServer
+
             # Server should be importable
             assert SIMBIOTMCPServer is not None
         except ImportError:
@@ -210,29 +188,17 @@ class TestMCPErrors:
 
     def test_invalid_tool_name(self, test_client):
         """Test invalid tool name returns appropriate error."""
-        payload = {
-            "tool_name": "nonexistent_tool",
-            "parameters": {}
-        }
+        payload = {"tool_name": "nonexistent_tool", "parameters": {}}
 
-        response = test_client.post(
-            "/api/mcp/simbiot/tools/execute",
-            json=payload
-        )
+        response = test_client.post("/api/mcp/simbiot/tools/execute", json=payload)
         # 405 if endpoint only supports GET
         assert response.status_code in [400, 404, 405, 422]
 
     def test_invalid_parameters(self, test_client):
         """Test invalid parameters return appropriate error."""
-        payload = {
-            "tool_name": "get_devices",
-            "parameters": {"invalid_param": "value"}
-        }
+        payload = {"tool_name": "get_devices", "parameters": {"invalid_param": "value"}}
 
-        response = test_client.post(
-            "/api/mcp/simbiot/tools/execute",
-            json=payload
-        )
+        response = test_client.post("/api/mcp/simbiot/tools/execute", json=payload)
         # 405 if endpoint only supports GET
         assert response.status_code in [400, 404, 405, 422]
 

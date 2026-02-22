@@ -1,6 +1,5 @@
 """Tests for AI optimizer with DALI lighting integration."""
 
-
 from app.services.ai_optimizer import AIOptimizerService
 from app.services.dali_service import DALIService
 

@@ -93,10 +93,7 @@ class SimulationLogger:
         meta_path = self.log_dir / f"{self.run_id}_meta.json"
         meta_path.write_text(json.dumps(self._meta, indent=2))
 
-        logger.info(
-            f"Simulation logger ended run {self.run_id}: "
-            f"{self._event_count} events in {duration:.1f} minutes"
-        )
+        logger.info(f"Simulation logger ended run {self.run_id}: {self._event_count} events in {duration:.1f} minutes")
 
         run_id = self.run_id
         self.run_id = None

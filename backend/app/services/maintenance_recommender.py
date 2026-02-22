@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MaintenanceRecommendation:
     """A structured maintenance recommendation."""
+
     equipment_id: str
     equipment_type: str
     risk_level: str
@@ -46,7 +47,7 @@ class MaintenanceRecommendation:
             "estimated_downtime": self.estimated_downtime,
             "priority": self.priority,
             "generated_at": self.generated_at,
-            "llm_used": self.llm_used
+            "llm_used": self.llm_used,
         }
 
 
@@ -56,84 +57,42 @@ DEFAULT_MAINTENANCE_ACTIONS = {
         "critical": [
             "Shut down and lock out equipment immediately",
             "Contact manufacturer technical support",
-            "Arrange emergency refrigerant check"
+            "Arrange emergency refrigerant check",
         ],
         "high": [
             "Schedule immediate inspection within 24-48 hours",
             "Check refrigerant levels and pressures",
-            "Verify compressor oil levels and quality"
+            "Verify compressor oil levels and quality",
         ],
         "medium": [
             "Schedule inspection within 7 days",
             "Review recent operating logs",
-            "Check condenser and evaporator approach temps"
+            "Check condenser and evaporator approach temps",
         ],
-        "low": [
-            "Include in next scheduled PM",
-            "Monitor trend data for changes"
-        ]
+        "low": ["Include in next scheduled PM", "Monitor trend data for changes"],
     },
     "ahu": {
         "critical": [
             "Switch to backup unit if available",
             "Isolate and lock out for inspection",
-            "Check for fire/smoke conditions"
+            "Check for fire/smoke conditions",
         ],
-        "high": [
-            "Inspect filters and replace if dirty",
-            "Check belt tension and condition",
-            "Verify damper operation"
-        ],
-        "medium": [
-            "Schedule filter replacement",
-            "Check VFD parameters",
-            "Review zone temperatures"
-        ],
-        "low": [
-            "Include in quarterly PM",
-            "Check coil cleanliness"
-        ]
+        "high": ["Inspect filters and replace if dirty", "Check belt tension and condition", "Verify damper operation"],
+        "medium": ["Schedule filter replacement", "Check VFD parameters", "Review zone temperatures"],
+        "low": ["Include in quarterly PM", "Check coil cleanliness"],
     },
     "generator": {
-        "critical": [
-            "Do not attempt start",
-            "Check fuel system for leaks",
-            "Verify battery disconnect is open"
-        ],
-        "high": [
-            "Perform immediate load test",
-            "Check coolant level and condition",
-            "Verify fuel quality"
-        ],
-        "medium": [
-            "Schedule oil analysis",
-            "Check battery specific gravity",
-            "Review run hours"
-        ],
-        "low": [
-            "Continue monthly exercising",
-            "Schedule next annual service"
-        ]
+        "critical": ["Do not attempt start", "Check fuel system for leaks", "Verify battery disconnect is open"],
+        "high": ["Perform immediate load test", "Check coolant level and condition", "Verify fuel quality"],
+        "medium": ["Schedule oil analysis", "Check battery specific gravity", "Review run hours"],
+        "low": ["Continue monthly exercising", "Schedule next annual service"],
     },
     "default": {
-        "critical": [
-            "Isolate equipment immediately",
-            "Contact supervisor",
-            "Document current conditions"
-        ],
-        "high": [
-            "Schedule priority inspection",
-            "Review recent alarms",
-            "Check safety systems"
-        ],
-        "medium": [
-            "Add to maintenance queue",
-            "Monitor for changes"
-        ],
-        "low": [
-            "Continue normal monitoring"
-        ]
-    }
+        "critical": ["Isolate equipment immediately", "Contact supervisor", "Document current conditions"],
+        "high": ["Schedule priority inspection", "Review recent alarms", "Check safety systems"],
+        "medium": ["Add to maintenance queue", "Monitor for changes"],
+        "low": ["Continue normal monitoring"],
+    },
 }
 
 # Common spare parts by equipment type
@@ -145,7 +104,7 @@ COMMON_SPARE_PARTS = {
     "cooling_tower": ["Fill media", "Fan belts", "Float valve", "Drift eliminator"],
     "vfd": ["Cooling fans", "Capacitors", "Control board"],
     "ups": ["Batteries", "Capacitors", "Cooling fans"],
-    "fcu": ["Filters", "Valve actuator", "Fan motor", "Thermostat"]
+    "fcu": ["Filters", "Valve actuator", "Fan motor", "Thermostat"],
 }
 
 
@@ -172,7 +131,7 @@ class MaintenanceRecommender:
         equipment_type: str,
         predictions: Dict[str, Any],
         maintenance_history: Optional[List[Dict]] = None,
-        sensor_readings: Optional[Dict[str, Any]] = None
+        sensor_readings: Optional[Dict[str, Any]] = None,
     ) -> MaintenanceRecommendation:
         """Generate maintenance recommendations based on predictions.
 
@@ -188,9 +147,9 @@ class MaintenanceRecommender:
         """
         overall_risk = predictions.get("overall_risk", {})
         risk_level = overall_risk.get("risk_level", "low")
-        predicted_failure = predictions.get("predictions", {}).get(
-            "failure_type", {}
-        ).get("predicted_failure", "Unknown")
+        predicted_failure = (
+            predictions.get("predictions", {}).get("failure_type", {}).get("predicted_failure", "Unknown")
+        )
 
         # Check if LLM is available
         ollama_available = await self.ollama.is_available()
@@ -203,14 +162,14 @@ class MaintenanceRecommender:
                 predicted_failure=predicted_failure,
                 predictions=predictions,
                 maintenance_history=maintenance_history,
-                sensor_readings=sensor_readings
+                sensor_readings=sensor_readings,
             )
         else:
             recommendation = self._generate_fallback_recommendation(
                 equipment_id=equipment_id,
                 equipment_type=equipment_type,
                 risk_level=risk_level,
-                predicted_failure=predicted_failure
+                predicted_failure=predicted_failure,
             )
 
         return recommendation
@@ -223,7 +182,7 @@ class MaintenanceRecommender:
         predicted_failure: str,
         predictions: Dict[str, Any],
         maintenance_history: Optional[List[Dict]] = None,
-        sensor_readings: Optional[Dict[str, Any]] = None
+        sensor_readings: Optional[Dict[str, Any]] = None,
     ) -> MaintenanceRecommendation:
         """Generate recommendation using LLM.
 
@@ -241,36 +200,31 @@ class MaintenanceRecommender:
         """
         # Format maintenance history
         if maintenance_history:
-            history_text = "\n".join([
-                f"- {h.get('date', 'Unknown')}: {h.get('description', 'No description')}"
-                for h in maintenance_history[:5]
-            ])
+            history_text = "\n".join(
+                [
+                    f"- {h.get('date', 'Unknown')}: {h.get('description', 'No description')}"
+                    for h in maintenance_history[:5]
+                ]
+            )
         else:
             history_text = "No recent maintenance history available."
 
         # Format sensor readings
         if sensor_readings:
-            sensor_text = "\n".join([
-                f"- {k}: {v}"
-                for k, v in sensor_readings.items()
-            ])
+            sensor_text = "\n".join([f"- {k}: {v}" for k, v in sensor_readings.items()])
         else:
             sensor_text = "No current sensor readings available."
 
         # Get fleet context from knowledge base
         query = f"{predicted_failure} {equipment_type}"
         knowledge = self.vector_db.search_knowledge(
-            query=query,
-            equipment_type=equipment_type,
-            n_results=2,
-            similarity_threshold=0.2
+            query=query, equipment_type=equipment_type, n_results=2, similarity_threshold=0.2
         )
 
         if knowledge:
-            fleet_text = "\n".join([
-                f"- {k.get('title', 'Unknown')}: {k.get('solution', k.get('description', ''))}"
-                for k in knowledge
-            ])
+            fleet_text = "\n".join(
+                [f"- {k.get('title', 'Unknown')}: {k.get('solution', k.get('description', ''))}" for k in knowledge]
+            )
         else:
             fleet_text = "No similar equipment experience found."
 
@@ -282,7 +236,7 @@ class MaintenanceRecommender:
             predicted_failure=predicted_failure,
             maintenance_history=history_text,
             sensor_context=sensor_text,
-            fleet_context=fleet_text
+            fleet_context=fleet_text,
         )
 
         # Generate with LLM
@@ -303,15 +257,11 @@ class MaintenanceRecommender:
             estimated_downtime=parsed.estimated_downtime,
             priority=self._risk_to_priority(risk_level),
             generated_at=datetime.now().isoformat(),
-            llm_used=True
+            llm_used=True,
         )
 
     def _generate_fallback_recommendation(
-        self,
-        equipment_id: str,
-        equipment_type: str,
-        risk_level: str,
-        predicted_failure: str
+        self, equipment_id: str, equipment_type: str, risk_level: str, predicted_failure: str
     ) -> MaintenanceRecommendation:
         """Generate fallback recommendation without LLM.
 
@@ -325,32 +275,27 @@ class MaintenanceRecommender:
             MaintenanceRecommendation with default actions
         """
         # Get default actions for this equipment type and risk level
-        type_actions = DEFAULT_MAINTENANCE_ACTIONS.get(
-            equipment_type.lower(),
-            DEFAULT_MAINTENANCE_ACTIONS["default"]
-        )
+        type_actions = DEFAULT_MAINTENANCE_ACTIONS.get(equipment_type.lower(), DEFAULT_MAINTENANCE_ACTIONS["default"])
         immediate = type_actions.get(risk_level, type_actions.get("low", []))
 
         # Build scheduled maintenance based on risk
         if risk_level == "critical":
             scheduled = [
                 {"timeline": "Immediate", "action": "Emergency repair/replacement"},
-                {"timeline": "24 hours", "action": "Root cause analysis"}
+                {"timeline": "24 hours", "action": "Root cause analysis"},
             ]
         elif risk_level == "high":
             scheduled = [
                 {"timeline": "48 hours", "action": "Detailed inspection"},
-                {"timeline": "1 week", "action": "Corrective maintenance"}
+                {"timeline": "1 week", "action": "Corrective maintenance"},
             ]
         elif risk_level == "medium":
             scheduled = [
                 {"timeline": "2 weeks", "action": "Scheduled inspection"},
-                {"timeline": "1 month", "action": "Preventive maintenance"}
+                {"timeline": "1 month", "action": "Preventive maintenance"},
             ]
         else:
-            scheduled = [
-                {"timeline": "Next PM cycle", "action": "Include in routine maintenance"}
-            ]
+            scheduled = [{"timeline": "Next PM cycle", "action": "Include in routine maintenance"}]
 
         # Get common spare parts for this equipment type
         spare_parts = COMMON_SPARE_PARTS.get(equipment_type.lower(), [])
@@ -360,7 +305,7 @@ class MaintenanceRecommender:
         preventive = [
             "Document current equipment condition with photos",
             "Review and update maintenance procedures if needed",
-            "Check calibration of all sensors and controls"
+            "Check calibration of all sensors and controls",
         ]
 
         # Standard skills based on equipment type
@@ -379,7 +324,7 @@ class MaintenanceRecommender:
             estimated_downtime=self._estimate_downtime(risk_level),
             priority=self._risk_to_priority(risk_level),
             generated_at=datetime.now().isoformat(),
-            llm_used=False
+            llm_used=False,
         )
 
     def _risk_to_priority(self, risk_level: str) -> str:
@@ -391,12 +336,9 @@ class MaintenanceRecommender:
         Returns:
             Priority string
         """
-        return {
-            "critical": "emergency",
-            "high": "urgent",
-            "medium": "planned",
-            "low": "routine"
-        }.get(risk_level.lower(), "routine")
+        return {"critical": "emergency", "high": "urgent", "medium": "planned", "low": "routine"}.get(
+            risk_level.lower(), "routine"
+        )
 
     def _estimate_downtime(self, risk_level: str) -> str:
         """Estimate downtime based on risk level.
@@ -411,13 +353,11 @@ class MaintenanceRecommender:
             "critical": "4-8 hours (emergency repair)",
             "high": "2-4 hours",
             "medium": "1-2 hours",
-            "low": "0.5-1 hour"
+            "low": "0.5-1 hour",
         }.get(risk_level.lower(), "1-2 hours")
 
     async def get_fleet_recommendations(
-        self,
-        equipment_list: List[Dict[str, Any]],
-        predictions_map: Dict[str, Dict]
+        self, equipment_list: List[Dict[str, Any]], predictions_map: Dict[str, Dict]
     ) -> List[MaintenanceRecommendation]:
         """Generate recommendations for multiple equipment.
 
@@ -439,7 +379,7 @@ class MaintenanceRecommender:
             recommendation = await self.generate_recommendation(
                 equipment_id=equipment_id,
                 equipment_type=equipment.get("equipment_type", "unknown"),
-                predictions=predictions
+                predictions=predictions,
             )
             recommendations.append(recommendation)
 

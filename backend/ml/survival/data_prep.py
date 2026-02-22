@@ -97,7 +97,7 @@ class SurvivalDataPrep:
                     "equipment_type": eq["type"],
                     "duration": max(1, duration),  # Minimum 1 day
                     "event": event,
-                    **features
+                    **features,
                 }
                 records.append(record)
             except Exception as e:
@@ -170,7 +170,7 @@ class SurvivalDataPrep:
             "generator": 15,
             "pump": 10,
             "fcu": 12,
-            "vrf": 12
+            "vrf": 12,
         }
 
         expected_life_years = expected_life.get(equipment_type, 15)
@@ -209,20 +209,16 @@ class SurvivalDataPrep:
             "expected_life_years": expected_life_years,
             "life_used_pct": round(min(100, life_used_pct), 2),
             "criticality": criticality,
-
             # Service history
             "service_count_12m": service_count_12m,
             "days_since_service": days_since_service,
             "overdue_services": 1 if days_since_service > 180 else 0,
-
             # Alarm history
             "alarm_count_30d": alarm_count_30d,
             "critical_alarms_30d": critical_alarms_30d,
-
             # Sensor summary (simulated)
             "vibration_rms_mean": round(vibration_rms_mean, 2),
             "temp_deviation_mean": round(temp_deviation_mean, 2),
-
             # Equipment type as categorical (one-hot encoded)
             "is_chiller": 1 if equipment_type == "chiller" else 0,
             "is_ahu": 1 if equipment_type == "ahu" else 0,
@@ -280,5 +276,5 @@ class SurvivalDataPrep:
             "event_rate": float(df["event"].mean()),
             "median_duration": float(df["duration"].median()),
             "max_duration": int(df["duration"].max()),
-            "equipment_types": df["equipment_type"].value_counts().to_dict()
+            "equipment_types": df["equipment_type"].value_counts().to_dict(),
         }

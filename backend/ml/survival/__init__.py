@@ -11,8 +11,4 @@ from .data_prep import SurvivalDataPrep
 from .model import SurvivalModel
 from .train import SurvivalTrainer
 
-__all__ = [
-    "SurvivalDataPrep",
-    "SurvivalModel",
-    "SurvivalTrainer"
-]
+__all__ = ["SurvivalDataPrep", "SurvivalModel", "SurvivalTrainer"]

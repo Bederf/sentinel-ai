@@ -30,6 +30,7 @@ ESP_BASE_URL = "https://developer.sepush.co.za/business/2.0"
 @dataclass
 class CachedResponse:
     """Cached API response with TTL."""
+
     data: Any
     fetched_at: float
     ttl_seconds: int
@@ -42,6 +43,7 @@ class CachedResponse:
 @dataclass
 class NationalStatus:
     """Parsed national load shedding status."""
+
     stage: int
     stage_updated: str
     name: str
@@ -51,6 +53,7 @@ class NationalStatus:
 @dataclass
 class AreaEvent:
     """A scheduled load shedding event for an area."""
+
     start: str
     end: str
     note: str
@@ -60,6 +63,7 @@ class AreaEvent:
 @dataclass
 class EskomSePushStatus:
     """Combined status from EskomSePush API."""
+
     eskom: NationalStatus
     capetown: Optional[NationalStatus]
     area_events: List[AreaEvent]
@@ -228,12 +232,14 @@ class EskomSePushService:
                         except (ValueError, IndexError):
                             pass
 
-                area_events.append(AreaEvent(
-                    start=event.get("start", ""),
-                    end=event.get("end", ""),
-                    note=note,
-                    stage=stage_num,
-                ))
+                area_events.append(
+                    AreaEvent(
+                        start=event.get("start", ""),
+                        end=event.get("end", ""),
+                        note=note,
+                        stage=stage_num,
+                    )
+                )
 
         return EskomSePushStatus(
             eskom=eskom,

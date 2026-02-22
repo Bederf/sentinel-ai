@@ -10,10 +10,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
-from app.models.device import (
-    Device, DeviceValue, DeviceStatus, DevicePoint,
-    create_device_from_dict
-)
+from app.models.device import Device, DeviceValue, DeviceStatus, DevicePoint, create_device_from_dict
 from app.services.safety_interlocks import safety_engine
 from app.services.audit_logger import AuditLogger
 from app.models.audit_log import AuditResultType
@@ -60,7 +57,7 @@ class DeviceInterface(ABC):
             await safety_engine.initialize()
 
         # Get device for validation - subclasses should provide this
-        device = getattr(self, 'device', None)
+        device = getattr(self, "device", None)
         if device:
             return await safety_engine.validate_control(device, point_name, value)
 
@@ -69,10 +66,7 @@ class DeviceInterface(ABC):
             "allowed": True,
             "reasons": [],
             "warnings": [],
-            "validation_details": {
-                "status": "no_device",
-                "message": "Safety validation skipped - no device context"
-            }
+            "validation_details": {"status": "no_device", "message": "Safety validation skipped - no device context"},
         }
 
     @abstractmethod
@@ -220,7 +214,7 @@ class DeviceAdapter(ABC):
                 result=AuditResultType.BLOCKED,
                 safety_validation=safety_result,
                 error_message=error_msg,
-                metadata={"priority": priority}
+                metadata={"priority": priority},
             )
 
             raise ValueError(error_msg)
@@ -228,7 +222,9 @@ class DeviceAdapter(ABC):
         # Log safety warnings if any
         warnings = safety_result.get("warnings", [])
         if warnings:
-            logger.warning(f"Safety warnings for {point_name} = {value} on device {self.device.id}: {', '.join(warnings)}")
+            logger.warning(
+                f"Safety warnings for {point_name} = {value} on device {self.device.id}: {', '.join(warnings)}"
+            )
 
         try:
             success = await self._protocol_write(point_name, value, priority)
@@ -243,7 +239,7 @@ class DeviceAdapter(ABC):
                     new_value=value,
                     result=AuditResultType.SUCCESS,
                     safety_validation=safety_result,
-                    metadata={"priority": priority}
+                    metadata={"priority": priority},
                 )
                 logger.info(f"Wrote {point_name} = {value} to device {self.device.id} (priority: {priority})")
             else:
@@ -256,7 +252,7 @@ class DeviceAdapter(ABC):
                     result=AuditResultType.FAILED,
                     safety_validation=safety_result,
                     error_message="Protocol write failed",
-                    metadata={"priority": priority}
+                    metadata={"priority": priority},
                 )
                 logger.warning(f"Failed to write {point_name} = {value} to device {self.device.id}")
 
@@ -272,7 +268,7 @@ class DeviceAdapter(ABC):
                 result=AuditResultType.FAILED,
                 safety_validation=safety_result,
                 error_message=str(e),
-                metadata={"priority": priority}
+                metadata={"priority": priority},
             )
             logger.error(f"Error writing {point_name} = {value} to device {self.device.id}: {e}")
             raise
@@ -395,7 +391,9 @@ class DeviceManager:
 
         return await adapter.read_value(point_name)
 
-    async def write_device_value(self, device_id: str, point_name: str, value: Any, priority: int = 8, user: str = "system") -> bool:
+    async def write_device_value(
+        self, device_id: str, point_name: str, value: Any, priority: int = 8, user: str = "system"
+    ) -> bool:
         """Write value to a device point."""
         adapter = await self.get_adapter(device_id)
         if not adapter:

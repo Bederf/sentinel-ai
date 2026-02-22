@@ -27,12 +27,7 @@ logger = logging.getLogger(__name__)
 class LSTMTrainer:
     """Training pipeline for LSTM forecasting models."""
 
-    def __init__(
-        self,
-        model_dir: str = None,
-        window_size: int = 168,
-        forecast_horizons: List[int] = None
-    ):
+    def __init__(self, model_dir: str = None, window_size: int = 168, forecast_horizons: List[int] = None):
         """
         Initialize trainer.
 
@@ -58,7 +53,7 @@ class LSTMTrainer:
         batch_size: int = 32,
         test_size: float = 0.2,
         use_demo_data: bool = True,
-        verbose: int = 1
+        verbose: int = 1,
     ) -> Dict[str, Any]:
         """
         Train LSTM model for a specific equipment type.
@@ -82,30 +77,20 @@ class LSTMTrainer:
         n_features = len(config["features"])
 
         # Prepare data
-        data_prep = LSTMDataPrep(
-            window_size=self.window_size,
-            forecast_horizons=self.forecast_horizons
-        )
+        data_prep = LSTMDataPrep(window_size=self.window_size, forecast_horizons=self.forecast_horizons)
 
         try:
             # Try to load real data (would connect to InfluxDB/Supabase)
             # For now, fall back to demo data
             if use_demo_data:
                 logger.info(f"Using demo data for {equipment_type}")
-                X, y = data_prep.generate_demo_data(
-                    n_samples=5000,
-                    n_features=n_features,
-                    noise_level=0.1
-                )
+                X, y = data_prep.generate_demo_data(n_samples=5000, n_features=n_features, noise_level=0.1)
             else:
                 raise NotImplementedError("Real data loading not yet implemented")
 
         except Exception as e:
             logger.warning(f"Could not load real data: {e}. Using demo data.")
-            X, y = data_prep.generate_demo_data(
-                n_samples=5000,
-                n_features=n_features
-            )
+            X, y = data_prep.generate_demo_data(n_samples=5000, n_features=n_features)
 
         # Verify data shape
         logger.info(f"Data shape: X={X.shape}, y={y.shape}")
@@ -128,18 +113,20 @@ class LSTMTrainer:
             n_features=n_features,
             n_outputs=len(self.forecast_horizons),
             lstm_units=(128, 64, 32),
-            dropout_rate=0.2
+            dropout_rate=0.2,
         )
         model.build()
 
         # Train
         history = model.train(
-            X_train_scaled, y_train,
-            X_val_scaled, y_val,
+            X_train_scaled,
+            y_train,
+            X_val_scaled,
+            y_val,
             epochs=epochs,
             batch_size=batch_size,
             patience=10,
-            verbose=verbose
+            verbose=verbose,
         )
 
         # Evaluate
@@ -172,9 +159,9 @@ class LSTMTrainer:
                 "training_samples": len(X_train),
                 "validation_samples": len(X_val),
                 "epochs_trained": len(history["loss"]),
-                "use_demo_data": use_demo_data
+                "use_demo_data": use_demo_data,
             },
-            auto_activate=True
+            auto_activate=True,
         )
 
         training_time = (datetime.now() - start_time).total_seconds()
@@ -189,69 +176,50 @@ class LSTMTrainer:
             "training_time_seconds": training_time,
             "epochs_trained": len(history["loss"]),
             "final_loss": history["loss"][-1],
-            "final_val_loss": history.get("val_loss", [None])[-1]
+            "final_val_loss": history.get("val_loss", [None])[-1],
         }
 
         logger.info(
-            f"Training complete for {equipment_type}: "
-            f"MAE_24h={metrics['mae_24h']:.4f}, "
-            f"R2_24h={metrics['r2_24h']:.4f}"
+            f"Training complete for {equipment_type}: MAE_24h={metrics['mae_24h']:.4f}, R2_24h={metrics['r2_24h']:.4f}"
         )
 
         return result
 
-    def _calculate_metrics(
-        self,
-        y_true: np.ndarray,
-        y_pred: np.ndarray
-    ) -> Dict[str, float]:
+    def _calculate_metrics(self, y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
         """Calculate prediction metrics for each forecast horizon."""
         from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
         metrics = {}
         horizon_names = ["24h", "48h", "72h"]
 
-        for i, name in enumerate(horizon_names[:y_true.shape[1]]):
+        for i, name in enumerate(horizon_names[: y_true.shape[1]]):
             metrics[f"mae_{name}"] = float(mean_absolute_error(y_true[:, i], y_pred[:, i]))
             metrics[f"rmse_{name}"] = float(np.sqrt(mean_squared_error(y_true[:, i], y_pred[:, i])))
             metrics[f"r2_{name}"] = float(r2_score(y_true[:, i], y_pred[:, i]))
 
         # Overall metrics
-        metrics["mae_avg"] = float(np.mean([metrics[f"mae_{n}"] for n in horizon_names[:y_true.shape[1]]]))
-        metrics["r2_avg"] = float(np.mean([metrics[f"r2_{n}"] for n in horizon_names[:y_true.shape[1]]]))
+        metrics["mae_avg"] = float(np.mean([metrics[f"mae_{n}"] for n in horizon_names[: y_true.shape[1]]]))
+        metrics["r2_avg"] = float(np.mean([metrics[f"r2_{n}"] for n in horizon_names[: y_true.shape[1]]]))
 
         return metrics
 
-    def train_all(
-        self,
-        epochs: int = 100,
-        use_demo_data: bool = True
-    ) -> List[Dict[str, Any]]:
+    def train_all(self, epochs: int = 100, use_demo_data: bool = True) -> List[Dict[str, Any]]:
         """Train models for all equipment types."""
         results = []
 
         for eq_type in EquipmentDataLoader.list_equipment_types():
             try:
-                result = self.train_equipment_type(
-                    eq_type,
-                    epochs=epochs,
-                    use_demo_data=use_demo_data
-                )
+                result = self.train_equipment_type(eq_type, epochs=epochs, use_demo_data=use_demo_data)
                 results.append(result)
             except Exception as e:
                 logger.error(f"Failed to train {eq_type}: {e}")
-                results.append({
-                    "equipment_type": eq_type,
-                    "error": str(e)
-                })
+                results.append({"equipment_type": eq_type, "error": str(e)})
 
         # Summary
         successful = [r for r in results if "error" not in r]
         failed = [r for r in results if "error" in r]
 
-        logger.info(
-            f"Training complete: {len(successful)} successful, {len(failed)} failed"
-        )
+        logger.info(f"Training complete: {len(successful)} successful, {len(failed)} failed")
 
         return results
 
@@ -260,41 +228,19 @@ def main():
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="Train LSTM forecasting models")
     parser.add_argument(
-        "--equipment-type", "-e",
-        type=str,
-        help="Equipment type to train (chiller, ahu, generator, etc.)"
+        "--equipment-type", "-e", type=str, help="Equipment type to train (chiller, ahu, generator, etc.)"
     )
+    parser.add_argument("--all", "-a", action="store_true", help="Train all equipment types")
+    parser.add_argument("--epochs", type=int, default=50, help="Maximum training epochs (default: 50)")
+    parser.add_argument("--demo-data", action="store_true", default=True, help="Use synthetic demo data")
     parser.add_argument(
-        "--all", "-a",
-        action="store_true",
-        help="Train all equipment types"
-    )
-    parser.add_argument(
-        "--epochs",
-        type=int,
-        default=50,
-        help="Maximum training epochs (default: 50)"
-    )
-    parser.add_argument(
-        "--demo-data",
-        action="store_true",
-        default=True,
-        help="Use synthetic demo data"
-    )
-    parser.add_argument(
-        "--verbose", "-v",
-        type=int,
-        default=1,
-        help="Verbosity level (0=silent, 1=progress, 2=detailed)"
+        "--verbose", "-v", type=int, default=1, help="Verbosity level (0=silent, 1=progress, 2=detailed)"
     )
 
     args = parser.parse_args()
 
     # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     trainer = LSTMTrainer()
 
@@ -309,10 +255,7 @@ def main():
 
     elif args.equipment_type:
         result = trainer.train_equipment_type(
-            args.equipment_type,
-            epochs=args.epochs,
-            use_demo_data=args.demo_data,
-            verbose=args.verbose
+            args.equipment_type, epochs=args.epochs, use_demo_data=args.demo_data, verbose=args.verbose
         )
         print(f"\n=== Training Result: {args.equipment_type} ===")
         print(f"  Model ID: {result['model_id']}")

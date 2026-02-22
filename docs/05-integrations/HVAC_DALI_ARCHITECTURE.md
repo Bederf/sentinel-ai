@@ -158,27 +158,35 @@ Step 4: Safety Validation (20-25 seconds)
           Safe to execute change
 
 
-Step 5: Lighting Coordination (25-30 seconds)
-══════════════════════════════════════════════
+Step 5: Lighting — Tridonic Handles Natively (concurrent)
+══════════════════════════════════════════════════════════
 
-  DALIService.check_lighting_adjustment()
+  Tridonic DALI-2 Controller (autonomous, no AI intervention):
       │
-      ├─ Input: Zone occupancy = 6.7%
-      ├─ Input: Current brightness = 100%
+      ├─ PIR MSensor detects: Zone occupancy dropped
+      ├─ Native behaviour: Dim to 20% (level 51) automatically
+      ├─ Emergency zones: Maintained at 70% minimum
+      ├─ Fade time: 3 seconds (smooth transition)
       │
-      ├─ Decision:
-      │  ├─ IF occupancy < 10%
-      │  ├─ THEN recommend brightness = 20%
-      │  ├─ (Occupied Full → Emergency + Occupied)
-      │  └─ Reason: Zone nearly empty, reduce lighting
-      │
-      └─→ LIGHTING RECOMMENDATION:
+      └─→ TRIDONIC HANDLES THIS NATIVELY:
           ├─ zone_id: Zone-101
-          ├─ action: set_brightness
-          ├─ current_level: 100%
-          ├─ recommended_level: 20%
+          ├─ action: Automatic PIR-triggered dimming
+          ├─ result: 100% → 20% (no SENTINEL command needed)
           ├─ heat_reduction: 256W (8 luminaires × 40W × 80%)
-          └─ safety: Emergency lighting available at 10%
+          └─ D4i lumDATA: Energy data logged per-luminaire (Part 252)
+
+  SENTINEL AI role (cross-system coordination, mode-dependent):
+      │
+      └─→ HVAC COORDINATION (what Tridonic can't do):
+          ├─ Tridonic dimmed the lights → reduced heat load by 256W
+          ├─ SENTINEL recommends: Raise setpoint +2°C (less cooling needed)
+          ├─ Mode determines action:
+          │  ├─ simulation/shadow: Log recommendation only
+          │  ├─ supervised: Queue for operator approval
+          │  └─ automatic: Execute if quality gate PASS
+          ├─ If executed: SafetyEngine validates, setpoint sent via BACnet
+          │  └─ Local Desigo/FCU control loop determines valve movement
+          └─ Combined savings: lighting (Tridonic) + HVAC (SENTINEL)
 
 
 Step 6: Execute Recommendations (30-35 seconds)
@@ -213,14 +221,14 @@ Step 6: Execute Recommendations (30-35 seconds)
               └─ Log: "FCU-101: Setpoint changed 22→25°C by AI (occupancy 6.7%)"
 
 
-         DALI CHANGE:
+         DALI (Tridonic-managed, NOT SENTINEL-commanded):
           │
-          ├─ Target: Zone-101 (DALI Controller)
-          ├─ Command: Set brightness
-          ├─ Addressing: Luminaires 0-7 (8 units)
+          ├─ Tridonic PIR sensor detected occupancy drop
+          ├─ Native controller dims Zone-101 automatically
+          ├─ No SENTINEL command sent (Tridonic handles this)
           │
-          ├─ DALI Protocol:
-          │  └─ Command Frame:
+          ├─ DALI Protocol (Tridonic-initiated):
+          │  └─ Command Frame (from Tridonic controller):
           │     ├─ Address: 00-07 (broadcast to Zone-101)
           │     ├─ Level: 50 (20% of 254 = 50)
           │     └─ Fade Time: 3 seconds
@@ -231,7 +239,8 @@ Step 6: Execute Recommendations (30-35 seconds)
           └─→ RESULT:
               ├─ Luminaires fade from 100% → 20% over 3 sec
               ├─ Heat reduction: 256W
-              └─ Log: "Zone-101: Brightness 100→20% (occupancy 6.7%)"
+              ├─ D4i Part 252: Energy reduction logged per luminaire
+              └─ Log: "Zone-101: Tridonic dimmed to 20% (PIR: occupancy 6.7%)"
 
 
 Step 7: Physical System Response (35-40 seconds)
@@ -491,24 +500,32 @@ Occupancy 80% → 6.7% at 18:00:
    └─ Stability: Room maintains 25°C (matches new setpoint)
 
 
-DALI Response to OCCUPANCY CHANGE:
+DALI Response to OCCUPANCY CHANGE (Tridonic-managed):
 
 Occupancy 80% → 6.7% at 18:00:
 ├─ Current brightness: 100% (occupied scene)
 ├─ Current daylight: 50 lux (sunset, low)
 ├─ Current power: 8 × 40W = 320W
 │
-├─ SENTINEL decision:
-│  ├─ Check: Occupancy 6.7% = very low
-│  ├─ Check: Daylight 50 lux = insufficient for work
-│  ├─ Decision: Reduce to 20% brightness (emergency + occupied minimum)
-│  └─ Reason: Energy savings, low occupancy acceptable
-│
-├─ DALI response:
-│  ├─ Scene change: "Occupied Full" → "Empty/Occupied"
+├─ Tridonic native response (NO SENTINEL command needed):
+│  ├─ PIR MSensor detects: no motion for 7+ minutes
+│  ├─ Controller applies: unoccupied dimming profile
+│  ├─ Scene change: "Occupied Full" → "Unoccupied" (automatic)
 │  ├─ Brightness: 254 → 50 (on 0-254 scale)
 │  ├─ Fade time: 3 seconds (smooth, not jarring)
-│  └─ Power: 320W → 64W (80% reduction)
+│  ├─ Power: 320W → 64W (80% reduction)
+│  └─ D4i lumDATA: Energy data logged per-luminaire (Part 252)
+│
+├─ SENTINEL AI role (cross-system coordination, mode-dependent):
+│  ├─ Reads Tridonic occupancy data (PIR + lux)
+│  ├─ Recommends HVAC setback: +3°C (Tridonic can't adjust HVAC)
+│  ├─ Note: In current integration, HVAC is not occupancy-driven from
+│  │  Tridonic data directly — SENTINEL bridges the gap. Desigo CAN
+│  │  support native occupancy logic if those points are wired at BMS level.
+│  ├─ If setpoint change is executed: SafetyEngine validates, then setpoint
+│  │  sent via BACnet; local Desigo/FCU control loop determines valve movement
+│  ├─ Coordinates security: Zone flagged as low-occupancy
+│  └─ Reads lumDATA Part 253 for predictive maintenance
 │
 ├─ Occupant experience:
 │  ├─ 2 people still present: Room still well-lit (200 lux)
@@ -517,10 +534,10 @@ Occupancy 80% → 6.7% at 18:00:
 │  └─ Comfort: Maintained
 │
 └─ Energy impact:
-   ├─ Heat reduction: 256W (less lighting load)
-   ├─ Chiller benefit: -0.26 kW (minor, but contributes)
-   ├─ Daily saving: 256W × 4 hours × €0.15/kWh = €0.15/day
-   └─ Annual (building): €72/year for this one zone
+   ├─ Heat reduction: 256W (less lighting load — Tridonic-managed)
+   ├─ HVAC benefit: -3 kW (SENTINEL-managed setback)
+   ├─ Daily saving: combined 3.26 kW × 4 hours × R1.50/kWh = R19.56/day
+   └─ Annual (building): R7,140/year for this one zone
 ```
 
 ---
@@ -813,11 +830,13 @@ Fallback (If Model Fails):
 
 This architecture demonstrates:
 
-1. **Layered Control**: HVAC → DALI → SENTINEL AI (each builds on previous)
-2. **Real-time Data Fusion**: Badge reader + PIR + weather + grid signals
-3. **Automated Decision-Making**: Occupancy-triggered, safety-validated, audit-logged
-4. **Energy Optimization**: 43% reduction through multi-objective coordination
-5. **Graceful Fallback**: Works with degraded sensors, manual override always available
+1. **Tridonic-First**: DALI controllers handle lighting natively (daylight, occupancy, scenes, faults)
+2. **SENTINEL Adds Value Above**: Cross-system coordination, predictive maintenance, tariff optimization
+3. **Mode-Dependent Execution**: simulation/shadow = log only; supervised = approval required; automatic = execute within gates
+4. **Real-time Data Fusion**: Badge reader + PIR + weather + grid signals + lumDATA (D4i Parts 250-253)
+5. **Setpoint-Level Control**: SENTINEL sends setpoints/commands; local Desigo/FCU control loops determine actuator positions
+6. **Energy Optimization**: 43% reduction through multi-objective coordination (HVAC + BESS + Tridonic data)
+7. **Graceful Fallback**: Works with degraded sensors, manual override always available
 
 Key files in SENTINEL codebase:
 - `app/services/dali_service.py` - Occupancy + lighting control

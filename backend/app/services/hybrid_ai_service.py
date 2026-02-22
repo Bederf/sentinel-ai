@@ -8,14 +8,13 @@ import time
 from typing import AsyncGenerator, Dict, Any
 
 # Add sentry tools to path for rate limit tracker
-sys.path.insert(0, '$SENTRY_HOME/tools')
+sys.path.insert(0, "$SENTRY_HOME/tools")
 
 from app.services.claude_service import claude_service
 from app.config.settings import settings
 from anthropic import RateLimitError
 
 logger = logging.getLogger(__name__)
-
 
 
 # ============================================================================
@@ -37,6 +36,7 @@ SAFETY_CRITICAL_INTENTS = {
     "damper_adjustment",
 }
 
+
 def is_safety_critical_intent(intent: str) -> bool:
     """
     Check if intent involves equipment control that requires Claude.
@@ -46,6 +46,7 @@ def is_safety_critical_intent(intent: str) -> bool:
     """
     intent_lower = intent.lower().strip()
     return any(critical in intent_lower for critical in SAFETY_CRITICAL_INTENTS)
+
 
 class HybridAIService:
     """
@@ -58,10 +59,7 @@ class HybridAIService:
     def __init__(self):
         """Initialize hybrid AI service."""
         self.ollama_url = "http://localhost:11434/api/generate"
-        self.ollama_models = {
-            "fast": "llama3.2:1b",
-            "balanced": "phi3:mini"
-        }
+        self.ollama_models = {"fast": "llama3.2:1b", "balanced": "phi3:mini"}
         self.claude_rate_limited = False
         self.rate_limit_time = 0
         self.cooldown_period = 60
@@ -71,6 +69,7 @@ class HybridAIService:
         else:
             try:
                 from rate_limit_tracker import rate_limit_tracker
+
                 self.rate_tracker = rate_limit_tracker
                 logger.info("Using shared rate limit tracker")
             except ImportError:
@@ -93,19 +92,19 @@ class HybridAIService:
                 "model": settings.claude_model,
                 "reason": "Equipment health analysis",
                 "estimated_cost": 0.0105,
-                "tier": 2
+                "tier": 2,
             }
 
         # Tier 1: Simple lookups (Ollama - FREE)
         simple_patterns = [
-            r'^what does error code',
-            r'^what\'?s? the status of',
-            r'^who stocks',
-            r'^list (all )?equipment',
-            r'^show me',
-            r'^get (me )?(the )?health',
-            r'^how many',
-            r'^(all|every) equipment',
+            r"^what does error code",
+            r"^what\'?s? the status of",
+            r"^who stocks",
+            r"^list (all )?equipment",
+            r"^show me",
+            r"^get (me )?(the )?health",
+            r"^how many",
+            r"^(all|every) equipment",
         ]
 
         if any(re.match(pattern, message_lower) for pattern in simple_patterns):
@@ -114,19 +113,19 @@ class HybridAIService:
                 "model": self.ollama_models["fast"],
                 "reason": "Simple lookup/retrieval",
                 "estimated_cost": 0.0,
-                "tier": 1
+                "tier": 1,
             }
 
         # Tier 1: Data queries (Ollama - FREE)
         data_patterns = [
-            r'^get ',
-            r'^show ',
-            r'^list ',
-            r'^check ',
-            r'^(all|every) (equipment|devices|alerts)',
-            r'^health (score|status)',
-            r'^temperature',
-            r'^alarm'
+            r"^get ",
+            r"^show ",
+            r"^list ",
+            r"^check ",
+            r"^(all|every) (equipment|devices|alerts)",
+            r"^health (score|status)",
+            r"^temperature",
+            r"^alarm",
         ]
 
         if any(re.search(pattern, message_lower) for pattern in data_patterns):
@@ -135,25 +134,25 @@ class HybridAIService:
                 "model": self.ollama_models["balanced"],
                 "reason": "Data query/retrieval",
                 "estimated_cost": 0.0,
-                "tier": 1
+                "tier": 1,
             }
 
         # Tier 2: Complex reasoning (Claude - paid)
         complex_patterns = [
-            r'^why (is|does|are)',
-            r'^diagnose',
-            r'^analyze',
-            r'^recommend',
-            r'^optimize',
-            r'^predict',
-            r'^troubleshoot',
-            r'root cause',
-            r'^too hot',
-            r'^too cold',
-            r'^unusual',
-            r'what should i do',
-            r'help me (understand|decide)',
-            r'occupancy',
+            r"^why (is|does|are)",
+            r"^diagnose",
+            r"^analyze",
+            r"^recommend",
+            r"^optimize",
+            r"^predict",
+            r"^troubleshoot",
+            r"root cause",
+            r"^too hot",
+            r"^too cold",
+            r"^unusual",
+            r"what should i do",
+            r"help me (understand|decide)",
+            r"occupancy",
         ]
 
         if any(re.search(pattern, message_lower) for pattern in complex_patterns):
@@ -162,19 +161,19 @@ class HybridAIService:
                 "model": settings.claude_model,
                 "reason": "Complex reasoning required",
                 "estimated_cost": 0.0105,  # Average cost per query
-                "tier": 2
+                "tier": 2,
             }
 
         # Tier 2: Control actions (Claude - paid, safety critical)
         control_patterns = [
-            r'^turn (on|off)',
-            r'^set .* to',
-            r'^adjust ',
-            r'^change ',
-            r'^control ',
-            r'^boost',
-            r'^lower',
-            r'^raise',
+            r"^turn (on|off)",
+            r"^set .* to",
+            r"^adjust ",
+            r"^change ",
+            r"^control ",
+            r"^boost",
+            r"^lower",
+            r"^raise",
         ]
 
         if any(re.search(pattern, message_lower) for pattern in control_patterns):
@@ -183,7 +182,7 @@ class HybridAIService:
                 "model": settings.claude_model,
                 "reason": "Control action (safety critical)",
                 "estimated_cost": 0.0105,
-                "tier": 2
+                "tier": 2,
             }
 
         # Default: Try Ollama first (can escalate if needed)
@@ -192,7 +191,7 @@ class HybridAIService:
             "model": settings.claude_model,
             "reason": "Default to Claude for ambiguous queries",
             "estimated_cost": 0.0105,
-            "tier": 2
+            "tier": 2,
         }
 
     def _should_use_claude(self) -> tuple[bool, str]:
@@ -245,8 +244,8 @@ class HybridAIService:
                         "options": {
                             "num_predict": 500,  # Limit response length
                             "temperature": 0.5,
-                        }
-                    }
+                        },
+                    },
                 )
                 response.raise_for_status()
                 result = response.json()
@@ -267,8 +266,7 @@ class HybridAIService:
         try:
             response_chunks = []
             async for chunk in claude_service.stream_response(
-                [{"role": "user", "content": message}],
-                include_building_context=False
+                [{"role": "user", "content": message}], include_building_context=False
             ):
                 response_chunks.append(chunk)
             return "".join(response_chunks)
@@ -277,9 +275,7 @@ class HybridAIService:
             return "I'm sorry, I'm having trouble processing your request right now. Please try again."
 
     async def _try_claude_with_fallback(
-        self,
-        message: str,
-        include_building_context: bool = True
+        self, message: str, include_building_context: bool = True
     ) -> AsyncGenerator[str, None]:
         """
         Try Claude with automatic fallback to Ollama on rate limit.
@@ -298,8 +294,7 @@ class HybridAIService:
 
             # Try Claude first
             async for chunk in claude_service.stream_response(
-                [{"role": "user", "content": message}],
-                include_building_context=include_building_context
+                [{"role": "user", "content": message}], include_building_context=include_building_context
             ):
                 yield chunk
 
@@ -329,7 +324,7 @@ class HybridAIService:
             response = await self.query_ollama(
                 message,
                 model=model,
-                escalate_on_fail=False  # Don't escalate back to Claude
+                escalate_on_fail=False,  # Don't escalate back to Claude
             )
 
             # Prefix with rate limit notice
@@ -356,11 +351,7 @@ class HybridAIService:
                     model = self.ollama_models["balanced"]
 
                 try:
-                    response = await self.query_ollama(
-                        message,
-                        model=model,
-                        escalate_on_fail=False
-                    )
+                    response = await self.query_ollama(message, model=model, escalate_on_fail=False)
                     # Prefix with fallback notice
                     yield f"[Claude unavailable ({error_type}) - using {model}] {response}"
                     return
@@ -373,11 +364,7 @@ class HybridAIService:
                 logger.error(f"Claude error (not transient API error): {e}")
                 raise
 
-    async def stream_response(
-        self,
-        message: str,
-        use_tools: bool = False
-    ) -> AsyncGenerator[str, None]:
+    async def stream_response(self, message: str, use_tools: bool = False) -> AsyncGenerator[str, None]:
         """
         Stream response from appropriate AI model.
 
@@ -417,9 +404,7 @@ class HybridAIService:
                 if self.rate_tracker:
                     self.rate_tracker.record_request()
 
-                async for chunk in claude_service.stream_response_with_tools(
-                    [{"role": "user", "content": message}]
-                ):
+                async for chunk in claude_service.stream_response_with_tools([{"role": "user", "content": message}]):
                     yield chunk
                 return
             except RateLimitError as e:
@@ -473,7 +458,7 @@ class HybridAIService:
                 response = await self.query_ollama(
                     message,
                     model=routing["model"],
-                    escalate_on_fail=True  # Can escalate to Claude if Ollama fails
+                    escalate_on_fail=True,  # Can escalate to Claude if Ollama fails
                 )
                 yield response
             except Exception as e:
@@ -483,10 +468,7 @@ class HybridAIService:
         else:
             # Use Claude (cloud) with rate limit fallback
             logger.info("Using Claude with rate limit fallback")
-            async for chunk in self._try_claude_with_fallback(
-                message,
-                include_building_context=True
-            ):
+            async for chunk in self._try_claude_with_fallback(message, include_building_context=True):
                 yield chunk
 
 

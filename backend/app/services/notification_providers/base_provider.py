@@ -12,11 +12,12 @@ from dataclasses import dataclass
 @dataclass
 class NotificationResult:
     """Result of a notification send attempt."""
+
     success: bool
-    message_id: Optional[str] = None          # Provider's message ID for tracking
+    message_id: Optional[str] = None  # Provider's message ID for tracking
     error_code: Optional[str] = None
     error_message: Optional[str] = None
-    provider_response: dict = None             # Full response from provider
+    provider_response: dict = None  # Full response from provider
 
 
 class BaseNotificationProvider(ABC):
@@ -35,13 +36,7 @@ class BaseNotificationProvider(ABC):
         pass
 
     @abstractmethod
-    async def send(
-        self,
-        recipient: str,
-        title: str,
-        body: str,
-        **kwargs
-    ) -> NotificationResult:
+    async def send(self, recipient: str, title: str, body: str, **kwargs) -> NotificationResult:
         """Send a notification.
 
         Args:

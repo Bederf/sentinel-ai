@@ -194,7 +194,8 @@ def create_jwt_token(
         "jti": str(uuid.uuid4()),  # Unique token ID for blacklisting
         "iat": datetime.utcnow(),
         "exp": datetime.utcnow() + timedelta(seconds=ttl_seconds),
-        "iss": "sentinel.bms",
+        "iss": settings.jwt_issuer,
+        "aud": settings.jwt_audience,
     }
 
     token = pyjwt.encode(payload, secret, algorithm="HS256")
@@ -232,6 +233,8 @@ def validate_jwt_token(token: str, required_token_type: Optional[str] = None) ->
             secret,
             algorithms=["HS256"],
             options={"verify_exp": True},
+            audience=settings.jwt_audience,
+            issuer=settings.jwt_issuer,
         )
 
         # Check token_type claim (Phase 65-02)

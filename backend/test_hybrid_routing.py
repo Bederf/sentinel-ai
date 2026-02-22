@@ -5,7 +5,8 @@ Test Hybrid AI Routing - Demonstrates Ollama vs Claude routing
 
 import asyncio
 import sys
-sys.path.insert(0, '/opt/bms-intelligence/backend')
+
+sys.path.insert(0, "/opt/bms-intelligence/backend")
 
 from app.services.hybrid_ai_service import hybrid_ai_service
 
@@ -19,16 +20,14 @@ async def test_routing():
         "What's the status of AHU-L12-01?",
         "Who stocks Carrier compressors?",
         "List all equipment with health < 70%",
-
         # Tier 2: Claude (complex reasoning)
         "Why is the chiller not starting?",
         "Too hot at desk 25",
         "Diagnose this unusual pattern in chiller operation",
         "What should I do about the rising filter DP?",
-
         # Control actions (Claude)
         "Turn on the chiller",
-        "Set zone temperature to 20°C"
+        "Set zone temperature to 20°C",
     ]
 
     print("=" * 80)
@@ -47,7 +46,7 @@ async def test_routing():
         print(f"Cost:     ${routing['estimated_cost']:.4f}")
 
         # Visual indicator
-        if routing['provider'] == 'ollama':
+        if routing["provider"] == "ollama":
             print("✅ FREE (Local Ollama)")
         else:
             print("💸 PAID (Cloud Claude)")
@@ -56,12 +55,12 @@ async def test_routing():
     print("ROUTING SUMMARY")
     print("=" * 80)
 
-    ollama_count = sum(1 for q in test_queries if hybrid_ai_service.classify_task(q)['provider'] == 'ollama')
+    ollama_count = sum(1 for q in test_queries if hybrid_ai_service.classify_task(q)["provider"] == "ollama")
     claude_count = len(test_queries) - ollama_count
 
     print(f"\nTotal queries: {len(test_queries)}")
-    print(f"Ollama (local): {ollama_count} ({ollama_count/len(test_queries)*100:.0f}%) - FREE")
-    print(f"Claude (cloud): {claude_count} ({claude_count/len(test_queries)*100:.0f}%) - PAID")
+    print(f"Ollama (local): {ollama_count} ({ollama_count / len(test_queries) * 100:.0f}%) - FREE")
+    print(f"Claude (cloud): {claude_count} ({claude_count / len(test_queries) * 100:.0f}%) - PAID")
 
     # Cost calculation
     ollama_cost = 0
@@ -73,7 +72,7 @@ async def test_routing():
     print("\nCost Analysis:")
     print(f"  All Claude: ${all_claude_cost:.4f}")
     print(f"  Hybrid:     ${total_cost:.4f}")
-    print(f"  Savings:    ${savings:.4f} ({savings/all_claude_cost*100:.0f}%)")
+    print(f"  Savings:    ${savings:.4f} ({savings / all_claude_cost * 100:.0f}%)")
 
 
 if __name__ == "__main__":

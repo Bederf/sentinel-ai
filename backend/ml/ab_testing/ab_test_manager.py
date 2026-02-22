@@ -29,6 +29,7 @@ class TestStatus(str, Enum):
 @dataclass
 class ABTest:
     """An A/B test between two model versions."""
+
     test_id: str
     model_type: str
     equipment_type: str
@@ -75,6 +76,7 @@ class ABTestManager:
             Test details dict
         """
         from ml.registry import get_model_registry
+
         registry = get_model_registry()
 
         # Get current active as control
@@ -107,9 +109,7 @@ class ABTestManager:
         )
         self._tests[test_id] = test
 
-        logger.info(
-            f"A/B test created: {test_id} - {control_id} vs {candidate_model_id}"
-        )
+        logger.info(f"A/B test created: {test_id} - {control_id} vs {candidate_model_id}")
 
         return {
             "success": True,
@@ -174,16 +174,12 @@ class ABTestManager:
                 test.control_metrics[metric_name] = 0.0
             # Running average
             n = test.control_assignments or 1
-            test.control_metrics[metric_name] = (
-                test.control_metrics[metric_name] * (n - 1) + metric_value
-            ) / n
+            test.control_metrics[metric_name] = (test.control_metrics[metric_name] * (n - 1) + metric_value) / n
         elif model_id == test.candidate_model_id:
             if metric_name not in test.candidate_metrics:
                 test.candidate_metrics[metric_name] = 0.0
             n = test.candidate_assignments or 1
-            test.candidate_metrics[metric_name] = (
-                test.candidate_metrics[metric_name] * (n - 1) + metric_value
-            ) / n
+            test.candidate_metrics[metric_name] = (test.candidate_metrics[metric_name] * (n - 1) + metric_value) / n
 
     def evaluate_test(self, test_id: str) -> Dict[str, Any]:
         """Evaluate A/B test results.
@@ -247,6 +243,7 @@ class ABTestManager:
 
         try:
             from ml.registry import get_model_registry
+
             registry = get_model_registry()
 
             # Promote candidate to active
@@ -255,9 +252,7 @@ class ABTestManager:
             test.status = TestStatus.PROMOTED
             test.completed_at = datetime.now().isoformat()
 
-            logger.info(
-                f"A/B test {test_id}: promoted {test.candidate_model_id} to active"
-            )
+            logger.info(f"A/B test {test_id}: promoted {test.candidate_model_id} to active")
 
             return {
                 "success": True,

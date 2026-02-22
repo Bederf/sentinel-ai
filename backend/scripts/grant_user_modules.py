@@ -4,14 +4,14 @@ Grant module access to a user at a specific site.
 
 Usage:
     python grant_user_modules.py \
-        --email grant@wardew.co.za \
+        --email grant@grantdemo.co.za \
         --site-code site-002 \
         --modules lighting \
         --granted-by admin@sentinel.bms
 
-Example - Grant DALI (lighting) module to Grant Wardew:
+Example - Grant DALI (lighting) module to Grant Demo:
     python grant_user_modules.py \
-        --email grant@wardew.co.za \
+        --email grant@grantdemo.co.za \
         --site-code site-002 \
         --modules lighting \
         --granted-by system
@@ -28,9 +28,7 @@ from app.database.repositories.module_access_repository import get_module_access
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Grant module access to a user at a specific site"
-    )
+    parser = argparse.ArgumentParser(description="Grant module access to a user at a specific site")
     parser.add_argument(
         "--email",
         required=True,
@@ -80,7 +78,7 @@ def main():
         )
         print("\n✓ Successfully granted modules!")
         print(f"\nUser {args.email} now has access to at site {args.site_code}:")
-        base_mods = ['control', 'assets', 'simbiot', 'integrations', 'notifications', 'hvac', 'energy']
+        base_mods = ["control", "assets", "simbiot", "integrations", "notifications", "hvac", "energy"]
         print(f"  - Base modules (automatic): {', '.join(sorted(base_mods))}")
         print(f"  - Granted modules: {', '.join(sorted(args.modules))}")
         print(f"  - Total effective: {', '.join(sorted(effective_modules))}")

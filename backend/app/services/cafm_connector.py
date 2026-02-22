@@ -48,11 +48,7 @@ class CAFMConnector:
 
         # Create session with basic auth
         auth = (username, password) if username and password else None
-        self.session = httpx.AsyncClient(
-            base_url=api_url,
-            auth=auth,
-            timeout=30.0
-        )
+        self.session = httpx.AsyncClient(base_url=api_url, auth=auth, timeout=30.0)
 
         # Test connection
         try:
@@ -72,11 +68,8 @@ class CAFMConnector:
         # Create session with API key header
         self.session = httpx.AsyncClient(
             base_url=api_url,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
-            timeout=30.0
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            timeout=30.0,
         )
 
         # Test connection
@@ -97,11 +90,7 @@ class CAFMConnector:
 
         # Create session with basic auth
         auth = (username, password) if username and password else None
-        self.session = httpx.AsyncClient(
-            base_url=api_url,
-            auth=auth,
-            timeout=30.0
-        )
+        self.session = httpx.AsyncClient(base_url=api_url, auth=auth, timeout=30.0)
 
         # Test connection
         try:
@@ -220,11 +209,7 @@ class CAFMConnector:
             response.raise_for_status()
 
             result = response.json()
-            return {
-                "cafm_id": result.get("id", ""),
-                "status": "created",
-                "cafm_system": "archibus"
-            }
+            return {"cafm_id": result.get("id", ""), "status": "created", "cafm_system": "archibus"}
         except Exception as e:
             logger.error(f"Archibus work order creation failed: {e}")
             return {}
@@ -245,11 +230,7 @@ class CAFMConnector:
             response.raise_for_status()
 
             result = response.json()
-            return {
-                "cafm_id": result.get("id", ""),
-                "status": "created",
-                "cafm_system": "planon"
-            }
+            return {"cafm_id": result.get("id", ""), "status": "created", "cafm_system": "planon"}
         except Exception as e:
             logger.error(f"Planon work order creation failed: {e}")
             return {}
@@ -270,11 +251,7 @@ class CAFMConnector:
             response.raise_for_status()
 
             result = response.json()
-            return {
-                "cafm_id": result.get("wonum", ""),
-                "status": "created",
-                "cafm_system": "maximo"
-            }
+            return {"cafm_id": result.get("wonum", ""), "status": "created", "cafm_system": "maximo"}
         except Exception as e:
             logger.error(f"Maximo work order creation failed: {e}")
             return {}
@@ -305,10 +282,7 @@ class CAFMConnector:
     async def _fetch_archibus_assets(self, site_id: str) -> List[Dict]:
         """Fetch assets from Archibus"""
         try:
-            response = await self.session.get(
-                "/api/v1/assets",
-                params={"filter": f"building='{site_id}'"}
-            )
+            response = await self.session.get("/api/v1/assets", params={"filter": f"building='{site_id}'"})
             response.raise_for_status()
 
             assets = response.json().get("data", [])
@@ -320,10 +294,7 @@ class CAFMConnector:
     async def _fetch_planon_assets(self, site_id: str) -> List[Dict]:
         """Fetch assets from Planon"""
         try:
-            response = await self.session.get(
-                "/api/v1/assets",
-                params={"site": site_id}
-            )
+            response = await self.session.get("/api/v1/assets", params={"site": site_id})
             response.raise_for_status()
 
             assets = response.json().get("items", [])
@@ -335,10 +306,7 @@ class CAFMConnector:
     async def _fetch_maximo_assets(self, site_id: str) -> List[Dict]:
         """Fetch assets from Maximo"""
         try:
-            response = await self.session.get(
-                "/api/v1/asset",
-                params={"oslc.where": f"siteid='{site_id}'"}
-            )
+            response = await self.session.get("/api/v1/asset", params={"oslc.where": f"siteid='{site_id}'"})
             response.raise_for_status()
 
             assets = response.json().get("rdfs:member", [])
@@ -373,21 +341,12 @@ class CAFMConnector:
     async def _update_archibus_status(self, order_id: str, status: str, resolution: str) -> Dict:
         """Update work order status in Archibus"""
         try:
-            payload = {
-                "status": status,
-                "resolution": resolution,
-                "completedDate": datetime.now().isoformat()
-            }
+            payload = {"status": status, "resolution": resolution, "completedDate": datetime.now().isoformat()}
 
             response = await self.session.put(f"/api/v1/workorders/{order_id}", json=payload)
             response.raise_for_status()
 
-            return {
-                "success": True,
-                "order_id": order_id,
-                "cafm_system": "archibus",
-                "status": status
-            }
+            return {"success": True, "order_id": order_id, "cafm_system": "archibus", "status": status}
         except Exception as e:
             logger.error(f"Archibus status update failed: {e}")
             return {}
@@ -395,24 +354,12 @@ class CAFMConnector:
     async def _update_planon_status(self, order_id: str, status: str, resolution: str) -> Dict:
         """Update work order status in Planon"""
         try:
-            payload = {
-                "status": status,
-                "resolution": resolution,
-                "completionDate": datetime.now().isoformat()
-            }
+            payload = {"status": status, "resolution": resolution, "completionDate": datetime.now().isoformat()}
 
-            response = await self.session.put(
-                f"/api/v1/maintenance/work-orders/{order_id}",
-                json=payload
-            )
+            response = await self.session.put(f"/api/v1/maintenance/work-orders/{order_id}", json=payload)
             response.raise_for_status()
 
-            return {
-                "success": True,
-                "order_id": order_id,
-                "cafm_system": "planon",
-                "status": status
-            }
+            return {"success": True, "order_id": order_id, "cafm_system": "planon", "status": status}
         except Exception as e:
             logger.error(f"Planon status update failed: {e}")
             return {}
@@ -420,21 +367,12 @@ class CAFMConnector:
     async def _update_maximo_status(self, order_id: str, status: str, resolution: str) -> Dict:
         """Update work order status in Maximo"""
         try:
-            payload = {
-                "status": status,
-                "description": resolution,
-                "completiondate": datetime.now().isoformat()
-            }
+            payload = {"status": status, "description": resolution, "completiondate": datetime.now().isoformat()}
 
             response = await self.session.put(f"/api/v1/workorder/{order_id}", json=payload)
             response.raise_for_status()
 
-            return {
-                "success": True,
-                "order_id": order_id,
-                "cafm_system": "maximo",
-                "status": status
-            }
+            return {"success": True, "order_id": order_id, "cafm_system": "maximo", "status": status}
         except Exception as e:
             logger.error(f"Maximo status update failed: {e}")
             return {}
@@ -452,7 +390,7 @@ class CAFMConnector:
             "assigned_to": wo.get("assignedTo", ""),
             "equipment_code": wo.get("equipment_code", ""),
             "created_date": wo.get("createdDate", ""),
-            "cafm_system": "archibus"
+            "cafm_system": "archibus",
         }
 
     def _transform_planon_wo(self, wo: Dict) -> Dict:
@@ -466,7 +404,7 @@ class CAFMConnector:
             "assigned_to": wo.get("assignee", ""),
             "equipment_code": wo.get("assetId", ""),
             "created_date": wo.get("createdDate", ""),
-            "cafm_system": "planon"
+            "cafm_system": "planon",
         }
 
     def _transform_maximo_wo(self, wo: Dict) -> Dict:
@@ -480,7 +418,7 @@ class CAFMConnector:
             "assigned_to": wo.get("assigneename", ""),
             "equipment_code": wo.get("assetnum", ""),
             "created_date": wo.get("createdate", ""),
-            "cafm_system": "maximo"
+            "cafm_system": "maximo",
         }
 
     def _transform_archibus_asset(self, asset: Dict) -> Dict:
@@ -494,7 +432,7 @@ class CAFMConnector:
             "manufacturer": asset.get("manufacturer", ""),
             "model": asset.get("model", ""),
             "installation_date": asset.get("installationDate", ""),
-            "cafm_system": "archibus"
+            "cafm_system": "archibus",
         }
 
     def _transform_planon_asset(self, asset: Dict) -> Dict:
@@ -508,7 +446,7 @@ class CAFMConnector:
             "manufacturer": asset.get("manufacturer", ""),
             "model": asset.get("modelNumber", ""),
             "installation_date": asset.get("dateInstalled", ""),
-            "cafm_system": "planon"
+            "cafm_system": "planon",
         }
 
     def _transform_maximo_asset(self, asset: Dict) -> Dict:
@@ -522,7 +460,7 @@ class CAFMConnector:
             "manufacturer": asset.get("manufacturer", ""),
             "model": asset.get("model", ""),
             "installation_date": asset.get("dateinstalled", ""),
-            "cafm_system": "maximo"
+            "cafm_system": "maximo",
         }
 
     async def close(self) -> None:

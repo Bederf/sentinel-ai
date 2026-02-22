@@ -181,9 +181,7 @@ class Building3DConfigService:
             return False, f"Y coordinate {y}m outside floor depth bounds [0, {depth}m]"
 
         if x < 0 or y < 0 or x > width or y > depth:
-            logger.warning(
-                f"Equipment {position['equipment_id']} slightly outside bounds: ({x}, {y})"
-            )
+            logger.warning(f"Equipment {position['equipment_id']} slightly outside bounds: ({x}, {y})")
 
         return True, None
 
@@ -313,13 +311,15 @@ class Building3DConfigService:
                 equipment_by_floor[floor] = []
 
             equipment = equipment_map.get(equipment_id, {})
-            equipment_by_floor[floor].append({
-                "equipment_id": equipment_id,
-                "code": equipment.get("code", equipment_id),
-                "type": equipment.get("type", "unknown"),
-                "position": {"x": pos.get("x"), "y": pos.get("y")},
-                "status": equipment.get("status", "unknown"),
-            })
+            equipment_by_floor[floor].append(
+                {
+                    "equipment_id": equipment_id,
+                    "code": equipment.get("code", equipment_id),
+                    "type": equipment.get("type", "unknown"),
+                    "position": {"x": pos.get("x"), "y": pos.get("y")},
+                    "status": equipment.get("status", "unknown"),
+                }
+            )
 
         # Build floor data
         floors = []

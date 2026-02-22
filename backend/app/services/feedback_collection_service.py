@@ -28,6 +28,7 @@ TEMPLATES_PATH = Path(__file__).parent.parent / "data" / "ml_data_templates.json
 
 class FeedbackItemType(str, Enum):
     """Types of feedback items."""
+
     READING = "reading"
     PHOTO = "photo"
     AUDIO = "audio"
@@ -37,8 +38,9 @@ class FeedbackItemType(str, Enum):
 
 class HealthImpact(str, Enum):
     """Health score impact direction."""
+
     POSITIVE = "positive"  # Reading improved vs baseline
-    NEUTRAL = "neutral"    # Reading within normal range
+    NEUTRAL = "neutral"  # Reading within normal range
     NEGATIVE = "negative"  # Reading worse than baseline or out of range
     CRITICAL = "critical"  # Reading in critical range
 
@@ -46,6 +48,7 @@ class HealthImpact(str, Enum):
 @dataclass
 class FeedbackItem:
     """A single feedback item submitted by technician."""
+
     item_type: FeedbackItemType
     item_key: str  # e.g., "vibration", "oil_level", "before_photo"
     value: Any
@@ -62,6 +65,7 @@ class FeedbackItem:
 @dataclass
 class FeedbackTemplate:
     """Template defining required feedback for equipment type."""
+
     equipment_type: str
     service_type: str
     required_items: List[str]
@@ -74,6 +78,7 @@ class FeedbackTemplate:
 @dataclass
 class FeedbackSession:
     """Active feedback collection session."""
+
     session_id: str
     work_order_id: str
     equipment_id: str
@@ -126,7 +131,7 @@ class FeedbackCollectionService:
                             optional_items=template_data.get("optional", []),
                             prompts=template_data.get("prompts", {}),
                             validation_rules=template_data.get("validation_rules", {}),
-                            audio_duration_seconds=template_data.get("audio_duration_seconds", 10)
+                            audio_duration_seconds=template_data.get("audio_duration_seconds", 10),
                         )
 
                 logger.info(f"Loaded feedback templates for {len(self._templates)} equipment types")
@@ -168,9 +173,9 @@ class FeedbackCollectionService:
                 "observation": "Describe the work performed and equipment condition",
                 "issue_photo": "Photo of any issues found (optional)",
                 "before_photo": "Before photo (optional)",
-                "after_photo": "After photo (optional)"
+                "after_photo": "After photo (optional)",
             },
-            validation_rules={}
+            validation_rules={},
         )
 
     def _parse_equipment_type(self, equipment_code: str) -> str:
@@ -201,11 +206,7 @@ class FeedbackCollectionService:
         return "unknown"
 
     async def start_feedback_session(
-        self,
-        work_order_id: str,
-        equipment_id: str,
-        equipment_code: str,
-        service_type: str = "minor"
+        self, work_order_id: str, equipment_id: str, equipment_code: str, service_type: str = "minor"
     ) -> FeedbackSession:
         """
         Start a new feedback collection session for a work order.
@@ -237,7 +238,7 @@ class FeedbackCollectionService:
             equipment_type=equipment_type,
             service_type=service_type,
             template=template,
-            started_at=datetime.now()
+            started_at=datetime.now(),
         )
 
         self._sessions[session_id] = session
@@ -286,7 +287,7 @@ class FeedbackCollectionService:
         item_type: FeedbackItemType = FeedbackItemType.READING,
         unit: Optional[str] = None,
         file_path: Optional[str] = None,
-        notes: Optional[str] = None
+        notes: Optional[str] = None,
     ) -> FeedbackItem:
         """
         Submit a feedback item for a session.
@@ -328,14 +329,12 @@ class FeedbackCollectionService:
             unit=unit or validation_rules.get("unit"),
             numeric_value=numeric_value,
             file_path=file_path,
-            notes=notes
+            notes=notes,
         )
 
         # Validate against rules if numeric
         if numeric_value is not None and validation_rules:
-            feedback_item = await self._validate_reading(
-                session, feedback_item, validation_rules
-            )
+            feedback_item = await self._validate_reading(session, feedback_item, validation_rules)
 
         # Add to session
         session.feedback_items.append(feedback_item)
@@ -343,17 +342,13 @@ class FeedbackCollectionService:
             session.items_collected.append(item_key)
 
         logger.info(
-            f"Session {session_id}: Collected {item_key} = {value} "
-            f"(impact: {feedback_item.health_impact.value})"
+            f"Session {session_id}: Collected {item_key} = {value} (impact: {feedback_item.health_impact.value})"
         )
 
         return feedback_item
 
     async def _validate_reading(
-        self,
-        session: FeedbackSession,
-        item: FeedbackItem,
-        rules: Dict[str, Any]
+        self, session: FeedbackSession, item: FeedbackItem, rules: Dict[str, Any]
     ) -> FeedbackItem:
         """
         Validate a reading against rules and baseline.
@@ -378,9 +373,7 @@ class FeedbackCollectionService:
 
         # Try to compare against baseline
         try:
-            baseline = await self.baseline_repo.get_active_equipment_baseline(
-                session.equipment_id
-            )
+            baseline = await self.baseline_repo.get_active_equipment_baseline(session.equipment_id)
             if baseline and baseline.baseline_values:
                 baseline_value = baseline.baseline_values.get(item.item_key)
                 if baseline_value is not None:
@@ -438,11 +431,7 @@ class FeedbackCollectionService:
         # Positive readings: +2 each (max +10)
         # Negative readings: -3 each
         # Critical readings: -5 each
-        score_change = (
-            min(positive_count * 2, 10) +
-            (negative_count * -3) +
-            (critical_count * -5)
-        )
+        score_change = min(positive_count * 2, 10) + (negative_count * -3) + (critical_count * -5)
 
         # Clamp to range
         score_change = max(-20, min(10, score_change))
@@ -450,11 +439,7 @@ class FeedbackCollectionService:
         session.health_score_change = score_change
         return score_change
 
-    async def complete_feedback_session(
-        self,
-        session_id: str,
-        force: bool = False
-    ) -> Dict[str, Any]:
+    async def complete_feedback_session(self, session_id: str, force: bool = False) -> Dict[str, Any]:
         """
         Complete a feedback session and update equipment health.
 
@@ -480,7 +465,7 @@ class FeedbackCollectionService:
                 "success": False,
                 "error": "missing_required_items",
                 "missing_items": missing_required,
-                "message": f"Missing required items: {', '.join(missing_required)}"
+                "message": f"Missing required items: {', '.join(missing_required)}",
             }
 
         # Calculate health score change
@@ -501,11 +486,10 @@ class FeedbackCollectionService:
                 else:
                     new_status = "critical"
 
-                self.equipment_repo.update(session.equipment_code, {
-                    "health_score": new_health,
-                    "status": new_status,
-                    "last_service_date": datetime.now().isoformat()
-                })
+                self.equipment_repo.update(
+                    session.equipment_code,
+                    {"health_score": new_health, "status": new_status, "last_service_date": datetime.now().isoformat()},
+                )
 
                 logger.info(
                     f"Updated {session.equipment_code} health: {current_health} -> {new_health} "
@@ -516,15 +500,18 @@ class FeedbackCollectionService:
                 try:
                     from app.services.event_emitter import get_event_emitter
                     import asyncio
+
                     emitter = get_event_emitter()
-                    asyncio.create_task(emitter.emit_health_changed(
-                        equipment_id=equipment.get("id", session.equipment_code),
-                        equipment_code=session.equipment_code,
-                        equipment_name=equipment.get("name", session.equipment_code),
-                        old_health_score=current_health,
-                        new_health_score=new_health,
-                        reason="service_feedback"
-                    ))
+                    asyncio.create_task(
+                        emitter.emit_health_changed(
+                            equipment_id=equipment.get("id", session.equipment_code),
+                            equipment_code=session.equipment_code,
+                            equipment_name=equipment.get("name", session.equipment_code),
+                            old_health_score=current_health,
+                            new_health_score=new_health,
+                            reason="service_feedback",
+                        )
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to emit health_changed event: {e}")
         except Exception as e:
@@ -547,7 +534,7 @@ class FeedbackCollectionService:
             "health_score_change": health_change,
             "feedback_summary": self._build_feedback_summary(session),
             "warnings": missing_required if missing_required else [],
-            "completed_at": session.completed_at.isoformat()
+            "completed_at": session.completed_at.isoformat(),
         }
 
         return summary
@@ -560,26 +547,20 @@ class FeedbackCollectionService:
 
         for item in session.feedback_items:
             if item.item_type == FeedbackItemType.READING:
-                readings.append({
-                    "key": item.item_key,
-                    "value": item.value,
-                    "unit": item.unit,
-                    "baseline": item.baseline_value,
-                    "deviation_percent": item.deviation_percent,
-                    "health_impact": item.health_impact.value
-                })
+                readings.append(
+                    {
+                        "key": item.item_key,
+                        "value": item.value,
+                        "unit": item.unit,
+                        "baseline": item.baseline_value,
+                        "deviation_percent": item.deviation_percent,
+                        "health_impact": item.health_impact.value,
+                    }
+                )
             elif item.item_type in (FeedbackItemType.PHOTO, FeedbackItemType.AUDIO):
-                attachments.append({
-                    "key": item.item_key,
-                    "file_path": item.file_path,
-                    "type": item.item_type.value
-                })
+                attachments.append({"key": item.item_key, "file_path": item.file_path, "type": item.item_type.value})
             elif item.item_type == FeedbackItemType.OBSERVATION:
-                observations.append({
-                    "key": item.item_key,
-                    "content": item.value,
-                    "notes": item.notes
-                })
+                observations.append({"key": item.item_key, "content": item.value, "notes": item.notes})
 
         return {
             "readings": readings,
@@ -589,8 +570,8 @@ class FeedbackCollectionService:
                 "positive": sum(1 for i in session.feedback_items if i.health_impact == HealthImpact.POSITIVE),
                 "neutral": sum(1 for i in session.feedback_items if i.health_impact == HealthImpact.NEUTRAL),
                 "negative": sum(1 for i in session.feedback_items if i.health_impact == HealthImpact.NEGATIVE),
-                "critical": sum(1 for i in session.feedback_items if i.health_impact == HealthImpact.CRITICAL)
-            }
+                "critical": sum(1 for i in session.feedback_items if i.health_impact == HealthImpact.CRITICAL),
+            },
         }
 
     def get_session_status(self, session_id: str) -> Optional[Dict[str, Any]]:
@@ -601,10 +582,7 @@ class FeedbackCollectionService:
 
         # Calculate progress
         total_required = len(session.template.required_items)
-        collected_required = sum(
-            1 for item in session.template.required_items
-            if item in session.items_collected
-        )
+        collected_required = sum(1 for item in session.template.required_items if item in session.items_collected)
 
         next_prompt = self.get_next_prompt(session_id)
 
@@ -619,16 +597,18 @@ class FeedbackCollectionService:
                 "required_total": total_required,
                 "optional_collected": len(session.items_collected) - collected_required,
                 "optional_total": len(session.template.optional_items),
-                "percent_complete": round((collected_required / total_required * 100) if total_required > 0 else 100)
+                "percent_complete": round((collected_required / total_required * 100) if total_required > 0 else 100),
             },
             "items_collected": session.items_collected,
             "next_item": {
                 "key": next_prompt[0] if next_prompt else None,
                 "prompt": next_prompt[1] if next_prompt else None,
-                "required": next_prompt[2] if next_prompt else None
-            } if next_prompt else None,
+                "required": next_prompt[2] if next_prompt else None,
+            }
+            if next_prompt
+            else None,
             "started_at": session.started_at.isoformat() if session.started_at else None,
-            "completed_at": session.completed_at.isoformat() if session.completed_at else None
+            "completed_at": session.completed_at.isoformat() if session.completed_at else None,
         }
 
     def get_water_repair_template(self) -> Optional[Dict[str, Any]]:
@@ -751,12 +731,11 @@ class FeedbackCollectionService:
             "service_quality": feedback.get("service_quality", "unknown"),
             "repair_time_hours": feedback.get("repair_time_hours", 0),
             "customer_satisfaction": feedback.get("customer_satisfaction", 0),
-            "health_impact_rating": "positive" if health_impact > 0 else (
-                "neutral" if health_impact == 0 else "negative"
-            ),
-            "follow_up_needed": "temporary_fix" in str(feedback.get("repair_method", "")).lower() or (
-                feedback.get("customer_satisfaction", 5) < 3
-            ),
+            "health_impact_rating": "positive"
+            if health_impact > 0
+            else ("neutral" if health_impact == 0 else "negative"),
+            "follow_up_needed": "temporary_fix" in str(feedback.get("repair_method", "")).lower()
+            or (feedback.get("customer_satisfaction", 5) < 3),
         }
 
 

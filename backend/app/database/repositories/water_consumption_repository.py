@@ -85,11 +85,7 @@ class WaterConsumptionRepository:
 
         # Try Supabase first
         try:
-            response = (
-                self.client.table("water_consumption")
-                .insert(consumption_data)
-                .execute()
-            )
+            response = self.client.table("water_consumption").insert(consumption_data).execute()
             record = response.data[0]
 
             # Backup to JSON
@@ -281,6 +277,7 @@ class WaterConsumptionRepository:
             Created alert record
         """
         import uuid
+
         alert_data = {
             "alert_id": str(uuid.uuid4()),
             "meter_id": meter_id,
@@ -300,11 +297,7 @@ class WaterConsumptionRepository:
 
         # Try Supabase first
         try:
-            response = (
-                self.client.table("water_alerts")
-                .insert(alert_data)
-                .execute()
-            )
+            response = self.client.table("water_alerts").insert(alert_data).execute()
             record = response.data[0]
             self._backup_alert(site, record)
             return record
@@ -433,12 +426,7 @@ class WaterConsumptionRepository:
         }
 
         try:
-            response = (
-                self.client.table("water_alerts")
-                .update(update_data)
-                .eq("alert_id", alert_id)
-                .execute()
-            )
+            response = self.client.table("water_alerts").update(update_data).eq("alert_id", alert_id).execute()
             return response.data[0] if response.data else None
 
         except Exception:
@@ -613,7 +601,6 @@ class WaterConsumptionRepository:
             "days": days,
         }
 
-
     def get_consumption_by_zone(
         self,
         zone_id: str,
@@ -750,8 +737,7 @@ class WaterConsumptionRepository:
                     "meter_count": 0,
                 }
             zone_consumption[zone_id]["total_liters"] = max(
-                zone_consumption[zone_id]["total_liters"],
-                record.get("volume_liters", 0)
+                zone_consumption[zone_id]["total_liters"], record.get("volume_liters", 0)
             )
             zone_consumption[zone_id]["meter_count"] += 1
 

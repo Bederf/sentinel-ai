@@ -609,9 +609,9 @@ class TestAIRecommendations:
         details = first_event.get("details", {})
 
         # Check for recommendation structure
-        assert (
-            "recommendations" in details or "confidence" in details
-        ), f"Missing recommendation data in event: {details}"
+        assert "recommendations" in details or "confidence" in details, (
+            f"Missing recommendation data in event: {details}"
+        )
 
     @pytest.mark.asyncio
     async def test_daily_recommendation_count(self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]):
@@ -644,9 +644,9 @@ class TestAIRecommendations:
         if days_elapsed > 0:
             avg_recommendations_per_day = optimization_event_count / days_elapsed
             # Allow some variance (2.5-3.5 recommendations per day)
-            assert (
-                2.5 <= avg_recommendations_per_day <= 3.5
-            ), f"Expected ~3 recommendations/day, got {avg_recommendations_per_day:.2f}"
+            assert 2.5 <= avg_recommendations_per_day <= 3.5, (
+                f"Expected ~3 recommendations/day, got {avg_recommendations_per_day:.2f}"
+            )
 
 
 # ============================================================================
@@ -689,9 +689,9 @@ class TestCheckpointRecovery:
         if days_elapsed > 0:
             expected_checkpoints = int(days_elapsed * 4)
             # Allow some variance
-            assert (
-                checkpoint_count >= expected_checkpoints * 0.8
-            ), f"Expected ~{expected_checkpoints} checkpoints, got {checkpoint_count}"
+            assert checkpoint_count >= expected_checkpoints * 0.8, (
+                f"Expected ~{expected_checkpoints} checkpoints, got {checkpoint_count}"
+            )
 
     @pytest.mark.asyncio
     async def test_pause_resume_preserves_state(self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]):

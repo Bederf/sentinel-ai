@@ -36,15 +36,13 @@ class ZoneIngestionService:
         Returns:
             Building UUID or None if not found
         """
-        response = self.client.table('buildings').select('id').eq('code', building_code).execute()
+        response = self.client.table("buildings").select("id").eq("code", building_code).execute()
 
         if response.data:
-            return response.data[0]['id']
+            return response.data[0]["id"]
         return None
 
-    async def ingest_zones(
-        self, building_id: str, zones: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    async def ingest_zones(self, building_id: str, zones: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Ingest zone configuration for a building.
 
         Each building can have a unique zone structure. This method validates
@@ -129,9 +127,7 @@ class ZoneIngestionService:
         logger.info(f"Ingested {len(zones)} zones for building {building_id}")
         return {"status": "success", "zones_created": len(zones)}
 
-    async def ingest_desks(
-        self, building_id: str, desks: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    async def ingest_desks(self, building_id: str, desks: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Ingest desk configuration for a building.
 
         Validation:
@@ -202,9 +198,7 @@ class ZoneIngestionService:
 
                 # Basic bounds check (X: 0-50m, Z: 0-50m)
                 if not (0 <= x <= 50 and 0 <= z <= 50):
-                    logger.warning(
-                        f"Desk {desk['desk_id']} coordinates outside typical bounds: ({x}, {z})"
-                    )
+                    logger.warning(f"Desk {desk['desk_id']} coordinates outside typical bounds: ({x}, {z})")
             except (ValueError, TypeError):
                 raise ValueError(f"Coordinates not numeric for desk {desk['desk_id']}")
 
@@ -229,9 +223,7 @@ class ZoneIngestionService:
         logger.info(f"Ingested {len(desks)} desks for building {building_id}")
         return {"status": "success", "desks_created": len(desks)}
 
-    async def calculate_zone_centroid(
-        self, building_id: str, zone_id: str
-    ) -> Optional[Dict[str, float]]:
+    async def calculate_zone_centroid(self, building_id: str, zone_id: str) -> Optional[Dict[str, float]]:
         """Calculate zone centroid from desk positions.
 
         The centroid is the average X, Z position of all desks in a zone.
@@ -262,9 +254,7 @@ class ZoneIngestionService:
 
         return {"x": round(avg_x, 2), "z": round(avg_z, 2)}
 
-    def get_all_zone_centroids(
-        self, building_id: str
-    ) -> Dict[str, Dict[str, float]]:
+    def get_all_zone_centroids(self, building_id: str) -> Dict[str, Dict[str, float]]:
         """Get centroids for all zones in a building.
 
         Efficient operation: loads all desks once, calculates centroids for
@@ -294,9 +284,7 @@ class ZoneIngestionService:
                 avg_z = sum(float(d.get("z_coord", 0)) for d in zone_desks) / len(zone_desks)
                 centroids[zone["zone_id"]] = {"x": round(avg_x, 2), "z": round(avg_z, 2)}
 
-        logger.info(
-            f"Calculated {len(centroids)} zone centroids for building {building_id}"
-        )
+        logger.info(f"Calculated {len(centroids)} zone centroids for building {building_id}")
         return centroids
 
     async def validate_zone_structure(self, building_id: str) -> Tuple[bool, List[str]]:

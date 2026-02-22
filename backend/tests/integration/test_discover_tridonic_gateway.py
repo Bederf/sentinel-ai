@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Test script for discover_tridonic_gateway MCP tool.
+"""Test script for discover_tridonic_gateway MCP tool.
 
 Usage:
     cd /opt/bms-intelligence
@@ -13,14 +12,14 @@ import pytest
 @pytest.mark.asyncio
 async def test_discover_tridonic_gateway_simulated():
     """Test discover_tridonic_gateway with simulated data."""
-    from backend.app.mcp.simbiot_server import discover_tridonic_gateway_tool
+    from app.mcp.simbiot_server import discover_tridonic_gateway_tool
 
     # Test with simulated mode
     result = await discover_tridonic_gateway_tool(
         building_id="site-002",
         gateway_ip="192.168.10.50",
         gateway_type="tridonic",
-        use_simulated=True
+        use_simulated=True,
     )
 
     # Verify result structure
@@ -53,14 +52,14 @@ async def test_discover_tridonic_gateway_simulated():
 @pytest.mark.asyncio
 async def test_discover_tridonic_gateway_offline():
     """Test discover_tridonic_gateway with offline gateway (no simulated fallback)."""
-    from backend.app.mcp.simbiot_server import discover_tridonic_gateway_tool
+    from app.mcp.simbiot_server import discover_tridonic_gateway_tool
 
     # Test with offline gateway and no simulated mode
     result = await discover_tridonic_gateway_tool(
         building_id="site-003",
         gateway_ip="192.168.10.99",
         gateway_type="tridonic",
-        use_simulated=False
+        use_simulated=False,
     )
 
     # Should fail gracefully
@@ -73,12 +72,12 @@ async def test_discover_tridonic_gateway_offline():
 @pytest.mark.asyncio
 async def test_discover_tridonic_gateway_equipment_code_format():
     """Test that equipment codes follow v2.0 naming convention."""
-    from backend.app.mcp.simbiot_server import discover_tridonic_gateway_tool
+    from app.mcp.simbiot_server import discover_tridonic_gateway_tool
 
     result = await discover_tridonic_gateway_tool(
         building_id="site-005",
         gateway_ip="192.168.10.50",
-        use_simulated=True
+        use_simulated=True,
     )
 
     assert result["success"] is True
@@ -92,20 +91,22 @@ async def test_discover_tridonic_gateway_equipment_code_format():
         code = code_entry["equipment_code"]
         # Format: S005-DALI-L1-01
         import re
-        assert re.match(r'^S\d{3}-DALI-L\d+-\d{2}$', code), f"Invalid DALI code: {code}"
+
+        assert re.match(r"^S\d{3}-DALI-L\d+-\d{2}$", code), f"Invalid DALI code: {code}"
 
     # Luminaires: S{site}-LUM-L{line}-{seq:03d}
     for code_entry in lum_codes:
         code = code_entry["equipment_code"]
         # Format: S005-LUM-L1-001
         import re
-        assert re.match(r'^S\d{3}-LUM-L\d+-\d{3}$', code), f"Invalid LUM code: {code}"
+
+        assert re.match(r"^S\d{3}-LUM-L\d+-\d{3}$", code), f"Invalid LUM code: {code}"
 
 
 @pytest.mark.asyncio
 async def test_discover_tridonic_gateway_different_building_id_formats():
     """Test equipment code generation with different building ID formats."""
-    from backend.app.mcp.simbiot_server import discover_tridonic_gateway_tool
+    from app.mcp.simbiot_server import discover_tridonic_gateway_tool
 
     test_cases = [
         ("site-001", "S001"),
@@ -117,25 +118,27 @@ async def test_discover_tridonic_gateway_different_building_id_formats():
         result = await discover_tridonic_gateway_tool(
             building_id=building_id,
             gateway_ip="192.168.10.50",
-            use_simulated=True
+            use_simulated=True,
         )
 
         assert result["success"] is True
         if result["equipment_list"]:
             # Check first equipment code starts with expected site code
             first_code = result["equipment_list"][0]["equipment_code"]
-            assert first_code.startswith(expected_site_code + "-"), f"Expected {expected_site_code} prefix in {first_code}"
+            assert first_code.startswith(expected_site_code + "-"), (
+                f"Expected {expected_site_code} prefix in {first_code}"
+            )
 
 
 @pytest.mark.asyncio
 async def test_discover_tridonic_gateway_summary_counts():
     """Test that summary counts match equipment list."""
-    from backend.app.mcp.simbiot_server import discover_tridonic_gateway_tool
+    from app.mcp.simbiot_server import discover_tridonic_gateway_tool
 
     result = await discover_tridonic_gateway_tool(
         building_id="site-002",
         gateway_ip="192.168.10.50",
-        use_simulated=True
+        use_simulated=True,
     )
 
     assert result["success"] is True
@@ -145,7 +148,7 @@ async def test_discover_tridonic_gateway_summary_counts():
         "controllers": len([e for e in result["equipment_list"] if e["equipment_type"] == "DALI"]),
         "luminaires": len([e for e in result["equipment_list"] if e["equipment_type"] == "LUM"]),
         "sensors": len([e for e in result["equipment_list"] if e["equipment_type"] == "PIR"]),
-        "other": 0
+        "other": 0,
     }
 
     # Verify summary matches count

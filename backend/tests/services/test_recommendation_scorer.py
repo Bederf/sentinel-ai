@@ -119,7 +119,7 @@ class TestRecommendationScorer:
         # Positive comfort impact (base)
         positive_comfort_rec = {
             "action": "high_comfort",
-            "comfort_impact": 2.0,    # Max positive comfort
+            "comfort_impact": 2.0,  # Max positive comfort
             "cost_impact": 0,
             "health_impact": 0,
             "energy_impact": 0,
@@ -129,7 +129,7 @@ class TestRecommendationScorer:
         # Negative comfort impact (same cost, energy, etc.)
         negative_comfort_rec = {
             "action": "low_comfort",
-            "comfort_impact": -2.0,   # Max negative comfort
+            "comfort_impact": -2.0,  # Max negative comfort
             "cost_impact": 0,
             "health_impact": 0,
             "energy_impact": 0,
@@ -264,7 +264,7 @@ class TestRecommendationScorer:
         max_positive_rec = {
             "action": "max_positive",
             "comfort_impact": 100,  # Way beyond normal range, clamped to 1.0
-            "cost_impact": 1000,    # Way beyond normal range, clamped to 1.0
+            "cost_impact": 1000,  # Way beyond normal range, clamped to 1.0
             "health_impact": 100,
             "energy_impact": 1000,
             "maintenance_impact": 100,
@@ -309,7 +309,7 @@ class TestRecommendationScorer:
         cost_saving_rec = {
             "action": "reduce_runtime",
             "comfort_impact": -1.0,
-            "cost_impact": 100,      # High cost savings
+            "cost_impact": 100,  # High cost savings
             "health_impact": -0.5,
             "energy_impact": 40,
             "maintenance_impact": -0.5,
@@ -318,8 +318,8 @@ class TestRecommendationScorer:
         # Comfort-focused recommendation
         comfort_rec = {
             "action": "tight_control",
-            "comfort_impact": 2.0,   # High comfort
-            "cost_impact": -80,      # High cost increase
+            "comfort_impact": 2.0,  # High comfort
+            "cost_impact": -80,  # High cost increase
             "health_impact": 1,
             "energy_impact": -30,
             "maintenance_impact": 1,
@@ -354,7 +354,7 @@ class TestRecommendationScorer:
             "action": "maximize_utilization",
             "comfort_impact": -1.0,
             "cost_impact": -50,
-            "health_impact": 2.0,      # High runtime/utilization
+            "health_impact": 2.0,  # High runtime/utilization
             "energy_impact": 30,
             "maintenance_impact": -1.5,
         }
@@ -363,8 +363,8 @@ class TestRecommendationScorer:
         cost_reduction_rec = {
             "action": "reduce_load",
             "comfort_impact": -0.5,
-            "cost_impact": 100,        # High cost savings
-            "health_impact": -2.0,     # Low runtime
+            "cost_impact": 100,  # High cost savings
+            "health_impact": -2.0,  # Low runtime
             "energy_impact": -40,
             "maintenance_impact": 0.5,
         }

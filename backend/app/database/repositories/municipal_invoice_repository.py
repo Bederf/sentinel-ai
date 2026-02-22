@@ -77,11 +77,7 @@ class MunicipalInvoiceRepository:
                     "tariff_type": tariff_type,
                     "main_meter_id": main_meter_id,
                 }
-                created = (
-                    self.client.table("municipal_accounts")
-                    .insert(payload)
-                    .execute()
-                )
+                created = self.client.table("municipal_accounts").insert(payload).execute()
                 return created.data[0] if created.data else None
             except Exception as exc:
                 logger.error("Error creating municipal account: %s", exc)
@@ -135,12 +131,7 @@ class MunicipalInvoiceRepository:
         """Update an invoice record by ID."""
         if self.client:
             try:
-                result = (
-                    self.client.table("municipal_invoices")
-                    .update(payload)
-                    .eq("id", invoice_id)
-                    .execute()
-                )
+                result = self.client.table("municipal_invoices").update(payload).eq("id", invoice_id).execute()
                 return result.data[0] if result.data else None
             except Exception as exc:
                 logger.error("Error updating municipal invoice %s: %s", invoice_id, exc)
@@ -159,13 +150,7 @@ class MunicipalInvoiceRepository:
         """Get invoice by ID."""
         if self.client:
             try:
-                result = (
-                    self.client.table("municipal_invoices")
-                    .select("*")
-                    .eq("id", invoice_id)
-                    .limit(1)
-                    .execute()
-                )
+                result = self.client.table("municipal_invoices").select("*").eq("id", invoice_id).limit(1).execute()
                 return result.data[0] if result.data else None
             except Exception as exc:
                 logger.error("Error fetching municipal invoice %s: %s", invoice_id, exc)
@@ -223,7 +208,7 @@ class MunicipalInvoiceRepository:
                 continue
             filtered.append(invoice)
 
-        return filtered[offset:offset + limit]
+        return filtered[offset : offset + limit]
 
     def approve_invoice(self, invoice_id: str, approved_by: str) -> Optional[Dict[str, Any]]:
         """Mark invoice as approved."""
@@ -240,11 +225,7 @@ class MunicipalInvoiceRepository:
     def create_alert(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if self.client:
             try:
-                result = (
-                    self.client.table("municipal_reconciliation_alerts")
-                    .insert(payload)
-                    .execute()
-                )
+                result = self.client.table("municipal_reconciliation_alerts").insert(payload).execute()
                 return result.data[0] if result.data else None
             except Exception as exc:
                 logger.error("Error creating municipal alert: %s", exc)

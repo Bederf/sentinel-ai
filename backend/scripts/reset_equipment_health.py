@@ -34,10 +34,7 @@ def reset_health_scores():
 
     if eq_ids:
         # Update all equipment to health_score = 90, status = normal
-        result = client.table("equipment").update({
-            "health_score": 90,
-            "status": "normal"
-        }).in_("id", eq_ids).execute()
+        result = client.table("equipment").update({"health_score": 90, "status": "normal"}).in_("id", eq_ids).execute()
 
         print(f"✓ Reset {len(eq_ids)} equipment items to health_score=90, status=normal")
     else:
@@ -53,9 +50,7 @@ def reset_health_scores():
         pred_ids = [p["id"] for p in predictions.data]
 
         # Update all to resolved
-        resolved = client.table("predictions").update({
-            "status": "resolved"
-        }).in_("id", pred_ids).execute()
+        resolved = client.table("predictions").update({"status": "resolved"}).in_("id", pred_ids).execute()
 
         print(f"✓ Resolved {len(pred_ids)} active predictions")
     else:
@@ -84,5 +79,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

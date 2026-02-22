@@ -439,7 +439,8 @@
     "dc_power": 74.8,
     "efficiency": 96.9,
     "temperature": 42.3,
-    "daily_energy": 385.2
+    "daily_energy": 385.2,
+    "grid_export_power": 0.0
   },
   "S002-INV-R-002": {
     "status": 1,
@@ -447,7 +448,8 @@
     "dc_power": 74.1,
     "efficiency": 96.9,
     "temperature": 41.8,
-    "daily_energy": 382.7
+    "daily_energy": 382.7,
+    "grid_export_power": 0.0
   },
   "S002-INV-R-003": {
     "status": 1,
@@ -1216,5 +1218,26 @@
     "compressor_status": 0.0,
     "enable": 0.0,
     "setpoint_temp": 8.5
+  },
+  "S002-DALI-L2-B-SENS": {
+    "brightness": 0.0,
+    "occupancy": false,
+    "temperature": 0.0
+  },
+  "S002-MTR-W-MAIN": {
+    "pulse_count": 0.0,
+    "flow_rate": 0.0,
+    "volume_liters": 0.0,
+    "temperature": 0.0,
+    "pressure": 0.0
+  },
+  "S002-DALI-L1-A-SENS": {
+    "brightness": 0.0,
+    "occupancy": false,
+    "lux": 0.0,
+    "status": false
+  },
+  "S002-SENSOR-B1-001": {
+    "co2": 0.0
   }
 }

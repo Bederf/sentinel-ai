@@ -46,23 +46,13 @@ class TestDeviceControlFlow:
             "point": writable_point,
             "value": 22.0,
         }
-        validate_response = test_client.post(
-            "/api/safety/validate",
-            json={"device_id": device_id, **validate_data}
-        )
+        validate_response = test_client.post("/api/safety/validate", json={"device_id": device_id, **validate_data})
         # Validation may pass or fail depending on safety rules
         assert validate_response.status_code in [200, 400]
 
         # Step 5: Execute control action
-        control_data = {
-            "point": writable_point,
-            "value": 22.0,
-            "priority": 8
-        }
-        control_response = test_client.post(
-            f"/api/devices/{device_id}/control",
-            json=control_data
-        )
+        control_data = {"point": writable_point, "value": 22.0, "priority": 8}
+        control_response = test_client.post(f"/api/devices/{device_id}/control", json=control_data)
         assert control_response.status_code in [200, 201, 400]
 
         # Step 6: Verify audit log entry
@@ -76,9 +66,7 @@ class TestDeviceControlFlow:
             # Find our control action in audit log
             entries = audit_data.get("entries", [])
             control_found = any(
-                entry.get("device_id") == device_id and
-                entry.get("point_name") == writable_point
-                for entry in entries
+                entry.get("device_id") == device_id and entry.get("point_name") == writable_point for entry in entries
             )
             # Note: May not appear immediately due to async logging
             # This is acceptable for integration test
@@ -116,12 +104,9 @@ class TestDeviceControlFlow:
         control_data = {
             "point": writable_point,
             "value": 100.0,  # Extreme value
-            "priority": 8
+            "priority": 8,
         }
-        control_response = test_client.post(
-            f"/api/devices/{device_id}/control",
-            json=control_data
-        )
+        control_response = test_client.post(f"/api/devices/{device_id}/control", json=control_data)
 
         # Should be blocked (400) or allowed with warning
         assert control_response.status_code in [200, 201, 400, 422]

@@ -17,6 +17,7 @@ router = APIRouter()
 
 class DiscoverDeviceRequest(BaseModel):
     """Request to discover a specific DALI device."""
+
     equipment_code: str = Field(..., description="Equipment code (e.g., S002-DALI-L1-A)")
     gateway_ip: Optional[str] = Field(None, description="DALI gateway IP (uses env default if not provided)")
     gateway_type: str = Field("tridonic", description="Gateway type: tridonic, philips, helvar, generic")
@@ -28,6 +29,7 @@ class DiscoverDeviceRequest(BaseModel):
 
 class DiscoverLineRequest(BaseModel):
     """Request to discover all devices on a DALI line."""
+
     gateway_ip: Optional[str] = Field(None, description="DALI gateway IP")
     gateway_type: str = Field("tridonic", description="Gateway type")
     dali_line: int = Field(1, ge=1, le=4, description="DALI line number")
@@ -37,6 +39,7 @@ class DiscoverLineRequest(BaseModel):
 
 class SimulatedDiscoveryRequest(BaseModel):
     """Request for simulated discovery (demo mode)."""
+
     equipment_code: str = Field(..., description="Equipment code to update")
     device_type: str = Field("led_panel", description="Device type: led_panel, led_downlight, emergency")
     dali_address: int = Field(1, ge=0, le=63, description="Simulated DALI address")
@@ -52,10 +55,7 @@ def _get_gateway_ip(provided_ip: Optional[str]) -> str:
     if env_ip:
         return env_ip
 
-    raise HTTPException(
-        status_code=400,
-        detail="No gateway IP provided and DALI_GATEWAY_IP not set in environment"
-    )
+    raise HTTPException(status_code=400, detail="No gateway IP provided and DALI_GATEWAY_IP not set in environment")
 
 
 @router.get("/dali/gateway/info")
@@ -91,7 +91,7 @@ async def get_gateway_info(
                 "dali_lines": 2,
                 "total_devices": 48,
                 "online": True,
-            }
+            },
         }
 
     service = DALIDiscoveryService(
@@ -106,10 +106,7 @@ async def get_gateway_info(
     if not gateway:
         raise HTTPException(status_code=503, detail="Could not connect to DALI gateway")
 
-    return {
-        "status": "success" if gateway.online else "offline",
-        "gateway": gateway.to_dict()
-    }
+    return {"status": "success" if gateway.online else "offline", "gateway": gateway.to_dict()}
 
 
 @router.post("/dali/discover/device")
@@ -130,10 +127,7 @@ async def discover_device(request: DiscoverDeviceRequest) -> dict:
     except HTTPException:
         # Fall back to simulated discovery
         return await _simulated_discovery(
-            request.equipment_code,
-            "led_panel",
-            request.dali_address or 1,
-            save_to_db=True
+            request.equipment_code, "led_panel", request.dali_address or 1, save_to_db=True
         )
 
     service = DALIDiscoveryService(
@@ -156,7 +150,7 @@ async def discover_device(request: DiscoverDeviceRequest) -> dict:
         raise HTTPException(
             status_code=404,
             detail=f"No DALI device found at line {request.dali_line}"
-            + (f" address {request.dali_address}" if request.dali_address else "")
+            + (f" address {request.dali_address}" if request.dali_address else ""),
         )
 
     return result
@@ -194,7 +188,7 @@ async def discover_line(request: DiscoverLineRequest) -> dict:
                 }
                 for i in range(1, 9)
             ],
-            "count": 8
+            "count": 8,
         }
 
     service = DALIDiscoveryService(
@@ -210,7 +204,7 @@ async def discover_line(request: DiscoverLineRequest) -> dict:
         "status": "success",
         "dali_line": request.dali_line,
         "devices": [d.to_dict() for d in devices],
-        "count": len(devices)
+        "count": len(devices),
     }
 
 
@@ -228,24 +222,14 @@ async def discover_simulated(request: SimulatedDiscoveryRequest) -> dict:
         Generated device info
     """
     return await _simulated_discovery(
-        request.equipment_code,
-        request.device_type,
-        request.dali_address,
-        request.save_to_db
+        request.equipment_code, request.device_type, request.dali_address, request.save_to_db
     )
 
 
-async def _simulated_discovery(
-    equipment_code: str,
-    device_type: str,
-    dali_address: int,
-    save_to_db: bool
-) -> dict:
+async def _simulated_discovery(equipment_code: str, device_type: str, dali_address: int, save_to_db: bool) -> dict:
     """Internal simulated discovery helper."""
     data = SimulatedDALIDiscovery.generate_device_info(
-        equipment_code=equipment_code,
-        device_type=device_type,
-        dali_address=dali_address
+        equipment_code=equipment_code, device_type=device_type, dali_address=dali_address
     )
 
     result = {
@@ -265,7 +249,7 @@ async def _simulated_discovery(
                 equipment_id=equipment_code,
                 network_info=data["network_info"],
                 device_info=data["device_info"],
-                operating_data=data["operating_data"]
+                operating_data=data["operating_data"],
             )
             result["saved"] = True
         except Exception as e:
@@ -319,14 +303,12 @@ async def discover_bulk(
                     dali_address=i + 1,  # Assign sequential addresses
                 )
             elif use_simulated:
-                result = await _simulated_discovery(
-                    code, "led_panel", i + 1, save_to_db=True
-                )
+                result = await _simulated_discovery(code, "led_panel", i + 1, save_to_db=True)
             else:
                 result = {
                     "equipment_code": code,
                     "status": "skipped",
-                    "reason": "Gateway unavailable and simulated mode disabled"
+                    "reason": "Gateway unavailable and simulated mode disabled",
                 }
 
             results.append(result)

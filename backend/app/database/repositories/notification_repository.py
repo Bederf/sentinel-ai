@@ -51,9 +51,7 @@ class NotificationRepository:
             try:
                 self.client = get_supabase_client()
             except Exception as e:
-                logger.warning(
-                    f"Supabase client initialization failed, falling back to JSON: {e}"
-                )
+                logger.warning(f"Supabase client initialization failed, falling back to JSON: {e}")
                 self.use_json = True
 
         # Ensure JSON files exist
@@ -108,9 +106,7 @@ class NotificationRepository:
             tech_id_str = str(technician_id)
             channels = data.get(tech_id_str, [])
             if channel_types:
-                channels = [
-                    c for c in channels if c.get("channel_type") in [ct.value for ct in channel_types]
-                ]
+                channels = [c for c in channels if c.get("channel_type") in [ct.value for ct in channel_types]]
             return [self._channel_dict_to_model(c) for c in channels]
 
         try:
@@ -234,9 +230,7 @@ class NotificationRepository:
 
     # ========== Notification Preferences ==========
 
-    async def get_notification_preferences(
-        self, technician_id: UUID
-    ) -> Optional[TechnicianNotificationPreferences]:
+    async def get_notification_preferences(self, technician_id: UUID) -> Optional[TechnicianNotificationPreferences]:
         """Get notification preferences for a technician.
 
         Args:
@@ -349,9 +343,7 @@ class NotificationRepository:
 
         try:
             result = (
-                self.client.table("notification_delivery_log")
-                .insert(self._delivery_log_model_to_dict(log))
-                .execute()
+                self.client.table("notification_delivery_log").insert(self._delivery_log_model_to_dict(log)).execute()
             )
             if result.data and len(result.data) > 0:
                 return self._delivery_log_dict_to_model(result.data[0])
@@ -383,10 +375,7 @@ class NotificationRepository:
                 all_logs.extend(logs)
 
             if technician_id:
-                all_logs = [
-                    log for log in all_logs
-                    if log.get("technician_id") == str(technician_id)
-                ]
+                all_logs = [log for log in all_logs if log.get("technician_id") == str(technician_id)]
 
             if status:
                 all_logs = [log for log in all_logs if log.get("status") == status.value]
@@ -394,9 +383,9 @@ class NotificationRepository:
             return [self._delivery_log_dict_to_model(log) for log in all_logs[-limit:]]
 
         try:
-            query = self.client.table("notification_delivery_log").select("*").order(
-                "created_at", desc=True
-            ).limit(limit)
+            query = (
+                self.client.table("notification_delivery_log").select("*").order("created_at", desc=True).limit(limit)
+            )
 
             if technician_id:
                 query = query.eq("technician_id", str(technician_id))
@@ -452,16 +441,17 @@ class NotificationRepository:
     def _preferences_dict_to_model(data: Dict[str, Any]) -> TechnicianNotificationPreferences:
         """Convert dictionary to TechnicianNotificationPreferences model."""
         from datetime import time
+
         return TechnicianNotificationPreferences(
             id=UUID(data.get("id")) if data.get("id") else UUID(int=0),
             technician_id=UUID(data.get("technician_id")) if data.get("technician_id") else UUID(int=0),
             preferred_channel=ChannelType(data.get("preferred_channel", "telegram")),
-            enabled_channels=[
-                ChannelType(ch) for ch in data.get("enabled_channels", ["telegram"])
-            ],
+            enabled_channels=[ChannelType(ch) for ch in data.get("enabled_channels", ["telegram"])],
             alert_level_min=data.get("alert_level_min", "warning"),
             quiet_hours_enabled=data.get("quiet_hours_enabled", True),
-            quiet_hours_start=time.fromisoformat(data["quiet_hours_start"]) if data.get("quiet_hours_start") else time(22, 0),
+            quiet_hours_start=time.fromisoformat(data["quiet_hours_start"])
+            if data.get("quiet_hours_start")
+            else time(22, 0),
             quiet_hours_end=time.fromisoformat(data["quiet_hours_end"]) if data.get("quiet_hours_end") else time(6, 0),
             emergency_override_enabled=data.get("emergency_override_enabled", True),
             batch_low_priority=data.get("batch_low_priority", False),

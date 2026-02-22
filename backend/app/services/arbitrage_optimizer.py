@@ -288,7 +288,7 @@ class PriceForecaster:
 class ArbitrageAnalyzer:
     """Identifies optimal charge/discharge windows and calculates revenue."""
 
-    BESS_CAPACITY_KWH = 500.0  # Huawei LUNA2000-200KWH-2H1
+    BESS_CAPACITY_KWH = 200.0  # Huawei LUNA2000-200KWH-2H1
     BESS_ROUND_TRIP_EFF = 0.90
     BATTERY_DEGRADATION_COST_R_PER_KWH = 0.05
     MIN_ARBITRAGE_SPREAD = 0.10  # Minimum ZAR/kWh spread to make arbitrage worthwhile

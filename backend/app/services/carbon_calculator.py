@@ -67,18 +67,19 @@ class CarbonCalculator:
         """
         try:
             # Query emissions_sources table for Scope 1 data
-            response = self.supabase.table("emissions_sources").select(
-                "source_type,monthly_value,unit,co2_factor,co2e_kg"
-            ).eq("building_id", building_id).eq("scope", 1).gte(
-                "measurement_date", period_start.isoformat()
-            ).lte(
-                "measurement_date", period_end.isoformat()
-            ).execute()
+            response = (
+                self.supabase.table("emissions_sources")
+                .select("source_type,monthly_value,unit,co2_factor,co2e_kg")
+                .eq("building_id", building_id)
+                .eq("scope", 1)
+                .gte("measurement_date", period_start.isoformat())
+                .lte("measurement_date", period_end.isoformat())
+                .execute()
+            )
 
             if not response.data:
                 self._logger.warning(
-                    f"No Scope 1 emissions data found for {building_id} "
-                    f"in period {period_start} to {period_end}"
+                    f"No Scope 1 emissions data found for {building_id} in period {period_start} to {period_end}"
                 )
                 return 0.0, {}
 
@@ -127,18 +128,19 @@ class CarbonCalculator:
         """
         try:
             # Query Scope 2 (grid electricity)
-            response = self.supabase.table("emissions_sources").select(
-                "source_type,monthly_value,unit,co2_factor,co2e_kg"
-            ).eq("building_id", building_id).eq("scope", 2).gte(
-                "measurement_date", period_start.isoformat()
-            ).lte(
-                "measurement_date", period_end.isoformat()
-            ).execute()
+            response = (
+                self.supabase.table("emissions_sources")
+                .select("source_type,monthly_value,unit,co2_factor,co2e_kg")
+                .eq("building_id", building_id)
+                .eq("scope", 2)
+                .gte("measurement_date", period_start.isoformat())
+                .lte("measurement_date", period_end.isoformat())
+                .execute()
+            )
 
             if not response.data:
                 self._logger.warning(
-                    f"No Scope 2 emissions data found for {building_id} "
-                    f"in period {period_start} to {period_end}"
+                    f"No Scope 2 emissions data found for {building_id} in period {period_start} to {period_end}"
                 )
                 return 0.0, {}
 
@@ -157,9 +159,7 @@ class CarbonCalculator:
             # TODO: Query solar module for renewable energy offset and reduce Scope 2
             # If solar PV data exists, subtract from grid emissions (for net carbon tracking)
 
-            self._logger.info(
-                f"Scope 2 calculation for {building_id}: {total_kg_co2e:.2f} kg CO2e"
-            )
+            self._logger.info(f"Scope 2 calculation for {building_id}: {total_kg_co2e:.2f} kg CO2e")
             return total_kg_co2e, breakdown
 
         except Exception as e:
@@ -191,18 +191,19 @@ class CarbonCalculator:
         """
         try:
             # Query Scope 3 emissions
-            response = self.supabase.table("emissions_sources").select(
-                "source_type,monthly_value,unit,co2_factor,co2e_kg"
-            ).eq("building_id", building_id).eq("scope", 3).gte(
-                "measurement_date", period_start.isoformat()
-            ).lte(
-                "measurement_date", period_end.isoformat()
-            ).execute()
+            response = (
+                self.supabase.table("emissions_sources")
+                .select("source_type,monthly_value,unit,co2_factor,co2e_kg")
+                .eq("building_id", building_id)
+                .eq("scope", 3)
+                .gte("measurement_date", period_start.isoformat())
+                .lte("measurement_date", period_end.isoformat())
+                .execute()
+            )
 
             if not response.data:
                 self._logger.warning(
-                    f"No Scope 3 emissions data found for {building_id} "
-                    f"in period {period_start} to {period_end}"
+                    f"No Scope 3 emissions data found for {building_id} in period {period_start} to {period_end}"
                 )
                 # Return estimate based on occupancy if available
                 return self._estimate_scope_3(building_id, period_start, period_end)
@@ -219,9 +220,7 @@ class CarbonCalculator:
                     breakdown[source] = 0.0
                 breakdown[source] += co2e
 
-            self._logger.info(
-                f"Scope 3 calculation for {building_id}: {total_kg_co2e:.2f} kg CO2e"
-            )
+            self._logger.info(f"Scope 3 calculation for {building_id}: {total_kg_co2e:.2f} kg CO2e")
             return total_kg_co2e, breakdown
 
         except Exception as e:
@@ -241,9 +240,12 @@ class CarbonCalculator:
         """
         try:
             # Get building info (occupancy, floor area)
-            response = self.supabase.table("buildings").select(
-                "occupancy_capacity,floor_area_m2"
-            ).eq("id", building_id).execute()
+            response = (
+                self.supabase.table("buildings")
+                .select("occupancy_capacity,floor_area_m2")
+                .eq("id", building_id)
+                .execute()
+            )
 
             if not response.data:
                 return 0.0, {}
@@ -329,9 +331,7 @@ class CarbonCalculator:
             total_co2e = emissions["total_kg_co2e"]
 
             # Get building floor area
-            response = self.supabase.table("buildings").select(
-                "floor_area_m2,code"
-            ).eq("id", building_id).execute()
+            response = self.supabase.table("buildings").select("floor_area_m2,code").eq("id", building_id).execute()
 
             if not response.data:
                 self._logger.error(f"Building {building_id} not found")
@@ -351,10 +351,7 @@ class CarbonCalculator:
 
             # SA benchmark: 0.15 kg/m²/day for office buildings
             sa_benchmark_kg_per_m2_per_day = 0.15
-            benchmark_ratio = round(
-                intensity_kg_per_m2_per_day / sa_benchmark_kg_per_m2_per_day,
-                2
-            )
+            benchmark_ratio = round(intensity_kg_per_m2_per_day / sa_benchmark_kg_per_m2_per_day, 2)
 
             result = {
                 "building_id": building_id,
@@ -368,10 +365,13 @@ class CarbonCalculator:
                 "sa_benchmark_kg_per_m2_per_day": sa_benchmark_kg_per_m2_per_day,
                 "benchmark_ratio": benchmark_ratio,
                 "above_benchmark_pct": round((benchmark_ratio - 1) * 100, 1) if benchmark_ratio > 1 else 0,
-                "rating": "excellent" if intensity_kg_per_m2_per_day < 0.10
-                    else "good" if intensity_kg_per_m2_per_day < 0.15
-                    else "average" if intensity_kg_per_m2_per_day < 0.25
-                    else "above_target",
+                "rating": "excellent"
+                if intensity_kg_per_m2_per_day < 0.10
+                else "good"
+                if intensity_kg_per_m2_per_day < 0.15
+                else "average"
+                if intensity_kg_per_m2_per_day < 0.25
+                else "above_target",
             }
 
             self._logger.info(
@@ -409,9 +409,7 @@ class CarbonCalculator:
             emissions = self.calculate_total_emissions(building_id, period_start, period_end)
 
             # Get building floor area
-            response = self.supabase.table("buildings").select(
-                "floor_area_m2"
-            ).eq("id", building_id).execute()
+            response = self.supabase.table("buildings").select("floor_area_m2").eq("id", building_id).execute()
 
             floor_area = response.data[0]["floor_area_m2"] if response.data else 1000
 
@@ -488,12 +486,7 @@ class CarbonCalculator:
             water_score = 75.0
 
             # Overall ESG score (weighted average)
-            overall_score = (
-                carbon_score * 0.40 +
-                energy_score * 0.30 +
-                waste_score * 0.20 +
-                water_score * 0.10
-            )
+            overall_score = carbon_score * 0.40 + energy_score * 0.30 + waste_score * 0.20 + water_score * 0.10
 
             return {
                 "carbon_intensity_score": round(carbon_score, 1),
@@ -501,10 +494,13 @@ class CarbonCalculator:
                 "waste_diversion_score": waste_score,
                 "water_efficiency_score": water_score,
                 "overall_esg_score": round(overall_score, 1),
-                "rating": "excellent" if overall_score >= 80
-                    else "good" if overall_score >= 60
-                    else "average" if overall_score >= 40
-                    else "needs_improvement",
+                "rating": "excellent"
+                if overall_score >= 80
+                else "good"
+                if overall_score >= 60
+                else "average"
+                if overall_score >= 40
+                else "needs_improvement",
             }
 
         except Exception as e:

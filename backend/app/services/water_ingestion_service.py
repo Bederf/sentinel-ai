@@ -84,30 +84,40 @@ class WaterIngestionService:
                     with open(equipment_file) as f:
                         equipment_data = json.load(f)
 
-                    if equipment_data.get("equipment_type") == "METER" and "W" in equipment_data.get("equipment_code", ""):
-                        meter = WaterMeter.from_dict({
-                            "meter_id": equipment_data["equipment_code"],
-                            "site": site_id,
-                            "meter_type": equipment_data.get("properties", {}).get("meter_type", "main"),
-                            "pulse_weight": equipment_data.get("properties", {}).get("pulse_weight", 10.0),
-                            "installation_date": datetime.fromisoformat(
-                                equipment_data.get("properties", {}).get("installation_date", "2023-01-01")
-                            ),
-                            "location": equipment_data.get("metadata", {}).get("location", ""),
-                            "protocol": equipment_data.get("protocol", "modbus"),
-                            "register_address": equipment_data.get("points", [{}])[0].get("address", 30001),
-                            "max_flow_rate_lpm": equipment_data.get("properties", {}).get("max_flow_rate_lpm", 100.0),
-                            "baseline_flow_lpm": equipment_data.get("properties", {}).get("baseline_flow_lpm", 2.0),
-                        })
+                    if equipment_data.get("equipment_type") == "METER" and "W" in equipment_data.get(
+                        "equipment_code", ""
+                    ):
+                        meter = WaterMeter.from_dict(
+                            {
+                                "meter_id": equipment_data["equipment_code"],
+                                "site": site_id,
+                                "meter_type": equipment_data.get("properties", {}).get("meter_type", "main"),
+                                "pulse_weight": equipment_data.get("properties", {}).get("pulse_weight", 10.0),
+                                "installation_date": datetime.fromisoformat(
+                                    equipment_data.get("properties", {}).get("installation_date", "2023-01-01")
+                                ),
+                                "location": equipment_data.get("metadata", {}).get("location", ""),
+                                "protocol": equipment_data.get("protocol", "modbus"),
+                                "register_address": equipment_data.get("points", [{}])[0].get("address", 30001),
+                                "max_flow_rate_lpm": equipment_data.get("properties", {}).get(
+                                    "max_flow_rate_lpm", 100.0
+                                ),
+                                "baseline_flow_lpm": equipment_data.get("properties", {}).get("baseline_flow_lpm", 2.0),
+                            }
+                        )
                         water_meters.append(meter)
 
                         # Extract zone_id from metadata
                         zone_id = equipment_data.get("metadata", {}).get("zone_id") or equipment_data.get("zone")
                         meter_zone_map[meter.meter_id] = zone_id
                         if zone_id:
-                            logger.info(f"Loaded water meter: {meter.meter_id} (zone: {zone_id}) from {equipment_file.name}")
+                            logger.info(
+                                f"Loaded water meter: {meter.meter_id} (zone: {zone_id}) from {equipment_file.name}"
+                            )
                         else:
-                            logger.info(f"Loaded water meter: {meter.meter_id} (no zone assigned) from {equipment_file.name}")
+                            logger.info(
+                                f"Loaded water meter: {meter.meter_id} (no zone assigned) from {equipment_file.name}"
+                            )
                 except Exception as e:
                     logger.error(f"Failed to load water meter from {equipment_file}: {e}")
 
@@ -119,7 +129,13 @@ class WaterIngestionService:
                 self.register_site(site_id, config, water_meters, meter_zone_map)
                 logger.info(f"Registered {len(water_meters)} water meter(s) for {site_id}")
 
-    def register_site(self, site_id: str, config: Dict, meters: List[WaterMeter], meter_zone_map: Optional[Dict[str, Optional[str]]] = None):
+    def register_site(
+        self,
+        site_id: str,
+        config: Dict,
+        meters: List[WaterMeter],
+        meter_zone_map: Optional[Dict[str, Optional[str]]] = None,
+    ):
         """Register a site with its water meters.
 
         Args:

@@ -84,15 +84,11 @@ class DigitalTwinService:
         # Sanitize if requested (default)
         if not skip_sanitization:
             logger.info(f"Sanitizing floor plan for {building_code}")
-            sanitized_bytes, _ = self.sanitizer.sanitize_floor_plan(
-                image_bytes, remove_text=True, return_lookup=True
-            )
+            sanitized_bytes, _ = self.sanitizer.sanitize_floor_plan(image_bytes, remove_text=True, return_lookup=True)
             image_to_send = sanitized_bytes
             was_sanitized = True
         else:
-            logger.warning(
-                f"Skipping sanitization for {building_code} (demo/non-sensitive only)"
-            )
+            logger.warning(f"Skipping sanitization for {building_code} (demo/non-sensitive only)")
             image_to_send = image_bytes
             was_sanitized = False
 
@@ -103,9 +99,7 @@ class DigitalTwinService:
 
         # Re-identify with original zone names if sanitized
         if was_sanitized and lookup_table:
-            extracted = self.sanitizer.reidentify_equipment_config(
-                extracted, lookup_table
-            )
+            extracted = self.sanitizer.reidentify_equipment_config(extracted, lookup_table)
 
         # Add metadata
         extracted["extraction_metadata"] = {
@@ -155,9 +149,7 @@ class DigitalTwinService:
             claude = ClaudeService()
 
             # Prepare extraction prompt
-            prompt = self._build_extraction_prompt(
-                building_name, floors_count, was_sanitized
-            )
+            prompt = self._build_extraction_prompt(building_name, floors_count, was_sanitized)
 
             # Encode image to base64 for API
             import base64
@@ -165,9 +157,7 @@ class DigitalTwinService:
             image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
             # Call Claude with vision capability
-            response = await claude.call_claude_vision(
-                prompt=prompt, image_base64=image_b64
-            )
+            response = await claude.call_claude_vision(prompt=prompt, image_base64=image_b64)
 
             # Parse response as JSON
             extracted = self._parse_extraction_response(response, building_code)
@@ -178,9 +168,7 @@ class DigitalTwinService:
             # Return demo config for testing
             return self._generate_demo_config(building_code, building_name, floors_count)
 
-    def _build_extraction_prompt(
-        self, building_name: str, floors_count: int, was_sanitized: bool
-    ) -> str:
+    def _build_extraction_prompt(self, building_name: str, floors_count: int, was_sanitized: bool) -> str:
         """Build structured extraction prompt for Claude vision."""
         sanitization_note = (
             "\n**NOTE:** This floor plan has been sanitized to remove identifying "
@@ -253,9 +241,7 @@ class DigitalTwinService:
 """
         return prompt
 
-    def _parse_extraction_response(
-        self, response: str, building_code: str
-    ) -> Dict:
+    def _parse_extraction_response(self, response: str, building_code: str) -> Dict:
         """Parse Claude vision response into structured config."""
         try:
             # Extract JSON from response
@@ -308,9 +294,7 @@ class DigitalTwinService:
         parser = get_dxf_parser_service()
 
         try:
-            config = await parser.parse_dxf_file(
-                dxf_bytes, building_code, building_name
-            )
+            config = await parser.parse_dxf_file(dxf_bytes, building_code, building_name)
 
             # Add metadata
             config["extraction_metadata"] = {
@@ -332,9 +316,7 @@ class DigitalTwinService:
             # Fallback to demo config for testing
             return self._generate_demo_config(building_code, building_name, 5)
 
-    def _generate_demo_config(
-        self, building_code: str, building_name: str, floors_count: int
-    ) -> Dict:
+    def _generate_demo_config(self, building_code: str, building_name: str, floors_count: int) -> Dict:
         """Generate realistic demo config for testing."""
         logger.info(f"Generating demo config for {building_code}")
 
@@ -383,13 +365,13 @@ class DigitalTwinService:
                 for i in range(2):
                     equipment.append(
                         {
-                            "name": f"VAV-{floor}-{i+1:02d}",
+                            "name": f"VAV-{floor}-{i + 1:02d}",
                             "equipment_type": "vav",
                             "floor": floor,
                             "x": 120 + i * 30,
                             "y": 80,
                             "confidence": 0.88,
-                            "zone": f"Zone-{floor}-{i+1}",
+                            "zone": f"Zone-{floor}-{i + 1}",
                         }
                     )
 
@@ -418,11 +400,7 @@ class DigitalTwinService:
                         "zone_id": f"Plant-{floor}",
                         "floor": floor,
                         "zone_type": "mechanical",
-                        "equipment": [
-                            e["name"]
-                            for e in equipment
-                            if e["floor"] == floor and e["zone"] == "Plant"
-                        ],
+                        "equipment": [e["name"] for e in equipment if e["floor"] == floor and e["zone"] == "Plant"],
                     }
                 )
             else:
@@ -434,9 +412,7 @@ class DigitalTwinService:
                             "zone_letter": zone_letter,
                             "zone_type": "open_office",
                             "equipment": [
-                                e["name"]
-                                for e in equipment
-                                if e["floor"] == floor and e["zone"] == zone_letter
+                                e["name"] for e in equipment if e["floor"] == floor and e["zone"] == zone_letter
                             ],
                         }
                     )

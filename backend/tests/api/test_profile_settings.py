@@ -16,11 +16,7 @@ class TestProfileModels:
 
     def test_zone_profile_override_serialization(self):
         """Test ZoneProfileOverride to_dict/from_dict."""
-        override = ZoneProfileOverride(
-            zone_id="server-room",
-            profile="comfort",
-            reason="Thermal criticality"
-        )
+        override = ZoneProfileOverride(zone_id="server-room", profile="comfort", reason="Thermal criticality")
 
         data = override.to_dict()
         assert data["zone_id"] == "server-room"
@@ -35,11 +31,7 @@ class TestProfileModels:
     def test_schedule_profile_override_serialization(self):
         """Test ScheduleProfileOverride to_dict/from_dict."""
         override = ScheduleProfileOverride(
-            day_of_week="monday",
-            start_hour=9,
-            end_hour=17,
-            profile="cost",
-            reason="Business hours optimization"
+            day_of_week="monday", start_hour=9, end_hour=17, profile="cost", reason="Business hours optimization"
         )
 
         data = override.to_dict()
@@ -58,13 +50,9 @@ class TestProfileModels:
             active_profile="cost",
             control_tier="human_in_loop",
             zone_overrides=[
-                ZoneProfileOverride(
-                    zone_id="server-room",
-                    profile="comfort",
-                    reason="Thermal criticality"
-                )
+                ZoneProfileOverride(zone_id="server-room", profile="comfort", reason="Thermal criticality")
             ],
-            schedule_overrides=[]
+            schedule_overrides=[],
         )
 
         data = config.to_dict()
@@ -95,11 +83,7 @@ class TestProfileService:
         service = ProfileService()
 
         # Mock loading a config
-        config = SiteProfileConfig(
-            site_id="site-002",
-            active_profile="cost_saving",
-            control_tier="human_in_loop"
-        )
+        config = SiteProfileConfig(site_id="site-002", active_profile="cost_saving", control_tier="human_in_loop")
         service.site_configs["site-002"] = config
 
         profile = service.get_site_profile("site-002")
@@ -111,10 +95,7 @@ class TestProfileService:
         service = ProfileService()
 
         config = SiteProfileConfig(
-            site_id="site-002",
-            active_profile="cost_saving",
-            control_tier="human_in_loop",
-            zone_overrides=[]
+            site_id="site-002", active_profile="cost_saving", control_tier="human_in_loop", zone_overrides=[]
         )
         service.site_configs["site-002"] = config
 
@@ -131,12 +112,8 @@ class TestProfileService:
             active_profile="cost_saving",
             control_tier="human_in_loop",
             zone_overrides=[
-                ZoneProfileOverride(
-                    zone_id="server-room",
-                    profile="comfort_first",
-                    reason="Thermal criticality"
-                )
-            ]
+                ZoneProfileOverride(zone_id="server-room", profile="comfort_first", reason="Thermal criticality")
+            ],
         )
         service.site_configs["site-002"] = config
 
@@ -182,12 +159,7 @@ class TestProfileService:
         initial_overrides = len(config.zone_overrides)
 
         # Add override
-        success = service.update_zone_override(
-            "site-002",
-            "test-zone",
-            "comfort_first",
-            "Test reason"
-        )
+        success = service.update_zone_override("site-002", "test-zone", "comfort_first", "Test reason")
 
         # Note: This will actually write to file, so we just check success
         assert isinstance(success, bool)
@@ -197,12 +169,7 @@ class TestProfileService:
         service = ProfileService()
 
         # Add and then remove
-        service.update_zone_override(
-            "site-002",
-            "test-zone-remove",
-            "comfort_first",
-            "Test"
-        )
+        service.update_zone_override("site-002", "test-zone-remove", "comfort_first", "Test")
 
         success = service.remove_zone_override("site-002", "test-zone-remove")
         assert isinstance(success, bool)
@@ -237,7 +204,7 @@ class TestProfileBuildingJsonIntegration:
 
     def test_all_buildings_have_optimization_section(self):
         """Test that all building.json files have optimization section."""
-        buildings_dir = Path(__file__).parent.parent.parent / "data" / "buildings"
+        buildings_dir = Path(__file__).parent.parent.parent / "app" / "data" / "buildings"
 
         building_files = list(buildings_dir.glob("*/building.json"))
         assert len(building_files) > 0, "No building.json files found"
@@ -255,7 +222,7 @@ class TestProfileBuildingJsonIntegration:
 
     def test_site_002_has_server_room_override(self):
         """Test that site-002 has the server-room override."""
-        buildings_dir = Path(__file__).parent.parent.parent / "data" / "buildings"
+        buildings_dir = Path(__file__).parent.parent.parent / "app" / "data" / "buildings"
         building_file = buildings_dir / "site-002" / "building.json"
 
         with open(building_file) as f:
@@ -265,10 +232,7 @@ class TestProfileBuildingJsonIntegration:
             zone_overrides = opt["zone_overrides"]
 
             # Check for server-room override
-            server_room_override = next(
-                (zo for zo in zone_overrides if zo["zone_id"] == "server-room"),
-                None
-            )
+            server_room_override = next((zo for zo in zone_overrides if zo["zone_id"] == "server-room"), None)
 
             if server_room_override:
                 assert server_room_override["profile"] == "comfort"

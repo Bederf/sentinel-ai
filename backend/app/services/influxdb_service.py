@@ -15,6 +15,7 @@ from dataclasses import dataclass
 try:
     from influxdb_client import InfluxDBClient, Point, WritePrecision
     from influxdb_client.client.write_api import SYNCHRONOUS
+
     INFLUXDB_AVAILABLE = True
 except ImportError:
     INFLUXDB_AVAILABLE = False
@@ -28,6 +29,7 @@ _influxdb_service: Optional["InfluxDBService"] = None
 @dataclass
 class SensorReading:
     """Sensor reading with timestamp and value."""
+
     timestamp: datetime
     value: float
     equipment_id: str = ""
@@ -45,21 +47,13 @@ class InfluxDBService:
 
     # Bucket configurations
     BUCKETS = {
-        "raw": {
-            "name": "sensor_data_raw",
-            "retention": "30d",
-            "description": "Raw sensor data at 1-minute resolution"
-        },
-        "hourly": {
-            "name": "sensor_data_1h",
-            "retention": "365d",
-            "description": "Hourly aggregated sensor data"
-        },
+        "raw": {"name": "sensor_data_raw", "retention": "30d", "description": "Raw sensor data at 1-minute resolution"},
+        "hourly": {"name": "sensor_data_1h", "retention": "365d", "description": "Hourly aggregated sensor data"},
         "daily": {
             "name": "sensor_data_1d",
             "retention": "1825d",
-            "description": "Daily aggregated sensor data (5 years)"
-        }
+            "description": "Daily aggregated sensor data (5 years)",
+        },
     }
 
     def __init__(
@@ -67,7 +61,7 @@ class InfluxDBService:
         url: Optional[str] = None,
         token: Optional[str] = None,
         org: Optional[str] = None,
-        bucket: Optional[str] = None
+        bucket: Optional[str] = None,
     ):
         """Initialize InfluxDB connection.
 
@@ -99,11 +93,7 @@ class InfluxDBService:
             return
 
         if self._client is None:
-            self._client = InfluxDBClient(
-                url=self.url,
-                token=self.token,
-                org=self.org
-            )
+            self._client = InfluxDBClient(url=self.url, token=self.token, org=self.org)
             self._write_api = self._client.write_api(write_options=SYNCHRONOUS)
             self._query_api = self._client.query_api()
             logger.info(f"Connected to InfluxDB at {self.url}")
@@ -120,7 +110,7 @@ class InfluxDBService:
                 "message": "Mock mode - no InfluxDB connection",
                 "mode": "mock",
                 "url": self.url,
-                "org": self.org
+                "org": self.org,
             }
 
         try:
@@ -131,16 +121,11 @@ class InfluxDBService:
                 "message": health.message or "InfluxDB is healthy",
                 "version": health.version,
                 "url": self.url,
-                "org": self.org
+                "org": self.org,
             }
         except Exception as e:
             logger.error(f"InfluxDB health check failed: {e}")
-            return {
-                "status": "error",
-                "message": str(e),
-                "url": self.url,
-                "org": self.org
-            }
+            return {"status": "error", "message": str(e), "url": self.url, "org": self.org}
 
     def write_sensor_data(
         self,
@@ -149,7 +134,7 @@ class InfluxDBService:
         value: float,
         timestamp: Optional[datetime] = None,
         unit: Optional[str] = None,
-        tags: Optional[Dict[str, str]] = None
+        tags: Optional[Dict[str, str]] = None,
     ) -> bool:
         """Write a sensor reading (API-compatible signature).
 
@@ -170,12 +155,9 @@ class InfluxDBService:
             key = f"{equipment_id}:{sensor_type}"
             if key not in self._mock_data:
                 self._mock_data[key] = []
-            self._mock_data[key].append(SensorReading(
-                timestamp=ts,
-                value=value,
-                equipment_id=equipment_id,
-                sensor_type=sensor_type
-            ))
+            self._mock_data[key].append(
+                SensorReading(timestamp=ts, value=value, equipment_id=equipment_id, sensor_type=sensor_type)
+            )
             return True
 
         return self.write_sensor_reading(
@@ -184,15 +166,11 @@ class InfluxDBService:
             sensor_type=sensor_type,
             value=value,
             unit=unit,
-            timestamp=ts
+            timestamp=ts,
         )
 
     def query_raw(
-        self,
-        equipment_id: str,
-        sensor_type: str,
-        start: datetime,
-        end: Optional[datetime] = None
+        self, equipment_id: str, sensor_type: str, start: datetime, end: Optional[datetime] = None
     ) -> List[SensorReading]:
         """Query raw sensor data.
 
@@ -217,20 +195,12 @@ class InfluxDBService:
         data = self.query_sensor_data(equipment_id, sensor_type, start, end)
         return [
             SensorReading(
-                timestamp=d["timestamp"],
-                value=d["value"],
-                equipment_id=equipment_id,
-                sensor_type=sensor_type
+                timestamp=d["timestamp"], value=d["value"], equipment_id=equipment_id, sensor_type=sensor_type
             )
             for d in data
         ]
 
-    def query_hourly(
-        self,
-        equipment_id: str,
-        sensor_type: str,
-        hours: int = 168
-    ) -> List[Dict[str, Any]]:
+    def query_hourly(self, equipment_id: str, sensor_type: str, hours: int = 168) -> List[Dict[str, Any]]:
         """Query hourly aggregated data.
 
         Args:
@@ -249,7 +219,7 @@ class InfluxDBService:
             start = datetime.utcnow() - timedelta(hours=hours)
 
             query = f'''
-                from(bucket: "{self.BUCKETS['hourly']['name']}")
+                from(bucket: "{self.BUCKETS["hourly"]["name"]}")
                 |> range(start: {start.isoformat()}Z)
                 |> filter(fn: (r) => r._measurement == "sensor_reading_1h")
                 |> filter(fn: (r) => r.equipment == "{equipment_id}")
@@ -262,10 +232,7 @@ class InfluxDBService:
             data = []
             for table in result:
                 for record in table.records:
-                    data.append({
-                        "timestamp": record.get_time(),
-                        "value": record.get_value()
-                    })
+                    data.append({"timestamp": record.get_time(), "value": record.get_value()})
 
             return data
 
@@ -274,10 +241,7 @@ class InfluxDBService:
             return self._generate_mock_hourly(equipment_id, sensor_type, hours)
 
     def get_ml_training_data(
-        self,
-        equipment_id: str,
-        sensor_types: List[str],
-        days: int = 180
+        self, equipment_id: str, sensor_types: List[str], days: int = 180
     ) -> Dict[str, List[float]]:
         """Get data formatted for ML training.
 
@@ -299,11 +263,7 @@ class InfluxDBService:
         return data
 
     def _generate_mock_readings(
-        self,
-        equipment_id: str,
-        sensor_type: str,
-        start: datetime,
-        end: datetime
+        self, equipment_id: str, sensor_type: str, start: datetime, end: datetime
     ) -> List[SensorReading]:
         """Generate mock sensor readings for demo."""
         readings = []
@@ -313,22 +273,16 @@ class InfluxDBService:
         while current <= end:
             # Add some variation
             value = base_value + random.uniform(-5, 5)
-            readings.append(SensorReading(
-                timestamp=current,
-                value=round(value, 2),
-                equipment_id=equipment_id,
-                sensor_type=sensor_type
-            ))
+            readings.append(
+                SensorReading(
+                    timestamp=current, value=round(value, 2), equipment_id=equipment_id, sensor_type=sensor_type
+                )
+            )
             current += timedelta(minutes=1)
 
         return readings
 
-    def _generate_mock_hourly(
-        self,
-        equipment_id: str,
-        sensor_type: str,
-        hours: int
-    ) -> List[Dict[str, Any]]:
+    def _generate_mock_hourly(self, equipment_id: str, sensor_type: str, hours: int) -> List[Dict[str, Any]]:
         """Generate mock hourly data for demo."""
         data = []
         base_value = self._get_base_value(sensor_type)
@@ -336,10 +290,7 @@ class InfluxDBService:
 
         for _ in range(hours):
             value = base_value + random.uniform(-3, 3)
-            data.append({
-                "timestamp": current,
-                "value": round(value, 2)
-            })
+            data.append({"timestamp": current, "value": round(value, 2)})
             current += timedelta(hours=1)
 
         return data
@@ -365,7 +316,7 @@ class InfluxDBService:
         sensor_type: str,
         value: float,
         unit: Optional[str] = None,
-        timestamp: Optional[datetime] = None
+        timestamp: Optional[datetime] = None,
     ) -> bool:
         """Write a single sensor reading.
 
@@ -386,12 +337,9 @@ class InfluxDBService:
             key = f"{equipment_id}:{sensor_type}"
             if key not in self._mock_data:
                 self._mock_data[key] = []
-            self._mock_data[key].append(SensorReading(
-                timestamp=ts,
-                value=value,
-                equipment_id=equipment_id,
-                sensor_type=sensor_type
-            ))
+            self._mock_data[key].append(
+                SensorReading(timestamp=ts, value=value, equipment_id=equipment_id, sensor_type=sensor_type)
+            )
             logger.debug(f"Mock wrote sensor reading: {equipment_id}/{sensor_type}={value}")
             return True
 
@@ -437,12 +385,14 @@ class InfluxDBService:
                 key = f"{equipment_id}:{sensor_type}"
                 if key not in self._mock_data:
                     self._mock_data[key] = []
-                self._mock_data[key].append(SensorReading(
-                    timestamp=reading.get("timestamp", datetime.utcnow()),
-                    value=reading["value"],
-                    equipment_id=equipment_id,
-                    sensor_type=sensor_type
-                ))
+                self._mock_data[key].append(
+                    SensorReading(
+                        timestamp=reading.get("timestamp", datetime.utcnow()),
+                        value=reading["value"],
+                        equipment_id=equipment_id,
+                        sensor_type=sensor_type,
+                    )
+                )
             logger.info(f"Mock wrote batch of {len(readings)} sensor readings")
             return len(readings)
 
@@ -480,7 +430,7 @@ class InfluxDBService:
         sensor_type: Optional[str] = None,
         start: Optional[datetime] = None,
         end: Optional[datetime] = None,
-        bucket: Optional[str] = None
+        bucket: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Query sensor data for an equipment.
 
@@ -505,27 +455,36 @@ class InfluxDBService:
                     readings = [r for r in self._mock_data[key] if start <= r.timestamp <= end]
                 else:
                     readings = self._generate_mock_readings(equipment_id, sensor_type, start, end)
-                return [{
-                    "timestamp": r.timestamp,
-                    "building_id": "default",
-                    "equipment_id": r.equipment_id,
-                    "sensor_type": r.sensor_type,
-                    "value": r.value,
-                    "unit": None
-                } for r in readings]
+                return [
+                    {
+                        "timestamp": r.timestamp,
+                        "building_id": "default",
+                        "equipment_id": r.equipment_id,
+                        "sensor_type": r.sensor_type,
+                        "value": r.value,
+                        "unit": None,
+                    }
+                    for r in readings
+                ]
             else:
                 # Return all sensor types for this equipment
                 all_readings = []
                 for key, readings in self._mock_data.items():
                     if key.startswith(f"{equipment_id}:"):
-                        all_readings.extend([{
-                            "timestamp": r.timestamp,
-                            "building_id": "default",
-                            "equipment_id": r.equipment_id,
-                            "sensor_type": r.sensor_type,
-                            "value": r.value,
-                            "unit": None
-                        } for r in readings if start <= r.timestamp <= end])
+                        all_readings.extend(
+                            [
+                                {
+                                    "timestamp": r.timestamp,
+                                    "building_id": "default",
+                                    "equipment_id": r.equipment_id,
+                                    "sensor_type": r.sensor_type,
+                                    "value": r.value,
+                                    "unit": None,
+                                }
+                                for r in readings
+                                if start <= r.timestamp <= end
+                            ]
+                        )
                 return all_readings
 
         try:
@@ -546,23 +505,25 @@ class InfluxDBService:
                 |> filter(fn: (r) => r.sensor_type == "{sensor_type}")
                 '''
 
-            query += '''
+            query += """
                 |> sort(columns: ["_time"])
-            '''
+            """
 
             result = self._query_api.query(query)
 
             readings = []
             for table in result:
                 for record in table.records:
-                    readings.append({
-                        "timestamp": record.get_time(),
-                        "building_id": record.values.get("building"),
-                        "equipment_id": record.values.get("equipment"),
-                        "sensor_type": record.values.get("sensor_type"),
-                        "value": record.get_value(),
-                        "unit": record.values.get("unit")
-                    })
+                    readings.append(
+                        {
+                            "timestamp": record.get_time(),
+                            "building_id": record.values.get("building"),
+                            "equipment_id": record.values.get("equipment"),
+                            "sensor_type": record.values.get("sensor_type"),
+                            "value": record.get_value(),
+                            "unit": record.values.get("unit"),
+                        }
+                    )
 
             return readings
 
@@ -570,11 +531,7 @@ class InfluxDBService:
             logger.error(f"Failed to query sensor data: {e}")
             return []
 
-    def get_equipment_features(
-        self,
-        equipment_id: str,
-        window_days: int = 7
-    ) -> Dict[str, Any]:
+    def get_equipment_features(self, equipment_id: str, window_days: int = 7) -> Dict[str, Any]:
         """Get ML features for an equipment.
 
         Computes statistical features over a time window:
@@ -607,7 +564,7 @@ class InfluxDBService:
                 "equipment_id": equipment_id,
                 "window_days": window_days,
                 "computed_at": datetime.utcnow().isoformat(),
-                "sensors": {}
+                "sensors": {},
             }
 
             for table in result:
@@ -625,18 +582,14 @@ class InfluxDBService:
                         "max": max(values),
                         "std": self._std(values),
                         "last_value": values[-1] if values else None,
-                        "last_timestamp": table.records[-1].get_time().isoformat() if table.records else None
+                        "last_timestamp": table.records[-1].get_time().isoformat() if table.records else None,
                     }
 
             return features
 
         except Exception as e:
             logger.error(f"Failed to get equipment features: {e}")
-            return {
-                "equipment_id": equipment_id,
-                "error": str(e),
-                "sensors": {}
-            }
+            return {"equipment_id": equipment_id, "error": str(e), "sensors": {}}
 
     def _std(self, values: List[float]) -> float:
         """Calculate standard deviation."""
@@ -644,7 +597,7 @@ class InfluxDBService:
             return 0.0
         mean = sum(values) / len(values)
         variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
-        return variance ** 0.5
+        return variance**0.5
 
     def close(self) -> None:
         """Close InfluxDB connection."""

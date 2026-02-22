@@ -195,12 +195,8 @@ async def create_or_update_config(
             floors=config.get("floors", []),
             equipment_positions=config.get("equipment_positions", []),
             zones=config.get("zones", []),
-            created_at=config.get("created_at", "").isoformat()
-            if config.get("created_at")
-            else "",
-            updated_at=config.get("updated_at", "").isoformat()
-            if config.get("updated_at")
-            else "",
+            created_at=config.get("created_at", "").isoformat() if config.get("created_at") else "",
+            updated_at=config.get("updated_at", "").isoformat() if config.get("updated_at") else "",
         )
 
     except HTTPException:
@@ -250,12 +246,8 @@ async def get_config(building_id: str) -> Building3DConfigResponse:
             floors=config.get("floors", []),
             equipment_positions=config.get("equipment_positions", []),
             zones=config.get("zones", []),
-            created_at=config.get("created_at", "").isoformat()
-            if config.get("created_at")
-            else "",
-            updated_at=config.get("updated_at", "").isoformat()
-            if config.get("updated_at")
-            else "",
+            created_at=config.get("created_at", "").isoformat() if config.get("created_at") else "",
+            updated_at=config.get("updated_at", "").isoformat() if config.get("updated_at") else "",
         )
 
     except HTTPException:

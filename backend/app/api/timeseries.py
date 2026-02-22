@@ -18,8 +18,10 @@ router = APIRouter(prefix="/api/timeseries", tags=["timeseries"])
 
 # ============= Pydantic Models =============
 
+
 class SensorReading(BaseModel):
     """Single sensor reading for write."""
+
     equipment_id: str
     sensor_type: str
     value: float
@@ -30,11 +32,13 @@ class SensorReading(BaseModel):
 
 class BatchReadings(BaseModel):
     """Multiple sensor readings for batch write."""
+
     readings: List[SensorReading]
 
 
 class WriteResponse(BaseModel):
     """Response for write operations."""
+
     success: bool
     count: int
     message: str
@@ -42,6 +46,7 @@ class WriteResponse(BaseModel):
 
 class QueryResult(BaseModel):
     """Result from time-series query."""
+
     equipment_id: str
     sensor_type: str
     data: List[Dict[str, Any]]
@@ -50,6 +55,7 @@ class QueryResult(BaseModel):
 
 class MLDataResult(BaseModel):
     """Result formatted for ML training."""
+
     equipment_id: str
     sensor_types: List[str]
     hours: int
@@ -57,6 +63,7 @@ class MLDataResult(BaseModel):
 
 
 # ============= Write Endpoints =============
+
 
 @router.post("/write", response_model=WriteResponse)
 async def write_sensor_reading(reading: SensorReading):
@@ -75,16 +82,14 @@ async def write_sensor_reading(reading: SensorReading):
         value=reading.value,
         timestamp=reading.timestamp,
         unit=reading.unit,
-        tags=reading.tags
+        tags=reading.tags,
     )
 
     if not success:
         raise HTTPException(status_code=500, detail="Failed to write sensor data")
 
     return WriteResponse(
-        success=True,
-        count=1,
-        message=f"Written reading for {reading.equipment_id}:{reading.sensor_type}"
+        success=True, count=1, message=f"Written reading for {reading.equipment_id}:{reading.sensor_type}"
     )
 
 
@@ -105,29 +110,21 @@ async def write_batch_readings(batch: BatchReadings):
             "sensor_type": r.sensor_type,
             "value": r.value,
             "timestamp": r.timestamp,
-            "unit": r.unit
+            "unit": r.unit,
         }
         for r in batch.readings
     ]
 
     count = service.write_batch(readings)
 
-    return WriteResponse(
-        success=count > 0,
-        count=count,
-        message=f"Written {count} of {len(readings)} readings"
-    )
+    return WriteResponse(success=count > 0, count=count, message=f"Written {count} of {len(readings)} readings")
 
 
 # ============= Query Endpoints =============
 
+
 @router.get("/query/raw", response_model=QueryResult)
-async def query_raw_data(
-    equipment_id: str,
-    sensor_type: str,
-    start: datetime,
-    end: Optional[datetime] = None
-):
+async def query_raw_data(equipment_id: str, sensor_type: str, start: datetime, end: Optional[datetime] = None):
     """
     Query raw sensor data for a time range.
 
@@ -142,15 +139,13 @@ async def query_raw_data(
         equipment_id=equipment_id,
         sensor_type=sensor_type,
         data=[{"timestamp": r.timestamp.isoformat(), "value": r.value} for r in readings],
-        count=len(readings)
+        count=len(readings),
     )
 
 
 @router.get("/query/hourly", response_model=QueryResult)
 async def query_hourly_data(
-    equipment_id: str,
-    sensor_type: str,
-    hours: int = Query(168, description="Hours of history (default 168 = 7 days)")
+    equipment_id: str, sensor_type: str, hours: int = Query(168, description="Hours of history (default 168 = 7 days)")
 ):
     """
     Query hourly aggregated sensor data.
@@ -165,8 +160,16 @@ async def query_hourly_data(
     return QueryResult(
         equipment_id=equipment_id,
         sensor_type=sensor_type,
-        data=[{"timestamp": d["timestamp"].isoformat() if hasattr(d["timestamp"], "isoformat") else str(d["timestamp"]), "value": d["value"]} for d in data],
-        count=len(data)
+        data=[
+            {
+                "timestamp": d["timestamp"].isoformat()
+                if hasattr(d["timestamp"], "isoformat")
+                else str(d["timestamp"]),
+                "value": d["value"],
+            }
+            for d in data
+        ],
+        count=len(data),
     )
 
 
@@ -174,7 +177,7 @@ async def query_hourly_data(
 async def query_ml_training_data(
     equipment_id: str,
     sensor_types: str = Query(..., description="Comma-separated sensor types"),
-    days: int = Query(180, description="Days of history")
+    days: int = Query(180, description="Days of history"),
 ):
     """
     Get data formatted for ML model training.
@@ -188,15 +191,11 @@ async def query_ml_training_data(
     types_list = [s.strip() for s in sensor_types.split(",")]
     data = service.get_ml_training_data(equipment_id, types_list, days)
 
-    return MLDataResult(
-        equipment_id=equipment_id,
-        sensor_types=types_list,
-        hours=days * 24,
-        data=data
-    )
+    return MLDataResult(equipment_id=equipment_id, sensor_types=types_list, hours=days * 24, data=data)
 
 
 # ============= Status Endpoints =============
+
 
 @router.get("/health")
 async def timeseries_health():
@@ -209,7 +208,7 @@ async def timeseries_health():
         "status": "healthy",
         "mode": "mock" if service.use_mock else "live",
         "url": service.url if not service.use_mock else None,
-        "buckets": list(service.BUCKETS.keys())
+        "buckets": list(service.BUCKETS.keys()),
     }
 
 
@@ -221,12 +220,7 @@ async def list_buckets():
     service = get_influxdb_service()
     return {
         "buckets": [
-            {
-                "key": key,
-                "name": config["name"],
-                "retention": config["retention"],
-                "description": config["description"]
-            }
+            {"key": key, "name": config["name"], "retention": config["retention"], "description": config["description"]}
             for key, config in service.BUCKETS.items()
         ]
     }

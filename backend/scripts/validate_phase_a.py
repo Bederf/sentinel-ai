@@ -17,7 +17,7 @@ from app.services.digital_twin_service import get_digital_twin_service
 
 def test_floor_plan(floor_code, floor_path):
     """Test sanitization and extraction for a single floor."""
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"Testing: {floor_code}")
     print(f"File: {floor_path.name}")
     print("=" * 70)
@@ -30,9 +30,7 @@ def test_floor_plan(floor_code, floor_path):
 
     # Step 1: Sanitize
     print("\n[1/4] Sanitizing floor plan...")
-    sanitized_bytes, lookup = sanitizer.sanitize_floor_plan(
-        image_bytes, remove_text=True, return_lookup=True
-    )
+    sanitized_bytes, lookup = sanitizer.sanitize_floor_plan(image_bytes, remove_text=True, return_lookup=True)
 
     print(f"  ✓ Original size: {len(image_bytes):,} bytes")
     print(f"  ✓ Sanitized size: {len(sanitized_bytes):,} bytes")
@@ -43,7 +41,7 @@ def test_floor_plan(floor_code, floor_path):
         for region_id, data in list(lookup.items())[:5]:
             print(f"    - {data['text']:20} @ ({data['coordinates']['x']}, {data['coordinates']['y']})")
         if len(lookup) > 5:
-            print(f"    ... and {len(lookup)-5} more")
+            print(f"    ... and {len(lookup) - 5} more")
 
     # Step 2: Simulate Claude extraction (demo config)
     print("\n[2/4] Simulating Claude vision extraction...")

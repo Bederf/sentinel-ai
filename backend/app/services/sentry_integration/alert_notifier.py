@@ -57,27 +57,23 @@ class AlertNotifier:
         Phase 58-04 H-5: Strips characters that could be interpreted by a
         shell even though we already pass args as a list (defence in depth).
         """
-        return re.sub(r'[;&|`$(){}[\]<>!#\\]', '', text)
+        return re.sub(r"[;&|`$(){}[\]<>!#\\]", "", text)
 
     def format_alert_message(self, alert: Dict[str, Any]) -> str:
         """Format alert for Telegram with configurable command buttons."""
-        severity_emoji = {
-            "critical": "🚨",
-            "warning": "⚠️",
-            "info": "ℹ️"
-        }
+        severity_emoji = {"critical": "🚨", "warning": "⚠️", "info": "ℹ️"}
 
         emoji = severity_emoji.get(alert.get("severity", "info"), "📢")
         severity = alert.get("severity", "info").upper()
 
         # Format equipment type nicely (e.g., "fcu" → "FCU", "daylight_sensor" → "Daylight Sensor")
-        eq_type = alert.get('equipment_type', 'equipment')
-        eq_type_display = eq_type.upper() if len(eq_type) <= 4 else eq_type.replace('_', ' ').title()
+        eq_type = alert.get("equipment_type", "equipment")
+        eq_type_display = eq_type.upper() if len(eq_type) <= 4 else eq_type.replace("_", " ").title()
 
-        equipment_code = alert.get('equipment_code', '')
+        equipment_code = alert.get("equipment_code", "")
         # Replace dashes with underscores for Telegram command compatibility
         # Telegram commands end at hyphens, so FCU-L12-03 becomes FCU only
-        command_code = equipment_code.replace('-', '_')
+        command_code = equipment_code.replace("-", "_")
 
         # Build dynamic command section from settings
         settings = _load_notification_settings()
@@ -108,16 +104,16 @@ class AlertNotifier:
         if enabled_commands:
             commands_section = "\n━━━━━━━━━━━━━━━━━━\n" + "\n".join(enabled_commands)
 
-        message = f"""{emoji} {severity} ALERT - {alert.get('building_name', 'Building')}
+        message = f"""{emoji} {severity} ALERT - {alert.get("building_name", "Building")}
 
-🏢 Zone: {alert.get('zone_name', 'Unknown')}
-🔧 Equipment: {alert.get('equipment_name', 'Unknown')}
+🏢 Zone: {alert.get("zone_name", "Unknown")}
+🔧 Equipment: {alert.get("equipment_name", "Unknown")}
 📋 Type: {eq_type_display}
 🆔 Code: {equipment_code}
 
-📝 {alert.get('message', '')}
+📝 {alert.get("message", "")}
 
-⏰ Time: {datetime.now().strftime('%H:%M:%S')}{commands_section}"""
+⏰ Time: {datetime.now().strftime("%H:%M:%S")}{commands_section}"""
 
         return message
 
@@ -133,11 +129,11 @@ class AlertNotifier:
         - Cooldown period has passed
         - Severity escalated (e.g., warning → critical)
         """
-        equipment_code = alert.get('equipment_code', alert.get('equipment_id', 'unknown'))
-        severity = alert.get('severity', 'info')
+        equipment_code = alert.get("equipment_code", alert.get("equipment_id", "unknown"))
+        severity = alert.get("severity", "info")
 
         # Severity ranking for escalation detection
-        severity_rank = {'info': 1, 'warning': 2, 'critical': 3}
+        severity_rank = {"info": 1, "warning": 2, "critical": 3}
         current_rank = severity_rank.get(severity, 0)
 
         # Check if this is an escalation from a previous alert
@@ -145,7 +141,7 @@ class AlertNotifier:
         previous_max_rank = 0
         for key in self._last_alerts.keys():
             if key.startswith(equipment_key_prefix):
-                prev_severity = key.split(':')[1]
+                prev_severity = key.split(":")[1]
                 prev_rank = severity_rank.get(prev_severity, 0)
                 previous_max_rank = max(previous_max_rank, prev_rank)
 
@@ -175,6 +171,7 @@ class AlertNotifier:
         """Check if the notifications module is active for the site."""
         try:
             from app.services.module_registry_service import ModuleRegistryService
+
             registry = ModuleRegistryService()
             # Check all configured sites for an active notifications module
             for site_id in registry._site_configs:
@@ -208,10 +205,15 @@ class AlertNotifier:
         try:
             result = subprocess.run(
                 [
-                    "sentrybot", "message", "send",
-                    "--channel", "telegram",
-                    "--target", sanitized_target,
-                    "--message", sanitized_message,
+                    "sentrybot",
+                    "message",
+                    "send",
+                    "--channel",
+                    "telegram",
+                    "--target",
+                    sanitized_target,
+                    "--message",
+                    sanitized_message,
                 ],
                 capture_output=True,
                 text=True,

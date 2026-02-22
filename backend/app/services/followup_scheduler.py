@@ -28,8 +28,10 @@ logger = logging.getLogger(__name__)
 # Models
 # ============================================================================
 
+
 class FollowupTask(BaseModel):
     """A scheduled follow-up task for post-repair monitoring."""
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
     equipment_id: str
     work_order_id: str
@@ -43,6 +45,7 @@ class FollowupTask(BaseModel):
 
 class CostBenefitAnalysis(BaseModel):
     """Cost-benefit analysis for a repair action."""
+
     work_order_id: str
     equipment_id: str
     repair_cost: float
@@ -56,6 +59,7 @@ class CostBenefitAnalysis(BaseModel):
 
 class EscalationRecord(BaseModel):
     """Escalation record for recurring repair failures."""
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
     equipment_id: str
     escalation_level: int  # 1-3
@@ -89,6 +93,7 @@ DEFAULT_FAILURE_COST = 20_000.0  # Fallback for unknown types
 # Service
 # ============================================================================
 
+
 class FollowupSchedulerService:
     """
     Manages follow-up scheduling, cost-benefit analysis, and escalation
@@ -113,11 +118,7 @@ class FollowupSchedulerService:
         logger.info("FollowupSchedulerService initialized")
 
     def schedule_followup(
-        self,
-        equipment_id: str,
-        work_order_id: str,
-        effectiveness_score: float,
-        repair_successful: bool
+        self, equipment_id: str, work_order_id: str, effectiveness_score: float, repair_successful: bool
     ) -> FollowupTask:
         """
         Schedule appropriate follow-up based on repair outcome.
@@ -141,7 +142,7 @@ class FollowupSchedulerService:
                 followup_type="re_inspection",
                 scheduled_date=datetime.now() + timedelta(days=30),
                 reason=f"Routine post-repair check (score: {effectiveness_score:.1f}%)",
-                priority="low"
+                priority="low",
             )
         elif repair_successful and effectiveness_score < 80:
             # Marginal repair - closer monitoring
@@ -151,14 +152,11 @@ class FollowupSchedulerService:
                 followup_type="re_inspection",
                 scheduled_date=datetime.now() + timedelta(days=7),
                 reason=f"Marginal repair effectiveness (score: {effectiveness_score:.1f}%), close monitoring needed",
-                priority="medium"
+                priority="medium",
             )
         elif not repair_successful and failed_count >= 1:
             # Repeated failure - escalate
-            escalation = self._create_escalation(
-                equipment_id=equipment_id,
-                failed_count=failed_count + 1
-            )
+            escalation = self._create_escalation(equipment_id=equipment_id, failed_count=failed_count + 1)
             self._escalations[equipment_id] = escalation
 
             task = FollowupTask(
@@ -167,12 +165,11 @@ class FollowupSchedulerService:
                 followup_type="escalation",
                 scheduled_date=datetime.now() + timedelta(days=1),
                 reason=f"Escalation level {escalation.escalation_level}: {escalation.recommended_action} "
-                       f"({failed_count + 1} failed repairs)",
-                priority="critical"
+                f"({failed_count + 1} failed repairs)",
+                priority="critical",
             )
             logger.warning(
-                f"ESCALATION: {equipment_id} - Level {escalation.escalation_level} "
-                f"({failed_count + 1} failed repairs)"
+                f"ESCALATION: {equipment_id} - Level {escalation.escalation_level} ({failed_count + 1} failed repairs)"
             )
         else:
             # First failure - schedule re-repair
@@ -182,7 +179,7 @@ class FollowupSchedulerService:
                 followup_type="re_repair",
                 scheduled_date=datetime.now() + timedelta(days=3),
                 reason=f"Repair failed (score: {effectiveness_score:.1f}%), re-repair needed",
-                priority="high"
+                priority="high",
             )
 
         self._scheduled_followups.append(task)
@@ -193,11 +190,7 @@ class FollowupSchedulerService:
         return task
 
     def calculate_cost_benefit(
-        self,
-        work_order_id: str,
-        equipment_id: str,
-        repair_cost: float,
-        effectiveness_score: float
+        self, work_order_id: str, equipment_id: str, repair_cost: float, effectiveness_score: float
     ) -> CostBenefitAnalysis:
         """
         Calculate cost-benefit analysis for a repair.
@@ -236,7 +229,7 @@ class FollowupSchedulerService:
             cost_avoidance=round(cost_avoidance, 2),
             roi_percent=round(roi_percent, 2),
             effectiveness_score=effectiveness_score,
-            cost_effective=cost_effective
+            cost_effective=cost_effective,
         )
 
         self._cost_analyses[work_order_id] = analysis
@@ -269,9 +262,7 @@ class FollowupSchedulerService:
         return self._create_escalation(equipment_id, failed_count)
 
     def get_pending_followups(
-        self,
-        equipment_id: Optional[str] = None,
-        status: Optional[str] = None
+        self, equipment_id: Optional[str] = None, status: Optional[str] = None
     ) -> List[FollowupTask]:
         """
         Get follow-up tasks, optionally filtered.
@@ -293,10 +284,7 @@ class FollowupSchedulerService:
 
         return sorted(results, key=lambda f: f.scheduled_date)
 
-    def get_cost_analyses(
-        self,
-        equipment_id: Optional[str] = None
-    ) -> List[CostBenefitAnalysis]:
+    def get_cost_analyses(self, equipment_id: Optional[str] = None) -> List[CostBenefitAnalysis]:
         """
         Get cost-benefit analyses, optionally filtered by equipment.
 
@@ -320,16 +308,12 @@ class FollowupSchedulerService:
     def _count_failed_repairs(self, equipment_id: str) -> int:
         """Count failed repair follow-ups for equipment."""
         return sum(
-            1 for f in self._scheduled_followups
-            if f.equipment_id == equipment_id
-            and f.followup_type in ("re_repair", "escalation")
+            1
+            for f in self._scheduled_followups
+            if f.equipment_id == equipment_id and f.followup_type in ("re_repair", "escalation")
         )
 
-    def _create_escalation(
-        self,
-        equipment_id: str,
-        failed_count: int
-    ) -> EscalationRecord:
+    def _create_escalation(self, equipment_id: str, failed_count: int) -> EscalationRecord:
         """Create escalation record based on failure count."""
         total_cost = self._calculate_total_repair_cost(equipment_id)
 
@@ -352,15 +336,12 @@ class FollowupSchedulerService:
             reason=reason,
             failed_repair_count=failed_count,
             total_repair_cost=total_cost,
-            recommended_action=action
+            recommended_action=action,
         )
 
     def _calculate_total_repair_cost(self, equipment_id: str) -> float:
         """Sum repair costs for equipment from cost analyses."""
-        return sum(
-            a.repair_cost for a in self._cost_analyses.values()
-            if a.equipment_id == equipment_id
-        )
+        return sum(a.repair_cost for a in self._cost_analyses.values() if a.equipment_id == equipment_id)
 
     def _infer_equipment_type(self, equipment_id: str) -> str:
         """

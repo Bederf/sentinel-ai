@@ -314,20 +314,40 @@ class PointListExporter:
     def _get_gateway_number(self, floor: str) -> int:
         """Get MCU2 gateway number for floor."""
         floor_gateway_map = {
-            "B2": 1, "B1": 1, "G": 2, "L0": 2,
-            "L1": 3, "L2": 4, "L3": 5, "L4": 6,
-            "L5": 7, "L6": 8, "L7": 9, "L8": 10,
-            "L9": 11, "R": 12,
+            "B2": 1,
+            "B1": 1,
+            "G": 2,
+            "L0": 2,
+            "L1": 3,
+            "L2": 4,
+            "L3": 5,
+            "L4": 6,
+            "L5": 7,
+            "L6": 8,
+            "L7": 9,
+            "L8": 10,
+            "L9": 11,
+            "R": 12,
         }
         return floor_gateway_map.get(floor, 1)
 
     def _floor_to_number(self, floor: str) -> int:
         """Convert floor code to numeric level."""
         floor_map = {
-            "B2": -2, "B1": -1, "G": 0, "L0": 0,
-            "L1": 1, "L2": 2, "L3": 3, "L4": 4,
-            "L5": 5, "L6": 6, "L7": 7, "L8": 8,
-            "L9": 9, "R": 99,
+            "B2": -2,
+            "B1": -1,
+            "G": 0,
+            "L0": 0,
+            "L1": 1,
+            "L2": 2,
+            "L3": 3,
+            "L4": 4,
+            "L5": 5,
+            "L6": 6,
+            "L7": 7,
+            "L8": 8,
+            "L9": 9,
+            "R": 99,
         }
         return floor_map.get(floor, 0)
 
@@ -402,8 +422,15 @@ class PointListExporter:
 
         # Determine fieldnames from first point + standard fields
         standard_fields = [
-            "name", "object_type", "instance", "units", "present_value",
-            "description", "min_value", "max_value", "writable"
+            "name",
+            "object_type",
+            "instance",
+            "units",
+            "present_value",
+            "description",
+            "min_value",
+            "max_value",
+            "writable",
         ]
 
         # Get all unique fields across points

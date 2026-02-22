@@ -55,40 +55,42 @@ class ContractManagementService:
             from app.database.repositories.organization_repository import (
                 get_organization_repository,
             )
+
             self._org_repo = get_organization_repository()
 
         if self._contract_repo is None:
             from app.database.repositories.contract_repository import (
                 get_contract_repository,
             )
+
             self._contract_repo = get_contract_repository()
 
         if self._sla_repo is None:
             from app.database.repositories.sla_terms_repository import (
                 get_sla_terms_repository,
             )
+
             self._sla_repo = get_sla_terms_repository()
 
         if self._budget_repo is None:
             from app.database.repositories.budget_repository import (
                 get_budget_repository,
             )
+
             self._budget_repo = get_budget_repository()
 
         if self._assessment_repo is None:
             from app.database.repositories.condition_assessment_repository import (
                 get_condition_assessment_repository,
             )
+
             self._assessment_repo = get_condition_assessment_repository()
 
     # ========================================================================
     # Organization Methods
     # ========================================================================
 
-    def create_organization(
-        self,
-        data: OrganizationCreate
-    ) -> Optional[Dict[str, Any]]:
+    def create_organization(self, data: OrganizationCreate) -> Optional[Dict[str, Any]]:
         """
         Create a new organization after validating unique code.
 
@@ -114,10 +116,7 @@ class ContractManagementService:
             logger.error(f"Error creating organization: {e}")
             return None
 
-    def get_organizations(
-        self,
-        tier: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    def get_organizations(self, tier: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         List organizations with optional tier filter.
 
@@ -139,10 +138,7 @@ class ContractManagementService:
     # Contract Lifecycle Methods
     # ========================================================================
 
-    def create_contract(
-        self,
-        data: ContractCreate
-    ) -> Optional[Dict[str, Any]]:
+    def create_contract(self, data: ContractCreate) -> Optional[Dict[str, Any]]:
         """
         Create a new contract with status=draft.
 
@@ -160,9 +156,7 @@ class ContractManagementService:
             # Validate organization exists
             org = self._org_repo.get_by_id(data.organization_id)
             if not org:
-                logger.warning(
-                    f"Organization {data.organization_id} not found"
-                )
+                logger.warning(f"Organization {data.organization_id} not found")
                 return None
 
             payload = data.model_dump(exclude_none=True)
@@ -182,11 +176,7 @@ class ContractManagementService:
             logger.error(f"Error creating contract: {e}")
             return None
 
-    def approve_contract(
-        self,
-        contract_id: str,
-        approved_by: str
-    ) -> Optional[Dict[str, Any]]:
+    def approve_contract(self, contract_id: str, approved_by: str) -> Optional[Dict[str, Any]]:
         """
         Transition contract from draft/pending_approval to active.
 
@@ -207,26 +197,23 @@ class ContractManagementService:
 
             current_status = contract.get("status")
             if current_status not in ("draft", "pending_approval"):
-                logger.warning(
-                    f"Cannot approve contract in status '{current_status}'"
-                )
+                logger.warning(f"Cannot approve contract in status '{current_status}'")
                 return None
 
-            return self._contract_repo.update(contract_id, {
-                "status": ContractStatus.ACTIVE.value,
-                "approved_by": approved_by,
-                "approved_at": datetime.utcnow().isoformat(),
-            })
+            return self._contract_repo.update(
+                contract_id,
+                {
+                    "status": ContractStatus.ACTIVE.value,
+                    "approved_by": approved_by,
+                    "approved_at": datetime.utcnow().isoformat(),
+                },
+            )
 
         except Exception as e:
             logger.error(f"Error approving contract {contract_id}: {e}")
             return None
 
-    def suspend_contract(
-        self,
-        contract_id: str,
-        reason: Optional[str] = None
-    ) -> Optional[Dict[str, Any]]:
+    def suspend_contract(self, contract_id: str, reason: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Transition contract from active to suspended.
 
@@ -245,9 +232,7 @@ class ContractManagementService:
                 return None
 
             if contract.get("status") != "active":
-                logger.warning(
-                    f"Cannot suspend contract in status '{contract.get('status')}'"
-                )
+                logger.warning(f"Cannot suspend contract in status '{contract.get('status')}'")
                 return None
 
             update_data: Dict[str, Any] = {
@@ -255,9 +240,7 @@ class ContractManagementService:
             }
             if reason:
                 existing_notes = contract.get("notes") or ""
-                suspension_note = (
-                    f"\n[SUSPENDED {datetime.utcnow().isoformat()}] {reason}"
-                )
+                suspension_note = f"\n[SUSPENDED {datetime.utcnow().isoformat()}] {reason}"
                 update_data["notes"] = existing_notes + suspension_note
 
             return self._contract_repo.update(contract_id, update_data)
@@ -266,10 +249,7 @@ class ContractManagementService:
             logger.error(f"Error suspending contract {contract_id}: {e}")
             return None
 
-    def expire_contract(
-        self,
-        contract_id: str
-    ) -> Optional[Dict[str, Any]]:
+    def expire_contract(self, contract_id: str) -> Optional[Dict[str, Any]]:
         """
         Transition contract from active to expired.
 
@@ -287,23 +267,21 @@ class ContractManagementService:
                 return None
 
             if contract.get("status") != "active":
-                logger.warning(
-                    f"Cannot expire contract in status '{contract.get('status')}'"
-                )
+                logger.warning(f"Cannot expire contract in status '{contract.get('status')}'")
                 return None
 
-            return self._contract_repo.update(contract_id, {
-                "status": ContractStatus.EXPIRED.value,
-            })
+            return self._contract_repo.update(
+                contract_id,
+                {
+                    "status": ContractStatus.EXPIRED.value,
+                },
+            )
 
         except Exception as e:
             logger.error(f"Error expiring contract {contract_id}: {e}")
             return None
 
-    def get_contract_summary(
-        self,
-        contract_id: str
-    ) -> Optional[Dict[str, Any]]:
+    def get_contract_summary(self, contract_id: str) -> Optional[Dict[str, Any]]:
         """
         Get comprehensive contract summary including org, SLAs, and budget.
 
@@ -325,9 +303,7 @@ class ContractManagementService:
 
             # Get budget summary for current year
             current_year = datetime.utcnow().year
-            budget_summary = self._budget_repo.get_spending_summary(
-                contract_id, current_year
-            )
+            budget_summary = self._budget_repo.get_spending_summary(contract_id, current_year)
 
             # Get equipment count
             equipment = self.get_contract_equipment(contract_id)
@@ -344,10 +320,7 @@ class ContractManagementService:
             return None
 
     def get_contracts(
-        self,
-        building_id: Optional[str] = None,
-        organization_id: Optional[str] = None,
-        status: Optional[str] = None
+        self, building_id: Optional[str] = None, organization_id: Optional[str] = None, status: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """List contracts with optional filters."""
         self._ensure_repos()
@@ -366,11 +339,7 @@ class ContractManagementService:
     # SLA Methods
     # ========================================================================
 
-    def set_sla_terms(
-        self,
-        contract_id: str,
-        terms: List[SLATermCreate]
-    ) -> List[Dict[str, Any]]:
+    def set_sla_terms(self, contract_id: str, terms: List[SLATermCreate]) -> List[Dict[str, Any]]:
         """
         Replace all SLA terms for a contract.
 
@@ -414,10 +383,7 @@ class ContractManagementService:
     # ========================================================================
 
     def assign_equipment_to_contract(
-        self,
-        contract_id: str,
-        equipment_id: str,
-        data: AssetContractCreate
+        self, contract_id: str, equipment_id: str, data: AssetContractCreate
     ) -> Optional[Dict[str, Any]]:
         """
         Link equipment to a contract via the asset_contracts table.
@@ -446,23 +412,15 @@ class ContractManagementService:
             result = client.table("asset_contracts").insert(payload).execute()
 
             if result.data and len(result.data) > 0:
-                logger.info(
-                    f"Assigned equipment {equipment_id} to contract {contract_id}"
-                )
+                logger.info(f"Assigned equipment {equipment_id} to contract {contract_id}")
                 return result.data[0]
             return None
 
         except Exception as e:
-            logger.error(
-                f"Error assigning equipment {equipment_id} to "
-                f"contract {contract_id}: {e}"
-            )
+            logger.error(f"Error assigning equipment {equipment_id} to contract {contract_id}: {e}")
             return None
 
-    def get_contract_equipment(
-        self,
-        contract_id: str
-    ) -> List[Dict[str, Any]]:
+    def get_contract_equipment(self, contract_id: str) -> List[Dict[str, Any]]:
         """
         List all equipment assigned to a contract.
 
@@ -481,27 +439,24 @@ class ContractManagementService:
             if not client:
                 return []
 
-            result = client.table("asset_contracts").select(
-                "*, equipment(code, name, type)"
-            ).eq("contract_id", contract_id).execute()
+            result = (
+                client.table("asset_contracts")
+                .select("*, equipment(code, name, type)")
+                .eq("contract_id", contract_id)
+                .execute()
+            )
 
             return result.data or []
 
         except Exception as e:
-            logger.error(
-                f"Error getting equipment for contract {contract_id}: {e}"
-            )
+            logger.error(f"Error getting equipment for contract {contract_id}: {e}")
             return []
 
     # ========================================================================
     # Budget Methods
     # ========================================================================
 
-    def set_budget(
-        self,
-        contract_id: str,
-        data: BudgetCreate
-    ) -> Optional[Dict[str, Any]]:
+    def set_budget(self, contract_id: str, data: BudgetCreate) -> Optional[Dict[str, Any]]:
         """
         Create a budget entry for a contract period.
 
@@ -523,11 +478,7 @@ class ContractManagementService:
             logger.error(f"Error setting budget for {contract_id}: {e}")
             return None
 
-    def get_budget_variance(
-        self,
-        contract_id: str,
-        year: int
-    ) -> Optional[Dict[str, Any]]:
+    def get_budget_variance(self, contract_id: str, year: int) -> Optional[Dict[str, Any]]:
         """
         Get budget vs actual variance for a contract year.
 
@@ -545,10 +496,7 @@ class ContractManagementService:
     # Condition Assessment Methods
     # ========================================================================
 
-    def record_assessment(
-        self,
-        data: ConditionAssessmentCreate
-    ) -> Optional[Dict[str, Any]]:
+    def record_assessment(self, data: ConditionAssessmentCreate) -> Optional[Dict[str, Any]]:
         """
         Record a condition assessment for equipment or building.
 
@@ -573,10 +521,7 @@ class ContractManagementService:
             logger.error(f"Error recording assessment: {e}")
             return None
 
-    def get_equipment_condition(
-        self,
-        equipment_id: str
-    ) -> Optional[Dict[str, Any]]:
+    def get_equipment_condition(self, equipment_id: str) -> Optional[Dict[str, Any]]:
         """
         Get the latest condition assessment for equipment.
 

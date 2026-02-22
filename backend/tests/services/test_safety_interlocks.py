@@ -21,21 +21,21 @@ class TestSafetyEngineExists:
         engine = SafetyEngine()
 
         # Initialization
-        assert hasattr(engine, 'initialize')
-        assert hasattr(engine, 'load_rules_from_repository')
-        assert hasattr(engine, 'load_rules_from_file')
-        assert hasattr(engine, 'save_rules_to_file')
+        assert hasattr(engine, "initialize")
+        assert hasattr(engine, "load_rules_from_repository")
+        assert hasattr(engine, "load_rules_from_file")
+        assert hasattr(engine, "save_rules_to_file")
 
         # Rule management
-        assert hasattr(engine, 'add_rule')
-        assert hasattr(engine, 'remove_rule')
-        assert hasattr(engine, 'get_rule')
-        assert hasattr(engine, 'list_rules')
-        assert hasattr(engine, 'get_rules_for_device')
+        assert hasattr(engine, "add_rule")
+        assert hasattr(engine, "remove_rule")
+        assert hasattr(engine, "get_rule")
+        assert hasattr(engine, "list_rules")
+        assert hasattr(engine, "get_rules_for_device")
 
         # Validation
-        assert hasattr(engine, 'validate_control')
-        assert hasattr(engine, 'get_device_safety_status')
+        assert hasattr(engine, "validate_control")
+        assert hasattr(engine, "get_device_safety_status")
 
 
 @pytest.mark.unit
@@ -88,9 +88,7 @@ class TestSafetyValidation:
         device_data = DeviceFactory.create_chiller()
         device = create_device_from_dict(device_data)
 
-        result = await safety_engine.validate_control(
-            device, "setpoint", 22.0
-        )
+        result = await safety_engine.validate_control(device, "setpoint", 22.0)
 
         assert isinstance(result, dict)
         assert "allowed" in result
@@ -102,9 +100,7 @@ class TestSafetyValidation:
         device = create_device_from_dict(device_data)
 
         # 7.0 is within chiller safe range (5-15°C)
-        result = await safety_engine.validate_control(
-            device, "setpoint", 7.0
-        )
+        result = await safety_engine.validate_control(device, "setpoint", 7.0)
 
         # Should be allowed (no rules or passes rules)
         assert result["allowed"] is True
@@ -115,9 +111,7 @@ class TestSafetyValidation:
         device_data = DeviceFactory.create()
         device = create_device_from_dict(device_data)
 
-        result = await safety_engine.validate_control(
-            device, "some_unknown_point", 25.0
-        )
+        result = await safety_engine.validate_control(device, "some_unknown_point", 25.0)
 
         # Should allow if no rules match
         assert result["allowed"] is True
@@ -163,11 +157,7 @@ class TestRuleManagement:
         engine.rules = {}
         await engine.initialize([])
 
-        rule_data = SafetyRuleFactory.create_temperature_range(
-            rule_id="test-add-rule",
-            min_temp=16.0,
-            max_temp=28.0
-        )
+        rule_data = SafetyRuleFactory.create_temperature_range(rule_id="test-add-rule", min_temp=16.0, max_temp=28.0)
 
         rule = await engine.add_rule(rule_data)
 
@@ -183,9 +173,7 @@ class TestRuleManagement:
         await engine.initialize([])
 
         # Add then remove
-        rule_data = SafetyRuleFactory.create_temperature_range(
-            rule_id="test-remove-rule"
-        )
+        rule_data = SafetyRuleFactory.create_temperature_range(rule_id="test-remove-rule")
         await engine.add_rule(rule_data)
         assert "test-remove-rule" in engine.rules
 
@@ -202,9 +190,7 @@ class TestRuleManagement:
         engine.rules = {}
         await engine.initialize([])
 
-        rule_data = SafetyRuleFactory.create_temperature_range(
-            rule_id="test-get-rule"
-        )
+        rule_data = SafetyRuleFactory.create_temperature_range(rule_id="test-get-rule")
         await engine.add_rule(rule_data)
 
         rule = await engine.get_rule("test-get-rule")

@@ -13,6 +13,9 @@ Usage:
 """
 
 from typing import Optional, Dict, List, Any
+import asyncio
+import hashlib
+import inspect
 import logging
 import json
 import re
@@ -25,6 +28,21 @@ from app.services.device_abstraction import device_manager
 from app.services.building_loader import get_building_loader
 
 logger = logging.getLogger(__name__)
+
+
+def _live_mode_guard(tool_name: str) -> Optional[Dict[str, Any]]:
+    """Return LIVE_DATA_REQUIRED error if in live mode, else None."""
+    from app.config.settings import settings
+
+    if settings.is_live_mode:
+        return {
+            "code": "LIVE_DATA_REQUIRED",
+            "tool": tool_name,
+            "mode": settings.resolved_ingestion_mode.value,
+            "message": f"JSON fallback blocked in {settings.resolved_ingestion_mode.value} mode",
+        }
+    return None
+
 
 # Data paths
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -111,6 +129,11 @@ async def get_buildings_tool(status_filter: str = "all", region: Optional[str] =
         - total: Total number of buildings
         - filtered: Number of buildings after filtering
     """
+    # Block JSON-only path in live modes
+    guard = _live_mode_guard("get_buildings")
+    if guard:
+        return guard
+
     sites = _load_sites()
     devices = _load_devices()
 
@@ -405,6 +428,11 @@ async def get_devices_tool(site_id: Optional[str] = None, device_type: Optional[
     except Exception as e:
         logger.warning(f"Device manager not available, falling back to JSON: {e}")
 
+    # Block JSON fallback in live modes
+    guard = _live_mode_guard("get_devices")
+    if guard:
+        return guard
+
     # Fallback to JSON file
     devices = _load_devices()
     device_list = []
@@ -469,6 +497,11 @@ async def read_device_point_tool(device_id: str, point_name: str) -> Dict[str, A
     except Exception as e:
         logger.warning(f"Device manager read failed, falling back to JSON: {e}")
 
+    # Block JSON fallback in live modes
+    guard = _live_mode_guard("read_device_point")
+    if guard:
+        return guard
+
     # Fallback to JSON file
     devices = _load_devices()
 
@@ -523,6 +556,21 @@ async def write_device_point_tool(
         - device_id: Device ID
         - point_name: Point name
     """
+    # Shadow-write interception: in shadow_live mode, log but don't actually write
+    from app.config.settings import settings
+
+    if settings.resolved_ingestion_mode.value == "shadow_live":
+        return {
+            "shadow_mode": True,
+            "success": False,
+            "intended_value": value,
+            "device_id": device_id,
+            "point_name": point_name,
+            "mode": "shadow_live",
+            "source": "shadow_write",
+            "message": "Write intercepted in shadow_live mode (no-op)",
+        }
+
     # Read current value first
     current_result = await read_device_point_tool(device_id, point_name)
     previous_value = current_result.get("value") if not current_result.get("error") else None
@@ -2948,6 +2996,128 @@ async def import_controller_list_tool(
 
 
 # ============================================================================
+# DALI Control Tool (Override Tridonic when SENTINEL needs to)
+# ============================================================================
+
+
+async def control_dali_device_tool(
+    equipment_code: str,
+    action: str,
+    value: Optional[Any] = None,
+    reason: str = "",
+    priority: int = 8,
+) -> dict:
+    """
+    Send a control command to a DALI/LUM device via SIMBIOT.
+
+    Tridonic handles routine lighting (daylight harvesting, occupancy dimming)
+    natively. This tool is for SENTINEL overrides when the AI or operator needs
+    to command lighting beyond what Tridonic does autonomously:
+
+    - Emergency shutoff (lights off for safety/evacuation)
+    - Demand response (forced dim during peak tariff)
+    - Maintenance lockout (hold lights off during servicing)
+    - Scene override (presentation mode for upcoming meeting)
+    - After-hours security (force specific zones on/off)
+
+    All commands go through SafetyEngine validation. Emergency zones cannot
+    be dimmed below 70% unless action is "emergency_off".
+
+    Args:
+        equipment_code: DALI/LUM equipment code (e.g., "S002-DALI-L1-01" or "S002-LUM-203-08")
+        action: One of: "set_brightness", "set_scene", "off", "on", "emergency_off"
+        value: For set_brightness: 0-100 (%). For set_scene: scene name string.
+        reason: Required explanation for audit trail (why override Tridonic?)
+        priority: BACnet priority 1-16 (default 8, use 1 for emergency)
+    """
+    from app.services.device_control_service import get_device_control_service
+
+    if not reason:
+        return {
+            "success": False,
+            "error": "reason is required — explain why SENTINEL is overriding Tridonic native control",
+        }
+
+    device_control = get_device_control_service()
+
+    # Validate equipment exists and is DALI/LUM type
+    eq_type_str = None
+    try:
+        eq_type = device_control.get_equipment_type(equipment_code)
+        eq_type_str = eq_type.value if eq_type else None
+    except Exception:
+        pass
+
+    if eq_type_str not in ("DALI", "LUM", "DALI_CONTROLLER", "LUMINAIRE"):
+        return {
+            "success": False,
+            "error": f"Equipment {equipment_code} is not a DALI/LUM device (got: {eq_type_str})",
+        }
+
+    # Map action to control point + value
+    if action == "off":
+        point_name = "brightness_level"
+        control_value = 0
+    elif action == "on":
+        point_name = "brightness_level"
+        control_value = 100
+    elif action == "emergency_off":
+        point_name = "brightness_level"
+        control_value = 0
+        priority = 1  # Highest priority override
+    elif action == "set_brightness":
+        point_name = "brightness_level"
+        if value is None or not isinstance(value, (int, float)) or not (0 <= value <= 100):
+            return {"success": False, "error": "set_brightness requires value 0-100 (%)"}
+        control_value = int(value)
+    elif action == "set_scene":
+        point_name = "scene"
+        valid_scenes = ["off", "working", "conference", "presentation", "relaxed"]
+        if value not in valid_scenes:
+            return {"success": False, "error": f"Invalid scene. Valid: {valid_scenes}"}
+        control_value = value
+    else:
+        return {
+            "success": False,
+            "error": f"Invalid action '{action}'. Valid: set_brightness, set_scene, off, on, emergency_off",
+        }
+
+    # Validate through safety engine
+    validation = device_control.validate_control_value(equipment_code, point_name, control_value)
+    if not validation.get("valid", False):
+        return {
+            "success": False,
+            "error": f"Safety validation failed: {validation.get('errors', [])}",
+            "warnings": validation.get("warning", []),
+        }
+
+    # Execute via device manager (routes through safety engine)
+    try:
+        from app.services.device_manager import device_manager
+
+        success = await device_manager.write_device_value(
+            equipment_code, point_name, control_value, priority, "simbiot"
+        )
+
+        return {
+            "success": success,
+            "equipment_code": equipment_code,
+            "action": action,
+            "point": point_name,
+            "value": control_value,
+            "priority": priority,
+            "reason": reason,
+            "note": "SENTINEL override of Tridonic native control — logged to audit trail",
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Control command failed: {str(e)}",
+            "equipment_code": equipment_code,
+        }
+
+
+# ============================================================================
 # DALI Discovery Tool (Tridonic Gateway Support)
 # ============================================================================
 
@@ -4477,8 +4647,7 @@ MCP_TOOLS = [
     {
         "name": "get_devices",
         "description": (
-            "List BMS devices with protocol and connection status. "
-            "Use this for device discovery and inventory queries."
+            "List BMS devices with protocol and connection status. Use this for device discovery and inventory queries."
         ),
         "input_schema": {
             "type": "object",
@@ -4578,7 +4747,7 @@ MCP_TOOLS = [
                 "query": {
                     "type": "string",
                     "description": (
-                        "Natural language search query " "(e.g., 'chiller alarms', 'temperature issues last week')"
+                        "Natural language search query (e.g., 'chiller alarms', 'temperature issues last week')"
                     ),
                 },
                 "building_id": {"type": "string", "description": "Optional building/site ID filter"},
@@ -4731,15 +4900,13 @@ MCP_TOOLS = [
                 "contract_start": {
                     "type": "string",
                     "description": (
-                        "Optional contract start date YYYY-MM-DD "
-                        "(requires client_name, monthly_fee_zar, contract_end)"
+                        "Optional contract start date YYYY-MM-DD (requires client_name, monthly_fee_zar, contract_end)"
                     ),
                 },
                 "contract_end": {
                     "type": "string",
                     "description": (
-                        "Optional contract end date YYYY-MM-DD "
-                        "(requires client_name, monthly_fee_zar, contract_start)"
+                        "Optional contract end date YYYY-MM-DD (requires client_name, monthly_fee_zar, contract_start)"
                     ),
                 },
             },
@@ -4822,7 +4989,7 @@ MCP_TOOLS = [
                                 "type": "string",
                                 "enum": ["N", "S", "E", "W", "NE", "NW", "SE", "SW"],
                                 "description": (
-                                    "Window orientation for solar analysis " "(Southern Hemisphere: N=most sun)"
+                                    "Window orientation for solar analysis (Southern Hemisphere: N=most sun)"
                                 ),
                             },
                             "near_diffuser": {
@@ -4864,7 +5031,7 @@ MCP_TOOLS = [
         "name": "add_building_devices",
         "description": (
             "Add BMS devices (chillers, AHUs, FCUs, VAVs, etc.) to the system. "
-            "Devices are added to mock_devices.json."
+            "Devices are added to the building device store."
         ),
         "input_schema": {
             "type": "object",
@@ -5001,13 +5168,56 @@ MCP_TOOLS = [
         },
     },
     {
+        "name": "control_dali_device",
+        "description": (
+            "Send a control command to a DALI/LUM device via SIMBIOT. "
+            "Tridonic handles routine lighting natively (daylight, occupancy). "
+            "Use this for SENTINEL overrides: emergency shutoff, demand response dimming, "
+            "maintenance lockout, scene override, or remote on/off. "
+            "Requires a reason for audit trail. Routes through SafetyEngine."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "equipment_code": {
+                    "type": "string",
+                    "description": "DALI/LUM equipment code (e.g., 'S002-DALI-L1-01' or 'S002-LUM-203-08')",
+                },
+                "action": {
+                    "type": "string",
+                    "enum": ["set_brightness", "set_scene", "off", "on", "emergency_off"],
+                    "description": (
+                        "Control action. 'off'/'on' for simple toggle, "
+                        "'set_brightness' with value 0-100%, "
+                        "'set_scene' with scene name, "
+                        "'emergency_off' for priority-1 safety shutoff"
+                    ),
+                },
+                "value": {
+                    "description": (
+                        "For set_brightness: 0-100 (%). "
+                        "For set_scene: 'off', 'working', 'conference', 'presentation', 'relaxed'"
+                    ),
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Required: why is SENTINEL overriding Tridonic? (logged to audit trail)",
+                },
+                "priority": {
+                    "type": "integer",
+                    "description": "BACnet priority 1-16 (default 8, use 1 for emergency)",
+                    "default": 8,
+                },
+            },
+            "required": ["equipment_code", "action", "reason"],
+        },
+    },
+    {
         "name": "discover_tridonic_gateway",
         "description": (
-            "Discover Tridonic DALI gateway and enumerate all lighting devices. Queries gateway for system "
-            "info and discovers all luminaires, sensors, and controllers across DALI lines. Generates equipment "
-            "codes following v2.0 naming convention. This is a READ-ONLY discovery tool for commissioning "
-            "engineers to review before bulk import. Use during building onboarding when Tridonic DALI-2 "
-            "lighting is present."
+            "Discover Tridonic DALI gateway and enumerate all lighting devices. "
+            "Queries gateway for luminaires, sensors, and controllers across DALI lines. "
+            "Read-only discovery tool for commissioning review before bulk import."
         ),
         "input_schema": {
             "type": "object",
@@ -5060,10 +5270,8 @@ MCP_TOOLS = [
     {
         "name": "configure_asset_metrics",
         "description": (
-            "Configure asset metrics for AI/ML predictive maintenance after building onboarding. Engineers can "
-            "customize thresholds (normal/warning/critical), health score weights, measurement intervals, and "
-            "specify which metrics use mobile phone vs BMS sensors. Saves configuration to building's "
-            "asset_metrics.json file."
+            "Configure asset metrics for AI/ML predictive maintenance. "
+            "Customize thresholds, health weights, and measurement intervals."
         ),
         "input_schema": {
             "type": "object",
@@ -5127,7 +5335,7 @@ MCP_TOOLS = [
                 },
                 "save_to_file": {
                     "type": "boolean",
-                    "description": "Save configuration to building's asset_metrics.json file (default: true)",
+                    "description": "Save configuration to building asset metrics store (default: true)",
                 },
             },
             "required": ["building_id", "metric_config"],
@@ -5297,7 +5505,7 @@ MCP_TOOLS = [
                 "condition_assessment": {
                     "type": "object",
                     "description": (
-                        "Optional condition assessment " "(overall_score, mechanical/electrical/structural scores)"
+                        "Optional condition assessment (overall_score, mechanical/electrical/structural scores)"
                     ),
                 },
             },
@@ -5349,7 +5557,7 @@ MCP_TOOLS = [
                 "municipality": {
                     "type": "string",
                     "description": (
-                        "Municipality name " "(e.g., city_of_johannesburg, city_of_cape_town, ekurhuleni, ethekwini)"
+                        "Municipality name (e.g., city_of_johannesburg, city_of_cape_town, ekurhuleni, ethekwini)"
                     ),
                 },
                 "utility_type": {"type": "string", "enum": ["electricity", "water"], "description": "Utility type"},
@@ -5442,6 +5650,7 @@ class SIMBIOTMCPServer:
             "add_building_devices": add_building_devices_tool,
             "import_point_list": import_point_list_tool,
             "import_controller_list": import_controller_list_tool,
+            "control_dali_device": control_dali_device_tool,
             "discover_tridonic_gateway": discover_tridonic_gateway_tool,
             # AI/ML Predictive Maintenance tools (asset metric configuration)
             "get_asset_metrics_template": get_asset_metrics_template_tool,
@@ -5463,31 +5672,137 @@ class SIMBIOTMCPServer:
 
         # Merge registry tools (code search, fetch, structure)
         self.tool_handlers.update(get_all_handlers())
+
+        # Compute manifest hash for tamper detection (P7)
+        self._manifest_hash = self._compute_manifest_hash()
         logger.info("SIMBIOTMCPServer initialized with %d tools", len(self.tools))
+
+    def _compute_manifest_hash(self) -> str:
+        """Compute SHA-256 hash of tool definitions for tamper detection."""
+        canonical = json.dumps(
+            [{"name": t["name"], "description": t.get("description", "")} for t in self.tools],
+            sort_keys=True,
+        )
+        return hashlib.sha256(canonical.encode()).hexdigest()
+
+    def verify_manifest(self) -> bool:
+        """Verify tool manifest has not been tampered with at runtime."""
+        current_hash = self._compute_manifest_hash()
+        return current_hash == self._manifest_hash
 
     def list_tools(self) -> List[Dict[str, Any]]:
         """List available MCP tools with their schemas."""
         return self.tools
 
     async def call_tool(self, tool_name: str, **kwargs) -> Any:
+        """Call an MCP tool by name with full security pipeline.
+
+        Supports internal kwargs (stripped before handler invocation):
+          _auth_context: AuthContext for the caller
+          _transport: "sse" | "local" — triggers SSE-specific guards
+          _approval_token: pre-approved token for high-risk tools
         """
-        Call an MCP tool by name.
+        from app.mcp.tool_permissions import (
+            MUTATING_TOOLS,
+            PUBLIC_TOOLS,
+            HIGH_RISK_TOOLS,
+            check_mcp_tool_access,
+            extract_site_id_from_args,
+        )
 
-        Args:
-            tool_name: Name of the tool to call
-            **kwargs: Tool arguments
+        # Extract internal kwargs
+        auth_ctx = kwargs.pop("_auth_context", None)
+        transport = kwargs.pop("_transport", None)
+        approval_token = kwargs.pop("_approval_token", None)
 
-        Returns:
-            Tool result
-
-        Raises:
-            ValueError: If tool not found
-        """
         handler = self.tool_handlers.get(tool_name)
         if not handler:
             raise ValueError(f"Unknown tool: {tool_name}. Available: {list(self.tool_handlers.keys())}")
 
-        return await handler(**kwargs)
+        is_sse = transport == "sse"
+
+        # SSE auth gating — all tools require auth over SSE (except PUBLIC)
+        if is_sse and tool_name not in PUBLIC_TOOLS and auth_ctx is None:
+            return {"error": "Authentication required for SSE transport", "code": "UNAUTHORIZED"}
+
+        # Mutating tool access control
+        if tool_name in MUTATING_TOOLS:
+            if auth_ctx is None:
+                return {"error": "Authentication required for mutating tools", "code": "UNAUTHORIZED"}
+            site_id = extract_site_id_from_args(tool_name, kwargs)
+            allowed, reason = check_mcp_tool_access(tool_name, auth_ctx, site_id)
+            if not allowed:
+                return {"error": reason, "code": "FORBIDDEN"}
+
+        # High-risk approval check (SSE only)
+        if is_sse and tool_name in HIGH_RISK_TOOLS:
+            if approval_token is None:
+                return {
+                    "error": "High-risk tool requires approval token",
+                    "code": "APPROVAL_REQUIRED",
+                    "approval_required": True,
+                    "approval_endpoint": "POST /api/mcp/sse/approve",
+                    "tool_name": tool_name,
+                }
+            try:
+                from app.mcp.approval_store import validate_approval_token
+
+                if not validate_approval_token(tool_name, approval_token):
+                    return {"error": "Invalid or expired approval token", "code": "FORBIDDEN"}
+            except ImportError:
+                pass  # approval_store not fully implemented
+
+        # Injection scanning (SSE only)
+        if is_sse:
+            from app.mcp.schema_validator import scan_arguments_for_injection
+
+            is_clean, injection_err = scan_arguments_for_injection(tool_name, kwargs)
+            if not is_clean:
+                try:
+                    from app.mcp.audit import log_mcp_tool_call
+
+                    log_mcp_tool_call(
+                        tool_name=tool_name,
+                        user_id=auth_ctx.user_id if auth_ctx else "unknown",
+                        arguments=kwargs,
+                        result_code="INJECTION_BLOCKED",
+                        duration_ms=0.0,
+                        auth_method=auth_ctx.auth_method if auth_ctx else "unknown",
+                        policy_result="deny",
+                        policy_reason="INJECTION_BLOCKED",
+                    )
+                except Exception:
+                    pass
+                return {"error": injection_err, "code": "INJECTION_BLOCKED"}
+
+        # Rate limiting
+        if auth_ctx is not None:
+            from app.mcp.rate_limiter import check_rate_limit
+
+            identity = auth_ctx.user_id
+            rate_ok, rate_reason, retry_after = check_rate_limit(identity, tool_name)
+            if not rate_ok:
+                return {"error": rate_reason, "code": "RATE_LIMITED", "retry_after": retry_after}
+
+        # Inject user identity if handler accepts it
+        if auth_ctx is not None:
+            sig = inspect.signature(handler)
+            if "user" in sig.parameters:
+                kwargs["user"] = f"mcp:{auth_ctx.email}" if auth_ctx.email else f"mcp:{auth_ctx.user_id}"
+
+        # Execute with timeout
+        from app.mcp.rate_limiter import get_tool_timeout
+
+        timeout_seconds = get_tool_timeout(tool_name)
+
+        try:
+            result = await asyncio.wait_for(handler(**kwargs), timeout=timeout_seconds)
+            return result
+        except asyncio.TimeoutError:
+            return {
+                "error": f"Tool '{tool_name}' timed out after {timeout_seconds}s",
+                "code": "TIMEOUT",
+            }
 
     def get_tool_schema(self, tool_name: str) -> Optional[Dict[str, Any]]:
         """Get JSON schema for a specific tool."""

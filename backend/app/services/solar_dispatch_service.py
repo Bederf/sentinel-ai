@@ -12,10 +12,12 @@ For demo purposes the full 24h cycle is simulated with compressed time
 to show BESS charging at night, discharging at peak, savings accumulating.
 """
 
+import json
 import logging
 import random
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 from app.services.solar_arbitrage_engine import (
@@ -25,6 +27,8 @@ from app.services.solar_arbitrage_engine import (
 from app.services.solar_config_service import get_site_solar_config
 
 logger = logging.getLogger(__name__)
+
+DATA_DIR = Path(__file__).parent.parent / "data"
 
 
 # === Dataclass models ===
@@ -47,9 +51,10 @@ class DispatchEvent:
     building_load_kw: float = 0.0
     grid_import_kw: float = 0.0
     grid_export_kw: float = 0.0
+    aegis_proposal_id: Optional[str] = None  # Join key to parasite_decisions
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "timestamp": self.timestamp,
             "action": self.action,
             "power_kw": round(self.power_kw, 0),
@@ -64,6 +69,9 @@ class DispatchEvent:
             "grid_import_kw": round(self.grid_import_kw, 0),
             "grid_export_kw": round(self.grid_export_kw, 0),
         }
+        if self.aegis_proposal_id:
+            d["aegis_proposal_id"] = self.aegis_proposal_id
+        return d
 
 
 @dataclass
@@ -117,7 +125,7 @@ class SolarDispatchService:
 
     # Simulation parameters
     CYCLE_INTERVAL_MINUTES = 5
-    BESS_CAPACITY_KWH = 500.0  # Huawei LUNA2000-200KWH-2H1
+    BESS_CAPACITY_KWH = 200.0  # Huawei LUNA2000-200KWH-2H1
     BESS_MIN_SOC = 10.0
     BESS_MAX_SOC = 95.0
     BESS_EFFICIENCY = 0.90
@@ -189,7 +197,7 @@ class SolarDispatchService:
                 soc = max(self.BESS_MIN_SOC, soc - soc_delta)
             elif action == "solar_priority" and solar_kw > load_kw:
                 excess = solar_kw - load_kw
-                charge_kw = min(excess, 250)
+                charge_kw = min(excess, 100)
                 energy_kwh = charge_kw * interval_hours * self.BESS_EFFICIENCY
                 soc_delta = (energy_kwh / self.BESS_CAPACITY_KWH) * 100
                 soc = min(self.BESS_MAX_SOC, soc + soc_delta)
@@ -459,7 +467,87 @@ class SolarDispatchService:
             self._dispatch_log[site_id] = []
         self._dispatch_log[site_id].append(event)
 
+        # Persist dispatch event to JSONL (survives restart)
+        self._persist_dispatch_event(site_id, event)
+
+        # Route through AEGIS governance pipeline (non-fatal)
+        try:
+            from app.services.aegis_bridge import run_aegis_cycle
+
+            aegis_result = await run_aegis_cycle(site_id)
+            if aegis_result:
+                proposal_id = aegis_result.get("aegis_proposal_id")
+                if proposal_id:
+                    event.aegis_proposal_id = proposal_id
+                    # Re-persist with join key so JSONL is joinable
+                    self._persist_dispatch_event(site_id, event, overwrite_last=True)
+                logger.info(
+                    "AEGIS proposal created: %s (tier=%s)",
+                    aegis_result.get("id", "?"),
+                    aegis_result.get("routing", {}).get("tier", "?"),
+                )
+        except Exception as e:
+            logger.warning("AEGIS bridge failed (non-fatal): %s", e)
+
         return event
+
+    # === JSONL persistence ===
+
+    def _persist_dispatch_event(self, site_id: str, event: DispatchEvent, overwrite_last: bool = False) -> None:
+        """Append dispatch event to daily JSONL file (survives restart).
+
+        If overwrite_last=True, replaces the last line (used to backfill
+        aegis_proposal_id after AEGIS bridge returns the join key).
+        """
+        try:
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            solar_dir = DATA_DIR / "solar"
+            solar_dir.mkdir(parents=True, exist_ok=True)
+            path = solar_dir / f"dispatch_log_{site_id}_{today}.jsonl"
+
+            if overwrite_last and path.exists():
+                # Read all lines, replace last, rewrite
+                with open(path) as f:
+                    lines = f.readlines()
+                if lines:
+                    lines[-1] = json.dumps(event.to_dict()) + "\n"
+                    with open(path, "w") as f:
+                        f.writelines(lines)
+                    return
+
+            with open(path, "a") as f:
+                f.write(json.dumps(event.to_dict()) + "\n")
+        except Exception as e:
+            logger.warning("Failed to persist dispatch event: %s", e)
+
+    def get_persistent_dispatch_log(self, site_id: str, hours: int = 24) -> List[Dict]:
+        """Read dispatch events from JSONL files for the given time window."""
+        events = []
+        solar_dir = DATA_DIR / "solar"
+        if not solar_dir.exists():
+            return events
+
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        # Check today and yesterday's files
+        for day_offset in range(2):
+            day = (datetime.now(timezone.utc) - timedelta(days=day_offset)).strftime("%Y-%m-%d")
+            path = solar_dir / f"dispatch_log_{site_id}_{day}.jsonl"
+            if not path.exists():
+                continue
+            try:
+                with open(path) as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        record = json.loads(line)
+                        ts = record.get("timestamp", "")
+                        if ts and datetime.fromisoformat(ts) >= cutoff:
+                            events.append(record)
+            except Exception as e:
+                logger.warning("Error reading dispatch JSONL %s: %s", path, e)
+
+        return sorted(events, key=lambda e: e.get("timestamp", ""), reverse=True)
 
     # === Dispatch log ===
 

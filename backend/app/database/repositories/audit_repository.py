@@ -18,7 +18,7 @@ class AuditRepository:
         offset: int = 0,
         user_id: Optional[str] = None,
         action: Optional[str] = None,
-        device_id: Optional[str] = None
+        device_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Get audit log entries with optional filtering.
 
@@ -32,16 +32,20 @@ class AuditRepository:
         Returns:
             List of audit log entries
         """
-        query = self.client.table('audit_log').select("*").order(
-            'timestamp', desc=True
-        ).limit(limit).range(offset, offset + limit - 1)
+        query = (
+            self.client.table("audit_log")
+            .select("*")
+            .order("timestamp", desc=True)
+            .limit(limit)
+            .range(offset, offset + limit - 1)
+        )
 
         if user_id:
-            query = query.eq('user_id', user_id)
+            query = query.eq("user_id", user_id)
         if action:
-            query = query.eq('action', action)
+            query = query.eq("action", action)
         if device_id:
-            query = query.eq('device_id', device_id)
+            query = query.eq("device_id", device_id)
 
         response = query.execute()
         return response.data
@@ -55,9 +59,7 @@ class AuditRepository:
         Returns:
             Audit log entry or None if not found
         """
-        response = self.client.table('audit_log').select("*").eq(
-            'id', entry_id
-        ).execute()
+        response = self.client.table("audit_log").select("*").eq("id", entry_id).execute()
 
         if response.data:
             return response.data[0]
@@ -72,9 +74,13 @@ class AuditRepository:
         Returns:
             List of related audit log entries
         """
-        response = self.client.table('audit_log').select("*").eq(
-            'correlation_id', correlation_id
-        ).order('timestamp', desc=True).execute()
+        response = (
+            self.client.table("audit_log")
+            .select("*")
+            .eq("correlation_id", correlation_id)
+            .order("timestamp", desc=True)
+            .execute()
+        )
 
         return response.data
 
@@ -88,9 +94,14 @@ class AuditRepository:
         Returns:
             List of audit log entries
         """
-        response = self.client.table('audit_log').select("*").eq(
-            'device_id', device_uuid
-        ).order('timestamp', desc=True).limit(limit).execute()
+        response = (
+            self.client.table("audit_log")
+            .select("*")
+            .eq("device_id", device_uuid)
+            .order("timestamp", desc=True)
+            .limit(limit)
+            .execute()
+        )
 
         return response.data
 
@@ -104,10 +115,10 @@ class AuditRepository:
             Created audit log entry
         """
         # Set timestamp if not provided
-        if 'timestamp' not in audit_data:
-            audit_data['timestamp'] = datetime.now(timezone.utc).isoformat()
+        if "timestamp" not in audit_data:
+            audit_data["timestamp"] = datetime.now(timezone.utc).isoformat()
 
-        response = self.client.table('audit_log').insert(audit_data).execute()
+        response = self.client.table("audit_log").insert(audit_data).execute()
         return response.data[0]
 
     def log_device_control(
@@ -117,11 +128,11 @@ class AuditRepository:
         old_value: Any,
         new_value: Any,
         user_name: str,
-        result: str = 'SUCCESS',
+        result: str = "SUCCESS",
         safety_validation: Optional[Dict[str, Any]] = None,
         error_message: Optional[str] = None,
         correlation_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Log a device control action.
 
@@ -141,17 +152,17 @@ class AuditRepository:
             Created audit log entry
         """
         audit_data = {
-            'action': 'DEVICE_CONTROL',
-            'device_id': device_id,
-            'point_name': point_name,
-            'old_value': old_value,
-            'new_value': new_value,
-            'user_name': user_name,
-            'result': result,
-            'safety_validation': safety_validation,
-            'error_message': error_message,
-            'correlation_id': correlation_id,
-            'metadata': metadata or {}
+            "action": "DEVICE_CONTROL",
+            "device_id": device_id,
+            "point_name": point_name,
+            "old_value": old_value,
+            "new_value": new_value,
+            "user_name": user_name,
+            "result": result,
+            "safety_validation": safety_validation,
+            "error_message": error_message,
+            "correlation_id": correlation_id,
+            "metadata": metadata or {},
         }
 
         return self.create(audit_data)
@@ -163,8 +174,8 @@ class AuditRepository:
         safety_rules_passed: List[str],
         safety_rules_failed: List[str],
         user_name: str,
-        result: str = 'SUCCESS',
-        correlation_id: Optional[str] = None
+        result: str = "SUCCESS",
+        correlation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Log a safety validation check.
 
@@ -181,15 +192,15 @@ class AuditRepository:
             Created audit log entry
         """
         audit_data = {
-            'action': 'SAFETY_VALIDATION',
-            'device_id': device_id,
-            'user_name': user_name,
-            'result': result,
-            'safety_rules_checked': safety_rules_checked,
-            'safety_rules_passed': safety_rules_passed,
-            'safety_rules_failed': safety_rules_failed,
-            'correlation_id': correlation_id,
-            'metadata': {}
+            "action": "SAFETY_VALIDATION",
+            "device_id": device_id,
+            "user_name": user_name,
+            "result": result,
+            "safety_rules_checked": safety_rules_checked,
+            "safety_rules_passed": safety_rules_passed,
+            "safety_rules_failed": safety_rules_failed,
+            "correlation_id": correlation_id,
+            "metadata": {},
         }
 
         return self.create(audit_data)
@@ -215,9 +226,14 @@ class AuditRepository:
         Returns:
             List of failed audit log entries
         """
-        response = self.client.table('audit_log').select("*").eq(
-            'result', 'FAILED'
-        ).order('timestamp', desc=True).limit(limit).execute()
+        response = (
+            self.client.table("audit_log")
+            .select("*")
+            .eq("result", "FAILED")
+            .order("timestamp", desc=True)
+            .limit(limit)
+            .execute()
+        )
 
         return response.data
 
@@ -227,7 +243,7 @@ class AuditRepository:
         user_id: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
         ip_address: Optional[str] = None,
-        result: str = 'SUCCESS'
+        result: str = "SUCCESS",
     ) -> Dict[str, Any]:
         """Log a security event (Phase 65-04).
 
@@ -256,11 +272,11 @@ class AuditRepository:
             Created audit log entry
         """
         audit_data = {
-            'action': event_type,
-            'user_id': user_id,
-            'result': result,
-            'details': details or {},
-            'ip_address': ip_address,
+            "action": event_type,
+            "user_id": user_id,
+            "result": result,
+            "details": details or {},
+            "ip_address": ip_address,
         }
 
         return self.create(audit_data)

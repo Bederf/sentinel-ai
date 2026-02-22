@@ -52,9 +52,7 @@ class TestQueryHandlerClassification:
     async def test_prediction_query_classification(self, handler):
         with patch.object(handler.ollama, "is_available", new_callable=AsyncMock, return_value=False):
             with patch("app.services.query_handler.get_rag_service", return_value=None):
-                result = await handler.handle_query(
-                    "Why is S002-CHILLER-B1-001 predicted to fail?"
-                )
+                result = await handler.handle_query("Why is S002-CHILLER-B1-001 predicted to fail?")
         assert result["intent"] == "why_prediction"
         assert "S002-CHILLER-B1-001" in result["equipment_ids"]
 
@@ -62,27 +60,21 @@ class TestQueryHandlerClassification:
     async def test_maintenance_query_classification(self, handler):
         with patch.object(handler.ollama, "is_available", new_callable=AsyncMock, return_value=False):
             with patch("app.services.query_handler.get_rag_service", return_value=None):
-                result = await handler.handle_query(
-                    "When is maintenance due for S002-CHILLER-B1-001?"
-                )
+                result = await handler.handle_query("When is maintenance due for S002-CHILLER-B1-001?")
         assert result["intent"] == "maintenance_due"
 
     @pytest.mark.asyncio
     async def test_status_query_classification(self, handler):
         with patch.object(handler.ollama, "is_available", new_callable=AsyncMock, return_value=False):
             with patch("app.services.query_handler.get_rag_service", return_value=None):
-                result = await handler.handle_query(
-                    "What's the status of S002-CHILLER-B1-001?"
-                )
+                result = await handler.handle_query("What's the status of S002-CHILLER-B1-001?")
         assert result["intent"] == "equipment_status"
 
     @pytest.mark.asyncio
     async def test_anomaly_query_classification(self, handler):
         with patch.object(handler.ollama, "is_available", new_callable=AsyncMock, return_value=False):
             with patch("app.services.query_handler.get_rag_service", return_value=None):
-                result = await handler.handle_query(
-                    "Explain the anomaly on S002-CHILLER-B1-001"
-                )
+                result = await handler.handle_query("Explain the anomaly on S002-CHILLER-B1-001")
         assert result["intent"] == "explain_anomaly"
 
 
@@ -93,9 +85,7 @@ class TestQueryHandlerOfflineResponse:
     async def test_offline_status_response(self, handler):
         with patch.object(handler.ollama, "is_available", new_callable=AsyncMock, return_value=False):
             with patch("app.services.query_handler.get_rag_service", return_value=None):
-                result = await handler.handle_query(
-                    "What's the status of S002-CHILLER-B1-001?"
-                )
+                result = await handler.handle_query("What's the status of S002-CHILLER-B1-001?")
         assert result["llm_available"] is False
         assert result["model_used"] is None
         assert "72%" in result["response"]  # Health score should appear
@@ -104,9 +94,7 @@ class TestQueryHandlerOfflineResponse:
     async def test_offline_maintenance_response(self, handler):
         with patch.object(handler.ollama, "is_available", new_callable=AsyncMock, return_value=False):
             with patch("app.services.query_handler.get_rag_service", return_value=None):
-                result = await handler.handle_query(
-                    "When is maintenance due for S002-CHILLER-B1-001?"
-                )
+                result = await handler.handle_query("When is maintenance due for S002-CHILLER-B1-001?")
         assert result["llm_available"] is False
         assert "45" in result["response"]  # RUL days
 
@@ -124,9 +112,7 @@ class TestQueryHandlerWithOllama:
 
     @pytest.mark.asyncio
     async def test_ollama_generates_response(self, handler):
-        with patch.object(
-            handler.ollama, "is_available", new_callable=AsyncMock, return_value=True
-        ):
+        with patch.object(handler.ollama, "is_available", new_callable=AsyncMock, return_value=True):
             with patch.object(
                 handler.ollama,
                 "generate",
@@ -134,9 +120,7 @@ class TestQueryHandlerWithOllama:
                 return_value="The chiller health is at 72% due to elevated vibration.",
             ):
                 with patch("app.services.query_handler.get_rag_service", return_value=None):
-                    result = await handler.handle_query(
-                        "What's the status of S002-CHILLER-B1-001?"
-                    )
+                    result = await handler.handle_query("What's the status of S002-CHILLER-B1-001?")
         assert result["llm_available"] is True
         assert "72%" in result["response"]
         assert result["model_used"] is not None
@@ -163,9 +147,7 @@ class TestQueryHandlerContextGathering:
     async def test_comparison_fetches_both(self, handler, mock_equipment_repo):
         with patch.object(handler.ollama, "is_available", new_callable=AsyncMock, return_value=False):
             with patch("app.services.query_handler.get_rag_service", return_value=None):
-                await handler.handle_query(
-                    "Compare S002-CHILLER-B1-001 vs S002-CHILLER-B1-002"
-                )
+                await handler.handle_query("Compare S002-CHILLER-B1-001 vs S002-CHILLER-B1-002")
         assert mock_equipment_repo.get_by_id.call_count >= 2
 
     @pytest.mark.asyncio

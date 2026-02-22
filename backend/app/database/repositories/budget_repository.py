@@ -19,11 +19,7 @@ class BudgetRepository:
         self._templates: Optional[Dict[str, Any]] = None
         self._load_templates()
 
-    def get_by_contract(
-        self,
-        contract_id: str,
-        year: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+    def get_by_contract(self, contract_id: str, year: Optional[int] = None) -> List[Dict[str, Any]]:
         """
         Get budgets for a contract with optional year filter.
 
@@ -39,11 +35,13 @@ class BudgetRepository:
             return []
 
         try:
-            query = self.client.table("budgets").select(
-                "*"
-            ).eq("contract_id", contract_id).order(
-                "budget_year", desc=True
-            ).order("budget_month")
+            query = (
+                self.client.table("budgets")
+                .select("*")
+                .eq("contract_id", contract_id)
+                .order("budget_year", desc=True)
+                .order("budget_month")
+            )
 
             if year:
                 query = query.eq("budget_year", year)
@@ -55,11 +53,7 @@ class BudgetRepository:
             logger.error(f"Error getting budgets for contract {contract_id}: {e}")
             return []
 
-    def get_spending_summary(
-        self,
-        contract_id: str,
-        year: int
-    ) -> Optional[Dict[str, Any]]:
+    def get_spending_summary(self, contract_id: str, year: int) -> Optional[Dict[str, Any]]:
         """
         Get aggregate budget vs actual for a contract year.
 
@@ -87,9 +81,7 @@ class BudgetRepository:
             total_actual = sum(b.get("total_actual_zar", 0) or 0 for b in budgets)
             total_variance = sum(b.get("variance_zar", 0) or 0 for b in budgets)
 
-            spend_pct = round(
-                (total_actual / total_budget * 100), 2
-            ) if total_budget > 0 else 0.0
+            spend_pct = round((total_actual / total_budget * 100), 2) if total_budget > 0 else 0.0
 
             return {
                 "contract_id": contract_id,
@@ -147,9 +139,7 @@ class BudgetRepository:
             return None
 
         try:
-            result = self.client.table("budgets").update(
-                data
-            ).eq("id", budget_id).execute()
+            result = self.client.table("budgets").update(data).eq("id", budget_id).execute()
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
@@ -165,9 +155,7 @@ class BudgetRepository:
             return None
 
         try:
-            result = self.client.table("budgets").select(
-                "*"
-            ).eq("id", budget_id).execute()
+            result = self.client.table("budgets").select("*").eq("id", budget_id).execute()
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
@@ -176,7 +164,6 @@ class BudgetRepository:
         except Exception as e:
             logger.error(f"Error getting budget {budget_id}: {e}")
             return None
-
 
     def _load_templates(self) -> None:
         """
@@ -224,11 +211,7 @@ class BudgetRepository:
         return self._templates.copy() if self._templates else {}
 
     def create_from_template(
-        self,
-        contract_id: str,
-        equipment_type: str,
-        year: int,
-        month: Optional[int] = None
+        self, contract_id: str, equipment_type: str, year: int, month: Optional[int] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Create a budget entry using equipment-type template defaults.
@@ -251,6 +234,7 @@ class BudgetRepository:
 
         # Generate unique code
         import uuid
+
         code = f"BUD-{equipment_type.upper()}-{year}"
         if month:
             code += f"-{month:02d}"
@@ -269,7 +253,7 @@ class BudgetRepository:
             "callout_budget_zar": breakdown.get("callout_budget_zar", 0.0),
             "warning_threshold_pct": 80.0,
             "critical_threshold_pct": 100.0,
-            "status": "draft"
+            "status": "draft",
         }
 
         return self.create(budget_data)

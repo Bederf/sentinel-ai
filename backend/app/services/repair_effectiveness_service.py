@@ -58,10 +58,7 @@ class RepairEffectivenessService:
     # ========================================================================
 
     async def validate_repair(
-        self,
-        equipment_id: str,
-        work_order_id: str,
-        post_readings: Optional[Dict[str, float]] = None
+        self, equipment_id: str, work_order_id: str, post_readings: Optional[Dict[str, float]] = None
     ) -> EffectivenessScore:
         """
         Validate repair effectiveness by comparing pre-repair baseline
@@ -120,9 +117,7 @@ class RepairEffectivenessService:
 
             # Baseline value (original healthy state) - approximate as midpoint
             # In production, this would come from the INITIAL baseline
-            baseline_value = await self._get_original_baseline_value(
-                equipment_id, element_name, pre_value
-            )
+            baseline_value = await self._get_original_baseline_value(equipment_id, element_name, pre_value)
 
             # Calculate improvement percentage
             if abs(pre_value - baseline_value) > 0.001:
@@ -157,14 +152,12 @@ class RepairEffectivenessService:
                 baseline_value=baseline_value,
                 improvement_percent=round(improvement_pct, 2),
                 back_to_baseline=back_to_bl,
-                status=status
+                status=status,
             )
 
         # 4. Calculate overall effectiveness score
         if element_improvements:
-            improvements_list = [
-                ei.improvement_percent for ei in element_improvements.values()
-            ]
+            improvements_list = [ei.improvement_percent for ei in element_improvements.values()]
             raw_score = sum(improvements_list) / len(improvements_list)
             effectiveness_score = max(0.0, min(100.0, raw_score))
         else:
@@ -193,7 +186,7 @@ class RepairEffectivenessService:
             health_score_before=round(health_before, 1),
             health_score_after=round(health_after, 1),
             health_improvement=round(health_after - health_before, 1),
-            validated_at=datetime.now()
+            validated_at=datetime.now(),
         )
 
         self._effectiveness_scores[work_order_id] = result
@@ -242,7 +235,7 @@ class RepairEffectivenessService:
                     previous_score=previous_score,
                     new_score=previous_score,
                     contributing_factors={"no_data": 100.0},
-                    updated_at=datetime.now()
+                    updated_at=datetime.now(),
                 )
 
             # Score each element based on trend direction
@@ -276,7 +269,7 @@ class RepairEffectivenessService:
             previous_score=previous_score,
             new_score=new_score,
             contributing_factors=contributing_factors,
-            updated_at=datetime.now()
+            updated_at=datetime.now(),
         )
 
     async def get_repair_history(self, equipment_id: str) -> List[RepairHistoryEntry]:
@@ -301,15 +294,17 @@ class RepairEffectivenessService:
             fault_type = outcome.repair_type if outcome else ""
             repair_date = outcome.repair_date if outcome else score.validated_at
 
-            entries.append(RepairHistoryEntry(
-                work_order_id=wo_id,
-                equipment_id=equipment_id,
-                repair_date=repair_date,
-                effectiveness_score=score.effectiveness_score,
-                repair_successful=score.repair_successful,
-                repair_cost=repair_cost,
-                fault_type=fault_type
-            ))
+            entries.append(
+                RepairHistoryEntry(
+                    work_order_id=wo_id,
+                    equipment_id=equipment_id,
+                    repair_date=repair_date,
+                    effectiveness_score=score.effectiveness_score,
+                    repair_successful=score.repair_successful,
+                    repair_cost=repair_cost,
+                    fault_type=fault_type,
+                )
+            )
 
         # Sort by date descending
         entries.sort(key=lambda e: e.repair_date, reverse=True)
@@ -331,7 +326,7 @@ class RepairEffectivenessService:
                 "avg_effectiveness": 0.0,
                 "success_rate": 0.0,
                 "total_cost": 0.0,
-                "repairs_by_type": {}
+                "repairs_by_type": {},
             }
 
         # Calculate averages
@@ -355,7 +350,7 @@ class RepairEffectivenessService:
             "avg_effectiveness": round(avg_effectiveness, 1),
             "success_rate": round(success_rate, 1),
             "total_cost": round(total_cost, 2),
-            "repairs_by_type": repairs_by_type
+            "repairs_by_type": repairs_by_type,
         }
 
     async def record_repair_outcome(self, outcome: RepairOutcome) -> None:
@@ -367,8 +362,7 @@ class RepairEffectivenessService:
         """
         self._repair_outcomes[outcome.work_order_id] = outcome
         logger.info(
-            f"Recorded repair outcome: {outcome.equipment_id}, "
-            f"WO {outcome.work_order_id}, type={outcome.repair_type}"
+            f"Recorded repair outcome: {outcome.equipment_id}, WO {outcome.work_order_id}, type={outcome.repair_type}"
         )
 
     # ========================================================================
@@ -382,18 +376,11 @@ class RepairEffectivenessService:
 
             repo = BaselineRepository()
             # Get most recent pre_repair baseline
-            baselines = await repo.get_equipment_baseline_history(
-                equipment_id=equipment_id,
-                limit=10
-            )
+            baselines = await repo.get_equipment_baseline_history(equipment_id=equipment_id, limit=10)
 
             for bl in baselines:
                 if bl.baseline_type.value == "pre_repair":
-                    return {
-                        "id": bl.id,
-                        "baseline_values": bl.baseline_values,
-                        "baseline_date": bl.baseline_date
-                    }
+                    return {"id": bl.id, "baseline_values": bl.baseline_values, "baseline_date": bl.baseline_date}
 
             return None
 
@@ -402,10 +389,7 @@ class RepairEffectivenessService:
             return None
 
     async def _get_original_baseline_value(
-        self,
-        equipment_id: str,
-        element_name: str,
-        pre_repair_value: float
+        self, equipment_id: str, element_name: str, pre_repair_value: float
     ) -> float:
         """
         Get original (initial) baseline value for an element.
@@ -434,9 +418,7 @@ class RepairEffectivenessService:
         return pre_repair_value * 0.8
 
     def _calculate_health_from_deviations(
-        self,
-        pre_values: Dict[str, float],
-        element_improvements: Dict[str, ElementImprovement]
+        self, pre_values: Dict[str, float], element_improvements: Dict[str, ElementImprovement]
     ) -> float:
         """
         Calculate health score from pre-repair state.
@@ -463,9 +445,7 @@ class RepairEffectivenessService:
         return max(0.0, score)
 
     def _calculate_health_from_post_readings(
-        self,
-        post_readings: Dict[str, float],
-        element_improvements: Dict[str, ElementImprovement]
+        self, post_readings: Dict[str, float], element_improvements: Dict[str, ElementImprovement]
     ) -> float:
         """
         Calculate health score from post-repair state.
@@ -491,31 +471,18 @@ class RepairEffectivenessService:
         # Typical chiller pre-repair values (degraded state)
         if "CHILLER" in equipment_id.upper():
             return {
-                "chw_supply_temp": 9.5,       # Degraded (baseline ~7.2)
-                "motor_current": 168.0,        # High (baseline ~145)
-                "vibration_rms": 3.2,          # Elevated (baseline ~1.2)
-                "discharge_pressure": 18.5,    # High (baseline ~15.8)
-                "oil_pressure": 38.0           # Low (baseline ~45)
+                "chw_supply_temp": 9.5,  # Degraded (baseline ~7.2)
+                "motor_current": 168.0,  # High (baseline ~145)
+                "vibration_rms": 3.2,  # Elevated (baseline ~1.2)
+                "discharge_pressure": 18.5,  # High (baseline ~15.8)
+                "oil_pressure": 38.0,  # Low (baseline ~45)
             }
         elif "AHU" in equipment_id.upper():
-            return {
-                "supply_air_temp": 16.5,
-                "filter_dp": 380.0,
-                "fan_vibration": 2.8,
-                "motor_current": 22.5
-            }
+            return {"supply_air_temp": 16.5, "filter_dp": 380.0, "fan_vibration": 2.8, "motor_current": 22.5}
         else:
-            return {
-                "temperature": 28.5,
-                "vibration": 2.5,
-                "current": 15.0
-            }
+            return {"temperature": 28.5, "vibration": 2.5, "current": 15.0}
 
-    def _generate_demo_post_values(
-        self,
-        equipment_id: str,
-        pre_values: Dict[str, float]
-    ) -> Dict[str, float]:
+    def _generate_demo_post_values(self, equipment_id: str, pre_values: Dict[str, float]) -> Dict[str, float]:
         """
         Generate synthetic post-repair values for demo scope.
 
@@ -526,6 +493,7 @@ class RepairEffectivenessService:
             # Simulate improvement: bring value closer to baseline
             # Improvement factor: 70-90% recovery
             import random
+
             factor = random.uniform(0.7, 0.9)
 
             # Estimate baseline as 80% of pre-repair value

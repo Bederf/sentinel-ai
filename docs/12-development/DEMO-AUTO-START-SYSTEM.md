@@ -66,7 +66,7 @@ Next month:         Method 1 = 88.2 kWh | Method 2 = 42.0 kWh | Method 3 = 38.0 
 ## Current Demos
 
 ### 1. Grant's Three-Method Comparison
-**Client Email:** `grant@wardew.co.za`
+**Client Email:** `grant@grantdemo.co.za`
 
 **Demo Type:** `three-method-comparison`
 
@@ -123,7 +123,7 @@ User Login (email)
     ↓
 Backend: Check _DEMO_USERS dict
     ↓
-    ├─ If grant@wardew.co.za
+    ├─ If grant@grantdemo.co.za
     │  ├─ Call orchestrator.reset() ← Fresh state
     │  └─ Add demo_auto_start: true
     │     └─ demo_type: "three-method-comparison"
@@ -152,7 +152,7 @@ Each time a demo user logs in, the orchestrator is reset to a clean state:
 
 ```python
 # In auth.py login endpoints:
-if email == "grant@wardew.co.za":
+if email == "grant@grantdemo.co.za":
     orchestrator = get_lifecycle_orchestrator()
     orchestrator.reset()  # Clears all previous simulation state
     response["demo_auto_start"] = True
@@ -181,8 +181,8 @@ if email == "grant@wardew.co.za":
   "refresh_token": "eyJ0eXAi...",
   "token_type": "bearer",
   "user": {
-    "id": "grant-wardew",
-    "email": "grant@wardew.co.za",
+    "id": "grant-demo",
+    "email": "grant@grantdemo.co.za",
     "full_name": "Grant",
     "role": "operator"
   },

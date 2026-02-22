@@ -342,12 +342,10 @@ class MFAService:
         """Generate and persist one-time MFA backup codes for a user."""
         alphabet = string.ascii_uppercase + string.digits
         plaintext_codes = [
-            "".join(secrets.choice(alphabet) for _ in range(BACKUP_CODE_LENGTH))
-            for _ in range(BACKUP_CODES_COUNT)
+            "".join(secrets.choice(alphabet) for _ in range(BACKUP_CODE_LENGTH)) for _ in range(BACKUP_CODES_COUNT)
         ]
         code_hashes = [
-            bcrypt.hashpw(code.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-            for code in plaintext_codes
+            bcrypt.hashpw(code.encode("utf-8"), bcrypt.gensalt()).decode("utf-8") for code in plaintext_codes
         ]
         persisted = self.repository.replace_backup_codes(user_id, code_hashes)
         if not persisted:

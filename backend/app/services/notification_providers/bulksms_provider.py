@@ -42,22 +42,13 @@ class BulkSMSProvider(BaseNotificationProvider):
 
         try:
             async with httpx.AsyncClient(auth=(self.api_key, self.api_secret)) as client:
-                response = await client.get(
-                    f"{self.base_url}/account",
-                    timeout=10
-                )
+                response = await client.get(f"{self.base_url}/account", timeout=10)
                 return response.status_code == 200
         except Exception as e:
             logger.error(f"BulkSMS connection test failed: {e}")
             return False
 
-    async def send(
-        self,
-        recipient: str,
-        title: str,
-        body: str,
-        **kwargs
-    ) -> NotificationResult:
+    async def send(self, recipient: str, title: str, body: str, **kwargs) -> NotificationResult:
         """Send SMS message via BulkSMS REST API.
 
         Args:
@@ -73,7 +64,7 @@ class BulkSMSProvider(BaseNotificationProvider):
             return NotificationResult(
                 success=False,
                 error_code="not_configured",
-                error_message="BulkSMS provider not configured (missing BULKSMS_API_KEY or BULKSMS_API_SECRET)"
+                error_message="BulkSMS provider not configured (missing BULKSMS_API_KEY or BULKSMS_API_SECRET)",
             )
 
         try:
@@ -81,33 +72,19 @@ class BulkSMSProvider(BaseNotificationProvider):
             message_text = f"{title}\n{body}"
 
             # Prepare payload for BulkSMS API
-            payload = {
-                "to": recipient,
-                "body": message_text
-            }
+            payload = {"to": recipient, "body": message_text}
 
-            headers = {
-                "Content-Type": "application/json"
-            }
+            headers = {"Content-Type": "application/json"}
 
             # Send via BulkSMS API
             async with httpx.AsyncClient(auth=(self.api_key, self.api_secret)) as client:
-                response = await client.post(
-                    f"{self.base_url}/messages",
-                    json=payload,
-                    headers=headers,
-                    timeout=10
-                )
+                response = await client.post(f"{self.base_url}/messages", json=payload, headers=headers, timeout=10)
 
                 if response.status_code == 201:
                     data = response.json()
                     message_id = data.get("id", "unknown")
                     logger.info(f"SMS message sent to {recipient}, ID: {message_id}")
-                    return NotificationResult(
-                        success=True,
-                        message_id=message_id,
-                        provider_response=data
-                    )
+                    return NotificationResult(success=True, message_id=message_id, provider_response=data)
                 else:
                     error_data = response.json() if response.text else {}
                     error_msg = error_data.get("error", "Unknown error")
@@ -116,19 +93,13 @@ class BulkSMSProvider(BaseNotificationProvider):
                         success=False,
                         error_code=f"http_{response.status_code}",
                         error_message=error_msg,
-                        provider_response=error_data
+                        provider_response=error_data,
                     )
 
         except httpx.TimeoutException:
             return NotificationResult(
-                success=False,
-                error_code="timeout",
-                error_message="BulkSMS API request timed out after 10 seconds"
+                success=False, error_code="timeout", error_message="BulkSMS API request timed out after 10 seconds"
             )
         except Exception as e:
             logger.error(f"BulkSMS provider error: {e}")
-            return NotificationResult(
-                success=False,
-                error_code="exception",
-                error_message=str(e)
-            )
+            return NotificationResult(success=False, error_code="exception", error_message=str(e))

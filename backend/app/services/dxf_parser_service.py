@@ -112,20 +112,11 @@ class DXFParserService:
 
             # 3. Extract equipment from layers
             equipment = []
-            equipment.extend(
-                self._extract_hvac_equipment(doc, bbox, building_code)
-            )
-            equipment.extend(
-                self._extract_electrical_equipment(doc, bbox, building_code)
-            )
-            equipment.extend(
-                self._extract_fire_equipment(doc, bbox, building_code)
-            )
+            equipment.extend(self._extract_hvac_equipment(doc, bbox, building_code))
+            equipment.extend(self._extract_electrical_equipment(doc, bbox, building_code))
+            equipment.extend(self._extract_fire_equipment(doc, bbox, building_code))
 
-            logger.info(
-                f"✓ Extracted {len(equipment)} equipment "
-                f"(HVAC, Electrical, Fire)"
-            )
+            logger.info(f"✓ Extracted {len(equipment)} equipment (HVAC, Electrical, Fire)")
 
             # 4. Infer floors from equipment positions
             floors = self._infer_floor_definitions(equipment)
@@ -269,9 +260,7 @@ class DXFParserService:
 
         for entity in hvac_entities:
             try:
-                eq_data = self._extract_equipment_from_entity(
-                    entity, bbox, building_code, "HVAC"
-                )
+                eq_data = self._extract_equipment_from_entity(entity, bbox, building_code, "HVAC")
                 if eq_data:
                     equipment.append(eq_data)
             except Exception as e:
@@ -322,9 +311,7 @@ class DXFParserService:
 
         for entity in power_entities:
             try:
-                eq_data = self._extract_equipment_from_entity(
-                    entity, bbox, building_code, "Electrical"
-                )
+                eq_data = self._extract_equipment_from_entity(entity, bbox, building_code, "Electrical")
                 if eq_data:
                     equipment.append(eq_data)
             except Exception as e:
@@ -369,9 +356,7 @@ class DXFParserService:
 
         for entity in fire_entities:
             try:
-                eq_data = self._extract_equipment_from_entity(
-                    entity, bbox, building_code, "Fire"
-                )
+                eq_data = self._extract_equipment_from_entity(entity, bbox, building_code, "Fire")
                 if eq_data:
                     equipment.append(eq_data)
             except Exception as e:
@@ -451,9 +436,7 @@ class DXFParserService:
         zone = self._infer_zone(eq_name, x_norm, y_norm, floor)
 
         # Build v2.0 equipment ID
-        equipment_id = self._build_v2_equipment_id(
-            building_code, eq_type, floor, zone
-        )
+        equipment_id = self._build_v2_equipment_id(building_code, eq_type, floor, zone)
 
         return {
             "name": equipment_id,
@@ -562,18 +545,14 @@ class DXFParserService:
             Floor code: B1, G, L1, L2, etc.
         """
         # Try parsing from name first (more reliable)
-        match = re.search(
-            r"-(B\d|G|L\d{1,2}|R)-", equipment_name, re.IGNORECASE
-        )
+        match = re.search(r"-(B\d|G|L\d{1,2}|R)-", equipment_name, re.IGNORECASE)
         if match:
             return match.group(1).upper()
 
         # Fallback to Z-coordinate
         return infer_floor_from_z_coordinate(z_coord)
 
-    def _infer_zone(
-        self, equipment_name: str, x: float, y: float, floor: str
-    ) -> str:
+    def _infer_zone(self, equipment_name: str, x: float, y: float, floor: str) -> str:
         """
         Infer zone assignment from equipment name or position.
 
@@ -634,9 +613,7 @@ class DXFParserService:
 
         return f"{site_code}-{equipment_type}-{floor}-{zone}"
 
-    def _infer_floor_definitions(
-        self, equipment: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def _infer_floor_definitions(self, equipment: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Infer floor definitions from equipment positions.
 
@@ -686,9 +663,7 @@ class DXFParserService:
 
         return floors
 
-    def _create_zones_from_equipment(
-        self, equipment: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def _create_zones_from_equipment(self, equipment: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Create zone definitions from equipment clustering.
 
@@ -700,9 +675,7 @@ class DXFParserService:
         Returns:
             List of zone definitions
         """
-        zones_dict = defaultdict(
-            lambda: {"equipment": [], "floor": "", "zone_type": "open_office"}
-        )
+        zones_dict = defaultdict(lambda: {"equipment": [], "floor": "", "zone_type": "open_office"})
 
         for eq in equipment:
             zone_key = f"Zone-{eq['floor']}-{eq['zone']}"

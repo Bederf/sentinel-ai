@@ -10,6 +10,7 @@ from app.models.audit_log import AuditResultType
 
 class DecisionStatus(Enum):
     """Status of an autonomous decision."""
+
     PENDING = "pending"
     EXECUTING = "executing"
     SUCCESS = "success"
@@ -20,6 +21,7 @@ class DecisionStatus(Enum):
 
 class EscalationLevel(Enum):
     """Escalation levels for boundary approach."""
+
     NONE = 0  # Normal operation
     WARNING = 1  # 75% approach - Logged
     ALERT = 2  # 85% approach - Email

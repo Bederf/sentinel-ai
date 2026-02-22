@@ -255,9 +255,7 @@ async def get_zone_centroid(
         centroid = await service.calculate_zone_centroid(building_id, zone_id)
 
         if not centroid:
-            raise HTTPException(
-                status_code=404, detail=f"Zone {zone_id} or desks not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Zone {zone_id} or desks not found")
 
         return ZoneCentroidResponse(
             zone_id=zone_id,

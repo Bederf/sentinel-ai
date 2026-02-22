@@ -23,9 +23,7 @@ class ImageExtractionRequest(BaseModel):
     image_base64: str = Field(..., description="Base64-encoded floor plan image")
     building_code: str = Field(..., description="Building code (e.g., site-002)")
     building_name: str = Field(..., description="Building name (e.g., Sandton City)")
-    floors_count: int = Field(
-        ..., ge=1, le=50, description="Expected number of floors"
-    )
+    floors_count: int = Field(..., ge=1, le=50, description="Expected number of floors")
     skip_sanitization: bool = Field(
         default=False,
         description="If False (default), sanitize image before API transmission for security",
@@ -59,9 +57,7 @@ class ZoneDefinition(BaseModel):
     zone_id: str = Field(..., description="Zone identifier")
     floor: str = Field(..., description="Floor level")
     zone_type: str = Field(..., description="Zone type (open_office, mechanical, etc.)")
-    equipment: Optional[list[str]] = Field(
-        None, description="Equipment IDs in this zone"
-    )
+    equipment: Optional[list[str]] = Field(None, description="Equipment IDs in this zone")
 
 
 class BuildingConfigResponse(BaseModel):
@@ -72,9 +68,7 @@ class BuildingConfigResponse(BaseModel):
     floors: list[FloorDefinition] = Field(..., description="Floor definitions")
     equipment: list[EquipmentLocation] = Field(..., description="Equipment locations")
     zones: list[ZoneDefinition] = Field(..., description="Zone definitions")
-    extraction_metadata: Dict = Field(
-        ..., description="Extraction method, accuracy, counts"
-    )
+    extraction_metadata: Dict = Field(..., description="Extraction method, accuracy, counts")
 
 
 # ============= Router =============
@@ -148,10 +142,7 @@ async def extract_from_image(
         service = get_digital_twin_service()
 
         # Extract config
-        logger.info(
-            f"Extracting building config: {request.building_code} "
-            f"(sanitize={not request.skip_sanitization})"
-        )
+        logger.info(f"Extracting building config: {request.building_code} (sanitize={not request.skip_sanitization})")
 
         config = await service.extract_from_image(
             image_base64=request.image_base64,

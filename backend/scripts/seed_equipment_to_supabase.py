@@ -12,6 +12,7 @@ This script:
 
 Run: python backend/scripts/seed_equipment_to_supabase.py
 """
+
 import sys
 import json
 from pathlib import Path
@@ -19,23 +20,24 @@ import uuid
 from dotenv import load_dotenv
 
 # Load environment variables from .env
-load_dotenv(Path(__file__).parent.parent / '.env')
+load_dotenv(Path(__file__).parent.parent / ".env")
 
-sys.path.insert(0, '/opt/bms-intelligence/backend')
+sys.path.insert(0, "/opt/bms-intelligence/backend")
 
 from app.database.supabase_client import get_supabase_client
 
-DATA_PATH = Path('/opt/bms-intelligence/backend/app/data')
-BUILDINGS_PATH = DATA_PATH / 'buildings'
+DATA_PATH = Path("/opt/bms-intelligence/backend/app/data")
+BUILDINGS_PATH = DATA_PATH / "buildings"
+
 
 def get_or_create_building(client, site_code: str, building_data: dict) -> str:
     """Get or create building in Supabase. Returns building UUID."""
     try:
         # Check if building already exists
-        result = client.table('buildings').select('id').eq('code', site_code).execute()
+        result = client.table("buildings").select("id").eq("code", site_code).execute()
 
         if result.data:
-            building_uuid = result.data[0]['id']
+            building_uuid = result.data[0]["id"]
             print(f"  ✓ Building {site_code} already exists (UUID: {building_uuid[:8]}...)")
             return building_uuid
 
@@ -43,18 +45,18 @@ def get_or_create_building(client, site_code: str, building_data: dict) -> str:
         building_uuid = str(uuid.uuid4())
 
         insert_data = {
-            'id': building_uuid,
-            'code': site_code,
-            'name': building_data.get('name', building_data.get('display_name', site_code)),
-            'address': building_data.get('address', ''),
-            'region': 'Unknown',
-            'type': 'office',
-            'sqm': 0,
-            'floors': len(building_data.get('floors', [])),
-            'year_built': 2020,
+            "id": building_uuid,
+            "code": site_code,
+            "name": building_data.get("name", building_data.get("display_name", site_code)),
+            "address": building_data.get("address", ""),
+            "region": "Unknown",
+            "type": "office",
+            "sqm": 0,
+            "floors": len(building_data.get("floors", [])),
+            "year_built": 2020,
         }
 
-        client.table('buildings').insert(insert_data).execute()
+        client.table("buildings").insert(insert_data).execute()
         print(f"  ✓ Created building {site_code} (UUID: {building_uuid[:8]}...)")
 
         return building_uuid
@@ -70,51 +72,47 @@ def _map_equipment_status(status_value):
     Equipment table only allows: 'normal', 'warning', 'critical', 'offline', 'maintenance'
     """
     if not status_value:
-        return 'normal'
+        return "normal"
 
     status_lower = str(status_value).lower().strip()
 
     # Direct mappings
-    valid_statuses = {'normal', 'warning', 'critical', 'offline', 'maintenance'}
+    valid_statuses = {"normal", "warning", "critical", "offline", "maintenance"}
     if status_lower in valid_statuses:
         return status_lower
 
     # Smart mapping from common values
     mappings = {
-        'online': 'normal',
-        'operational': 'normal',
-        'active': 'normal',
-        'running': 'normal',
-        'enabled': 'normal',
-        'ok': 'normal',
-        'healthy': 'normal',
-        'good': 'normal',
-
-        'offline': 'offline',
-        'down': 'offline',
-        'disconnected': 'offline',
-        'not responding': 'offline',
-
-        'degraded': 'warning',
-        'warning': 'warning',
-        'caution': 'warning',
-        'alert': 'warning',
-        'moderate': 'warning',
-
-        'critical': 'critical',
-        'error': 'critical',
-        'failed': 'critical',
-        'fault': 'critical',
-        'emergency': 'critical',
-
-        'maintenance': 'maintenance',
-        'servicing': 'maintenance',
-        'standby': 'maintenance',
-        'idle': 'maintenance',
-        'unknown': 'normal',
+        "online": "normal",
+        "operational": "normal",
+        "active": "normal",
+        "running": "normal",
+        "enabled": "normal",
+        "ok": "normal",
+        "healthy": "normal",
+        "good": "normal",
+        "offline": "offline",
+        "down": "offline",
+        "disconnected": "offline",
+        "not responding": "offline",
+        "degraded": "warning",
+        "warning": "warning",
+        "caution": "warning",
+        "alert": "warning",
+        "moderate": "warning",
+        "critical": "critical",
+        "error": "critical",
+        "failed": "critical",
+        "fault": "critical",
+        "emergency": "critical",
+        "maintenance": "maintenance",
+        "servicing": "maintenance",
+        "standby": "maintenance",
+        "idle": "maintenance",
+        "unknown": "normal",
     }
 
-    return mappings.get(status_lower, 'normal')
+    return mappings.get(status_lower, "normal")
 
 
 def seed_equipment_for_site(client, site_code: str, building_uuid: str) -> int:
@@ -123,67 +121,71 @@ def seed_equipment_for_site(client, site_code: str, building_uuid: str) -> int:
     Returns count of equipment created/updated.
     """
     site_path = BUILDINGS_PATH / site_code
-    equipment_dir = site_path / 'equipment'
+    equipment_dir = site_path / "equipment"
 
     if not equipment_dir.exists():
         print(f"    ⓘ No equipment directory for {site_code}")
         return 0
 
     count = 0
-    equipment_files = sorted(list(equipment_dir.glob('*.json')))
+    equipment_files = sorted(list(equipment_dir.glob("*.json")))
 
     for eq_file in equipment_files:
         try:
             with open(eq_file) as f:
                 eq_data = json.load(f)
 
-            equipment_code = eq_data.get('code') or eq_data.get('id')
+            equipment_code = eq_data.get("code") or eq_data.get("id")
 
             # Skip if no code
             if not equipment_code:
                 print(f"    ⓘ Skipping {eq_file.name}: no code found")
                 continue
 
-            equipment_name = eq_data.get('name', equipment_code)
-            equipment_type = eq_data.get('type', 'unknown')
+            equipment_name = eq_data.get("name", equipment_code)
+            equipment_type = eq_data.get("type", "unknown")
 
             # Map status to valid value
-            mapped_status = _map_equipment_status(eq_data.get('status'))
+            mapped_status = _map_equipment_status(eq_data.get("status"))
 
             # Check if equipment already exists
-            result = client.table('equipment').select('id').eq('code', equipment_code).execute()
+            result = client.table("equipment").select("id").eq("code", equipment_code).execute()
 
             if result.data:
                 # Update existing
-                eq_uuid = result.data[0]['id']
-                client.table('equipment').update({
-                    'name': equipment_name,
-                    'type': equipment_type,
-                    'status': mapped_status,
-                    'health_score': eq_data.get('health_score', 85),
-                    'location': eq_data.get('location', ''),
-                    'manufacturer': eq_data.get('manufacturer', ''),
-                    'model': eq_data.get('model', ''),
-                }).eq('id', eq_uuid).execute()
+                eq_uuid = result.data[0]["id"]
+                client.table("equipment").update(
+                    {
+                        "name": equipment_name,
+                        "type": equipment_type,
+                        "status": mapped_status,
+                        "health_score": eq_data.get("health_score", 85),
+                        "location": eq_data.get("location", ""),
+                        "manufacturer": eq_data.get("manufacturer", ""),
+                        "model": eq_data.get("model", ""),
+                    }
+                ).eq("id", eq_uuid).execute()
             else:
                 # Create new
                 eq_uuid = str(uuid.uuid4())
-                client.table('equipment').insert({
-                    'id': eq_uuid,
-                    'code': equipment_code,
-                    'building_id': building_uuid,
-                    'name': equipment_name,
-                    'type': equipment_type,
-                    'status': mapped_status,
-                    'health_score': eq_data.get('health_score', 85),
-                    'location': eq_data.get('location', ''),
-                    'manufacturer': eq_data.get('manufacturer', ''),
-                    'model': eq_data.get('model', ''),
-                    'capacity': eq_data.get('capacity', ''),
-                    'serial_number': eq_data.get('serial_number', ''),
-                    'install_date': eq_data.get('install_date'),
-                    'last_service': eq_data.get('last_service'),
-                }).execute()
+                client.table("equipment").insert(
+                    {
+                        "id": eq_uuid,
+                        "code": equipment_code,
+                        "building_id": building_uuid,
+                        "name": equipment_name,
+                        "type": equipment_type,
+                        "status": mapped_status,
+                        "health_score": eq_data.get("health_score", 85),
+                        "location": eq_data.get("location", ""),
+                        "manufacturer": eq_data.get("manufacturer", ""),
+                        "model": eq_data.get("model", ""),
+                        "capacity": eq_data.get("capacity", ""),
+                        "serial_number": eq_data.get("serial_number", ""),
+                        "install_date": eq_data.get("install_date"),
+                        "last_service": eq_data.get("last_service"),
+                    }
+                ).execute()
 
             count += 1
 
@@ -200,28 +202,28 @@ def _map_zone_status(status_value):
     HVAC zones table allows: 'running', 'idle', 'heating', 'cooling', 'fault', 'offline'
     """
     if not status_value:
-        return 'idle'
+        return "idle"
 
     status_lower = str(status_value).lower().strip()
 
-    valid_statuses = {'running', 'idle', 'heating', 'cooling', 'fault', 'offline'}
+    valid_statuses = {"running", "idle", "heating", "cooling", "fault", "offline"}
     if status_lower in valid_statuses:
         return status_lower
 
     # Smart mapping
     mappings = {
-        'active': 'running',
-        'on': 'running',
-        'enabled': 'running',
-        'standby': 'idle',
-        'off': 'idle',
-        'disabled': 'idle',
-        'error': 'fault',
-        'down': 'offline',
-        'normal': 'idle',
+        "active": "running",
+        "on": "running",
+        "enabled": "running",
+        "standby": "idle",
+        "off": "idle",
+        "disabled": "idle",
+        "error": "fault",
+        "down": "offline",
+        "normal": "idle",
     }
 
-    return mappings.get(status_lower, 'idle')
+    return mappings.get(status_lower, "idle")
 
 
 def seed_zones_for_site(client, site_code: str, building_uuid: str) -> int:
@@ -230,7 +232,7 @@ def seed_zones_for_site(client, site_code: str, building_uuid: str) -> int:
     Returns count of zones created/updated.
     """
     site_path = BUILDINGS_PATH / site_code
-    zones_file = site_path / 'zones.json'
+    zones_file = site_path / "zones.json"
 
     if not zones_file.exists():
         print(f"    ⓘ No zones.json for {site_code}")
@@ -248,42 +250,46 @@ def seed_zones_for_site(client, site_code: str, building_uuid: str) -> int:
 
         for zone in zones_data:
             try:
-                zone_id = zone.get('zone_id')
-                zone_name = zone.get('zone_name', zone_id)
+                zone_id = zone.get("zone_id")
+                zone_name = zone.get("zone_name", zone_id)
 
                 if not zone_id:
                     print("    ⓘ Skipping zone with no zone_id")
                     continue
 
                 # Map status to valid value
-                mapped_status = _map_zone_status(zone.get('status'))
+                mapped_status = _map_zone_status(zone.get("status"))
 
                 # Check if zone already exists
-                result = client.table('hvac_zones').select('id').eq('zone_id', zone_id).execute()
+                result = client.table("hvac_zones").select("id").eq("zone_id", zone_id).execute()
 
                 if result.data:
                     # Update existing
-                    zone_uuid = result.data[0]['id']
-                    client.table('hvac_zones').update({
-                        'zone_name': zone_name,
-                        'floor': zone.get('floor', ''),
-                        'current_temp': zone.get('current_temp'),
-                        'setpoint': zone.get('setpoint'),
-                        'status': mapped_status,
-                    }).eq('id', zone_uuid).execute()
+                    zone_uuid = result.data[0]["id"]
+                    client.table("hvac_zones").update(
+                        {
+                            "zone_name": zone_name,
+                            "floor": zone.get("floor", ""),
+                            "current_temp": zone.get("current_temp"),
+                            "setpoint": zone.get("setpoint"),
+                            "status": mapped_status,
+                        }
+                    ).eq("id", zone_uuid).execute()
                 else:
                     # Create new
                     zone_uuid = str(uuid.uuid4())
-                    client.table('hvac_zones').insert({
-                        'id': zone_uuid,
-                        'zone_id': zone_id,
-                        'zone_name': zone_name,
-                        'building_id': building_uuid,
-                        'floor': zone.get('floor', ''),
-                        'current_temp': zone.get('current_temp'),
-                        'setpoint': zone.get('setpoint'),
-                        'status': mapped_status,
-                    }).execute()
+                    client.table("hvac_zones").insert(
+                        {
+                            "id": zone_uuid,
+                            "zone_id": zone_id,
+                            "zone_name": zone_name,
+                            "building_id": building_uuid,
+                            "floor": zone.get("floor", ""),
+                            "current_temp": zone.get("current_temp"),
+                            "setpoint": zone.get("setpoint"),
+                            "status": mapped_status,
+                        }
+                    ).execute()
 
                 count += 1
 
@@ -322,10 +328,7 @@ def main():
         print(f"✗ ERROR: Buildings path not found: {BUILDINGS_PATH}")
         return 1
 
-    sites = sorted([
-        d.name for d in BUILDINGS_PATH.iterdir()
-        if d.is_dir() and not d.name.startswith('_')
-    ])
+    sites = sorted([d.name for d in BUILDINGS_PATH.iterdir() if d.is_dir() and not d.name.startswith("_")])
 
     if not sites:
         print(f"✗ ERROR: No sites found in {BUILDINGS_PATH}")
@@ -343,17 +346,17 @@ def main():
         site_path = BUILDINGS_PATH / site_code
 
         # Load building metadata
-        building_file = site_path / 'building.json'
+        building_file = site_path / "building.json"
         if not building_file.exists():
             print(f"  ⓘ No building.json for {site_code}")
-            building_data = {'name': site_code}
+            building_data = {"name": site_code}
         else:
             try:
                 with open(building_file) as f:
                     building_data = json.load(f)
             except Exception as e:
                 print(f"  ✗ ERROR reading building.json: {e}")
-                building_data = {'name': site_code}
+                building_data = {"name": site_code}
 
         # Get or create building
         building_uuid = get_or_create_building(client, site_code, building_data)
@@ -386,24 +389,24 @@ def main():
 
     try:
         # Count buildings
-        b_result = client.table('buildings').select('id', count='exact').execute()
+        b_result = client.table("buildings").select("id", count="exact").execute()
         print(f"Buildings in Supabase: {b_result.count}")
 
         # Count equipment
-        e_result = client.table('equipment').select('id', count='exact').execute()
+        e_result = client.table("equipment").select("id", count="exact").execute()
         print(f"Equipment in Supabase: {e_result.count}")
 
         # Count zones
-        z_result = client.table('hvac_zones').select('id', count='exact').execute()
+        z_result = client.table("hvac_zones").select("id", count="exact").execute()
         print(f"HVAC Zones in Supabase: {z_result.count}")
 
         # Count by building
         print("\nEquipment per building:")
-        buildings_result = client.table('buildings').select('id, code, name').execute()
+        buildings_result = client.table("buildings").select("id, code, name").execute()
         for building in buildings_result.data[:5]:  # Show first 5
-            eq_result = client.table('equipment').select('id', count='exact').eq(
-                'building_id', building['id']
-            ).execute()
+            eq_result = (
+                client.table("equipment").select("id", count="exact").eq("building_id", building["id"]).execute()
+            )
             print(f"  {building['code']}: {eq_result.count} equipment")
 
     except Exception as e:
@@ -415,5 +418,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

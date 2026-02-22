@@ -38,9 +38,13 @@ class MFARepository:
             return None
 
         try:
-            result = self.client.table("mfa_secrets").select("*").eq(
-                "user_email", user_email.lower().strip()
-            ).single().execute()
+            result = (
+                self.client.table("mfa_secrets")
+                .select("*")
+                .eq("user_email", user_email.lower().strip())
+                .single()
+                .execute()
+            )
 
             return result.data
         except Exception as e:
@@ -77,21 +81,34 @@ class MFARepository:
 
             if existing:
                 # Update existing record (re-enrollment)
-                result = self.client.table("mfa_secrets").update({
-                    "totp_secret": totp_secret,
-                    "enabled": False,  # Must verify to enable
-                    "failed_attempts": 0,
-                    "last_failed_at": None,
-                    "created_at": datetime.utcnow().isoformat(),
-                }).eq("user_email", email).execute()
+                result = (
+                    self.client.table("mfa_secrets")
+                    .update(
+                        {
+                            "totp_secret": totp_secret,
+                            "enabled": False,  # Must verify to enable
+                            "failed_attempts": 0,
+                            "last_failed_at": None,
+                            "created_at": datetime.utcnow().isoformat(),
+                        }
+                    )
+                    .eq("user_email", email)
+                    .execute()
+                )
             else:
                 # Create new record
-                result = self.client.table("mfa_secrets").insert({
-                    "user_email": email,
-                    "totp_secret": totp_secret,
-                    "enabled": False,
-                    "failed_attempts": 0,
-                }).execute()
+                result = (
+                    self.client.table("mfa_secrets")
+                    .insert(
+                        {
+                            "user_email": email,
+                            "totp_secret": totp_secret,
+                            "enabled": False,
+                            "failed_attempts": 0,
+                        }
+                    )
+                    .execute()
+                )
 
             if result.data:
                 return result.data[0]
@@ -115,12 +132,19 @@ class MFARepository:
             return False
 
         try:
-            result = self.client.table("mfa_secrets").update({
-                "enabled": True,
-                "last_enrolled_at": datetime.utcnow().isoformat(),
-                "failed_attempts": 0,
-                "last_failed_at": None,
-            }).eq("user_email", user_email.lower().strip()).execute()
+            result = (
+                self.client.table("mfa_secrets")
+                .update(
+                    {
+                        "enabled": True,
+                        "last_enrolled_at": datetime.utcnow().isoformat(),
+                        "failed_attempts": 0,
+                        "last_failed_at": None,
+                    }
+                )
+                .eq("user_email", user_email.lower().strip())
+                .execute()
+            )
 
             return bool(result.data)
 
@@ -142,9 +166,7 @@ class MFARepository:
             return False
 
         try:
-            result = self.client.table("mfa_secrets").delete().eq(
-                "user_email", user_email.lower().strip()
-            ).execute()
+            result = self.client.table("mfa_secrets").delete().eq("user_email", user_email.lower().strip()).execute()
 
             return True  # Delete succeeds even if no record existed
 
@@ -166,11 +188,18 @@ class MFARepository:
             return False
 
         try:
-            result = self.client.table("mfa_secrets").update({
-                "last_used_at": datetime.utcnow().isoformat(),
-                "failed_attempts": 0,  # Reset on success
-                "last_failed_at": None,
-            }).eq("user_email", user_email.lower().strip()).execute()
+            result = (
+                self.client.table("mfa_secrets")
+                .update(
+                    {
+                        "last_used_at": datetime.utcnow().isoformat(),
+                        "failed_attempts": 0,  # Reset on success
+                        "last_failed_at": None,
+                    }
+                )
+                .eq("user_email", user_email.lower().strip())
+                .execute()
+            )
 
             return bool(result.data)
 
@@ -212,10 +241,12 @@ class MFARepository:
             new_count = failed_attempts + 1
 
             # Update record
-            self.client.table("mfa_secrets").update({
-                "failed_attempts": new_count,
-                "last_failed_at": datetime.utcnow().isoformat(),
-            }).eq("user_email", email).execute()
+            self.client.table("mfa_secrets").update(
+                {
+                    "failed_attempts": new_count,
+                    "last_failed_at": datetime.utcnow().isoformat(),
+                }
+            ).eq("user_email", email).execute()
 
             return new_count
 
@@ -291,13 +322,19 @@ class MFARepository:
             return None
 
         try:
-            result = self.client.table("mfa_events").insert({
-                "user_email": user_email.lower().strip(),
-                "event_type": event_type,
-                "source_ip": source_ip,
-                "user_agent": user_agent,
-                "event_data": event_data or {},
-            }).execute()
+            result = (
+                self.client.table("mfa_events")
+                .insert(
+                    {
+                        "user_email": user_email.lower().strip(),
+                        "event_type": event_type,
+                        "source_ip": source_ip,
+                        "user_agent": user_agent,
+                        "event_data": event_data or {},
+                    }
+                )
+                .execute()
+            )
 
             if result.data:
                 return result.data[0]
@@ -407,12 +444,18 @@ class MFARepository:
             return False
 
         try:
-            result = self.client.table("mfa_backup_codes").update(
-                {
-                    "used": True,
-                    "used_at": datetime.utcnow().isoformat(),
-                }
-            ).eq("id", code_id).eq("used", False).execute()
+            result = (
+                self.client.table("mfa_backup_codes")
+                .update(
+                    {
+                        "used": True,
+                        "used_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .eq("id", code_id)
+                .eq("used", False)
+                .execute()
+            )
             return bool(result.data)
         except Exception as e:
             logger.error(f"Error marking MFA backup code as used ({code_id}): {e}")
@@ -424,9 +467,13 @@ class MFARepository:
             return 0
 
         try:
-            result = self.client.table("mfa_backup_codes").select(
-                "id", count="exact"
-            ).eq("user_id", user_id).eq("used", False).execute()
+            result = (
+                self.client.table("mfa_backup_codes")
+                .select("id", count="exact")
+                .eq("user_id", user_id)
+                .eq("used", False)
+                .execute()
+            )
             return int(result.count or 0)
         except Exception as e:
             logger.error(f"Error counting MFA backup codes for {user_id}: {e}")

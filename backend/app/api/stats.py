@@ -36,6 +36,7 @@ def get_stats_from_supabase() -> Optional[dict]:
 
     try:
         from app.database.supabase_client import get_supabase_client
+
         client = get_supabase_client()
 
         # Get building count
@@ -102,7 +103,13 @@ def get_stats_from_supabase() -> Optional[dict]:
         for b in buildings:
             region = b.get("region", "Unknown")
             if region not in region_stats:
-                region_stats[region] = {"region": region, "site_count": 0, "equipment_count": 0, "total_sqm": 0, "alert_count": 0}
+                region_stats[region] = {
+                    "region": region,
+                    "site_count": 0,
+                    "equipment_count": 0,
+                    "total_sqm": 0,
+                    "alert_count": 0,
+                }
             region_stats[region]["site_count"] += 1
             region_stats[region]["total_sqm"] += b.get("sqm", 0)
 
@@ -112,7 +119,7 @@ def get_stats_from_supabase() -> Optional[dict]:
         # Equipment by type (simplified - use type field)
         eq_types = client.table("equipment").select("type,health_score,status").execute()
         type_stats = {}
-        for eq in (eq_types.data or []):
+        for eq in eq_types.data or []:
             eq_type = eq.get("type", "Unknown")
             if eq_type not in type_stats:
                 type_stats[eq_type] = {"type": eq_type, "count": 0, "total_health": 0, "warning_count": 0}
@@ -403,6 +410,7 @@ async def get_stats() -> StatsResponse:
     if readings:
         timestamps = [r["timestamp"] for r in readings]
         from datetime import datetime
+
         dates = [datetime.fromisoformat(ts) for ts in timestamps]
         date_range = (max(dates) - min(dates)).days + 1
     else:

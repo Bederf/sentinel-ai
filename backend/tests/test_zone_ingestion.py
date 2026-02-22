@@ -11,6 +11,7 @@ from typing import List, Dict, Optional
 
 # ============= Validation Utilities =============
 
+
 def validate_zone_id(zone_id: str) -> bool:
     """Validate zone ID format: Zone-FLOOR-LETTER"""
     parts = zone_id.split("-")
@@ -210,10 +211,7 @@ class TestZoneValidation:
 
     def test_zone_centroid_20_desks(self):
         """Test centroid with 20 desks (standard zone)"""
-        desks = [
-            {"coordinates": {"x": 3.0 + (i % 5) * 1.2, "y": 3.5, "z": 2.5 + (i // 5) * 5.0}}
-            for i in range(20)
-        ]
+        desks = [{"coordinates": {"x": 3.0 + (i % 5) * 1.2, "y": 3.5, "z": 2.5 + (i // 5) * 5.0}} for i in range(20)]
         centroid = calculate_zone_centroid(desks)
         assert centroid is not None
         # Centroid should be near middle of zone
@@ -266,7 +264,7 @@ class TestZoneValidation:
         # Building A: 15 zones (5 per floor × 3 floors)
         zones_a = [
             {
-                "zone_id": f"Zone-L{floor}-{chr(65+zone)}",
+                "zone_id": f"Zone-L{floor}-{chr(65 + zone)}",
                 "floor": f"L{floor}",
                 "zone_type": "open_office",
             }
@@ -277,7 +275,7 @@ class TestZoneValidation:
         # Building B: 6 zones (3 per floor × 2 floors)
         zones_b = [
             {
-                "zone_id": f"Zone-L{floor}-{chr(65+zone)}",
+                "zone_id": f"Zone-L{floor}-{chr(65 + zone)}",
                 "floor": f"L{floor}",
                 "zone_type": "open_office",
             }
@@ -318,8 +316,8 @@ class TestZoneValidation:
         """Test site-002 standard configuration: 15 zones (5 per floor × 3 floors)"""
         zones = [
             {
-                "zone_id": f"Zone-L{floor}-{chr(65+zone)}",
-                "zone_name": f"Level {floor} Zone {chr(65+zone)}",
+                "zone_id": f"Zone-L{floor}-{chr(65 + zone)}",
+                "zone_name": f"Level {floor} Zone {chr(65 + zone)}",
                 "floor": f"L{floor}",
                 "zone_letter": chr(65 + zone),
                 "zone_type": "open_office",

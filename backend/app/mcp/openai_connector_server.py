@@ -42,7 +42,7 @@ BASE_URL = "https://bms.sentinel.local"
 def _load_json(filepath: Path) -> Any:
     """Load JSON file safely."""
     try:
-        with open(filepath, 'r') as f:
+        with open(filepath, "r") as f:
             return json.load(f)
     except Exception as e:
         logger.warning(f"Failed to load {filepath}: {e}")
@@ -53,6 +53,7 @@ def _get_supabase_client():
     """Get Supabase client if available."""
     try:
         from app.database.supabase_client import get_supabase_client
+
         return get_supabase_client()
     except Exception as e:
         logger.warning(f"Supabase not available: {e}")
@@ -82,9 +83,12 @@ class SupabaseDataLoader:
             offset = 0
 
             while True:
-                response = self.client.table("equipment").select(
-                    "*, buildings(name, code)"
-                ).range(offset, offset + page_size - 1).execute()
+                response = (
+                    self.client.table("equipment")
+                    .select("*, buildings(name, code)")
+                    .range(offset, offset + page_size - 1)
+                    .execute()
+                )
 
                 if not response.data:
                     break
@@ -104,9 +108,13 @@ class SupabaseDataLoader:
     def load_alerts(self) -> List[Dict[str, Any]]:
         """Load alerts from Supabase with related info."""
         try:
-            response = self.client.table("alerts").select(
-                "*, equipment(name, code, type), buildings(name, code)"
-            ).order("created_at", desc=True).limit(100).execute()
+            response = (
+                self.client.table("alerts")
+                .select("*, equipment(name, code, type), buildings(name, code)")
+                .order("created_at", desc=True)
+                .limit(100)
+                .execute()
+            )
             return response.data or []
         except Exception as e:
             logger.error(f"Failed to load alerts from Supabase: {e}")
@@ -121,9 +129,13 @@ class SupabaseDataLoader:
             max_records = 2000  # Limit total predictions to avoid huge indexes
 
             while len(all_predictions) < max_records:
-                response = self.client.table("predictions").select(
-                    "*, equipment(name, code, type, manufacturer, model), buildings(name, code)"
-                ).order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
+                response = (
+                    self.client.table("predictions")
+                    .select("*, equipment(name, code, type, manufacturer, model), buildings(name, code)")
+                    .order("created_at", desc=True)
+                    .range(offset, offset + page_size - 1)
+                    .execute()
+                )
 
                 if not response.data:
                     break
@@ -143,9 +155,13 @@ class SupabaseDataLoader:
     def load_work_orders(self) -> List[Dict[str, Any]]:
         """Load work orders from Supabase."""
         try:
-            response = self.client.table("work_orders").select(
-                "*, equipment(name, code, type), buildings(name, code)"
-            ).order("created_at", desc=True).limit(100).execute()
+            response = (
+                self.client.table("work_orders")
+                .select("*, equipment(name, code, type), buildings(name, code)")
+                .order("created_at", desc=True)
+                .limit(100)
+                .execute()
+            )
             return response.data or []
         except Exception as e:
             logger.error(f"Failed to load work orders from Supabase: {e}")
@@ -154,10 +170,16 @@ class SupabaseDataLoader:
     def load_documents(self) -> List[Dict[str, Any]]:
         """Load technical documents from Supabase."""
         try:
-            response = self.client.table("documents").select(
-                "id, code, title, document_type, equipment_type, manufacturer, model, "
-                "summary, keywords, failure_modes, source_url"
-            ).eq("is_latest", True).limit(100).execute()
+            response = (
+                self.client.table("documents")
+                .select(
+                    "id, code, title, document_type, equipment_type, manufacturer, model, "
+                    "summary, keywords, failure_modes, source_url"
+                )
+                .eq("is_latest", True)
+                .limit(100)
+                .execute()
+            )
             return response.data or []
         except Exception as e:
             logger.error(f"Failed to load documents from Supabase: {e}")
@@ -200,8 +222,8 @@ def _build_building_document(building: Dict, source: str = "supabase") -> Dict[s
             "region": building.get("region"),
             "type": building.get("type"),
             "sqm": building.get("sqm"),
-            "source": source
-        }
+            "source": source,
+        },
     }
 
 
@@ -252,8 +274,8 @@ def _build_equipment_document(equipment: Dict, source: str = "supabase") -> Dict
             "model": equipment.get("model"),
             "health_score": equipment.get("health_score"),
             "status": equipment.get("status"),
-            "source": source
-        }
+            "source": source,
+        },
     }
 
 
@@ -297,8 +319,8 @@ def _build_alert_document(alert: Dict, source: str = "supabase") -> Dict[str, An
             "severity": alert.get("severity"),
             "status": alert.get("status"),
             "type": alert.get("type"),
-            "source": source
-        }
+            "source": source,
+        },
     }
 
 
@@ -365,8 +387,8 @@ def _build_prediction_document(prediction: Dict, source: str = "supabase") -> Di
             "severity": prediction.get("severity"),
             "urgency": prediction.get("urgency"),
             "status": prediction.get("status"),
-            "source": source
-        }
+            "source": source,
+        },
     }
 
 
@@ -414,8 +436,8 @@ def _build_work_order_document(wo: Dict, source: str = "supabase") -> Dict[str, 
             "work_order_id": str(wo_id),
             "priority": wo.get("priority"),
             "status": wo.get("status"),
-            "source": source
-        }
+            "source": source,
+        },
     }
 
 
@@ -452,8 +474,8 @@ def _build_tech_document(doc: Dict, source: str = "supabase") -> Dict[str, Any]:
             "document_type": doc.get("document_type"),
             "equipment_type": doc.get("equipment_type"),
             "manufacturer": doc.get("manufacturer"),
-            "source": source
-        }
+            "source": source,
+        },
     }
 
 
@@ -595,9 +617,9 @@ class OpenAIConnectorMCPServer:
         now = datetime.now()
 
         should_refresh = (
-            self._documents is None or
-            force_refresh or
-            (self._last_refresh and (now - self._last_refresh).total_seconds() > self._refresh_interval_seconds)
+            self._documents is None
+            or force_refresh
+            or (self._last_refresh and (now - self._last_refresh).total_seconds() > self._refresh_interval_seconds)
         )
 
         if should_refresh:
@@ -623,11 +645,11 @@ class OpenAIConnectorMCPServer:
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "Search query to find relevant documents (e.g., 'chiller maintenance', 'Sandton building alerts', 'high risk predictions')"
+                            "description": "Search query to find relevant documents (e.g., 'chiller maintenance', 'Sandton building alerts', 'high risk predictions')",
                         }
                     },
-                    "required": ["query"]
-                }
+                    "required": ["query"],
+                },
             },
             {
                 "name": "fetch",
@@ -635,14 +657,11 @@ class OpenAIConnectorMCPServer:
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "id": {
-                            "type": "string",
-                            "description": "Document ID to fetch (from search results)"
-                        }
+                        "id": {"type": "string", "description": "Document ID to fetch (from search results)"}
                     },
-                    "required": ["id"]
-                }
-            }
+                    "required": ["id"],
+                },
+            },
         ]
 
     async def search(self, query: str) -> Dict[str, Any]:
@@ -661,14 +680,7 @@ class OpenAIConnectorMCPServer:
 
         matching_docs = _simple_text_search(query, self._documents, limit=15)
 
-        results = [
-            {
-                "id": doc["id"],
-                "title": doc["title"],
-                "url": doc["url"]
-            }
-            for doc in matching_docs
-        ]
+        results = [{"id": doc["id"], "title": doc["title"], "url": doc["url"]} for doc in matching_docs]
 
         logger.info(f"OpenAI Connector search: '{query}' -> {len(results)} results")
 
@@ -698,7 +710,7 @@ class OpenAIConnectorMCPServer:
                 "title": "Document Not Found",
                 "text": f"No document found with ID: {id}",
                 "url": "",
-                "metadata": {"error": "not_found"}
+                "metadata": {"error": "not_found"},
             }
 
         logger.info(f"OpenAI Connector fetch: {id}")
@@ -708,7 +720,7 @@ class OpenAIConnectorMCPServer:
             "title": doc["title"],
             "text": doc["text"],
             "url": doc["url"],
-            "metadata": doc.get("metadata", {})
+            "metadata": doc.get("metadata", {}),
         }
 
     async def call_tool(self, tool_name: str, **kwargs) -> Dict[str, Any]:
@@ -740,7 +752,7 @@ class OpenAIConnectorMCPServer:
             "total_documents": len(self._documents),
             "by_type": type_counts,
             "by_source": source_counts,
-            "last_refresh": self._last_refresh.isoformat() if self._last_refresh else None
+            "last_refresh": self._last_refresh.isoformat() if self._last_refresh else None,
         }
 
 

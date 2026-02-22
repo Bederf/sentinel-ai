@@ -16,7 +16,7 @@ from app.models.autonomous_decision import (
     DecisionStatus,
     EscalationLevel,
     BoundaryStatus,
-    AutonomousSystemStatus
+    AutonomousSystemStatus,
 )
 from app.models.audit_log import AuditResultType
 from app.services.safety_interlocks import safety_engine
@@ -70,10 +70,7 @@ class AutonomousDecisionEngine:
             with open(DECISION_HISTORY_FILE) as f:
                 history_data = json.load(f)
 
-            self.decision_history = [
-                AutonomousDecision.from_dict(decision_data)
-                for decision_data in history_data
-            ]
+            self.decision_history = [AutonomousDecision.from_dict(decision_data) for decision_data in history_data]
 
             logger.info(f"Loaded {len(self.decision_history)} decisions from history")
         except Exception as e:
@@ -311,10 +308,18 @@ class AutonomousDecisionEngine:
             },
         ]
 
-        self.decision_history = [
-            AutonomousDecision.from_dict(decision)
-            for decision in decisions
-        ]
+        # Convert datetime objects to ISO strings and enums to their values for from_dict
+        for d in decisions:
+            if isinstance(d.get("timestamp"), datetime):
+                d["timestamp"] = d["timestamp"].isoformat()
+            if hasattr(d.get("status"), "value"):
+                d["status"] = d["status"].value
+            if hasattr(d.get("result"), "value"):
+                d["result"] = d["result"].value
+            if hasattr(d.get("escalation_level"), "value"):
+                d["escalation_level"] = d["escalation_level"].value
+
+        self.decision_history = [AutonomousDecision.from_dict(decision) for decision in decisions]
 
         # Save to file
         await self._save_decision_history()
@@ -324,7 +329,7 @@ class AutonomousDecisionEngine:
         try:
             history_data = [decision.to_dict() for decision in self.decision_history]
 
-            with open(DECISION_HISTORY_FILE, 'w') as f:
+            with open(DECISION_HISTORY_FILE, "w") as f:
                 json.dump(history_data, f, indent=2)
 
             logger.info(f"Saved {len(history_data)} decisions to {DECISION_HISTORY_FILE}")
@@ -332,12 +337,7 @@ class AutonomousDecisionEngine:
             logger.error(f"Failed to save decision history: {e}")
 
     async def evaluate_and_execute(
-        self,
-        rule_id: str,
-        device_id: str,
-        point_name: str,
-        target_value: float,
-        decision_rationale: str
+        self, rule_id: str, device_id: str, point_name: str, target_value: float, decision_rationale: str
     ) -> AutonomousDecision:
         """Evaluate a rule and execute the decision if safe."""
         start_time = datetime.now()
@@ -393,8 +393,7 @@ class AutonomousDecisionEngine:
             await self._save_decision_history()
 
             logger.warning(
-                f"Decision {decision.id} BLOCKED - Safety validation failed: "
-                f"{safety_result.get('reasons', [])}"
+                f"Decision {decision.id} BLOCKED - Safety validation failed: {safety_result.get('reasons', [])}"
             )
 
             # Notify callbacks
@@ -475,7 +474,7 @@ class AutonomousDecisionEngine:
         limit: int = 100,
         offset: int = 0,
         device_id: Optional[str] = None,
-        status: Optional[DecisionStatus] = None
+        status: Optional[DecisionStatus] = None,
     ) -> List[AutonomousDecision]:
         """Get decision history with optional filtering."""
         filtered_decisions = self.decision_history
@@ -486,7 +485,7 @@ class AutonomousDecisionEngine:
         if status:
             filtered_decisions = [d for d in filtered_decisions if d.status == status]
 
-        return filtered_decisions[-(offset + limit):-offset] if offset > 0 else filtered_decisions[-limit:]
+        return filtered_decisions[-(offset + limit) : -offset] if offset > 0 else filtered_decisions[-limit:]
 
     async def get_system_status(self) -> AutonomousSystemStatus:
         """Get current status of the autonomous system."""
@@ -502,7 +501,9 @@ class AutonomousDecisionEngine:
                 current_escalation = decision.escalation_level
 
         # Calculate safety score (based on recent blocked/failed decisions)
-        blocked_failed = len([d for d in recent_decisions if d.status in (DecisionStatus.BLOCKED, DecisionStatus.FAILED)])
+        blocked_failed = len(
+            [d for d in recent_decisions if d.status in (DecisionStatus.BLOCKED, DecisionStatus.FAILED)]
+        )
         safety_score = max(0.0, 100.0 - (blocked_failed * 10.0))
 
         last_decision_time = None
@@ -522,26 +523,17 @@ class AutonomousDecisionEngine:
     def enable_autonomous_mode(self) -> Dict[str, Any]:
         """Enable autonomous mode."""
         if self.enabled:
-            return {
-                "success": False,
-                "message": "Autonomous mode already enabled"
-            }
+            return {"success": False, "message": "Autonomous mode already enabled"}
 
         self.enabled = True
         logger.info("Autonomous mode ENABLED")
 
-        return {
-            "success": True,
-            "message": "Autonomous mode enabled successfully"
-        }
+        return {"success": True, "message": "Autonomous mode enabled successfully"}
 
     def disable_autonomous_mode(self) -> Dict[str, Any]:
         """Disable autonomous mode and cancel active decisions."""
         if not self.enabled:
-            return {
-                "success": False,
-                "message": "Autonomous mode already disabled"
-            }
+            return {"success": False, "message": "Autonomous mode already disabled"}
 
         self.enabled = False
 
@@ -559,8 +551,9 @@ class AutonomousDecisionEngine:
         return {
             "success": True,
             "message": f"Autonomous mode disabled - Cancelled {cancelled_count} active decisions",
-            "cancelled_decisions": cancelled_count
+            "cancelled_decisions": cancelled_count,
         }
+
 
 # Global instance
 autonomous_decision_engine = AutonomousDecisionEngine()

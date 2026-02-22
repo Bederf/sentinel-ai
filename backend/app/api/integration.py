@@ -10,19 +10,28 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Query
 from pydantic import BaseModel, Field
 
 from app.models.integration import (
-    LogSource, LogSourceCreate, LogSourceUpdate,
-    ColumnMapping, ColumnMappingCreate,
-    PointAssetMapping, PointAssetMappingCreate,
-    FormatDetectionResult, ParseResult, BulkMatchResult,
+    LogSource,
+    LogSourceCreate,
+    LogSourceUpdate,
+    ColumnMapping,
+    ColumnMappingCreate,
+    PointAssetMapping,
+    PointAssetMappingCreate,
+    FormatDetectionResult,
+    ParseResult,
+    BulkMatchResult,
     ColumnMapping as CMModel,
-    BuildingStatus, ValidationChecklist,
+    BuildingStatus,
+    ValidationChecklist,
 )
 
 
 # ==================== Monitoring Response Models ====================
 
+
 class IntegrationAlert(BaseModel):
     """An alert from integration health monitoring."""
+
     id: str = ""
     type: str  # 'stale_data', 'high_error_rate', 'low_match_coverage'
     severity: str  # 'warning', 'critical'
@@ -34,6 +43,7 @@ class IntegrationAlert(BaseModel):
 
 class DALISourceHealth(BaseModel):
     """Health status for a DALI lighting data source."""
+
     site_id: str
     source_name: str
     source_type: str = "dali_lighting"
@@ -50,6 +60,7 @@ class DALISourceHealth(BaseModel):
 
 class IntegrationHealthSummary(BaseModel):
     """Integration health summary for monitoring dashboard."""
+
     sources_count: int
     active_sources: int
     last_sync: Optional[datetime] = None
@@ -63,16 +74,18 @@ class IntegrationHealthSummary(BaseModel):
 
 class DataQualityMetrics(BaseModel):
     """Data quality metrics for a building."""
+
     match_coverage: float = Field(..., ge=0, le=100, description="Percentage of points matched")
     data_freshness_hours: float = Field(..., description="Hours since last sync")
     error_rate: float = Field(..., ge=0, le=100, description="Percentage of failed sync jobs")
     duplicate_rate: float = Field(..., ge=0, le=100, description="Percentage of skipped records")
     overall_score: float = Field(..., ge=0, le=100, description="Weighted quality score")
-    trend: Literal['improving', 'stable', 'degrading']
+    trend: Literal["improving", "stable", "degrading"]
 
 
 class SyncJobSummary(BaseModel):
     """Summary of a sync job."""
+
     id: str
     log_source_id: str
     source_name: Optional[str] = None
@@ -89,14 +102,17 @@ class SyncJobSummary(BaseModel):
 
 # ==================== Building Status Response Models ====================
 
+
 class BuildingStatusUpdate(BaseModel):
     """Request to update building status."""
+
     status: str  # BuildingStatus enum value
     notes: Optional[str] = None
 
 
 class ActivationResult(BaseModel):
     """Result of building activation attempt."""
+
     success: bool
     building_id: str
     new_status: str  # BuildingStatus enum value
@@ -106,6 +122,7 @@ class ActivationResult(BaseModel):
 
 class BuildingStatusResponse(BaseModel):
     """Current building status."""
+
     building_id: str
     status: str  # BuildingStatus enum value
     last_validated_at: Optional[datetime] = None
@@ -117,6 +134,8 @@ from app.database.repositories.building_repository import BuildingRepository
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.services.log_parser import LogParserService
 from app.services.point_matcher import PointMatcherService
+from app.services.commissioning_service import CommissioningService
+from app.models.commissioning import TruthCheckSubmission
 
 
 router = APIRouter(prefix="/api/integration", tags=["Integration"])
@@ -127,6 +146,7 @@ building_repo = BuildingRepository()
 equipment_repo = EquipmentRepository()
 parser_service = LogParserService()
 matcher_service = PointMatcherService()
+commissioning_service = CommissioningService()
 
 
 _building_uuid_cache: dict[str, str] = {}
@@ -145,7 +165,7 @@ def resolve_building_uuid(building_id: str) -> str:
     try:
         building = building_repo.get_by_id(building_id)
         if building:
-            resolved = building['id']
+            resolved = building["id"]
             _building_uuid_cache[building_id] = resolved
             return resolved
     except Exception:
@@ -154,6 +174,7 @@ def resolve_building_uuid(building_id: str) -> str:
 
 
 # ==================== Log Sources ====================
+
 
 @router.get("/sources", response_model=List[LogSource])
 async def list_log_sources(
@@ -189,7 +210,7 @@ async def create_log_source(source: LogSourceCreate):
         raise HTTPException(status_code=404, detail="Building not found")
 
     data = source.model_dump(exclude_none=True)
-    data['building_id'] = resolved_id
+    data["building_id"] = resolved_id
     return integration_repo.create_log_source(data)
 
 
@@ -216,7 +237,7 @@ async def delete_log_source(source_id: str):
 @router.post("/sources/{source_id}/activate", response_model=LogSource)
 async def activate_log_source(source_id: str):
     """Activate a log source for scheduled sync."""
-    updated = integration_repo.update_log_source(source_id, {'is_active': True})
+    updated = integration_repo.update_log_source(source_id, {"is_active": True})
     if not updated:
         raise HTTPException(status_code=404, detail="Log source not found")
     return updated
@@ -225,13 +246,14 @@ async def activate_log_source(source_id: str):
 @router.post("/sources/{source_id}/deactivate", response_model=LogSource)
 async def deactivate_log_source(source_id: str):
     """Deactivate a log source."""
-    updated = integration_repo.update_log_source(source_id, {'is_active': False})
+    updated = integration_repo.update_log_source(source_id, {"is_active": False})
     if not updated:
         raise HTTPException(status_code=404, detail="Log source not found")
     return updated
 
 
 # ==================== Format Detection ====================
+
 
 @router.post("/detect-format", response_model=FormatDetectionResult)
 async def detect_file_format(file: UploadFile = File(...)):
@@ -244,18 +266,19 @@ async def detect_file_format(file: UploadFile = File(...)):
 
     # Try UTF-8 first, fall back to Latin-1
     try:
-        text_content = content.decode('utf-8')
+        text_content = content.decode("utf-8")
     except UnicodeDecodeError:
-        text_content = content.decode('latin-1')
+        text_content = content.decode("latin-1")
 
     try:
-        result = parser_service.detect_format(text_content, file.filename or '')
+        result = parser_service.detect_format(text_content, file.filename or "")
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 # ==================== Column Mappings ====================
+
 
 @router.get("/sources/{source_id}/mappings", response_model=List[ColumnMapping])
 async def get_column_mappings(source_id: str):
@@ -281,6 +304,7 @@ async def save_column_mappings(source_id: str, mappings: List[ColumnMappingCreat
 
 # ==================== Point-Asset Matching ====================
 
+
 @router.post("/buildings/{building_id}/match-points", response_model=BulkMatchResult)
 async def match_points_to_assets(
     building_id: str,
@@ -298,29 +322,26 @@ async def match_points_to_assets(
         # Fall back to equipment table if no CAFM sync yet
         building = building_repo.get_by_uuid(resolved_id)
         if building:
-            equipment = equipment_repo.get_by_building(building['id'])
-            cafm_assets = [{'asset_tag': e['code'], 'description': e['name']} for e in equipment]
+            equipment = equipment_repo.get_by_building(building["id"])
+            cafm_assets = [{"asset_tag": e["code"], "description": e["name"]} for e in equipment]
 
     # Parse file to extract point IDs
     content = await file.read()
     try:
-        text_content = content.decode('utf-8')
+        text_content = content.decode("utf-8")
     except UnicodeDecodeError:
-        text_content = content.decode('latin-1')
+        text_content = content.decode("latin-1")
 
     # Detect format and extract point column
-    detection = parser_service.detect_format(text_content, file.filename or '')
-    point_column = detection.suggested_mappings.get('point_id')
+    detection = parser_service.detect_format(text_content, file.filename or "")
+    point_column = detection.suggested_mappings.get("point_id")
 
     if not point_column:
-        raise HTTPException(
-            status_code=400,
-            detail="Could not detect point ID column. Please specify manually."
-        )
+        raise HTTPException(status_code=400, detail="Could not detect point ID column. Please specify manually.")
 
     # Extract unique point IDs
     rows = list(csv.DictReader(io.StringIO(text_content), delimiter=detection.delimiter))
-    point_ids = list(set(r.get(point_column, '') for r in rows if r.get(point_column)))
+    point_ids = list(set(r.get(point_column, "") for r in rows if r.get(point_column)))
 
     # Run matching
     result = matcher_service.bulk_match(point_ids, cafm_assets)
@@ -387,6 +408,7 @@ async def get_point_mappings(
 
 # ==================== Log Ingestion ====================
 
+
 @router.post("/sources/{source_id}/ingest", response_model=ParseResult)
 async def ingest_log_file(
     source_id: str,
@@ -416,24 +438,24 @@ async def ingest_log_file(
     # Read file
     content = await file.read()
     try:
-        text_content = content.decode('utf-8')
+        text_content = content.decode("utf-8")
     except UnicodeDecodeError:
-        text_content = content.decode('latin-1')
+        text_content = content.decode("latin-1")
 
     # Parse based on source type
-    if source['source_type'] in ['bms_alarm', 'bcc_alarm']:
+    if source["source_type"] in ["bms_alarm", "bcc_alarm"]:
         result = parser_service.parse_alarms(
             text_content,
             mapping_models,
-            source.get('date_format', 'YYYY-MM-DD HH:MI:SS'),
-            source.get('delimiter', ','),
+            source.get("date_format", "YYYY-MM-DD HH:MI:SS"),
+            source.get("delimiter", ","),
         )
     else:
         result = parser_service.parse_trends(
             text_content,
             mapping_models,
-            source.get('date_format', 'YYYY-MM-DD HH:MI:SS'),
-            source.get('delimiter', ','),
+            source.get("date_format", "YYYY-MM-DD HH:MI:SS"),
+            source.get("delimiter", ","),
         )
 
     if dry_run:
@@ -441,8 +463,7 @@ async def ingest_log_file(
 
     # Get point mappings for asset lookup
     point_mappings = {
-        m['bms_point_id']: m.get('cafm_asset_id')
-        for m in integration_repo.get_point_mappings(source['building_id'])
+        m["bms_point_id"]: m.get("cafm_asset_id") for m in integration_repo.get_point_mappings(source["building_id"])
     }
 
     # Create sync job
@@ -456,22 +477,22 @@ async def ingest_log_file(
             alarms_to_insert = []
             for alarm in result.parsed_alarms:
                 alarm_dict = {
-                    'log_source_id': source_id,
-                    'building_id': source['building_id'],
-                    'occurred_at': alarm.occurred_at.isoformat(),
-                    'point_id': alarm.point_id,
-                    'asset_id': point_mappings.get(alarm.point_id) or alarm.asset_id,
-                    'alarm_code': alarm.alarm_code,
-                    'sentinel_code': alarm.sentinel_code,
-                    'description': alarm.description,
-                    'value': alarm.value,
-                    'threshold': alarm.threshold,
-                    'severity': alarm.severity.value if alarm.severity else None,
-                    'state': alarm.state.value if alarm.state else None,
-                    'acknowledged_by': alarm.acknowledged_by,
-                    'notes': alarm.notes,
-                    'raw_data': alarm.raw_data,
-                    'source_hash': parser_service.compute_hash(alarm),
+                    "log_source_id": source_id,
+                    "building_id": source["building_id"],
+                    "occurred_at": alarm.occurred_at.isoformat(),
+                    "point_id": alarm.point_id,
+                    "asset_id": point_mappings.get(alarm.point_id) or alarm.asset_id,
+                    "alarm_code": alarm.alarm_code,
+                    "sentinel_code": alarm.sentinel_code,
+                    "description": alarm.description,
+                    "value": alarm.value,
+                    "threshold": alarm.threshold,
+                    "severity": alarm.severity.value if alarm.severity else None,
+                    "state": alarm.state.value if alarm.state else None,
+                    "acknowledged_by": alarm.acknowledged_by,
+                    "notes": alarm.notes,
+                    "raw_data": alarm.raw_data,
+                    "source_hash": parser_service.compute_hash(alarm),
                 }
                 alarms_to_insert.append(alarm_dict)
 
@@ -481,15 +502,15 @@ async def ingest_log_file(
             trends_to_insert = []
             for trend in result.parsed_trends:
                 trend_dict = {
-                    'log_source_id': source_id,
-                    'building_id': source['building_id'],
-                    'recorded_at': trend.recorded_at.isoformat(),
-                    'point_id': trend.point_id,
-                    'asset_id': point_mappings.get(trend.point_id) or trend.asset_id,
-                    'parameter_name': trend.parameter_name,
-                    'value': trend.value,
-                    'unit': trend.unit,
-                    'quality': trend.quality,
+                    "log_source_id": source_id,
+                    "building_id": source["building_id"],
+                    "recorded_at": trend.recorded_at.isoformat(),
+                    "point_id": trend.point_id,
+                    "asset_id": point_mappings.get(trend.point_id) or trend.asset_id,
+                    "parameter_name": trend.parameter_name,
+                    "value": trend.value,
+                    "unit": trend.unit,
+                    "quality": trend.quality,
                 }
                 trends_to_insert.append(trend_dict)
 
@@ -498,8 +519,8 @@ async def ingest_log_file(
         # Complete job
         processing_time = int((time.time() - start_time) * 1000)
         integration_repo.complete_sync_job(
-            job['id'],
-            status='success',
+            job["id"],
+            status="success",
             processed=result.total_rows,
             inserted=inserted,
             skipped=result.total_rows - result.valid_rows,
@@ -508,19 +529,19 @@ async def ingest_log_file(
         )
 
         # Update source sync status
-        integration_repo.update_sync_status(source_id, 'success', inserted)
+        integration_repo.update_sync_status(source_id, "success", inserted)
 
     except Exception as e:
         integration_repo.complete_sync_job(
-            job['id'],
-            status='failed',
+            job["id"],
+            status="failed",
             processed=result.total_rows,
             inserted=0,
             skipped=0,
             failed=result.total_rows,
             error_message=str(e),
         )
-        integration_repo.update_sync_status(source_id, 'failed', 0, str(e))
+        integration_repo.update_sync_status(source_id, "failed", 0, str(e))
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {e}")
 
     return result
@@ -533,6 +554,7 @@ async def get_sync_jobs(source_id: str, limit: int = Query(20, ge=1, le=100)):
 
 
 # ==================== Reference Data ====================
+
 
 @router.get("/reference/alarm-taxonomy")
 async def get_alarm_taxonomy():
@@ -547,6 +569,7 @@ async def get_severity_mappings(source_id: Optional[str] = None):
 
 
 # ==================== CAFM Assets ====================
+
 
 @router.get("/buildings/{building_id}/cafm-assets")
 async def get_cafm_assets(building_id: str):
@@ -567,6 +590,7 @@ async def get_recent_alarms(
 
 
 # ==================== Monitoring Endpoints ====================
+
 
 @router.get("/health", response_model=IntegrationHealthSummary)
 async def get_integration_health(
@@ -590,60 +614,67 @@ async def get_integration_health(
     alerts: List[IntegrationAlert] = []
 
     # Stale data alert (>24 hours since last sync)
-    if health['last_sync']:
+    if health["last_sync"]:
         try:
-            last_sync_str = health['last_sync']
+            last_sync_str = health["last_sync"]
             if isinstance(last_sync_str, str):
-                last_sync = datetime.fromisoformat(last_sync_str.replace('Z', '+00:00').replace('+00:00', ''))
+                last_sync = datetime.fromisoformat(last_sync_str.replace("Z", "+00:00").replace("+00:00", ""))
             else:
                 last_sync = last_sync_str
             hours_since_sync = (datetime.utcnow() - last_sync).total_seconds() / 3600
             if hours_since_sync > 24:
-                alerts.append(IntegrationAlert(
-                    id=str(uuid.uuid4()),
-                    type='stale_data',
-                    severity='warning' if hours_since_sync < 48 else 'critical',
-                    message=f"Data is {int(hours_since_sync)} hours old. Last sync was {last_sync.strftime('%Y-%m-%d %H:%M')}.",
-                    timestamp=datetime.utcnow().isoformat(),
-                    value=round(hours_since_sync, 1),
-                    threshold=24,
-                ))
+                alerts.append(
+                    IntegrationAlert(
+                        id=str(uuid.uuid4()),
+                        type="stale_data",
+                        severity="warning" if hours_since_sync < 48 else "critical",
+                        message=f"Data is {int(hours_since_sync)} hours old. Last sync was {last_sync.strftime('%Y-%m-%d %H:%M')}.",
+                        timestamp=datetime.utcnow().isoformat(),
+                        value=round(hours_since_sync, 1),
+                        threshold=24,
+                    )
+                )
         except (ValueError, TypeError):
             pass
 
     # High error rate alert (>10% of recent syncs failed)
-    if health['recent_errors_count'] > 0 and health['active_sources'] > 0:
+    if health["recent_errors_count"] > 0 and health["active_sources"] > 0:
         # Approximate error rate based on active sources
-        error_ratio = health['recent_errors_count'] / health['active_sources']
+        error_ratio = health["recent_errors_count"] / health["active_sources"]
         if error_ratio > 0.1:
-            alerts.append(IntegrationAlert(
-                id=str(uuid.uuid4()),
-                type='high_error_rate',
-                severity='warning' if error_ratio < 0.25 else 'critical',
-                message=f"{health['recent_errors_count']} sync failures in the last 24 hours.",
-                timestamp=datetime.utcnow().isoformat(),
-                value=health['recent_errors_count'],
-                threshold=health['active_sources'] * 0.1,
-            ))
+            alerts.append(
+                IntegrationAlert(
+                    id=str(uuid.uuid4()),
+                    type="high_error_rate",
+                    severity="warning" if error_ratio < 0.25 else "critical",
+                    message=f"{health['recent_errors_count']} sync failures in the last 24 hours.",
+                    timestamp=datetime.utcnow().isoformat(),
+                    value=health["recent_errors_count"],
+                    threshold=health["active_sources"] * 0.1,
+                )
+            )
 
     # Low match coverage alert (<50% of points matched)
-    if health['total_points_mapped'] > 0:
-        match_rate = (health['total_points_mapped'] - health['unmatched_points']) / health['total_points_mapped'] * 100
+    if health["total_points_mapped"] > 0:
+        match_rate = (health["total_points_mapped"] - health["unmatched_points"]) / health["total_points_mapped"] * 100
         if match_rate < 50:
-            alerts.append(IntegrationAlert(
-                id=str(uuid.uuid4()),
-                type='low_match_coverage',
-                severity='warning' if match_rate > 25 else 'critical',
-                message=f"Only {match_rate:.0f}% of points are matched to assets. {health['unmatched_points']} points unmatched.",
-                timestamp=datetime.utcnow().isoformat(),
-                value=round(match_rate, 1),
-                threshold=50,
-            ))
+            alerts.append(
+                IntegrationAlert(
+                    id=str(uuid.uuid4()),
+                    type="low_match_coverage",
+                    severity="warning" if match_rate > 25 else "critical",
+                    message=f"Only {match_rate:.0f}% of points are matched to assets. {health['unmatched_points']} points unmatched.",
+                    timestamp=datetime.utcnow().isoformat(),
+                    value=round(match_rate, 1),
+                    threshold=50,
+                )
+            )
 
     # Get DALI source health
     dali_sources: List[DALISourceHealth] = []
     try:
         from app.services.dali_service import get_dali_service
+
         dali_service = get_dali_service()
         for dh in dali_service.get_sources_health():
             # If filtering by building_id, only include matching site
@@ -654,13 +685,13 @@ async def get_integration_health(
         pass  # DALI service may not be available
 
     return IntegrationHealthSummary(
-        sources_count=health['sources_count'],
-        active_sources=health['active_sources'],
-        last_sync=health['last_sync'],
-        total_records_ingested=health['total_records_ingested'],
-        total_points_mapped=health['total_points_mapped'],
-        unmatched_points=health['unmatched_points'],
-        recent_errors_count=health['recent_errors_count'],
+        sources_count=health["sources_count"],
+        active_sources=health["active_sources"],
+        last_sync=health["last_sync"],
+        total_records_ingested=health["total_records_ingested"],
+        total_points_mapped=health["total_points_mapped"],
+        unmatched_points=health["unmatched_points"],
+        recent_errors_count=health["recent_errors_count"],
         alerts=alerts,
         dali_sources=dali_sources,
     )
@@ -683,12 +714,12 @@ async def get_quality_metrics(building_id: str):
     metrics = integration_repo.get_quality_metrics(resolved_id)
 
     return DataQualityMetrics(
-        match_coverage=metrics['match_coverage'],
-        data_freshness_hours=metrics['data_freshness_hours'],
-        error_rate=metrics['error_rate'],
-        duplicate_rate=metrics['duplicate_rate'],
-        overall_score=metrics['overall_score'],
-        trend=metrics['trend'],
+        match_coverage=metrics["match_coverage"],
+        data_freshness_hours=metrics["data_freshness_hours"],
+        error_rate=metrics["error_rate"],
+        duplicate_rate=metrics["duplicate_rate"],
+        overall_score=metrics["overall_score"],
+        trend=metrics["trend"],
     )
 
 
@@ -707,33 +738,34 @@ async def get_sync_jobs_summary(
     jobs = integration_repo.get_sync_jobs_summary(resolved_id, days)
 
     # Look up source names for display
-    source_ids = list({job['log_source_id'] for job in jobs})
+    source_ids = list({job["log_source_id"] for job in jobs})
     source_names: dict[str, str] = {}
     if source_ids:
         sources = integration_repo.get_log_sources_by_ids(source_ids)
         for s in sources:
-            source_names[s['id']] = s.get('name') or s['id'][:8]
+            source_names[s["id"]] = s.get("name") or s["id"][:8]
 
     return [
         SyncJobSummary(
-            id=job['id'],
-            log_source_id=job['log_source_id'],
-            source_name=source_names.get(job['log_source_id']),
-            status=job['status'],
-            records_processed=job.get('records_processed'),
-            records_inserted=job.get('records_inserted'),
-            records_failed=job.get('records_failed'),
-            records_skipped=job.get('records_skipped'),
-            processing_time_ms=job.get('processing_time_ms'),
-            started_at=job.get('started_at'),
-            completed_at=job.get('completed_at'),
-            file_name=job.get('file_name'),
+            id=job["id"],
+            log_source_id=job["log_source_id"],
+            source_name=source_names.get(job["log_source_id"]),
+            status=job["status"],
+            records_processed=job.get("records_processed"),
+            records_inserted=job.get("records_inserted"),
+            records_failed=job.get("records_failed"),
+            records_skipped=job.get("records_skipped"),
+            processing_time_ms=job.get("processing_time_ms"),
+            started_at=job.get("started_at"),
+            completed_at=job.get("completed_at"),
+            file_name=job.get("file_name"),
         )
         for job in jobs
     ]
 
 
 # ==================== Building Status / Go-Live Workflow ====================
+
 
 @router.get("/buildings/{building_id}/validation-checklist", response_model=ValidationChecklist)
 async def get_validation_checklist(building_id: str):
@@ -756,23 +788,23 @@ async def get_validation_checklist(building_id: str):
         if not building:
             building = building_repo.get_by_id(building_id)
         if building:
-            checklist['building_name'] = building.get('name')
+            checklist["building_name"] = building.get("name")
     except Exception:
         pass
 
     # Get current building status
     status_record = integration_repo.get_building_status(resolved_id)
-    current_status = BuildingStatus(status_record['status']) if status_record else BuildingStatus.DRAFT
+    current_status = BuildingStatus(status_record["status"]) if status_record else BuildingStatus.DRAFT
 
     return ValidationChecklist(
         building_id=building_id,
-        building_name=checklist.get('building_name'),
+        building_name=checklist.get("building_name"),
         status=current_status,
         checked_at=datetime.utcnow(),
-        items=checklist['items'],
-        summary=checklist['summary'],
-        can_activate=checklist['can_activate'],
-        blocking_issues=checklist['blocking_issues'],
+        items=checklist["items"],
+        summary=checklist["summary"],
+        can_activate=checklist["can_activate"],
+        blocking_issues=checklist["blocking_issues"],
     )
 
 
@@ -795,9 +827,9 @@ async def get_building_status(building_id: str):
 
     return BuildingStatusResponse(
         building_id=building_id,
-        status=status_record['status'],
-        last_validated_at=status_record.get('last_validated_at'),
-        notes=status_record.get('notes'),
+        status=status_record["status"],
+        last_validated_at=status_record.get("last_validated_at"),
+        notes=status_record.get("notes"),
     )
 
 
@@ -820,12 +852,12 @@ async def validate_building(building_id: str):
         if not building:
             building = building_repo.get_by_id(building_id)
         if building:
-            checklist['building_name'] = building.get('name')
+            checklist["building_name"] = building.get("name")
     except Exception:
         pass
 
     # Determine new status based on validation
-    if checklist['can_activate']:
+    if checklist["can_activate"]:
         new_status = BuildingStatus.PENDING_VALIDATION
         integration_repo.update_building_status(
             resolved_id,
@@ -835,17 +867,17 @@ async def validate_building(building_id: str):
     else:
         # Stay in DRAFT or current status if validation fails
         current = integration_repo.get_building_status(resolved_id)
-        new_status = BuildingStatus(current['status']) if current else BuildingStatus.DRAFT
+        new_status = BuildingStatus(current["status"]) if current else BuildingStatus.DRAFT
 
     return ValidationChecklist(
         building_id=building_id,
-        building_name=checklist.get('building_name'),
+        building_name=checklist.get("building_name"),
         status=new_status,
         checked_at=datetime.utcnow(),
-        items=checklist['items'],
-        summary=checklist['summary'],
-        can_activate=checklist['can_activate'],
-        blocking_issues=checklist['blocking_issues'],
+        items=checklist["items"],
+        summary=checklist["summary"],
+        can_activate=checklist["can_activate"],
+        blocking_issues=checklist["blocking_issues"],
     )
 
 
@@ -864,11 +896,11 @@ async def activate_building(building_id: str):
 
     # Check current status
     current = integration_repo.get_building_status(resolved_id)
-    if not current or current['status'] != BuildingStatus.PENDING_VALIDATION.value:
+    if not current or current["status"] != BuildingStatus.PENDING_VALIDATION.value:
         return ActivationResult(
             success=False,
             building_id=building_id,
-            new_status=current['status'] if current else BuildingStatus.DRAFT.value,
+            new_status=current["status"] if current else BuildingStatus.DRAFT.value,
             message="Building must be in PENDING_VALIDATION status to activate. Run /validate first.",
             validation_errors=["Status is not PENDING_VALIDATION"],
         )
@@ -876,13 +908,13 @@ async def activate_building(building_id: str):
     # Run validation again to confirm
     checklist = integration_repo.get_validation_checklist(resolved_id)
 
-    if not checklist['can_activate']:
+    if not checklist["can_activate"]:
         return ActivationResult(
             success=False,
             building_id=building_id,
             new_status=BuildingStatus.PENDING_VALIDATION.value,
             message="Activation blocked by failed validation checks.",
-            validation_errors=checklist['blocking_issues'],
+            validation_errors=checklist["blocking_issues"],
         )
 
     # Activate the building
@@ -930,6 +962,7 @@ async def suspend_building(
 
 # ==================== Demo Seeding ====================
 
+
 @router.get("/unmatched-points")
 async def get_unmatched_points(
     building_id: Optional[str] = Query(None, description="Filter by building ID"),
@@ -961,14 +994,14 @@ async def seed_integration_data():
     if not building:
         raise HTTPException(status_code=404, detail="Sandton building not found")
 
-    building_id = building['id']
+    building_id = building["id"]
 
     # Get existing log source
     sources = integration_repo.get_log_sources(building_id=building_id)
     if not sources:
         raise HTTPException(status_code=404, detail="No log sources found. Create one first.")
 
-    source_id = sources[0]['id']
+    source_id = sources[0]["id"]
 
     # Get REAL equipment from site-002
     equipment_list = equipment_repo.get_by_building_code("site-002")
@@ -981,52 +1014,101 @@ async def seed_integration_data():
     # Build point mappings from real equipment
     point_mappings = []
     parameter_templates = {
-        'fcu': [('ZoneTemp', 'Zone Temperature', 'analog'), ('FanSpeed', 'Fan Speed', 'analog'), ('ValvePos', 'Valve Position', 'analog')],
-        'ahu': [('SupplyTemp', 'Supply Air Temp', 'analog'), ('ReturnTemp', 'Return Air Temp', 'analog'), ('FanStatus', 'Fan Status', 'binary')],
-        'vav': [('DamperPos', 'Damper Position', 'analog'), ('FlowRate', 'Air Flow Rate', 'analog')],
-        'chiller': [('ChwSupply', 'CHW Supply Temp', 'analog'), ('ChwReturn', 'CHW Return Temp', 'analog'), ('LoadPct', 'Load Percentage', 'analog')],
-        'generator': [('RunStatus', 'Run Status', 'binary'), ('Voltage', 'Output Voltage', 'analog'), ('Frequency', 'Frequency', 'analog')],
-        'lighting': [('LightLevel', 'Light Level', 'analog'), ('OccStatus', 'Occupancy Status', 'binary')],
-        'sensor': [('Reading', 'Sensor Reading', 'analog')],
+        "fcu": [
+            ("ZoneTemp", "Zone Temperature", "analog"),
+            ("FanSpeed", "Fan Speed", "analog"),
+            ("ValvePos", "Valve Position", "analog"),
+        ],
+        "ahu": [
+            ("SupplyTemp", "Supply Air Temp", "analog"),
+            ("ReturnTemp", "Return Air Temp", "analog"),
+            ("FanStatus", "Fan Status", "binary"),
+        ],
+        "vav": [("DamperPos", "Damper Position", "analog"), ("FlowRate", "Air Flow Rate", "analog")],
+        "chiller": [
+            ("ChwSupply", "CHW Supply Temp", "analog"),
+            ("ChwReturn", "CHW Return Temp", "analog"),
+            ("LoadPct", "Load Percentage", "analog"),
+        ],
+        "generator": [
+            ("RunStatus", "Run Status", "binary"),
+            ("Voltage", "Output Voltage", "analog"),
+            ("Frequency", "Frequency", "analog"),
+        ],
+        "lighting": [("LightLevel", "Light Level", "analog"), ("OccStatus", "Occupancy Status", "binary")],
+        "sensor": [("Reading", "Sensor Reading", "analog")],
     }
 
-    confidences = ['exact', 'exact', 'exact', 'fuzzy', 'fuzzy', 'manual']  # Weighted towards exact
+    confidences = ["exact", "exact", "exact", "fuzzy", "fuzzy", "manual"]  # Weighted towards exact
 
     for eq in equipment_list[:50]:  # Limit to 50 equipment items
-        eq_id = eq.get('code') or eq.get('equipment_id') or eq.get('id')
-        eq_type = (eq.get('type') or 'sensor').lower()
-        eq_name = eq.get('name') or eq_id
+        eq_id = eq.get("code") or eq.get("equipment_id") or eq.get("id")
+        eq_type = (eq.get("type") or "sensor").lower()
+        eq_name = eq.get("name") or eq_id
 
         # Get parameter templates for this equipment type
-        params = parameter_templates.get(eq_type, [('Value', 'Value', 'analog')])
+        params = parameter_templates.get(eq_type, [("Value", "Value", "analog")])
 
         for param_suffix, param_name, param_type in params:
             bms_point_id = f"BMS.{eq_id}.{param_suffix}"
             confidence = random.choice(confidences)
 
-            point_mappings.append({
-                "bms_point_id": bms_point_id,
-                "extracted_asset_id": eq_id,
-                "cafm_asset_id": f"CAFM-{eq_id}" if confidence != 'unmatched' else None,
-                "parameter_name": param_name,
-                "parameter_type": param_type,
-                "match_confidence": confidence,
-                "is_verified": confidence in ['exact', 'manual'],
-            })
+            point_mappings.append(
+                {
+                    "bms_point_id": bms_point_id,
+                    "extracted_asset_id": eq_id,
+                    "cafm_asset_id": f"CAFM-{eq_id}" if confidence != "unmatched" else None,
+                    "parameter_name": param_name,
+                    "parameter_type": param_type,
+                    "match_confidence": confidence,
+                    "is_verified": confidence in ["exact", "manual"],
+                }
+            )
 
     # Add a few unmatched points for realism
-    point_mappings.extend([
-        {"bms_point_id": "BMS.Legacy.Sensor42", "extracted_asset_id": None, "cafm_asset_id": None, "parameter_name": None, "parameter_type": None, "match_confidence": "unmatched", "is_verified": False},
-        {"bms_point_id": "BMS.Unknown.PointX", "extracted_asset_id": None, "cafm_asset_id": None, "parameter_name": None, "parameter_type": None, "match_confidence": "unmatched", "is_verified": False},
-        {"bms_point_id": "BMS.Orphan.TempSensor", "extracted_asset_id": None, "cafm_asset_id": None, "parameter_name": None, "parameter_type": None, "match_confidence": "unmatched", "is_verified": False},
-    ])
+    point_mappings.extend(
+        [
+            {
+                "bms_point_id": "BMS.Legacy.Sensor42",
+                "extracted_asset_id": None,
+                "cafm_asset_id": None,
+                "parameter_name": None,
+                "parameter_type": None,
+                "match_confidence": "unmatched",
+                "is_verified": False,
+            },
+            {
+                "bms_point_id": "BMS.Unknown.PointX",
+                "extracted_asset_id": None,
+                "cafm_asset_id": None,
+                "parameter_name": None,
+                "parameter_type": None,
+                "match_confidence": "unmatched",
+                "is_verified": False,
+            },
+            {
+                "bms_point_id": "BMS.Orphan.TempSensor",
+                "extracted_asset_id": None,
+                "cafm_asset_id": None,
+                "parameter_name": None,
+                "parameter_type": None,
+                "match_confidence": "unmatched",
+                "is_verified": False,
+            },
+        ]
+    )
 
     mappings_created = integration_repo.bulk_upsert_point_mappings(building_id, point_mappings)
 
     # Seed column_mappings for the log source
     # Schema: source_column, sentinel_field, transform, transform_params (jsonb)
     column_mappings = [
-        {"source_column": "TIMESTAMP", "sentinel_field": "occurred_at", "transform": "datetime", "transform_params": {"format": "YYYY-MM-DD HH:MI:SS"}},
+        {
+            "source_column": "TIMESTAMP",
+            "sentinel_field": "occurred_at",
+            "transform": "datetime",
+            "transform_params": {"format": "YYYY-MM-DD HH:MI:SS"},
+        },
         {"source_column": "POINT_ID", "sentinel_field": "point_id", "transform": None, "transform_params": None},
         {"source_column": "VALUE", "sentinel_field": "value", "transform": "number", "transform_params": None},
         {"source_column": "ALARM_CODE", "sentinel_field": "alarm_code", "transform": None, "transform_params": None},
@@ -1042,5 +1124,52 @@ async def seed_integration_data():
         "source_id": source_id,
         "point_mappings_created": mappings_created,
         "column_mappings_created": len(mappings_saved),
-        "message": "Demo integration data seeded successfully"
+        "message": "Demo integration data seeded successfully",
     }
+
+
+# ==================== Commissioning Scorecard (Phase 107b) ====================
+
+
+@router.get("/buildings/{building_id}/commissioning-scorecard")
+async def get_commissioning_scorecard(building_id: str):
+    """Run the commissioning scorecard for a building.
+
+    Evaluates 8 hard gates and returns pass/fail status, truth check results,
+    consecutive pass days, and promotion readiness.
+    """
+    scorecard = await commissioning_service.run_scorecard(building_id)
+    return scorecard.model_dump()
+
+
+@router.post("/buildings/{building_id}/truth-check")
+async def submit_truth_check(building_id: str, submission: TruthCheckSubmission):
+    """Submit a truth check for a building (minimum 20 entries).
+
+    Compares SENTINEL readings against native BMS values to verify accuracy.
+    """
+    result = commissioning_service.submit_truth_check(building_id, submission.entries)
+    return result.model_dump()
+
+
+@router.post("/buildings/{building_id}/promote-to-live")
+async def promote_to_live(building_id: str):
+    """Attempt to promote a building from SHADOW_LIVE to LIVE_CONTROL.
+
+    Requires: all gates passed, >= 2 consecutive pass days, passing truth check,
+    and current ingestion mode must be shadow_live.
+    """
+    from app.config.settings import settings, IngestionMode
+
+    current_mode = settings.resolved_ingestion_mode
+    if current_mode != IngestionMode.SHADOW_LIVE:
+        return {
+            "success": False,
+            "building_id": building_id,
+            "previous_mode": current_mode.value,
+            "message": f"Cannot promote: current mode is {current_mode.value}, must be shadow_live",
+            "blocking_reasons": [f"mode_is_{current_mode.value}"],
+        }
+
+    result = await commissioning_service.promote_to_live(building_id)
+    return result.model_dump()

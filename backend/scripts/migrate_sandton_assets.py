@@ -693,9 +693,7 @@ def verify_asset_summary(supabase: Client, building_id: str):
     print("\n📊 Verifying asset summary...")
 
     try:
-        response = supabase.table("v_building_asset_summary").select("*").eq(
-            "building_id", building_id
-        ).execute()
+        response = supabase.table("v_building_asset_summary").select("*").eq("building_id", building_id).execute()
 
         if response.data:
             summary = response.data[0]

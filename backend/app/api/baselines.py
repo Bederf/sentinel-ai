@@ -43,8 +43,10 @@ def get_baseline_repository() -> BaselineRepository:
 # Request/Response Models
 # ============================================================================
 
+
 class BaselineCaptureRequest(BaseModel):
     """Request to capture equipment baseline."""
+
     captured_by: str = Field(..., description="Technician name or system identifier")
     baseline_type: BaselineType = Field(default=BaselineType.INITIAL, description="Type of baseline")
     baseline_values: Dict[str, Any] = Field(..., description="Baseline measurement values", min_length=1)
@@ -56,12 +58,14 @@ class BaselineCaptureRequest(BaseModel):
 
 class CurrentDataRequest(BaseModel):
     """Request containing current readings for comparison."""
+
     current_values: Dict[str, float] = Field(..., description="Current equipment readings")
     data_source: str = Field(default="bms_sensor", description="Source of current data")
 
 
 class ComparisonResponse(BaseModel):
     """Response from baseline comparison."""
+
     equipment_id: str
     baseline_id: str
     baseline_date: datetime
@@ -76,11 +80,9 @@ class ComparisonResponse(BaseModel):
 # API Endpoints
 # ============================================================================
 
+
 @router.post("/{equipment_id}", response_model=EquipmentBaseline, status_code=201)
-async def capture_equipment_baseline(
-    equipment_id: str,
-    request: BaselineCaptureRequest
-) -> EquipmentBaseline:
+async def capture_equipment_baseline(equipment_id: str, request: BaselineCaptureRequest) -> EquipmentBaseline:
     """
     Capture baseline for equipment.
 
@@ -100,10 +102,7 @@ async def capture_equipment_baseline(
 
         # Validate at least one element
         if not request.baseline_values:
-            raise HTTPException(
-                status_code=400,
-                detail="At least one baseline value required"
-            )
+            raise HTTPException(status_code=400, detail="At least one baseline value required")
 
         # Create baseline
         baseline = await repo.create_equipment_baseline(
@@ -114,7 +113,7 @@ async def capture_equipment_baseline(
             measurement_conditions=request.measurement_conditions,
             source_type=request.source_type.value,
             notes=request.notes,
-            attachment_urls=request.attachment_urls
+            attachment_urls=request.attachment_urls,
         )
 
         logger.info(f"Captured baseline {baseline.id} for equipment {equipment_id}")
@@ -138,10 +137,7 @@ async def get_latest_baseline(equipment_id: str) -> EquipmentBaseline:
         baseline = await repo.get_active_equipment_baseline(equipment_id)
 
         if not baseline:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No active baseline found for equipment {equipment_id}"
-            )
+            raise HTTPException(status_code=404, detail=f"No active baseline found for equipment {equipment_id}")
 
         return baseline
 
@@ -154,8 +150,7 @@ async def get_latest_baseline(equipment_id: str) -> EquipmentBaseline:
 
 @router.get("/{equipment_id}/history", response_model=List[EquipmentBaseline])
 async def get_baseline_history(
-    equipment_id: str,
-    limit: int = Query(10, ge=1, le=100, description="Number of records to return")
+    equipment_id: str, limit: int = Query(10, ge=1, le=100, description="Number of records to return")
 ) -> List[EquipmentBaseline]:
     """
     Get baseline history for equipment.
@@ -165,10 +160,7 @@ async def get_baseline_history(
     """
     try:
         repo = get_baseline_repository()
-        baselines = await repo.get_equipment_baseline_history(
-            equipment_id=equipment_id,
-            limit=limit
-        )
+        baselines = await repo.get_equipment_baseline_history(equipment_id=equipment_id, limit=limit)
 
         logger.info(f"Retrieved {len(baselines)} baselines for {equipment_id}")
         return baselines
@@ -179,10 +171,7 @@ async def get_baseline_history(
 
 
 @router.post("/{equipment_id}/compare", response_model=ComparisonResponse)
-async def compare_to_baseline(
-    equipment_id: str,
-    request: CurrentDataRequest
-) -> ComparisonResponse:
+async def compare_to_baseline(equipment_id: str, request: CurrentDataRequest) -> ComparisonResponse:
     """
     Compare current readings to baseline.
 
@@ -204,8 +193,7 @@ async def compare_to_baseline(
 
         # Perform comparison
         comparison = await comparison_service.compare_to_baseline(
-            equipment_id=equipment_id,
-            current_data=request.current_values
+            equipment_id=equipment_id, current_data=request.current_values
         )
 
         # Build deviations dict for response
@@ -215,7 +203,7 @@ async def compare_to_baseline(
                 baseline=dev.baseline_value,
                 current=dev.current_value,
                 deviation_percent=dev.deviation_percent,
-                status=DeviationStatus(dev.severity)
+                status=DeviationStatus(dev.severity),
             )
 
         # Build response
@@ -227,7 +215,7 @@ async def compare_to_baseline(
             overall_status=comparison.overall_status,
             max_deviation_percent=comparison.max_deviation_percent,
             deviations=deviations_dict,
-            comparison_notes=comparison.summary
+            comparison_notes=comparison.summary,
         )
 
         logger.info(
@@ -245,12 +233,11 @@ async def compare_to_baseline(
                     comparison_date=comparison.comparison_date,
                     max_deviation_percent=comparison.max_deviation_percent,
                     deviating_metrics={d.element_name: d.deviation_percent for d in comparison.deviations},
-                    within_threshold=False
+                    within_threshold=False,
                 )
 
                 trigger_result = await trigger_engine.on_baseline_deviation(
-                    equipment_id=equipment_id,
-                    comparison=workflow_comparison
+                    equipment_id=equipment_id, comparison=workflow_comparison
                 )
 
                 logger.info(f"Workflow trigger result: {trigger_result.action_taken}")
@@ -296,7 +283,7 @@ async def get_baseline_summary(equipment_id: str) -> Dict[str, Any]:
 @router.get("/{equipment_id}/report")
 async def get_baseline_report(
     equipment_id: str,
-    baseline_id: Optional[str] = Query(None, description="Specific baseline ID (uses latest if None)")
+    baseline_id: Optional[str] = Query(None, description="Specific baseline ID (uses latest if None)"),
 ):
     """
     Generate PDF baseline report.
@@ -323,16 +310,13 @@ async def get_baseline_report(
             baseline = await repo.get_active_equipment_baseline(equipment_id)
 
         if not baseline:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No baseline found for equipment {equipment_id}"
-            )
+            raise HTTPException(status_code=404, detail=f"No baseline found for equipment {equipment_id}")
 
         # Generate PDF report
         pdf_bytes = await comparison_service.generate_baseline_report(
             equipment_id=equipment_id,
             baseline=baseline,
-            comparison=None  # Could optionally include latest comparison
+            comparison=None,  # Could optionally include latest comparison
         )
 
         # Return PDF file
@@ -340,9 +324,7 @@ async def get_baseline_report(
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
-            headers={
-                "Content-Disposition": f"attachment; filename={filename}"
-            }
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
 
     except HTTPException:
@@ -356,11 +338,8 @@ async def get_baseline_report(
 # Health Check
 # ============================================================================
 
+
 @router.get("/health", tags=["baselines"])
 async def health_check() -> Dict[str, str]:
     """Baseline API health check."""
-    return {
-        "service": "equipment-baseline-api",
-        "status": "healthy",
-        "version": "1.0.0"
-    }
+    return {"service": "equipment-baseline-api", "status": "healthy", "version": "1.0.0"}

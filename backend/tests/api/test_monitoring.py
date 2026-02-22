@@ -125,11 +125,13 @@ async def test_stale_data_alert_fires():
     svc = MonitoringService()
     stale_sync = (datetime.utcnow() - timedelta(hours=30)).isoformat()
 
-    with patch.object(svc._integration_repo, "get_integration_health") as mock_health, patch.object(
-        svc._integration_repo, "get_quality_metrics"
-    ) as mock_qm, patch.object(svc._integration_repo, "get_log_sources", return_value=[]), patch.object(
-        svc._audit_logger, "get_logs", return_value=[]
-    ), patch("app.services.monitoring_service.settings") as mock_settings:
+    with (
+        patch.object(svc._integration_repo, "get_integration_health") as mock_health,
+        patch.object(svc._integration_repo, "get_quality_metrics") as mock_qm,
+        patch.object(svc._integration_repo, "get_log_sources", return_value=[]),
+        patch.object(svc._audit_logger, "get_logs", return_value=[]),
+        patch("app.services.monitoring_service.settings") as mock_settings,
+    ):
         mock_settings.resolved_ingestion_mode.value = "shadow_live"
         mock_settings.is_live_mode = True
         mock_settings.resolved_ingestion_mode = MagicMock()
@@ -150,11 +152,13 @@ async def test_json_in_live_alert_fires():
     """json_in_live alert fires when file/manual sources exist in live mode."""
     svc = MonitoringService()
 
-    with patch.object(svc._integration_repo, "get_integration_health") as mock_health, patch.object(
-        svc._integration_repo, "get_quality_metrics"
-    ) as mock_qm, patch.object(svc._integration_repo, "get_log_sources") as mock_sources, patch.object(
-        svc._audit_logger, "get_logs", return_value=[]
-    ), patch("app.services.monitoring_service.settings") as mock_settings:
+    with (
+        patch.object(svc._integration_repo, "get_integration_health") as mock_health,
+        patch.object(svc._integration_repo, "get_quality_metrics") as mock_qm,
+        patch.object(svc._integration_repo, "get_log_sources") as mock_sources,
+        patch.object(svc._audit_logger, "get_logs", return_value=[]),
+        patch("app.services.monitoring_service.settings") as mock_settings,
+    ):
         from app.config.settings import IngestionMode
 
         mock_settings.resolved_ingestion_mode = IngestionMode.SHADOW_LIVE
@@ -178,11 +182,13 @@ async def test_high_error_rate_warning():
     """High error rate produces warning when rate > 10%."""
     svc = MonitoringService()
 
-    with patch.object(svc._integration_repo, "get_integration_health") as mock_health, patch.object(
-        svc._integration_repo, "get_quality_metrics"
-    ) as mock_qm, patch.object(svc._integration_repo, "get_log_sources", return_value=[]), patch.object(
-        svc._audit_logger, "get_logs", return_value=[]
-    ), patch("app.services.monitoring_service.settings") as mock_settings:
+    with (
+        patch.object(svc._integration_repo, "get_integration_health") as mock_health,
+        patch.object(svc._integration_repo, "get_quality_metrics") as mock_qm,
+        patch.object(svc._integration_repo, "get_log_sources", return_value=[]),
+        patch.object(svc._audit_logger, "get_logs", return_value=[]),
+        patch("app.services.monitoring_service.settings") as mock_settings,
+    ):
         from app.config.settings import IngestionMode
 
         mock_settings.resolved_ingestion_mode = IngestionMode.SIMULATION
@@ -203,11 +209,13 @@ async def test_high_error_rate_critical():
     """High error rate produces critical when ratio >= 25%."""
     svc = MonitoringService()
 
-    with patch.object(svc._integration_repo, "get_integration_health") as mock_health, patch.object(
-        svc._integration_repo, "get_quality_metrics"
-    ) as mock_qm, patch.object(svc._integration_repo, "get_log_sources", return_value=[]), patch.object(
-        svc._audit_logger, "get_logs", return_value=[]
-    ), patch("app.services.monitoring_service.settings") as mock_settings:
+    with (
+        patch.object(svc._integration_repo, "get_integration_health") as mock_health,
+        patch.object(svc._integration_repo, "get_quality_metrics") as mock_qm,
+        patch.object(svc._integration_repo, "get_log_sources", return_value=[]),
+        patch.object(svc._audit_logger, "get_logs", return_value=[]),
+        patch("app.services.monitoring_service.settings") as mock_settings,
+    ):
         from app.config.settings import IngestionMode
 
         mock_settings.resolved_ingestion_mode = IngestionMode.SIMULATION
@@ -228,11 +236,13 @@ async def test_low_coverage_alert():
     """Low coverage alert fires when match_coverage < 50%."""
     svc = MonitoringService()
 
-    with patch.object(svc._integration_repo, "get_integration_health") as mock_health, patch.object(
-        svc._integration_repo, "get_quality_metrics"
-    ) as mock_qm, patch.object(svc._integration_repo, "get_log_sources", return_value=[]), patch.object(
-        svc._audit_logger, "get_logs", return_value=[]
-    ), patch("app.services.monitoring_service.settings") as mock_settings:
+    with (
+        patch.object(svc._integration_repo, "get_integration_health") as mock_health,
+        patch.object(svc._integration_repo, "get_quality_metrics") as mock_qm,
+        patch.object(svc._integration_repo, "get_log_sources", return_value=[]),
+        patch.object(svc._audit_logger, "get_logs", return_value=[]),
+        patch("app.services.monitoring_service.settings") as mock_settings,
+    ):
         from app.config.settings import IngestionMode
 
         mock_settings.resolved_ingestion_mode = IngestionMode.SIMULATION
@@ -257,11 +267,12 @@ async def test_simulation_mode_no_commissioning():
     """In SIMULATION mode, commissioning is None."""
     svc = MonitoringService()
 
-    with patch.object(svc._integration_repo, "get_integration_health") as mock_health, patch.object(
-        svc._integration_repo, "get_log_sources", return_value=[]
-    ), patch.object(svc._audit_logger, "get_logs", return_value=[]), patch(
-        "app.services.monitoring_service.settings"
-    ) as mock_settings:
+    with (
+        patch.object(svc._integration_repo, "get_integration_health") as mock_health,
+        patch.object(svc._integration_repo, "get_log_sources", return_value=[]),
+        patch.object(svc._audit_logger, "get_logs", return_value=[]),
+        patch("app.services.monitoring_service.settings") as mock_settings,
+    ):
         from app.config.settings import IngestionMode
 
         mock_settings.resolved_ingestion_mode = IngestionMode.SIMULATION
@@ -278,11 +289,12 @@ async def test_empty_audit_log_zeros():
     """No audit entries means all control KPIs are 0."""
     svc = MonitoringService()
 
-    with patch.object(svc._integration_repo, "get_integration_health") as mock_health, patch.object(
-        svc._integration_repo, "get_log_sources", return_value=[]
-    ), patch.object(svc._audit_logger, "get_logs", return_value=[]), patch(
-        "app.services.monitoring_service.settings"
-    ) as mock_settings:
+    with (
+        patch.object(svc._integration_repo, "get_integration_health") as mock_health,
+        patch.object(svc._integration_repo, "get_log_sources", return_value=[]),
+        patch.object(svc._audit_logger, "get_logs", return_value=[]),
+        patch("app.services.monitoring_service.settings") as mock_settings,
+    ):
         from app.config.settings import IngestionMode
 
         mock_settings.resolved_ingestion_mode = IngestionMode.SIMULATION
@@ -302,11 +314,12 @@ async def test_trend_buckets_24_hours():
     """Trend buckets contain exactly 24 entries with derived flag."""
     svc = MonitoringService()
 
-    with patch.object(svc._integration_repo, "get_integration_health") as mock_health, patch.object(
-        svc._integration_repo, "get_log_sources", return_value=[]
-    ), patch.object(svc._audit_logger, "get_logs", return_value=[]), patch(
-        "app.services.monitoring_service.settings"
-    ) as mock_settings:
+    with (
+        patch.object(svc._integration_repo, "get_integration_health") as mock_health,
+        patch.object(svc._integration_repo, "get_log_sources", return_value=[]),
+        patch.object(svc._audit_logger, "get_logs", return_value=[]),
+        patch("app.services.monitoring_service.settings") as mock_settings,
+    ):
         from app.config.settings import IngestionMode
 
         mock_settings.resolved_ingestion_mode = IngestionMode.SIMULATION

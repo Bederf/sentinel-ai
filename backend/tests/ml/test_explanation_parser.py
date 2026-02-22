@@ -296,8 +296,6 @@ Bold format summary
 **KEY_FACTORS**
 - Factor one
 """
-        sections = ExplanationParser._extract_sections(
-            text, ["SUMMARY", "KEY_FACTORS"]
-        )
+        sections = ExplanationParser._extract_sections(text, ["SUMMARY", "KEY_FACTORS"])
         assert "SUMMARY" in sections
         assert "Bold format" in sections["SUMMARY"]

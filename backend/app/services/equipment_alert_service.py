@@ -117,9 +117,12 @@ class EquipmentAlertService:
     def _get_equipment(self, equipment_id: str) -> Optional[Dict[str, Any]]:
         """Get equipment by UUID."""
         try:
-            response = self.supabase.table("equipment").select(
-                "id, code, name, type, health_score, building_id"
-            ).eq("id", equipment_id).execute()
+            response = (
+                self.supabase.table("equipment")
+                .select("id, code, name, type, health_score, building_id")
+                .eq("id", equipment_id)
+                .execute()
+            )
             if not response.data:
                 return None
             equipment = response.data[0]
@@ -133,8 +136,9 @@ class EquipmentAlertService:
     def _parse_zone_from_name(self, name: str) -> str:
         """Parse zone name from equipment name pattern like 'Zone-L12-C'."""
         import re
+
         # Match patterns like "Zone-L12-C" or "S001-Zone-L1-A"
-        match = re.search(r'Zone-L(\d+)-([A-Z])', name)
+        match = re.search(r"Zone-L(\d+)-([A-Z])", name)
         if match:
             level = match.group(1)
             zone_letter = match.group(2)
@@ -144,9 +148,7 @@ class EquipmentAlertService:
     def _get_building(self, building_id: str) -> Optional[Dict[str, Any]]:
         """Get building by UUID."""
         try:
-            response = self.supabase.table("buildings").select(
-                "id, code, name"
-            ).eq("id", building_id).execute()
+            response = self.supabase.table("buildings").select("id, code, name").eq("id", building_id).execute()
             return response.data[0] if response.data else None
         except Exception as e:
             logger.error(f"Failed to get building: {e}")

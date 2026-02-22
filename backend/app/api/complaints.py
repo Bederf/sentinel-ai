@@ -178,5 +178,5 @@ async def reload_data() -> dict:
         "status": "reloaded",
         "desks_loaded": len(desks),
         "zones_loaded": len(zones),
-        "message": f"Loaded {len(desks)} desks and {len(zones)} zones"
+        "message": f"Loaded {len(desks)} desks and {len(zones)} zones",
     }

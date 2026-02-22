@@ -11,10 +11,11 @@ from enum import Enum
 
 class LearningCurvePhase(str, Enum):
     """Learning curve phases for ML confidence progression."""
+
     PHASE_1_LEARNING = "phase_1_learning"  # Months 1-2, confidence 78-80%
-    PHASE_2_TUNING = "phase_2_tuning"      # Months 3-6, confidence 82-88%
-    PHASE_3_MATURE = "phase_3_mature"      # Months 7-12, confidence 90-92%
-    PHASE_4_STABLE = "phase_4_stable"      # 12+ months, confidence 92%
+    PHASE_2_TUNING = "phase_2_tuning"  # Months 3-6, confidence 82-88%
+    PHASE_3_MATURE = "phase_3_mature"  # Months 7-12, confidence 90-92%
+    PHASE_4_STABLE = "phase_4_stable"  # 12+ months, confidence 92%
 
 
 class BuildingState(BaseModel):

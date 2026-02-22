@@ -89,8 +89,8 @@ def main():
         if recordings:
             latest = recordings[-1]
             print(f"  Latest RMS: {latest.get('rms_total_ms2', 'N/A')} m/s^2")
-            if 'anomalies' in latest:
-                anom = latest['anomalies']
+            if "anomalies" in latest:
+                anom = latest["anomalies"]
                 print(f"  ANOMALY: {anom['type']} ({anom['severity']})")
 
 

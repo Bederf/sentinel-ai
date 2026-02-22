@@ -46,8 +46,15 @@ DEFAULT_SERVICE_COST = 2000.0  # Default for unknown equipment types
 # ============================================================================
 
 INVERTED_ELEMENTS = {
-    "efficiency", "cop", "eer", "seer", "cooling_capacity",
-    "flow_rate", "airflow", "battery_voltage", "fuel_level",
+    "efficiency",
+    "cop",
+    "eer",
+    "seer",
+    "cooling_capacity",
+    "flow_rate",
+    "airflow",
+    "battery_voltage",
+    "fuel_level",
 }
 
 
@@ -72,6 +79,7 @@ class ServiceOptimizer:
         """Lazy-load ElementTrendService."""
         if self._trend_service is None:
             from app.services.element_trend_service import get_element_trend_service
+
             self._trend_service = get_element_trend_service()
         return self._trend_service
 
@@ -81,6 +89,7 @@ class ServiceOptimizer:
         if self._rul_calculator is None:
             try:
                 from app.services.rul_calculator import get_rul_calculator
+
                 self._rul_calculator = get_rul_calculator()
             except (ImportError, Exception) as e:
                 logger.debug(f"RULCalculator not available: {e}")
@@ -92,9 +101,7 @@ class ServiceOptimizer:
     # ========================================================================
 
     async def calculate_utilization(
-        self,
-        equipment_id: str,
-        equipment_type: Optional[str] = None
+        self, equipment_id: str, equipment_type: Optional[str] = None
     ) -> List[AssetUtilization]:
         """
         Calculate asset utilization for all elements of an equipment.
@@ -139,9 +146,7 @@ class ServiceOptimizer:
                     unit = trend.data_points[-1].unit
 
                 # Get threshold from RUL calculator or use defaults
-                threshold_value = self._get_threshold(
-                    trend.element_name, element_ruls, unit
-                )
+                threshold_value = self._get_threshold(trend.element_name, element_ruls, unit)
 
                 if threshold_value is None or threshold_value == 0:
                     continue  # Skip elements without thresholds
@@ -156,29 +161,26 @@ class ServiceOptimizer:
 
                 remaining_pct = max(0.0, min(100.0, 100.0 - utilization_pct))
 
-                utilizations.append(AssetUtilization(
-                    equipment_id=equipment_id,
-                    equipment_type=eq_type,
-                    element_name=trend.element_name,
-                    current_value=current_value,
-                    threshold_value=threshold_value,
-                    unit=unit,
-                    utilization_percent=round(utilization_pct, 1),
-                    remaining_percent=round(remaining_pct, 1),
-                    status=status,
-                ))
+                utilizations.append(
+                    AssetUtilization(
+                        equipment_id=equipment_id,
+                        equipment_type=eq_type,
+                        element_name=trend.element_name,
+                        current_value=current_value,
+                        threshold_value=threshold_value,
+                        unit=unit,
+                        utilization_percent=round(utilization_pct, 1),
+                        remaining_percent=round(remaining_pct, 1),
+                        status=status,
+                    )
+                )
 
         except Exception as e:
             logger.warning(f"Could not calculate utilization for {equipment_id}: {e}")
 
         return utilizations
 
-    def _get_threshold(
-        self,
-        element_name: str,
-        element_ruls: Dict,
-        unit: str
-    ) -> Optional[float]:
+    def _get_threshold(self, element_name: str, element_ruls: Dict, unit: str) -> Optional[float]:
         """Get threshold value from RUL data or defaults."""
         # First try RUL calculator thresholds
         if element_name in element_ruls:
@@ -229,9 +231,7 @@ class ServiceOptimizer:
 
     @staticmethod
     def _calculate_utilization_percent(
-        current_value: Optional[float],
-        threshold_value: float,
-        element_name: str
+        current_value: Optional[float], threshold_value: float, element_name: str
     ) -> float:
         """
         Calculate utilization percentage.
@@ -273,10 +273,7 @@ class ServiceOptimizer:
     # Service Window Optimization
     # ========================================================================
 
-    async def optimize_service_window(
-        self,
-        equipment_id: str
-    ) -> Optional[ServiceWindow]:
+    async def optimize_service_window(self, equipment_id: str) -> Optional[ServiceWindow]:
         """
         Calculate optimal service window for equipment.
 
@@ -318,9 +315,7 @@ class ServiceOptimizer:
 
         # Fallback: estimate from trend data
         if days_until_threshold is None:
-            days_until_threshold, driving_elements, reason_parts = (
-                await self._estimate_from_trends(equipment_id)
-            )
+            days_until_threshold, driving_elements, reason_parts = await self._estimate_from_trends(equipment_id)
 
         # No degrading elements = no service needed
         if days_until_threshold is None:
@@ -358,10 +353,7 @@ class ServiceOptimizer:
             cost_impact=cost_impact,
         )
 
-    async def _estimate_from_trends(
-        self,
-        equipment_id: str
-    ) -> tuple:
+    async def _estimate_from_trends(self, equipment_id: str) -> tuple:
         """
         Estimate days until threshold from trend data (fallback when RUL calculator unavailable).
 
@@ -376,9 +368,7 @@ class ServiceOptimizer:
             summary = await self.trend_service.get_equipment_trend_summary(equipment_id)
 
             for trend in summary.element_trends:
-                if trend.trend_direction not in (
-                    TrendDirection.DEGRADING, TrendDirection.RAPID_DEGRADING
-                ):
+                if trend.trend_direction not in (TrendDirection.DEGRADING, TrendDirection.RAPID_DEGRADING):
                     continue
 
                 if trend.degradation_rate_per_day is None or trend.degradation_rate_per_day <= 0:
@@ -404,8 +394,7 @@ class ServiceOptimizer:
 
                 driving_elements.append(trend.element_name)
                 reason_parts.append(
-                    f"{trend.element_name}: {trend.trend_direction.value}, "
-                    f"~{int(days_est)} days to threshold"
+                    f"{trend.element_name}: {trend.trend_direction.value}, ~{int(days_est)} days to threshold"
                 )
 
                 if min_days is None or days_est < min_days:
@@ -421,10 +410,7 @@ class ServiceOptimizer:
     # ========================================================================
 
     async def compare_maintenance_costs(
-        self,
-        equipment_id: str,
-        equipment_type: Optional[str] = None,
-        fixed_interval_days: int = 90
+        self, equipment_id: str, equipment_type: Optional[str] = None, fixed_interval_days: int = 90
     ) -> MaintenanceCostComparison:
         """
         Compare fixed-schedule vs condition-based maintenance costs.
@@ -455,18 +441,14 @@ class ServiceOptimizer:
                 pass
 
         # Get service cost rate
-        cost_per_service = SERVICE_COST_RATES.get(
-            (eq_type or "").lower(), DEFAULT_SERVICE_COST
-        )
+        cost_per_service = SERVICE_COST_RATES.get((eq_type or "").lower(), DEFAULT_SERVICE_COST)
 
         # Fixed schedule calculation
         fixed_services_per_year = int(365 / fixed_interval_days)
         fixed_annual_cost = fixed_services_per_year * cost_per_service
 
         # Conditional schedule calculation
-        conditional_services = await self._estimate_conditional_services(
-            equipment_id, fixed_interval_days
-        )
+        conditional_services = await self._estimate_conditional_services(equipment_id, fixed_interval_days)
         conditional_annual_cost = conditional_services * cost_per_service
 
         # Calculate savings
@@ -476,9 +458,7 @@ class ServiceOptimizer:
             savings_pct = 0.0
 
         # Generate recommendation
-        recommendation = self._generate_cost_recommendation(
-            savings_pct, conditional_services, fixed_services_per_year
-        )
+        recommendation = self._generate_cost_recommendation(savings_pct, conditional_services, fixed_services_per_year)
 
         return MaintenanceCostComparison(
             equipment_id=equipment_id,
@@ -491,11 +471,7 @@ class ServiceOptimizer:
             recommendation=recommendation,
         )
 
-    async def _estimate_conditional_services(
-        self,
-        equipment_id: str,
-        fixed_interval_days: int
-    ) -> float:
+    async def _estimate_conditional_services(self, equipment_id: str, fixed_interval_days: int) -> float:
         """
         Estimate number of services per year based on actual condition.
 
@@ -525,9 +501,7 @@ class ServiceOptimizer:
             min_days = None
 
             for trend in summary.element_trends:
-                if trend.trend_direction in (
-                    TrendDirection.DEGRADING, TrendDirection.RAPID_DEGRADING
-                ):
+                if trend.trend_direction in (TrendDirection.DEGRADING, TrendDirection.RAPID_DEGRADING):
                     has_degrading = True
 
                     if trend.degradation_rate_per_day and trend.degradation_rate_per_day > 0:
@@ -557,11 +531,7 @@ class ServiceOptimizer:
             return 2.0  # Conservative default
 
     @staticmethod
-    def _generate_cost_recommendation(
-        savings_pct: float,
-        conditional_services: float,
-        fixed_services: int
-    ) -> str:
+    def _generate_cost_recommendation(savings_pct: float, conditional_services: float, fixed_services: int) -> str:
         """Generate human-readable cost recommendation."""
         if savings_pct > 40:
             return (
@@ -600,10 +570,7 @@ class ServiceOptimizer:
     # ========================================================================
 
     async def optimize_fleet_schedule(
-        self,
-        equipment_ids: Optional[List[str]] = None,
-        fixed_interval_days: int = 90,
-        limit: int = 20
+        self, equipment_ids: Optional[List[str]] = None, fixed_interval_days: int = 90, limit: int = 20
     ) -> OptimizedSchedule:
         """
         Optimize service schedule across multiple equipment.
@@ -642,9 +609,7 @@ class ServiceOptimizer:
 
             # Collect cost data for summary
             try:
-                cost = await self.compare_maintenance_costs(
-                    eq_id, fixed_interval_days=fixed_interval_days
-                )
+                cost = await self.compare_maintenance_costs(eq_id, fixed_interval_days=fixed_interval_days)
                 total_fixed_cost += cost.fixed_annual_cost_estimate
                 total_conditional_cost += cost.conditional_annual_cost_estimate
                 equipment_with_cost += 1
@@ -688,8 +653,7 @@ class ServiceOptimizer:
 
             # Read buildings registry
             registry_path = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)),
-                "data", "buildings", "_registry.json"
+                os.path.dirname(os.path.dirname(__file__)), "data", "buildings", "_registry.json"
             )
 
             if os.path.exists(registry_path):
@@ -697,10 +661,7 @@ class ServiceOptimizer:
                     registry = json.load(f)
 
                 for site_id in registry.get("active_buildings", []):
-                    site_path = os.path.join(
-                        os.path.dirname(registry_path),
-                        f"{site_id}.json"
-                    )
+                    site_path = os.path.join(os.path.dirname(registry_path), f"{site_id}.json")
                     if os.path.exists(site_path):
                         with open(site_path, "r") as f:
                             site_data = json.load(f)
@@ -713,10 +674,7 @@ class ServiceOptimizer:
 
             if not equipment_ids:
                 # Fallback: try mock devices
-                devices_path = os.path.join(
-                    os.path.dirname(os.path.dirname(__file__)),
-                    "data", "mock_devices.json"
-                )
+                devices_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "mock_devices.json")
                 if os.path.exists(devices_path):
                     with open(devices_path, "r") as f:
                         devices = json.load(f)

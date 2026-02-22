@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class IdentifiedComponent:
     """A component identified in an image."""
+
     name: str
     manufacturer: Optional[str] = None
     model: Optional[str] = None
@@ -33,6 +34,7 @@ class IdentifiedComponent:
 @dataclass
 class DetectedIssue:
     """An issue detected in equipment image."""
+
     type: str
     severity: str  # low, medium, high, critical
     location: Optional[str] = None
@@ -42,6 +44,7 @@ class DetectedIssue:
 @dataclass
 class ModelPlateInfo:
     """Information extracted from equipment model plate."""
+
     manufacturer: Optional[str] = None
     model: Optional[str] = None
     serial: Optional[str] = None
@@ -63,46 +66,35 @@ class VisionService:
         """Encode image bytes to base64."""
         return base64.b64encode(image_data).decode("utf-8")
 
-    def _create_vision_message(
-        self,
-        image_data: bytes,
-        media_type: str,
-        prompt: str
-    ) -> str:
+    def _create_vision_message(self, image_data: bytes, media_type: str, prompt: str) -> str:
         """Send image to Claude and get response."""
         try:
             message = self.client.messages.create(
                 model=self.model,
                 max_tokens=1500,
-                messages=[{
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": self._encode_image(image_data)
-                            }
-                        },
-                        {
-                            "type": "text",
-                            "text": prompt
-                        }
-                    ]
-                }]
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": media_type,
+                                    "data": self._encode_image(image_data),
+                                },
+                            },
+                            {"type": "text", "text": prompt},
+                        ],
+                    }
+                ],
             )
             return message.content[0].text
         except Exception as e:
             logger.error(f"Vision API error: {e}")
             raise
 
-    def analyze_image(
-        self,
-        image_data: bytes,
-        media_type: str = "image/jpeg",
-        prompt: Optional[str] = None
-    ) -> dict:
+    def analyze_image(self, image_data: bytes, media_type: str = "image/jpeg", prompt: Optional[str] = None) -> dict:
         """
         General image analysis.
 
@@ -118,22 +110,12 @@ class VisionService:
 Describe what you see, identify any components, and note any visible issues.
 Be specific about manufacturers, models, and conditions if visible."""
 
-        analysis = self._create_vision_message(
-            image_data,
-            media_type,
-            prompt or default_prompt
-        )
+        analysis = self._create_vision_message(image_data, media_type, prompt or default_prompt)
 
-        return {
-            "analysis": analysis,
-            "success": True
-        }
+        return {"analysis": analysis, "success": True}
 
     def identify_component(
-        self,
-        image_data: bytes,
-        media_type: str = "image/jpeg",
-        context: Optional[str] = None
+        self, image_data: bytes, media_type: str = "image/jpeg", context: Optional[str] = None
     ) -> dict:
         """
         Identify equipment component from image.
@@ -171,6 +153,7 @@ Only output valid JSON, no markdown formatting."""
         # Try to parse JSON response
         try:
             import json
+
             # Clean up response if needed
             clean_response = response.strip()
             if clean_response.startswith("```"):
@@ -182,18 +165,9 @@ Only output valid JSON, no markdown formatting."""
             return result
         except json.JSONDecodeError:
             # Return raw response if JSON parsing fails
-            return {
-                "success": True,
-                "components": [],
-                "notes": response,
-                "parse_error": True
-            }
+            return {"success": True, "components": [], "notes": response, "parse_error": True}
 
-    def read_model_plate(
-        self,
-        image_data: bytes,
-        media_type: str = "image/jpeg"
-    ) -> dict:
+    def read_model_plate(self, image_data: bytes, media_type: str = "image/jpeg") -> dict:
         """
         Extract information from equipment model/serial plate.
 
@@ -226,6 +200,7 @@ If any field is not visible, use null. Only output valid JSON, no markdown."""
         # Try to parse JSON response
         try:
             import json
+
             clean_response = response.strip()
             if clean_response.startswith("```"):
                 clean_response = clean_response.split("```")[1]
@@ -235,17 +210,10 @@ If any field is not visible, use null. Only output valid JSON, no markdown."""
             result["success"] = True
             return result
         except json.JSONDecodeError:
-            return {
-                "success": True,
-                "raw_text": response,
-                "parse_error": True
-            }
+            return {"success": True, "raw_text": response, "parse_error": True}
 
     def diagnose_damage(
-        self,
-        image_data: bytes,
-        media_type: str = "image/jpeg",
-        equipment_context: Optional[str] = None
+        self, image_data: bytes, media_type: str = "image/jpeg", equipment_context: Optional[str] = None
     ) -> dict:
         """
         Assess visible damage or wear in equipment image.
@@ -283,6 +251,7 @@ If no issues are visible, return an empty issues array. Only output valid JSON."
 
         try:
             import json
+
             clean_response = response.strip()
             if clean_response.startswith("```"):
                 clean_response = clean_response.split("```")[1]
@@ -292,18 +261,10 @@ If no issues are visible, return an empty issues array. Only output valid JSON."
             result["success"] = True
             return result
         except json.JSONDecodeError:
-            return {
-                "success": True,
-                "issues": [],
-                "notes": response,
-                "parse_error": True
-            }
+            return {"success": True, "issues": [], "notes": response, "parse_error": True}
 
     def read_error_display(
-        self,
-        image_data: bytes,
-        media_type: str = "image/jpeg",
-        manufacturer: Optional[str] = None
+        self, image_data: bytes, media_type: str = "image/jpeg", manufacturer: Optional[str] = None
     ) -> dict:
         """
         Extract fault codes from equipment error display screen.
@@ -343,6 +304,7 @@ Only output valid JSON, no markdown formatting."""
 
         try:
             import json
+
             clean_response = response.strip()
             if clean_response.startswith("```"):
                 clean_response = clean_response.split("```")[1]
@@ -352,12 +314,7 @@ Only output valid JSON, no markdown formatting."""
             result["success"] = True
             return result
         except json.JSONDecodeError:
-            return {
-                "success": True,
-                "fault_codes": [],
-                "raw_text": response,
-                "parse_error": True
-            }
+            return {"success": True, "fault_codes": [], "raw_text": response, "parse_error": True}
 
 
 # Singleton instance

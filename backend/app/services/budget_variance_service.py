@@ -31,24 +31,14 @@ class BudgetVarianceService:
     """Compute variance and create alerts."""
 
     def __init__(
-        self,
-        budget_repo: Optional[BudgetRepository] = None,
-        alert_repo: Optional[BudgetAlertRepository] = None
+        self, budget_repo: Optional[BudgetRepository] = None, alert_repo: Optional[BudgetAlertRepository] = None
     ):
         self.budget_repo = budget_repo or BudgetRepository()
         self.alert_repo = alert_repo or BudgetAlertRepository()
 
-    def evaluate_budget(
-        self,
-        contract_id: str,
-        year: int,
-        month: int
-    ) -> BudgetVarianceResult:
+    def evaluate_budget(self, contract_id: str, year: int, month: int) -> BudgetVarianceResult:
         budgets = self.budget_repo.get_by_contract(contract_id, year=year)
-        budget = next(
-            (b for b in budgets if b.get("budget_month") == month and b.get("equipment_type") is None),
-            None
-        )
+        budget = next((b for b in budgets if b.get("budget_month") == month and b.get("equipment_type") is None), None)
         if not budget:
             return BudgetVarianceResult(
                 contract_id=contract_id,
@@ -60,7 +50,7 @@ class BudgetVarianceService:
                 variance_zar=0.0,
                 spend_percentage=0.0,
                 severity=None,
-                message=None
+                message=None,
             )
 
         total_budget = float(budget.get("total_budget_zar") or 0.0)
@@ -81,19 +71,21 @@ class BudgetVarianceService:
             message = f"Budget warning: {spend_pct:.1f}% of budget used."
 
         if severity:
-            self.alert_repo.create_or_update({
-                "contract_id": contract_id,
-                "budget_id": budget.get("id"),
-                "period_year": year,
-                "period_month": month,
-                "spend_percentage": spend_pct,
-                "total_budget_zar": total_budget,
-                "total_actual_zar": total_actual,
-                "variance_zar": variance,
-                "severity": severity,
-                "message": message,
-                "status": "open"
-            })
+            self.alert_repo.create_or_update(
+                {
+                    "contract_id": contract_id,
+                    "budget_id": budget.get("id"),
+                    "period_year": year,
+                    "period_month": month,
+                    "spend_percentage": spend_pct,
+                    "total_budget_zar": total_budget,
+                    "total_actual_zar": total_actual,
+                    "variance_zar": variance,
+                    "severity": severity,
+                    "message": message,
+                    "status": "open",
+                }
+            )
 
         return BudgetVarianceResult(
             contract_id=contract_id,
@@ -105,15 +97,10 @@ class BudgetVarianceService:
             variance_zar=variance,
             spend_percentage=spend_pct,
             severity=severity,
-            message=message
+            message=message,
         )
 
-    def evaluate_equipment_type_budgets(
-        self,
-        contract_id: str,
-        year: int,
-        month: int
-    ) -> List[Dict[str, Any]]:
+    def evaluate_equipment_type_budgets(self, contract_id: str, year: int, month: int) -> List[Dict[str, Any]]:
         budgets = self.budget_repo.get_by_contract(contract_id, year=year)
         results: List[Dict[str, Any]] = []
 
@@ -140,31 +127,35 @@ class BudgetVarianceService:
                 message = f"{equipment_type} budget warning: {spend_pct:.1f}% used."
 
             if severity:
-                self.alert_repo.create_or_update({
-                    "contract_id": contract_id,
+                self.alert_repo.create_or_update(
+                    {
+                        "contract_id": contract_id,
+                        "budget_id": budget.get("id"),
+                        "period_year": year,
+                        "period_month": month,
+                        "spend_percentage": spend_pct,
+                        "total_budget_zar": total_budget,
+                        "total_actual_zar": total_actual,
+                        "variance_zar": variance,
+                        "severity": severity,
+                        "message": message,
+                        "equipment_type": equipment_type,
+                        "status": "open",
+                    }
+                )
+
+            results.append(
+                {
+                    "equipment_type": equipment_type,
                     "budget_id": budget.get("id"),
-                    "period_year": year,
-                    "period_month": month,
-                    "spend_percentage": spend_pct,
                     "total_budget_zar": total_budget,
                     "total_actual_zar": total_actual,
                     "variance_zar": variance,
+                    "spend_percentage": spend_pct,
                     "severity": severity,
                     "message": message,
-                    "equipment_type": equipment_type,
-                    "status": "open"
-                })
-
-            results.append({
-                "equipment_type": equipment_type,
-                "budget_id": budget.get("id"),
-                "total_budget_zar": total_budget,
-                "total_actual_zar": total_actual,
-                "variance_zar": variance,
-                "spend_percentage": spend_pct,
-                "severity": severity,
-                "message": message
-            })
+                }
+            )
 
         return results
 
@@ -174,14 +165,10 @@ class BudgetVarianceService:
         year: Optional[int] = None,
         month: Optional[int] = None,
         status: Optional[str] = None,
-        severity: Optional[str] = None
+        severity: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         return self.alert_repo.list_by_contract(
-            contract_id=contract_id,
-            year=year,
-            month=month,
-            status=status,
-            severity=severity
+            contract_id=contract_id, year=year, month=month, status=status, severity=severity
         )
 
 

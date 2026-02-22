@@ -14,6 +14,7 @@ import uuid
 
 class AuditActionType(str, Enum):
     """Types of actions that can be audited."""
+
     DEVICE_CONTROL = "device_control"
     SAFETY_VALIDATION = "safety_validation"
     SYSTEM_EVENT = "system_event"
@@ -22,10 +23,13 @@ class AuditActionType(str, Enum):
 
 class AuditResultType(str, Enum):
     """Result types for audit log entries."""
+
     SUCCESS = "success"
     FAILED = "failed"
     BLOCKED = "blocked"
     WARNING = "warning"
+    SHADOW = "shadow"
+    CANCELLED = "cancelled"
 
 
 @dataclass
@@ -72,14 +76,16 @@ class AuditLogEntry:
             "safety_validation": self.safety_validation,
             "error_message": self.error_message,
             "correlation_id": self.correlation_id,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AuditLogEntry":
         """Create audit log entry from dictionary."""
         # Parse timestamp
-        timestamp = datetime.fromisoformat(data["timestamp"]) if isinstance(data["timestamp"], str) else data["timestamp"]
+        timestamp = (
+            datetime.fromisoformat(data["timestamp"]) if isinstance(data["timestamp"], str) else data["timestamp"]
+        )
 
         return cls(
             action=AuditActionType(data["action"]),
@@ -94,5 +100,5 @@ class AuditLogEntry:
             safety_validation=data.get("safety_validation"),
             error_message=data.get("error_message"),
             correlation_id=data.get("correlation_id"),
-            metadata=data.get("metadata", {})
+            metadata=data.get("metadata", {}),
         )

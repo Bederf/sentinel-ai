@@ -29,8 +29,10 @@ router = APIRouter(prefix="/api/service-feedback", tags=["service-feedback"])
 # Request/Response Models
 # ============================================================================
 
+
 class StartFeedbackRequest(BaseModel):
     """Request to start feedback collection."""
+
     work_order_id: str
     equipment_code: str
     service_type: str = "minor"  # minor, major, breakdown
@@ -38,6 +40,7 @@ class StartFeedbackRequest(BaseModel):
 
 class StartFeedbackResponse(BaseModel):
     """Response when starting feedback session."""
+
     session_id: str
     equipment_code: str
     equipment_type: str
@@ -49,6 +52,7 @@ class StartFeedbackResponse(BaseModel):
 
 class SubmitReadingRequest(BaseModel):
     """Request to submit a reading."""
+
     item_key: str
     value: Any
     unit: Optional[str] = None
@@ -57,6 +61,7 @@ class SubmitReadingRequest(BaseModel):
 
 class SubmitObservationRequest(BaseModel):
     """Request to submit an observation."""
+
     item_key: str = "observation"
     content: str
     notes: Optional[str] = None
@@ -64,6 +69,7 @@ class SubmitObservationRequest(BaseModel):
 
 class FeedbackItemResponse(BaseModel):
     """Response for a submitted feedback item."""
+
     item_key: str
     item_type: str
     value: Any
@@ -76,6 +82,7 @@ class FeedbackItemResponse(BaseModel):
 
 class SessionStatusResponse(BaseModel):
     """Response for session status."""
+
     session_id: str
     status: str
     equipment_code: str
@@ -90,6 +97,7 @@ class SessionStatusResponse(BaseModel):
 
 class CompleteFeedbackResponse(BaseModel):
     """Response when completing feedback session."""
+
     success: bool
     session_id: str
     equipment_code: str
@@ -104,6 +112,7 @@ class CompleteFeedbackResponse(BaseModel):
 
 class TemplateResponse(BaseModel):
     """Response containing feedback template."""
+
     equipment_type: str
     service_type: str
     required_items: List[str]
@@ -115,6 +124,7 @@ class TemplateResponse(BaseModel):
 # ============================================================================
 # Endpoints
 # ============================================================================
+
 
 @router.post("/start", response_model=StartFeedbackResponse)
 async def start_feedback_session(request: StartFeedbackRequest):
@@ -149,18 +159,14 @@ async def start_feedback_session(request: StartFeedbackRequest):
         work_order_id=request.work_order_id,
         equipment_id=equipment_id,
         equipment_code=request.equipment_code,
-        service_type=request.service_type
+        service_type=request.service_type,
     )
 
     # Get first prompt
     next_prompt = service.get_next_prompt(session.session_id)
     first_prompt = None
     if next_prompt:
-        first_prompt = {
-            "key": next_prompt[0],
-            "prompt": next_prompt[1],
-            "required": next_prompt[2]
-        }
+        first_prompt = {"key": next_prompt[0], "prompt": next_prompt[1], "required": next_prompt[2]}
 
     return StartFeedbackResponse(
         session_id=session.session_id,
@@ -169,7 +175,7 @@ async def start_feedback_session(request: StartFeedbackRequest):
         service_type=session.service_type,
         required_items=session.template.required_items,
         optional_items=session.template.optional_items,
-        first_prompt=first_prompt
+        first_prompt=first_prompt,
     )
 
 
@@ -206,7 +212,7 @@ async def submit_reading(session_id: str, request: SubmitReadingRequest):
             value=request.value,
             item_type=FeedbackItemType.READING,
             unit=request.unit,
-            notes=request.notes
+            notes=request.notes,
         )
 
         return FeedbackItemResponse(
@@ -217,7 +223,7 @@ async def submit_reading(session_id: str, request: SubmitReadingRequest):
             baseline_value=item.baseline_value,
             deviation_percent=item.deviation_percent,
             health_impact=item.health_impact.value,
-            notes=item.notes
+            notes=item.notes,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -238,7 +244,7 @@ async def submit_observation(session_id: str, request: SubmitObservationRequest)
             item_key=request.item_key,
             value=request.content,
             item_type=FeedbackItemType.OBSERVATION,
-            notes=request.notes
+            notes=request.notes,
         )
 
         return FeedbackItemResponse(
@@ -249,7 +255,7 @@ async def submit_observation(session_id: str, request: SubmitObservationRequest)
             baseline_value=None,
             deviation_percent=None,
             health_impact=item.health_impact.value,
-            notes=item.notes
+            notes=item.notes,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -257,10 +263,7 @@ async def submit_observation(session_id: str, request: SubmitObservationRequest)
 
 @router.post("/session/{session_id}/photo", response_model=FeedbackItemResponse)
 async def submit_photo(
-    session_id: str,
-    item_key: str = Form(...),
-    notes: Optional[str] = Form(None),
-    file: UploadFile = File(...)
+    session_id: str, item_key: str = Form(...), notes: Optional[str] = Form(None), file: UploadFile = File(...)
 ):
     """
     Submit a photo for the feedback session.
@@ -280,7 +283,7 @@ async def submit_photo(
             value=file.filename,
             item_type=FeedbackItemType.PHOTO,
             file_path=file_path,
-            notes=notes
+            notes=notes,
         )
 
         return FeedbackItemResponse(
@@ -291,7 +294,7 @@ async def submit_photo(
             baseline_value=None,
             deviation_percent=None,
             health_impact=item.health_impact.value,
-            notes=item.notes
+            notes=item.notes,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -299,10 +302,7 @@ async def submit_photo(
 
 @router.post("/session/{session_id}/audio", response_model=FeedbackItemResponse)
 async def submit_audio(
-    session_id: str,
-    item_key: str = Form(...),
-    notes: Optional[str] = Form(None),
-    file: UploadFile = File(...)
+    session_id: str, item_key: str = Form(...), notes: Optional[str] = Form(None), file: UploadFile = File(...)
 ):
     """
     Submit an audio recording for the feedback session.
@@ -321,7 +321,7 @@ async def submit_audio(
             value=file.filename,
             item_type=FeedbackItemType.AUDIO,
             file_path=file_path,
-            notes=notes
+            notes=notes,
         )
 
         return FeedbackItemResponse(
@@ -332,7 +332,7 @@ async def submit_audio(
             baseline_value=None,
             deviation_percent=None,
             health_impact=item.health_impact.value,
-            notes=item.notes
+            notes=item.notes,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -340,8 +340,7 @@ async def submit_audio(
 
 @router.post("/session/{session_id}/complete", response_model=CompleteFeedbackResponse)
 async def complete_feedback_session(
-    session_id: str,
-    force: bool = Query(False, description="Complete even if required items missing")
+    session_id: str, force: bool = Query(False, description="Complete even if required items missing")
 ):
     """
     Complete the feedback session and update equipment health.
@@ -364,7 +363,7 @@ async def complete_feedback_session(
             warnings=result.get("warnings", []),
             completed_at=result.get("completed_at"),
             error=result.get("error"),
-            message=result.get("message")
+            message=result.get("message"),
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -372,8 +371,7 @@ async def complete_feedback_session(
 
 @router.get("/template/{equipment_type}", response_model=TemplateResponse)
 async def get_feedback_template(
-    equipment_type: str,
-    service_type: str = Query("minor", description="Service type: minor, major, breakdown")
+    equipment_type: str, service_type: str = Query("minor", description="Service type: minor, major, breakdown")
 ):
     """
     Get the feedback template for an equipment type.
@@ -384,10 +382,7 @@ async def get_feedback_template(
     template = service.get_template(equipment_type, service_type)
 
     if not template:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No template found for {equipment_type}/{service_type}"
-        )
+        raise HTTPException(status_code=404, detail=f"No template found for {equipment_type}/{service_type}")
 
     return TemplateResponse(
         equipment_type=template.equipment_type,
@@ -395,7 +390,7 @@ async def get_feedback_template(
         required_items=template.required_items,
         optional_items=template.optional_items,
         prompts=template.prompts,
-        validation_rules=template.validation_rules
+        validation_rules=template.validation_rules,
     )
 
 
@@ -410,22 +405,19 @@ async def list_available_templates():
 
     templates_summary = {}
     for eq_type, service_types in service._templates.items():
-        templates_summary[eq_type] = {
-            "service_types": list(service_types.keys()),
-            "configurations": {}
-        }
+        templates_summary[eq_type] = {"service_types": list(service_types.keys()), "configurations": {}}
         for svc_type, template in service_types.items():
             templates_summary[eq_type]["configurations"][svc_type] = {
                 "required_count": len(template.required_items),
                 "optional_count": len(template.optional_items),
                 "has_audio": template.audio_duration_seconds > 0,
-                "audio_duration": template.audio_duration_seconds
+                "audio_duration": template.audio_duration_seconds,
             }
 
     return {
         "equipment_types": list(templates_summary.keys()),
         "count": len(templates_summary),
-        "templates": templates_summary
+        "templates": templates_summary,
     }
 
 
@@ -441,28 +433,12 @@ async def get_health_impact_rules():
         "impact_levels": {
             "positive": {
                 "description": "Reading improved or within 5% of baseline",
-                "score_change": "+2 per item (max +10)"
+                "score_change": "+2 per item (max +10)",
             },
-            "neutral": {
-                "description": "Reading within 15% of baseline",
-                "score_change": "0"
-            },
-            "negative": {
-                "description": "Reading 15-30% deviation from baseline",
-                "score_change": "-3 per item"
-            },
-            "critical": {
-                "description": "Reading >30% deviation or out of range",
-                "score_change": "-5 per item"
-            }
+            "neutral": {"description": "Reading within 15% of baseline", "score_change": "0"},
+            "negative": {"description": "Reading 15-30% deviation from baseline", "score_change": "-3 per item"},
+            "critical": {"description": "Reading >30% deviation or out of range", "score_change": "-5 per item"},
         },
-        "score_bounds": {
-            "min_change": -20,
-            "max_change": +10
-        },
-        "health_status_thresholds": {
-            "normal": "health >= 80",
-            "warning": "health >= 60",
-            "critical": "health < 60"
-        }
+        "score_bounds": {"min_change": -20, "max_change": +10},
+        "health_status_thresholds": {"normal": "health >= 80", "warning": "health >= 60", "critical": "health < 60"},
     }

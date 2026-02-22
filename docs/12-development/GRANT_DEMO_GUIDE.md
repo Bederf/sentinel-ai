@@ -1,6 +1,6 @@
-# SENTINEL BMS + Wardew Tridonic Demo Guide
+# SENTINEL BMS + Tridonic Demo Guide
 
-**For:** Grant (Wardew Automation)  
+**For:** Grant (Demo Account)  
 **Date:** February 2026  
 **Duration:** 4 hours real-time (simulates full 365-day building year)  
 **Building:** Site-002 (Sandton Office Complex)  
@@ -9,7 +9,7 @@
 
 ## 🎯 Demo Overview
 
-This demo showcases how Wardew's Tridonic DALI lighting system, when integrated with SENTINEL's AI optimization engine, transforms building energy management across a full year.
+This demo showcases how Tridonic DALI lighting system, when integrated with SENTINEL's AI optimization engine, transforms building energy management across a full year.
 
 **What You'll See:**
 - Tridonic lights responding to occupancy, daylight, season, and weather
@@ -48,11 +48,11 @@ curl http://localhost:9095/api/health
 ### Step 1: Login as Grant
 
 **Method A: Email Login**
-- Email: `grant@wardew.co.za`
+- Email: `grant@grantdemo.co.za`
 - No password needed (DEMO_MODE auto-accepts)
 
 **Method B: Social Login**
-- Google: `grant@wardew.co.za`
+- Google: `grant@grantdemo.co.za`
 - Microsoft: Same email
 
 ### Step 2: Auto-Start
@@ -420,7 +420,7 @@ Your Approvals Today (Day 47):
 ## 📱 Demo Flow (Suggested)
 
 ### Phase 1: Introduction (15 min)
-1. Log in as grant@wardew.co.za
+1. Log in as grant@grantdemo.co.za
 2. Show Digital Twin 3D building
 3. Explain equipment layout (zones, HVAC, lighting)
 4. Point out timeline: "Day 1 of 365"
@@ -558,7 +558,7 @@ You'll see notifications appear regularly:
 ## 📊 Key Takeaways for Grant
 
 **Value Proposition:**
-1. **Wardew's Tridonic system** provides lighting control
+1. **Tridonic lighting system** provides lighting control
 2. **SENTINEL's BMS integration** connects lighting to HVAC and building data
 3. **AI optimization layer** makes coordinated recommendations
 4. **Your approval workflow** maintains human oversight
@@ -571,7 +571,7 @@ You'll see notifications appear regularly:
 - Fault detection (catching issues before they cause failures)
 - Data-driven decisions (see exactly how much each change saves)
 
-**Wardew's Role:**
+**Lighting Integration Role:**
 - Install Tridonic DALI controllers (64 channels/controller)
 - Network to building BMS via your integration
 - SENTINEL handles the intelligence layer
@@ -595,6 +595,6 @@ You'll see notifications appear regularly:
 
 ---
 
-**Ready to start? Log in as: `grant@wardew.co.za`**
+**Ready to start? Log in as: `grant@grantdemo.co.za`**
 
 Let the simulation begin! 🚀

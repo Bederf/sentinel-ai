@@ -16,12 +16,12 @@ from app.database.supabase_client import get_supabase_client
 
 def check_building(client):
     """Check if site-002 building record exists."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("1️⃣  BUILDING CHECK")
-    print("="*60)
+    print("=" * 60)
 
     try:
-        result = client.table('buildings').select('*').eq('code', 'site-002').execute()
+        result = client.table("buildings").select("*").eq("code", "site-002").execute()
 
         if result.data:
             building = result.data[0]
@@ -32,7 +32,7 @@ def check_building(client):
             print(f"   Address: {building.get('address')}")
             print(f"   Floors: {building.get('floors')}")
             print(f"   SQM: {building.get('sqm')}")
-            return building.get('id')
+            return building.get("id")
         else:
             print("❌ Building 'site-002' NOT FOUND in Supabase")
             return None
@@ -44,14 +44,17 @@ def check_building(client):
 
 def check_equipment(client, building_id):
     """Check equipment records for site-002."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("2️⃣  EQUIPMENT CHECK")
-    print("="*60)
+    print("=" * 60)
 
     try:
-        result = client.table('equipment').select('code, name, type, status, health_score').eq(
-            'building_id', building_id
-        ).execute()
+        result = (
+            client.table("equipment")
+            .select("code, name, type, status, health_score")
+            .eq("building_id", building_id)
+            .execute()
+        )
 
         count = len(result.data) if result.data else 0
         print(f"Equipment records found: {count}")
@@ -67,7 +70,7 @@ def check_equipment(client, building_id):
             # Group by type
             types = {}
             for eq in result.data:
-                eq_type = eq.get('type', 'unknown')
+                eq_type = eq.get("type", "unknown")
                 types[eq_type] = types.get(eq_type, 0) + 1
 
             print("\nEquipment by type:")
@@ -85,14 +88,14 @@ def check_equipment(client, building_id):
 
 def check_zones(client, building_id):
     """Check zones for site-002."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("3️⃣  ZONES CHECK")
-    print("="*60)
+    print("=" * 60)
 
     try:
-        result = client.table('zones').select('zone_id, floor, zone_type, area_sqm').eq(
-            'building_id', building_id
-        ).execute()
+        result = (
+            client.table("zones").select("zone_id, floor, zone_type, area_sqm").eq("building_id", building_id).execute()
+        )
 
         count = len(result.data) if result.data else 0
         print(f"Zone records found: {count}")
@@ -100,7 +103,9 @@ def check_zones(client, building_id):
         if count > 0:
             print("\n✅ Zones:")
             for zone in result.data:
-                print(f"   - {zone.get('zone_id')} ({zone.get('floor')}) {zone.get('zone_type')} - {zone.get('area_sqm')} sqm")
+                print(
+                    f"   - {zone.get('zone_id')} ({zone.get('floor')}) {zone.get('zone_type')} - {zone.get('area_sqm')} sqm"
+                )
         else:
             print("❌ NO zones found for site-002")
 
@@ -113,14 +118,12 @@ def check_zones(client, building_id):
 
 def check_desks(client, building_id):
     """Check desks for site-002."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("4️⃣  DESKS CHECK")
-    print("="*60)
+    print("=" * 60)
 
     try:
-        result = client.table('desks').select('desk_id, floor, zone_id').eq(
-            'building_id', building_id
-        ).execute()
+        result = client.table("desks").select("desk_id, floor, zone_id").eq("building_id", building_id).execute()
 
         count = len(result.data) if result.data else 0
         print(f"Desk records found: {count}")
@@ -144,15 +147,18 @@ def check_desks(client, building_id):
 
 def check_technicians(client, building_id):
     """Check technician assignments for site-002."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("5️⃣  TECHNICIANS CHECK")
-    print("="*60)
+    print("=" * 60)
 
     try:
         # Get technicians assigned to this building
-        result = client.table('site_technicians').select(
-            'id, technician_id, specialty, is_primary'
-        ).eq('building_id', building_id).execute()
+        result = (
+            client.table("site_technicians")
+            .select("id, technician_id, specialty, is_primary")
+            .eq("building_id", building_id)
+            .execute()
+        )
 
         count = len(result.data) if result.data else 0
         print(f"Technician assignments found: {count}")
@@ -160,7 +166,7 @@ def check_technicians(client, building_id):
         if count > 0:
             print("\n✅ Technician assignments:")
             for assignment in result.data:
-                primary = "PRIMARY" if assignment.get('is_primary') else "secondary"
+                primary = "PRIMARY" if assignment.get("is_primary") else "secondary"
                 print(f"   - Technician {assignment.get('technician_id')}: {assignment.get('specialty')} ({primary})")
         else:
             print("❌ NO technician assignments found for site-002")
@@ -174,12 +180,12 @@ def check_technicians(client, building_id):
 
 def check_technician_details(client):
     """Get technician details."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("6️⃣  TECHNICIAN DETAILS")
-    print("="*60)
+    print("=" * 60)
 
     try:
-        result = client.table('technicians').select('*').execute()
+        result = client.table("technicians").select("*").execute()
 
         count = len(result.data) if result.data else 0
         print(f"Total technicians in system: {count}")
@@ -187,7 +193,9 @@ def check_technician_details(client):
         if count > 0:
             print("\n✅ All technicians:")
             for tech in result.data:
-                print(f"   - {tech.get('code')}: {tech.get('name')} ({tech.get('email')}) - Active: {tech.get('active')}")
+                print(
+                    f"   - {tech.get('code')}: {tech.get('name')} ({tech.get('email')}) - Active: {tech.get('active')}"
+                )
 
         return count
 
@@ -199,11 +207,11 @@ def check_technician_details(client):
 def main():
     """Main diagnostic function."""
     print("\n")
-    print("╔" + "="*58 + "╗")
-    print("║" + " "*12 + "SUPABASE DIAGNOSTIC: SITE-002" + " "*17 + "║")
-    print("║" + " "*58 + "║")
-    print("║" + f" Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" + " "*29 + "║")
-    print("╚" + "="*58 + "╝")
+    print("╔" + "=" * 58 + "╗")
+    print("║" + " " * 12 + "SUPABASE DIAGNOSTIC: SITE-002" + " " * 17 + "║")
+    print("║" + " " * 58 + "║")
+    print("║" + f" Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" + " " * 29 + "║")
+    print("╚" + "=" * 58 + "╝")
 
     try:
         client = get_supabase_client()
@@ -230,9 +238,9 @@ def main():
     check_technician_details(client)
 
     # Summary
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("📊 SUMMARY")
-    print("="*60)
+    print("=" * 60)
 
     if building_id:
         print(f"✅ Building: EXISTS (ID: {building_id})")

@@ -18,13 +18,9 @@ def load_settings() -> Dict[str, Any]:
     if not SETTINGS_FILE.exists():
         # Create default settings if file doesn't exist
         default_settings = {
-            "healthThresholds": {
-                "healthy": 90,
-                "warning": 70,
-                "critical": 0
-            },
+            "healthThresholds": {"healthy": 90, "warning": 70, "critical": 0},
             "notifications": {},
-            "display": {}
+            "display": {},
         }
         save_settings(default_settings)
         return default_settings
@@ -74,18 +70,12 @@ async def update_all_settings(settings_data: Dict[str, Any]) -> Dict[str, Any]:
             if key in thresholds:
                 value = thresholds[key]
                 if not (0 <= value <= 100):
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"{key} threshold must be between 0 and 100"
-                    )
+                    raise HTTPException(status_code=400, detail=f"{key} threshold must be between 0 and 100")
 
         # Validate threshold ordering (healthy > warning > critical)
         if "healthy" in thresholds and "warning" in thresholds:
             if thresholds["healthy"] <= thresholds["warning"]:
-                raise HTTPException(
-                    status_code=400,
-                    detail="healthy threshold must be greater than warning threshold"
-                )
+                raise HTTPException(status_code=400, detail="healthy threshold must be greater than warning threshold")
 
     # Merge with existing settings
     current_settings = load_settings()
@@ -136,7 +126,7 @@ async def update_notification_settings(notifications: Dict[str, Any]) -> Dict[st
             if key not in VALID_ALERT_COMMANDS:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Unknown alert command: {key}. Valid: {', '.join(sorted(VALID_ALERT_COMMANDS))}"
+                    detail=f"Unknown alert command: {key}. Valid: {', '.join(sorted(VALID_ALERT_COMMANDS))}",
                 )
             if not isinstance(config, dict):
                 raise HTTPException(status_code=400, detail=f"alertCommands.{key} must be an object")
@@ -149,19 +139,13 @@ async def update_notification_settings(notifications: Dict[str, Any]) -> Dict[st
     if "alertCooldownMinutes" in notifications:
         cooldown = notifications["alertCooldownMinutes"]
         if not isinstance(cooldown, (int, float)) or cooldown < 1 or cooldown > 60:
-            raise HTTPException(
-                status_code=400,
-                detail="alertCooldownMinutes must be a number between 1 and 60"
-            )
+            raise HTTPException(status_code=400, detail="alertCooldownMinutes must be a number between 1 and 60")
 
     # Validate resetBlockedTypes if provided
     if "resetBlockedTypes" in notifications:
         blocked = notifications["resetBlockedTypes"]
         if not isinstance(blocked, list) or not all(isinstance(t, str) for t in blocked):
-            raise HTTPException(
-                status_code=400,
-                detail="resetBlockedTypes must be an array of strings"
-            )
+            raise HTTPException(status_code=400, detail="resetBlockedTypes must be an array of strings")
 
     # Merge with existing settings
     current_settings = load_settings()
@@ -187,11 +171,7 @@ async def update_notification_settings(notifications: Dict[str, Any]) -> Dict[st
 async def get_health_thresholds() -> Dict[str, int]:
     """Get health score thresholds."""
     settings_data = load_settings()
-    return settings_data.get("healthThresholds", {
-        "healthy": 90,
-        "warning": 70,
-        "critical": 0
-    })
+    return settings_data.get("healthThresholds", {"healthy": 90, "warning": 70, "critical": 0})
 
 
 @router.put("/settings/health-thresholds")
@@ -201,40 +181,25 @@ async def update_health_thresholds(thresholds: Dict[str, int]) -> Dict[str, int]
     required_fields = ["healthy", "warning", "critical"]
     for field in required_fields:
         if field not in thresholds:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Missing required field: {field}"
-            )
+            raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
 
     # Validate threshold values are numbers
     for field in required_fields:
         if not isinstance(thresholds[field], (int, float)):
-            raise HTTPException(
-                status_code=400,
-                detail=f"{field} must be a number"
-            )
+            raise HTTPException(status_code=400, detail=f"{field} must be a number")
 
     # Validate threshold ranges (0-100)
     for field in required_fields:
         value = thresholds[field]
         if not (0 <= value <= 100):
-            raise HTTPException(
-                status_code=400,
-                detail=f"{field} must be between 0 and 100"
-            )
+            raise HTTPException(status_code=400, detail=f"{field} must be between 0 and 100")
 
     # Validate threshold ordering (healthy > warning > critical)
     if thresholds["healthy"] <= thresholds["warning"]:
-        raise HTTPException(
-            status_code=400,
-            detail="healthy threshold must be greater than warning threshold"
-        )
+        raise HTTPException(status_code=400, detail="healthy threshold must be greater than warning threshold")
 
     if thresholds["warning"] <= thresholds["critical"]:
-        raise HTTPException(
-            status_code=400,
-            detail="warning threshold must be greater than critical threshold"
-        )
+        raise HTTPException(status_code=400, detail="warning threshold must be greater than critical threshold")
 
     # Load current settings and update thresholds
     current_settings = load_settings()

@@ -306,7 +306,8 @@ Examples:
     )
 
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable verbose logging",
     )
@@ -316,7 +317,9 @@ Examples:
     # generate command
     gen_parser = subparsers.add_parser("generate", help="Generate complete BMS simulation")
     gen_parser.add_argument("--site", default="site-002", help="Site ID (default: site-002)")
-    gen_parser.add_argument("--vendor", default="desigo", help="Vendor format: desigo, niagara, rickard (default: desigo)")
+    gen_parser.add_argument(
+        "--vendor", default="desigo", help="Vendor format: desigo, niagara, rickard (default: desigo)"
+    )
     gen_parser.add_argument("--days", type=int, default=30, help="Days of trend data (default: 30)")
     gen_parser.add_argument("--interval", type=int, default=15, help="Trend interval in minutes (default: 15)")
     gen_parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42)")
@@ -329,13 +332,13 @@ Examples:
         "--climate",
         choices=["johannesburg", "durban", "cape_town", "pretoria"],
         default=None,
-        help="Climate profile for weather-based variations"
+        help="Climate profile for weather-based variations",
     )
     gen_parser.add_argument(
         "--pattern",
         choices=["diurnal", "exponential", "stepped", "linear", "seasonal", "intermittent"],
         default=None,
-        help="Degradation pattern type override"
+        help="Degradation pattern type override",
     )
     gen_parser.set_defaults(func=cmd_generate)
 
@@ -360,7 +363,7 @@ Examples:
         "--climate",
         choices=["johannesburg", "durban", "cape_town", "pretoria"],
         default=None,
-        help="Climate profile for weather-based variations"
+        help="Climate profile for weather-based variations",
     )
     trends_parser.set_defaults(func=cmd_generate_trends)
 
@@ -391,7 +394,7 @@ Examples:
             "generator-fuel",
             "icu-humidity",
         ],
-        help="Scenario to generate"
+        help="Scenario to generate",
     )
     scenario_parser.add_argument("--site", default="site-004", help="Site ID (default: site-004)")
     scenario_parser.add_argument("--output", help="Output JSON file path (optional)")

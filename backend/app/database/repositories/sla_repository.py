@@ -301,7 +301,6 @@ class SLARepository:
     ) -> Optional[SLAPerformanceWithCompliance]:
         """Create performance record in Supabase."""
         try:
-
             # Check if Supabase is configured
             if not self._is_supabase_configured():
                 return None
@@ -467,6 +466,7 @@ class SLARepository:
         # Generate ID if not present
         if not perf.id or perf.id.startswith("perf-"):
             import uuid
+
             perf.id = f"perf-{uuid.uuid4().hex[:8]}"
 
         # Serialize to dict
@@ -507,11 +507,7 @@ class SLARepository:
         data = self._read_json_data()
 
         # Filter by contract_id
-        filtered = [
-            p
-            for p in data["performance"]
-            if p["contract_id"] == contract_id
-        ]
+        filtered = [p for p in data["performance"] if p["contract_id"] == contract_id]
 
         # Sort by period_start descending
         filtered.sort(key=lambda x: x["period_start"], reverse=True)
@@ -556,6 +552,7 @@ class SLARepository:
         # Generate ID if not present
         if not breach.id:
             import uuid
+
             breach.id = f"breach-{uuid.uuid4().hex[:8]}"
 
         # TODO: Store in JSON file
@@ -566,11 +563,7 @@ class SLARepository:
         data = self._read_json_data()
 
         # Filter by contract_id
-        performance = [
-            p
-            for p in data["performance"]
-            if p["contract_id"] == contract_id
-        ]
+        performance = [p for p in data["performance"] if p["contract_id"] == contract_id]
 
         if not performance:
             return {
@@ -586,10 +579,9 @@ class SLARepository:
         # Calculate aggregates
         total_breaches = sum(p.get("incidents_count", 0) for p in performance)
         total_clawback = sum(p.get("penalty_amount_zar", 0.0) for p in performance)
-        avg_compliance = sum(
-            p.get("details", {}).get("compliance_percentage", 100.0)
-            for p in performance
-        ) / len(performance)
+        avg_compliance = sum(p.get("details", {}).get("compliance_percentage", 100.0) for p in performance) / len(
+            performance
+        )
 
         # Count by severity
         by_severity = {"minor": 0, "major": 0, "critical": 0}
@@ -681,6 +673,7 @@ class SLARepository:
     def _is_supabase_configured(self) -> bool:
         """Check if Supabase is configured."""
         import os
+
         return bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_KEY"))
 
     def _get_supabase_client(self):

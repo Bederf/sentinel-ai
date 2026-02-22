@@ -37,6 +37,7 @@ class FireSafetyRepository:
         if self._client is None and not self._use_json:
             try:
                 from app.database.supabase_client import get_supabase_client
+
                 self._client = get_supabase_client()
             except Exception as e:
                 logger.warning(f"Failed to get Supabase client, using JSON fallback: {e}")
@@ -102,12 +103,7 @@ class FireSafetyRepository:
         """Get active (uncleared) fire alarms."""
         if not self._use_json and self.client:
             try:
-                response = (
-                    self.client.table("fire_alarms")
-                    .select("*")
-                    .eq("cleared", False)
-                    .execute()
-                )
+                response = self.client.table("fire_alarms").select("*").eq("cleared", False).execute()
                 if response.data is not None:
                     return response.data
             except Exception as e:
@@ -151,12 +147,7 @@ class FireSafetyRepository:
         """Update a fire alarm (dual-write)."""
         if not self._use_json and self.client:
             try:
-                response = (
-                    self.client.table("fire_alarms")
-                    .update(data)
-                    .eq("alarm_id", alarm_id)
-                    .execute()
-                )
+                response = self.client.table("fire_alarms").update(data).eq("alarm_id", alarm_id).execute()
                 if response.data:
                     pass  # Success in Supabase
             except Exception as e:
@@ -195,12 +186,7 @@ class FireSafetyRepository:
         """Update a smoke damper (dual-write)."""
         if not self._use_json and self.client:
             try:
-                response = (
-                    self.client.table("fire_dampers")
-                    .update(data)
-                    .eq("damper_id", damper_id)
-                    .execute()
-                )
+                response = self.client.table("fire_dampers").update(data).eq("damper_id", damper_id).execute()
             except Exception as e:
                 logger.warning(f"Supabase fire_dampers update failed: {e}")
 
@@ -238,10 +224,7 @@ class FireSafetyRepository:
         if not self._use_json and self.client:
             try:
                 response = (
-                    self.client.table("fire_pressurization")
-                    .update(data)
-                    .eq("stairwell_id", stairwell_id)
-                    .execute()
+                    self.client.table("fire_pressurization").update(data).eq("stairwell_id", stairwell_id).execute()
                 )
             except Exception as e:
                 logger.warning(f"Supabase fire_pressurization update failed: {e}")

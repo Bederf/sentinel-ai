@@ -44,14 +44,14 @@ class LightingSimulationEngine:
 
     # Zone characteristics
     WINDOW_ZONES = {
-        "Zone-001": True,   # Level 0 Zone A (window)
+        "Zone-001": True,  # Level 0 Zone A (window)
         "Zone-002": False,  # Level 0 Zone B (interior)
-        "Zone-101": True,   # Level 1 Zone A (window)
+        "Zone-101": True,  # Level 1 Zone A (window)
         "Zone-102": False,  # Level 1 Zone B (interior)
-        "Zone-201": True,   # Level 2 Zone A (window)
+        "Zone-201": True,  # Level 2 Zone A (window)
         "Zone-202": False,  # Level 2 Zone B (interior)
-        "Zone-R": False,    # Common area
-        "Entry": True,      # Entry with skylight
+        "Zone-R": False,  # Common area
+        "Entry": True,  # Entry with skylight
     }
 
     def __init__(self, building_id: str):
@@ -182,9 +182,9 @@ class LightingSimulationEngine:
             # Adjust daylight for weather
             effective_lux = daylight_lux
             if cloud_cover_pct > 50:
-                effective_lux *= (1.0 - (self.CLOUDY_REDUCTION * (cloud_cover_pct / 100.0)))
+                effective_lux *= 1.0 - (self.CLOUDY_REDUCTION * (cloud_cover_pct / 100.0))
             if is_raining:
-                effective_lux *= (1.0 - self.RAIN_REDUCTION)
+                effective_lux *= 1.0 - self.RAIN_REDUCTION
 
             # Calculate daylight contribution
             if effective_lux >= self.DAYLIGHT_THRESHOLD_LUX:
@@ -204,19 +204,19 @@ class LightingSimulationEngine:
         # Clamp to min (DALI minimum dim)
         power_kw = max(self.DALI_MIN_DIM * baseline_power, power_with_occupancy)
 
-        logger.debug(
-            f"[LIGHT CALC] {zone_id}: occ={occupancy_pct:.0f}% "
-            f"lux={daylight_lux:.0f} → {power_kw:.2f}kW"
-        )
+        logger.debug(f"[LIGHT CALC] {zone_id}: occ={occupancy_pct:.0f}% lux={daylight_lux:.0f} → {power_kw:.2f}kW")
 
         return power_kw
 
     async def _load_zone_metadata(self) -> None:
         """Load zone configuration from database."""
         try:
-            response = self.supabase.table("hvac_zones").select(
-                "id, zone_id, zone_name, floor, typical_occupancy, area_sqm"
-            ).eq("building_id", self.building_id).execute()
+            response = (
+                self.supabase.table("hvac_zones")
+                .select("id, zone_id, zone_name, floor, typical_occupancy, area_sqm")
+                .eq("building_id", self.building_id)
+                .execute()
+            )
 
             for zone in response.data:
                 self._zone_cache[zone["zone_id"]] = {
@@ -253,10 +253,7 @@ class LightingSimulationEngine:
                 "last_update": datetime.utcnow().isoformat() + "Z",
             }
 
-            self.supabase.table("power_meters").upsert(
-                hvac_meter_update,
-                on_conflict="meter_id"
-            ).execute()
+            self.supabase.table("power_meters").upsert(hvac_meter_update, on_conflict="meter_id").execute()
 
             # Record hourly energy consumption
             energy_record = {
@@ -270,9 +267,7 @@ class LightingSimulationEngine:
                 "daylight_lux": round(daylight_lux, 1),
             }
 
-            self.supabase.table("energy_consumption_history").insert(
-                energy_record
-            ).execute()
+            self.supabase.table("energy_consumption_history").insert(energy_record).execute()
 
             logger.debug(
                 f"[LIGHTING] Updated meter S002-MTR-B1-LIGHT: "

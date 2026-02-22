@@ -97,9 +97,7 @@ async def test_track_ohs_completion(compliance_service, mocker):
 
 
 @pytest.mark.asyncio
-async def test_schedule_fire_equipment_inspection_12month(
-    compliance_service, mocker
-):
+async def test_schedule_fire_equipment_inspection_12month(compliance_service, mocker):
     """Verify fire inspection interval is 12 months per NFPA 10."""
     mock_schedule = MagicMock()
     mock_schedule.id = "schedule-001"
@@ -112,22 +110,16 @@ async def test_schedule_fire_equipment_inspection_12month(
         return_value=mock_schedule,
     )
 
-    schedule = await compliance_service.schedule_fire_equipment_inspection(
-        "extinguisher", "zone-B1"
-    )
+    schedule = await compliance_service.schedule_fire_equipment_inspection("extinguisher", "zone-B1")
 
     assert schedule.id == "schedule-001"
     # Verify interval is approximately 365 days
-    interval_days = (
-        schedule.next_due_date - schedule.created_at
-    ).days
+    interval_days = (schedule.next_due_date - schedule.created_at).days
     assert 363 <= interval_days <= 367  # Allow 2-day variance
 
 
 @pytest.mark.asyncio
-async def test_track_fire_equipment_expiry_alert(
-    compliance_service, mocker
-):
+async def test_track_fire_equipment_expiry_alert(compliance_service, mocker):
     """Verify alert when certification expiring within 30 days."""
     expiry_date = datetime.now() + timedelta(days=20)
 
@@ -142,9 +134,7 @@ async def test_track_fire_equipment_expiry_alert(
         return_value=mock_tracking,
     )
 
-    result = await compliance_service.track_fire_equipment_charge(
-        "fire-001", 150.0, datetime.now()
-    )
+    result = await compliance_service.track_fire_equipment_charge("fire-001", 150.0, datetime.now())
 
     assert result.charge_pressure == 150.0
     # Alert would be created for expiry within 30 days
@@ -156,9 +146,7 @@ async def test_track_fire_equipment_expiry_alert(
 
 
 @pytest.mark.asyncio
-async def test_schedule_emergency_light_daily_auto_test(
-    compliance_service, mocker
-):
+async def test_schedule_emergency_light_daily_auto_test(compliance_service, mocker):
     """Verify daily auto-test schedule (0100-0130 UTC) per IEC 62034."""
     mock_schedules = [MagicMock(id="schedule-001"), MagicMock(id="schedule-002")]
 
@@ -168,17 +156,13 @@ async def test_schedule_emergency_light_daily_auto_test(
         return_value=mock_schedules,
     )
 
-    schedules = await compliance_service.schedule_emergency_light_test(
-        ["EMERG-001", "EMERG-002"], auto_test=True
-    )
+    schedules = await compliance_service.schedule_emergency_light_test(["EMERG-001", "EMERG-002"], auto_test=True)
 
     assert len(schedules) == 2
 
 
 @pytest.mark.asyncio
-async def test_record_emergency_light_battery_degradation(
-    compliance_service, mocker
-):
+async def test_record_emergency_light_battery_degradation(compliance_service, mocker):
     """Verify battery health trend tracking."""
     mocker.patch.object(
         compliance_service.repository,
@@ -189,18 +173,14 @@ async def test_record_emergency_light_battery_degradation(
         },
     )
 
-    result = await compliance_service.record_emergency_light_test(
-        "EMERG-001", 85, "pass"
-    )
+    result = await compliance_service.record_emergency_light_test("EMERG-001", 85, "pass")
 
     assert result["battery_health"] == 85
     # No alert (> 75% threshold)
 
 
 @pytest.mark.asyncio
-async def test_emergency_light_battery_alert_critical(
-    compliance_service, mocker
-):
+async def test_emergency_light_battery_alert_critical(compliance_service, mocker):
     """Verify alert triggered when battery < 75% (IEC 62034 threshold)."""
     mocker.patch.object(
         compliance_service.repository,
@@ -211,9 +191,7 @@ async def test_emergency_light_battery_alert_critical(
         },
     )
 
-    result = await compliance_service.record_emergency_light_test(
-        "EMERG-002", 70, "alert"
-    )
+    result = await compliance_service.record_emergency_light_test("EMERG-002", 70, "alert")
 
     assert result["battery_health"] == 70
     # Alert should be created (< 75% threshold)
@@ -225,9 +203,7 @@ async def test_emergency_light_battery_alert_critical(
 
 
 @pytest.mark.asyncio
-async def test_legionella_risk_matrix_high_risk(
-    compliance_service, mocker
-):
+async def test_legionella_risk_matrix_high_risk(compliance_service, mocker):
     """Verify high-risk when optimal temp AND old treatment."""
     mock_assessment = MagicMock()
     mock_assessment.risk_level = RiskLevel.HIGH
@@ -250,9 +226,7 @@ async def test_legionella_risk_matrix_high_risk(
 
 
 @pytest.mark.asyncio
-async def test_legionella_risk_matrix_low_risk(
-    compliance_service, mocker
-):
+async def test_legionella_risk_matrix_low_risk(compliance_service, mocker):
     """Verify low-risk when cold temp AND recent treatment."""
     mock_assessment = MagicMock()
     mock_assessment.risk_level = RiskLevel.LOW
@@ -275,9 +249,7 @@ async def test_legionella_risk_matrix_low_risk(
 
 
 @pytest.mark.asyncio
-async def test_create_legionella_maintenance_high_risk(
-    compliance_service, mocker
-):
+async def test_create_legionella_maintenance_high_risk(compliance_service, mocker):
     """Verify high-risk gets 14-day biocide schedule."""
     mock_schedule = MagicMock()
     mock_schedule.id = "schedule-legionella-001"
@@ -289,17 +261,13 @@ async def test_create_legionella_maintenance_high_risk(
         return_value=mock_schedule,
     )
 
-    schedule = await compliance_service.create_legionella_maintenance_task(
-        "assess-001"
-    )
+    schedule = await compliance_service.create_legionella_maintenance_task("assess-001")
 
     assert "14-day" in schedule.schedule_name
 
 
 @pytest.mark.asyncio
-async def test_create_legionella_maintenance_low_risk(
-    compliance_service, mocker
-):
+async def test_create_legionella_maintenance_low_risk(compliance_service, mocker):
     """Verify low-risk gets 90-day monitoring schedule."""
     mock_schedule = MagicMock()
     mock_schedule.id = "schedule-legionella-002"
@@ -311,9 +279,7 @@ async def test_create_legionella_maintenance_low_risk(
         return_value=mock_schedule,
     )
 
-    schedule = await compliance_service.create_legionella_maintenance_task(
-        "assess-002"
-    )
+    schedule = await compliance_service.create_legionella_maintenance_task("assess-002")
 
     assert "90-day" in schedule.schedule_name
 
@@ -324,15 +290,14 @@ async def test_create_legionella_maintenance_low_risk(
 
 
 @pytest.mark.asyncio
-async def test_electrical_certificate_5year_expiry(
-    compliance_service, mocker
-):
+async def test_electrical_certificate_5year_expiry(compliance_service, mocker):
     """Verify 5-year validity (South African SABS standard)."""
     from app.models.compliance import ElectricalCompliance
 
     cert = ElectricalCompliance(
         site_id="S002",
         certificate_type="CoC_new_installation",
+        certificate_number="CoC-2026-001",
         issued_by="John Smith",
         issue_date=datetime.now(),
         scope="L1-L2 distribution upgrade",
@@ -352,22 +317,19 @@ async def test_electrical_certificate_5year_expiry(
 
     assert result is True
     # Verify expiry is 5 years from issue
-    days_to_expiry = (
-        mock_saved.expiry_date - datetime.now()
-    ).days
+    days_to_expiry = (mock_saved.expiry_date - datetime.now()).days
     assert 1820 <= days_to_expiry <= 1825  # ~5 years
 
 
 @pytest.mark.asyncio
-async def test_electrical_compliance_expiry_alert(
-    compliance_service, mocker
-):
+async def test_electrical_compliance_expiry_alert(compliance_service, mocker):
     """Verify alert when certificate expiring within 30 days."""
     from app.models.compliance import ElectricalCompliance
 
     cert = ElectricalCompliance(
         site_id="S002",
         certificate_type="CoC_new_installation",
+        certificate_number="CoC-2021-001",
         issued_by="John Smith",
         issue_date=datetime.now() - timedelta(days=365 * 5 - 20),  # Expiring in 20 days
         scope="L1-L2 distribution upgrade",
@@ -395,9 +357,7 @@ async def test_electrical_compliance_expiry_alert(
 
 
 @pytest.mark.asyncio
-async def test_schedule_lift_inspection_6monthly(
-    compliance_service, mocker
-):
+async def test_schedule_lift_inspection_6monthly(compliance_service, mocker):
     """Verify periodic lift inspection scheduling."""
     mock_schedule = MagicMock()
     mock_schedule.id = "schedule-lift-001"
@@ -408,17 +368,13 @@ async def test_schedule_lift_inspection_6monthly(
         return_value=mock_schedule,
     )
 
-    schedule = await compliance_service.schedule_lift_inspection(
-        "LIFT-R-001", "periodic_6monthly"
-    )
+    schedule = await compliance_service.schedule_lift_inspection("LIFT-R-001", "periodic_6monthly")
 
     assert schedule.id == "schedule-lift-001"
 
 
 @pytest.mark.asyncio
-async def test_record_lift_test_results_compliant(
-    compliance_service, mocker
-):
+async def test_record_lift_test_results_compliant(compliance_service, mocker):
     """Verify lift test validation: brake ≤ 1m, governor OK, e-stop OK."""
     mocker.patch.object(
         compliance_service.repository,
@@ -436,17 +392,13 @@ async def test_record_lift_test_results_compliant(
         "shaft_pressure": "normal",
     }
 
-    result = await compliance_service.record_lift_test_results(
-        "LIFT-R-001", test_results
-    )
+    result = await compliance_service.record_lift_test_results("LIFT-R-001", test_results)
 
     assert result["compliant"] is True
 
 
 @pytest.mark.asyncio
-async def test_record_lift_test_results_non_compliant(
-    compliance_service, mocker
-):
+async def test_record_lift_test_results_non_compliant(compliance_service, mocker):
     """Verify non-compliance when brake test fails."""
     mocker.patch.object(
         compliance_service.repository,
@@ -464,9 +416,7 @@ async def test_record_lift_test_results_non_compliant(
         "shaft_pressure": "normal",
     }
 
-    result = await compliance_service.record_lift_test_results(
-        "LIFT-R-002", test_results
-    )
+    result = await compliance_service.record_lift_test_results("LIFT-R-002", test_results)
 
     assert result["compliant"] is False
 
@@ -477,9 +427,7 @@ async def test_record_lift_test_results_non_compliant(
 
 
 @pytest.mark.asyncio
-async def test_get_compliance_status_aggregates_all_types(
-    compliance_service, mocker
-):
+async def test_get_compliance_status_aggregates_all_types(compliance_service, mocker):
     """Verify compliance status aggregates OHS, Fire, Electrical, etc."""
     from app.models.compliance import ComplianceStatus
 
@@ -506,9 +454,7 @@ async def test_get_compliance_status_aggregates_all_types(
 
 
 @pytest.mark.asyncio
-async def test_get_compliance_audits_with_filters(
-    compliance_service, mocker
-):
+async def test_get_compliance_audits_with_filters(compliance_service, mocker):
     """Verify audit history retrieval with type/status filters."""
     mock_audits = [
         MagicMock(id="audit-001", compliance_type="Fire", status="submitted"),
@@ -520,9 +466,7 @@ async def test_get_compliance_audits_with_filters(
         return_value=mock_audits,
     )
 
-    audits = await compliance_service.get_compliance_audits(
-        "S002", compliance_type="Fire", status="submitted"
-    )
+    audits = await compliance_service.get_compliance_audits("S002", compliance_type="Fire", status="submitted")
 
     assert len(audits) == 1
     assert audits[0].compliance_type == "Fire"

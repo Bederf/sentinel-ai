@@ -20,18 +20,18 @@ router = APIRouter(prefix="/api/fleet", tags=["fleet-learning"])
 async def get_fleet_summary():
     """Get fleet-wide summary statistics."""
     from ml.fleet.aggregator import get_fleet_aggregator
+
     aggregator = get_fleet_aggregator()
     return aggregator.get_fleet_summary()
 
 
 @router.get("/failure-patterns")
 async def get_failure_patterns(
-    equipment_type: Optional[str] = Query(
-        None, description="Filter by equipment type (CHILLER, AHU, etc.)"
-    ),
+    equipment_type: Optional[str] = Query(None, description="Filter by equipment type (CHILLER, AHU, etc.)"),
 ):
     """Get anonymized failure patterns across fleet."""
     from ml.fleet.aggregator import get_fleet_aggregator
+
     aggregator = get_fleet_aggregator()
     patterns = aggregator.aggregate_failure_patterns(equipment_type=equipment_type)
     return {"patterns": patterns, "total": len(patterns)}
@@ -41,12 +41,11 @@ async def get_failure_patterns(
 async def get_similar_failures(
     equipment_type: str = Query(..., description="Equipment type to match"),
     failure_type: Optional[str] = Query(None, description="Specific failure type"),
-    exclude_site: Optional[str] = Query(
-        None, description="Site to exclude from results (privacy)"
-    ),
+    exclude_site: Optional[str] = Query(None, description="Site to exclude from results (privacy)"),
 ):
     """Find similar equipment failures across fleet."""
     from ml.fleet.aggregator import get_fleet_aggregator
+
     aggregator = get_fleet_aggregator()
     failures = aggregator.get_similar_failures(
         equipment_type=equipment_type,
@@ -60,6 +59,7 @@ async def get_similar_failures(
 async def get_risk_distribution():
     """Get fleet-wide equipment risk distribution."""
     from ml.fleet.aggregator import get_fleet_aggregator
+
     aggregator = get_fleet_aggregator()
     return aggregator.get_risk_distribution()
 
@@ -69,12 +69,11 @@ async def get_risk_distribution():
 
 @router.get("/benchmarks")
 async def get_benchmarks(
-    equipment_type: Optional[str] = Query(
-        None, description="Filter by equipment type"
-    ),
+    equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
 ):
     """Get fleet benchmarking data for equipment types."""
     from ml.fleet.aggregator import get_fleet_aggregator
+
     aggregator = get_fleet_aggregator()
     benchmarks = aggregator.get_benchmarks(equipment_type=equipment_type)
     return {"benchmarks": benchmarks, "total": len(benchmarks)}
@@ -84,12 +83,11 @@ async def get_benchmarks(
 async def benchmark_site(
     site_code: str = Query(..., description="Site to benchmark"),
     site_health: float = Query(..., description="Current site health score (0-100)"),
-    equipment_type: Optional[str] = Query(
-        None, description="Filter by equipment type"
-    ),
+    equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
 ):
     """Compare a site's performance against fleet average."""
     from ml.fleet.aggregator import get_fleet_aggregator
+
     aggregator = get_fleet_aggregator()
     return aggregator.benchmark_site(
         site_code=site_code,
@@ -108,10 +106,9 @@ async def list_global_models(
 ):
     """List all trained global fleet models."""
     from ml.fleet.global_model import get_global_model_trainer
+
     trainer = get_global_model_trainer()
-    models = trainer.list_global_models(
-        model_type=model_type, equipment_type=equipment_type
-    )
+    models = trainer.list_global_models(model_type=model_type, equipment_type=equipment_type)
     return {"models": models, "total": len(models)}
 
 
@@ -122,6 +119,7 @@ async def train_global_model(
 ):
     """Train a global model on aggregated fleet data."""
     from ml.fleet.global_model import get_global_model_trainer
+
     trainer = get_global_model_trainer()
     result = trainer.train_global_model(model_type, equipment_type)
 
@@ -147,6 +145,7 @@ async def compare_global_vs_local(
 ):
     """Compare global model vs local model performance."""
     from ml.fleet.global_model import get_global_model_trainer
+
     trainer = get_global_model_trainer()
     return trainer.compare_global_vs_local(
         model_type=model_type,
@@ -159,6 +158,7 @@ async def compare_global_vs_local(
 async def get_global_training_history():
     """Get global model training history."""
     from ml.fleet.global_model import get_global_model_trainer
+
     trainer = get_global_model_trainer()
     return {"history": trainer.get_training_history()}
 
@@ -174,6 +174,7 @@ async def list_fine_tuned_models(
 ):
     """List all fine-tuned models."""
     from ml.fleet.fine_tuning import get_local_fine_tuner
+
     tuner = get_local_fine_tuner()
     models = tuner.list_fine_tuned_models(
         site_code=site_code,
@@ -191,6 +192,7 @@ async def fine_tune_model(
 ):
     """Fine-tune a global model for a specific site."""
     from ml.fleet.fine_tuning import get_local_fine_tuner
+
     tuner = get_local_fine_tuner()
     result = tuner.fine_tune(
         site_code=site_code,
@@ -199,9 +201,7 @@ async def fine_tune_model(
     )
 
     if not result.success:
-        raise HTTPException(
-            status_code=400, detail=result.error or "Fine-tuning failed"
-        )
+        raise HTTPException(status_code=400, detail=result.error or "Fine-tuning failed")
 
     return {
         "success": True,
@@ -220,6 +220,7 @@ async def get_improvement_summary(
 ):
     """Get summary of fine-tuning improvements."""
     from ml.fleet.fine_tuning import get_local_fine_tuner
+
     tuner = get_local_fine_tuner()
     return tuner.get_improvement_summary(site_code=site_code)
 
@@ -230,5 +231,6 @@ async def get_fine_tune_history(
 ):
     """Get history of fine-tuning operations."""
     from ml.fleet.fine_tuning import get_local_fine_tuner
+
     tuner = get_local_fine_tuner()
     return {"history": tuner.get_fine_tune_history(site_code=site_code)}

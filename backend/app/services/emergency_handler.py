@@ -28,7 +28,7 @@ SAFE_STATE_DEFAULTS = {
     "equipment": {
         "runtime": 1,  # Maintain current safe state
         "status": "maintain",
-    }
+    },
 }
 
 
@@ -68,37 +68,35 @@ class EmergencyHandler:
             "escalation_event": escalation_event.to_dict(),
             "actions_taken": [],
             "devices_affected": 0,
-            "status": "success"
+            "status": "success",
         }
 
         try:
             # 1. IMMEDIATE: Stop autonomous mode
             stop_result = await self._stop_autonomous_mode()
-            response["actions_taken"].append({
-                "action": "stop_autonomous_mode",
-                "result": stop_result,
-                "timestamp": datetime.now()
-            })
+            response["actions_taken"].append(
+                {"action": "stop_autonomous_mode", "result": stop_result, "timestamp": datetime.now()}
+            )
             logger.info(f"Autonomous mode stopped: {stop_result}")
 
             # 2. Restore devices to safe state
             safe_state_result = await self._restore_safe_state(escalation_event.device_id)
-            response["actions_taken"].append({
-                "action": "restore_safe_state",
-                "result": safe_state_result,
-                "devices_affected": safe_state_result.get("devices_affected", 0),
-                "timestamp": datetime.now()
-            })
+            response["actions_taken"].append(
+                {
+                    "action": "restore_safe_state",
+                    "result": safe_state_result,
+                    "devices_affected": safe_state_result.get("devices_affected", 0),
+                    "timestamp": datetime.now(),
+                }
+            )
             response["devices_affected"] = safe_state_result.get("devices_affected", 0)
             logger.info(f"Safe state restoration: {safe_state_result}")
 
             # 3. Log emergency to audit system
             audit_result = await self._log_emergency_audit(escalation_event, response)
-            response["actions_taken"].append({
-                "action": "log_audit",
-                "result": audit_result,
-                "timestamp": datetime.now()
-            })
+            response["actions_taken"].append(
+                {"action": "log_audit", "result": audit_result, "timestamp": datetime.now()}
+            )
             logger.info(f"Emergency audit logged: {audit_result}")
 
             # 4. Calculate response time
@@ -129,23 +127,18 @@ class EmergencyHandler:
 
             # Log to audit
             await audit_logger.log_autonomous_mode_change(
-                enabled=False,
-                triggered_by="emergency_handler",
-                reason="Boundary breach emergency stop"
+                enabled=False, triggered_by="emergency_handler", reason="Boundary breach emergency stop"
             )
 
             return {
                 "success": result.get("success", False),
                 "message": result.get("message", "Autonomous mode stop initiated"),
-                "cancelled_decisions": result.get("cancelled_decisions", 0)
+                "cancelled_decisions": result.get("cancelled_decisions", 0),
             }
 
         except Exception as e:
             logger.error(f"Error stopping autonomous mode: {e}")
-            return {
-                "success": False,
-                "message": f"Failed to stop autonomous mode: {str(e)}"
-            }
+            return {"success": False, "message": f"Failed to stop autonomous mode: {str(e)}"}
 
     async def _restore_safe_state(self, affected_device_id: str) -> Dict[str, Any]:
         """
@@ -179,9 +172,7 @@ class EmergencyHandler:
 
                         # Log to audit
                         await audit_logger.log_safe_state_restoration(
-                            device_id=device.id,
-                            device_name=device.name,
-                            safe_state=safe_state
+                            device_id=device.id, device_name=device.name, safe_state=safe_state
                         )
 
                 except Exception as e:
@@ -189,20 +180,12 @@ class EmergencyHandler:
                     errors.append(error_msg)
                     logger.error(error_msg)
 
-            return {
-                "devices_affected": devices_affected,
-                "errors": errors,
-                "success": len(errors) == 0
-            }
+            return {"devices_affected": devices_affected, "errors": errors, "success": len(errors) == 0}
 
         except Exception as e:
             error_msg = f"Critical error in safe state restoration: {str(e)}"
             logger.error(error_msg)
-            return {
-                "devices_affected": devices_affected,
-                "errors": [error_msg],
-                "success": False
-            }
+            return {"devices_affected": devices_affected, "errors": [error_msg], "success": False}
 
     async def _log_emergency_audit(self, escalation_event: EscalationEvent, response: Dict[str, Any]) -> bool:
         """
@@ -227,9 +210,9 @@ class EmergencyHandler:
                         "emergency_id": response["emergency_id"],
                         "response_time_seconds": response.get("response_time_seconds", 0),
                         "devices_affected": response["devices_affected"],
-                        "actions_taken": response["actions_taken"]
-                    }
-                }
+                        "actions_taken": response["actions_taken"],
+                    },
+                },
             }
 
             await audit_logger.log_audit_entry(audit_data)
@@ -251,7 +234,7 @@ class EmergencyHandler:
         """
         # Check if device has controllable points
         for point in device.points.values():
-            if hasattr(point, 'writable') and point.writable:
+            if hasattr(point, "writable") and point.writable:
                 return True
 
         return False
@@ -266,13 +249,13 @@ class EmergencyHandler:
         Returns:
             Safe state configuration or None if not applicable
         """
-        device_type = device.type if hasattr(device, 'type') else 'equipment'
+        device_type = device.type if hasattr(device, "type") else "equipment"
 
-        if 'hvac' in device_type.lower() or 'chiller' in device_type.lower():
+        if "hvac" in device_type.lower() or "chiller" in device_type.lower():
             return SAFE_STATE_DEFAULTS["temperature"]
-        elif 'lighting' in device_type.lower():
+        elif "lighting" in device_type.lower():
             return SAFE_STATE_DEFAULTS["lighting"]
-        elif 'equipment' in device_type.lower():
+        elif "equipment" in device_type.lower():
             return SAFE_STATE_DEFAULTS["equipment"]
 
         return None
@@ -292,11 +275,7 @@ class EmergencyHandler:
             # Apply safe values for each relevant point
             for point_name, safe_value in safe_state.items():
                 if point_name in device.points:
-                    await device_manager.write_device_value(
-                        device.id,
-                        point_name,
-                        safe_value
-                    )
+                    await device_manager.write_device_value(device.id, point_name, safe_value)
 
             return True
 
@@ -334,7 +313,7 @@ class EmergencyHandler:
             acknowledged_at=None,
             auto_resolved=False,
             warnings=["Test emergency - boundary breach"],
-            metadata={"test": True}
+            metadata={"test": True},
         )
 
         # Create corresponding boundary status
@@ -347,7 +326,7 @@ class EmergencyHandler:
             approach_percentage=100.0,
             escalation_level=EscalationLevel.EMERGENCY,
             warnings=["Test emergency"],
-            last_updated=datetime.now()
+            last_updated=datetime.now(),
         )
 
         # Process emergency (mock mode - don't actually stop autonomous)

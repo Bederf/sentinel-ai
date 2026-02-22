@@ -30,11 +30,7 @@ class SafetyBoundaryService:
             logger.info("Safety boundary service initialized")
 
     async def check_boundary_approach(
-        self,
-        device: Device,
-        point_name: str,
-        current_value: float,
-        proposed_value: Optional[float] = None
+        self, device: Device, point_name: str, current_value: float, proposed_value: Optional[float] = None
     ) -> BoundaryStatus:
         """
         Check how close a value is to safety boundaries.
@@ -60,8 +56,8 @@ class SafetyBoundaryService:
         # Only consider temperature and brightness rules for boundary monitoring
         for rule in rules:
             if rule.rule_type == RuleType.TEMPERATURE_RANGE:
-                min_temp = getattr(rule, 'min_temp', None)
-                max_temp = getattr(rule, 'max_temp', None)
+                min_temp = getattr(rule, "min_temp", None)
+                max_temp = getattr(rule, "max_temp", None)
 
                 if min_temp is not None:
                     boundary_min = min_temp
@@ -69,7 +65,7 @@ class SafetyBoundaryService:
                     boundary_max = max_temp
 
             elif rule.rule_type == RuleType.BRIGHTNESS_LIMIT:
-                max_brightness = getattr(rule, 'max_brightness', None)
+                max_brightness = getattr(rule, "max_brightness", None)
                 if max_brightness is not None:
                     boundary_max = max_brightness
 
@@ -98,10 +94,14 @@ class SafetyBoundaryService:
                             approach_percentage = (1 - (distance_to_min / approach_distance)) * 100
                             if approach_percentage >= 95:
                                 escalation_level = EscalationLevel.EMERGENCY
-                                warnings.append(f"EMERGENCY: Value {check_value} is {approach_percentage:.1f}% of the way to minimum limit")
+                                warnings.append(
+                                    f"EMERGENCY: Value {check_value} is {approach_percentage:.1f}% of the way to minimum limit"
+                                )
                             elif approach_percentage >= 85:
                                 escalation_level = EscalationLevel.CRITICAL
-                                warnings.append(f"CRITICAL: Value {check_value} approaching minimum limit {boundary_min}")
+                                warnings.append(
+                                    f"CRITICAL: Value {check_value} approaching minimum limit {boundary_min}"
+                                )
                             elif approach_percentage >= 75:
                                 escalation_level = EscalationLevel.ALERT
                                 warnings.append(f"ALERT: Value {check_value} within 25% of minimum limit")
@@ -123,10 +123,14 @@ class SafetyBoundaryService:
                             approach_percentage = (1 - (distance_to_max / approach_distance)) * 100
                             if approach_percentage >= 95:
                                 escalation_level = EscalationLevel.EMERGENCY
-                                warnings.append(f"EMERGENCY: Value {check_value} is {approach_percentage:.1f}% of the way to maximum limit")
+                                warnings.append(
+                                    f"EMERGENCY: Value {check_value} is {approach_percentage:.1f}% of the way to maximum limit"
+                                )
                             elif approach_percentage >= 85:
                                 escalation_level = EscalationLevel.CRITICAL
-                                warnings.append(f"CRITICAL: Value {check_value} approaching maximum limit {boundary_max}")
+                                warnings.append(
+                                    f"CRITICAL: Value {check_value} approaching maximum limit {boundary_max}"
+                                )
                             elif approach_percentage >= 75:
                                 escalation_level = EscalationLevel.ALERT
                                 warnings.append(f"ALERT: Value {check_value} within 25% of maximum limit")
@@ -147,7 +151,9 @@ class SafetyBoundaryService:
                     approach_percentage = (check_value / boundary_max) * 100
                     if approach_percentage >= 95:
                         escalation_level = EscalationLevel.EMERGENCY
-                        warnings.append(f"EMERGENCY: Value {check_value} at {approach_percentage:.1f}% of maximum limit")
+                        warnings.append(
+                            f"EMERGENCY: Value {check_value} at {approach_percentage:.1f}% of maximum limit"
+                        )
                     elif approach_percentage >= 85:
                         escalation_level = EscalationLevel.CRITICAL
                         warnings.append(f"CRITICAL: Value {check_value} approaching maximum limit {boundary_max}")
@@ -257,12 +263,7 @@ class SafetyBoundaryService:
             "details": [s.to_dict() for s in statuses],
         }
 
-    async def update_boundary_config(
-        self,
-        device_id: str,
-        point_name: str,
-        new_boundaries: Dict[str, float]
-    ) -> bool:
+    async def update_boundary_config(self, device_id: str, point_name: str, new_boundaries: Dict[str, float]) -> bool:
         """
         Update boundary configuration for a device/point.
 
@@ -278,6 +279,7 @@ class SafetyBoundaryService:
         # This would modify the safety rules for the device
         logger.info(f"Boundary config update requested for {device_id}.{point_name}: {new_boundaries}")
         return True
+
 
 # Global instance
 safety_boundary_service = SafetyBoundaryService()

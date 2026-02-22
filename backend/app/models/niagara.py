@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 # Configuration
 # ---------------------------------------------------------------------------
 
+
 class OBIXConfig(BaseModel):
     """Configuration for oBIX connection to Niagara server."""
 
@@ -31,6 +32,7 @@ class OBIXConfig(BaseModel):
 # Point Values
 # ---------------------------------------------------------------------------
 
+
 class OBIXPointValue(BaseModel):
     """Response for a single oBIX point value."""
 
@@ -45,6 +47,7 @@ class OBIXPointValue(BaseModel):
 # ---------------------------------------------------------------------------
 # History
 # ---------------------------------------------------------------------------
+
 
 class OBIXHistoryRequest(BaseModel):
     """Request parameters for historical data query."""
@@ -74,6 +77,7 @@ class OBIXHistoryResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Alarms
 # ---------------------------------------------------------------------------
+
 
 class OBIXAlarm(BaseModel):
     """A single oBIX alarm record."""
@@ -108,6 +112,7 @@ class OBIXAlarmResponse(BaseModel):
 # Connection Status
 # ---------------------------------------------------------------------------
 
+
 class OBIXConnectionStatus(BaseModel):
     """oBIX connection health status."""
 
@@ -133,6 +138,7 @@ class OBIXConfigResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # BACnet Device Discovery
 # ---------------------------------------------------------------------------
+
 
 class BACnetDeviceInfo(BaseModel):
     """A BACnet device discovered via WhoIs/IAm."""
@@ -161,6 +167,7 @@ class BACnetDiscoverResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # BACnet Points
 # ---------------------------------------------------------------------------
+
 
 class BACnetPointInfo(BaseModel):
     """A BACnet point/object discovered on a device."""
@@ -196,6 +203,7 @@ class BACnetPointDiscoveryResponse(BaseModel):
 # BACnet Read/Write
 # ---------------------------------------------------------------------------
 
+
 class BACnetPointReadResponse(BaseModel):
     """Response for reading a single BACnet point."""
 
@@ -229,6 +237,7 @@ class BACnetPointWriteResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # BACnet COV Subscriptions
 # ---------------------------------------------------------------------------
+
 
 class BACnetCOVPoint(BaseModel):
     """A point to include in a COV subscription."""
@@ -267,6 +276,7 @@ class BACnetCOVSubscriptionListResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # BACnet Client Status
 # ---------------------------------------------------------------------------
+
 
 class BACnetTestConnectionRequest(BaseModel):
     """Request to test BACnet connectivity."""

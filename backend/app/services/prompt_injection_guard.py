@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PromptInjection:
     """Represents a detected prompt injection attempt."""
+
     pattern: str
     severity: str  # "critical", "high", "medium", "low"
     description: str
@@ -37,97 +38,115 @@ class PromptInjectionDetector:
 
     # Critical patterns - attempts to reveal system instructions
     CRITICAL_PATTERNS = [
-        (r'(?i)(ignore|forget|disregard).*(instructions?|prompts?|commands?)',
-         "Attempt to ignore system instructions"),
-        (r'(?i)(ignore|forget|disregard)\s+(?:all\s+)?(?:the\s+)?(previous|above|system)\s+rules?',
-         "Attempt to ignore system rules"),
-        (r'(?i)(forget|ignore)(\s+)?(everything|all)(\s+)?(above|previous|before)',
-         "Attempt to reset context"),
-        (r'(?i)i(?:\W+|\.)g(?:\W+|\.)n(?:\W+|\.)o(?:\W+|\.)r(?:\W+|\.)e(\s+the\s+)?(above|previous)?\s+rules?',
-         "Obfuscated ignore attempt"),
-
-        (r'(?i)(show|tell|reveal|display|print|output)(\s+me)?(\s+your|\s+the)?(\s+)?(system|above|previous)?(\s+)?(prompt|instructions|configuration)',
-         "Attempt to extract system prompt"),
-        (r'(?i)show me.*(system prompt|configuration)',
-         "Attempt to extract system prompt"),
-
-        (r'(?i)(what(\s+are)?(\s+the)?(\s+)?(system|initial|original))(\s+)?(instructions?|prompts?|rules?|commands?)(\s+you(\s+were)?(\s+)?given)?',
-         "Attempt to discover system prompt"),
-
-        (r'(?i)(jailbreak|jailbreak|developer|admin|override)(\s+mode)?',
-         "Jailbreak attempt"),
+        (r"(?i)(ignore|forget|disregard).*(instructions?|prompts?|commands?)", "Attempt to ignore system instructions"),
+        (
+            r"(?i)(ignore|forget|disregard)\s+(?:all\s+)?(?:the\s+)?(previous|above|system)\s+rules?",
+            "Attempt to ignore system rules",
+        ),
+        (r"(?i)(forget|ignore)(\s+)?(everything|all)(\s+)?(above|previous|before)", "Attempt to reset context"),
+        (
+            r"(?i)i(?:\W+|\.)g(?:\W+|\.)n(?:\W+|\.)o(?:\W+|\.)r(?:\W+|\.)e(\s+the\s+)?(above|previous)?\s+rules?",
+            "Obfuscated ignore attempt",
+        ),
+        (
+            r"(?i)(show|tell|reveal|display|print|output)(\s+me)?(\s+your|\s+the)?(\s+)?(system|above|previous)?(\s+)?(prompt|instructions|configuration)",
+            "Attempt to extract system prompt",
+        ),
+        (r"(?i)show me.*(system prompt|configuration)", "Attempt to extract system prompt"),
+        (
+            r"(?i)(what(\s+are)?(\s+the)?(\s+)?(system|initial|original))(\s+)?(instructions?|prompts?|rules?|commands?)(\s+you(\s+were)?(\s+)?given)?",
+            "Attempt to discover system prompt",
+        ),
+        (r"(?i)(jailbreak|jailbreak|developer|admin|override)(\s+mode)?", "Jailbreak attempt"),
     ]
 
     # High severity patterns - attempts to bypass safety
     HIGH_PATTERNS = [
-        (r'(?i)(no|not|don\'t|never)(\s+)?(worry|concern|check|validate)(\s+)?about(\s+)?(safety|security|rules|limits)',
-         "Attempt to disable safety checks"),
-        (r'(?i)(no|not)(\s+)?(concern|worry)(\s+)?for(\s+)?(safety|security)',
-         "Attempt to disable safety checks"),
-
-        (r'(?i)(pretend|act|behave|roleplay)(\s+as)?(\s+)?(you\'?re|you are)?(\s+)?(a|an)?(\s+)?(unrestricted|unlimited|unfiltered)(\s+)?(AI|assistant|model)',
-         "Attempt to assume unrestricted persona"),
-        (r'(?i)pretend.*(unrestricted|unlimited|unfiltered).*(AI|assistant|model)',
-         "Attempt to assume unrestricted persona"),
-
-        (r'(?i)(you are|you\'re|act as)(\s+)?(a|an)?(\s+)?(developer|admin|god|superuser|root)(\s+)?(mode)?',
-         "Attempt to assume elevated privileges"),
-
-        (r'(?i)(translate|convert)(\s+this)?(\s+)?(to|into)(\s+)?(code|json|xml|python|javascript)',
-         "Attempt to force structured output that may reveal system info"),
+        (
+            r"(?i)(no|not|don\'t|never)(\s+)?(worry|concern|check|validate)(\s+)?about(\s+)?(safety|security|rules|limits)",
+            "Attempt to disable safety checks",
+        ),
+        (r"(?i)(no|not)(\s+)?(concern|worry)(\s+)?for(\s+)?(safety|security)", "Attempt to disable safety checks"),
+        (
+            r"(?i)(pretend|act|behave|roleplay)(\s+as)?(\s+)?(you\'?re|you are)?(\s+)?(a|an)?(\s+)?(unrestricted|unlimited|unfiltered)(\s+)?(AI|assistant|model)",
+            "Attempt to assume unrestricted persona",
+        ),
+        (
+            r"(?i)pretend.*(unrestricted|unlimited|unfiltered).*(AI|assistant|model)",
+            "Attempt to assume unrestricted persona",
+        ),
+        (
+            r"(?i)(you are|you\'re|act as)(\s+)?(a|an)?(\s+)?(developer|admin|god|superuser|root)(\s+)?(mode)?",
+            "Attempt to assume elevated privileges",
+        ),
+        (
+            r"(?i)(translate|convert)(\s+this)?(\s+)?(to|into)(\s+)?(code|json|xml|python|javascript)",
+            "Attempt to force structured output that may reveal system info",
+        ),
     ]
 
     # Medium severity patterns - suspicious behaviors
     MEDIUM_PATTERNS = [
-        (r'(?i)(repeat|echo|say).*(everything|above).*(exactly|verbatim|word-for-word)',
-         "Attempt to echo back instructions"),
-
-        (r'(?i)(starting|beginning)(\s+)?(from|at)(\s+)?(now|here|start)',
-         "Attempt to reference context boundary"),
-
-        (r'(?i)(simulate|imitate|mimic)(\s+)?(a|an)?(\s+)?(different|another)(\s+)?(AI|assistant|model)',
-         "Attempt to switch to different persona"),
-        (r'(?i)(ignore|bypass)(\s+)?(the)?(\s+)?(safety|security)(\s+)?(protocols?|rules?|checks?)',
-         "Attempt to override safety protocols"),
+        (
+            r"(?i)(repeat|echo|say).*(everything|above).*(exactly|verbatim|word-for-word)",
+            "Attempt to echo back instructions",
+        ),
+        (r"(?i)(starting|beginning)(\s+)?(from|at)(\s+)?(now|here|start)", "Attempt to reference context boundary"),
+        (
+            r"(?i)(simulate|imitate|mimic)(\s+)?(a|an)?(\s+)?(different|another)(\s+)?(AI|assistant|model)",
+            "Attempt to switch to different persona",
+        ),
+        (
+            r"(?i)(ignore|bypass)(\s+)?(the)?(\s+)?(safety|security)(\s+)?(protocols?|rules?|checks?)",
+            "Attempt to override safety protocols",
+        ),
     ]
 
     # Low severity patterns - worth monitoring
     LOW_PATTERNS = [
-        (r'(?i)(DAN|developer mode|unrestricted|uncensored)',
-         "Known jailbreak keyword"),
-
-        (r'(?i)(hypothetically?|theoretically?|in(\s+)?fiction)',
-         "Attempt to bypass safeguards through hypothetical framing"),
-
-        (r'(?i)(just(\s+)?curious|asking(\s+)?for(\s+)?a(\s+)?friend)',
-         "Social engineering attempt"),
-
-        (r'(?i)(off(-|\s+)the(\s+)?record|off(-|\s+)record)',
-         "Attempt to request off-record behavior"),
+        (r"(?i)(DAN|developer mode|unrestricted|uncensored)", "Known jailbreak keyword"),
+        (
+            r"(?i)(hypothetically?|theoretically?|in(\s+)?fiction)",
+            "Attempt to bypass safeguards through hypothetical framing",
+        ),
+        (r"(?i)(just(\s+)?curious|asking(\s+)?for(\s+)?a(\s+)?friend)", "Social engineering attempt"),
+        (r"(?i)(off(-|\s+)the(\s+)?record|off(-|\s+)record)", "Attempt to request off-record behavior"),
     ]
 
     # BMS-specific patterns - attempts to manipulate building control
     BMS_PATTERNS = [
-        (r'(?i)(disable|turn off|bypass)(\s+)?(all)?(\s+)?(fire|life|life safety)?(\s+)?(safety|security|interlock|limit)(\s+)?(checks?|rules?|systems?)?',
-         "Attempt to disable safety systems"),
-
-        (r'(?i)(emergency)(\s+)?(override|shutdown|stop|kill)(\s+)?(everything|all systems)',
-         "Critical system manipulation attempt"),
-
-        (r'(?i)(ignore|skip|bypass)(\s+)?(the)?(\s+)?(temperature|pressure|safety|interlock)(\s+)?(limits?|rules?|checks?|interlocks?)',
-         "Attempt to override safety limits"),
-
-        (r'(?i)(force)(\s+)?(the)?(\s+)?(chiller|hvac|ahu)(\s+)?(to|at)(\s+)?(dangerous|unsafe|extreme)(\s+)?(temperature|pressure|speed)',
-         "Attempt to force unsafe equipment states"),
-
-        (r'(?i)(shut down|stop|kill|terminate)(\s+)?(all)?(\s+)?(fire|safety|security)(\s+)?(systems?|alarms?|panels?)',
-         "Attempt to disable fire/safety systems"),
-        (r'(?i)(shut down|stop|kill|terminate)(\s+)?(the)?(\s+)?(fire|safety)(\s+)?panel',
-         "Attempt to disable fire/safety systems"),
-        (r'(?i)(disable|bypass)(\s+)?(the)?(\s+)?(fire alarm|fire)(\s+)?(hvac )?(interlock|interlocks)',
-         "Attempt to disable fire/safety systems"),
-        (r'(?i)emergency\s+stop\s+(all\s+)?(fire(\s+safety)?|safety|security)\s+(systems?|alarms?|panels?)',
-         "Attempt to disable fire/safety systems"),
+        (
+            r"(?i)(disable|turn off|bypass)(\s+)?(all)?(\s+)?(fire|life|life safety)?(\s+)?(safety|security|interlock|limit)(\s+)?(checks?|rules?|systems?)?",
+            "Attempt to disable safety systems",
+        ),
+        (
+            r"(?i)(emergency)(\s+)?(override|shutdown|stop|kill)(\s+)?(everything|all systems)",
+            "Critical system manipulation attempt",
+        ),
+        (
+            r"(?i)(ignore|skip|bypass)(\s+)?(the)?(\s+)?(temperature|pressure|safety|interlock)(\s+)?(limits?|rules?|checks?|interlocks?)",
+            "Attempt to override safety limits",
+        ),
+        (
+            r"(?i)(force)(\s+)?(the)?(\s+)?(chiller|hvac|ahu)(\s+)?(to|at)(\s+)?(dangerous|unsafe|extreme)(\s+)?(temperature|pressure|speed)",
+            "Attempt to force unsafe equipment states",
+        ),
+        (
+            r"(?i)(shut down|stop|kill|terminate)(\s+)?(all)?(\s+)?(fire|safety|security)(\s+)?(systems?|alarms?|panels?)",
+            "Attempt to disable fire/safety systems",
+        ),
+        (
+            r"(?i)(shut down|stop|kill|terminate)(\s+)?(the)?(\s+)?(fire|safety)(\s+)?panel",
+            "Attempt to disable fire/safety systems",
+        ),
+        (
+            r"(?i)(disable|bypass)(\s+)?(the)?(\s+)?(fire alarm|fire)(\s+)?(hvac )?(interlock|interlocks)",
+            "Attempt to disable fire/safety systems",
+        ),
+        (
+            r"(?i)emergency\s+stop\s+(all\s+)?(fire(\s+safety)?|safety|security)\s+(systems?|alarms?|panels?)",
+            "Attempt to disable fire/safety systems",
+        ),
     ]
 
     # Maximum query length (characters)
@@ -166,15 +185,12 @@ class PromptInjectionDetector:
             if key in seen:
                 return
             seen.add(key)
-            injections.append(PromptInjection(
-                pattern=pattern,
-                severity=severity,
-                description=description,
-                matched_text=matched_text
-            ))
+            injections.append(
+                PromptInjection(pattern=pattern, severity=severity, description=description, matched_text=matched_text)
+            )
 
-        normalized_query = re.sub(r'[^a-zA-Z0-9\s]', '', query)
-        normalized_query = re.sub(r'\s+', ' ', normalized_query).strip()
+        normalized_query = re.sub(r"[^a-zA-Z0-9\s]", "", query)
+        normalized_query = re.sub(r"\s+", " ", normalized_query).strip()
 
         # Check length limits
         if len(query) > self.MAX_QUERY_LENGTH:
@@ -182,7 +198,7 @@ class PromptInjectionDetector:
                 pattern="length_limit",
                 severity="medium",
                 description=f"Query exceeds maximum length of {self.MAX_QUERY_LENGTH} characters",
-                matched_text=query[:100] + "..."
+                matched_text=query[:100] + "...",
             )
 
         # Check for excessive repetition
@@ -191,7 +207,7 @@ class PromptInjectionDetector:
                 pattern="excessive_repetition",
                 severity="low",
                 description="Query contains excessive repetitive content",
-                matched_text="Repetition detected"
+                matched_text="Repetition detected",
             )
 
         # Check BMS-specific patterns (highest priority for building control)
@@ -202,7 +218,7 @@ class PromptInjectionDetector:
                     pattern="bms_safety_bypass",
                     severity="critical",  # BMS safety is always critical
                     description=f"BMS Safety: {description}",
-                    matched_text=match.group(0)
+                    matched_text=match.group(0),
                 )
 
         # Check critical patterns
@@ -213,7 +229,7 @@ class PromptInjectionDetector:
                     pattern="prompt_extraction",
                     severity="critical",
                     description=description,
-                    matched_text=match.group(0)
+                    matched_text=match.group(0),
                 )
 
         # Check high severity patterns
@@ -221,10 +237,7 @@ class PromptInjectionDetector:
             match = pattern.search(query) or pattern.search(normalized_query)
             if match:
                 record_injection(
-                    pattern="safety_bypass",
-                    severity="high",
-                    description=description,
-                    matched_text=match.group(0)
+                    pattern="safety_bypass", severity="high", description=description, matched_text=match.group(0)
                 )
 
         # Check medium severity patterns
@@ -235,7 +248,7 @@ class PromptInjectionDetector:
                     pattern="suspicious_behavior",
                     severity="medium",
                     description=description,
-                    matched_text=match.group(0)
+                    matched_text=match.group(0),
                 )
 
         # Check low severity patterns
@@ -243,10 +256,7 @@ class PromptInjectionDetector:
             match = pattern.search(query) or pattern.search(normalized_query)
             if match:
                 record_injection(
-                    pattern="suspicious_keyword",
-                    severity="low",
-                    description=description,
-                    matched_text=match.group(0)
+                    pattern="suspicious_keyword", severity="low", description=description, matched_text=match.group(0)
                 )
 
         # If nothing matched, run a second pass on normalized text only
@@ -259,7 +269,7 @@ class PromptInjectionDetector:
                         pattern="bms_safety_bypass",
                         severity="critical",
                         description=f"BMS Safety: {description}",
-                        matched_text=match.group(0)
+                        matched_text=match.group(0),
                     )
             for pattern, description in self.critical_patterns:
                 match = pattern.search(normalized_query)
@@ -268,7 +278,7 @@ class PromptInjectionDetector:
                         pattern="prompt_extraction",
                         severity="critical",
                         description=description,
-                        matched_text=match.group(0)
+                        matched_text=match.group(0),
                     )
 
         # Sort by severity (critical first)
@@ -310,12 +320,12 @@ class PromptInjectionDetector:
         # Replace detected patterns with [REDACTED]
         sanitized = query
 
-        all_patterns = (self.critical_patterns + self.high_patterns +
-                       self.medium_patterns + self.low_patterns +
-                       self.bms_patterns)
+        all_patterns = (
+            self.critical_patterns + self.high_patterns + self.medium_patterns + self.low_patterns + self.bms_patterns
+        )
 
         for pattern, _ in all_patterns:
-            sanitized = pattern.sub('[REDACTED]', sanitized)
+            sanitized = pattern.sub("[REDACTED]", sanitized)
 
         return sanitized
 

@@ -27,8 +27,10 @@ logger = logging.getLogger(__name__)
 # Data Models
 # ============================================================================
 
+
 class BaselineDeviation(BaseModel):
     """Individual baseline deviation result."""
+
     element_name: str = Field(..., description="Name of deviating element")
     baseline_value: float = Field(..., description="Baseline value")
     current_value: float = Field(..., description="Current reading")
@@ -41,6 +43,7 @@ class BaselineDeviation(BaseModel):
 
 class BaselineComparison(BaseModel):
     """Complete baseline comparison result."""
+
     baseline_id: str
     equipment_id: str
     comparison_date: datetime
@@ -53,6 +56,7 @@ class BaselineComparison(BaseModel):
 
 class BaselineReportRequest(BaseModel):
     """Request for baseline report generation."""
+
     equipment_id: str
     baseline_id: Optional[str] = Field(None, description="Specific baseline, uses latest if None")
     include_recommendations: bool = Field(default=True)
@@ -61,6 +65,7 @@ class BaselineReportRequest(BaseModel):
 # ============================================================================
 # Service
 # ============================================================================
+
 
 class BaselineComparisonService:
     """
@@ -84,10 +89,7 @@ class BaselineComparisonService:
             self.repository = BaselineRepository()
 
     async def compare_to_baseline(
-        self,
-        equipment_id: str,
-        current_data: Dict[str, float],
-        baseline_id: Optional[str] = None
+        self, equipment_id: str, current_data: Dict[str, float], baseline_id: Optional[str] = None
     ) -> BaselineComparison:
         """
         Compare current readings to baseline.
@@ -143,7 +145,7 @@ class BaselineComparisonService:
                 baseline_value=baseline_value,
                 current_value=current_value,
                 tolerance=tolerance,
-                tolerance_type=tolerance_type
+                tolerance_type=tolerance_type,
             )
 
             if deviation:
@@ -163,16 +165,11 @@ class BaselineComparisonService:
             deviations=deviations,
             overall_status=overall_status,
             max_deviation_percent=max_deviation,
-            summary=summary
+            summary=summary,
         )
 
     def _calculate_deviation(
-        self,
-        element_name: str,
-        baseline_value: float,
-        current_value: float,
-        tolerance: float,
-        tolerance_type: str
+        self, element_name: str, baseline_value: float, current_value: float, tolerance: float, tolerance_type: str
     ) -> Optional[BaselineDeviation]:
         """
         Calculate deviation for a single element.
@@ -210,8 +207,7 @@ class BaselineComparisonService:
 
         # Determine severity
         severity = self._determine_severity(
-            deviation_percent=deviation_pct_for_severity,
-            tolerance=tolerance if tolerance_type == "percentage" else 0
+            deviation_percent=deviation_pct_for_severity, tolerance=tolerance if tolerance_type == "percentage" else 0
         )
 
         # Only return deviation if not normal
@@ -220,9 +216,7 @@ class BaselineComparisonService:
 
         # Generate recommended action
         action = self._generate_recommended_action(
-            element_name=element_name,
-            severity=severity,
-            deviation_percent=deviation_pct_for_severity
+            element_name=element_name, severity=severity, deviation_percent=deviation_pct_for_severity
         )
 
         return BaselineDeviation(
@@ -233,7 +227,7 @@ class BaselineComparisonService:
             tolerance_type=tolerance_type,
             deviation_percent=round(deviation_pct_for_severity, 2),
             severity=severity,
-            recommended_action=action
+            recommended_action=action,
         )
 
     def _determine_severity(self, deviation_percent: float, tolerance: float) -> str:
@@ -259,12 +253,7 @@ class BaselineComparisonService:
         else:
             return "normal"
 
-    def _generate_recommended_action(
-        self,
-        element_name: str,
-        severity: str,
-        deviation_percent: float
-    ) -> str:
+    def _generate_recommended_action(self, element_name: str, severity: str, deviation_percent: float) -> str:
         """Generate recommended action based on severity and element."""
         if severity == "critical":
             return f"Critical deviation detected for {element_name} ({deviation_percent:.1f}%). Immediate inspection required."
@@ -273,10 +262,7 @@ class BaselineComparisonService:
         else:
             return f"Monitor {element_name} - within acceptable range."
 
-    def _determine_overall_status(
-        self,
-        deviations: List[BaselineDeviation]
-    ) -> tuple[DeviationStatus, float]:
+    def _determine_overall_status(self, deviations: List[BaselineDeviation]) -> tuple[DeviationStatus, float]:
         """
         Determine overall status from deviations list.
 
@@ -311,11 +297,7 @@ class BaselineComparisonService:
         else:
             return DeviationStatus.NORMAL, max_deviation
 
-    def _build_summary(
-        self,
-        deviations: List[BaselineDeviation],
-        overall_status: DeviationStatus
-    ) -> str:
+    def _build_summary(self, deviations: List[BaselineDeviation], overall_status: DeviationStatus) -> str:
         """Build human-readable summary."""
         critical_count = sum(1 for d in deviations if d.severity == "critical")
         warning_count = sum(1 for d in deviations if d.severity == "warning")
@@ -328,10 +310,7 @@ class BaselineComparisonService:
             return "All readings within normal range."
 
     async def generate_baseline_report(
-        self,
-        equipment_id: str,
-        baseline: EquipmentBaseline,
-        comparison: Optional[BaselineComparison] = None
+        self, equipment_id: str, baseline: EquipmentBaseline, comparison: Optional[BaselineComparison] = None
     ) -> bytes:
         """
         Generate PDF baseline report.
@@ -368,10 +347,10 @@ class BaselineComparisonService:
             doc = SimpleDocTemplate(
                 buffer,
                 pagesize=landscape(letter),
-                rightMargin=0.5*inch,
-                leftMargin=0.5*inch,
-                topMargin=0.5*inch,
-                bottomMargin=0.5*inch
+                rightMargin=0.5 * inch,
+                leftMargin=0.5 * inch,
+                topMargin=0.5 * inch,
+                bottomMargin=0.5 * inch,
             )
 
             # Build PDF content
@@ -380,26 +359,19 @@ class BaselineComparisonService:
 
             # Custom styles
             header_style = ParagraphStyle(
-                'CustomHeader',
-                parent=styles['Heading1'],
-                fontSize=18,
-                alignment=TA_CENTER,
-                spaceAfter=0.2*inch
+                "CustomHeader", parent=styles["Heading1"], fontSize=18, alignment=TA_CENTER, spaceAfter=0.2 * inch
             )
 
-            title_style = ParagraphStyle(
-                'CustomTitle',
-                parent=styles['Heading2'],
-                fontSize=14,
-                spaceAfter=0.15*inch
-            )
+            title_style = ParagraphStyle("CustomTitle", parent=styles["Heading2"], fontSize=14, spaceAfter=0.15 * inch)
 
             # 1. Header
             story.append(Paragraph("Baseline Assessment Report", header_style))
-            story.append(Paragraph(f"Equipment: {equipment_id}", styles['Normal']))
-            story.append(Paragraph(f"Baseline Date: {baseline.baseline_date.strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
-            story.append(Paragraph(f"Captured By: {baseline.captured_by}", styles['Normal']))
-            story.append(Spacer(1, 0.2*inch))
+            story.append(Paragraph(f"Equipment: {equipment_id}", styles["Normal"]))
+            story.append(
+                Paragraph(f"Baseline Date: {baseline.baseline_date.strftime('%Y-%m-%d %H:%M')}", styles["Normal"])
+            )
+            story.append(Paragraph(f"Captured By: {baseline.captured_by}", styles["Normal"]))
+            story.append(Spacer(1, 0.2 * inch))
 
             # 2. Baseline summary table
             story.append(Paragraph("Baseline Values", title_style))
@@ -420,17 +392,21 @@ class BaselineComparisonService:
                 baseline_data.append([element_name, str(value), str(unit), str(tolerance)])
 
             baseline_table = Table(baseline_data)
-            baseline_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 12),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black)
-            ]))
+            baseline_table.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        ("FONTSIZE", (0, 0), (-1, 0), 12),
+                        ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                        ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                    ]
+                )
+            )
             story.append(baseline_table)
-            story.append(Spacer(1, 0.2*inch))
+            story.append(Spacer(1, 0.2 * inch))
 
             # 3. Comparison table (if comparison provided)
             if comparison and comparison.deviations:
@@ -439,52 +415,56 @@ class BaselineComparisonService:
                 comparison_data = [["Element", "Baseline", "Current", "Deviation", "Status"]]
 
                 for dev in comparison.deviations:
-                    comparison_data.append([
-                        dev.element_name,
-                        f"{dev.baseline_value:.2f}",
-                        f"{dev.current_value:.2f}",
-                        f"{dev.deviation_percent:.1f}%",
-                        dev.severity.upper()
-                    ])
+                    comparison_data.append(
+                        [
+                            dev.element_name,
+                            f"{dev.baseline_value:.2f}",
+                            f"{dev.current_value:.2f}",
+                            f"{dev.deviation_percent:.1f}%",
+                            dev.severity.upper(),
+                        ]
+                    )
 
                 comparison_table = Table(comparison_data)
 
                 # Build table styles with color-coded status cells
                 comp_styles = [
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 12),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 12),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                    ("GRID", (0, 0), (-1, -1), 1, colors.black),
                 ]
 
                 # Add color coding for status column (column index 4)
                 for i, dev in enumerate(comparison.deviations, start=1):  # start=1 to skip header row
                     if dev.severity == "critical":
-                        comp_styles.append(('BACKGROUND', (4, i), (4, i), colors.red))
-                        comp_styles.append(('TEXTCOLOR', (4, i), (4, i), colors.whitesmoke))
+                        comp_styles.append(("BACKGROUND", (4, i), (4, i), colors.red))
+                        comp_styles.append(("TEXTCOLOR", (4, i), (4, i), colors.whitesmoke))
                     elif dev.severity == "warning":
-                        comp_styles.append(('BACKGROUND', (4, i), (4, i), colors.yellow))
-                        comp_styles.append(('TEXTCOLOR', (4, i), (4, i), colors.black))
+                        comp_styles.append(("BACKGROUND", (4, i), (4, i), colors.yellow))
+                        comp_styles.append(("TEXTCOLOR", (4, i), (4, i), colors.black))
 
                 comparison_table.setStyle(TableStyle(comp_styles))
                 story.append(comparison_table)
-                story.append(Spacer(1, 0.2*inch))
+                story.append(Spacer(1, 0.2 * inch))
 
             # 4. Notes section
             if baseline.notes:
                 story.append(Paragraph("Notes", title_style))
-                story.append(Paragraph(baseline.notes, styles['Normal']))
-                story.append(Spacer(1, 0.2*inch))
+                story.append(Paragraph(baseline.notes, styles["Normal"]))
+                story.append(Spacer(1, 0.2 * inch))
 
             # 5. Footer
-            story.append(Spacer(1, 0.5*inch))
-            story.append(Paragraph(
-                f"Generated by SENTINEL BMS Intelligence - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER)
-            ))
+            story.append(Spacer(1, 0.5 * inch))
+            story.append(
+                Paragraph(
+                    f"Generated by SENTINEL BMS Intelligence - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                    ParagraphStyle("Footer", parent=styles["Normal"], fontSize=8, alignment=TA_CENTER),
+                )
+            )
 
             # Build PDF
             doc.build(story)
@@ -501,10 +481,7 @@ class BaselineComparisonService:
             return self._generate_text_report(equipment_id, baseline, comparison)
 
     def _generate_text_report(
-        self,
-        equipment_id: str,
-        baseline: EquipmentBaseline,
-        comparison: Optional[BaselineComparison]
+        self, equipment_id: str, baseline: EquipmentBaseline, comparison: Optional[BaselineComparison]
     ) -> bytes:
         """Generate simple text report as fallback."""
         lines = [
@@ -534,12 +511,14 @@ class BaselineComparisonService:
             lines.append(f"{element_name}: {value} {unit} (tolerance: ±{tolerance})")
 
         if comparison and comparison.deviations:
-            lines.extend([
-                "",
-                "-" * 80,
-                "CURRENT COMPARISON",
-                "-" * 80,
-            ])
+            lines.extend(
+                [
+                    "",
+                    "-" * 80,
+                    "CURRENT COMPARISON",
+                    "-" * 80,
+                ]
+            )
 
             for dev in comparison.deviations:
                 lines.append(
@@ -550,22 +529,18 @@ class BaselineComparisonService:
                     lines.append(f"  → {dev.recommended_action}")
 
         if baseline.notes:
-            lines.extend([
+            lines.extend(["", "-" * 80, "NOTES", "-" * 80, baseline.notes])
+
+        lines.extend(
+            [
                 "",
-                "-" * 80,
-                "NOTES",
-                "-" * 80,
-                baseline.notes
-            ])
+                "=" * 80,
+                f"Generated by SENTINEL BMS Intelligence - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                "=" * 80,
+            ]
+        )
 
-        lines.extend([
-            "",
-            "=" * 80,
-            f"Generated by SENTINEL BMS Intelligence - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            "=" * 80,
-        ])
-
-        return "\n".join(lines).encode('utf-8')
+        return "\n".join(lines).encode("utf-8")
 
 
 # ============================================================================

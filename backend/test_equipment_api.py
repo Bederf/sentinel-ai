@@ -38,7 +38,7 @@ async def test_fault_code_lookup():
         print("\n1. Testing valid Carrier E4 fault code...")
         response = await client.get(
             f"{BASE_URL}/api/equipment-lookup/fault-code",
-            params={"manufacturer": "Carrier", "fault_code": "E4", "model": "30XA"}
+            params={"manufacturer": "Carrier", "fault_code": "E4", "model": "30XA"},
         )
 
         if response.status_code == 200:
@@ -58,8 +58,7 @@ async def test_fault_code_lookup():
         # Test 2: Case-insensitive lookup
         print("\n2. Testing case-insensitive lookup (carrier, e4)...")
         response = await client.get(
-            f"{BASE_URL}/api/equipment-lookup/fault-code",
-            params={"manufacturer": "carrier", "fault_code": "e4"}
+            f"{BASE_URL}/api/equipment-lookup/fault-code", params={"manufacturer": "carrier", "fault_code": "e4"}
         )
 
         if response.status_code == 200:
@@ -74,7 +73,7 @@ async def test_fault_code_lookup():
         print("\n3. Testing ABB VSD fault code (FAULT_001)...")
         response = await client.get(
             f"{BASE_URL}/api/equipment-lookup/fault-code",
-            params={"manufacturer": "ABB", "fault_code": "FAULT_001", "model": "ACS580"}
+            params={"manufacturer": "ABB", "fault_code": "FAULT_001", "model": "ACS580"},
         )
 
         if response.status_code == 200:
@@ -89,8 +88,7 @@ async def test_fault_code_lookup():
         # Test 4: 404 for unknown fault code
         print("\n4. Testing 404 for unknown fault code...")
         response = await client.get(
-            f"{BASE_URL}/api/equipment-lookup/fault-code",
-            params={"manufacturer": "Carrier", "fault_code": "XXXX999"}
+            f"{BASE_URL}/api/equipment-lookup/fault-code", params={"manufacturer": "Carrier", "fault_code": "XXXX999"}
         )
 
         if response.status_code == 404:
@@ -113,8 +111,7 @@ async def test_parts_search():
         # Test 1: Search by part number
         print("\n1. Testing search by part number...")
         response = await client.get(
-            f"{BASE_URL}/api/equipment-lookup/parts",
-            params={"part_number": "30HX-405-332", "manufacturer": "Carrier"}
+            f"{BASE_URL}/api/equipment-lookup/parts", params={"part_number": "30HX-405-332", "manufacturer": "Carrier"}
         )
 
         if response.status_code == 200:
@@ -129,10 +126,7 @@ async def test_parts_search():
 
         # Test 2: Search by description
         print("\n2. Testing search by description...")
-        response = await client.get(
-            f"{BASE_URL}/api/equipment-lookup/parts",
-            params={"part_description": "oil filter"}
-        )
+        response = await client.get(f"{BASE_URL}/api/equipment-lookup/parts", params={"part_description": "oil filter"})
 
         if response.status_code == 200:
             data = response.json()
@@ -144,9 +138,7 @@ async def test_parts_search():
 
         # Test 3: 400 for missing parameters
         print("\n3. Testing 400 for missing parameters...")
-        response = await client.get(
-            f"{BASE_URL}/api/equipment-lookup/parts"
-        )
+        response = await client.get(f"{BASE_URL}/api/equipment-lookup/parts")
 
         if response.status_code == 400:
             print(f"   ✓ Status: {response.status_code} (expected)")
@@ -167,10 +159,7 @@ async def test_natural_language_search():
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         # Test 1: Fault code in query
         print("\n1. Testing fault code detection (carrier fault E4)...")
-        response = await client.post(
-            f"{BASE_URL}/api/equipment-lookup/search",
-            params={"query": "carrier fault E4"}
-        )
+        response = await client.post(f"{BASE_URL}/api/equipment-lookup/search", params={"query": "carrier fault E4"})
 
         if response.status_code == 200:
             data = response.json()
@@ -185,8 +174,7 @@ async def test_natural_language_search():
         # Test 2: Keyword search
         print("\n2. Testing keyword search (chiller making loud noise)...")
         response = await client.post(
-            f"{BASE_URL}/api/equipment-lookup/search",
-            params={"query": "chiller making loud noise"}
+            f"{BASE_URL}/api/equipment-lookup/search", params={"query": "chiller making loud noise"}
         )
 
         if response.status_code == 200:
@@ -202,8 +190,7 @@ async def test_natural_language_search():
         # Test 3: Search with manufacturer
         print("\n3. Testing search with manufacturer parameter...")
         response = await client.post(
-            f"{BASE_URL}/api/equipment-lookup/search",
-            params={"query": "VSD showing fault 29", "manufacturer": "ABB"}
+            f"{BASE_URL}/api/equipment-lookup/search", params={"query": "VSD showing fault 29", "manufacturer": "ABB"}
         )
 
         if response.status_code == 200:

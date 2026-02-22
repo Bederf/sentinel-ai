@@ -64,6 +64,14 @@ class COVMonitorService:
         }
         logger.info("COVMonitorService initialized")
 
+    def _is_bess_equipment(self, equipment_id: str) -> bool:
+        """Check if equipment is a BESS unit."""
+        return "BESS" in (equipment_id or "").upper()
+
+    def _bess_writer_enabled(self) -> bool:
+        """Check if AEGIS BESS writer is enabled (Phase 1)."""
+        return getattr(settings, "aegis_bess_writer_enabled", False)
+
     async def verify_write(
         self,
         equipment_id: str,
@@ -90,6 +98,22 @@ class COVMonitorService:
         Raises:
             Exception: Only on critical failures (logs and continues)
         """
+        # AEGIS Phase 0: BESS writes are blocked until ops CONFIRM
+        if self._is_bess_equipment(equipment_id) and not self._bess_writer_enabled():
+            logger.info(
+                "AEGIS_WRITE_BLOCKED: BESS writer disabled for %s, decision=%s",
+                equipment_id,
+                decision_id,
+            )
+            return COVVerificationResult(
+                verified=False,
+                actual_value=None,
+                expected_value=expected_value,
+                read_success=False,
+                elapsed_seconds=0.0,
+                error="AEGIS_WRITE_BLOCKED: No Modbus writer configured. Awaiting ops CONFIRM.",
+            )
+
         start_time = datetime.utcnow()
         timeout = timeout_seconds or settings.parasite_cov_timeout_seconds
 
@@ -103,25 +127,20 @@ class COVMonitorService:
 
             # Attempt read-back from device
             try:
-                read_result = await device_manager.read_device_value(
-                    equipment_id, point_name
-                )
-                actual_value = read_result.value if hasattr(read_result, 'value') else read_result
+                read_result = await device_manager.read_device_value(equipment_id, point_name)
+                actual_value = read_result.value if hasattr(read_result, "value") else read_result
                 read_success = True
                 read_error = None
 
                 logger.debug(
-                    f"COV read succeeded: equipment={equipment_id}, "
-                    f"actual={actual_value}, expected={expected_value}"
+                    f"COV read succeeded: equipment={equipment_id}, actual={actual_value}, expected={expected_value}"
                 )
 
             except Exception as e:
                 actual_value = None
                 read_success = False
                 read_error = str(e)
-                logger.warning(
-                    f"COV read failed: equipment={equipment_id}, point={point_name}, error={e}"
-                )
+                logger.warning(f"COV read failed: equipment={equipment_id}, point={point_name}, error={e}")
 
             # Calculate verification result
             elapsed = (datetime.utcnow() - start_time).total_seconds()
@@ -132,14 +151,12 @@ class COVMonitorService:
                 if verified:
                     self._verification_stats["successful_verifications"] += 1
                     logger.info(
-                        f"COV VERIFIED: decision={decision_id}, "
-                        f"actual={actual_value} matches expected={expected_value}"
+                        f"COV VERIFIED: decision={decision_id}, actual={actual_value} matches expected={expected_value}"
                     )
                 else:
                     self._verification_stats["failed_verifications"] += 1
                     logger.warning(
-                        f"COV MISMATCH: decision={decision_id}, "
-                        f"expected={expected_value}, actual={actual_value}"
+                        f"COV MISMATCH: decision={decision_id}, expected={expected_value}, actual={actual_value}"
                     )
             else:
                 verified = False
@@ -160,9 +177,7 @@ class COVMonitorService:
                     decision_id, verified, str(actual_value) if actual_value is not None else "null"
                 )
             except Exception as e:
-                logger.error(
-                    f"Failed to update COV status in parasite_decisions: {e}"
-                )
+                logger.error(f"Failed to update COV status in parasite_decisions: {e}")
 
             return result
 
@@ -204,18 +219,13 @@ class COVMonitorService:
         window = window_minutes or settings.parasite_outcome_window_minutes
 
         try:
-            logger.info(
-                f"Scheduling outcome measurement: decision={decision_id}, "
-                f"window={window} minutes"
-            )
+            logger.info(f"Scheduling outcome measurement: decision={decision_id}, window={window} minutes")
 
             self._pending_measurements[decision_id] = {
                 "equipment_id": equipment_id,
                 "expected_outcome": expected_outcome,
                 "scheduled_at": datetime.utcnow().isoformat(),
-                "measure_at": (
-                    datetime.utcnow() + timedelta(minutes=window)
-                ).isoformat(),
+                "measure_at": (datetime.utcnow() + timedelta(minutes=window)).isoformat(),
                 "measurement_window_minutes": window,
             }
 
@@ -242,22 +252,15 @@ class COVMonitorService:
 
         try:
             pending_ids = list(self._pending_measurements.keys())
-            logger.debug(
-                f"Checking {len(pending_ids)} pending measurements"
-            )
+            logger.debug(f"Checking {len(pending_ids)} pending measurements")
 
             for decision_id in pending_ids:
                 measurement_req = self._pending_measurements[decision_id]
-                measure_at = datetime.fromisoformat(
-                    measurement_req["measure_at"]
-                )
+                measure_at = datetime.fromisoformat(measurement_req["measure_at"])
 
                 # Check if measurement window has passed
                 if now < measure_at:
-                    logger.debug(
-                        f"Measurement for {decision_id} not ready yet "
-                        f"(ready at {measure_at.isoformat()})"
-                    )
+                    logger.debug(f"Measurement for {decision_id} not ready yet (ready at {measure_at.isoformat()})")
                     continue
 
                 # Measurement window elapsed - collect results
@@ -265,25 +268,15 @@ class COVMonitorService:
                     equipment_id = measurement_req["equipment_id"]
                     expected_outcome = measurement_req["expected_outcome"]
 
-                    logger.info(
-                        f"Measuring outcome for decision={decision_id}, "
-                        f"equipment={equipment_id}"
-                    )
+                    logger.info(f"Measuring outcome for decision={decision_id}, equipment={equipment_id}")
 
                     # Read current equipment state (simplified for this phase)
-                    actual_outcome = await self._read_equipment_outcome(
-                        equipment_id, expected_outcome
-                    )
+                    actual_outcome = await self._read_equipment_outcome(equipment_id, expected_outcome)
 
                     # Determine if outcome matched prediction
-                    matched = self._outcome_matches_prediction(
-                        expected_outcome, actual_outcome
-                    )
+                    matched = self._outcome_matches_prediction(expected_outcome, actual_outcome)
 
-                    logger.info(
-                        f"Outcome measurement complete: decision={decision_id}, "
-                        f"matched={matched}"
-                    )
+                    logger.info(f"Outcome measurement complete: decision={decision_id}, matched={matched}")
 
                     # Create measurement result
                     measurement = OutcomeMeasurement(
@@ -292,13 +285,9 @@ class COVMonitorService:
                         expected_outcome=expected_outcome,
                         actual_outcome=actual_outcome,
                         matched=matched,
-                        measurement_window_minutes=measurement_req[
-                            "measurement_window_minutes"
-                        ],
+                        measurement_window_minutes=measurement_req["measurement_window_minutes"],
                         measured_at=now.isoformat(),
-                        contributing_metrics=self._calculate_contributing_metrics(
-                            expected_outcome, actual_outcome
-                        ),
+                        contributing_metrics=self._calculate_contributing_metrics(expected_outcome, actual_outcome),
                     )
 
                     # Update parasite_decisions record with outcome
@@ -308,13 +297,9 @@ class COVMonitorService:
                             actual_outcome,
                             matched,
                         )
-                        logger.debug(
-                            f"Updated parasite_decisions with outcome for {decision_id}"
-                        )
+                        logger.debug(f"Updated parasite_decisions with outcome for {decision_id}")
                     except Exception as e:
-                        logger.error(
-                            f"Failed to update outcome in parasite_decisions: {e}"
-                        )
+                        logger.error(f"Failed to update outcome in parasite_decisions: {e}")
 
                     completed_measurements.append(measurement.__dict__)
 
@@ -322,9 +307,7 @@ class COVMonitorService:
                     del self._pending_measurements[decision_id]
 
                 except Exception as e:
-                    logger.error(
-                        f"Error processing measurement for {decision_id}: {e}"
-                    )
+                    logger.error(f"Error processing measurement for {decision_id}: {e}")
                     # Leave in pending for next iteration
 
             return completed_measurements
@@ -351,9 +334,7 @@ class COVMonitorService:
             "pending_measurements": self.get_pending_count(),
         }
 
-    def _values_match(
-        self, expected: Any, actual: Any, tolerance: float = 0.5
-    ) -> bool:
+    def _values_match(self, expected: Any, actual: Any, tolerance: float = 0.5) -> bool:
         """Compare expected vs actual values with configurable tolerance.
 
         For numeric values: uses ±tolerance range (device may round).
@@ -383,9 +364,7 @@ class COVMonitorService:
         return str(expected).lower() == str(actual).lower()
 
     @staticmethod
-    def build_expected_outcome(
-        action_type: str, target_value: Any, original_value: Any
-    ) -> Dict:
+    def build_expected_outcome(action_type: str, target_value: Any, original_value: Any) -> Dict:
         """Build expected outcome based on action type.
 
         Generates outcome prediction template based on the type of control action,
@@ -420,9 +399,7 @@ class COVMonitorService:
                 "tolerance_percent": 10.0,
             }
 
-    async def _read_equipment_outcome(
-        self, equipment_id: str, expected_outcome: Dict
-    ) -> Dict:
+    async def _read_equipment_outcome(self, equipment_id: str, expected_outcome: Dict) -> Dict:
         """Read equipment state to measure outcome.
 
         Simplified implementation: reads key measurement points from equipment.
@@ -439,37 +416,25 @@ class COVMonitorService:
 
         try:
             measurement_points = expected_outcome.get("measurement_points", [])
-            logger.debug(
-                f"Reading outcome from {equipment_id}: points={measurement_points}"
-            )
+            logger.debug(f"Reading outcome from {equipment_id}: points={measurement_points}")
 
             for point_name in measurement_points:
                 try:
-                    result = await device_manager.read_device_value(
-                        equipment_id, point_name
-                    )
-                    value = result.value if hasattr(result, 'value') else result
+                    result = await device_manager.read_device_value(equipment_id, point_name)
+                    value = result.value if hasattr(result, "value") else result
                     actual_outcome[point_name] = value
-                    logger.debug(
-                        f"Read {point_name} from {equipment_id}: {value}"
-                    )
+                    logger.debug(f"Read {point_name} from {equipment_id}: {value}")
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to read {point_name} from {equipment_id}: {e}"
-                    )
+                    logger.warning(f"Failed to read {point_name} from {equipment_id}: {e}")
                     actual_outcome[point_name] = None
 
         except Exception as e:
-            logger.error(
-                f"Error reading equipment outcome for {equipment_id}: {e}"
-            )
+            logger.error(f"Error reading equipment outcome for {equipment_id}: {e}")
 
         return actual_outcome
 
     @staticmethod
-    def _outcome_matches_prediction(
-        expected_outcome: Dict, actual_outcome: Dict
-    ) -> bool:
+    def _outcome_matches_prediction(expected_outcome: Dict, actual_outcome: Dict) -> bool:
         """Determine if measured outcome matches prediction.
 
         Compares expected vs actual values with tolerances defined in expected_outcome.
@@ -492,17 +457,11 @@ class COVMonitorService:
             if not measurement_points:
                 return True  # No specific points expected
 
-            successful_reads = [
-                p for p in measurement_points
-                if p in actual_outcome and actual_outcome[p] is not None
-            ]
+            successful_reads = [p for p in measurement_points if p in actual_outcome and actual_outcome[p] is not None]
 
             # Success if we got at least one reading
             matched = len(successful_reads) > 0
-            logger.debug(
-                f"Outcome matching: expected={measurement_points}, "
-                f"got={successful_reads}, matched={matched}"
-            )
+            logger.debug(f"Outcome matching: expected={measurement_points}, got={successful_reads}, matched={matched}")
 
             return matched
 
@@ -511,9 +470,7 @@ class COVMonitorService:
             return False
 
     @staticmethod
-    def _calculate_contributing_metrics(
-        expected_outcome: Dict, actual_outcome: Dict
-    ) -> Dict:
+    def _calculate_contributing_metrics(expected_outcome: Dict, actual_outcome: Dict) -> Dict:
         """Calculate individual metric comparisons.
 
         Provides granular metrics for understanding which measurements matched

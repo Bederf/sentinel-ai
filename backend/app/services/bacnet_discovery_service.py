@@ -42,6 +42,7 @@ class BACnetProperty:
 @dataclass
 class BACnetDeviceInfo:
     """Discovered BACnet device information."""
+
     device_id: int
     device_name: str = ""
     vendor_name: str = ""
@@ -111,7 +112,7 @@ class BACnetDiscoveryService:
         niagara_port: int = 80,
         niagara_username: Optional[str] = None,
         niagara_password: Optional[str] = None,
-        timeout: float = 10.0
+        timeout: float = 10.0,
     ):
         """Initialize BACnet discovery service.
 
@@ -165,10 +166,7 @@ class BACnetDiscoveryService:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 # Query device object via oBIX
                 # Niagara exposes BACnet devices under /obix/config/Drivers/BacnetNetwork/
-                response = await client.get(
-                    f"{base_url}/obix/config/Drivers/BacnetNetwork/",
-                    auth=auth
-                )
+                response = await client.get(f"{base_url}/obix/config/Drivers/BacnetNetwork/", auth=auth)
 
                 if response.status_code != 200:
                     logger.warning(f"Niagara query failed: {response.status_code}")
@@ -187,12 +185,7 @@ class BACnetDiscoveryService:
             logger.error(f"Niagara discovery error: {e}")
             return None
 
-    async def discover_and_save(
-        self,
-        equipment_code: str,
-        device_id: int,
-        ip_address: Optional[str] = None
-    ) -> dict:
+    async def discover_and_save(self, equipment_code: str, device_id: int, ip_address: Optional[str] = None) -> dict:
         """Discover BACnet device and save to equipment metadata.
 
         Args:
@@ -243,7 +236,7 @@ class BACnetDiscoveryService:
                     "system_status": device.system_status,
                     "object_count": device.object_count,
                     "location": device.location,
-                }
+                },
             )
             result["saved"] = True
             result["status"] = "success"
@@ -299,10 +292,7 @@ class SimulatedBACnetDiscovery:
 
     @classmethod
     def generate_device_info(
-        cls,
-        equipment_code: str,
-        equipment_type: str = "default",
-        device_id: Optional[int] = None
+        cls, equipment_code: str, equipment_type: str = "default", device_id: Optional[int] = None
     ) -> dict:
         """Generate simulated BACnet device info.
 
@@ -350,5 +340,5 @@ class SimulatedBACnetDiscovery:
                 "object_count": object_count,
                 "protocol_version": 1,
                 "protocol_revision": 14,
-            }
+            },
         }

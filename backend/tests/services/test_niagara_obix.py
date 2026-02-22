@@ -20,6 +20,7 @@ from app.services.niagara.obix_client import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def client():
     """Create a fresh OBIXClient for testing."""
@@ -122,6 +123,7 @@ ALARM_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
 # Test: Initialization
 # ---------------------------------------------------------------------------
 
+
 class TestOBIXClientInit:
     """Tests for OBIXClient initialization."""
 
@@ -153,6 +155,7 @@ class TestOBIXClientInit:
 # Test: Authentication
 # ---------------------------------------------------------------------------
 
+
 class TestOBIXAuthentication:
     """Tests for Niagara 4.9+ authentication."""
 
@@ -182,9 +185,8 @@ class TestOBIXAuthentication:
 
     def test_authenticate_connection_error(self, client):
         import requests as req
-        client.session.post = MagicMock(
-            side_effect=req.exceptions.ConnectionError("Connection refused")
-        )
+
+        client.session.post = MagicMock(side_effect=req.exceptions.ConnectionError("Connection refused"))
 
         with pytest.raises(OBIXConnectionError, match="Cannot connect"):
             client.authenticate()
@@ -193,6 +195,7 @@ class TestOBIXAuthentication:
 # ---------------------------------------------------------------------------
 # Test: Point Reading
 # ---------------------------------------------------------------------------
+
 
 class TestPointReading:
     """Tests for reading oBIX point values."""
@@ -280,6 +283,7 @@ class TestPointReading:
 # Test: History Reading
 # ---------------------------------------------------------------------------
 
+
 class TestHistoryReading:
     """Tests for reading oBIX historical data."""
 
@@ -326,6 +330,7 @@ class TestHistoryReading:
 # ---------------------------------------------------------------------------
 # Test: Alarm Reading
 # ---------------------------------------------------------------------------
+
 
 class TestAlarmReading:
     """Tests for reading oBIX alarm history."""
@@ -376,6 +381,7 @@ class TestAlarmReading:
 # Test: Connection Health Check
 # ---------------------------------------------------------------------------
 
+
 class TestConnectionHealthCheck:
     """Tests for connection health checking."""
 
@@ -404,6 +410,7 @@ class TestConnectionHealthCheck:
 # ---------------------------------------------------------------------------
 # Test: Auto-retry on 401
 # ---------------------------------------------------------------------------
+
 
 class TestAutoRetry:
     """Tests for automatic re-authentication on 401 responses."""
@@ -438,6 +445,7 @@ class TestAutoRetry:
 # Test: Singleton
 # ---------------------------------------------------------------------------
 
+
 class TestSingleton:
     """Tests for the singleton factory function."""
 
@@ -452,14 +460,17 @@ class TestSingleton:
         assert client.username == ""
 
     def test_get_obix_client_env_config(self):
-        with patch.dict(os.environ, {
-            "NIAGARA_OBIX_HOST": "192.168.1.100",
-            "NIAGARA_OBIX_PORT": "443",
-            "NIAGARA_OBIX_USERNAME": "admin",
-            "NIAGARA_OBIX_PASSWORD": "secret",
-            "NIAGARA_OBIX_HTTPS": "true",
-            "NIAGARA_OBIX_TIMEOUT": "60",
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "NIAGARA_OBIX_HOST": "192.168.1.100",
+                "NIAGARA_OBIX_PORT": "443",
+                "NIAGARA_OBIX_USERNAME": "admin",
+                "NIAGARA_OBIX_PASSWORD": "secret",
+                "NIAGARA_OBIX_HTTPS": "true",
+                "NIAGARA_OBIX_TIMEOUT": "60",
+            },
+        ):
             reset_obix_client()
             client = get_obix_client()
 

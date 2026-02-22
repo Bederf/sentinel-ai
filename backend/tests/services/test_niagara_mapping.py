@@ -32,6 +32,7 @@ from app.services.niagara.mapping_service import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def mapping_service():
     """Create a fresh PointMappingService."""
@@ -132,14 +133,13 @@ def sample_classified_points():
 # Point-to-Equipment Mapping Tests
 # ---------------------------------------------------------------------------
 
+
 class TestPointMapping:
     """Tests for point-to-equipment grouping."""
 
     def test_group_points_by_equipment(self, mapping_service, sample_classified_points):
         """Test that points are grouped correctly by equipment ID."""
-        mappings = mapping_service.map_points_to_equipment(
-            sample_classified_points, "site-002"
-        )
+        mappings = mapping_service.map_points_to_equipment(sample_classified_points, "site-002")
 
         # Equipment IDs are now in v2.0 format (converted from BMS IDs)
         assert "S002-CHILLER-B1-001" in mappings
@@ -147,48 +147,32 @@ class TestPointMapping:
         assert len(mappings["S002-CHILLER-B1-001"].points) == 3  # 3 chiller points
         assert len(mappings["S002-AHU-B1-001"].points) == 2  # 2 AHU points
 
-    def test_orphan_points_grouped_as_unassigned(
-        self, mapping_service, sample_classified_points
-    ):
+    def test_orphan_points_grouped_as_unassigned(self, mapping_service, sample_classified_points):
         """Test that orphan points go to UNASSIGNED."""
-        mappings = mapping_service.map_points_to_equipment(
-            sample_classified_points, "site-002"
-        )
+        mappings = mapping_service.map_points_to_equipment(sample_classified_points, "site-002")
 
         assert "UNASSIGNED" in mappings
         assert len(mappings["UNASSIGNED"].points) == 1
 
-    def test_equipment_type_majority_vote(
-        self, mapping_service, sample_classified_points
-    ):
+    def test_equipment_type_majority_vote(self, mapping_service, sample_classified_points):
         """Test that equipment type is determined by majority."""
-        mappings = mapping_service.map_points_to_equipment(
-            sample_classified_points, "site-002"
-        )
+        mappings = mapping_service.map_points_to_equipment(sample_classified_points, "site-002")
 
         # Equipment IDs are now in v2.0 format
         assert mappings["S002-CHILLER-B1-001"].equipment_type == "chiller"
         assert mappings["S002-AHU-B1-001"].equipment_type == "ahu"
 
-    def test_demo_points_grouping(
-        self, mapping_service, demo_classified_points
-    ):
+    def test_demo_points_grouping(self, mapping_service, demo_classified_points):
         """Test grouping with full demo point set."""
-        mappings = mapping_service.map_points_to_equipment(
-            demo_classified_points, "site-002"
-        )
+        mappings = mapping_service.map_points_to_equipment(demo_classified_points, "site-002")
 
         # Should have at least 5 equipment groups
         real_equipment = {k: v for k, v in mappings.items() if k != "UNASSIGNED"}
         assert len(real_equipment) >= 5
 
-    def test_equipment_confidence_scoring(
-        self, mapping_service, sample_classified_points
-    ):
+    def test_equipment_confidence_scoring(self, mapping_service, sample_classified_points):
         """Test group confidence is based on point confidences."""
-        mappings = mapping_service.map_points_to_equipment(
-            sample_classified_points, "site-002"
-        )
+        mappings = mapping_service.map_points_to_equipment(sample_classified_points, "site-002")
 
         # Equipment IDs are now in v2.0 format
         assert mappings["S002-CHILLER-B1-001"].confidence == "high"  # All high confidence points
@@ -198,14 +182,13 @@ class TestPointMapping:
 # Equipment Model Generation Tests
 # ---------------------------------------------------------------------------
 
+
 class TestEquipmentModelGeneration:
     """Tests for generating device-compatible equipment models."""
 
     def test_generate_equipment_model(self, mapping_service, sample_classified_points):
         """Test equipment model generation."""
-        mappings = mapping_service.map_points_to_equipment(
-            sample_classified_points, "site-002"
-        )
+        mappings = mapping_service.map_points_to_equipment(sample_classified_points, "site-002")
 
         # Equipment IDs are now in v2.0 format
         model = mapping_service.generate_equipment_model(mappings["S002-CHILLER-B1-001"])
@@ -219,18 +202,14 @@ class TestEquipmentModelGeneration:
 
     def test_model_has_bacnet_references(self, mapping_service, sample_classified_points):
         """Test that equipment model includes BACnet references."""
-        mappings = mapping_service.map_points_to_equipment(
-            sample_classified_points, "site-002"
-        )
+        mappings = mapping_service.map_points_to_equipment(sample_classified_points, "site-002")
 
         # Equipment IDs are now in v2.0 format
         model = mapping_service.generate_equipment_model(mappings["S002-CHILLER-B1-001"])
         points = model["points"]
 
         # At least one point should have a bacnet_ref
-        has_bacnet = any(
-            p.get("bacnet_ref") for p in points.values()
-        )
+        has_bacnet = any(p.get("bacnet_ref") for p in points.values())
         assert has_bacnet
 
     def test_model_device_type_mapping(self, mapping_service):
@@ -256,14 +235,13 @@ class TestEquipmentModelGeneration:
 # Validation Tests
 # ---------------------------------------------------------------------------
 
+
 class TestMappingValidation:
     """Tests for mapping validation."""
 
     def test_detect_orphan_points(self, mapping_service, sample_classified_points):
         """Test that orphan points are detected."""
-        mappings = mapping_service.map_points_to_equipment(
-            sample_classified_points, "site-002"
-        )
+        mappings = mapping_service.map_points_to_equipment(sample_classified_points, "site-002")
 
         result = mapping_service.validate_mappings(mappings)
 
@@ -293,9 +271,7 @@ class TestMappingValidation:
 
     def test_detect_low_confidence(self, mapping_service, sample_classified_points):
         """Test that low confidence points are flagged."""
-        mappings = mapping_service.map_points_to_equipment(
-            sample_classified_points, "site-002"
-        )
+        mappings = mapping_service.map_points_to_equipment(sample_classified_points, "site-002")
 
         result = mapping_service.validate_mappings(mappings)
         # The UNASSIGNED point should be flagged
@@ -317,27 +293,22 @@ class TestMappingValidation:
 # Storage and Correction Tests
 # ---------------------------------------------------------------------------
 
+
 class TestMappingStorage:
     """Tests for mapping storage and corrections."""
 
     def test_save_and_load_mappings(self, mapping_service, sample_classified_points, tmp_path):
         """Test saving and loading mappings from JSON."""
-        mappings = mapping_service.map_points_to_equipment(
-            sample_classified_points, "site-002"
-        )
+        mappings = mapping_service.map_points_to_equipment(sample_classified_points, "site-002")
 
-        save_result = mapping_service.save_mappings(
-            "test-001", mappings, "site-002"
-        )
+        save_result = mapping_service.save_mappings("test-001", mappings, "site-002")
 
         assert save_result["success"] is True
         assert save_result["equipment_count"] > 0
 
     def test_mapping_caching(self, mapping_service, sample_classified_points):
         """Test that mappings are cached in memory."""
-        mappings = mapping_service.map_points_to_equipment(
-            sample_classified_points, "site-002"
-        )
+        mappings = mapping_service.map_points_to_equipment(sample_classified_points, "site-002")
 
         mapping_service.save_mappings("test-002", mappings, "site-002")
 
@@ -348,9 +319,7 @@ class TestMappingStorage:
 
     def test_correct_point_type(self, mapping_service, sample_classified_points):
         """Test manual correction of point type."""
-        mappings = mapping_service.map_points_to_equipment(
-            sample_classified_points, "site-002"
-        )
+        mappings = mapping_service.map_points_to_equipment(sample_classified_points, "site-002")
         mapping_service.save_mappings("test-003", mappings, "site-002")
 
         result = mapping_service.correct_point(
@@ -362,13 +331,9 @@ class TestMappingStorage:
         assert result["success"] is True
         assert "point_type -> setpoint" in result["corrections"]
 
-    def test_correct_move_point_to_different_equipment(
-        self, mapping_service, sample_classified_points
-    ):
+    def test_correct_move_point_to_different_equipment(self, mapping_service, sample_classified_points):
         """Test moving a point to different equipment."""
-        mappings = mapping_service.map_points_to_equipment(
-            sample_classified_points, "site-002"
-        )
+        mappings = mapping_service.map_points_to_equipment(sample_classified_points, "site-002")
         mapping_service.save_mappings("test-004", mappings, "site-002")
 
         result = mapping_service.correct_point(
@@ -385,9 +350,7 @@ class TestMappingStorage:
 
     def test_mapping_history_tracked(self, mapping_service, sample_classified_points):
         """Test that mapping changes are tracked in history."""
-        mappings = mapping_service.map_points_to_equipment(
-            sample_classified_points, "site-002"
-        )
+        mappings = mapping_service.map_points_to_equipment(sample_classified_points, "site-002")
         mapping_service.save_mappings("test-005", mappings, "site-002")
 
         history = mapping_service.get_mapping_history("test-005")
@@ -396,9 +359,7 @@ class TestMappingStorage:
 
     def test_approve_mappings(self, mapping_service, sample_classified_points):
         """Test approval workflow."""
-        mappings = mapping_service.map_points_to_equipment(
-            sample_classified_points, "site-002"
-        )
+        mappings = mapping_service.map_points_to_equipment(sample_classified_points, "site-002")
         mapping_service.save_mappings("test-006", mappings, "site-002")
 
         result = mapping_service.approve_mappings("test-006", approved_by="admin")
@@ -433,6 +394,7 @@ class TestMappingStorage:
 # ---------------------------------------------------------------------------
 # Singleton Tests
 # ---------------------------------------------------------------------------
+
 
 class TestMappingSingleton:
     """Test singleton factory."""

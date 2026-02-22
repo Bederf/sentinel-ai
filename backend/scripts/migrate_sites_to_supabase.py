@@ -11,6 +11,7 @@ This script:
 Usage:
     python scripts/migrate_sites_to_supabase.py [--dry-run]
 """
+
 import sys
 import json
 import csv
@@ -44,40 +45,40 @@ def load_legacy_equipment():
 def site_to_building(site: dict) -> dict:
     """Convert legacy site format to Supabase building format"""
     # Generate deterministic UUID from site ID
-    site_id = site.get('id', '')
+    site_id = site.get("id", "")
     building_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"sentinel-bms-{site_id}"))
 
     # Map all types to 'regional_office' (Supabase constraint limitation)
     # TODO: Update constraint to allow retail, hospital, etc.
-    building_type = 'regional_office'
+    building_type = "regional_office"
 
     return {
-        'id': building_id,
-        'code': site_id,
-        'name': site.get('name', ''),
-        'address': site.get('address', ''),
-        'region': site.get('region', ''),
-        'type': building_type,
-        'sqm': site.get('sqm', 0),
-        'floors': site.get('floors', 1),
-        'year_built': site.get('year_built'),
-        'operating_hours': site.get('operating_hours'),
-        'occupancy_pattern': site.get('occupancy_pattern', 'office'),
-        'latitude': site.get('latitude'),
-        'longitude': site.get('longitude'),
-        'contact_email': site.get('contact_email'),
-        'contact_phone': site.get('contact_phone'),
-        'optimization_enabled': site.get('optimization_enabled', False),
-        'optimization_status': site.get('optimization_status'),
-        'control_enabled': site.get('control_enabled', False),
-        'control_note': site.get('control_note'),
-        'equipment_count': 0,  # Will be updated after equipment migration
+        "id": building_id,
+        "code": site_id,
+        "name": site.get("name", ""),
+        "address": site.get("address", ""),
+        "region": site.get("region", ""),
+        "type": building_type,
+        "sqm": site.get("sqm", 0),
+        "floors": site.get("floors", 1),
+        "year_built": site.get("year_built"),
+        "operating_hours": site.get("operating_hours"),
+        "occupancy_pattern": site.get("occupancy_pattern", "office"),
+        "latitude": site.get("latitude"),
+        "longitude": site.get("longitude"),
+        "contact_email": site.get("contact_email"),
+        "contact_phone": site.get("contact_phone"),
+        "optimization_enabled": site.get("optimization_enabled", False),
+        "optimization_status": site.get("optimization_status"),
+        "control_enabled": site.get("control_enabled", False),
+        "control_note": site.get("control_note"),
+        "equipment_count": 0,  # Will be updated after equipment migration
     }
 
 
 def asset_to_equipment(asset: dict, building_id_map: dict) -> dict:
     """Convert legacy asset format to Supabase equipment format"""
-    site_id = asset.get('site_id', '').lower()
+    site_id = asset.get("site_id", "").lower()
     building_id = building_id_map.get(site_id)
 
     if not building_id:
@@ -85,7 +86,7 @@ def asset_to_equipment(asset: dict, building_id_map: dict) -> dict:
         return None
 
     # Generate deterministic UUID from asset ID
-    asset_id = asset.get('asset_id', '')
+    asset_id = asset.get("asset_id", "")
     equipment_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"sentinel-equipment-{asset_id}"))
 
     # Map CSV column names to equipment fields
@@ -94,29 +95,35 @@ def asset_to_equipment(asset: dict, building_id_map: dict) -> dict:
     #      criticality, condition, last_service_date, next_service_date, notes
 
     # Determine health score based on condition
-    condition = asset.get('condition', 'good').lower()
-    health_map = {'excellent': 95, 'good': 80, 'fair': 60, 'poor': 40, 'critical': 20}
+    condition = asset.get("condition", "good").lower()
+    health_map = {"excellent": 95, "good": 80, "fair": 60, "poor": 40, "critical": 20}
     health_score = health_map.get(condition, 70)
 
     # Determine status based on condition
-    status_map = {'excellent': 'normal', 'good': 'normal', 'fair': 'warning', 'poor': 'critical', 'critical': 'critical'}
-    status = status_map.get(condition, 'normal')
+    status_map = {
+        "excellent": "normal",
+        "good": "normal",
+        "fair": "warning",
+        "poor": "critical",
+        "critical": "critical",
+    }
+    status = status_map.get(condition, "normal")
 
     return {
-        'id': equipment_id,
-        'code': asset_id,
-        'building_id': building_id,
-        'name': asset.get('asset_tag', ''),
-        'type': asset.get('asset_category', 'unknown'),
-        'manufacturer': asset.get('make', ''),
-        'model': asset.get('model', ''),
-        'capacity': '',  # Not in CSV
-        'serial_number': asset.get('serial_number', ''),
-        'install_date': asset.get('install_date') or None,
-        'last_service': asset.get('last_service_date') or None,
-        'status': status,
-        'health_score': health_score,
-        'location': asset.get('site_name', ''),
+        "id": equipment_id,
+        "code": asset_id,
+        "building_id": building_id,
+        "name": asset.get("asset_tag", ""),
+        "type": asset.get("asset_category", "unknown"),
+        "manufacturer": asset.get("make", ""),
+        "model": asset.get("model", ""),
+        "capacity": "",  # Not in CSV
+        "serial_number": asset.get("serial_number", ""),
+        "install_date": asset.get("install_date") or None,
+        "last_service": asset.get("last_service_date") or None,
+        "status": status,
+        "health_score": health_score,
+        "location": asset.get("site_name", ""),
     }
 
 
@@ -139,8 +146,8 @@ def migrate(dry_run: bool = False):
 
     # Get existing buildings
     print("\n2. Checking existing buildings...")
-    existing = client.table('buildings').select('code').execute()
-    existing_codes = {b['code'] for b in existing.data}
+    existing = client.table("buildings").select("code").execute()
+    existing_codes = {b["code"] for b in existing.data}
     print(f"   Found {len(existing_codes)} existing buildings: {existing_codes}")
 
     # Convert and filter sites
@@ -149,8 +156,8 @@ def migrate(dry_run: bool = False):
 
     for site in sites:
         building = site_to_building(site)
-        code = building['code']
-        building_id_map[code] = building['id']
+        code = building["code"]
+        building_id_map[code] = building["id"]
 
         if code in existing_codes:
             print(f"   Skipping {code} ({building['name']}) - already exists")
@@ -162,7 +169,7 @@ def migrate(dry_run: bool = False):
     if buildings_to_insert and not dry_run:
         print(f"\n3. Inserting {len(buildings_to_insert)} buildings...")
         try:
-            result = client.table('buildings').insert(buildings_to_insert).execute()
+            result = client.table("buildings").insert(buildings_to_insert).execute()
             print(f"   Inserted {len(result.data)} buildings")
         except Exception as e:
             print(f"   Error: {e}")
@@ -172,8 +179,8 @@ def migrate(dry_run: bool = False):
 
     # Get existing equipment
     print("\n4. Checking existing equipment...")
-    existing_eq = client.table('equipment').select('code').execute()
-    existing_eq_codes = {e['code'] for e in existing_eq.data if e.get('code')}
+    existing_eq = client.table("equipment").select("code").execute()
+    existing_eq_codes = {e["code"] for e in existing_eq.data if e.get("code")}
     print(f"   Found {len(existing_eq_codes)} existing equipment items")
 
     # Convert and filter equipment
@@ -184,7 +191,7 @@ def migrate(dry_run: bool = False):
         if not eq:
             continue
 
-        code = eq['code']
+        code = eq["code"]
         if code in existing_eq_codes:
             print(f"   Skipping {code} - already exists")
         else:
@@ -195,7 +202,7 @@ def migrate(dry_run: bool = False):
     if equipment_to_insert and not dry_run:
         print(f"\n5. Inserting {len(equipment_to_insert)} equipment items...")
         try:
-            result = client.table('equipment').insert(equipment_to_insert).execute()
+            result = client.table("equipment").insert(equipment_to_insert).execute()
             print(f"   Inserted {len(result.data)} equipment items")
         except Exception as e:
             print(f"   Error: {e}")
@@ -207,9 +214,11 @@ def migrate(dry_run: bool = False):
     if not dry_run:
         print("\n6. Updating equipment counts...")
         for code, building_id in building_id_map.items():
-            count_result = client.table('equipment').select('id', count='exact').eq('building_id', building_id).execute()
+            count_result = (
+                client.table("equipment").select("id", count="exact").eq("building_id", building_id).execute()
+            )
             count = count_result.count or 0
-            client.table('buildings').update({'equipment_count': count}).eq('id', building_id).execute()
+            client.table("buildings").update({"equipment_count": count}).eq("id", building_id).execute()
             print(f"   {code}: {count} items")
 
     print("\n" + "=" * 60)
@@ -219,7 +228,7 @@ def migrate(dry_run: bool = False):
     return True
 
 
-if __name__ == '__main__':
-    dry_run = '--dry-run' in sys.argv
+if __name__ == "__main__":
+    dry_run = "--dry-run" in sys.argv
     success = migrate(dry_run=dry_run)
     sys.exit(0 if success else 1)

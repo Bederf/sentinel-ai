@@ -28,25 +28,29 @@ def export_budget_report_csv(report: Dict[str, Any]) -> bytes:
 
     writer.writerow(["Month", "Budget (ZAR)", "Actual (ZAR)", "Variance (ZAR)", "Spend %"])
     for row in report.get("monthly", []):
-        writer.writerow([
-            row.get("month"),
-            row.get("total_budget_zar"),
-            row.get("total_actual_zar"),
-            row.get("variance_zar"),
-            row.get("spend_percentage"),
-        ])
+        writer.writerow(
+            [
+                row.get("month"),
+                row.get("total_budget_zar"),
+                row.get("total_actual_zar"),
+                row.get("variance_zar"),
+                row.get("spend_percentage"),
+            ]
+        )
 
     writer.writerow([])
     writer.writerow(["Equipment Type Breakdown"])
     writer.writerow(["Equipment Type", "Budget (ZAR)", "Actual (ZAR)", "Variance (ZAR)", "Spend %"])
     for row in report.get("equipment_type_breakdown", []):
-        writer.writerow([
-            row.get("equipment_type"),
-            row.get("total_budget_zar"),
-            row.get("total_actual_zar"),
-            row.get("variance_zar"),
-            row.get("spend_percentage"),
-        ])
+        writer.writerow(
+            [
+                row.get("equipment_type"),
+                row.get("total_budget_zar"),
+                row.get("total_actual_zar"),
+                row.get("variance_zar"),
+                row.get("spend_percentage"),
+            ]
+        )
 
     summary = report.get("alert_summary", {})
     writer.writerow([])
@@ -128,8 +132,11 @@ def _generate_simple_pdf(lines: List[str]) -> bytes:
     )
     objects.append(b"4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n")
     objects.append(
-        b"5 0 obj << /Length " + str(len(content_bytes)).encode("ascii") + b" >> stream\n" +
-        content_bytes + b"\nendstream endobj\n"
+        b"5 0 obj << /Length "
+        + str(len(content_bytes)).encode("ascii")
+        + b" >> stream\n"
+        + content_bytes
+        + b"\nendstream endobj\n"
     )
 
     offsets = []

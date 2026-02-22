@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class Season(str, Enum):
     """South African seasons for year-round simulation."""
+
     SUMMER = "summer"  # Dec-Feb: High solar, high HVAC load
     AUTUMN = "autumn"  # Mar-May: Declining solar, moderate HVAC
     WINTER = "winter"  # Jun-Aug: Low solar, low HVAC (dry, cool)
@@ -24,6 +25,7 @@ class Season(str, Enum):
 @dataclass
 class HourlySnapshot:
     """Single hour of simulation data (for internal aggregation)."""
+
     hour: int  # 0-8759 (365 × 24)
     date: datetime
     month: int
@@ -44,6 +46,7 @@ class HourlySnapshot:
 @dataclass
 class MonthSummary:
     """Monthly aggregation of solar/BESS/cost data."""
+
     month: int  # 1-12
     month_name: str  # January-December
     season: str  # summer|autumn|winter|spring
@@ -80,6 +83,7 @@ class MonthSummary:
 @dataclass
 class SeasonSummary:
     """Seasonal aggregation (3-month period)."""
+
     season: str
     start_month: int
     end_month: int
@@ -95,6 +99,7 @@ class SeasonSummary:
 @dataclass
 class AnnualSummary:
     """Full 365-day simulation results."""
+
     site_id: str
     year: int
     scenario: str
@@ -146,15 +151,15 @@ class SolarAnnualAggregator:
 
     # South African City Power tariffs (2026 rates, ZAR per kWh)
     SUMMER_TARIFFS = {
-        "peak": 3.4567,          # 07:00-10:00, 18:00-20:00
-        "standard": 2.1234,      # 10:00-18:00
-        "off_peak": 1.0567,      # 20:00-07:00 (off-peak always includes night)
+        "peak": 3.4567,  # 07:00-10:00, 18:00-20:00
+        "standard": 2.1234,  # 10:00-18:00
+        "off_peak": 1.0567,  # 20:00-07:00 (off-peak always includes night)
     }
 
     WINTER_TARIFFS = {
-        "peak": 4.8912,          # 06:00-09:00, 17:00-22:00
-        "standard": 2.5678,      # 09:00-17:00
-        "off_peak": 1.3456,      # 22:00-06:00
+        "peak": 4.8912,  # 06:00-09:00, 17:00-22:00
+        "standard": 2.5678,  # 09:00-17:00
+        "off_peak": 1.3456,  # 22:00-06:00
     }
 
     # Demand charge (R/kVA per month)
@@ -171,14 +176,32 @@ class SolarAnnualAggregator:
     def __init__(self, site_id: str = "site-002"):
         self.site_id = site_id
         self.month_names = [
-            "January", "February", "March", "April", "May", "June",
-            "July", "August", "September", "October", "November", "December"
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
         ]
         self.season_map = {
-            1: Season.SUMMER, 2: Season.SUMMER, 3: Season.AUTUMN,
-            4: Season.AUTUMN, 5: Season.AUTUMN, 6: Season.WINTER,
-            7: Season.WINTER, 8: Season.WINTER, 9: Season.SPRING,
-            10: Season.SPRING, 11: Season.SPRING, 12: Season.SUMMER,
+            1: Season.SUMMER,
+            2: Season.SUMMER,
+            3: Season.AUTUMN,
+            4: Season.AUTUMN,
+            5: Season.AUTUMN,
+            6: Season.WINTER,
+            7: Season.WINTER,
+            8: Season.WINTER,
+            9: Season.SPRING,
+            10: Season.SPRING,
+            11: Season.SPRING,
+            12: Season.SUMMER,
         }
 
     async def aggregate_annual_results(
@@ -210,7 +233,9 @@ class SolarAnnualAggregator:
         # Apply learning curve to savings calculations
         for i, month in enumerate(monthly_summaries):
             month.learning_factor = learning_curve[i]["learning_factor"]
-            month.total_cost_sentinel_ai_zar = month.total_cost_standard_ems_zar * (1 - learning_curve[i]["savings_pct"] / 100.0)
+            month.total_cost_sentinel_ai_zar = month.total_cost_standard_ems_zar * (
+                1 - learning_curve[i]["savings_pct"] / 100.0
+            )
             month.savings_zar = month.total_cost_standard_ems_zar - month.total_cost_sentinel_ai_zar
             month.savings_pct = learning_curve[i]["savings_pct"]
 
@@ -251,7 +276,9 @@ class SolarAnnualAggregator:
             total_cost_standard_ems_zar=total_cost_standard,
             total_cost_sentinel_ai_zar=total_cost_sentinel,
             annual_savings_zar=total_cost_standard - total_cost_sentinel,
-            annual_savings_pct=((total_cost_standard - total_cost_sentinel) / total_cost_standard * 100) if total_cost_standard > 0 else 0,
+            annual_savings_pct=((total_cost_standard - total_cost_sentinel) / total_cost_standard * 100)
+            if total_cost_standard > 0
+            else 0,
             capacity_factor_pct=capacity_factor,
             self_consumption_pct=self_consumption_pct,
             learning_curve=learning_curve,
@@ -260,7 +287,9 @@ class SolarAnnualAggregator:
             simulation_duration_seconds=duration_seconds,
         )
 
-        logger.info(f"Annual aggregation complete: {total_solar:.0f} kWh solar, {total_cost_standard:.0f}→{total_cost_sentinel:.0f} ZAR ({summary.annual_savings_pct:.1f}% savings)")
+        logger.info(
+            f"Annual aggregation complete: {total_solar:.0f} kWh solar, {total_cost_standard:.0f}→{total_cost_sentinel:.0f} ZAR ({summary.annual_savings_pct:.1f}% savings)"
+        )
 
         return summary
 
@@ -276,7 +305,9 @@ class SolarAnnualAggregator:
                 continue
 
             # Sum energy flows
-            solar_kwh = sum(h.solar_gen_kw for h in month_hours) / 60  # kW * 1h intervals / 60 = kWh/min, but we're summing hourly
+            solar_kwh = (
+                sum(h.solar_gen_kw for h in month_hours) / 60
+            )  # kW * 1h intervals / 60 = kWh/min, but we're summing hourly
             # Actually, if each snapshot is hourly, then kW * 1 hour = kWh
             solar_kwh = sum(h.solar_gen_kw for h in month_hours)
             bess_charged_kwh = sum(h.bess_charge_kw for h in month_hours)
@@ -308,7 +339,9 @@ class SolarAnnualAggregator:
 
             # Capacity factor for this month
             days_in_month = len(set(h.day_of_year for h in month_hours))
-            theoretical_month_kwh = (self.SOLAR_CAPACITY_KWP * self.THEORETICAL_SOLAR_KWH_PER_KWP_DAY * days_in_month) / 1000
+            theoretical_month_kwh = (
+                self.SOLAR_CAPACITY_KWP * self.THEORETICAL_SOLAR_KWH_PER_KWP_DAY * days_in_month
+            ) / 1000
             capacity_factor = (solar_kwh / theoretical_month_kwh * 100) if theoretical_month_kwh > 0 else 0
 
             monthly[month_num - 1] = MonthSummary(
@@ -355,7 +388,7 @@ class SolarAnnualAggregator:
 
         # Demand cost (ZAR)
         # Demand charge = kVA × charge_per_kva, assume power factor 0.95
-        demand_kva = (peak_demand_kw / 0.95)
+        demand_kva = peak_demand_kw / 0.95
         monthly_demand_cost = demand_kva * demand_charge
 
         total_cost = energy_cost + monthly_demand_cost
@@ -387,12 +420,14 @@ class SolarAnnualAggregator:
                 savings_pct = 16.0 + progress * 2.0
                 learning_factor = 0.16 + progress * 0.02
 
-            learning_curve.append({
-                "month": month_num,
-                "month_name": month.month_name,
-                "savings_pct": round(savings_pct, 2),
-                "learning_factor": round(learning_factor, 4),
-            })
+            learning_curve.append(
+                {
+                    "month": month_num,
+                    "month_name": month.month_name,
+                    "savings_pct": round(savings_pct, 2),
+                    "learning_factor": round(learning_factor, 4),
+                }
+            )
 
         return learning_curve
 
@@ -400,8 +435,8 @@ class SolarAnnualAggregator:
         """Aggregate 12 months into 4 seasonal summaries."""
         season_months = {
             Season.SUMMER: [12, 1, 2],  # Dec-Feb
-            Season.AUTUMN: [3, 4, 5],    # Mar-May
-            Season.WINTER: [6, 7, 8],    # Jun-Aug
+            Season.AUTUMN: [3, 4, 5],  # Mar-May
+            Season.WINTER: [6, 7, 8],  # Jun-Aug
             Season.SPRING: [9, 10, 11],  # Sep-Nov
         }
 
@@ -416,19 +451,23 @@ class SolarAnnualAggregator:
             total_import = sum(m.grid_import_kwh for m in months_in_season)
             total_export = sum(m.grid_export_kwh for m in months_in_season)
             total_cost = sum(m.total_cost_sentinel_ai_zar for m in months_in_season)
-            avg_savings = sum(m.savings_pct for m in months_in_season) / len(months_in_season) if months_in_season else 0
+            avg_savings = (
+                sum(m.savings_pct for m in months_in_season) / len(months_in_season) if months_in_season else 0
+            )
 
-            seasonal.append(SeasonSummary(
-                season=season_name.value,
-                start_month=month_nums[0],
-                end_month=month_nums[2],
-                months=months_in_season,
-                total_solar_kwh=total_solar,
-                total_grid_import_kwh=total_import,
-                total_grid_export_kwh=total_export,
-                total_cost_zar=total_cost,
-                avg_savings_pct=avg_savings,
-            ))
+            seasonal.append(
+                SeasonSummary(
+                    season=season_name.value,
+                    start_month=month_nums[0],
+                    end_month=month_nums[2],
+                    months=months_in_season,
+                    total_solar_kwh=total_solar,
+                    total_grid_import_kwh=total_import,
+                    total_grid_export_kwh=total_export,
+                    total_cost_zar=total_cost,
+                    avg_savings_pct=avg_savings,
+                )
+            )
 
         return seasonal
 

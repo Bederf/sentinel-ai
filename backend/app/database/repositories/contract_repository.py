@@ -22,7 +22,7 @@ class ContractRepository:
         building_id: Optional[str] = None,
         organization_id: Optional[str] = None,
         status: Optional[str] = None,
-        limit: int = 50
+        limit: int = 50,
     ) -> List[Dict[str, Any]]:
         """
         List contracts with optional filters.
@@ -41,9 +41,12 @@ class ContractRepository:
             return []
 
         try:
-            query = self.client.table("contracts").select(
-                "*, organizations(code, name), buildings(code, name)"
-            ).order("created_at", desc=True).limit(limit)
+            query = (
+                self.client.table("contracts")
+                .select("*, organizations(code, name), buildings(code, name)")
+                .order("created_at", desc=True)
+                .limit(limit)
+            )
 
             if building_id:
                 query = query.eq("building_id", building_id)
@@ -65,9 +68,12 @@ class ContractRepository:
             return None
 
         try:
-            result = self.client.table("contracts").select(
-                "*, organizations(code, name, tier), buildings(code, name)"
-            ).eq("id", contract_id).execute()
+            result = (
+                self.client.table("contracts")
+                .select("*, organizations(code, name, tier), buildings(code, name)")
+                .eq("id", contract_id)
+                .execute()
+            )
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
@@ -83,9 +89,12 @@ class ContractRepository:
             return None
 
         try:
-            result = self.client.table("contracts").select(
-                "*, organizations(code, name), buildings(code, name)"
-            ).eq("code", code).execute()
+            result = (
+                self.client.table("contracts")
+                .select("*, organizations(code, name), buildings(code, name)")
+                .eq("code", code)
+                .execute()
+            )
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
@@ -101,11 +110,13 @@ class ContractRepository:
             return []
 
         try:
-            result = self.client.table("contracts").select(
-                "*, organizations(code, name)"
-            ).eq("building_id", building_id).order(
-                "created_at", desc=True
-            ).execute()
+            result = (
+                self.client.table("contracts")
+                .select("*, organizations(code, name)")
+                .eq("building_id", building_id)
+                .order("created_at", desc=True)
+                .execute()
+            )
 
             return result.data or []
 
@@ -119,9 +130,13 @@ class ContractRepository:
             return []
 
         try:
-            result = self.client.table("contracts").select(
-                "*, organizations(code, name), buildings(code, name)"
-            ).eq("status", "active").order("created_at", desc=True).execute()
+            result = (
+                self.client.table("contracts")
+                .select("*, organizations(code, name), buildings(code, name)")
+                .eq("status", "active")
+                .order("created_at", desc=True)
+                .execute()
+            )
 
             return result.data or []
 
@@ -171,9 +186,7 @@ class ContractRepository:
             return None
 
         try:
-            result = self.client.table("contracts").update(
-                data
-            ).eq("id", contract_id).execute()
+            result = self.client.table("contracts").update(data).eq("id", contract_id).execute()
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
@@ -183,11 +196,7 @@ class ContractRepository:
             logger.error(f"Error updating contract {contract_id}: {e}")
             return None
 
-    def update_status(
-        self,
-        contract_id: str,
-        status: str
-    ) -> Optional[Dict[str, Any]]:
+    def update_status(self, contract_id: str, status: str) -> Optional[Dict[str, Any]]:
         """
         Update contract status.
 
@@ -215,9 +224,12 @@ class ContractRepository:
             return []
 
         try:
-            result = self.client.table("asset_contracts").select(
-                "*, equipment(code, name, type)"
-            ).eq("contract_id", contract_id).execute()
+            result = (
+                self.client.table("asset_contracts")
+                .select("*, equipment(code, name, type)")
+                .eq("contract_id", contract_id)
+                .execute()
+            )
 
             return result.data or []
 
@@ -232,9 +244,7 @@ class ContractRepository:
             return None
 
         try:
-            result = self.client.table("equipment").select("*").eq(
-                "code", equipment_code
-            ).execute()
+            result = self.client.table("equipment").select("*").eq("code", equipment_code).execute()
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
@@ -245,10 +255,7 @@ class ContractRepository:
             return None
 
     def find_similar_contracts(
-        self,
-        equipment_types: List[str],
-        sla_tier: Any = None,
-        limit: int = 5
+        self, equipment_types: List[str], sla_tier: Any = None, limit: int = 5
     ) -> List[Dict[str, Any]]:
         """
         Find similar contracts based on equipment types.
@@ -263,9 +270,7 @@ class ContractRepository:
         try:
             if equipment_types:
                 # Best-effort: find contracts with assets of similar equipment types
-                asset_rows = self.client.table("asset_contracts").select(
-                    "contract_id, equipment(type)"
-                ).execute()
+                asset_rows = self.client.table("asset_contracts").select("contract_id, equipment(type)").execute()
                 contract_ids = []
                 for row in asset_rows.data or []:
                     eq = row.get("equipment") or {}
@@ -273,15 +278,18 @@ class ContractRepository:
                         contract_ids.append(row.get("contract_id"))
 
                 if contract_ids:
-                    result = self.client.table("contracts").select(
-                        "*"
-                    ).in_("id", list(set(contract_ids))).eq("status", "active").limit(limit).execute()
+                    result = (
+                        self.client.table("contracts")
+                        .select("*")
+                        .in_("id", list(set(contract_ids)))
+                        .eq("status", "active")
+                        .limit(limit)
+                        .execute()
+                    )
                     return result.data or []
 
             # Fallback to active contracts
-            result = self.client.table("contracts").select(
-                "*"
-            ).eq("status", "active").limit(limit).execute()
+            result = self.client.table("contracts").select("*").eq("status", "active").limit(limit).execute()
             return result.data or []
 
         except Exception as e:

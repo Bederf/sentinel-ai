@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ZoneMapping:
     """Mapping between HVAC and DALI zones."""
+
     hvac_zone_id: str
     dali_zone_id: str
     floor: str
@@ -99,21 +100,18 @@ class ZoneMappingService:
             ZoneMapping("Zone-L2-C", "Zone-L2-C", "L2", "Level 2 Zone C", "open_office", 3),
             ZoneMapping("Zone-L2-D", "Zone-L2-D", "L2", "Level 2 Zone D", "open_office", 3),
             ZoneMapping("Zone-L2-E", "Zone-L2-E", "L2", "Level 2 Zone E", "open_office", 3),
-
             # Level 1 (formerly L11)
             ZoneMapping("Zone-L1-A", "Zone-L1-A", "L1", "Level 1 Zone A", "open_office", 3),
             ZoneMapping("Zone-L1-B", "Zone-L1-B", "L1", "Level 1 Zone B", "open_office", 3),
             ZoneMapping("Zone-L1-C", "Zone-L1-C", "L1", "Level 1 Zone C", "open_office", 3),
             ZoneMapping("Zone-L1-D", "Zone-L1-D", "L1", "Level 1 Zone D", "open_office", 3),
             ZoneMapping("Zone-L1-E", "Zone-L1-E", "L1", "Level 1 Zone E", "open_office", 3),
-
             # Level 0/Ground (formerly L10)
             ZoneMapping("Zone-L0-A", "Zone-L0-A", "L0", "Ground Level Zone A", "open_office", 3),
             ZoneMapping("Zone-L0-B", "Zone-L0-B", "L0", "Ground Level Zone B", "open_office", 3),
             ZoneMapping("Zone-L0-C", "Zone-L0-C", "L0", "Ground Level Zone C", "open_office", 3),
             ZoneMapping("Zone-L0-D", "Zone-L0-D", "L0", "Ground Level Zone D", "open_office", 3),
             ZoneMapping("Zone-L0-E", "Zone-L0-E", "L0", "Ground Level Zone E", "open_office", 3),
-
             # Basement
             ZoneMapping("Zone-B1-001", "Zone-B1-001", "B1", "Basement Level 1", "plant_room", 2),
         ]

@@ -25,6 +25,13 @@ from app.database.repositories.compliance_repository import ComplianceRepository
 logger = logging.getLogger(__name__)
 
 
+def _attr(obj, key, default=None):
+    """Get attribute from dict or object (repo may return either)."""
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
 class ComplianceService:
     """Service for managing all compliance requirements across the building."""
 
@@ -37,9 +44,7 @@ class ComplianceService:
     # OHS Compliance Methods
     # ========================================================================
 
-    async def generate_ohs_checklist(
-        self, site_code: str, zone_id: str
-    ) -> Dict[str, Any]:
+    async def generate_ohs_checklist(self, site_code: str, zone_id: str) -> Dict[str, Any]:
         """
         Generate OHS checklist for a specific zone.
 
@@ -61,20 +66,19 @@ class ComplianceService:
 
             # Create inspection task from template
             task = await self.repository.create_inspection_task(template, zone_id)
-            logger.info(f"Generated OHS checklist for zone {zone_id}: {task.id}")
+            task_id = _attr(task, "id")
+            logger.info(f"Generated OHS checklist for zone {zone_id}: {task_id}")
 
             return {
-                "task_id": str(task.id),
-                "items_count": len(template.checklist_items),
+                "task_id": str(task_id),
+                "items_count": len(_attr(template, "checklist_items", [])),
             }
 
         except Exception as e:
             logger.error(f"Failed to generate OHS checklist: {e}")
             raise
 
-    async def track_ohs_completion(
-        self, task_id: str, findings: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def track_ohs_completion(self, task_id: str, findings: Dict[str, Any]) -> Dict[str, Any]:
         """
         Mark OHS checklist complete with findings.
 
@@ -99,7 +103,7 @@ class ComplianceService:
             )
 
             logger.info(f"Completed OHS checklist task {task_id}")
-            return {"result_id": str(result.id), "audit_id": str(audit.id)}
+            return {"result_id": str(_attr(result, "id")), "audit_id": str(_attr(audit, "id"))}
 
         except Exception as e:
             logger.error(f"Failed to track OHS completion: {e}")
@@ -109,9 +113,7 @@ class ComplianceService:
     # Fire Equipment Methods
     # ========================================================================
 
-    async def schedule_fire_equipment_inspection(
-        self, equipment_type: str, location_zone: str
-    ) -> InspectionSchedule:
+    async def schedule_fire_equipment_inspection(self, equipment_type: str, location_zone: str) -> InspectionSchedule:
         """
         Schedule fire equipment inspection.
 
@@ -125,12 +127,8 @@ class ComplianceService:
             InspectionSchedule with next_due_date
         """
         try:
-            schedule = await self.repository.create_fire_inspection_schedule(
-                equipment_type, location_zone
-            )
-            logger.info(
-                f"Scheduled {equipment_type} inspection at {location_zone}: {schedule.id}"
-            )
+            schedule = await self.repository.create_fire_inspection_schedule(equipment_type, location_zone)
+            logger.info(f"Scheduled {equipment_type} inspection at {location_zone}: {_attr(schedule, 'id')}")
             return schedule
 
         except Exception as e:
@@ -164,12 +162,8 @@ class ComplianceService:
             )
 
             # Check if certification expiring within 30 days
-            if tracking.certification_expiry and (
-                tracking.certification_expiry - datetime.now()
-            ) < timedelta(days=30):
-                logger.warning(
-                    f"Fire equipment {equipment_id} certification expiring soon"
-                )
+            if tracking.certification_expiry and (tracking.certification_expiry - datetime.now()) < timedelta(days=30):
+                logger.warning(f"Fire equipment {equipment_id} certification expiring soon")
                 # TODO: Create alert in alerts table
 
             return tracking
@@ -198,9 +192,7 @@ class ComplianceService:
             List of InspectionSchedule UUIDs
         """
         try:
-            schedules = await self.repository.create_emergency_light_schedules(
-                light_codes, auto_test
-            )
+            schedules = await self.repository.create_emergency_light_schedules(light_codes, auto_test)
             logger.info(f"Scheduled {len(schedules)} emergency light tests")
             return schedules
 
@@ -230,15 +222,11 @@ class ComplianceService:
             Dictionary with light_code and battery_health
         """
         try:
-            result = await self.repository.record_emergency_light_test(
-                light_code, battery_health_percent, test_result
-            )
+            result = await self.repository.record_emergency_light_test(light_code, battery_health_percent, test_result)
 
             # Check if battery health degraded below threshold
             if battery_health_percent < 75:
-                logger.warning(
-                    f"Emergency light {light_code} battery health critical: {battery_health_percent}%"
-                )
+                logger.warning(f"Emergency light {light_code} battery health critical: {battery_health_percent}%")
                 # TODO: Create alert in alerts table
 
             return {"light_code": light_code, "battery_health": battery_health_percent}
@@ -274,12 +262,10 @@ class ComplianceService:
             LegionellaRiskAssessment with risk_level
         """
         try:
-            assessment = await self.repository.assess_legionella_risk(
-                tower_code, water_temp, last_treatment
-            )
+            assessment = await self.repository.assess_legionella_risk(tower_code, water_temp, last_treatment)
 
             # Log high-risk conditions
-            if assessment.risk_level == RiskLevel.HIGH:
+            if _attr(assessment, "risk_level") == RiskLevel.HIGH:
                 logger.warning(
                     f"Legionella HIGH RISK for {tower_code}: temp={water_temp}°C, "
                     f"treatment {(datetime.now() - last_treatment).days} days ago"
@@ -292,9 +278,7 @@ class ComplianceService:
             logger.error(f"Failed to assess legionella risk: {e}")
             raise
 
-    async def create_legionella_maintenance_task(
-        self, risk_assessment_id: str
-    ) -> InspectionSchedule:
+    async def create_legionella_maintenance_task(self, risk_assessment_id: str) -> InspectionSchedule:
         """
         Create legionella maintenance task based on risk level.
 
@@ -309,10 +293,8 @@ class ComplianceService:
             InspectionSchedule for maintenance task
         """
         try:
-            schedule = await self.repository.create_legionella_maintenance_task(
-                risk_assessment_id
-            )
-            logger.info(f"Created legionella maintenance task: {schedule.id}")
+            schedule = await self.repository.create_legionella_maintenance_task(risk_assessment_id)
+            logger.info(f"Created legionella maintenance task: {_attr(schedule, 'id')}")
             return schedule
 
         except Exception as e:
@@ -323,9 +305,7 @@ class ComplianceService:
     # Electrical Compliance
     # ========================================================================
 
-    async def track_electrical_certificate(
-        self, certificate: ElectricalCompliance
-    ) -> bool:
+    async def track_electrical_certificate(self, certificate: ElectricalCompliance) -> bool:
         """
         Track electrical Certificate of Compliance.
 
@@ -352,21 +332,17 @@ class ComplianceService:
             # Check if expiring within 30 days
             days_to_expiry = (expiry_date - datetime.now()).days
             if days_to_expiry <= 30 and days_to_expiry > 0:
-                logger.warning(
-                    f"Electrical certificate {saved.id} expiring in {days_to_expiry} days"
-                )
+                logger.warning(f"Electrical certificate {_attr(saved, 'id')} expiring in {days_to_expiry} days")
                 # TODO: Create work order for re-certification
 
-            logger.info(f"Tracked electrical certificate: {saved.id}")
+            logger.info(f"Tracked electrical certificate: {_attr(saved, 'id')}")
             return True
 
         except Exception as e:
             logger.error(f"Failed to track electrical certificate: {e}")
             raise
 
-    async def check_electrical_compliance_status(
-        self, site_code: str
-    ) -> ComplianceStatus:
+    async def check_electrical_compliance_status(self, site_code: str) -> ComplianceStatus:
         """
         Get electrical compliance status for site.
 
@@ -390,9 +366,7 @@ class ComplianceService:
     # Lift Inspection
     # ========================================================================
 
-    async def schedule_lift_inspection(
-        self, lift_code: str, inspection_type: str
-    ) -> InspectionSchedule:
+    async def schedule_lift_inspection(self, lift_code: str, inspection_type: str) -> InspectionSchedule:
         """
         Schedule lift inspection.
 
@@ -409,19 +383,15 @@ class ComplianceService:
             InspectionSchedule
         """
         try:
-            schedule = await self.repository.create_lift_inspection_schedule(
-                lift_code, inspection_type
-            )
-            logger.info(f"Scheduled lift inspection for {lift_code}: {schedule.id}")
+            schedule = await self.repository.create_lift_inspection_schedule(lift_code, inspection_type)
+            logger.info(f"Scheduled lift inspection for {lift_code}: {_attr(schedule, 'id')}")
             return schedule
 
         except Exception as e:
             logger.error(f"Failed to schedule lift inspection: {e}")
             raise
 
-    async def record_lift_test_results(
-        self, lift_code: str, test_results: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def record_lift_test_results(self, lift_code: str, test_results: Dict[str, Any]) -> Dict[str, Any]:
         """
         Record lift inspection test results.
 
@@ -438,9 +408,7 @@ class ComplianceService:
             Dictionary with lift_code and compliant status
         """
         try:
-            result = await self.repository.record_lift_test_results(
-                lift_code, test_results
-            )
+            result = await self.repository.record_lift_test_results(lift_code, test_results)
 
             # Check compliance
             is_compliant = True
@@ -491,10 +459,8 @@ class ComplianceService:
             ComplianceAudit record
         """
         try:
-            audit = await self.repository.create_compliance_audit(
-                audit_type, findings, auditor_info
-            )
-            logger.info(f"Created compliance audit: {audit.id}")
+            audit = await self.repository.create_compliance_audit(audit_type, findings, auditor_info)
+            logger.info(f"Created compliance audit: {_attr(audit, 'id')}")
             return audit
 
         except Exception as e:
@@ -552,9 +518,7 @@ class ComplianceService:
             List of ComplianceAudit records
         """
         try:
-            audits = await self.repository.get_compliance_audits(
-                site_code, compliance_type, status, limit
-            )
+            audits = await self.repository.get_compliance_audits(site_code, compliance_type, status, limit)
             return audits
 
         except Exception as e:

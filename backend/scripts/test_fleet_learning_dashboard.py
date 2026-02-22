@@ -15,6 +15,7 @@ import httpx
 BASE_URL = "http://localhost:9095"
 TIMEOUT = 30
 
+
 class Colors:
     GREEN = "\033[92m"
     RED = "\033[91m"
@@ -22,11 +23,9 @@ class Colors:
     CYAN = "\033[96m"
     END = "\033[0m"
 
+
 async def test_endpoint(
-    name: str,
-    method: str = "GET",
-    endpoint: str = "",
-    expected_fields: Optional[list] = None
+    name: str, method: str = "GET", endpoint: str = "", expected_fields: Optional[list] = None
 ) -> bool:
     """Test a single endpoint."""
     try:
@@ -73,43 +72,32 @@ async def test_endpoint(
         print(f"  {Colors.RED}Error: {e}{Colors.END}")
         return False
 
+
 async def run_all_tests() -> Dict[str, Any]:
     """Run all Fleet Learning API tests."""
-    print(f"\n{Colors.CYAN}{'='*60}")
+    print(f"\n{Colors.CYAN}{'=' * 60}")
     print("Fleet Learning API Test Suite")
-    print(f"{'='*60}{Colors.END}\n")
+    print(f"{'=' * 60}{Colors.END}\n")
 
     tests = [
         # Fleet aggregation
-        ("Fleet Summary", "GET", "/api/fleet/summary",
-         ["fleet_overview", "type_distribution", "top_failure_patterns"]),
-
-        ("Failure Patterns", "GET", "/api/fleet/failure-patterns",
-         ["patterns", "total"]),
-
-        ("Risk Distribution", "GET", "/api/fleet/risk-distribution",
-         ["total_equipment", "distribution", "sites_with_critical"]),
-
-        ("Benchmarks", "GET", "/api/fleet/benchmarks",
-         ["benchmarks", "total"]),
-
+        ("Fleet Summary", "GET", "/api/fleet/summary", ["fleet_overview", "type_distribution", "top_failure_patterns"]),
+        ("Failure Patterns", "GET", "/api/fleet/failure-patterns", ["patterns", "total"]),
+        (
+            "Risk Distribution",
+            "GET",
+            "/api/fleet/risk-distribution",
+            ["total_equipment", "distribution", "sites_with_critical"],
+        ),
+        ("Benchmarks", "GET", "/api/fleet/benchmarks", ["benchmarks", "total"]),
         # Global models
-        ("Global Models List", "GET", "/api/fleet/global-models",
-         ["models", "total"]),
-
+        ("Global Models List", "GET", "/api/fleet/global-models", ["models", "total"]),
         # Fine-tuned models
-        ("Fine-Tuned Models List", "GET", "/api/fleet/fine-tuned",
-         ["models", "total"]),
-
-        ("Improvement Summary", "GET", "/api/fleet/fine-tuned/improvement",
-         ["models_count", "avg_improvement_pct"]),
-
-        ("Fine-Tune History", "GET", "/api/fleet/fine-tuned/history",
-         ["history"]),
-
+        ("Fine-Tuned Models List", "GET", "/api/fleet/fine-tuned", ["models", "total"]),
+        ("Improvement Summary", "GET", "/api/fleet/fine-tuned/improvement", ["models_count", "avg_improvement_pct"]),
+        ("Fine-Tune History", "GET", "/api/fleet/fine-tuned/history", ["history"]),
         # Global model history
-        ("Global Models History", "GET", "/api/fleet/global-models/history",
-         ["history"]),
+        ("Global Models History", "GET", "/api/fleet/global-models/history", ["history"]),
     ]
 
     results = {"passed": 0, "failed": 0, "errors": []}
@@ -123,9 +111,9 @@ async def run_all_tests() -> Dict[str, Any]:
             results["errors"].append(name)
 
     # Print summary
-    print(f"\n{Colors.CYAN}{'='*60}")
+    print(f"\n{Colors.CYAN}{'=' * 60}")
     print("Test Summary")
-    print(f"{'='*60}{Colors.END}")
+    print(f"{'=' * 60}{Colors.END}")
     print(f"{Colors.GREEN}Passed: {results['passed']}{Colors.END}")
     print(f"{Colors.RED}Failed: {results['failed']}{Colors.END}")
 
@@ -136,6 +124,7 @@ async def run_all_tests() -> Dict[str, Any]:
 
     print()
     return results
+
 
 async def test_imports() -> bool:
     """Test that all backend modules can be imported."""
@@ -166,6 +155,7 @@ async def test_imports() -> bool:
 
     return True
 
+
 async def main():
     """Main test runner."""
     # First test imports
@@ -176,6 +166,7 @@ async def main():
 
     # Exit code
     sys.exit(0 if results["failed"] == 0 and imports_ok else 1)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

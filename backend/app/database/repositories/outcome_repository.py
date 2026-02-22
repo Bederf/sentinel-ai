@@ -57,9 +57,7 @@ class OutcomeRepository:
 
                 self._client = get_supabase_client()
             except Exception as e:
-                logger.warning(
-                    f"Failed to get Supabase client, using JSON fallback: {e}"
-                )
+                logger.warning(f"Failed to get Supabase client, using JSON fallback: {e}")
                 self._use_json = True
         return self._client
 
@@ -99,22 +97,14 @@ class OutcomeRepository:
     async def _create_supabase(self, outcome: Outcome) -> Outcome:
         """Store outcome in Supabase."""
         try:
-            result = (
-                self.client.table("outcomes")
-                .insert(outcome.to_dict())
-                .execute()
-            )
-            logger.debug(
-                f"Stored outcome in Supabase for {outcome.recommendation_id}"
-            )
+            result = self.client.table("outcomes").insert(outcome.to_dict()).execute()
+            logger.debug(f"Stored outcome in Supabase for {outcome.recommendation_id}")
             return outcome
         except Exception as e:
             logger.error(f"Error storing outcome in Supabase: {e}")
             raise
 
-    async def get_by_recommendation(
-        self, rec_id: str
-    ) -> Optional[Outcome]:
+    async def get_by_recommendation(self, rec_id: str) -> Optional[Outcome]:
         """Retrieve outcome for a recommendation.
 
         Args:
@@ -143,17 +133,10 @@ class OutcomeRepository:
             logger.error(f"Error retrieving outcome from JSON: {e}")
             return None
 
-    async def _get_by_recommendation_supabase(
-        self, rec_id: str
-    ) -> Optional[Outcome]:
+    async def _get_by_recommendation_supabase(self, rec_id: str) -> Optional[Outcome]:
         """Get outcome from Supabase."""
         try:
-            result = (
-                self.client.table("outcomes")
-                .select("*")
-                .eq("recommendation_id", rec_id)
-                .execute()
-            )
+            result = self.client.table("outcomes").select("*").eq("recommendation_id", rec_id).execute()
             if result.data and len(result.data) > 0:
                 return Outcome.from_dict(result.data[0])
             return None
@@ -161,9 +144,7 @@ class OutcomeRepository:
             logger.error(f"Error retrieving outcome from Supabase: {e}")
             return None
 
-    async def get_accuracy_for_action_type(
-        self, action_type: str, site_id: str, days: int = 30
-    ) -> float:
+    async def get_accuracy_for_action_type(self, action_type: str, site_id: str, days: int = 30) -> float:
         """Get average accuracy for action type over time period.
 
         Queries all outcomes for this action type and calculates average accuracy.
@@ -180,16 +161,12 @@ class OutcomeRepository:
             if self._use_json or not self.client:
                 return self._get_accuracy_json(action_type, site_id, days)
             else:
-                return await self._get_accuracy_supabase(
-                    action_type, site_id, days
-                )
+                return await self._get_accuracy_supabase(action_type, site_id, days)
         except Exception as e:
             logger.error(f"Error getting accuracy for action type: {e}")
             return 0.0
 
-    def _get_accuracy_json(
-        self, action_type: str, site_id: str, days: int = 30
-    ) -> float:
+    def _get_accuracy_json(self, action_type: str, site_id: str, days: int = 30) -> float:
         """Get average accuracy from JSON data."""
         try:
             cutoff_date = datetime.utcnow() - timedelta(days=days)
@@ -198,23 +175,17 @@ class OutcomeRepository:
             # Note: JSON outcomes don't have action_type/site_id directly
             # In real implementation, would need to join with recommendations table
             # For now, return 0.0 as placeholder
-            logger.debug(
-                "Average accuracy calculation requires database implementation"
-            )
+            logger.debug("Average accuracy calculation requires database implementation")
             return 0.0
 
         except Exception as e:
             logger.error(f"Error calculating accuracy from JSON: {e}")
             return 0.0
 
-    async def _get_accuracy_supabase(
-        self, action_type: str, site_id: str, days: int = 30
-    ) -> float:
+    async def _get_accuracy_supabase(self, action_type: str, site_id: str, days: int = 30) -> float:
         """Get average accuracy from Supabase."""
         try:
-            cutoff_date = (
-                datetime.utcnow() - timedelta(days=days)
-            ).isoformat()
+            cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
 
             # Query outcomes joined with recommendations to filter by action_type/site_id
             result = self.client.rpc(

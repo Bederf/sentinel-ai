@@ -34,24 +34,29 @@ router = APIRouter(
 
 # --- Request/Response models ---
 
+
 class TriggerAlarmRequest(BaseModel):
     """Request to trigger a fire alarm."""
+
     zone_id: str = Field(..., description="Fire zone ID (e.g., FZ-L1-C)")
     alarm_type: str = Field("smoke", description="Alarm type: smoke, heat, manual, flow, fault")
 
 
 class ClearAlarmRequest(BaseModel):
     """Request to clear a fire alarm."""
+
     alarm_id: str = Field(..., description="Alarm ID to clear")
 
 
 class SmokeManagementRequest(BaseModel):
     """Request to enter smoke management mode."""
+
     zone_id: str = Field(..., description="Fire zone ID for smoke management")
 
 
 class ForceResetRequest(BaseModel):
     """Request to force reset fire mode."""
+
     authorization: str = Field(..., description="ENGINEER authorization code")
 
 
@@ -107,9 +112,7 @@ async def get_fire_zones():
         zone_dict = z.model_dump()
         zone_dict["zone_type"] = z.zone_type.value
         zone_dict["has_active_alarm"] = z.zone_id in alarm_zones
-        zone_dict["total_detectors"] = (
-            z.smoke_detectors + z.heat_detectors + z.beam_detectors + z.manual_call_points
-        )
+        zone_dict["total_detectors"] = z.smoke_detectors + z.heat_detectors + z.beam_detectors + z.manual_call_points
         zone_list.append(zone_dict)
 
     return {
@@ -326,6 +329,7 @@ async def get_action_log(
     operations, pressurization activations, and resets.
     """
     from app.database.repositories.fire_safety_repository import get_fire_safety_repository
+
     repo = get_fire_safety_repository()
     log = repo.get_action_log(limit=limit)
     return {

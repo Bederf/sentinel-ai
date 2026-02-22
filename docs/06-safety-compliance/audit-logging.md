@@ -723,9 +723,31 @@ The **Security Operations** dashboard (`infrastructure/grafana/provisioning/dash
 {job="sentinel-decisions", stage="rollback.executed"}
 ```
 
+## PARASITE decision audit trail
+
+In addition to the event-based audit log described above, every PARASITE recommendation decision is recorded in the `parasite_decisions` table/JSON store. This is a separate, richer audit record designed for post-hoc investigation of autonomous Tier 3 writes without opening log files.
+
+**Key difference from audit_log:** The audit log captures individual events (write, validation, rollback). The `parasite_decisions` record captures the full decision lifecycle in a single row — from routing through execution, COV verification, outcome measurement, and rollback.
+
+**Fields added for audit/debugging (Phase 109):**
+- Decision context: `mode`, `gate_status`, `enforcement`, `gate_snapshot_id`
+- Safety context: `safety_check_version`, `safety_rules_evaluated`, `safety_rules_triggered`, `safety_result`
+- Execution context: `actor`, `approval_id`, `command_id`, `write_attempt_count`, `cov_latency_ms`
+- Outcome/learning: `predicted_impact`, `measured_impact`, `rejection_category`
+
+**Linking the two:** Both systems use `correlation_id` for cross-referencing. Given a `correlation_id`, you can:
+1. Query `parasite_decisions` for the full decision record
+2. Query `audit_log` for all related events
+3. Query Loki for structured pipeline events
+
+See [Agent Contract Appendix Section D](../08-ai-ml/agent-contract-appendix.md#d-parasitedecision-audit-record-schema) for the complete `parasite_decisions` schema.
+
 ## Related documents
 
 - [Safety Interlocks Engine](safety-interlocks-engine.md) - Safety validation logging
 - [Device Abstraction Layer](../02-architecture/device-abstraction-layer.md) - Device control logging
 - [MCP Tools Reference](../03-api-reference/mcp-tools-reference.md) - MCP tool audit integration
 - [Logging Architecture](../08-security/logging-architecture.md) - Full logging pipeline (Promtail → Loki → Grafana)
+- [Agent Contract Appendix](../08-ai-ml/agent-contract-appendix.md) - ParasiteDecision schema, quality gate metrics, safety rules
+- [Write Policy & Rollout](../08-ai-ml/write-policy-and-rollout.md) - Mode-by-mode write policy, rollout checklist
+- [Quality Gate API](../03-api-reference/quality-gate-api.md) - Quality gate endpoint reference

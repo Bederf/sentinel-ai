@@ -23,6 +23,7 @@ class FeatureDefinition(BaseModel):
         aggregation: Aggregation method (mean, std, min, max, trend, count_delta)
         window_days: Time window for computation in days
     """
+
     name: str = Field(..., description="Unique feature name")
     dtype: Literal["float", "int", "bool"] = Field(default="float", description="Data type")
     description: str = Field(..., description="Human-readable description")
@@ -39,6 +40,7 @@ class FeatureSet(BaseModel):
     Combines common features (applicable to all equipment) with
     type-specific features (e.g., chiller, AHU, generator).
     """
+
     equipment_type: str = Field(..., description="Equipment type (chiller, ahu, generator)")
     features: List[FeatureDefinition] = Field(..., description="List of feature definitions")
 
@@ -59,18 +61,13 @@ class ComputedFeatures(BaseModel):
     Features are stored as a dictionary mapping feature name to value.
     Missing features (insufficient data) have None values.
     """
+
     equipment_id: str = Field(..., description="Equipment identifier")
     equipment_type: str = Field(..., description="Equipment type")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Computation timestamp")
-    features: Dict[str, Optional[float]] = Field(
-        default_factory=dict, description="Feature name to value mapping"
-    )
-    missing_sensors: List[str] = Field(
-        default_factory=list, description="Sensors with insufficient data"
-    )
-    computation_time_ms: Optional[float] = Field(
-        None, description="Time taken to compute features in milliseconds"
-    )
+    features: Dict[str, Optional[float]] = Field(default_factory=dict, description="Feature name to value mapping")
+    missing_sensors: List[str] = Field(default_factory=list, description="Sensors with insufficient data")
+    computation_time_ms: Optional[float] = Field(None, description="Time taken to compute features in milliseconds")
 
     @property
     def valid_feature_count(self) -> int:
@@ -87,6 +84,7 @@ class ComputedFeatures(BaseModel):
 
 class FeatureBatchRequest(BaseModel):
     """Request to compute features for multiple equipment."""
+
     equipment_ids: List[str] = Field(..., min_length=1, description="Equipment IDs to compute")
     equipment_type: str = Field(..., description="Equipment type (all must be same type)")
     as_of: Optional[datetime] = Field(None, description="Compute features as of this time")
@@ -94,6 +92,7 @@ class FeatureBatchRequest(BaseModel):
 
 class FeatureBatchResponse(BaseModel):
     """Response containing computed features for multiple equipment."""
+
     equipment_type: str = Field(..., description="Equipment type")
     as_of: datetime = Field(..., description="Features computed as of this time")
     results: List[ComputedFeatures] = Field(..., description="Computed features per equipment")
@@ -109,6 +108,7 @@ class FeatureBatchResponse(BaseModel):
 
 class TrainingDatasetMetadata(BaseModel):
     """Metadata for a saved training dataset."""
+
     name: str = Field(..., description="Dataset name")
     version: str = Field(..., description="Dataset version (e.g., v1, v2)")
     equipment_type: str = Field(..., description="Equipment type")
@@ -128,24 +128,20 @@ class TrainingDatasetMetadata(BaseModel):
 
 class TrainingDataRequest(BaseModel):
     """Request to generate a training dataset."""
+
     equipment_type: str = Field(..., description="Equipment type to generate data for")
     start_date: datetime = Field(..., description="Start date for data")
     end_date: datetime = Field(..., description="End date for data")
-    sample_interval_days: int = Field(
-        default=7, ge=1, le=30, description="Days between samples"
-    )
+    sample_interval_days: int = Field(default=7, ge=1, le=30, description="Days between samples")
     name: str = Field(..., description="Dataset name")
     version: str = Field(default="v1", description="Dataset version")
-    add_labels: bool = Field(
-        default=False, description="Add failure labels from work order history"
-    )
-    label_lookahead_days: int = Field(
-        default=30, ge=7, le=90, description="Days ahead to look for failures"
-    )
+    add_labels: bool = Field(default=False, description="Add failure labels from work order history")
+    label_lookahead_days: int = Field(default=30, ge=7, le=90, description="Days ahead to look for failures")
 
 
 class FeatureDefinitionsResponse(BaseModel):
     """Response containing all feature definitions."""
+
     version: str = Field(..., description="Feature definitions version")
     common_features: List[FeatureDefinition] = Field(..., description="Common features")
     equipment_specific: Dict[str, List[FeatureDefinition]] = Field(

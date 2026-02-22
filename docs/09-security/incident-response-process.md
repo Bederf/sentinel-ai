@@ -610,7 +610,7 @@ NOTIFICATION OF SECURITY COMPROMISE
 (Section 22 of the Protection of Personal Information Act 4 of 2013)
 
 To: Information Regulator
-From: [Responsible Party — SENTINEL / Wardew Smart Building Solutions]
+From: [Responsible Party — SENTINEL Smart Building Solutions]
 Date: [Date]
 
 1. DESCRIPTION OF SECURITY COMPROMISE

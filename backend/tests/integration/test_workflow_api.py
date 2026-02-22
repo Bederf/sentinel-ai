@@ -30,8 +30,8 @@ class TestWorkflowAPI:
                 "anomaly_type": "vibration",
                 "description": "High vibration detected during monitoring",
                 "probability": 0.85,
-                "timeframe": "24h"
-            }
+                "timeframe": "24h",
+            },
         )
 
         assert response.status_code == 200
@@ -48,8 +48,8 @@ class TestWorkflowAPI:
                 "equipment_id": "api-pump-001",
                 "baseline_id": "bl-001",
                 "max_deviation_percent": 18.5,
-                "deviating_metrics": {"vibration": 18.5, "current": 15.0}
-            }
+                "deviating_metrics": {"vibration": 18.5, "current": 15.0},
+            },
         )
 
         assert response.status_code == 200
@@ -71,8 +71,8 @@ class TestWorkflowAPI:
                 "recommended_action": "Replace bearings within 48 hours",
                 "estimated_repair_cost_min": 5000.0,
                 "estimated_repair_cost_max": 8000.0,
-                "estimated_repair_hours": 4.0
-            }
+                "estimated_repair_hours": 4.0,
+            },
         )
 
         assert response.status_code == 200
@@ -90,8 +90,8 @@ class TestWorkflowAPI:
                 "equipment_id": "api-fcu-001",
                 "completion_notes": "Bearings replaced successfully",
                 "parts_used": ["Bearing SKF 6205", "Seal kit"],
-                "actual_hours": 3.5
-            }
+                "actual_hours": 3.5,
+            },
         )
 
         assert response.status_code == 200
@@ -108,19 +108,9 @@ class TestWorkflowAPI:
             json={
                 "equipment_id": "api-vav-001",
                 "work_order_id": "WO-API-002",
-                "pre_baseline": {
-                    "baseline_values": {
-                        "vibration_rms": 3.5,
-                        "motor_current": 152.0
-                    }
-                },
-                "post_baseline": {
-                    "baseline_values": {
-                        "vibration_rms": 1.2,
-                        "motor_current": 145.0
-                    }
-                }
-            }
+                "pre_baseline": {"baseline_values": {"vibration_rms": 3.5, "motor_current": 152.0}},
+                "post_baseline": {"baseline_values": {"vibration_rms": 1.2, "motor_current": 145.0}},
+            },
         )
 
         assert response.status_code == 200
@@ -143,8 +133,8 @@ class TestWorkflowAPI:
                 "equipment_id": "history-eq-001",
                 "anomaly_type": "temperature",
                 "description": "High temperature",
-                "probability": 0.75
-            }
+                "probability": 0.75,
+            },
         )
 
         # Then query history
@@ -161,12 +151,7 @@ class TestWorkflowAPI:
         # Create trigger for specific equipment
         client.post(
             "/api/workflow/triggers/ml-anomaly",
-            json={
-                "equipment_id": equipment_id,
-                "anomaly_type": "vibration",
-                "description": "Test",
-                "probability": 0.8
-            }
+            json={"equipment_id": equipment_id, "anomaly_type": "vibration", "description": "Test", "probability": 0.8},
         )
 
         response = client.get(f"/api/workflow/triggers/history?equipment_id={equipment_id}")
@@ -181,12 +166,7 @@ class TestWorkflowAPI:
         # Create inspection via trigger
         client.post(
             "/api/workflow/triggers/ml-anomaly",
-            json={
-                "equipment_id": equipment_id,
-                "anomaly_type": "vibration",
-                "description": "Test",
-                "probability": 0.9
-            }
+            json={"equipment_id": equipment_id, "anomaly_type": "vibration", "description": "Test", "probability": 0.9},
         )
 
         response = client.get(f"/api/workflow/triggers/inspections/{equipment_id}")
@@ -208,8 +188,8 @@ class TestWorkflowAPI:
                 "severity": "critical",
                 "deficiency_title": "Test deficiency",
                 "deficiency_description": "Test description",
-                "recommended_action": "Test action"
-            }
+                "recommended_action": "Test action",
+            },
         )
 
         response = client.get(f"/api/workflow/triggers/work-orders/{equipment_id}")
@@ -229,8 +209,8 @@ class TestWorkflowAPI:
                 "equipment_id": "eff-query-eq",
                 "work_order_id": work_order_id,
                 "pre_baseline": {"baseline_values": {"vibration": 3.0}},
-                "post_baseline": {"baseline_values": {"vibration": 1.0}}
-            }
+                "post_baseline": {"baseline_values": {"vibration": 1.0}},
+            },
         )
 
         response = client.get(f"/api/workflow/triggers/effectiveness/{work_order_id}")
@@ -251,10 +231,7 @@ class TestWorkflowAPI:
         """Test the test endpoint for ML anomaly."""
         response = client.post(
             "/api/workflow/test/trigger-ml-anomaly",
-            params={
-                "equipment_id": "test-chiller",
-                "anomaly_type": "temperature"
-            }
+            params={"equipment_id": "test-chiller", "anomaly_type": "temperature"},
         )
 
         assert response.status_code == 200
@@ -264,10 +241,7 @@ class TestWorkflowAPI:
 
     def test_full_workflow_test_endpoint(self, client):
         """Test the full workflow test endpoint."""
-        response = client.post(
-            "/api/workflow/test/full-workflow",
-            params={"equipment_id": "full-workflow-test-eq"}
-        )
+        response = client.post("/api/workflow/test/full-workflow", params={"equipment_id": "full-workflow-test-eq"})
 
         assert response.status_code == 200
         data = response.json()
@@ -316,8 +290,8 @@ class TestWorkflowScenarios:
                 "equipment_id": equipment_id,
                 "anomaly_type": "vibration",
                 "description": "Elevated vibration levels",
-                "probability": 0.75
-            }
+                "probability": 0.75,
+            },
         )
         assert r1.status_code == 200
 
@@ -330,8 +304,8 @@ class TestWorkflowScenarios:
                 "severity": "critical",
                 "deficiency_title": "Bearing wear",
                 "deficiency_description": "Bearings showing excessive wear",
-                "recommended_action": "Replace bearings"
-            }
+                "recommended_action": "Replace bearings",
+            },
         )
         assert r2.status_code == 200
         work_order_id = r2.json()["details"]["work_order_id"]
@@ -342,8 +316,8 @@ class TestWorkflowScenarios:
             json={
                 "work_order_id": work_order_id,
                 "equipment_id": equipment_id,
-                "completion_notes": "Bearings replaced"
-            }
+                "completion_notes": "Bearings replaced",
+            },
         )
         assert r3.status_code == 200
 
@@ -354,8 +328,8 @@ class TestWorkflowScenarios:
                 "equipment_id": equipment_id,
                 "work_order_id": work_order_id,
                 "pre_baseline": {"baseline_values": {"vibration": 4.0, "current": 155.0}},
-                "post_baseline": {"baseline_values": {"vibration": 1.0, "current": 142.0}}
-            }
+                "post_baseline": {"baseline_values": {"vibration": 1.0, "current": 142.0}},
+            },
         )
         assert r4.status_code == 200
         assert r4.json()["details"]["repair_successful"] is True
@@ -368,11 +342,7 @@ class TestWorkflowScenarios:
         # Repair completed
         client.post(
             "/api/workflow/triggers/repair-completed",
-            json={
-                "work_order_id": work_order_id,
-                "equipment_id": equipment_id,
-                "completion_notes": "Attempted repair"
-            }
+            json={"work_order_id": work_order_id, "equipment_id": equipment_id, "completion_notes": "Attempted repair"},
         )
 
         # Validation fails (minimal improvement)
@@ -382,8 +352,8 @@ class TestWorkflowScenarios:
                 "equipment_id": equipment_id,
                 "work_order_id": work_order_id,
                 "pre_baseline": {"baseline_values": {"vibration": 4.0}},
-                "post_baseline": {"baseline_values": {"vibration": 3.8}}  # Only 5% improvement
-            }
+                "post_baseline": {"baseline_values": {"vibration": 3.8}},  # Only 5% improvement
+            },
         )
 
         assert r.status_code == 200
@@ -395,10 +365,7 @@ class TestWorkflowScenarios:
         inspections = client.get(f"/api/workflow/triggers/inspections/{equipment_id}")
         assert inspections.status_code == 200
         inspection_data = inspections.json()
-        follow_ups = [
-            i for i in inspection_data["inspections"]
-            if "Failed Repair" in i["task_name"]
-        ]
+        follow_ups = [i for i in inspection_data["inspections"] if "Failed Repair" in i["task_name"]]
         assert len(follow_ups) >= 1
 
     def test_scenario_baseline_deviation_critical(self, client):
@@ -411,8 +378,8 @@ class TestWorkflowScenarios:
                 "equipment_id": equipment_id,
                 "baseline_id": "bl-scenario",
                 "max_deviation_percent": 25.0,  # Critical threshold
-                "deviating_metrics": {"vibration": 25.0, "temperature": 22.0}
-            }
+                "deviating_metrics": {"vibration": 25.0, "temperature": 22.0},
+            },
         )
 
         assert r.status_code == 200

@@ -51,10 +51,10 @@ class WOConversationHandler:
                     "service_record_code": self.service_record_code,
                     "telegram_user_id": self.telegram_user_id,
                     "message_type": "text",
-                    "content": "done"
+                    "content": "done",
                 },
                 headers={"X-Sentry-Secret": SENTRY_SECRET},
-                timeout=10
+                timeout=10,
             )
 
             if response.status_code == 200:
@@ -95,10 +95,10 @@ class WOConversationHandler:
                     "service_record_code": self.service_record_code,
                     "telegram_user_id": self.telegram_user_id,
                     "message_type": message_type,
-                    "content": file_info
+                    "content": file_info,
                 },
                 headers={"X-Sentry-Secret": SENTRY_SECRET},
-                timeout=30  # Allow longer for file uploads
+                timeout=30,  # Allow longer for file uploads
             )
 
             if response.status_code == 200:
@@ -120,10 +120,7 @@ class WOConversationHandler:
                     progress = result.get("progress", "")
                     percent = result.get("completion_percentage", 0)
 
-                    return (
-                        f"✅ Received! Progress: {progress} ({percent:.0f}%)\n\n"
-                        f"{result['next_prompt']}"
-                    )
+                    return f"✅ Received! Progress: {progress} ({percent:.0f}%)\n\n{result['next_prompt']}"
 
                 else:
                     return "✅ Received! Waiting for next instruction..."
@@ -146,7 +143,7 @@ class WOConversationHandler:
             response = requests.get(
                 f"{BMS_API_URL}/api/sentry/work-order/status/{self.service_record_code}",
                 headers={"X-Sentry-Secret": SENTRY_SECRET},
-                timeout=10
+                timeout=10,
             )
 
             if response.status_code == 200:
@@ -174,19 +171,19 @@ class WOConversationHandler:
         msg += f"Progress: {status['progress']}\n\n"
 
         # Show collected items
-        if status.get('collected_items'):
+        if status.get("collected_items"):
             msg += "✅ Collected:\n"
-            for item in status['collected_items']:
+            for item in status["collected_items"]:
                 msg += f"  • {self.format_item_name(item)}\n"
 
         # Show missing items
-        if status.get('missing_items'):
+        if status.get("missing_items"):
             msg += "\n⏳ Still needed:\n"
-            for item in status['missing_items']:
+            for item in status["missing_items"]:
                 msg += f"  • {self.format_item_name(item)}\n"
 
         # Show next prompt
-        if status.get('next_prompt'):
+        if status.get("next_prompt"):
             msg += f"\n📝 Next: {status['next_prompt']}"
 
         return msg
@@ -205,7 +202,7 @@ class WOConversationHandler:
             "after_photo": "After photo",
             "load_test_video": "Load test video",
             "oil_analysis_report": "Oil analysis report",
-            "observation": "Text observation"
+            "observation": "Text observation",
         }
         return item_names.get(item, item)
 

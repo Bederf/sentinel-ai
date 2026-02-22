@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 class ModelStatus(str, Enum):
     """Status of ML model availability and quality."""
+
     ACTIVE = "active"
     INACTIVE = "inactive"
     DEGRADED = "degraded"
@@ -35,6 +36,7 @@ class ModelStatus(str, Enum):
 @dataclass
 class ModelConfig:
     """Configuration for a single ML model from database."""
+
     model_id: str
     model_type: str  # "lstm", "autoencoder", etc.
     equipment_type: str
@@ -52,6 +54,7 @@ class ModelConfig:
 @dataclass
 class ThresholdConfig:
     """Confidence thresholds for equipment type."""
+
     equipment_type: str
     tier2_confidence_min: float  # Advisory recommendations
     tier3_confidence_min: float  # Auto-execute recommendations
@@ -115,11 +118,14 @@ class ModelRegistryDB:
                 return self._models_cache.get(equipment_type)
 
             # Query Supabase for active model
-            response = self.supabase.table("ml_models").select(
-                "model_id, model_type, equipment_type, model_path, scaler_path, r_squared_avg, status, notes"
-            ).eq("equipment_type", equipment_type.lower()).eq(
-                "status", "active"
-            ).limit(1).execute()
+            response = (
+                self.supabase.table("ml_models")
+                .select("model_id, model_type, equipment_type, model_path, scaler_path, r_squared_avg, status, notes")
+                .eq("equipment_type", equipment_type.lower())
+                .eq("status", "active")
+                .limit(1)
+                .execute()
+            )
 
             if not response.data:
                 logger.debug(f"No active model found for {equipment_type}")
@@ -165,9 +171,13 @@ class ModelRegistryDB:
                 return self._thresholds_cache.get(equipment_type)
 
             # Query Supabase
-            response = self.supabase.table("model_thresholds").select(
-                "equipment_type, tier2_confidence_min, tier3_confidence_min, status, reason"
-            ).eq("equipment_type", equipment_type.lower()).limit(1).execute()
+            response = (
+                self.supabase.table("model_thresholds")
+                .select("equipment_type, tier2_confidence_min, tier3_confidence_min, status, reason")
+                .eq("equipment_type", equipment_type.lower())
+                .limit(1)
+                .execute()
+            )
 
             if not response.data:
                 logger.warning(f"No thresholds found for {equipment_type}")
@@ -194,7 +204,9 @@ class ModelRegistryDB:
                 self._thresholds_cache[equipment_type] = thresholds
                 self._thresholds_cache_time = datetime.now()
 
-            logger.debug(f"Loaded thresholds for {equipment_type}: tier2={thresholds.tier2_confidence_min}, tier3={thresholds.tier3_confidence_min}")
+            logger.debug(
+                f"Loaded thresholds for {equipment_type}: tier2={thresholds.tier2_confidence_min}, tier3={thresholds.tier3_confidence_min}"
+            )
             return thresholds
 
         except Exception as e:
@@ -208,11 +220,7 @@ class ModelRegistryDB:
                 reason=f"Error loading: {str(e)}",
             )
 
-    async def get_threshold_value(
-        self,
-        equipment_type: str,
-        tier: int = 2
-    ) -> Optional[float]:
+    async def get_threshold_value(self, equipment_type: str, tier: int = 2) -> Optional[float]:
         """
         Get confidence threshold for specific tier.
 
@@ -253,9 +261,12 @@ class ModelRegistryDB:
             Dict mapping equipment_type → ModelConfig
         """
         try:
-            response = self.supabase.table("ml_models").select(
-                "model_id, model_type, equipment_type, model_path, scaler_path, r_squared_avg, status, notes"
-            ).eq("status", "active").execute()
+            response = (
+                self.supabase.table("ml_models")
+                .select("model_id, model_type, equipment_type, model_path, scaler_path, r_squared_avg, status, notes")
+                .eq("status", "active")
+                .execute()
+            )
 
             models = {}
             for model_data in response.data or []:
@@ -286,9 +297,11 @@ class ModelRegistryDB:
             Dict mapping equipment_type → ThresholdConfig
         """
         try:
-            response = self.supabase.table("model_thresholds").select(
-                "equipment_type, tier2_confidence_min, tier3_confidence_min, status, reason"
-            ).execute()
+            response = (
+                self.supabase.table("model_thresholds")
+                .select("equipment_type, tier2_confidence_min, tier3_confidence_min, status, reason")
+                .execute()
+            )
 
             thresholds = {}
             for threshold_data in response.data or []:
@@ -330,10 +343,14 @@ class ModelRegistryDB:
                 "total_thresholds": len(thresholds),
                 "active_models": active_count,
                 "enabled_thresholds": enabled_count,
-                "models": {k: {"model_id": v.model_id, "r_squared": v.r_squared_avg, "status": v.status}
-                          for k, v in models.items()},
-                "thresholds": {k: {"tier2": v.tier2_confidence_min, "tier3": v.tier3_confidence_min, "status": v.status}
-                              for k, v in thresholds.items()},
+                "models": {
+                    k: {"model_id": v.model_id, "r_squared": v.r_squared_avg, "status": v.status}
+                    for k, v in models.items()
+                },
+                "thresholds": {
+                    k: {"tier2": v.tier2_confidence_min, "tier3": v.tier3_confidence_min, "status": v.status}
+                    for k, v in thresholds.items()
+                },
             }
 
         except Exception as e:

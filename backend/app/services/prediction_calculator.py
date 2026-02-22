@@ -233,10 +233,7 @@ class PredictionCalculator:
 
         # Calculate repeat work orders in last 6 months
         six_months_ago = datetime.now() - timedelta(days=180)
-        recent_wo = [
-            wo for wo in work_orders
-            if wo.get("reported_date") and wo["reported_date"] >= six_months_ago
-        ]
+        recent_wo = [wo for wo in work_orders if wo.get("reported_date") and wo["reported_date"] >= six_months_ago]
 
         repeat_wo_count = sum(1 for wo in recent_wo if wo.get("repeat_call"))
 
@@ -261,10 +258,7 @@ class PredictionCalculator:
                         break
 
         # Calculate alarm frequency
-        recent_alarms = [
-            a for a in alarms
-            if a.get("triggered_at") and a.get("triggered_at") >= six_months_ago
-        ]
+        recent_alarms = [a for a in alarms if a.get("triggered_at") and a.get("triggered_at") >= six_months_ago]
         alarm_frequency: Dict[str, int] = defaultdict(int)
         for alarm in recent_alarms:
             code = alarm.get("alarm_code", "")
@@ -330,23 +324,29 @@ class PredictionCalculator:
 
         # Build contributing factors
         contributing_factors = []
-        contributing_factors.append({
-            "factor": "Equipment Health Score",
-            "weight": 0.40,
-            "description": f"Health score of {health_score}% indicates degraded condition"
-        })
+        contributing_factors.append(
+            {
+                "factor": "Equipment Health Score",
+                "weight": 0.40,
+                "description": f"Health score of {health_score}% indicates degraded condition",
+            }
+        )
         if repeat_wo_count > 0:
-            contributing_factors.append({
-                "factor": "Repeat fault calls",
-                "weight": 0.25,
-                "description": f"{repeat_wo_count} work orders in 6 months{' for same fault code' if most_common_fault else ''}"
-            })
+            contributing_factors.append(
+                {
+                    "factor": "Repeat fault calls",
+                    "weight": 0.25,
+                    "description": f"{repeat_wo_count} work orders in 6 months{' for same fault code' if most_common_fault else ''}",
+                }
+            )
         if risk_notes:
-            contributing_factors.append({
-                "factor": "Technician observations",
-                "weight": 0.20,
-                "description": f"Risk indicators documented in {len(risk_notes)} service visit(s)"
-            })
+            contributing_factors.append(
+                {
+                    "factor": "Technician observations",
+                    "weight": 0.20,
+                    "description": f"Risk indicators documented in {len(risk_notes)} service visit(s)",
+                }
+            )
         # Calculate age from asset or equipment install_date
         age_years = 0
         expected_life = 20  # Default expected life
@@ -361,8 +361,16 @@ class PredictionCalculator:
                 age_years = (datetime.now() - install_date).days // 365
                 # Set expected life based on equipment type
                 expected_life_by_type = {
-                    "chiller": 20, "ahu": 20, "fcu": 15, "split": 12, "split_unit": 12,
-                    "generator": 25, "ups": 10, "vav": 15, "transformer": 30, "fire_panel": 15
+                    "chiller": 20,
+                    "ahu": 20,
+                    "fcu": 15,
+                    "split": 12,
+                    "split_unit": 12,
+                    "generator": 25,
+                    "ups": 10,
+                    "vav": 15,
+                    "transformer": 30,
+                    "fire_panel": 15,
                 }
                 for key, life in expected_life_by_type.items():
                     if key in eq_type.lower():
@@ -373,11 +381,13 @@ class PredictionCalculator:
 
         age_factor = age_years / expected_life if expected_life > 0 else 0
         if age_years > 0 and age_factor > 0.5:
-            contributing_factors.append({
-                "factor": "Asset age",
-                "weight": 0.15,
-                "description": f"{age_years} years old, {int((age_factor * 100))}% through expected life ({expected_life} years)"
-            })
+            contributing_factors.append(
+                {
+                    "factor": "Asset age",
+                    "weight": 0.15,
+                    "description": f"{age_years} years old, {int((age_factor * 100))}% through expected life ({expected_life} years)",
+                }
+            )
 
         # Estimate financial impact
         repair_cost = 25000
@@ -399,9 +409,7 @@ class PredictionCalculator:
         parts_required = PredictionCalculator._get_parts_for_equipment_type(eq_type, prediction_type)
 
         # Generate cost impact breakdown
-        cost_impact = PredictionCalculator._generate_cost_impact(
-            repair_cost, potential_loss, eq_type, downtime_hours
-        )
+        cost_impact = PredictionCalculator._generate_cost_impact(repair_cost, potential_loss, eq_type, downtime_hours)
 
         # Generate prediction ID
         eq_id_num = equipment.get("id", "").replace("eqp-", "").zfill(3)
@@ -426,16 +434,16 @@ class PredictionCalculator:
                 "alarm_frequency": dict(alarm_frequency),
                 "asset_age_years": age_years,
                 "expected_life_years": expected_life,
-                "technician_notes": risk_notes[:5] if risk_notes else PredictionCalculator._generate_synthetic_notes(
-                    health_score, age_years, expected_life, eq_type
-                ),
+                "technician_notes": risk_notes[:5]
+                if risk_notes
+                else PredictionCalculator._generate_synthetic_notes(health_score, age_years, expected_life, eq_type),
                 "health_score": health_score,
                 "latest_reading": {
                     "parameter": "health_score",
                     "value": health_score,
                     "baseline": thresholds["healthy"],
                     "threshold": thresholds["warning"],
-                    "trend": "decreasing" if health_score < thresholds["healthy"] else "stable"
+                    "trend": "decreasing" if health_score < thresholds["healthy"] else "stable",
                 },
                 "formula_version": FORMULA_VERSION_STATIC,
             },
@@ -464,38 +472,146 @@ class PredictionCalculator:
         """
         parts_catalog = {
             "chiller": [
-                {"part_number": "CP-2234", "name": "Compressor Assembly", "quantity": 1, "cost_zar": 85000, "lead_time_days": 14},
-                {"part_number": "RV-1122", "name": "Refrigerant Valve Kit", "quantity": 2, "cost_zar": 4500, "lead_time_days": 5},
-                {"part_number": "SF-3345", "name": "Shaft Seal Set", "quantity": 1, "cost_zar": 2800, "lead_time_days": 3},
-                {"part_number": "OC-5567", "name": "Oil Charge (15L)", "quantity": 1, "cost_zar": 3200, "lead_time_days": 2},
+                {
+                    "part_number": "CP-2234",
+                    "name": "Compressor Assembly",
+                    "quantity": 1,
+                    "cost_zar": 85000,
+                    "lead_time_days": 14,
+                },
+                {
+                    "part_number": "RV-1122",
+                    "name": "Refrigerant Valve Kit",
+                    "quantity": 2,
+                    "cost_zar": 4500,
+                    "lead_time_days": 5,
+                },
+                {
+                    "part_number": "SF-3345",
+                    "name": "Shaft Seal Set",
+                    "quantity": 1,
+                    "cost_zar": 2800,
+                    "lead_time_days": 3,
+                },
+                {
+                    "part_number": "OC-5567",
+                    "name": "Oil Charge (15L)",
+                    "quantity": 1,
+                    "cost_zar": 3200,
+                    "lead_time_days": 2,
+                },
             ],
             "ahu": [
-                {"part_number": "BM-4456", "name": "Belt Motor Assembly", "quantity": 1, "cost_zar": 12000, "lead_time_days": 7},
+                {
+                    "part_number": "BM-4456",
+                    "name": "Belt Motor Assembly",
+                    "quantity": 1,
+                    "cost_zar": 12000,
+                    "lead_time_days": 7,
+                },
                 {"part_number": "VB-2233", "name": "V-Belt Set", "quantity": 2, "cost_zar": 850, "lead_time_days": 2},
                 {"part_number": "BR-7789", "name": "Bearing Kit", "quantity": 4, "cost_zar": 1200, "lead_time_days": 3},
-                {"part_number": "FT-3344", "name": "Filter Set (MERV-13)", "quantity": 6, "cost_zar": 450, "lead_time_days": 1},
+                {
+                    "part_number": "FT-3344",
+                    "name": "Filter Set (MERV-13)",
+                    "quantity": 6,
+                    "cost_zar": 450,
+                    "lead_time_days": 1,
+                },
             ],
             "fcu": [
                 {"part_number": "FM-1123", "name": "Fan Motor", "quantity": 1, "cost_zar": 4500, "lead_time_days": 5},
-                {"part_number": "CV-2234", "name": "Control Valve", "quantity": 1, "cost_zar": 2800, "lead_time_days": 4},
-                {"part_number": "CT-3345", "name": "Condensate Tray", "quantity": 1, "cost_zar": 650, "lead_time_days": 2},
+                {
+                    "part_number": "CV-2234",
+                    "name": "Control Valve",
+                    "quantity": 1,
+                    "cost_zar": 2800,
+                    "lead_time_days": 4,
+                },
+                {
+                    "part_number": "CT-3345",
+                    "name": "Condensate Tray",
+                    "quantity": 1,
+                    "cost_zar": 650,
+                    "lead_time_days": 2,
+                },
             ],
             "split": [
-                {"part_number": "CP-5567", "name": "Compressor Unit", "quantity": 1, "cost_zar": 18000, "lead_time_days": 10},
-                {"part_number": "CF-6678", "name": "Condenser Fan Motor", "quantity": 1, "cost_zar": 3500, "lead_time_days": 5},
-                {"part_number": "EV-7789", "name": "Expansion Valve", "quantity": 1, "cost_zar": 2200, "lead_time_days": 4},
-                {"part_number": "RC-8890", "name": "Refrigerant Charge (R410A)", "quantity": 1, "cost_zar": 1800, "lead_time_days": 2},
+                {
+                    "part_number": "CP-5567",
+                    "name": "Compressor Unit",
+                    "quantity": 1,
+                    "cost_zar": 18000,
+                    "lead_time_days": 10,
+                },
+                {
+                    "part_number": "CF-6678",
+                    "name": "Condenser Fan Motor",
+                    "quantity": 1,
+                    "cost_zar": 3500,
+                    "lead_time_days": 5,
+                },
+                {
+                    "part_number": "EV-7789",
+                    "name": "Expansion Valve",
+                    "quantity": 1,
+                    "cost_zar": 2200,
+                    "lead_time_days": 4,
+                },
+                {
+                    "part_number": "RC-8890",
+                    "name": "Refrigerant Charge (R410A)",
+                    "quantity": 1,
+                    "cost_zar": 1800,
+                    "lead_time_days": 2,
+                },
             ],
             "generator": [
-                {"part_number": "FP-1234", "name": "Fuel Pump Assembly", "quantity": 1, "cost_zar": 15000, "lead_time_days": 14},
-                {"part_number": "SR-2345", "name": "Starter Relay", "quantity": 1, "cost_zar": 2500, "lead_time_days": 5},
+                {
+                    "part_number": "FP-1234",
+                    "name": "Fuel Pump Assembly",
+                    "quantity": 1,
+                    "cost_zar": 15000,
+                    "lead_time_days": 14,
+                },
+                {
+                    "part_number": "SR-2345",
+                    "name": "Starter Relay",
+                    "quantity": 1,
+                    "cost_zar": 2500,
+                    "lead_time_days": 5,
+                },
                 {"part_number": "BT-3456", "name": "Battery Set", "quantity": 2, "cost_zar": 4500, "lead_time_days": 3},
-                {"part_number": "FK-4567", "name": "Filter Kit (Oil/Fuel/Air)", "quantity": 1, "cost_zar": 1200, "lead_time_days": 2},
+                {
+                    "part_number": "FK-4567",
+                    "name": "Filter Kit (Oil/Fuel/Air)",
+                    "quantity": 1,
+                    "cost_zar": 1200,
+                    "lead_time_days": 2,
+                },
             ],
             "vav": [
-                {"part_number": "DA-1122", "name": "Damper Actuator", "quantity": 1, "cost_zar": 3500, "lead_time_days": 5},
-                {"part_number": "PS-2233", "name": "Pressure Sensor", "quantity": 1, "cost_zar": 1800, "lead_time_days": 3},
-                {"part_number": "CT-3344", "name": "Controller Board", "quantity": 1, "cost_zar": 4200, "lead_time_days": 7},
+                {
+                    "part_number": "DA-1122",
+                    "name": "Damper Actuator",
+                    "quantity": 1,
+                    "cost_zar": 3500,
+                    "lead_time_days": 5,
+                },
+                {
+                    "part_number": "PS-2233",
+                    "name": "Pressure Sensor",
+                    "quantity": 1,
+                    "cost_zar": 1800,
+                    "lead_time_days": 3,
+                },
+                {
+                    "part_number": "CT-3344",
+                    "name": "Controller Board",
+                    "quantity": 1,
+                    "cost_zar": 4200,
+                    "lead_time_days": 7,
+                },
             ],
         }
 
@@ -512,10 +628,7 @@ class PredictionCalculator:
 
     @staticmethod
     def _generate_cost_impact(
-        repair_cost: float,
-        potential_loss: float,
-        eq_type: str,
-        downtime_hours: int
+        repair_cost: float, potential_loss: float, eq_type: str, downtime_hours: int
     ) -> Dict[str, Any]:
         """
         Generate detailed cost impact breakdown for preventive vs reactive maintenance.
@@ -556,12 +669,7 @@ class PredictionCalculator:
         }
 
     @staticmethod
-    def _generate_synthetic_notes(
-        health_score: int,
-        age_years: int,
-        expected_life: int,
-        eq_type: str
-    ) -> List[str]:
+    def _generate_synthetic_notes(health_score: int, age_years: int, expected_life: int, eq_type: str) -> List[str]:
         """
         Generate synthetic technician observations based on equipment condition.
 
@@ -574,19 +682,29 @@ class PredictionCalculator:
 
         # Health-based observations (using configured thresholds)
         if health_score < thresholds["critical"]:
-            notes.append(f"Equipment showing significant degradation. Health score at {health_score}% - recommend urgent attention.")
-            notes.append("Multiple performance indicators below acceptable thresholds. Schedule comprehensive inspection.")
+            notes.append(
+                f"Equipment showing significant degradation. Health score at {health_score}% - recommend urgent attention."
+            )
+            notes.append(
+                "Multiple performance indicators below acceptable thresholds. Schedule comprehensive inspection."
+            )
         elif health_score < thresholds["warning"]:
-            notes.append(f"Health score declined to {health_score}%. Preventive maintenance recommended within 30 days.")
+            notes.append(
+                f"Health score declined to {health_score}%. Preventive maintenance recommended within 30 days."
+            )
             notes.append("Monitoring shows gradual performance decline. Review maintenance schedule.")
         elif health_score < thresholds["healthy"]:
             notes.append(f"Health score at {health_score}%. Normal wear patterns observed - continue monitoring.")
 
         # Age-based observations
         if age_factor > 1.0:
-            notes.append(f"Unit is {age_years - expected_life} years beyond expected service life. Replacement planning recommended.")
+            notes.append(
+                f"Unit is {age_years - expected_life} years beyond expected service life. Replacement planning recommended."
+            )
         elif age_factor > 0.8:
-            notes.append(f"Asset is {int(age_factor * 100)}% through expected life cycle. Begin CAPEX planning for replacement.")
+            notes.append(
+                f"Asset is {int(age_factor * 100)}% through expected life cycle. Begin CAPEX planning for replacement."
+            )
         elif age_factor > 0.6:
             notes.append(f"Unit age at {age_years} years - approaching end of optimal service period.")
 

@@ -55,27 +55,12 @@ def as_single_text_content(payload: Dict[str, Any]) -> Dict[str, Any]:
         ]
     }
     """
-    return {
-        "content": [
-            {
-                "type": "text",
-                "text": json.dumps(payload)
-            }
-        ]
-    }
+    return {"content": [{"type": "text", "text": json.dumps(payload)}]}
 
 
 def as_single_text_error(error_message: str) -> Dict[str, Any]:
     """Format error as single text content item."""
-    return {
-        "content": [
-            {
-                "type": "text",
-                "text": json.dumps({"error": error_message})
-            }
-        ],
-        "isError": True
-    }
+    return {"content": [{"type": "text", "text": json.dumps({"error": error_message})}], "isError": True}
 
 
 class MCPStreamableHTTPHandler:
@@ -98,13 +83,8 @@ class MCPStreamableHTTPHandler:
 
         return {
             "protocolVersion": "2024-11-05",
-            "serverInfo": {
-                "name": "sentinel-bms-connector",
-                "version": "1.0.0"
-            },
-            "capabilities": {
-                "tools": {}
-            }
+            "serverInfo": {"name": "sentinel-bms-connector", "version": "1.0.0"},
+            "capabilities": {"tools": {}},
         }
 
     async def handle_tools_list(self) -> Dict:
@@ -155,11 +135,7 @@ class MCPStreamableHTTPHandler:
             elif method == "notifications/initialized":
                 # Client notification - no response needed for notifications
                 # But we still return empty result for Streamable HTTP
-                return {
-                    "jsonrpc": "2.0",
-                    "id": request_id,
-                    "result": {}
-                }
+                return {"jsonrpc": "2.0", "id": request_id, "result": {}}
 
             elif method == "tools/list":
                 result = await self.handle_tools_list()
@@ -175,27 +151,17 @@ class MCPStreamableHTTPHandler:
                 return {
                     "jsonrpc": "2.0",
                     "id": request_id,
-                    "error": {
-                        "code": -32601,
-                        "message": f"Method not found: {method}"
-                    }
+                    "error": {"code": -32601, "message": f"Method not found: {method}"},
                 }
 
-            return {
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "result": result
-            }
+            return {"jsonrpc": "2.0", "id": request_id, "result": result}
 
         except Exception as e:
             logger.error(f"MCP request error: {e}", exc_info=True)
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
-                "error": {
-                    "code": -32603,
-                    "message": f"Internal error: {str(e)}"
-                }
+                "error": {"code": -32603, "message": f"Internal error: {str(e)}"},
             }
 
 
@@ -215,11 +181,9 @@ def get_mcp_handler() -> MCPStreamableHTTPHandler:
 # Streamable HTTP MCP Endpoint (Primary)
 # =============================================================================
 
+
 @router.post("/mcp")
-async def mcp_streamable_http_endpoint(
-    request: Request,
-    accept: Optional[str] = Header(default="application/json")
-):
+async def mcp_streamable_http_endpoint(request: Request, accept: Optional[str] = Header(default="application/json")):
     """
     Streamable HTTP MCP endpoint.
 
@@ -245,24 +209,14 @@ async def mcp_streamable_http_endpoint(
         logger.error(f"MCP invalid JSON: {e}")
         return JSONResponse(
             status_code=400,
-            content={
-                "jsonrpc": "2.0",
-                "id": None,
-                "error": {
-                    "code": -32700,
-                    "message": "Parse error: Invalid JSON"
-                }
-            },
-            headers=CORS_HEADERS
+            content={"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error: Invalid JSON"}},
+            headers=CORS_HEADERS,
         )
 
     handler = get_mcp_handler()
     response = await handler.handle_request(body)
 
-    return JSONResponse(
-        content=response,
-        headers=CORS_HEADERS
-    )
+    return JSONResponse(content=response, headers=CORS_HEADERS)
 
 
 @router.options("/mcp")
@@ -273,7 +227,7 @@ async def mcp_options():
         headers={
             **CORS_HEADERS,
             "Access-Control-Max-Age": "86400",
-        }
+        },
     )
 
 
@@ -294,15 +248,16 @@ async def mcp_get_info():
             "protocolVersion": "2024-11-05",
             "transport": "streamable-http",
             "tools": ["search", "fetch"],
-            "documents_indexed": len(server._documents or []) if server._documents else "not loaded"
+            "documents_indexed": len(server._documents or []) if server._documents else "not loaded",
         },
-        headers=CORS_HEADERS
+        headers=CORS_HEADERS,
     )
 
 
 # =============================================================================
 # Health & Info Endpoints
 # =============================================================================
+
 
 @router.get("/info")
 async def openai_connector_info():
@@ -319,10 +274,10 @@ async def openai_connector_info():
             "tools": server.list_tools(),
             "capabilities": {
                 "search": "Search BMS data including buildings, equipment, alerts, predictions",
-                "fetch": "Retrieve full document content by ID"
-            }
+                "fetch": "Retrieve full document content by ID",
+            },
         },
-        headers=CORS_HEADERS
+        headers=CORS_HEADERS,
     )
 
 
@@ -339,9 +294,9 @@ async def openai_connector_health():
             "timestamp": datetime.now().isoformat(),
             "mcp_endpoint": "/api/mcp/openai/mcp",
             "transport": "streamable-http",
-            "tools": ["search", "fetch"]
+            "tools": ["search", "fetch"],
         },
-        headers=CORS_HEADERS
+        headers=CORS_HEADERS,
     )
 
 
@@ -349,10 +304,7 @@ async def openai_connector_health():
 async def openai_connector_stats():
     """Get detailed index statistics."""
     server = get_openai_connector_server()
-    return JSONResponse(
-        content=server.get_stats(),
-        headers=CORS_HEADERS
-    )
+    return JSONResponse(content=server.get_stats(), headers=CORS_HEADERS)
 
 
 @router.post("/refresh")
@@ -360,18 +312,13 @@ async def openai_connector_refresh():
     """Force refresh the document index."""
     server = get_openai_connector_server()
     server.refresh_index()
-    return JSONResponse(
-        content={
-            "status": "refreshed",
-            "stats": server.get_stats()
-        },
-        headers=CORS_HEADERS
-    )
+    return JSONResponse(content={"status": "refreshed", "stats": server.get_stats()}, headers=CORS_HEADERS)
 
 
 # =============================================================================
 # Legacy SSE Endpoint (kept for backwards compatibility)
 # =============================================================================
+
 
 @router.get("/sse")
 @router.get("/sse/")
@@ -386,9 +333,9 @@ async def sse_legacy_redirect():
         content={
             "message": "SSE transport is deprecated. Use Streamable HTTP instead.",
             "mcp_endpoint": "/api/mcp/openai/mcp",
-            "documentation": "https://modelcontextprotocol.io/specification/2025-06-18/basic/transports"
+            "documentation": "https://modelcontextprotocol.io/specification/2025-06-18/basic/transports",
         },
-        headers=CORS_HEADERS
+        headers=CORS_HEADERS,
     )
 
 
@@ -403,19 +350,12 @@ async def sse_legacy_post(request: Request):
     try:
         body = await request.json()
     except Exception:
-        return JSONResponse(
-            status_code=400,
-            content={"error": "Invalid JSON"},
-            headers=CORS_HEADERS
-        )
+        return JSONResponse(status_code=400, content={"error": "Invalid JSON"}, headers=CORS_HEADERS)
 
     handler = get_mcp_handler()
     response = await handler.handle_request(body)
 
-    return JSONResponse(
-        content=response,
-        headers=CORS_HEADERS
-    )
+    return JSONResponse(content=response, headers=CORS_HEADERS)
 
 
 @router.options("/sse")
@@ -427,13 +367,14 @@ async def sse_options():
         headers={
             **CORS_HEADERS,
             "Access-Control-Max-Age": "86400",
-        }
+        },
     )
 
 
 # =============================================================================
 # Well-Known MCP Discovery Endpoint
 # =============================================================================
+
 
 @wellknown_router.get("/.well-known/mcp.json")
 async def mcp_discovery():
@@ -448,18 +389,14 @@ async def mcp_discovery():
             "name": "sentinel-bms-connector",
             "version": "1.0.0",
             "description": "SENTINEL BMS Intelligence Platform - Building Management Data Connector",
-            "mcp": {
-                "version": "2024-11-05",
-                "transport": "streamable-http",
-                "endpoint": "/api/mcp/openai/mcp"
-            },
+            "mcp": {"version": "2024-11-05", "transport": "streamable-http", "endpoint": "/api/mcp/openai/mcp"},
             "tools": ["search", "fetch"],
             "capabilities": {
                 "search": "Search BMS data including buildings, equipment, alerts, predictions",
-                "fetch": "Retrieve full document content by ID"
-            }
+                "fetch": "Retrieve full document content by ID",
+            },
         },
-        headers=CORS_HEADERS
+        headers=CORS_HEADERS,
     )
 
 
@@ -471,5 +408,5 @@ async def mcp_discovery_options():
         headers={
             **CORS_HEADERS,
             "Access-Control-Max-Age": "86400",
-        }
+        },
     )

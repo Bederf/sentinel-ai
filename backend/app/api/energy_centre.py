@@ -14,6 +14,7 @@ router = APIRouter(prefix="/energy-centre", tags=["energy-centre"])
 
 # === SCADA Overview ===
 
+
 @router.get("/scada/{site_id}")
 async def get_scada_overview(site_id: str):
     """Get complete SCADA overview for energy centre."""
@@ -31,6 +32,7 @@ async def get_sld_data(site_id: str):
 
 # === Energy Centres ===
 
+
 @router.get("")
 async def list_centres(
     site_id: Optional[str] = Query(None, description="Filter by site"),
@@ -45,6 +47,7 @@ async def list_centres(
 
 
 # === ATS (Automatic Transfer Switch) ===
+
 
 @router.get("/ats")
 async def list_ats_units(
@@ -81,6 +84,7 @@ async def get_ats_status(ats_id: str):
 
 # === MV Switchgear ===
 
+
 @router.get("/mv-incomers")
 async def list_mv_incomers(
     site_id: Optional[str] = Query(None, description="Filter by site"),
@@ -105,6 +109,7 @@ async def get_mv_incomer(incomer_id: str):
 
 
 # === Transformers ===
+
 
 @router.get("/transformers")
 async def list_transformers(
@@ -131,6 +136,7 @@ async def get_transformer(transformer_id: str):
 
 # === LV Switchboards ===
 
+
 @router.get("/switchboards")
 async def list_switchboards(
     site_id: Optional[str] = Query(None, description="Filter by site"),
@@ -155,6 +161,7 @@ async def get_switchboard(switchboard_id: str):
 
 
 # === Power Metering ===
+
 
 @router.get("/meters")
 async def list_meters(
@@ -189,6 +196,7 @@ async def get_power_summary(site_id: str):
 
 # === Power Factor Correction ===
 
+
 @router.get("/pfc")
 async def list_pfc_banks(
     site_id: Optional[str] = Query(None, description="Filter by site"),
@@ -213,6 +221,7 @@ async def get_pfc(pfc_id: str):
 
 
 # === UPS Systems ===
+
 
 @router.get("/ups")
 async def list_ups_systems(
@@ -245,6 +254,7 @@ async def get_ups_summary(site_id: str):
 
 
 # === Distribution Feeders ===
+
 
 @router.get("/feeders")
 async def list_feeders(

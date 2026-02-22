@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class InspectionDecision(str, Enum):
     """Decision after analyzing inspection findings."""
+
     RESOLVED = "resolved"
     RECOMMEND_REPAIR = "recommend_repair"
     MONITOR = "monitor"
@@ -26,6 +27,7 @@ class InspectionDecision(str, Enum):
 @dataclass
 class InspectionAnalysisResult:
     """Result of inspection analysis with recommendation."""
+
     decision: InspectionDecision
     severity: Optional[str] = None  # high, medium, low
     reason: Optional[str] = None  # Human-readable explanation
@@ -39,7 +41,7 @@ class InspectionAnalysisResult:
             "severity": self.severity,
             "reason": self.reason,
             "parts_needed": self.parts_needed or [],
-            "confidence": self.confidence
+            "confidence": self.confidence,
         }
 
 
@@ -57,7 +59,7 @@ class InspectionAnalyzer:
         "back to normal",
         "cleaned",
         "cleared",
-        "reset"
+        "reset",
     ]
 
     # Keywords that indicate critical/high severity issues
@@ -72,7 +74,7 @@ class InspectionAnalyzer:
         "severe",
         "critical",
         "emergency",
-        "catastrophic"
+        "catastrophic",
     ]
 
     # Keywords that indicate repair is needed
@@ -86,7 +88,7 @@ class InspectionAnalyzer:
         "overdue",
         "service",
         "replacement",
-        "component"
+        "component",
     ]
 
     # Keywords that indicate monitoring is sufficient
@@ -100,7 +102,7 @@ class InspectionAnalyzer:
         "minor",
         "cosmetic",
         "aesthetic",
-        "clean"
+        "clean",
     ]
 
     def analyze_inspection_completion(
@@ -110,7 +112,7 @@ class InspectionAnalyzer:
         health_before: int = None,
         health_after: int = None,
         parts_needed: list = None,
-        technician_notes: str = None
+        technician_notes: str = None,
     ) -> InspectionAnalysisResult:
         """
         Analyze inspection findings to recommend next action.
@@ -131,9 +133,7 @@ class InspectionAnalyzer:
         # Check for resolved issues
         if self._check_resolved(findings_lower, health_before, health_after):
             return InspectionAnalysisResult(
-                decision=InspectionDecision.RESOLVED,
-                reason=self._extract_resolution_summary(findings),
-                confidence=0.9
+                decision=InspectionDecision.RESOLVED, reason=self._extract_resolution_summary(findings), confidence=0.9
             )
 
         # Check for critical issues requiring repair
@@ -143,7 +143,7 @@ class InspectionAnalyzer:
                 severity="high",
                 reason=self._extract_issue_summary(findings),
                 parts_needed=parts_needed,
-                confidence=0.95
+                confidence=0.95,
             )
 
         # Check for repair needed
@@ -153,22 +153,17 @@ class InspectionAnalyzer:
                 severity="medium",
                 reason=self._extract_issue_summary(findings),
                 parts_needed=parts_needed,
-                confidence=0.85
+                confidence=0.85,
             )
 
         # Default: Monitor if unclear
         return InspectionAnalysisResult(
             decision=InspectionDecision.MONITOR,
             reason="Issue appears minor or unclear. Continue monitoring.",
-            confidence=0.7
+            confidence=0.7,
         )
 
-    def _check_resolved(
-        self,
-        findings_lower: str,
-        health_before: int = None,
-        health_after: int = None
-    ) -> bool:
+    def _check_resolved(self, findings_lower: str, health_before: int = None, health_after: int = None) -> bool:
         """Check if findings indicate the issue was resolved."""
         # Keyword match for resolved status
         if any(keyword in findings_lower for keyword in self.RESOLVED_KEYWORDS):
@@ -183,11 +178,7 @@ class InspectionAnalyzer:
 
         return False
 
-    def _check_critical_issue(
-        self,
-        findings_lower: str,
-        parts_needed: list = None
-    ) -> bool:
+    def _check_critical_issue(self, findings_lower: str, parts_needed: list = None) -> bool:
         """Check if findings indicate a critical issue requiring repair."""
         # Critical keywords found
         if any(keyword in findings_lower for keyword in self.CRITICAL_KEYWORDS):
@@ -202,12 +193,7 @@ class InspectionAnalyzer:
 
         return False
 
-    def _check_repair_needed(
-        self,
-        findings_lower: str,
-        health_before: int = None,
-        health_after: int = None
-    ) -> bool:
+    def _check_repair_needed(self, findings_lower: str, health_before: int = None, health_after: int = None) -> bool:
         """Check if findings indicate repair is needed."""
         # Repair keywords found
         if any(keyword in findings_lower for keyword in self.REPAIR_KEYWORDS):
@@ -233,7 +219,7 @@ class InspectionAnalyzer:
             "wipe",
             "cloth",
             "battery",
-            "fuse"
+            "fuse",
         ]
         part_lower = part.lower()
         return any(c in part_lower for c in consumables)
@@ -267,7 +253,7 @@ class InspectionAnalyzer:
         if len(findings) > 100:
             period_index = findings.find(".")
             if period_index > 0 and period_index < 150:
-                return findings[:period_index + 1]
+                return findings[: period_index + 1]
             return findings[:100] + "..."
 
         return findings

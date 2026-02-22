@@ -20,11 +20,7 @@ logger = logging.getLogger(__name__)
 CACHE_TTL = 300  # 5 minutes
 
 # Default thresholds (used as ultimate fallback)
-DEFAULT_THRESHOLDS = {
-    "healthy": 90,
-    "warning": 70,
-    "critical": 50
-}
+DEFAULT_THRESHOLDS = {"healthy": 90, "warning": 70, "critical": 50}
 
 
 class HealthThresholdService:
@@ -67,8 +63,10 @@ class HealthThresholdService:
         self._cache = thresholds
         self._cache_expiry = datetime.now() + timedelta(seconds=CACHE_TTL)
 
-        logger.info(f"Health thresholds: healthy={thresholds['healthy']}, "
-                   f"warning={thresholds['warning']}, critical={thresholds['critical']}")
+        logger.info(
+            f"Health thresholds: healthy={thresholds['healthy']}, "
+            f"warning={thresholds['warning']}, critical={thresholds['critical']}"
+        )
 
         return thresholds
 
@@ -107,11 +105,7 @@ class HealthThresholdService:
             Color string: "green", "amber", or "red"
         """
         status = self.get_health_status(health_score)
-        return {
-            "healthy": "green",
-            "warning": "amber",
-            "critical": "red"
-        }[status]
+        return {"healthy": "green", "warning": "amber", "critical": "red"}[status]
 
     def _is_cache_valid(self) -> bool:
         """Check if cache is still valid."""
@@ -123,10 +117,7 @@ class HealthThresholdService:
         """Load thresholds from Supabase system_settings."""
         try:
             supabase = get_supabase_client()
-            result = supabase.table("system_settings")\
-                .select("value")\
-                .eq("key", "health_thresholds")\
-                .execute()
+            result = supabase.table("system_settings").select("value").eq("key", "health_thresholds").execute()
 
             if result.data:
                 thresholds = result.data[0]["value"]
@@ -146,6 +137,7 @@ class HealthThresholdService:
         """Load thresholds from JSON settings file."""
         try:
             from app.api.settings import load_settings
+
             settings_data = load_settings()
             thresholds = settings_data.get("healthThresholds")
 
@@ -183,6 +175,7 @@ def get_health_threshold_service() -> HealthThresholdService:
 # ============================================================================
 # Convenience Functions
 # ============================================================================
+
 
 def get_health_thresholds(force_refresh: bool = False) -> Dict[str, int]:
     """

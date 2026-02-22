@@ -110,6 +110,7 @@ class DevicePoint:
     min_value: Optional[float] = None
     max_value: Optional[float] = None
     default_value: Optional[Any] = None
+    value: Optional[Any] = None  # Current runtime value (populated by device reads)
     writable: bool = False
     priority: int = 8  # Default priority for writable points
     metadata: Dict[str, Any] = field(default_factory=dict)

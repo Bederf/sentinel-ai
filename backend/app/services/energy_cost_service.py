@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TariffBand:
     """Time-of-use tariff band details."""
+
     band: str  # "peak", "standard", "off_peak"
     energy_rate_c_kwh: float  # c/kWh
     network_rate_c_kwh: float  # c/kWh
@@ -42,6 +43,7 @@ class TariffBand:
 @dataclass
 class HourlyCost:
     """Cost breakdown for one simulated hour."""
+
     simulated_hour: int
     power_kw: float
     energy_kwh: float  # 1 hour
@@ -72,7 +74,7 @@ class EnergyCostService:
             tariff = self.tariff_svc.get_tariff(
                 municipality=self.municipality,
                 tariff_name="TOU Commercial - Large Power User",
-                effective_date=date.today()
+                effective_date=date.today(),
             )
             if tariff:
                 return tariff.tariff_data
@@ -83,11 +85,11 @@ class EnergyCostService:
         return {
             "energy_charge_c_kwh": {
                 "summer": {"peak": 345.67, "standard": 187.23, "off_peak": 112.45},
-                "winter": {"peak": 489.12, "standard": 215.89, "off_peak": 134.67}
+                "winter": {"peak": 489.12, "standard": 215.89, "off_peak": 134.67},
             },
             "network_charge_c_kwh": {
                 "summer": {"peak": 45.12, "standard": 28.67, "off_peak": 15.23},
-                "winter": {"peak": 52.34, "standard": 33.12, "off_peak": 18.45}
+                "winter": {"peak": 52.34, "standard": 33.12, "off_peak": 18.45},
             },
             "demand_charge_r_kva": {"summer": 189.45, "winter": 267.89},
             "service_charge_r_month": 8456.78,
@@ -172,22 +174,14 @@ class EnergyCostService:
             energy_rate = energy_rates.get(band, 200.0)
             network_rate = network_rates.get(band, 30.0)
 
-            return TariffBand(
-                band=band,
-                energy_rate_c_kwh=energy_rate,
-                network_rate_c_kwh=network_rate
-            )
+            return TariffBand(band=band, energy_rate_c_kwh=energy_rate, network_rate_c_kwh=network_rate)
         except Exception as e:
             logger.warning(f"[COST] Error getting hourly rate: {e}")
             return self._get_simple_rate()
 
     def _get_simple_rate(self) -> TariffBand:
         """Fallback simple rate (City Power 2026 average)."""
-        return TariffBand(
-            band="standard",
-            energy_rate_c_kwh=200.0,
-            network_rate_c_kwh=30.0
-        )
+        return TariffBand(band="standard", energy_rate_c_kwh=200.0, network_rate_c_kwh=30.0)
 
     def calculate_hourly_cost(
         self,
@@ -254,21 +248,21 @@ class EnergyCostService:
             power_kw = hourly_power_data.get(hour, 0.0)
 
             hourly_cost = self.calculate_hourly_cost(
-                simulated_hour=hour,
-                power_kw=power_kw,
-                simulated_date=simulated_date
+                simulated_hour=hour, power_kw=power_kw, simulated_date=simulated_date
             )
 
-            hourly_costs.append({
-                "hour": hour,
-                "power_kw": round(power_kw, 2),
-                "energy_kwh": round(hourly_cost.energy_kwh, 2),
-                "tariff_band": hourly_cost.tariff_band,
-                "rate_r_kwh": round(hourly_cost.rate_r_kwh, 3),
-                "energy_cost_r": hourly_cost.energy_cost_r,
-                "network_cost_r": hourly_cost.network_cost_r,
-                "total_cost_r": hourly_cost.total_cost_r,
-            })
+            hourly_costs.append(
+                {
+                    "hour": hour,
+                    "power_kw": round(power_kw, 2),
+                    "energy_kwh": round(hourly_cost.energy_kwh, 2),
+                    "tariff_band": hourly_cost.tariff_band,
+                    "rate_r_kwh": round(hourly_cost.rate_r_kwh, 3),
+                    "energy_cost_r": hourly_cost.energy_cost_r,
+                    "network_cost_r": hourly_cost.network_cost_r,
+                    "total_cost_r": hourly_cost.total_cost_r,
+                }
+            )
 
             total_energy_kwh += hourly_cost.energy_kwh
             total_energy_cost_r += hourly_cost.energy_cost_r
@@ -321,10 +315,7 @@ class EnergyCostService:
             }
 
             # Upsert into energy_cost_summary table
-            self.supabase.table("energy_cost_summary").upsert(
-                record,
-                on_conflict="building_id,date"
-            ).execute()
+            self.supabase.table("energy_cost_summary").upsert(record, on_conflict="building_id,date").execute()
 
             logger.debug(
                 f"[COST] Daily cost recorded for {simulated_date.date()}: "
@@ -349,9 +340,7 @@ class EnergyCostService:
         """
         try:
             # Query energy_cost_summary for the month
-            response = self.supabase.table("energy_cost_summary").select("*").eq(
-                "building_id", building_id
-            ).execute()
+            response = self.supabase.table("energy_cost_summary").select("*").eq("building_id", building_id).execute()
 
             if not response.data:
                 return {"days": 0, "total_energy_kwh": 0, "total_cost_r": 0}

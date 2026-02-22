@@ -66,17 +66,19 @@ def bridge_discovery_to_integration(
     }
 
     try:
-        log_source = repo.create_log_source({
-            "building_id": building_id,
-            "name": vendor_names.get(bms_vendor.lower(), f"{bms_vendor.title()} BMS"),
-            "source_type": "bms_trend",
-            "connection_type": "api",
-            "vendor_pattern": bms_vendor.lower(),
-            "is_active": True,
-            "sync_frequency_minutes": 15,
-            "last_sync_at": datetime.utcnow().isoformat(),
-            "last_sync_status": "success",
-        })
+        log_source = repo.create_log_source(
+            {
+                "building_id": building_id,
+                "name": vendor_names.get(bms_vendor.lower(), f"{bms_vendor.title()} BMS"),
+                "source_type": "bms_trend",
+                "connection_type": "api",
+                "vendor_pattern": bms_vendor.lower(),
+                "is_active": True,
+                "sync_frequency_minutes": 15,
+                "last_sync_at": datetime.utcnow().isoformat(),
+                "last_sync_status": "success",
+            }
+        )
         source_id = log_source.get("id")
     except Exception as e:
         logger.error("Failed to create log_source: %s", e)
@@ -128,16 +130,18 @@ def bridge_discovery_to_integration(
                 "unknown": "unmatched",
             }.get(str(confidence).lower(), "fuzzy")
 
-            point_mappings.append({
-                "building_id": building_id,
-                "bms_point_id": point.get("original_name", point.get("name", "")),
-                "extracted_asset_id": equipment_name,
-                "cafm_asset_id": equipment_id,
-                "parameter_name": point.get("standardized_name", point.get("name", "")),
-                "parameter_type": point.get("point_type", "sensor"),
-                "match_confidence": match_confidence,
-                "is_verified": match_confidence in ("exact", "manual"),
-            })
+            point_mappings.append(
+                {
+                    "building_id": building_id,
+                    "bms_point_id": point.get("original_name", point.get("name", "")),
+                    "extracted_asset_id": equipment_name,
+                    "cafm_asset_id": equipment_id,
+                    "parameter_name": point.get("standardized_name", point.get("name", "")),
+                    "parameter_type": point.get("point_type", "sensor"),
+                    "match_confidence": match_confidence,
+                    "is_verified": match_confidence in ("exact", "manual"),
+                }
+            )
 
     points_mapped = 0
     if point_mappings:
@@ -177,6 +181,7 @@ def _resolve_building_id(site_id: str) -> Optional[str]:
     """
     try:
         from app.database.repositories.building_repository import BuildingRepository
+
         repo = BuildingRepository()
         # get_by_id uses the 'code' field to look up
         building = repo.get_by_id(site_id)

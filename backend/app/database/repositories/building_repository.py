@@ -26,7 +26,7 @@ class BuildingRepository:
                 return query.execute()
             except Exception as e:
                 error_msg = str(e)
-                if '429' in error_msg or 'rate limit' in error_msg.lower():
+                if "429" in error_msg or "rate limit" in error_msg.lower():
                     last_error = e
                     if attempt < max_retries:
                         logger.warning(f"Rate limit hit, retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
@@ -41,11 +41,7 @@ class BuildingRepository:
         if last_error:
             raise last_error
 
-    def get_all(
-        self,
-        region: Optional[str] = None,
-        site_type: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    def get_all(self, region: Optional[str] = None, site_type: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all buildings with optional filtering.
 
         Args:
@@ -55,12 +51,12 @@ class BuildingRepository:
         Returns:
             List of buildings
         """
-        query = self.client.table('buildings').select("*")
+        query = self.client.table("buildings").select("*")
 
         if region:
-            query = query.eq('region', region)
+            query = query.eq("region", region)
         if site_type:
-            query = query.eq('type', site_type)
+            query = query.eq("type", site_type)
 
         response = self._execute_with_retry(query)
         return response.data
@@ -74,7 +70,7 @@ class BuildingRepository:
         Returns:
             Building data or None if not found
         """
-        query = self.client.table('buildings').select("*").eq('code', building_id)
+        query = self.client.table("buildings").select("*").eq("code", building_id)
         response = self._execute_with_retry(query)
 
         if response.data:
@@ -90,7 +86,7 @@ class BuildingRepository:
         Returns:
             Building data or None if not found
         """
-        query = self.client.table('buildings').select("*").eq('id', uuid)
+        query = self.client.table("buildings").select("*").eq("id", uuid)
         response = self._execute_with_retry(query)
 
         if response.data:
@@ -109,10 +105,10 @@ class BuildingRepository:
         # Use the equipment_count column that's maintained by triggers
         building = self.get_by_uuid(building_uuid)
         if building:
-            return building.get('equipment_count', 0)
+            return building.get("equipment_count", 0)
         return 0
 
-    def get_alert_count(self, building_uuid: str, status: str = 'active') -> int:
+    def get_alert_count(self, building_uuid: str, status: str = "active") -> int:
         """Get the alert count for a building.
 
         Args:
@@ -122,9 +118,13 @@ class BuildingRepository:
         Returns:
             Number of alerts
         """
-        response = self.client.table('alerts').select("id", count="exact").eq(
-            'building_id', building_uuid
-        ).eq('status', status).execute()
+        response = (
+            self.client.table("alerts")
+            .select("id", count="exact")
+            .eq("building_id", building_uuid)
+            .eq("status", status)
+            .execute()
+        )
 
         return response.count or 0
 
@@ -137,9 +137,13 @@ class BuildingRepository:
         Returns:
             Number of equipment with warning or critical status
         """
-        response = self.client.table('equipment').select("id", count="exact").eq(
-            'building_id', building_uuid
-        ).in_('status', ['warning', 'critical']).execute()
+        response = (
+            self.client.table("equipment")
+            .select("id", count="exact")
+            .eq("building_id", building_uuid)
+            .in_("status", ["warning", "critical"])
+            .execute()
+        )
 
         return response.count or 0
 
@@ -158,11 +162,16 @@ class BuildingRepository:
             return []
 
         # Query equipment table by building_id (includes metadata fields)
-        response = self.client.table('equipment').select(
-            "id, code, name, status, health_score, type, building_id, "
-            "manufacturer, model, install_date, commissioning_date, "
-            "device_info, operating_data, network_info, location"
-        ).eq('building_id', building['id']).execute()
+        response = (
+            self.client.table("equipment")
+            .select(
+                "id, code, name, status, health_score, type, building_id, "
+                "manufacturer, model, install_date, commissioning_date, "
+                "device_info, operating_data, network_info, location"
+            )
+            .eq("building_id", building["id"])
+            .execute()
+        )
 
         return response.data or []
 
@@ -175,7 +184,7 @@ class BuildingRepository:
         Returns:
             Created building
         """
-        response = self.client.table('buildings').insert(building_data).execute()
+        response = self.client.table("buildings").insert(building_data).execute()
         return response.data[0]
 
     def update(self, building_id: str, building_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -193,9 +202,7 @@ class BuildingRepository:
         if not building:
             return None
 
-        response = self.client.table('buildings').update(
-            building_data
-        ).eq('id', building['id']).execute()
+        response = self.client.table("buildings").update(building_data).eq("id", building["id"]).execute()
 
         if response.data:
             return response.data[0]
@@ -214,9 +221,7 @@ class BuildingRepository:
         if not building:
             return False
 
-        response = self.client.table('buildings').delete().eq(
-            'id', building['id']
-        ).execute()
+        response = self.client.table("buildings").delete().eq("id", building["id"]).execute()
 
         return len(response.data) > 0
 
@@ -230,9 +235,9 @@ class BuildingRepository:
             Asset summary dict with counts by category, or None if not found
         """
         try:
-            response = self.client.table('v_building_asset_summary').select(
-                "*"
-            ).eq('building_id', building_uuid).execute()
+            response = (
+                self.client.table("v_building_asset_summary").select("*").eq("building_id", building_uuid).execute()
+            )
 
             if response.data:
                 return response.data[0]
@@ -251,9 +256,9 @@ class BuildingRepository:
             Asset summary dict with counts by category, or None if not found
         """
         try:
-            response = self.client.table('v_building_asset_summary').select(
-                "*"
-            ).eq('building_code', building_code).execute()
+            response = (
+                self.client.table("v_building_asset_summary").select("*").eq("building_code", building_code).execute()
+            )
 
             if response.data:
                 return response.data[0]
@@ -263,11 +268,7 @@ class BuildingRepository:
             return None
 
     def get_all_for_user(
-        self,
-        user_email: str,
-        user_role: SentinelRole,
-        region: Optional[str] = None,
-        site_type: Optional[str] = None
+        self, user_email: str, user_role: SentinelRole, region: Optional[str] = None, site_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all buildings accessible to a user with optional filtering.
 
@@ -292,27 +293,28 @@ class BuildingRepository:
             email = user_email.lower().strip()
 
             # Get building IDs user has access to
-            access_result = self.client.table('user_site_access').select(
-                'building_id'
-            ).eq('user_email', email).execute()
+            access_result = (
+                self.client.table("user_site_access").select("building_id").eq("user_email", email).execute()
+            )
 
             if not access_result.data:
                 return []
 
-            building_ids = [a['building_id'] for a in access_result.data]
+            building_ids = [a["building_id"] for a in access_result.data]
 
             # Get buildings with those IDs
-            query = self.client.table('buildings').select("*").in_('id', building_ids)
+            query = self.client.table("buildings").select("*").in_("id", building_ids)
 
             if region:
-                query = query.eq('region', region)
+                query = query.eq("region", region)
             if site_type:
-                query = query.eq('type', site_type)
+                query = query.eq("type", site_type)
 
             response = query.execute()
             return response.data or []
 
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).error(f"Error getting buildings for user: {e}")
             return []

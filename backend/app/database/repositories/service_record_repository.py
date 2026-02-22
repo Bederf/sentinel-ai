@@ -24,7 +24,7 @@ class ServiceRecordRepository:
 
     async def get_by_id(self, record_id: str) -> Optional[Dict[str, Any]]:
         """Get service record by ID."""
-        response = self.client.table(self.table).select("*").eq('id', record_id).execute()
+        response = self.client.table(self.table).select("*").eq("id", record_id).execute()
         return response.data[0] if response.data else None
 
     async def get_detail(self, record_id: str) -> Optional[Dict[str, Any]]:
@@ -58,7 +58,7 @@ class ServiceRecordRepository:
     async def update(self, record_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update service record."""
         data["updated_at"] = datetime.now().isoformat()
-        response = self.client.table(self.table).update(data).eq('id', record_id).execute()
+        response = self.client.table(self.table).update(data).eq("id", record_id).execute()
         return response.data[0] if response.data else None
 
     async def add_reading(self, record_id: str, reading_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -69,9 +69,7 @@ class ServiceRecordRepository:
 
     async def list_readings(self, record_id: str) -> List[Dict[str, Any]]:
         """Get all readings for a service record."""
-        response = self.client.table("service_readings").select("*").eq(
-            'service_record_id', record_id
-        ).execute()
+        response = self.client.table("service_readings").select("*").eq("service_record_id", record_id).execute()
         return response.data
 
     async def add_attachment(self, attachment_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -81,9 +79,7 @@ class ServiceRecordRepository:
 
     async def list_attachments(self, record_id: str) -> List[Dict[str, Any]]:
         """Get all attachments for a service record."""
-        response = self.client.table("service_attachments").select("*").eq(
-            'service_record_id', record_id
-        ).execute()
+        response = self.client.table("service_attachments").select("*").eq("service_record_id", record_id).execute()
         return response.data
 
     async def add_observation(self, record_id: str, observation_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -94,14 +90,12 @@ class ServiceRecordRepository:
 
     async def list_observations(self, record_id: str) -> List[Dict[str, Any]]:
         """Get all observations for a service record."""
-        response = self.client.table("service_observations").select("*").eq(
-            'service_record_id', record_id
-        ).execute()
+        response = self.client.table("service_observations").select("*").eq("service_record_id", record_id).execute()
         return response.data
 
     async def get_equipment_by_id(self, equipment_id: str) -> Optional[Dict[str, Any]]:
         """Get equipment details by ID."""
-        response = self.client.table("equipment").select("*").eq('id', equipment_id).execute()
+        response = self.client.table("equipment").select("*").eq("id", equipment_id).execute()
         return response.data[0] if response.data else None
 
     async def equipment_exists(self, equipment_id: str) -> bool:
@@ -133,7 +127,11 @@ class ServiceRecordRepository:
 
     async def count_by_technician(self, technician_id: str) -> int:
         """Count active service records for technician."""
-        response = self.client.table(self.table).select("id", count="exact").eq(
-            "technician_id", technician_id
-        ).neq("status", "closed").execute()
+        response = (
+            self.client.table(self.table)
+            .select("id", count="exact")
+            .eq("technician_id", technician_id)
+            .neq("status", "closed")
+            .execute()
+        )
         return len(response.data) if response.data else 0

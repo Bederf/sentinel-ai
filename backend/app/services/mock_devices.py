@@ -13,10 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
 
-from app.models.device import (
-    Device, DeviceValue, DevicePoint,
-    PointType
-)
+from app.models.device import Device, DeviceValue, DevicePoint, PointType
 from app.services.device_abstraction import DeviceAdapter
 
 logger = logging.getLogger(__name__)
@@ -168,12 +165,7 @@ class MockDeviceAdapter(DeviceAdapter):
                 else:
                     value = round(value, 2)
 
-        return DeviceValue(
-            point_name=point_name,
-            value=value,
-            unit=point.unit,
-            quality="good"
-        )
+        return DeviceValue(point_name=point_name, value=value, unit=point.unit, quality="good")
 
     async def _protocol_write(self, point_name: str, value: Any, priority: int) -> bool:
         """Mock write implementation with validation and simulation."""
@@ -205,10 +197,7 @@ class MockDeviceAdapter(DeviceAdapter):
         _save_global_state()
 
         # Log the change
-        logger.info(
-            f"Mock wrote {point_name}: {old_value} -> {value} "
-            f"(priority: {priority}, device: {self.device.id})"
-        )
+        logger.info(f"Mock wrote {point_name}: {old_value} -> {value} (priority: {priority}, device: {self.device.id})")
 
         # Update device timestamp
         self.device.updated_at = datetime.now().isoformat()
@@ -243,16 +232,12 @@ class MockDeviceAdapter(DeviceAdapter):
                 return
 
             # Prepare operating data update with timestamp
-            point_data = {
-                "value": value,
-                "timestamp": datetime.now().isoformat(),
-                "source": "mock_demo"
-            }
+            point_data = {"value": value, "timestamp": datetime.now().isoformat(), "source": "mock_demo"}
 
             # Update database using repository method
             repo.update_operating_data(
                 equipment["id"],  # Use UUID for direct update
-                {point_name: point_data}
+                {point_name: point_data},
             )
 
             logger.debug(f"DEMO_MODE: Synced {point_name}={value} to database for {self.device.id}")

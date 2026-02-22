@@ -51,12 +51,7 @@ class WhatsAppService:
             else:
                 logger.warning("WhatsApp Twilio credentials not fully configured")
 
-    async def send_text_message(
-        self,
-        to_number: str,
-        message: str,
-        context_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def send_text_message(self, to_number: str, message: str, context_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Send text message via WhatsApp.
 
@@ -81,38 +76,25 @@ class WhatsAppService:
             logger.error(f"Error sending WhatsApp message: {e}")
             return {"success": False, "error": str(e)}
 
-    async def _send_meta_text(
-        self,
-        to_number: str,
-        message: str,
-        context_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def _send_meta_text(self, to_number: str, message: str, context_id: Optional[str] = None) -> Dict[str, Any]:
         """Send via Meta Cloud API."""
         payload = {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
             "to": to_number,
             "type": "text",
-            "text": {"preview_url": True, "body": message}
+            "text": {"preview_url": True, "body": message},
         }
 
         if context_id:
             payload["context"] = {"message_id": context_id}
 
-        headers = {
-            "Authorization": f"Bearer {self.api_token}",
-            "Content-Type": "application/json"
-        }
+        headers = {"Authorization": f"Bearer {self.api_token}", "Content-Type": "application/json"}
 
         logger.debug(f"Sending Meta WhatsApp to {to_number}: {message[:50]}...")
 
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.api_url,
-                json=payload,
-                headers=headers,
-                timeout=10.0
-            )
+            response = await client.post(self.api_url, json=payload, headers=headers, timeout=10.0)
             response.raise_for_status()
             data = response.json()
 
@@ -124,32 +106,19 @@ class WhatsAppService:
                 "message_id": message_id,
                 "timestamp": datetime.utcnow().isoformat(),
                 "provider": "meta",
-                "to": to_number
+                "to": to_number,
             }
 
-    async def _send_twilio_text(
-        self,
-        to_number: str,
-        message: str
-    ) -> Dict[str, Any]:
+    async def _send_twilio_text(self, to_number: str, message: str) -> Dict[str, Any]:
         """Send via Twilio."""
-        payload = {
-            "From": self.twilio_whatsapp,
-            "To": f"whatsapp:{to_number}",
-            "Body": message
-        }
+        payload = {"From": self.twilio_whatsapp, "To": f"whatsapp:{to_number}", "Body": message}
 
         auth = (self.account_sid, self.auth_token)
 
         logger.debug(f"Sending Twilio WhatsApp to {to_number}: {message[:50]}...")
 
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.api_url,
-                data=payload,
-                auth=auth,
-                timeout=10.0
-            )
+            response = await client.post(self.api_url, data=payload, auth=auth, timeout=10.0)
             response.raise_for_status()
             data = response.json()
 
@@ -161,7 +130,7 @@ class WhatsAppService:
                 "message_id": message_id,
                 "timestamp": datetime.utcnow().isoformat(),
                 "provider": "twilio",
-                "to": to_number
+                "to": to_number,
             }
 
     def verify_webhook_token(self, token: str) -> bool:
@@ -177,7 +146,7 @@ class WhatsAppService:
             "enabled": self.enabled,
             "provider": self.provider,
             "phone_id": self.phone_id if self.provider == "meta" else None,
-            "twilio_number": self.twilio_whatsapp if self.provider == "twilio" else None
+            "twilio_number": self.twilio_whatsapp if self.provider == "twilio" else None,
         }
 
 

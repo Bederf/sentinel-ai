@@ -71,7 +71,11 @@ class WaterCostRepository:
                 response = self.client.table("water_tariffs").select("*").eq("site", site).execute()
                 tariffs = response.data or []
                 for t in tariffs:
-                    eff = datetime.fromisoformat(t["effective_date"]) if isinstance(t["effective_date"], str) else t["effective_date"]
+                    eff = (
+                        datetime.fromisoformat(t["effective_date"])
+                        if isinstance(t["effective_date"], str)
+                        else t["effective_date"]
+                    )
                     end = None
                     if t.get("end_date"):
                         end = datetime.fromisoformat(t["end_date"]) if isinstance(t["end_date"], str) else t["end_date"]
@@ -83,7 +87,11 @@ class WaterCostRepository:
                 backup = self._load_json_backup(site, "tariffs")
                 tariffs = backup.get("tariffs", [])
                 for t in tariffs:
-                    eff = datetime.fromisoformat(t["effective_date"]) if isinstance(t["effective_date"], str) else t["effective_date"]
+                    eff = (
+                        datetime.fromisoformat(t["effective_date"])
+                        if isinstance(t["effective_date"], str)
+                        else t["effective_date"]
+                    )
                     end = None
                     if t.get("end_date"):
                         end = datetime.fromisoformat(t["end_date"]) if isinstance(t["end_date"], str) else t["end_date"]
@@ -96,7 +104,11 @@ class WaterCostRepository:
             backup = self._load_json_backup(site, "tariffs")
             tariffs = backup.get("tariffs", [])
             for t in tariffs:
-                eff = datetime.fromisoformat(t["effective_date"]) if isinstance(t["effective_date"], str) else t["effective_date"]
+                eff = (
+                    datetime.fromisoformat(t["effective_date"])
+                    if isinstance(t["effective_date"], str)
+                    else t["effective_date"]
+                )
                 end = None
                 if t.get("end_date"):
                     end = datetime.fromisoformat(t["end_date"]) if isinstance(t["end_date"], str) else t["end_date"]
@@ -178,9 +190,14 @@ class WaterCostRepository:
         """
         try:
             if not self.use_json and self.client:
-                response = self.client.table("water_costs").select("*").eq("zone_id", zone_id)\
-                    .gte("period_date", start.isoformat())\
-                    .lte("period_date", end.isoformat()).execute()
+                response = (
+                    self.client.table("water_costs")
+                    .select("*")
+                    .eq("zone_id", zone_id)
+                    .gte("period_date", start.isoformat())
+                    .lte("period_date", end.isoformat())
+                    .execute()
+                )
                 costs = response.data or []
             else:
                 # JSON search - find costs for this zone
@@ -228,9 +245,14 @@ class WaterCostRepository:
         """
         try:
             if not self.use_json and self.client:
-                response = self.client.table("water_costs").select("*").eq("site", site)\
-                    .gte("period_date", start.isoformat())\
-                    .lte("period_date", end.isoformat()).execute()
+                response = (
+                    self.client.table("water_costs")
+                    .select("*")
+                    .eq("site", site)
+                    .gte("period_date", start.isoformat())
+                    .lte("period_date", end.isoformat())
+                    .execute()
+                )
                 costs = response.data or []
             else:
                 backup = self._load_json_backup(site, "costs")
@@ -303,13 +325,20 @@ class WaterCostRepository:
             cutoff = datetime.now() - timedelta(days=7)
 
             if not self.use_json and self.client:
-                response = self.client.table("water_costs").select("*").eq("site", site)\
-                    .gte("period_date", cutoff.isoformat()).execute()
+                response = (
+                    self.client.table("water_costs")
+                    .select("*")
+                    .eq("site", site)
+                    .gte("period_date", cutoff.isoformat())
+                    .execute()
+                )
                 recent_costs = response.data or []
             else:
                 backup = self._load_json_backup(site, "costs")
                 recent_costs = backup.get("costs", [])
-                recent_costs = [c for c in recent_costs if datetime.fromisoformat(c.get("period_date", "2000-01-01")) >= cutoff]
+                recent_costs = [
+                    c for c in recent_costs if datetime.fromisoformat(c.get("period_date", "2000-01-01")) >= cutoff
+                ]
 
             if not recent_costs:
                 return {
@@ -363,10 +392,7 @@ class WaterCostRepository:
 
         # Tier 2: From tier_1_liters to tier_2_liters at tier_2_rate
         if consumption_liters > tariff.tier_1_liters:
-            tier_2_usage = min(
-                consumption_liters - tariff.tier_1_liters,
-                tariff.tier_2_liters - tariff.tier_1_liters
-            )
+            tier_2_usage = min(consumption_liters - tariff.tier_1_liters, tariff.tier_2_liters - tariff.tier_1_liters)
             tier_2_cost = tier_2_usage * tariff.tier_2_rate_per_liter
 
         # Tier 3: Beyond tier_2_liters at tier_3_rate

@@ -22,18 +22,12 @@ def mock_profile_service():
     service.get_site_profile.return_value = {
         "name": "Cost Saving",
         "description": "Minimize operational spend",
-        "weights": {
-            "runtime": 0.10,
-            "comfort": 0.15,
-            "cost": 0.35,
-            "maintenance": 0.10,
-            "energy": 0.30
-        },
+        "weights": {"runtime": 0.10, "comfort": 0.15, "cost": 0.35, "maintenance": 0.10, "energy": 0.30},
         "thresholds": {
             "max_comfort_deviation_c": 2.0,
             "empty_zone_setback": 3.0,
             "empty_zone_lighting": 15,
-        }
+        },
     }
     return service
 
@@ -76,9 +70,7 @@ class TestProfileAwareOptimizer:
             "meter": [],
         }
 
-        prompt = ai_optimizer._build_optimization_prompt(
-            site, conditions, weather, energy_prices, equipment_inventory
-        )
+        prompt = ai_optimizer._build_optimization_prompt(site, conditions, weather, energy_prices, equipment_inventory)
 
         assert "Test Building" in prompt
         assert "Equipment Inventory" in prompt
@@ -123,21 +115,14 @@ class TestProfileAwareOptimizer:
         cost_profile = {
             "name": "Cost Saving",
             "description": "Minimize operational spend",
-            "weights": {
-                "runtime": 0.10,
-                "comfort": 0.15,
-                "cost": 0.35,
-                "maintenance": 0.10,
-                "energy": 0.30
-            },
+            "weights": {"runtime": 0.10, "comfort": 0.15, "cost": 0.35, "maintenance": 0.10, "energy": 0.30},
             "thresholds": {
                 "max_comfort_deviation_c": 2.0,
-            }
+            },
         }
 
         prompt = ai_optimizer._build_optimization_prompt(
-            site, conditions, weather, energy_prices, equipment_inventory,
-            profile=cost_profile
+            site, conditions, weather, energy_prices, equipment_inventory, profile=cost_profile
         )
 
         assert "Cost Saving" in prompt
@@ -176,21 +161,14 @@ class TestProfileAwareOptimizer:
         comfort_profile = {
             "name": "Comfort First",
             "description": "Prioritize occupant comfort",
-            "weights": {
-                "runtime": 0.10,
-                "comfort": 0.40,
-                "cost": 0.10,
-                "maintenance": 0.20,
-                "energy": 0.20
-            },
+            "weights": {"runtime": 0.10, "comfort": 0.40, "cost": 0.10, "maintenance": 0.20, "energy": 0.20},
             "thresholds": {
                 "max_comfort_deviation_c": 1.0,
-            }
+            },
         }
 
         prompt = ai_optimizer._build_optimization_prompt(
-            site, conditions, weather, energy_prices, equipment_inventory,
-            profile=comfort_profile
+            site, conditions, weather, energy_prices, equipment_inventory, profile=comfort_profile
         )
 
         assert "Comfort First" in prompt
@@ -262,18 +240,11 @@ class TestProfileAwareOptimizer:
         cost_profile = {
             "name": "Cost Saving",
             "description": "Minimize operational spend",
-            "weights": {
-                "runtime": 0.10,
-                "comfort": 0.15,
-                "cost": 0.35,
-                "maintenance": 0.10,
-                "energy": 0.30
-            },
+            "weights": {"runtime": 0.10, "comfort": 0.15, "cost": 0.35, "maintenance": 0.10, "energy": 0.30},
         }
 
         result = ai_optimizer._analyze_with_rules(
-            site_id, conditions, weather, energy_prices,
-            equipment_inventory, profile=cost_profile
+            site_id, conditions, weather, energy_prices, equipment_inventory, profile=cost_profile
         )
 
         assert isinstance(result, OptimizationRecommendation)

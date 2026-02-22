@@ -116,9 +116,7 @@ async def get_equipment_diagnostic(
         )
 
     try:
-        report = await _monitoring_service.get_equipment_diagnostic(
-            equipment_id, diagnostic_type
-        )
+        report = await _monitoring_service.get_equipment_diagnostic(equipment_id, diagnostic_type)
         _audit_logger.log_system_event(
             event_type="remote_equipment_diagnostic",
             user=user["user_id"],

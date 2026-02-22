@@ -7,7 +7,6 @@ Endpoints for:
   - Performance alerts and recommendations
 """
 
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.middleware.rate_limiter import limiter
 
@@ -148,7 +147,8 @@ async def get_peer_comparison(request: Request, inverter_id: str):
 
     # Get peer inverters (same manufacturer + model)
     peers = [
-        inv for inv in all_inverters
+        inv
+        for inv in all_inverters
         if inv.manufacturer == target_inverter.manufacturer
         and inv.model == target_inverter.model
         and inv.inverter_id != inverter_id
@@ -159,9 +159,7 @@ async def get_peer_comparison(request: Request, inverter_id: str):
 
     # Calculate current efficiency for target inverter
     current_efficiency = (
-        target_inverter.ac_power_kw / target_inverter.dc_power_kw
-        if target_inverter.dc_power_kw > 0
-        else 0.90
+        target_inverter.ac_power_kw / target_inverter.dc_power_kw if target_inverter.dc_power_kw > 0 else 0.90
     )
 
     # Get comparison report

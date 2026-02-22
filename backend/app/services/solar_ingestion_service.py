@@ -147,34 +147,36 @@ class SolarIngestionService:
                 site_plants = []
                 for plant in plants_by_site.get(site_id, []):
                     plant_inverters = inverters_by_plant.get(plant["plant_id"], [])
-                    site_plants.append({
-                        "plant_id": plant["plant_id"],
-                        "name": plant.get("name", ""),
-                        "capacity_kwp": plant.get("capacity_kwp", 0),
-                        "panel_count": plant.get("panel_count", 0),
-                        "panel_model": plant.get("panel_model", ""),
-                        "panel_rating_w": plant.get("panel_rating_w", 0),
-                        "commissioning_date": plant.get("commissioning_date"),
-                        "orientation": plant.get("orientation", 0),
-                        "tilt": plant.get("tilt", 0),
-                        "inverters": [
-                            {
-                                "id": inv["inverter_id"],
-                                "name": inv.get("name", ""),
-                                "manufacturer": inv.get("manufacturer", ""),
-                                "model": inv.get("model", ""),
-                                "rated_kva": inv.get("rated_kva", 0),
-                                "mppt_count": inv.get("mppt_count", 0),
-                                "protocol": inv.get("protocol", ""),
-                                "ip": inv.get("ip", ""),
-                                "port": inv.get("port", 0),
-                                "unit_id": inv.get("unit_id", 0),
-                                "strings_per_mppt": inv.get("strings_per_mppt", 0),
-                                "panels_per_string": inv.get("panels_per_string", 0),
-                            }
-                            for inv in plant_inverters
-                        ],
-                    })
+                    site_plants.append(
+                        {
+                            "plant_id": plant["plant_id"],
+                            "name": plant.get("name", ""),
+                            "capacity_kwp": plant.get("capacity_kwp", 0),
+                            "panel_count": plant.get("panel_count", 0),
+                            "panel_model": plant.get("panel_model", ""),
+                            "panel_rating_w": plant.get("panel_rating_w", 0),
+                            "commissioning_date": plant.get("commissioning_date"),
+                            "orientation": plant.get("orientation", 0),
+                            "tilt": plant.get("tilt", 0),
+                            "inverters": [
+                                {
+                                    "id": inv["inverter_id"],
+                                    "name": inv.get("name", ""),
+                                    "manufacturer": inv.get("manufacturer", ""),
+                                    "model": inv.get("model", ""),
+                                    "rated_kva": inv.get("rated_kva", 0),
+                                    "mppt_count": inv.get("mppt_count", 0),
+                                    "protocol": inv.get("protocol", ""),
+                                    "ip": inv.get("ip", ""),
+                                    "port": inv.get("port", 0),
+                                    "unit_id": inv.get("unit_id", 0),
+                                    "strings_per_mppt": inv.get("strings_per_mppt", 0),
+                                    "panels_per_string": inv.get("panels_per_string", 0),
+                                }
+                                for inv in plant_inverters
+                            ],
+                        }
+                    )
 
                 config = {
                     "site_id": site_id,
@@ -229,45 +231,51 @@ class SolarIngestionService:
                 continue
 
             try:
-                client.table("solar_sites").insert({
-                    "site_id": site_id,
-                    "site_name": config.get("site_name", site_id),
-                    "latitude": config.get("latitude"),
-                    "longitude": config.get("longitude"),
-                }).execute()
+                client.table("solar_sites").insert(
+                    {
+                        "site_id": site_id,
+                        "site_name": config.get("site_name", site_id),
+                        "latitude": config.get("latitude"),
+                        "longitude": config.get("longitude"),
+                    }
+                ).execute()
 
                 plants = []
                 inverters = []
                 for plant in config.get("plants", []):
-                    plants.append({
-                        "plant_id": plant.get("plant_id"),
-                        "site_id": site_id,
-                        "name": plant.get("name", ""),
-                        "capacity_kwp": plant.get("capacity_kwp", 0),
-                        "panel_count": plant.get("panel_count", 0),
-                        "panel_model": plant.get("panel_model", ""),
-                        "panel_rating_w": plant.get("panel_rating_w", 0),
-                        "commissioning_date": plant.get("commissioning_date"),
-                        "orientation": plant.get("orientation", 0),
-                        "tilt": plant.get("tilt", 0),
-                    })
-                    for inv in plant.get("inverters", []):
-                        inverters.append({
-                            "inverter_id": inv.get("id"),
-                            "site_id": site_id,
+                    plants.append(
+                        {
                             "plant_id": plant.get("plant_id"),
-                            "name": inv.get("name", ""),
-                            "manufacturer": inv.get("manufacturer", ""),
-                            "model": inv.get("model", ""),
-                            "rated_kva": inv.get("rated_kva", 0),
-                            "mppt_count": inv.get("mppt_count", 0),
-                            "protocol": inv.get("protocol", ""),
-                            "ip": inv.get("ip", ""),
-                            "port": inv.get("port", 0),
-                            "unit_id": inv.get("unit_id", 0),
-                            "strings_per_mppt": inv.get("strings_per_mppt", 0),
-                            "panels_per_string": inv.get("panels_per_string", 0),
-                        })
+                            "site_id": site_id,
+                            "name": plant.get("name", ""),
+                            "capacity_kwp": plant.get("capacity_kwp", 0),
+                            "panel_count": plant.get("panel_count", 0),
+                            "panel_model": plant.get("panel_model", ""),
+                            "panel_rating_w": plant.get("panel_rating_w", 0),
+                            "commissioning_date": plant.get("commissioning_date"),
+                            "orientation": plant.get("orientation", 0),
+                            "tilt": plant.get("tilt", 0),
+                        }
+                    )
+                    for inv in plant.get("inverters", []):
+                        inverters.append(
+                            {
+                                "inverter_id": inv.get("id"),
+                                "site_id": site_id,
+                                "plant_id": plant.get("plant_id"),
+                                "name": inv.get("name", ""),
+                                "manufacturer": inv.get("manufacturer", ""),
+                                "model": inv.get("model", ""),
+                                "rated_kva": inv.get("rated_kva", 0),
+                                "mppt_count": inv.get("mppt_count", 0),
+                                "protocol": inv.get("protocol", ""),
+                                "ip": inv.get("ip", ""),
+                                "port": inv.get("port", 0),
+                                "unit_id": inv.get("unit_id", 0),
+                                "strings_per_mppt": inv.get("strings_per_mppt", 0),
+                                "panels_per_string": inv.get("panels_per_string", 0),
+                            }
+                        )
 
                 if plants:
                     client.table("solar_plants").insert(plants).execute()
@@ -276,32 +284,36 @@ class SolarIngestionService:
 
                 bess = config.get("bess")
                 if bess:
-                    client.table("solar_bess").insert({
-                        "bess_id": bess.get("container_id"),
-                        "site_id": site_id,
-                        "container_id": bess.get("container_id"),
-                        "name": bess.get("name", ""),
-                        "manufacturer": bess.get("manufacturer", ""),
-                        "model": bess.get("model", ""),
-                        "capacity_kwh": bess.get("capacity_kwh", 0),
-                        "rated_power_kw": bess.get("rated_power_kw", 0),
-                        "rack_count": bess.get("rack_count", 0),
-                        "cell_chemistry": bess.get("cell_chemistry", ""),
-                        "protocol": bess.get("protocol", ""),
-                    }).execute()
+                    client.table("solar_bess").insert(
+                        {
+                            "bess_id": bess.get("container_id"),
+                            "site_id": site_id,
+                            "container_id": bess.get("container_id"),
+                            "name": bess.get("name", ""),
+                            "manufacturer": bess.get("manufacturer", ""),
+                            "model": bess.get("model", ""),
+                            "capacity_kwh": bess.get("capacity_kwh", 0),
+                            "rated_power_kw": bess.get("rated_power_kw", 0),
+                            "rack_count": bess.get("rack_count", 0),
+                            "cell_chemistry": bess.get("cell_chemistry", ""),
+                            "protocol": bess.get("protocol", ""),
+                        }
+                    ).execute()
 
                 meters = []
                 for m in config.get("meters", []):
-                    meters.append({
-                        "meter_id": m.get("meter_id"),
-                        "site_id": site_id,
-                        "name": m.get("name", ""),
-                        "manufacturer": m.get("manufacturer", ""),
-                        "model": m.get("model", ""),
-                        "protocol": m.get("protocol", ""),
-                        "ip": m.get("ip", ""),
-                        "port": m.get("port", 0),
-                    })
+                    meters.append(
+                        {
+                            "meter_id": m.get("meter_id"),
+                            "site_id": site_id,
+                            "name": m.get("name", ""),
+                            "manufacturer": m.get("manufacturer", ""),
+                            "model": m.get("model", ""),
+                            "protocol": m.get("protocol", ""),
+                            "ip": m.get("ip", ""),
+                            "port": m.get("port", 0),
+                        }
+                    )
                 if meters:
                     client.table("solar_meters").insert(meters).execute()
 
@@ -371,8 +383,7 @@ class SolarIngestionService:
 
         self._sites[site_id] = reg
         logger.info(
-            f"Registered solar site '{site_name}' with "
-            f"{len(reg.plants)} plants, {len(reg.connectors)} connectors"
+            f"Registered solar site '{site_name}' with {len(reg.plants)} plants, {len(reg.connectors)} connectors"
         )
 
     def _create_connector(
@@ -492,14 +503,16 @@ class SolarIngestionService:
             plant_summaries = []
             for plant in site.plants.values():
                 plant_inverters = [i for i in all_inverters if i.plant_id == plant.plant_id]
-                plant_summaries.append({
-                    "plant_id": plant.plant_id,
-                    "name": plant.name,
-                    "capacity_kwp": plant.capacity_kwp,
-                    "current_kw": round(sum(i.ac_power_kw for i in plant_inverters), 1),
-                    "inverters_online": sum(1 for i in plant_inverters if i.status == "online"),
-                    "inverters_total": len(plant_inverters),
-                })
+                plant_summaries.append(
+                    {
+                        "plant_id": plant.plant_id,
+                        "name": plant.name,
+                        "capacity_kwp": plant.capacity_kwp,
+                        "current_kw": round(sum(i.ac_power_kw for i in plant_inverters), 1),
+                        "inverters_online": sum(1 for i in plant_inverters if i.status == "online"),
+                        "inverters_total": len(plant_inverters),
+                    }
+                )
 
             # Total plant capacity
             total_capacity_kwp = sum(p.capacity_kwp for p in site.plants.values())
@@ -511,7 +524,6 @@ class SolarIngestionService:
                 "site_name": site.site_name,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "data_source": "annual_simulation + live_connectors",
-
                 # Real-time generation & grid
                 "generation": {
                     "total_pv_kw": round(total_pv_kw, 1),
@@ -532,7 +544,6 @@ class SolarIngestionService:
                     "net_kw": round(grid_import_kw - grid_export_kw, 1),
                 },
                 "plants": plant_summaries,
-
                 # Annual simulation metrics (if available)
                 "annual_summary": annual_data,
             }
@@ -547,11 +558,15 @@ class SolarIngestionService:
         """Fetch annual simulation summary from cache."""
         try:
             supabase = get_supabase_client()
-            response = supabase.table("solar_annual_simulations").select("*").eq(
-                "site_id", site_id
-            ).eq("scenario", "grant_solar_bess_ai_annual").order(
-                "created_at", desc=True
-            ).limit(1).execute()
+            response = (
+                supabase.table("solar_annual_simulations")
+                .select("*")
+                .eq("site_id", site_id)
+                .eq("scenario", "grant_solar_bess_ai_annual")
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
 
             if not response.data:
                 logger.debug(f"No annual summary found for {site_id}")
@@ -560,8 +575,10 @@ class SolarIngestionService:
             result = response.data[0]
             annual_data = result.get("results", {})
 
-            logger.info(f"✅ Annual summary: R{annual_data.get('annual_savings_zar', 0):,.0f}, "
-                       f"{annual_data.get('annual_savings_pct', 0):.1f}% savings")
+            logger.info(
+                f"✅ Annual summary: R{annual_data.get('annual_savings_zar', 0):,.0f}, "
+                f"{annual_data.get('annual_savings_pct', 0):.1f}% savings"
+            )
 
             return annual_data
 
@@ -597,9 +614,7 @@ class SolarIngestionService:
                             logger.error(f"Failed to read inverter {inv_cfg['id']}: {e}")
         return inverters
 
-    async def get_inverter_detail(
-        self, site_id: str, inverter_id: str
-    ) -> Optional[Dict]:
+    async def get_inverter_detail(self, site_id: str, inverter_id: str) -> Optional[Dict]:
         """Get single inverter detail with string-level data."""
         site = self._sites.get(site_id)
         if not site:
@@ -730,6 +745,7 @@ class SolarIngestionService:
         building_repo = None
         try:
             from app.database.repositories.building_repository import BuildingRepository
+
             building_repo = BuildingRepository()
         except Exception as e:
             logger.debug(f"Building repository unavailable: {e}")
@@ -744,14 +760,16 @@ class SolarIngestionService:
                 except Exception as e:
                     logger.debug(f"Could not fetch building {site.site_id}: {e}")
 
-            results.append({
-                "site_id": site.site_id,
-                "site_name": site.site_name,
-                "building_name": building_name,
-                "plants": len(site.plants),
-                "connectors": len(site.connectors),
-                "last_poll": site.last_poll,
-            })
+            results.append(
+                {
+                    "site_id": site.site_id,
+                    "site_name": site.site_name,
+                    "building_name": building_name,
+                    "plants": len(site.plants),
+                    "connectors": len(site.connectors),
+                    "last_poll": site.last_poll,
+                }
+            )
 
         return results
 

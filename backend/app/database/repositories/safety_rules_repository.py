@@ -27,6 +27,7 @@ class SafetyRulesRepository:
         if self._client is None and not self._use_json:
             try:
                 from app.database.supabase_client import get_supabase_client
+
                 self._client = get_supabase_client()
             except Exception as e:
                 logger.warning(f"Failed to get Supabase client, using JSON fallback: {e}")

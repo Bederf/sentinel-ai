@@ -39,6 +39,7 @@ router = APIRouter(prefix="/api/niagara/obix", tags=["niagara-obix"])
 # POST /api/niagara/obix/config - Configure oBIX connection
 # ---------------------------------------------------------------------------
 
+
 @router.post("/config", response_model=OBIXConfigResponse)
 async def configure_obix(config: OBIXConfig):
     """
@@ -84,6 +85,7 @@ async def configure_obix(config: OBIXConfig):
 # GET /api/niagara/obix/status - Connection status
 # ---------------------------------------------------------------------------
 
+
 @router.get("/status", response_model=OBIXConnectionStatus)
 async def get_obix_status():
     """
@@ -104,6 +106,7 @@ async def get_obix_status():
 # ---------------------------------------------------------------------------
 # GET /api/niagara/obix/points/{point_path:path} - Read point value
 # ---------------------------------------------------------------------------
+
 
 @router.get("/points/{point_path:path}", response_model=OBIXPointValue)
 async def read_obix_point(point_path: str):
@@ -146,6 +149,7 @@ async def read_obix_point(point_path: str):
 # ---------------------------------------------------------------------------
 # GET /api/niagara/obix/history - Get historical data
 # ---------------------------------------------------------------------------
+
 
 @router.get("/history", response_model=OBIXHistoryResponse)
 async def read_obix_history(
@@ -203,6 +207,7 @@ async def read_obix_history(
 # ---------------------------------------------------------------------------
 # GET /api/niagara/obix/alarms - Get alarm history
 # ---------------------------------------------------------------------------
+
 
 @router.get("/alarms", response_model=OBIXAlarmResponse)
 async def read_obix_alarms(

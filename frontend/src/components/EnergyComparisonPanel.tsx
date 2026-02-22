@@ -1,5 +1,5 @@
 /**
- * EnergyComparisonPanel Component - Wardew Tridonic Demo Card
+ * EnergyComparisonPanel Component - Tridonic DALI Demo Card
  *
  * Shows 3-tier energy savings comparison driven by the DALI simulation engine:
  * 1. Baseline: Traditional lighting (100%)
@@ -105,7 +105,7 @@ export function EnergyComparisonPanel({ siteId }: { siteId: string }) {
           </div>
           <div>
             <h3 className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
-              Energy Impact: Wardew Tridonic Integration
+              Energy Impact: Tridonic DALI Integration
             </h3>
             <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               {periodDays > 0 ? `${periodDays}-day` : 'Cumulative'} consumption comparison (kWh)
@@ -152,7 +152,7 @@ export function EnergyComparisonPanel({ siteId }: { siteId: string }) {
             <Leaf className="h-5 w-5" style={{ color: "#22C55E" }} />
             <div>
               <p className="text-sm font-medium" style={{ color: "#22C55E" }}>
-                Wardew Tridonic + SENTINEL AI
+                Tridonic DALI + SENTINEL AI
               </p>
               <p className="text-xs" style={{ color: "rgba(34, 197, 94, 0.8)" }}>
                 {(withSentinel.savings_kwh || 0).toLocaleString()} kWh saved &bull;

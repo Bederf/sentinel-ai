@@ -14,11 +14,13 @@ class TestAIService:
     def test_hybrid_ai_service_exists(self):
         """Test hybrid AI service exists."""
         from app.services.hybrid_ai_service import HybridAIService
+
         assert HybridAIService is not None
 
     def test_hybrid_ai_service_initialization(self):
         """Test hybrid AI service can be initialized."""
         from app.services.hybrid_ai_service import HybridAIService
+
         # Should be able to create instance
         try:
             service = HybridAIService()
@@ -35,13 +37,12 @@ class TestClaudeIntegration:
     async def test_claude_service_exists(self):
         """Test Claude service is available."""
         from app.services.claude_service import claude_service
+
         assert claude_service is not None
 
     async def test_claude_tool_execution(self):
         """Test Claude can use tools for device control."""
-        from app.services.chat_tools import (
-            list_devices
-        )
+        from app.services.chat_tools import list_devices
 
         # Tools should be callable
         devices = await list_devices()
@@ -53,7 +54,8 @@ class TestClaudeIntegration:
     async def test_claude_service_has_stream_method(self):
         """Test Claude service has streaming method."""
         from app.services.claude_service import claude_service
-        assert hasattr(claude_service, 'stream_response')
+
+        assert hasattr(claude_service, "stream_response")
 
 
 @pytest.mark.unit
@@ -80,15 +82,8 @@ class TestOllamaIntegration:
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                payload = {
-                    "model": "llama2",
-                    "prompt": "What is BMS?",
-                    "stream": False
-                }
-                response = await client.post(
-                    "http://localhost:11434/api/generate",
-                    json=payload
-                )
+                payload = {"model": "llama2", "prompt": "What is BMS?", "stream": False}
+                response = await client.post("http://localhost:11434/api/generate", json=payload)
                 assert response.status_code == 200
                 assert "response" in response.json()
         except Exception:
@@ -107,7 +102,7 @@ class TestHybridAIRouting:
             "What is the status of device X?",
             "List all sites",
             "Show me temperature readings",
-            "Get current alerts"
+            "Get current alerts",
         ]
 
         try:
@@ -127,7 +122,7 @@ class TestHybridAIRouting:
             "Analyze the failure patterns and recommend optimizations",
             "Control chiller 1 based on current conditions",
             "Why is this equipment failing?",
-            "Diagnose the root cause of the temperature problem"
+            "Diagnose the root cause of the temperature problem",
         ]
 
         try:
@@ -176,11 +171,7 @@ class TestAIChatTools:
             device_id = devices[0].get("id") or devices[0].get("device_id")
             if device_id:
                 # Try to control (may be blocked by safety)
-                control_result = await control_device(
-                    device_id=device_id,
-                    point="setpoint",
-                    value=22
-                )
+                control_result = await control_device(device_id=device_id, point="setpoint", value=22)
                 # Result should indicate success or safety block
                 assert control_result is not None
 
@@ -205,11 +196,7 @@ class TestAIChatTools:
         from app.services.chat_tools import diagnose_comfort_complaint
 
         # Test with a sample complaint
-        result = await diagnose_comfort_complaint(
-            desk_id="201",
-            complaint_type="too_hot",
-            building="sandton"
-        )
+        result = await diagnose_comfort_complaint(desk_id="201", complaint_type="too_hot", building="sandton")
         # Should return diagnosis or error
         assert result is not None
 
@@ -220,19 +207,13 @@ class TestAIChatEndpoint:
 
     def test_chat_endpoint_exists(self, test_client):
         """Test /api/chat endpoint exists."""
-        response = test_client.post(
-            "/api/chat",
-            json={"message": "What is the system status?"}
-        )
+        response = test_client.post("/api/chat", json={"message": "What is the system status?"})
         # May return 200, 401 (auth), 422 (validation), or 500 (API not configured)
         assert response.status_code in [200, 401, 422, 500]
 
     def test_hybrid_chat_endpoint_exists(self, test_client):
         """Test /api/hybrid-chat endpoint exists."""
-        response = test_client.post(
-            "/api/hybrid-chat",
-            json={"message": "What is the system status?"}
-        )
+        response = test_client.post("/api/hybrid-chat", json={"message": "What is the system status?"})
         # May return 200, 401 (auth), 422 (validation), or 500
         assert response.status_code in [200, 401, 422, 500]
 
@@ -249,9 +230,7 @@ class TestAIStreaming:
         try:
             with httpx.Client(timeout=30.0) as client:
                 with client.stream(
-                    "POST",
-                    "http://localhost:9095/api/chat",
-                    json={"query": "What is BMS?"}
+                    "POST", "http://localhost:9095/api/chat", json={"query": "What is BMS?"}
                 ) as response:
                     assert response.status_code in [200, 401, 500]
 
@@ -290,10 +269,7 @@ class TestAIErrorHandling:
 
     def test_api_key_missing_handled_gracefully(self, test_client):
         """Test missing API key is handled gracefully."""
-        response = test_client.post(
-            "/api/chat",
-            json={"message": "test"}
-        )
+        response = test_client.post("/api/chat", json={"message": "test"})
         # Should return error, not crash
         assert response.status_code in [200, 401, 422, 500, 503]
 
@@ -302,10 +278,7 @@ class TestAIErrorHandling:
         # Make many rapid requests
         responses = []
         for _ in range(10):
-            response = test_client.post(
-                "/api/chat",
-                json={"message": "test"}
-            )
+            response = test_client.post("/api/chat", json={"message": "test"})
             responses.append(response.status_code)
 
         # Should handle gracefully (not crash)

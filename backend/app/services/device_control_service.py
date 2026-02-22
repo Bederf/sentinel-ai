@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class EquipmentType(str, Enum):
     """Equipment types with control capabilities."""
+
     # HVAC
     FCU = "FCU"  # Fan Coil Unit
     VAV = "VAV"  # Variable Air Volume
@@ -38,6 +39,10 @@ class EquipmentType(str, Enum):
     GEN = "GEN"  # Generator
     UPS = "UPS"  # Uninterruptible Power Supply
 
+    # Energy Storage
+    BESS = "BESS"  # Battery Energy Storage System
+    INV = "INV"  # Inverter
+
     # Other
     MTR = "MTR"  # Meter
 
@@ -45,6 +50,7 @@ class EquipmentType(str, Enum):
 @dataclass
 class ControlPoint:
     """Definition of a controllable point on equipment."""
+
     name: str  # e.g., "cooling_setpoint"
     description: str
     data_type: str  # "float", "int", "bool", "enum"
@@ -58,6 +64,7 @@ class ControlPoint:
 @dataclass
 class ControlAction:
     """A control action to be executed."""
+
     equipment_code: str
     equipment_id: str
     control_point: str
@@ -76,7 +83,7 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=16.0,
             max_value=28.0,
             unit="°C",
-            writable=True
+            writable=True,
         ),
         ControlPoint(
             name="heating_setpoint",
@@ -85,14 +92,14 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=16.0,
             max_value=28.0,
             unit="°C",
-            writable=True
+            writable=True,
         ),
         ControlPoint(
             name="fan_mode",
             description="Fan operation mode",
             data_type="enum",
             enum_values=["auto", "on", "off"],
-            writable=True
+            writable=True,
         ),
         ControlPoint(
             name="fan_speed",
@@ -101,10 +108,9 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=0,
             max_value=100,
             unit="%",
-            writable=True
+            writable=True,
         ),
     ],
-
     EquipmentType.VAV: [
         ControlPoint(
             name="airflow_setpoint",
@@ -113,7 +119,7 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=0.0,
             max_value=5.0,
             unit="m³/s",
-            writable=True
+            writable=True,
         ),
         ControlPoint(
             name="damper_position",
@@ -122,7 +128,7 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=0,
             max_value=100,
             unit="%",
-            writable=True
+            writable=True,
         ),
         ControlPoint(
             name="cooling_setpoint",
@@ -131,10 +137,9 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=16.0,
             max_value=28.0,
             unit="°C",
-            writable=True
+            writable=True,
         ),
     ],
-
     EquipmentType.AHU: [
         ControlPoint(
             name="supply_temp_setpoint",
@@ -143,7 +148,7 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=10.0,
             max_value=30.0,
             unit="°C",
-            writable=True
+            writable=True,
         ),
         ControlPoint(
             name="return_temp_setpoint",
@@ -152,24 +157,19 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=10.0,
             max_value=30.0,
             unit="°C",
-            writable=True
+            writable=True,
         ),
         ControlPoint(
-            name="fan_mode",
-            description="Fan mode",
-            data_type="enum",
-            enum_values=["auto", "on", "off"],
-            writable=True
+            name="fan_mode", description="Fan mode", data_type="enum", enum_values=["auto", "on", "off"], writable=True
         ),
         ControlPoint(
             name="economizer_mode",
             description="Economizer operation",
             data_type="enum",
             enum_values=["enabled", "disabled", "auto"],
-            writable=True
+            writable=True,
         ),
     ],
-
     EquipmentType.CHILLER: [
         ControlPoint(
             name="chw_setpoint",
@@ -178,14 +178,14 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=4.0,
             max_value=12.0,
             unit="°C",
-            writable=True
+            writable=True,
         ),
         ControlPoint(
             name="mode",
             description="Chiller operation mode",
             data_type="enum",
             enum_values=["auto", "cooling_only", "off", "shutdown"],
-            writable=True
+            writable=True,
         ),
         ControlPoint(
             name="capacity_percent",
@@ -194,10 +194,9 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=0,
             max_value=100,
             unit="%",
-            writable=True
+            writable=True,
         ),
     ],
-
     EquipmentType.PUMP: [
         ControlPoint(
             name="flow_setpoint",
@@ -206,7 +205,7 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=0.0,
             max_value=10.0,
             unit="m³/h",
-            writable=True
+            writable=True,
         ),
         ControlPoint(
             name="speed_percent",
@@ -215,17 +214,16 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=0,
             max_value=100,
             unit="%",
-            writable=True
+            writable=True,
         ),
         ControlPoint(
             name="mode",
             description="Pump operation mode",
             data_type="enum",
             enum_values=["auto", "on", "off"],
-            writable=True
+            writable=True,
         ),
     ],
-
     EquipmentType.DALI: [
         ControlPoint(
             name="brightness_level",
@@ -234,14 +232,14 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=0,
             max_value=100,
             unit="%",
-            writable=True
+            writable=True,
         ),
         ControlPoint(
             name="scene",
             description="Preset lighting scene",
             data_type="enum",
             enum_values=["off", "working", "conference", "presentation", "relaxed"],
-            writable=True
+            writable=True,
         ),
         ControlPoint(
             name="color_temp",
@@ -250,10 +248,9 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=2700,
             max_value=6500,
             unit="K",
-            writable=True
+            writable=True,
         ),
     ],
-
     EquipmentType.LUM: [
         ControlPoint(
             name="brightness_level",
@@ -262,17 +259,16 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=0,
             max_value=100,
             unit="%",
-            writable=True
+            writable=True,
         ),
     ],
-
     EquipmentType.GEN: [
         ControlPoint(
             name="load_mode",
             description="Generator load mode",
             data_type="enum",
             enum_values=["auto", "standby", "load_shed", "peak_load", "off"],
-            writable=True
+            writable=True,
         ),
         ControlPoint(
             name="frequency_setpoint",
@@ -281,7 +277,7 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=49.0,
             max_value=51.0,
             unit="Hz",
-            writable=True
+            writable=True,
         ),
         ControlPoint(
             name="voltage_setpoint",
@@ -290,30 +286,66 @@ EQUIPMENT_CONTROL_POINTS = {
             min_value=400.0,
             max_value=440.0,
             unit="V",
-            writable=True
+            writable=True,
         ),
     ],
-
     EquipmentType.UPS: [
         ControlPoint(
             name="output_mode",
             description="UPS output mode",
             data_type="enum",
             enum_values=["auto", "battery", "eco", "bypass"],
-            writable=True
+            writable=True,
         ),
         ControlPoint(
             name="battery_charge_mode",
             description="Battery charging mode",
             data_type="enum",
             enum_values=["fast", "normal", "trickle", "off"],
-            writable=True
+            writable=True,
+        ),
+        ControlPoint(name="load_shed_enable", description="Enable load shedding", data_type="bool", writable=True),
+    ],
+    EquipmentType.BESS: [
+        ControlPoint(
+            name="dispatch_command",
+            description="AEGIS dispatch command (structured JSON payload)",
+            data_type="json",
+            writable=True,
         ),
         ControlPoint(
-            name="load_shed_enable",
-            description="Enable load shedding",
-            data_type="bool",
-            writable=True
+            name="mode",
+            description="BESS operating mode",
+            data_type="enum",
+            enum_values=["peak_shaving", "load_shifting", "grid_export", "backup", "idle"],
+            writable=True,
+        ),
+        ControlPoint(
+            name="charge_rate_kw",
+            description="Charge rate in kW",
+            data_type="float",
+            min_value=0.0,
+            max_value=100.0,
+            unit="kW",
+            writable=True,
+        ),
+        ControlPoint(
+            name="discharge_rate_kw",
+            description="Discharge rate in kW",
+            data_type="float",
+            min_value=0.0,
+            max_value=100.0,
+            unit="kW",
+            writable=True,
+        ),
+        ControlPoint(
+            name="soc_target_pct",
+            description="Target state of charge",
+            data_type="float",
+            min_value=10.0,
+            max_value=95.0,
+            unit="%",
+            writable=True,
         ),
     ],
 }
@@ -332,7 +364,7 @@ class DeviceControlService:
         if not equipment_code:
             return None
 
-        parts = equipment_code.split('-')
+        parts = equipment_code.split("-")
         if len(parts) < 2:
             return None
 
@@ -369,11 +401,7 @@ class DeviceControlService:
         points = DeviceControlService.get_control_points(equipment_code)
 
         if point_name not in points:
-            return {
-                "valid": False,
-                "errors": [f"Unknown control point: {point_name}"],
-                "warning": None
-            }
+            return {"valid": False, "errors": [f"Unknown control point: {point_name}"], "warning": None}
 
         point = points[point_name]
         errors = []
@@ -410,11 +438,7 @@ class DeviceControlService:
             elif point.max_value and value == point.max_value:
                 warning = f"Value at maximum threshold ({point.max_value})"
 
-        return {
-            "valid": len(errors) == 0,
-            "errors": errors,
-            "warning": warning
-        }
+        return {"valid": len(errors) == 0, "errors": errors, "warning": warning}
 
 
 # Singleton instance

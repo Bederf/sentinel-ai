@@ -22,6 +22,7 @@ async def get_model_status(request: Request):
     Rate limit: 1000 requests/minute
     """
     from ml.training.retraining_scheduler import get_retraining_scheduler
+
     scheduler = get_retraining_scheduler()
     checks = scheduler.check_all_models()
 
@@ -47,6 +48,7 @@ async def trigger_retraining(
     Rate limit: 100 requests/minute (CPU-intensive)
     """
     from ml.training.retraining_scheduler import get_retraining_scheduler
+
     scheduler = get_retraining_scheduler()
 
     result = scheduler.trigger_retraining(model_type, equipment_type, reason)
@@ -69,6 +71,7 @@ async def get_retrain_history(request: Request):
     Rate limit: 1000 requests/minute
     """
     from ml.training.retraining_scheduler import get_retraining_scheduler
+
     scheduler = get_retraining_scheduler()
     return {"history": scheduler.get_retrain_history()}
 
@@ -85,6 +88,7 @@ async def evaluate_performance(
     Rate limit: 1000 requests/minute
     """
     from ml.monitoring.performance_monitor import get_performance_monitor
+
     monitor = get_performance_monitor()
     return monitor.evaluate_predictions(days_back=days_back, building_code=building_code)
 
@@ -97,6 +101,7 @@ async def get_model_health(request: Request):
     Rate limit: 1000 requests/minute (was hitting 429 with global 200/min)
     """
     from ml.monitoring.performance_monitor import get_performance_monitor
+
     monitor = get_performance_monitor()
     return monitor.get_model_health_summary()
 
@@ -112,6 +117,7 @@ async def get_performance_trend(
     Rate limit: 1000 requests/minute
     """
     from ml.monitoring.performance_monitor import get_performance_monitor
+
     monitor = get_performance_monitor()
     return {"evaluations": monitor.get_performance_trend(limit=limit)}
 
@@ -129,6 +135,7 @@ async def create_ab_test(
     Rate limit: 100 requests/minute (CPU-intensive)
     """
     from ml.ab_testing.ab_test_manager import get_ab_test_manager
+
     manager = get_ab_test_manager()
     result = manager.create_test(model_type, equipment_type, candidate_model_id)
 
@@ -146,6 +153,7 @@ async def evaluate_ab_test(request: Request, test_id: str):
     Rate limit: 600 requests/minute
     """
     from ml.ab_testing.ab_test_manager import get_ab_test_manager
+
     manager = get_ab_test_manager()
     result = manager.evaluate_test(test_id)
 
@@ -163,6 +171,7 @@ async def promote_ab_test(request: Request, test_id: str):
     Rate limit: 100 requests/minute (CPU-intensive)
     """
     from ml.ab_testing.ab_test_manager import get_ab_test_manager
+
     manager = get_ab_test_manager()
     result = manager.promote_candidate(test_id)
 
@@ -183,5 +192,6 @@ async def list_ab_tests(
     Rate limit: 1000 requests/minute
     """
     from ml.ab_testing.ab_test_manager import get_ab_test_manager
+
     manager = get_ab_test_manager()
     return {"tests": manager.list_tests(status=status)}

@@ -110,8 +110,7 @@ class TestAuthentication:
             # Attempt a control action
             # May succeed, fail validation, or error depending on device state
             control_response = test_client.post(
-                f"/api/devices/{device_id}/control",
-                json={"point_name": "setpoint", "value": 22}
+                f"/api/devices/{device_id}/control", json={"point_name": "setpoint", "value": 22}
             )
             # Control may return various status codes depending on safety validation
             assert control_response.status_code in [200, 400, 404, 422, 500]

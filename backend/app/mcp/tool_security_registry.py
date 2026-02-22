@@ -346,6 +346,17 @@ _r(
 
 _r(
     ToolSecurityProfile(
+        name="control_dali_device",
+        mutating=True,
+        rate_class="mutate",
+        min_role=SentinelRole.OPERATOR,
+        required_module=ModuleType.SIMBIOT,
+        audit_fields=frozenset({"equipment_code", "action", "value", "reason", "priority"}),
+    )
+)
+
+_r(
+    ToolSecurityProfile(
         name="discover_tridonic_gateway",
         mutating=True,
         rate_class="mutate",

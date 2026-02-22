@@ -31,9 +31,7 @@ class OutcomeTracker:
         self.recommendation_service = get_recommendation_service()
         self.repo = OutcomeRepository()
 
-    async def verify_outcome(
-        self, rec_id: str, verify_delay_minutes: int = 30
-    ) -> Optional[Outcome]:
+    async def verify_outcome(self, rec_id: str, verify_delay_minutes: int = 30) -> Optional[Outcome]:
         """Verify actual outcome 30 minutes after recommendation execution.
 
         Compares predicted vs actual impact:
@@ -51,10 +49,7 @@ class OutcomeTracker:
         try:
             # Note: Full implementation would fetch from repository
             # For now, this is a placeholder that demonstrates the logic
-            logger.info(
-                f"Verifying outcome for recommendation {rec_id} "
-                f"with {verify_delay_minutes}min delay"
-            )
+            logger.info(f"Verifying outcome for recommendation {rec_id} with {verify_delay_minutes}min delay")
 
             # In production, would query repository here
             rec = None
@@ -64,9 +59,7 @@ class OutcomeTracker:
                 return None
 
             if rec.status != RecommendationStatus.EXECUTED:
-                logger.info(
-                    f"Skipping outcome verification - recommendation not in EXECUTED status: {rec.status}"
-                )
+                logger.info(f"Skipping outcome verification - recommendation not in EXECUTED status: {rec.status}")
                 return None
 
             # Wait for system to stabilize after execution
@@ -107,9 +100,7 @@ class OutcomeTracker:
 
             # Update recommendation with outcome
             # Note: This would normally update the recommendation in the service/repo
-            logger.info(
-                f"Verified outcome for {rec_id}: accuracy={accuracy:.1%}"
-            )
+            logger.info(f"Verified outcome for {rec_id}: accuracy={accuracy:.1%}")
 
             # Feed back to learning system
             await self._process_outcome_learning(rec, accuracy)
@@ -174,14 +165,10 @@ class OutcomeTracker:
             device = await self.device_manager.read_device(equipment_id)
             return device.state if hasattr(device, "state") else {}
         except Exception as e:
-            logger.warning(
-                f"Failed to read actual state for {equipment_id}: {e}"
-            )
+            logger.warning(f"Failed to read actual state for {equipment_id}: {e}")
             return {}
 
-    async def _estimate_cost(
-        self, state: Dict[str, Any], since: datetime
-    ) -> float:
+    async def _estimate_cost(self, state: Dict[str, Any], since: datetime) -> float:
         """Estimate energy cost since recommendation execution.
 
         Args:
@@ -204,9 +191,7 @@ class OutcomeTracker:
             logger.warning(f"Failed to estimate cost: {e}")
             return 0.0
 
-    async def _process_outcome_learning(
-        self, rec: Recommendation, accuracy: float
-    ) -> None:
+    async def _process_outcome_learning(self, rec: Recommendation, accuracy: float) -> None:
         """Update confidence scores based on outcome accuracy.
 
         High accuracy (> 0.8): increase confidence for similar actions
@@ -219,28 +204,16 @@ class OutcomeTracker:
         try:
             if accuracy > 0.8:
                 # Successful prediction - increase confidence
-                await self._increase_confidence(
-                    rec.action_type, rec.site_id, amount=0.05
-                )
-                logger.info(
-                    f"High accuracy outcome ({accuracy:.1%}) for {rec.action_type} - "
-                    f"increasing confidence"
-                )
+                await self._increase_confidence(rec.action_type, rec.site_id, amount=0.05)
+                logger.info(f"High accuracy outcome ({accuracy:.1%}) for {rec.action_type} - increasing confidence")
             elif accuracy < 0.4:
                 # Poor prediction - decrease confidence
-                await self._decrease_confidence(
-                    rec.action_type, rec.site_id, amount=0.1
-                )
-                logger.warning(
-                    f"Low accuracy outcome ({accuracy:.1%}) for {rec.action_type} - "
-                    f"decreasing confidence"
-                )
+                await self._decrease_confidence(rec.action_type, rec.site_id, amount=0.1)
+                logger.warning(f"Low accuracy outcome ({accuracy:.1%}) for {rec.action_type} - decreasing confidence")
         except Exception as e:
             logger.error(f"Error processing outcome learning: {e}")
 
-    async def _increase_confidence(
-        self, action_type: str, site_id: str, amount: float = 0.05
-    ) -> None:
+    async def _increase_confidence(self, action_type: str, site_id: str, amount: float = 0.05) -> None:
         """Increase confidence score for action type.
 
         Args:
@@ -249,13 +222,9 @@ class OutcomeTracker:
             amount: Amount to increase by (0.0-1.0)
         """
         # Note: Placeholder - full implementation would update confidence tracking
-        logger.debug(
-            f"Increasing confidence for {action_type} on {site_id} by {amount}"
-        )
+        logger.debug(f"Increasing confidence for {action_type} on {site_id} by {amount}")
 
-    async def _decrease_confidence(
-        self, action_type: str, site_id: str, amount: float = 0.1
-    ) -> None:
+    async def _decrease_confidence(self, action_type: str, site_id: str, amount: float = 0.1) -> None:
         """Decrease confidence score for action type.
 
         Args:
@@ -264,9 +233,7 @@ class OutcomeTracker:
             amount: Amount to decrease by (0.0-1.0)
         """
         # Note: Placeholder - full implementation would update confidence tracking
-        logger.debug(
-            f"Decreasing confidence for {action_type} on {site_id} by {amount}"
-        )
+        logger.debug(f"Decreasing confidence for {action_type} on {site_id} by {amount}")
 
 
 # Singleton instance

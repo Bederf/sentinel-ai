@@ -19,10 +19,7 @@ class DeviceRepository:
         self.client = get_supabase_client()
 
     def get_all(
-        self,
-        building_id: Optional[str] = None,
-        device_type: Optional[str] = None,
-        status: Optional[str] = None
+        self, building_id: Optional[str] = None, device_type: Optional[str] = None, status: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all devices with optional filtering.
 
@@ -34,14 +31,14 @@ class DeviceRepository:
         Returns:
             List of devices
         """
-        query = self.client.table('devices').select("*")
+        query = self.client.table("devices").select("*")
 
         if building_id:
-            query = query.eq('building_id', building_id)
+            query = query.eq("building_id", building_id)
         if device_type:
-            query = query.eq('device_type', device_type)
+            query = query.eq("device_type", device_type)
         if status:
-            query = query.eq('status', status)
+            query = query.eq("status", status)
 
         response = query.execute()
         return response.data
@@ -56,9 +53,9 @@ class DeviceRepository:
         Returns:
             Device data or None if not found
         """
-        response = self.client.table('devices').select("*").eq(
-            'building_id', building_id
-        ).eq('device_id', device_id).execute()
+        response = (
+            self.client.table("devices").select("*").eq("building_id", building_id).eq("device_id", device_id).execute()
+        )
 
         if response.data:
             return response.data[0]
@@ -73,7 +70,7 @@ class DeviceRepository:
         Returns:
             Device data or None if not found
         """
-        response = self.client.table('devices').select("*").eq('id', uuid).execute()
+        response = self.client.table("devices").select("*").eq("id", uuid).execute()
 
         if response.data:
             return response.data[0]
@@ -89,19 +86,15 @@ class DeviceRepository:
             List of devices
         """
         # First get the building UUID
-        building_response = self.client.table('buildings').select('id').eq(
-            'code', building_code
-        ).execute()
+        building_response = self.client.table("buildings").select("id").eq("code", building_code).execute()
 
         if not building_response.data:
             return []
 
-        building_uuid = building_response.data[0]['id']
+        building_uuid = building_response.data[0]["id"]
 
         # Get devices for this building
-        response = self.client.table('devices').select("*").eq(
-            'building_id', building_uuid
-        ).execute()
+        response = self.client.table("devices").select("*").eq("building_id", building_uuid).execute()
 
         return response.data
 
@@ -114,9 +107,7 @@ class DeviceRepository:
         Returns:
             List of devices controlling this equipment
         """
-        response = self.client.table('devices').select("*").eq(
-            'equipment_id', equipment_id
-        ).execute()
+        response = self.client.table("devices").select("*").eq("equipment_id", equipment_id).execute()
 
         return response.data
 
@@ -129,16 +120,11 @@ class DeviceRepository:
         Returns:
             List of devices in this zone
         """
-        response = self.client.table('devices').select("*").eq(
-            'zone_id', zone_id
-        ).execute()
+        response = self.client.table("devices").select("*").eq("zone_id", zone_id).execute()
 
         return response.data
 
-    def get_with_details(
-        self,
-        building_id: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    def get_with_details(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get devices with enriched building/equipment/zone details.
 
         Uses the v_devices_with_equipment view for efficient joins.
@@ -149,18 +135,15 @@ class DeviceRepository:
         Returns:
             List of enriched device records
         """
-        query = self.client.table('v_devices_with_equipment').select("*")
+        query = self.client.table("v_devices_with_equipment").select("*")
 
         if building_id:
-            query = query.eq('building_id', building_id)
+            query = query.eq("building_id", building_id)
 
         response = query.execute()
         return response.data
 
-    def get_fault_devices(
-        self,
-        building_id: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    def get_fault_devices(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all devices with fault status.
 
         Args:
@@ -169,18 +152,15 @@ class DeviceRepository:
         Returns:
             List of devices in fault state
         """
-        query = self.client.table('devices').select("*").eq('status', 'fault')
+        query = self.client.table("devices").select("*").eq("status", "fault")
 
         if building_id:
-            query = query.eq('building_id', building_id)
+            query = query.eq("building_id", building_id)
 
         response = query.execute()
         return response.data
 
-    def get_offline_devices(
-        self,
-        building_id: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    def get_offline_devices(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all offline devices.
 
         Args:
@@ -189,10 +169,10 @@ class DeviceRepository:
         Returns:
             List of offline devices
         """
-        query = self.client.table('devices').select("*").eq('status', 'offline')
+        query = self.client.table("devices").select("*").eq("status", "offline")
 
         if building_id:
-            query = query.eq('building_id', building_id)
+            query = query.eq("building_id", building_id)
 
         response = query.execute()
         return response.data
@@ -206,7 +186,7 @@ class DeviceRepository:
         Returns:
             Created device
         """
-        response = self.client.table('devices').insert(device_data).execute()
+        response = self.client.table("devices").insert(device_data).execute()
         return response.data[0]
 
     def upsert(self, device_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -220,10 +200,7 @@ class DeviceRepository:
         Returns:
             Upserted device data
         """
-        response = self.client.table('devices').upsert(
-            device_data,
-            on_conflict='building_id,device_id'
-        ).execute()
+        response = self.client.table("devices").upsert(device_data, on_conflict="building_id,device_id").execute()
         return response.data[0] if response.data else {}
 
     def upsert_many(self, devices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -238,18 +215,10 @@ class DeviceRepository:
         if not devices:
             return []
 
-        response = self.client.table('devices').upsert(
-            devices,
-            on_conflict='building_id,device_id'
-        ).execute()
+        response = self.client.table("devices").upsert(devices, on_conflict="building_id,device_id").execute()
         return response.data
 
-    def update(
-        self,
-        building_id: str,
-        device_id: str,
-        device_data: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def update(self, building_id: str, device_id: str, device_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a device.
 
         Args:
@@ -260,19 +229,19 @@ class DeviceRepository:
         Returns:
             Updated device or None if not found
         """
-        response = self.client.table('devices').update(
-            device_data
-        ).eq('building_id', building_id).eq('device_id', device_id).execute()
+        response = (
+            self.client.table("devices")
+            .update(device_data)
+            .eq("building_id", building_id)
+            .eq("device_id", device_id)
+            .execute()
+        )
 
         if response.data:
             return response.data[0]
         return None
 
-    def update_by_uuid(
-        self,
-        uuid: str,
-        device_data: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def update_by_uuid(self, uuid: str, device_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a device by UUID.
 
         Args:
@@ -282,9 +251,7 @@ class DeviceRepository:
         Returns:
             Updated device or None if not found
         """
-        response = self.client.table('devices').update(
-            device_data
-        ).eq('id', uuid).execute()
+        response = self.client.table("devices").update(device_data).eq("id", uuid).execute()
 
         if response.data:
             return response.data[0]
@@ -300,9 +267,9 @@ class DeviceRepository:
         Returns:
             True if deleted, False if not found
         """
-        response = self.client.table('devices').delete().eq(
-            'building_id', building_id
-        ).eq('device_id', device_id).execute()
+        response = (
+            self.client.table("devices").delete().eq("building_id", building_id).eq("device_id", device_id).execute()
+        )
 
         return len(response.data) > 0
 
@@ -315,15 +282,10 @@ class DeviceRepository:
         Returns:
             True if deleted, False if not found
         """
-        response = self.client.table('devices').delete().eq('id', uuid).execute()
+        response = self.client.table("devices").delete().eq("id", uuid).execute()
         return len(response.data) > 0
 
-    def update_status(
-        self,
-        building_id: str,
-        device_id: str,
-        status: str
-    ) -> Optional[Dict[str, Any]]:
+    def update_status(self, building_id: str, device_id: str, status: str) -> Optional[Dict[str, Any]]:
         """Update device status.
 
         Args:
@@ -334,13 +296,9 @@ class DeviceRepository:
         Returns:
             Updated device or None if not found
         """
-        return self.update(building_id, device_id, {'status': status})
+        return self.update(building_id, device_id, {"status": status})
 
-    def update_last_seen(
-        self,
-        building_id: str,
-        device_id: str
-    ) -> Optional[Dict[str, Any]]:
+    def update_last_seen(self, building_id: str, device_id: str) -> Optional[Dict[str, Any]]:
         """Update device last_seen timestamp to NOW.
 
         Uses the optimized update_device_last_seen function.
@@ -354,21 +312,15 @@ class DeviceRepository:
         """
         # Use the stored function for fast heartbeat updates
         try:
-            self.client.rpc('update_device_last_seen', {
-                'p_device_id': device_id,
-                'p_building_id': building_id
-            }).execute()
+            self.client.rpc(
+                "update_device_last_seen", {"p_device_id": device_id, "p_building_id": building_id}
+            ).execute()
             return None
         except Exception as e:
             logger.error(f"Failed to update last_seen for device {device_id}: {e}")
             return None
 
-    def update_points(
-        self,
-        building_id: str,
-        device_id: str,
-        points: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def update_points(self, building_id: str, device_id: str, points: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update device points (control/monitoring points).
 
         Args:
@@ -379,7 +331,7 @@ class DeviceRepository:
         Returns:
             Updated device or None if not found
         """
-        return self.update(building_id, device_id, {'points': points})
+        return self.update(building_id, device_id, {"points": points})
 
     def get_building_summary(self, building_id: str) -> Optional[Dict[str, Any]]:
         """Get device summary for a building.
@@ -392,9 +344,7 @@ class DeviceRepository:
         Returns:
             Device summary with counts by type and status
         """
-        response = self.client.table('v_building_device_summary').select(
-            "*"
-        ).eq('building_id', building_id).execute()
+        response = self.client.table("v_building_device_summary").select("*").eq("building_id", building_id).execute()
 
         if response.data:
             return response.data[0]

@@ -20,12 +20,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 # Import baseline models
-from app.models.baseline import (
-    EquipmentBaseline,
-    BaselineType,
-    BaselineSource,
-    BaselineStatus
-)
+from app.models.baseline import EquipmentBaseline, BaselineType, BaselineSource, BaselineStatus
 
 # Import existing services
 try:
@@ -48,28 +43,34 @@ logger = logging.getLogger(__name__)
 # Exception Classes
 # ============================================================================
 
+
 class BaselineCaptureError(Exception):
     """Base exception for baseline capture errors."""
+
     pass
 
 
 class EquipmentNotFound(BaselineCaptureError):
     """Raised when equipment_id does not exist."""
+
     pass
 
 
 class InvalidBaselineData(BaselineCaptureError):
     """Raised when baseline data is malformed or invalid."""
+
     pass
 
 
 class DeviceNotAvailable(BaselineCaptureError):
     """Raised when device source is requested but device_manager not initialized."""
+
     pass
 
 
 class SensorDataNotAvailable(BaselineCaptureError):
     """Raised when sensor_analysis source is requested but no baseline exists."""
+
     pass
 
 
@@ -77,22 +78,17 @@ class SensorDataNotAvailable(BaselineCaptureError):
 # Baseline Element Structure
 # ============================================================================
 
+
 class BaselineElement(BaseModel):
     """Single baseline element with value, unit, and tolerance."""
+
     value: float = Field(..., description="Baseline value")
     unit: str = Field(..., description="Measurement unit (°C, PSI, mm/s, etc.)")
     tolerance: float = Field(..., description="Acceptable deviation (absolute or %)")
     tolerance_type: str = Field(default="percent", description="Tolerance type: 'percent' or 'absolute'")
 
     class Config:
-        json_schema_extra = {
-            "example": {
-                "value": 7.2,
-                "unit": "°C",
-                "tolerance": 2.0,
-                "tolerance_type": "absolute"
-            }
-        }
+        json_schema_extra = {"example": {"value": 7.2, "unit": "°C", "tolerance": 2.0, "tolerance_type": "absolute"}}
 
 
 from pydantic import BaseModel, Field
@@ -101,6 +97,7 @@ from pydantic import BaseModel, Field
 # ============================================================================
 # BaselineCaptureService
 # ============================================================================
+
 
 class BaselineCaptureService:
     """
@@ -118,52 +115,52 @@ class BaselineCaptureService:
     DEFAULT_TOLERANCES = {
         "chiller": {
             "temperature": 2.0,  # ±2°C
-            "pressure": 10,     # ±10%
-            "vibration": 0.3,   # ±0.3 mm/s
-            "current": 15,      # ±15%
-            "flow_rate": 10     # ±10%
+            "pressure": 10,  # ±10%
+            "vibration": 0.3,  # ±0.3 mm/s
+            "current": 15,  # ±15%
+            "flow_rate": 10,  # ±10%
         },
         "generator": {
             "temperature": 5.0,  # ±5°C
-            "pressure": 15,      # ±15%
-            "vibration": 0.5,    # ±0.5 mm/s
-            "frequency": 2,      # ±2 Hz
-            "voltage": 5         # ±5%
+            "pressure": 15,  # ±15%
+            "vibration": 0.5,  # ±0.5 mm/s
+            "frequency": 2,  # ±2 Hz
+            "voltage": 5,  # ±5%
         },
         "ahu": {
             "temperature": 3.0,  # ±3°C
-            "filter_dp": 50,     # ±50 Pa (absolute)
-            "vibration": 0.4,    # ±0.4 mm/s
-            "current": 12        # ±12%
+            "filter_dp": 50,  # ±50 Pa (absolute)
+            "vibration": 0.4,  # ±0.4 mm/s
+            "current": 12,  # ±12%
         },
         "fcu": {
             "temperature": 3.0,  # ±3°C
-            "filter_dp": 30,     # ±30 Pa (absolute)
-            "vibration": 0.5,    # ±0.5 mm/s
-            "airflow": 15        # ±15%
+            "filter_dp": 30,  # ±30 Pa (absolute)
+            "vibration": 0.5,  # ±0.5 mm/s
+            "airflow": 15,  # ±15%
         },
         "pump": {
             "temperature": 5.0,  # ±5°C
-            "pressure": 15,      # ±15%
-            "vibration": 0.5,    # ±0.5 mm/s
-            "flow_rate": 12      # ±12%
+            "pressure": 15,  # ±15%
+            "vibration": 0.5,  # ±0.5 mm/s
+            "flow_rate": 12,  # ±12%
         },
         "default": {
             "temperature": 5.0,  # ±5°C
-            "pressure": 15,      # ±15%
-            "vibration": 0.5,    # ±0.5 mm/s
-            "current": 15,       # ±15%
-            "generic": 10        # ±10% for any other metric
-        }
+            "pressure": 15,  # ±15%
+            "vibration": 0.5,  # ±0.5 mm/s
+            "current": 15,  # ±15%
+            "generic": 10,  # ±10% for any other metric
+        },
     }
 
     # Sensor baseline tolerances (phone sensors)
     SENSOR_TOLERANCES = {
-        "vibration_rms": 20,        # ±20%
-        "vibration_peak": 15,       # ±15%
-        "frequency_peak": 15,       # ±15%
-        "audio_level": 10,          # ±10% dBA
-        "noise_floor": 10           # ±10% dBA
+        "vibration_rms": 20,  # ±20%
+        "vibration_peak": 15,  # ±15%
+        "frequency_peak": 15,  # ±15%
+        "audio_level": 10,  # ±10% dBA
+        "noise_floor": 10,  # ±10% dBA
     }
 
     # Point mappings from device_point names to baseline elements
@@ -175,34 +172,28 @@ class BaselineCaptureService:
         "evaporator_temp": {"element": "evaporator_temp", "unit": "°C", "type": "temperature"},
         "oil_temp": {"element": "oil_temp", "unit": "°C", "type": "temperature"},
         "bearing_temp": {"element": "bearing_temp", "unit": "°C", "type": "temperature"},
-
         # Pressure points
         "suction_pressure": {"element": "suction_pressure", "unit": "PSI", "type": "pressure"},
         "discharge_pressure": {"element": "discharge_pressure", "unit": "PSI", "type": "pressure"},
         "oil_pressure": {"element": "oil_pressure", "unit": "PSI", "type": "pressure"},
         "head_pressure": {"element": "head_pressure", "unit": "PSI", "type": "pressure"},
-
         # Vibration points
         "vibration": {"element": "vibration", "unit": "mm/s", "type": "vibration"},
         "vibration_x": {"element": "vibration_x", "unit": "mm/s", "type": "vibration"},
         "vibration_y": {"element": "vibration_y", "unit": "mm/s", "type": "vibration"},
         "vibration_z": {"element": "vibration_z", "unit": "mm/s", "type": "vibration"},
-
         # Filter differential pressure
         "filter_dp": {"element": "filter_dp", "unit": "Pa", "type": "filter_dp"},
-
         # Electrical points
         "current": {"element": "motor_current", "unit": "A", "type": "current"},
         "motor_current": {"element": "motor_current", "unit": "A", "type": "current"},
         "voltage": {"element": "voltage", "unit": "V", "type": "voltage"},
-
         # Flow points
         "flow_rate": {"element": "flow_rate", "unit": "L/s", "type": "flow_rate"},
         "chw_flow": {"element": "chw_flow", "unit": "L/s", "type": "flow_rate"},
-
         # Frequency points
         "frequency": {"element": "frequency", "unit": "Hz", "type": "frequency"},
-        "running_speed": {"element": "running_speed", "unit": "RPM", "type": "generic"}
+        "running_speed": {"element": "running_speed", "unit": "RPM", "type": "generic"},
     }
 
     def __init__(self):
@@ -217,7 +208,7 @@ class BaselineCaptureService:
         if DeviceManager:
             try:
                 self.device_manager = DeviceManager()
-                if hasattr(self.device_manager, 'initialized') and not self.device_manager.initialized:
+                if hasattr(self.device_manager, "initialized") and not self.device_manager.initialized:
                     logger.warning("Device manager available but not initialized")
             except Exception as e:
                 logger.warning(f"Could not initialize device manager: {e}")
@@ -239,7 +230,7 @@ class BaselineCaptureService:
         captured_by: str = "unknown",
         baseline_type: BaselineType = BaselineType.INITIAL,
         notes: Optional[str] = None,
-        measurement_conditions: Optional[Dict[str, Any]] = None
+        measurement_conditions: Optional[Dict[str, Any]] = None,
     ) -> EquipmentBaseline:
         """
         Capture baseline from specified source.
@@ -293,7 +284,7 @@ class BaselineCaptureService:
                 "value": element.value,
                 "unit": element.unit,
                 "tolerance": element.tolerance,
-                "tolerance_type": element.tolerance_type
+                "tolerance_type": element.tolerance_type,
             }
 
         # Create EquipmentBaseline model (will be saved by caller via baseline_service)
@@ -310,7 +301,7 @@ class BaselineCaptureService:
             notes=notes,
             attachment_urls=[],
             created_at=datetime.now(),
-            updated_at=datetime.now()
+            updated_at=datetime.now(),
         )
 
         logger.info(f"Baseline captured for {equipment_id}: {len(baseline_elements)} elements")
@@ -330,6 +321,7 @@ class BaselineCaptureService:
         # Try repository
         try:
             from app.database.repositories.equipment_repository import EquipmentRepository
+
             repo = EquipmentRepository()
             equipment = await repo.get_equipment(equipment_id)
             if equipment:
@@ -340,6 +332,7 @@ class BaselineCaptureService:
         # Try JSON fallback
         try:
             from app.data.load_json import load_json
+
             devices = load_json("mock_devices.json")
             for device in devices:
                 if device.get("device_id") == equipment_id or device.get("id") == equipment_id:
@@ -350,9 +343,7 @@ class BaselineCaptureService:
         return False
 
     async def _normalize_from_manual(
-        self,
-        equipment_id: str,
-        manual_data: Dict[str, Any]
+        self, equipment_id: str, manual_data: Dict[str, Any]
     ) -> Dict[str, BaselineElement]:
         """
         Normalize manual entry data to baseline elements.
@@ -391,16 +382,14 @@ class BaselineCaptureService:
                 value=float(val),
                 unit=unit,
                 tolerance=tolerance or 0,  # Placeholder
-                tolerance_type=tolerance_type
+                tolerance_type=tolerance_type,
             )
 
         logger.info(f"Normalized {len(elements)} manual baseline elements for {equipment_id}")
         return elements
 
     async def _normalize_from_device(
-        self,
-        equipment_id: str,
-        device_data: Optional[Dict[str, Any]]
+        self, equipment_id: str, device_data: Optional[Dict[str, Any]]
     ) -> Dict[str, BaselineElement]:
         """
         Normalize BMS device readings to baseline elements.
@@ -416,9 +405,7 @@ class BaselineCaptureService:
             DeviceNotAvailable: If device_manager not initialized
         """
         if not self.device_manager or not self.device_manager.initialized:
-            raise DeviceNotAvailable(
-                "Device manager not initialized. Cannot capture baseline from device source."
-            )
+            raise DeviceNotAvailable("Device manager not initialized. Cannot capture baseline from device source.")
 
         elements = {}
         points_to_read = None
@@ -457,7 +444,7 @@ class BaselineCaptureService:
                         # Use point_name as-is with unknown unit
                         logger.debug(f"No mapping for point {point_name}, using raw name")
                         element_name = point_name
-                        unit = point_info.unit if hasattr(point_info, 'unit') else ""
+                        unit = point_info.unit if hasattr(point_info, "unit") else ""
                         metric_type = "generic"
                     else:
                         element_name = mapping["element"]
@@ -469,7 +456,7 @@ class BaselineCaptureService:
                         value=float(device_value.value),
                         unit=unit,
                         tolerance=0,  # Placeholder
-                        tolerance_type="percent"
+                        tolerance_type="percent",
                     )
 
                 except Exception as e:
@@ -485,9 +472,7 @@ class BaselineCaptureService:
             raise InvalidBaselineData(f"Failed to read device data: {e}")
 
     async def _normalize_from_sensor_analysis(
-        self,
-        equipment_id: str,
-        sensor_data: Optional[Dict[str, Any]]
+        self, equipment_id: str, sensor_data: Optional[Dict[str, Any]]
     ) -> Dict[str, BaselineElement]:
         """
         Normalize phone sensor baseline data to baseline elements.
@@ -503,9 +488,7 @@ class BaselineCaptureService:
             SensorDataNotAvailable: If no baseline exists in sensor_analysis
         """
         if not self.baseline_comparator:
-            raise SensorDataNotAvailable(
-                "Baseline comparator not available. Cannot capture sensor baseline."
-            )
+            raise SensorDataNotAvailable("Baseline comparator not available. Cannot capture sensor baseline.")
 
         try:
             # Try to get sensor baseline from sensor_analysis service
@@ -530,19 +513,19 @@ class BaselineCaptureService:
                         value=float(vib["overall_rms"]),
                         unit="mm/s",
                         tolerance=self.SENSOR_TOLERANCES["vibration_rms"],
-                        tolerance_type="percent"
+                        tolerance_type="percent",
                     )
 
                 # Extract frequency peaks
                 if "peaks" in vib and isinstance(vib["peaks"], list):
                     for i, peak in enumerate(vib["peaks"]):
                         if isinstance(peak, dict) and "frequency" in peak:
-                            peak_name = f"vibration_peak_{i+1}"
+                            peak_name = f"vibration_peak_{i + 1}"
                             elements[peak_name] = BaselineElement(
                                 value=float(peak["frequency"]),
                                 unit="Hz",
                                 tolerance=self.SENSOR_TOLERANCES["frequency_peak"],
-                                tolerance_type="percent"
+                                tolerance_type="percent",
                             )
 
             # Extract audio data
@@ -553,7 +536,7 @@ class BaselineCaptureService:
                         value=float(audio["decibel_level"]),
                         unit="dBA",
                         tolerance=self.SENSOR_TOLERANCES["audio_level"],
-                        tolerance_type="percent"
+                        tolerance_type="percent",
                     )
 
                 if "noise_floor" in audio:
@@ -561,7 +544,7 @@ class BaselineCaptureService:
                         value=float(audio["noise_floor"]),
                         unit="dBA",
                         tolerance=self.SENSOR_TOLERANCES["noise_floor"],
-                        tolerance_type="percent"
+                        tolerance_type="percent",
                     )
 
             logger.info(f"Normalized {len(elements)} sensor baseline elements for {equipment_id}")
@@ -574,9 +557,7 @@ class BaselineCaptureService:
             raise InvalidBaselineData(f"Failed to read sensor data: {e}")
 
     def _apply_default_tolerances(
-        self,
-        equipment_type: str,
-        elements: Dict[str, BaselineElement]
+        self, equipment_type: str, elements: Dict[str, BaselineElement]
     ) -> Dict[str, BaselineElement]:
         """
         Apply default tolerances based on equipment type and metric type.
@@ -589,10 +570,7 @@ class BaselineCaptureService:
             Dict with tolerances applied
         """
         # Get tolerance config for equipment type
-        tolerance_config = self.DEFAULT_TOLERANCES.get(
-            equipment_type,
-            self.DEFAULT_TOLERANCES["default"]
-        )
+        tolerance_config = self.DEFAULT_TOLERANCES.get(equipment_type, self.DEFAULT_TOLERANCES["default"])
 
         # Apply tolerances to elements without explicit tolerances
         for element_name, element in elements.items():
@@ -665,9 +643,9 @@ class BaselineCaptureService:
         if self.device_manager and self.device_manager.initialized:
             try:
                 device = await self.device_manager.get_device(equipment_id)
-                if device and hasattr(device, 'device'):
+                if device and hasattr(device, "device"):
                     # Extract equipment type from device properties
-                    device_type = device.device.type if hasattr(device.device, 'type') else None
+                    device_type = device.device.type if hasattr(device.device, "type") else None
                     if device_type:
                         # Map device type to equipment type
                         return self._map_device_type_to_equipment_type(device_type.value)
@@ -677,9 +655,10 @@ class BaselineCaptureService:
         # Try repository
         try:
             from app.database.repositories.equipment_repository import EquipmentRepository
+
             repo = EquipmentRepository()
             equipment = await repo.get_equipment(equipment_id)
-            if equipment and hasattr(equipment, 'equipment_type'):
+            if equipment and hasattr(equipment, "equipment_type"):
                 return self._map_device_type_to_equipment_type(equipment.equipment_type)
         except Exception as e:
             logger.debug(f"Could not get equipment type from repository: {e}")
@@ -687,6 +666,7 @@ class BaselineCaptureService:
         # Try JSON fallback
         try:
             from app.data.load_json import load_json
+
             devices = load_json("mock_devices.json")
             for device in devices:
                 if device.get("device_id") == equipment_id or device.get("id") == equipment_id:

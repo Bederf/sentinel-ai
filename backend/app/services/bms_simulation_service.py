@@ -17,9 +17,11 @@ from app.services.sentry_integration.alert_notifier import alert_notifier
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class EquipmentState:
     """Current state of simulated equipment"""
+
     id: str
     name: str
     type: str
@@ -35,6 +37,7 @@ class EquipmentState:
     fault_codes: List[str]
     sensor_readings: Dict[str, float]
     timestamp: datetime
+
 
 class BMSimulationService:
     """Service to simulate realistic BMS equipment behavior"""
@@ -74,8 +77,8 @@ class BMSimulationService:
                 "ups": 1,
                 "temperature_sensor": 15,
                 "pressure_sensor": 10,
-                "flow_sensor": 8
-            }
+                "flow_sensor": 8,
+            },
         }
 
         # Track demand history seeding (one row per day per site)
@@ -114,20 +117,21 @@ class BMSimulationService:
         if self.config.get("use_supabase_equipment", True):
             try:
                 from app.database.supabase_client import get_supabase_client
+
                 client = get_supabase_client()
 
                 # Get building UUID for site-002
-                building_result = client.table('buildings').select('id').eq('code', site_id).execute()
+                building_result = client.table("buildings").select("id").eq("code", site_id).execute()
                 if building_result.data:
-                    building_uuid = building_result.data[0]['id']
+                    building_uuid = building_result.data[0]["id"]
 
                     # Get equipment for this building (HVAC types only for simulation)
-                    hvac_types = ['ahu', 'fcu', 'vav', 'chiller', 'cooling_tower', 'ups', 'generator']
+                    hvac_types = ["ahu", "fcu", "vav", "chiller", "cooling_tower", "ups", "generator"]
                     equipment_result = (
-                        client.table('equipment')
-                        .select('code, name, type, manufacturer, location, health_score, status')
-                        .eq('building_id', building_uuid)
-                        .in_('type', hvac_types)
+                        client.table("equipment")
+                        .select("code, name, type, manufacturer, location, health_score, status")
+                        .eq("building_id", building_uuid)
+                        .in_("type", hvac_types)
                         .limit(50)  # Limit to 50 equipment items for simulation
                         .execute()
                     )
@@ -174,15 +178,15 @@ class BMSimulationService:
 
     def _create_from_supabase(self, eq: dict, site_id: str, site_name: str) -> EquipmentState:
         """Create EquipmentState from Supabase equipment record"""
-        eq_type = eq.get('type', 'unknown')
+        eq_type = eq.get("type", "unknown")
         return EquipmentState(
-            id=eq.get('code', f"EQ-{random.randint(1000, 9999)}"),
-            name=eq.get('name', 'Unknown Equipment'),
+            id=eq.get("code", f"EQ-{random.randint(1000, 9999)}"),
+            name=eq.get("name", "Unknown Equipment"),
             type=eq_type,
-            manufacturer=eq.get('manufacturer', 'Generic'),
-            location=eq.get('location', site_name),
-            health_score=float(eq.get('health_score', 85) or 85),
-            status=eq.get('status', 'running'),
+            manufacturer=eq.get("manufacturer", "Generic"),
+            location=eq.get("location", site_name),
+            health_score=float(eq.get("health_score", 85) or 85),
+            status=eq.get("status", "running"),
             temperature=self._get_default_temp(eq_type),
             pressure=self._get_default_pressure(eq_type),
             power_consumption=self._get_default_power(eq_type),
@@ -217,11 +221,11 @@ class BMSimulationService:
     def _create_ahu(self, index: int, site_id: str = "site-002", site_name: str = "Sandton") -> EquipmentState:
         """Create an AHU (Air Handling Unit)"""
         return EquipmentState(
-            id=f"{site_id}-AHU-L{index+1:02d}-01",
-            name=f"Air Handling Unit L{index+1}",
+            id=f"{site_id}-AHU-L{index + 1:02d}-01",
+            name=f"Air Handling Unit L{index + 1}",
             type="ahu",
             manufacturer=random.choice(["Carrier", "York", "Trane", "Daikin"]),
-            location=f"{site_name} Level {index+1}",
+            location=f"{site_name} Level {index + 1}",
             health_score=random.uniform(85, 95),
             status="running",
             temperature=random.uniform(20, 24),
@@ -234,16 +238,16 @@ class BMSimulationService:
                 "supply_temp": random.uniform(18, 22),
                 "return_temp": random.uniform(22, 26),
                 "fan_speed": random.uniform(0.7, 0.9),
-                "filter_pressure": random.uniform(0.1, 0.3)
+                "filter_pressure": random.uniform(0.1, 0.3),
             },
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
     def _create_chiller(self, index: int, site_id: str = "site-002", site_name: str = "Sandton") -> EquipmentState:
         """Create a chiller unit"""
         return EquipmentState(
-            id=f"{site_id}-CH-{index+1:02d}",
-            name=f"Chiller {index+1}",
+            id=f"{site_id}-CH-{index + 1:02d}",
+            name=f"Chiller {index + 1}",
             type="chiller",
             manufacturer=random.choice(["Carrier", "York", "Trane", "Daikin"]),
             location=f"{site_name} Basement",
@@ -259,9 +263,9 @@ class BMSimulationService:
                 "evap_temp": random.uniform(5, 8),
                 "cond_temp": random.uniform(30, 35),
                 "oil_pressure": random.uniform(2.0, 2.5),
-                "refrigerant_pressure": random.uniform(1.5, 2.0)
+                "refrigerant_pressure": random.uniform(1.5, 2.0),
             },
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
     def _create_fcu(self, index: int, site_id: str = "site-002", site_name: str = "Sandton") -> EquipmentState:
@@ -287,16 +291,16 @@ class BMSimulationService:
                 "room_temp": random.uniform(20, 24),
                 "setpoint": random.uniform(20, 22),
                 "valve_position": random.uniform(0.3, 0.8),
-                "fan_speed": random.uniform(0.4, 0.9) if random.choice(["running", "standby"]) == "running" else 0.0
+                "fan_speed": random.uniform(0.4, 0.9) if random.choice(["running", "standby"]) == "running" else 0.0,
             },
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
     def _create_ups(self, index: int, site_id: str = "site-002", site_name: str = "Sandton") -> EquipmentState:
         """Create a UPS unit"""
         return EquipmentState(
-            id=f"{site_id}-UPS-{index+1:02d}",
-            name=f"UPS {index+1}",
+            id=f"{site_id}-UPS-{index + 1:02d}",
+            name=f"UPS {index + 1}",
             type="ups",
             manufacturer=random.choice(["APC", "Eaton", "Vertiv"]),
             location=f"{site_name} Server Room",
@@ -312,12 +316,14 @@ class BMSimulationService:
                 "battery_level": random.uniform(95, 100),
                 "load_percentage": random.uniform(20, 60),
                 "input_voltage": random.uniform(220, 240),
-                "output_voltage": random.uniform(220, 240)
+                "output_voltage": random.uniform(220, 240),
             },
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
-    def _create_sensor(self, sensor_type: str, index: int, site_id: str = "site-002", site_name: str = "Sandton") -> EquipmentState:
+    def _create_sensor(
+        self, sensor_type: str, index: int, site_id: str = "site-002", site_name: str = "Sandton"
+    ) -> EquipmentState:
         """Create a sensor device"""
         sensor_configs = {
             "temperature_sensor": {
@@ -325,30 +331,30 @@ class BMSimulationService:
                 "type": "temperature_sensor",
                 "manufacturers": ["Honeywell", "Siemens", "Johnson Controls"],
                 "base_temp": 22.0,
-                "variance": 2.0
+                "variance": 2.0,
             },
             "pressure_sensor": {
                 "prefix": "PRESS",
                 "type": "pressure_sensor",
                 "manufacturers": ["Rosemount", "Endress+Hauser", "Yokogawa"],
                 "base_pressure": 1.0,
-                "variance": 0.1
+                "variance": 0.1,
             },
             "flow_sensor": {
                 "prefix": "FLOW",
                 "type": "flow_sensor",
                 "manufacturers": ["Emerson", "Krohne", "ABB"],
                 "base_flow": 100.0,
-                "variance": 20.0
-            }
+                "variance": 20.0,
+            },
         }
 
         config = sensor_configs[sensor_type]
         base_value = config.get("base_value", config.get(f"base_{sensor_type.split('_')[0]}", 0))
 
         return EquipmentState(
-            id=f"{site_id}-{config['prefix']}-{index+1:03d}",
-            name=f"{sensor_type.replace('_', ' ').title()} {index+1}",
+            id=f"{site_id}-{config['prefix']}-{index + 1:03d}",
+            name=f"{sensor_type.replace('_', ' ').title()} {index + 1}",
             type=config["type"],
             manufacturer=random.choice(config["manufacturers"]),
             location=f"{site_name} Zone {(index % 5) + 1}",
@@ -363,9 +369,9 @@ class BMSimulationService:
             sensor_readings={
                 "value": base_value + random.uniform(-config["variance"], config["variance"]),
                 "accuracy": random.uniform(0.95, 0.99),
-                "calibration_date": datetime.now() - timedelta(days=random.randint(30, 180))
+                "calibration_date": datetime.now() - timedelta(days=random.randint(30, 180)),
             },
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
     async def _simulation_loop(self):
@@ -440,6 +446,7 @@ class BMSimulationService:
         """Seed daily municipal demand history into Supabase for demo sites."""
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
         except Exception as exc:
             logger.info("Supabase unavailable for municipal demand seeding: %s", exc)
@@ -477,6 +484,7 @@ class BMSimulationService:
         """Seed municipal tariff schedules and monthly invoices for demo sites."""
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
         except Exception as exc:
             logger.info("Supabase unavailable for municipal billing seeding: %s", exc)
@@ -508,16 +516,18 @@ class BMSimulationService:
 
         # Upsert tariff schedule for current year (City Power demo)
         try:
-            client.table("municipal_tariff_schedules").upsert({
-                "municipality": "City Power Johannesburg",
-                "tariff_name": "TOU Commercial",
-                "utility_type": "electricity",
-                "effective_date": f"{today.year}-01-01",
-                "tariff_data": tariff_data,
-                "nersa_approved": True,
-                "source_url": "demo",
-                "notes": "Simulated tariff schedule for demo",
-            }).execute()
+            client.table("municipal_tariff_schedules").upsert(
+                {
+                    "municipality": "City Power Johannesburg",
+                    "tariff_name": "TOU Commercial",
+                    "utility_type": "electricity",
+                    "effective_date": f"{today.year}-01-01",
+                    "tariff_data": tariff_data,
+                    "nersa_approved": True,
+                    "source_url": "demo",
+                    "notes": "Simulated tariff schedule for demo",
+                }
+            ).execute()
         except Exception as exc:
             logger.info("Tariff schedule seed failed: %s", exc)
 
@@ -530,13 +540,7 @@ class BMSimulationService:
             # Resolve region/province from buildings table
             region = "Gauteng"
             try:
-                building_resp = (
-                    client.table("buildings")
-                    .select("region")
-                    .eq("code", site_id)
-                    .limit(1)
-                    .execute()
-                )
+                building_resp = client.table("buildings").select("region").eq("code", site_id).limit(1).execute()
                 if building_resp.data:
                     region = building_resp.data[0].get("region") or region
             except Exception as exc:
@@ -562,14 +566,20 @@ class BMSimulationService:
                 if account_result.data:
                     account_id = account_result.data[0]["id"]
                 else:
-                    created = client.table("municipal_accounts").insert({
-                        "site_id": site_id,
-                        "municipality": municipality,
-                        "utility_type": "electricity",
-                        "account_number": account_number,
-                        "tariff_type": tariff_name,
-                        "main_meter_id": meter_id,
-                    }).execute()
+                    created = (
+                        client.table("municipal_accounts")
+                        .insert(
+                            {
+                                "site_id": site_id,
+                                "municipality": municipality,
+                                "utility_type": "electricity",
+                                "account_number": account_number,
+                                "tariff_type": tariff_name,
+                                "main_meter_id": meter_id,
+                            }
+                        )
+                        .execute()
+                    )
                     account_id = created.data[0]["id"] if created.data else None
             except Exception as exc:
                 logger.info("Municipal account seed failed for %s: %s", site_id, exc)
@@ -783,7 +793,14 @@ class BMSimulationService:
         random_factor = random.uniform(-0.05, 0.02)
 
         # Calculate new health
-        total_degradation = natural_degradation + fault_degradation + runtime_penalty + condition_penalty + random_factor - maintenance_boost
+        total_degradation = (
+            natural_degradation
+            + fault_degradation
+            + runtime_penalty
+            + condition_penalty
+            + random_factor
+            - maintenance_boost
+        )
         new_health = current_health - total_degradation
 
         # Clamp to valid range
@@ -799,7 +816,13 @@ class BMSimulationService:
 
         # Determine new status based on centralized health thresholds
         if new_health >= thresholds["healthy"]:
-            new_status = "running" if equipment.type in ["ahu", "chiller", "fcu"] else "normal" if equipment.type == "ups" else "active"
+            new_status = (
+                "running"
+                if equipment.type in ["ahu", "chiller", "fcu"]
+                else "normal"
+                if equipment.type == "ups"
+                else "active"
+            )
         elif new_health >= thresholds["warning"]:
             new_status = "warning"
         elif new_health >= thresholds["critical"]:
@@ -823,18 +846,26 @@ class BMSimulationService:
         elif new_status != old_status:
             equipment.status = new_status
             if new_status == "critical" and old_status != "critical":
-                self._generate_alert(equipment, "critical", f"{equipment.name} is in CRITICAL state - immediate attention required")
+                self._generate_alert(
+                    equipment, "critical", f"{equipment.name} is in CRITICAL state - immediate attention required"
+                )
             elif new_status == "warning" and old_status in ["running", "normal", "active"]:
-                self._generate_alert(equipment, "warning", f"{equipment.name} health degrading - maintenance recommended")
+                self._generate_alert(
+                    equipment, "warning", f"{equipment.name} health degrading - maintenance recommended"
+                )
 
         # Health threshold crossing alerts (using centralized thresholds)
         # Note: 90% threshold alert removed - already covered by status transition to "warning"
         if old_health >= thresholds["warning"] and new_health < thresholds["warning"]:
-            self._generate_alert(equipment, "health_danger",
-                f"{equipment.name} health at {new_health:.0f}% - risk of failure increasing")
+            self._generate_alert(
+                equipment, "health_danger", f"{equipment.name} health at {new_health:.0f}% - risk of failure increasing"
+            )
         elif old_health >= thresholds["critical"] and new_health < thresholds["critical"]:
-            self._generate_alert(equipment, "health_critical",
-                f"{equipment.name} health at {new_health:.0f}% - CRITICAL - immediate attention required")
+            self._generate_alert(
+                equipment,
+                "health_critical",
+                f"{equipment.name} health at {new_health:.0f}% - CRITICAL - immediate attention required",
+            )
 
     def _check_comfort_alerts(self, equipment: EquipmentState, current_time: datetime):
         """Check for comfort/operational issues that can be fixed remotely"""
@@ -844,7 +875,7 @@ class BMSimulationService:
 
         # Throttle comfort alerts - only once per 15 minutes per equipment
         alert_key = f"comfort_{equipment.id}"
-        if not hasattr(self, '_comfort_alert_times'):
+        if not hasattr(self, "_comfort_alert_times"):
             self._comfort_alert_times = {}
 
         last_alert = self._comfort_alert_times.get(alert_key)
@@ -865,9 +896,10 @@ class BMSimulationService:
         # Check for too hot (actionable: lower setpoint)
         if zone_temp > COMFORT_MAX and equipment.status != "down":
             self._generate_alert(
-                equipment, "too_hot",
+                equipment,
+                "too_hot",
                 f"Zone temperature {zone_temp:.1f}°C exceeds comfort limit ({COMFORT_MAX}°C). "
-                f"Lower setpoint or increase cooling."
+                f"Lower setpoint or increase cooling.",
             )
             self._comfort_alert_times[alert_key] = current_time
             return
@@ -875,9 +907,10 @@ class BMSimulationService:
         # Check for too cold (actionable: raise setpoint)
         if zone_temp < COMFORT_MIN and equipment.status != "down":
             self._generate_alert(
-                equipment, "too_cold",
+                equipment,
+                "too_cold",
                 f"Zone temperature {zone_temp:.1f}°C below comfort limit ({COMFORT_MIN}°C). "
-                f"Raise setpoint or switch to heating."
+                f"Raise setpoint or switch to heating.",
             )
             self._comfort_alert_times[alert_key] = current_time
             return
@@ -886,8 +919,9 @@ class BMSimulationService:
         power = equipment.power_consumption
         if equipment.type == "chiller" and power > 180:  # High power
             self._generate_alert(
-                equipment, "high_energy",
-                f"{equipment.name} consuming {power:.0f}kW (high). Check if all zones need cooling."
+                equipment,
+                "high_energy",
+                f"{equipment.name} consuming {power:.0f}kW (high). Check if all zones need cooling.",
             )
             self._comfort_alert_times[alert_key] = current_time
             return
@@ -898,9 +932,10 @@ class BMSimulationService:
             # Only alert occasionally for after-hours
             if random.random() < 0.01:  # 1% chance per check
                 self._generate_alert(
-                    equipment, "after_hours",
+                    equipment,
+                    "after_hours",
                     f"{equipment.name} running after hours ({current_time.strftime('%H:%M')}). "
-                    f"Turn off if building is unoccupied."
+                    f"Turn off if building is unoccupied.",
                 )
                 self._comfort_alert_times[alert_key] = current_time
 
@@ -921,14 +956,10 @@ class BMSimulationService:
             "too_cold": "warning",
             "high_energy": "warning",
             "after_hours": "info",
-            "equipment_idle": "info"
+            "equipment_idle": "info",
         }
 
-        priority_map = {
-            "critical": 1,
-            "warning": 2,
-            "info": 3
-        }
+        priority_map = {"critical": 1, "warning": 2, "info": 3}
 
         severity = severity_map.get(alert_type, "warning")
 
@@ -941,7 +972,7 @@ class BMSimulationService:
             "equipment_idle": f"Turn on if needed: 'turn on {equipment.id}'",
             "failure": "Dispatch technician - cannot fix remotely",
             "critical": "Run maintenance or dispatch technician",
-            "warning": "Schedule maintenance soon"
+            "warning": "Schedule maintenance soon",
         }
 
         alert = {
@@ -961,9 +992,14 @@ class BMSimulationService:
             "created_at": datetime.now().isoformat(),
             "acknowledged": False,
             "acknowledged_by": None,
-            "category": "hvac" if equipment.type in ["ahu", "chiller", "fcu"] else "electrical" if equipment.type == "ups" else "sensor",
+            "category": "hvac"
+            if equipment.type in ["ahu", "chiller", "fcu"]
+            else "electrical"
+            if equipment.type == "ups"
+            else "sensor",
             "suggested_action": action_map.get(alert_type, None),
-            "actionable_remotely": alert_type in ["too_hot", "too_cold", "high_energy", "after_hours", "equipment_idle"]
+            "actionable_remotely": alert_type
+            in ["too_hot", "too_cold", "high_energy", "after_hours", "equipment_idle"],
         }
 
         self.alert_queue.append(alert)
@@ -1038,13 +1074,15 @@ class BMSimulationService:
             equipment.status = "running" if equipment.type in ["ahu", "chiller", "fcu"] else "normal"
             self._generate_alert(equipment, "info", f"{equipment.name} restored to service after maintenance")
 
-        logger.info(f"MAINTENANCE: {equipment_id} health restored from {old_health:.0f}% to {equipment.health_score:.0f}%")
+        logger.info(
+            f"MAINTENANCE: {equipment_id} health restored from {old_health:.0f}% to {equipment.health_score:.0f}%"
+        )
 
         return {
             "success": True,
             "message": f"Maintenance completed on {equipment.name}",
             "old_health": old_health,
-            "new_health": equipment.health_score
+            "new_health": equipment.health_score,
         }
 
     async def _apply_faults(self):
@@ -1071,7 +1109,7 @@ class BMSimulationService:
                         "F21": "Airflow restriction - check filters",
                         "P01": "Pressure sensor fault",
                         "T03": "Temperature sensor drift detected",
-                        "C05": "Communication fault with controller"
+                        "C05": "Communication fault with controller",
                     }
                     description = fault_descriptions.get(fault_code, f"Fault code {fault_code} detected")
                     self._generate_alert(equipment, "fault", f"{equipment.name}: {description}")
@@ -1084,13 +1122,13 @@ class BMSimulationService:
             "health_stats": {
                 "avg_health": sum(eq.health_score for eq in self.equipment.values()) / len(self.equipment),
                 "min_health": min(eq.health_score for eq in self.equipment.values()),
-                "max_health": max(eq.health_score for eq in self.equipment.values())
+                "max_health": max(eq.health_score for eq in self.equipment.values()),
             },
             "fault_summary": {
                 "total_faults": sum(len(eq.fault_codes) for eq in self.equipment.values()),
-                "equipment_with_faults": sum(1 for eq in self.equipment.values() if eq.fault_codes)
+                "equipment_with_faults": sum(1 for eq in self.equipment.values() if eq.fault_codes),
             },
-            "timestamp": datetime.now()
+            "timestamp": datetime.now(),
         }
 
         # Count by type
@@ -1125,7 +1163,7 @@ class BMSimulationService:
         else:
             return {
                 "equipment": [asdict(eq) for eq in self.equipment.values()],
-                "summary": self.get_equipment_summary()
+                "summary": self.get_equipment_summary(),
             }
 
 
@@ -1142,7 +1180,7 @@ class FaultSimulator:
                 "E5": "Communication error",
                 "E14": "Outdoor fan motor fault",
                 "E21": "Compressor overload",
-                "E23": "Outdoor coil temperature sensor fault"
+                "E23": "Outdoor coil temperature sensor fault",
             },
             "York": {
                 "F1": "High pressure fault",
@@ -1152,7 +1190,7 @@ class FaultSimulator:
                 "F5": "Outdoor fan fault",
                 "F14": "Indoor fan fault",
                 "F21": "Temperature sensor fault",
-                "F23": "Communication fault"
+                "F23": "Communication fault",
             },
             "Trane": {
                 "E01": "High pressure cutout",
@@ -1162,7 +1200,7 @@ class FaultSimulator:
                 "E05": "Communication error",
                 "E14": "Fan motor fault",
                 "E21": "Compressor fault",
-                "E23": "Sensor communication fault"
+                "E23": "Sensor communication fault",
             },
             "Daikin": {
                 "U1": "High pressure switch",
@@ -1172,7 +1210,7 @@ class FaultSimulator:
                 "U5": "Communication error",
                 "U14": "Fan motor error",
                 "U21": "Compressor error",
-                "U23": "Sensor error"
+                "U23": "Sensor error",
             },
             "Generic": {
                 "E001": "System communication fault",
@@ -1182,8 +1220,8 @@ class FaultSimulator:
                 "E005": "Power supply issue",
                 "E006": "Temperature out of range",
                 "E007": "Pressure out of range",
-                "E008": "Flow rate too low"
-            }
+                "E008": "Flow rate too low",
+            },
         }
 
     def generate_fault(self, equipment: EquipmentState) -> Optional[str]:
@@ -1215,11 +1253,7 @@ class SensorSimulator:
     def apply_drift(self, equipment: EquipmentState):
         """Apply realistic sensor drift over time"""
         # Different drift rates for different sensor types
-        drift_rates = {
-            "temperature": 0.01,
-            "pressure": 0.005,
-            "flow": 0.02
-        }
+        drift_rates = {"temperature": 0.01, "pressure": 0.005, "flow": 0.02}
 
         for key, value in equipment.sensor_readings.items():
             if isinstance(value, (int, float)):
@@ -1267,4 +1301,4 @@ def create_simulation_service() -> BMSimulationService:
 
 
 # Export for use in other modules
-__all__ = ['BMSimulationService', 'create_simulation_service', 'EquipmentState']
+__all__ = ["BMSimulationService", "create_simulation_service", "EquipmentState"]

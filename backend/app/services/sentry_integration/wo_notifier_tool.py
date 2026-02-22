@@ -41,7 +41,7 @@ def send_notification(work_order_data: Dict[str, Any]) -> bool:
             f"{BMS_API_URL}/api/sentry/work-order/notify",
             json=payload,
             headers={"X-Sentry-Secret": SENTRY_SECRET},
-            timeout=10
+            timeout=10,
         )
 
         if response.status_code == 200:
@@ -72,7 +72,7 @@ def get_collection_status(service_record_code: str) -> Dict[str, Any]:
         response = requests.get(
             f"{BMS_API_URL}/api/sentry/work-order/status/{service_record_code}",
             headers={"X-Sentry-Secret": SENTRY_SECRET},
-            timeout=10
+            timeout=10,
         )
 
         if response.status_code == 200:
@@ -99,7 +99,7 @@ def mark_complete(service_record_code: str) -> bool:
         response = requests.post(
             f"{BMS_API_URL}/api/sentry/work-order/complete/{service_record_code}",
             headers={"X-Sentry-Secret": SENTRY_SECRET},
-            timeout=10
+            timeout=10,
         )
 
         if response.status_code == 200:
@@ -153,7 +153,7 @@ def cli():
             "technician_id": args.technician_id,
             "technician_name": args.technician_name,
             "criticality": args.criticality,
-            "description": args.description
+            "description": args.description,
         }
         send_notification(data)
 
@@ -164,9 +164,9 @@ def cli():
             print(f"Status: {status['status']}")
             print(f"Progress: {status['progress']}")
             print(f"Collected: {status['collected_items']}")
-            if status['missing_items']:
+            if status["missing_items"]:
                 print(f"Missing: {status['missing_items']}")
-            if status.get('next_prompt'):
+            if status.get("next_prompt"):
                 print(f"\n📋 Next: {status['next_prompt']}")
         else:
             print(f"Error: {status['error']}")

@@ -125,7 +125,7 @@ class AlarmEventGenerator:
             for i, (ts, val) in enumerate(zip(timestamps, values)):
                 # Skip if in existing alarm state (avoid duplicate alarms)
                 if i > 0:
-                    prev_val = values[i-1]
+                    prev_val = values[i - 1]
                 else:
                     prev_val = val
 
@@ -162,7 +162,7 @@ class AlarmEventGenerator:
                     if prev_val <= alarm_threshold:
                         severity = "critical" if critical_threshold and val > critical_threshold else "warning"
                         alarm = AlarmEvent(
-                            timestamp=ts.isoformat() if hasattr(ts, 'isoformat') else str(ts),
+                            timestamp=ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
                             equipment_id=device_id,
                             equipment_type=device_type,
                             alarm_code=f"{point_name.upper()}_HI",
@@ -195,7 +195,7 @@ class AlarmEventGenerator:
         severity = "critical" if deviation > 0.2 else "warning"
 
         return AlarmEvent(
-            timestamp=timestamp.isoformat() if hasattr(timestamp, 'isoformat') else str(timestamp),
+            timestamp=timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp),
             equipment_id=equipment_id,
             equipment_type=equipment_type,
             alarm_code=alarm_code,
@@ -305,7 +305,7 @@ class AlarmEventGenerator:
                 cleared = self.rng.random() > 0.3
 
                 alarm = AlarmEvent(
-                    timestamp=ts.isoformat() if hasattr(ts, 'isoformat') else str(ts),
+                    timestamp=ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
                     equipment_id=device_id,
                     equipment_type=device_type,
                     alarm_code=alarm_info.get("code", "TRANSIENT"),
@@ -348,10 +348,7 @@ class AlarmEventGenerator:
         # Generate timestamps
         start = datetime.combine(self.config.start_date, datetime.min.time())
         n_intervals = self.config.days * 24 * 60 // self.config.interval_minutes
-        timestamps = np.array([
-            start + timedelta(minutes=i * self.config.interval_minutes)
-            for i in range(n_intervals)
-        ])
+        timestamps = np.array([start + timedelta(minutes=i * self.config.interval_minutes) for i in range(n_intervals)])
 
         all_alarms = []
 
@@ -495,66 +492,74 @@ class AlarmEventGenerator:
         alarms = []
 
         # T+0h: TEMP_HI warning
-        alarms.append(AlarmEvent(
-            timestamp=(start_date).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="cold_room",
-            alarm_code="TEMP_HI",
-            severity="warning",
-            description="Cold room temperature high - check compressor",
-            point_name="cabinet_temp",
-            point_value=6.5,
-            threshold_value=6.0,
-            notes="Temperature rising above normal range",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="cold_room",
+                alarm_code="TEMP_HI",
+                severity="warning",
+                description="Cold room temperature high - check compressor",
+                point_name="cabinet_temp",
+                point_value=6.5,
+                threshold_value=6.0,
+                notes="Temperature rising above normal range",
+            )
+        )
 
         # T+4h: TEMP_CRIT critical
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(hours=4)).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="cold_room",
-            alarm_code="TEMP_CRIT",
-            severity="critical",
-            description="Cold room temperature critical - vaccine storage compromised",
-            point_name="cabinet_temp",
-            point_value=8.5,
-            threshold_value=8.0,
-            notes="URGENT: Vaccine cold chain at risk",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(hours=4)).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="cold_room",
+                alarm_code="TEMP_CRIT",
+                severity="critical",
+                description="Cold room temperature critical - vaccine storage compromised",
+                point_name="cabinet_temp",
+                point_value=8.5,
+                threshold_value=8.0,
+                notes="URGENT: Vaccine cold chain at risk",
+            )
+        )
 
         # T+5h: Technician response - alarm acknowledged
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(hours=5)).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="cold_room",
-            alarm_code="TEMP_CRIT",
-            severity="critical",
-            description="Cold room temperature critical - vaccine storage compromised",
-            point_name="cabinet_temp",
-            point_value=8.2,
-            threshold_value=8.0,
-            acknowledged=True,
-            acknowledged_by="Maintenance Tech",
-            acknowledged_at=(start_date + timedelta(hours=5)).isoformat(),
-            notes="Technician on site, compressor being serviced",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(hours=5)).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="cold_room",
+                alarm_code="TEMP_CRIT",
+                severity="critical",
+                description="Cold room temperature critical - vaccine storage compromised",
+                point_name="cabinet_temp",
+                point_value=8.2,
+                threshold_value=8.0,
+                acknowledged=True,
+                acknowledged_by="Maintenance Tech",
+                acknowledged_at=(start_date + timedelta(hours=5)).isoformat(),
+                notes="Technician on site, compressor being serviced",
+            )
+        )
 
         # T+8h: Alarms cleared
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(hours=8)).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="cold_room",
-            alarm_code="TEMP_HI",
-            severity="warning",
-            description="Cold room temperature high - check compressor",
-            point_name="cabinet_temp",
-            point_value=4.5,
-            threshold_value=6.0,
-            acknowledged=True,
-            cleared=True,
-            cleared_at=(start_date + timedelta(hours=8)).isoformat(),
-            notes="Compressor repaired, temperature returned to normal",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(hours=8)).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="cold_room",
+                alarm_code="TEMP_HI",
+                severity="warning",
+                description="Cold room temperature high - check compressor",
+                point_name="cabinet_temp",
+                point_value=4.5,
+                threshold_value=6.0,
+                acknowledged=True,
+                cleared=True,
+                cleared_at=(start_date + timedelta(hours=8)).isoformat(),
+                notes="Compressor repaired, temperature returned to normal",
+            )
+        )
 
         return alarms
 
@@ -594,76 +599,86 @@ class AlarmEventGenerator:
         ch1, ch2 = equipment_ids[0], equipment_ids[1]
 
         # T+0h: Chiller 1 VIB_WARN
-        alarms.append(AlarmEvent(
-            timestamp=start_date.isoformat(),
-            equipment_id=ch1,
-            equipment_type="chiller",
-            alarm_code="VIB_WARN",
-            severity="warning",
-            description="Compressor vibration warning - monitor closely",
-            point_name="compressor_amps",
-            point_value=220,
-            threshold_value=200,
-            notes="Vibration trending upward over past week",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=start_date.isoformat(),
+                equipment_id=ch1,
+                equipment_type="chiller",
+                alarm_code="VIB_WARN",
+                severity="warning",
+                description="Compressor vibration warning - monitor closely",
+                point_name="compressor_amps",
+                point_value=220,
+                threshold_value=200,
+                notes="Vibration trending upward over past week",
+            )
+        )
 
         # T+2h: Chiller 1 trips
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(hours=2)).isoformat(),
-            equipment_id=ch1,
-            equipment_type="chiller",
-            alarm_code="VIB_CRIT",
-            severity="critical",
-            description="Compressor vibration critical - unit tripped",
-            point_name="compressor_amps",
-            point_value=0,
-            threshold_value=260,
-            notes="Chiller 1 offline - Chiller 2 taking full load",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(hours=2)).isoformat(),
+                equipment_id=ch1,
+                equipment_type="chiller",
+                alarm_code="VIB_CRIT",
+                severity="critical",
+                description="Compressor vibration critical - unit tripped",
+                point_name="compressor_amps",
+                point_value=0,
+                threshold_value=260,
+                notes="Chiller 1 offline - Chiller 2 taking full load",
+            )
+        )
 
         # T+3h: Chiller 2 struggling
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(hours=3)).isoformat(),
-            equipment_id=ch2,
-            equipment_type="chiller",
-            alarm_code="TEMP_HI",
-            severity="warning",
-            description="Chilled water temperature high",
-            point_name="chw_supply_temp",
-            point_value=8.5,
-            threshold_value=7.5,
-            notes="Single chiller unable to meet full building load",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(hours=3)).isoformat(),
+                equipment_id=ch2,
+                equipment_type="chiller",
+                alarm_code="TEMP_HI",
+                severity="warning",
+                description="Chilled water temperature high",
+                point_name="chw_supply_temp",
+                point_value=8.5,
+                threshold_value=7.5,
+                notes="Single chiller unable to meet full building load",
+            )
+        )
 
         # T+4h: Theatre cooling risk
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(hours=4)).isoformat(),
-            equipment_id="UMH-AHU-L3-TH1",
-            equipment_type="theatre_ahu",
-            alarm_code="TEMP_HI",
-            severity="critical",
-            description="Theatre supply air temperature high - surgery at risk",
-            point_name="supply_air_temp",
-            point_value=21.5,
-            threshold_value=20.0,
-            notes="URGENT: Surgical environment compromised",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(hours=4)).isoformat(),
+                equipment_id="UMH-AHU-L3-TH1",
+                equipment_type="theatre_ahu",
+                alarm_code="TEMP_HI",
+                severity="critical",
+                description="Theatre supply air temperature high - surgery at risk",
+                point_name="supply_air_temp",
+                point_value=21.5,
+                threshold_value=20.0,
+                notes="URGENT: Surgical environment compromised",
+            )
+        )
 
         # T+6h: Resolution
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(hours=6)).isoformat(),
-            equipment_id=ch1,
-            equipment_type="chiller",
-            alarm_code="VIB_CRIT",
-            severity="critical",
-            description="Compressor vibration critical - unit tripped",
-            acknowledged=True,
-            acknowledged_by="Senior Tech",
-            acknowledged_at=(start_date + timedelta(hours=3)).isoformat(),
-            cleared=True,
-            cleared_at=(start_date + timedelta(hours=6)).isoformat(),
-            notes="Bearing replaced, chiller back online",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(hours=6)).isoformat(),
+                equipment_id=ch1,
+                equipment_type="chiller",
+                alarm_code="VIB_CRIT",
+                severity="critical",
+                description="Compressor vibration critical - unit tripped",
+                acknowledged=True,
+                acknowledged_by="Senior Tech",
+                acknowledged_at=(start_date + timedelta(hours=3)).isoformat(),
+                cleared=True,
+                cleared_at=(start_date + timedelta(hours=6)).isoformat(),
+                notes="Bearing replaced, chiller back online",
+            )
+        )
 
         return alarms
 
@@ -699,75 +714,85 @@ class AlarmEventGenerator:
         alarms = []
 
         # Day 30: Prefilter trending
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(days=30)).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="theatre_ahu",
-            alarm_code="FILTER_DP",
-            severity="info",
-            description="Prefilter DP trending upward - schedule inspection",
-            point_name="prefilter_dp",
-            point_value=180,
-            threshold_value=200,
-            notes="ML prediction: HEPA replacement in 60 days",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(days=30)).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="theatre_ahu",
+                alarm_code="FILTER_DP",
+                severity="info",
+                description="Prefilter DP trending upward - schedule inspection",
+                point_name="prefilter_dp",
+                point_value=180,
+                threshold_value=200,
+                notes="ML prediction: HEPA replacement in 60 days",
+            )
+        )
 
         # Day 60: HEPA_DP_HI
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(days=60)).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="theatre_ahu",
-            alarm_code="HEPA_DP_HI",
-            severity="warning",
-            description="HEPA filter DP high - schedule replacement",
-            point_name="hepa_dp",
-            point_value=380,
-            threshold_value=350,
-            notes="Filter loading at 75% - order replacement filters",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(days=60)).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="theatre_ahu",
+                alarm_code="HEPA_DP_HI",
+                severity="warning",
+                description="HEPA filter DP high - schedule replacement",
+                point_name="hepa_dp",
+                point_value=380,
+                threshold_value=350,
+                notes="Filter loading at 75% - order replacement filters",
+            )
+        )
 
         # Day 75: Approaching critical
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(days=75)).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="theatre_ahu",
-            alarm_code="HEPA_DP_HI",
-            severity="warning",
-            description="HEPA filter DP high - replacement overdue",
-            point_name="hepa_dp",
-            point_value=420,
-            threshold_value=350,
-            notes="URGENT: Schedule filter change this week",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(days=75)).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="theatre_ahu",
+                alarm_code="HEPA_DP_HI",
+                severity="warning",
+                description="HEPA filter DP high - replacement overdue",
+                point_name="hepa_dp",
+                point_value=420,
+                threshold_value=350,
+                notes="URGENT: Schedule filter change this week",
+            )
+        )
 
         # Day 85: Critical
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(days=85)).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="theatre_ahu",
-            alarm_code="HEPA_DP_CRIT",
-            severity="critical",
-            description="HEPA filter DP critical - replace immediately",
-            point_name="hepa_dp",
-            point_value=480,
-            threshold_value=450,
-            notes="Filter change scheduled for tomorrow between surgeries",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(days=85)).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="theatre_ahu",
+                alarm_code="HEPA_DP_CRIT",
+                severity="critical",
+                description="HEPA filter DP critical - replace immediately",
+                point_name="hepa_dp",
+                point_value=480,
+                threshold_value=450,
+                notes="Filter change scheduled for tomorrow between surgeries",
+            )
+        )
 
         # Day 90: Resolved
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(days=90)).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="theatre_ahu",
-            alarm_code="HEPA_DP_HI",
-            severity="warning",
-            cleared=True,
-            cleared_at=(start_date + timedelta(days=90)).isoformat(),
-            description="HEPA filter replaced",
-            point_name="hepa_dp",
-            point_value=180,
-            notes="New filters installed, DP returned to baseline",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(days=90)).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="theatre_ahu",
+                alarm_code="HEPA_DP_HI",
+                severity="warning",
+                cleared=True,
+                cleared_at=(start_date + timedelta(days=90)).isoformat(),
+                description="HEPA filter replaced",
+                point_name="hepa_dp",
+                point_value=180,
+                notes="New filters installed, DP returned to baseline",
+            )
+        )
 
         return alarms
 
@@ -803,60 +828,68 @@ class AlarmEventGenerator:
         alarms = []
 
         # T+0h: Generator starts
-        alarms.append(AlarmEvent(
-            timestamp=start_date.isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="generator",
-            alarm_code="ON_GENERATOR",
-            severity="info",
-            description="Generator online - load shedding stage 6",
-            point_name="status",
-            point_value=2,  # Running
-            notes="Fuel level 85%, estimated runtime 8 hours",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=start_date.isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="generator",
+                alarm_code="ON_GENERATOR",
+                severity="info",
+                description="Generator online - load shedding stage 6",
+                point_name="status",
+                point_value=2,  # Running
+                notes="Fuel level 85%, estimated runtime 8 hours",
+            )
+        )
 
         # T+4h: FUEL_LO
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(hours=4)).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="generator",
-            alarm_code="FUEL_LO",
-            severity="warning",
-            description="Fuel level low",
-            point_name="fuel_level",
-            point_value=45,
-            threshold_value=50,
-            notes="Extended load shedding - fuel truck on standby",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(hours=4)).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="generator",
+                alarm_code="FUEL_LO",
+                severity="warning",
+                description="Fuel level low",
+                point_name="fuel_level",
+                point_value=45,
+                threshold_value=50,
+                notes="Extended load shedding - fuel truck on standby",
+            )
+        )
 
         # T+5h: FUEL_CRIT
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(hours=5)).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="generator",
-            alarm_code="FUEL_CRIT",
-            severity="critical",
-            description="Fuel level critical",
-            point_name="fuel_level",
-            point_value=25,
-            threshold_value=30,
-            notes="URGENT: Fuel truck dispatched, ETA 30 min",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(hours=5)).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="generator",
+                alarm_code="FUEL_CRIT",
+                severity="critical",
+                description="Fuel level critical",
+                point_name="fuel_level",
+                point_value=25,
+                threshold_value=30,
+                notes="URGENT: Fuel truck dispatched, ETA 30 min",
+            )
+        )
 
         # T+6h: Mains restored
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(hours=6)).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="generator",
-            alarm_code="FUEL_CRIT",
-            severity="critical",
-            cleared=True,
-            cleared_at=(start_date + timedelta(hours=6)).isoformat(),
-            description="Mains restored, generator cooling down",
-            point_name="fuel_level",
-            point_value=18,
-            notes="Generator ran for 6 hours, fuel at 18%",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(hours=6)).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="generator",
+                alarm_code="FUEL_CRIT",
+                severity="critical",
+                cleared=True,
+                cleared_at=(start_date + timedelta(hours=6)).isoformat(),
+                description="Mains restored, generator cooling down",
+                point_name="fuel_level",
+                point_value=18,
+                notes="Generator ran for 6 hours, fuel at 18%",
+            )
+        )
 
         return alarms
 
@@ -891,64 +924,72 @@ class AlarmEventGenerator:
         alarms = []
 
         # T+1h: HUMIDITY_HI
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(hours=1)).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="theatre_ahu",
-            alarm_code="HUMIDITY_HI",
-            severity="warning",
-            description="ICU supply humidity high",
-            point_name="supply_humidity",
-            point_value=62,
-            threshold_value=60,
-            notes="Outdoor humidity 95%RH - dehumidification at max",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(hours=1)).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="theatre_ahu",
+                alarm_code="HUMIDITY_HI",
+                severity="warning",
+                description="ICU supply humidity high",
+                point_name="supply_humidity",
+                point_value=62,
+                threshold_value=60,
+                notes="Outdoor humidity 95%RH - dehumidification at max",
+            )
+        )
 
         # T+3h: Still high
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(hours=3)).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="theatre_ahu",
-            alarm_code="HUMIDITY_HI",
-            severity="warning",
-            description="ICU humidity still elevated",
-            point_name="supply_humidity",
-            point_value=68,
-            threshold_value=60,
-            notes="Adjusting cooling coil discharge temp",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(hours=3)).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="theatre_ahu",
+                alarm_code="HUMIDITY_HI",
+                severity="warning",
+                description="ICU humidity still elevated",
+                point_name="supply_humidity",
+                point_value=68,
+                threshold_value=60,
+                notes="Adjusting cooling coil discharge temp",
+            )
+        )
 
         # T+4h: Action taken
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(hours=4)).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="theatre_ahu",
-            alarm_code="HUMIDITY_HI",
-            severity="warning",
-            acknowledged=True,
-            acknowledged_by="BMS Operator",
-            acknowledged_at=(start_date + timedelta(hours=4)).isoformat(),
-            description="Humidity control adjusted",
-            point_name="supply_humidity",
-            point_value=63,
-            notes="Reheat enabled, overcooling for dehumidification",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(hours=4)).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="theatre_ahu",
+                alarm_code="HUMIDITY_HI",
+                severity="warning",
+                acknowledged=True,
+                acknowledged_by="BMS Operator",
+                acknowledged_at=(start_date + timedelta(hours=4)).isoformat(),
+                description="Humidity control adjusted",
+                point_name="supply_humidity",
+                point_value=63,
+                notes="Reheat enabled, overcooling for dehumidification",
+            )
+        )
 
         # T+6h: Resolved
-        alarms.append(AlarmEvent(
-            timestamp=(start_date + timedelta(hours=6)).isoformat(),
-            equipment_id=equipment_id,
-            equipment_type="theatre_ahu",
-            alarm_code="HUMIDITY_HI",
-            severity="warning",
-            acknowledged=True,
-            cleared=True,
-            cleared_at=(start_date + timedelta(hours=6)).isoformat(),
-            description="Humidity returned to setpoint",
-            point_name="supply_humidity",
-            point_value=55,
-            notes="Dehumidification successful with adjusted strategy",
-        ))
+        alarms.append(
+            AlarmEvent(
+                timestamp=(start_date + timedelta(hours=6)).isoformat(),
+                equipment_id=equipment_id,
+                equipment_type="theatre_ahu",
+                alarm_code="HUMIDITY_HI",
+                severity="warning",
+                acknowledged=True,
+                cleared=True,
+                cleared_at=(start_date + timedelta(hours=6)).isoformat(),
+                description="Humidity returned to setpoint",
+                point_name="supply_humidity",
+                point_value=55,
+                notes="Dehumidification successful with adjusted strategy",
+            )
+        )
 
         return alarms
 

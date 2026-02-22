@@ -154,13 +154,14 @@ async def enroll_mfa(request: Request):
         # Log failed enrollment attempt
         try:
             from app.database.repositories.audit_repository import AuditRepository
+
             audit_repo = AuditRepository()
             audit_repo.log_security_event(
-                event_type='MFA_ENROLLED',
+                event_type="MFA_ENROLLED",
                 user_id=user["id"],
                 ip_address=source_ip,
-                result='FAILED',
-                details={'reason': 'enrollment_generation_failed'}
+                result="FAILED",
+                details={"reason": "enrollment_generation_failed"},
             )
         except Exception as e:
             logger.warning(f"Failed to audit log failed MFA enrollment: {e}")
@@ -177,13 +178,14 @@ async def enroll_mfa(request: Request):
     # Log successful enrollment initiation (Phase 65-04)
     try:
         from app.database.repositories.audit_repository import AuditRepository
+
         audit_repo = AuditRepository()
         audit_repo.log_security_event(
-            event_type='MFA_ENROLLED',
+            event_type="MFA_ENROLLED",
             user_id=user["id"],
             ip_address=source_ip,
-            result='SUCCESS',
-            details={'action': 'enrollment_started', 'backup_codes_generated': bool(backup_codes)}
+            result="SUCCESS",
+            details={"action": "enrollment_started", "backup_codes_generated": bool(backup_codes)},
         )
         logger.info(f"User {user['id']} started MFA enrollment")
     except Exception as e:
@@ -236,13 +238,14 @@ async def verify_and_enable_mfa(request: Request, body: VerifyRequest):
         # Log failed verification
         try:
             from app.database.repositories.audit_repository import AuditRepository
+
             audit_repo = AuditRepository()
             audit_repo.log_security_event(
-                event_type='MFA_ENROLLED',
+                event_type="MFA_ENROLLED",
                 user_id=user["id"],
                 ip_address=source_ip,
-                result='FAILED',
-                details={'reason': error or 'verification_failed'}
+                result="FAILED",
+                details={"reason": error or "verification_failed"},
             )
         except Exception as e:
             logger.warning(f"Failed to audit log failed MFA verification: {e}")
@@ -252,13 +255,14 @@ async def verify_and_enable_mfa(request: Request, body: VerifyRequest):
     # Log successful MFA enrollment (Phase 65-04)
     try:
         from app.database.repositories.audit_repository import AuditRepository
+
         audit_repo = AuditRepository()
         audit_repo.log_security_event(
-            event_type='MFA_ENROLLED',
+            event_type="MFA_ENROLLED",
             user_id=user["id"],
             ip_address=source_ip,
-            result='SUCCESS',
-            details={'action': 'mfa_enabled'}
+            result="SUCCESS",
+            details={"action": "mfa_enabled"},
         )
         logger.info(f"User {user['id']} successfully enabled MFA")
     except Exception as e:
@@ -440,13 +444,14 @@ async def disable_mfa(request: Request, body: DisableRequest):
         # Log failed MFA disabling attempt
         try:
             from app.database.repositories.audit_repository import AuditRepository
+
             audit_repo = AuditRepository()
             audit_repo.log_security_event(
-                event_type='MFA_DISABLED',
+                event_type="MFA_DISABLED",
                 user_id=user["id"],
                 ip_address=source_ip,
-                result='FAILED',
-                details={'target_user': body.user_email, 'reason': 'user_mfa_not_enabled'}
+                result="FAILED",
+                details={"target_user": body.user_email, "reason": "user_mfa_not_enabled"},
             )
         except Exception as e:
             logger.warning(f"Failed to audit log failed MFA disable: {e}")
@@ -459,13 +464,14 @@ async def disable_mfa(request: Request, body: DisableRequest):
     # Log successful MFA disabling (Phase 65-04)
     try:
         from app.database.repositories.audit_repository import AuditRepository
+
         audit_repo = AuditRepository()
         audit_repo.log_security_event(
-            event_type='MFA_DISABLED',
+            event_type="MFA_DISABLED",
             user_id=user["id"],
             ip_address=source_ip,
-            result='SUCCESS',
-            details={'target_user': body.user_email}
+            result="SUCCESS",
+            details={"target_user": body.user_email},
         )
         logger.warning(f"Admin {user['id']} disabled MFA for {body.user_email}")
     except Exception as e:

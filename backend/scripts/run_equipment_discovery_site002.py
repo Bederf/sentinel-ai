@@ -15,7 +15,7 @@ import sys
 import asyncio
 
 # Add backend to path
-sys.path.insert(0, '/opt/bms-intelligence/backend')
+sys.path.insert(0, "/opt/bms-intelligence/backend")
 
 from app.database.repositories.building_repository import BuildingRepository
 from app.services.dali_discovery_service import SimulatedDALIDiscovery
@@ -88,7 +88,7 @@ async def discover_equipment_for_site(site_code: str):
         print(f"❌ Site {site_code} not found")
         return
 
-    building_uuid = building['id']
+    building_uuid = building["id"]
     print(f"✅ Found site: {building['name']}")
 
     # Get all equipment
@@ -105,10 +105,10 @@ async def discover_equipment_for_site(site_code: str):
     error_count = 0
 
     for idx, equipment in enumerate(equipment_list, 1):
-        eq_code = equipment.get('code')
-        eq_type = equipment.get('type')
-        eq_name = equipment.get('name')
-        eq_id = equipment.get('id')
+        eq_code = equipment.get("code")
+        eq_type = equipment.get("type")
+        eq_name = equipment.get("name")
+        eq_id = equipment.get("id")
 
         try:
             # Determine protocol
@@ -128,18 +128,15 @@ async def discover_equipment_for_site(site_code: str):
             operating_data = discovery_data.get("operating_data")
 
             metadata_repo.update_from_discovery(
-                equipment_id=eq_id,
-                network_info=network_info,
-                device_info=device_info,
-                operating_data=operating_data
+                equipment_id=eq_id, network_info=network_info, device_info=device_info, operating_data=operating_data
             )
 
             # Extract useful info for display
             protocol_info = f"[{protocol.upper()}]"
             if device_info:
-                if device_info.get('manufacturer'):
+                if device_info.get("manufacturer"):
                     protocol_info += f" {device_info['manufacturer']}"
-                if device_info.get('model'):
+                if device_info.get("model"):
                     protocol_info += f" {device_info['model']}"
 
             print(f"✅ [{idx:2d}/{len(equipment_list)}] {eq_code:<25} {protocol_info}")
@@ -153,7 +150,7 @@ async def discover_equipment_for_site(site_code: str):
     print(f"\n📊 Discovery Summary for {site_code}:")
     print(f"   ✅ Successful: {success_count}/{len(equipment_list)}")
     print(f"   ❌ Failed:     {error_count}/{len(equipment_list)}")
-    print(f"   Success Rate: {success_count*100//len(equipment_list)}%")
+    print(f"   Success Rate: {success_count * 100 // len(equipment_list)}%")
 
     if success_count > 0:
         print("\n✨ Equipment metadata has been populated!")

@@ -11,25 +11,29 @@ from typing import List, Dict, Any, Optional
 
 # === Enums ===
 
+
 class ATSType(str, Enum):
     """ATS changeover mechanism type."""
-    MECHANICAL = "mechanical"         # Motorized contactors (Socomec, ABB)
-    ELECTRONIC = "electronic"         # Solid-state/static transfer
-    HYBRID = "hybrid"                 # Mechanical with electronic control
+
+    MECHANICAL = "mechanical"  # Motorized contactors (Socomec, ABB)
+    ELECTRONIC = "electronic"  # Solid-state/static transfer
+    HYBRID = "hybrid"  # Mechanical with electronic control
 
 
 class ATSPosition(str, Enum):
     """ATS position states."""
+
     MAINS = "mains"
     GENERATOR = "generator"
-    OFF = "off"                       # Both open (break-before-make)
+    OFF = "off"  # Both open (break-before-make)
     TRANSITIONING = "transitioning"
-    PARALLEL = "parallel"             # Brief parallel for closed-transition
+    PARALLEL = "parallel"  # Brief parallel for closed-transition
     FAULT = "fault"
 
 
 class BreakerState(str, Enum):
     """Circuit breaker states."""
+
     OPEN = "open"
     CLOSED = "closed"
     TRIPPED = "tripped"
@@ -40,12 +44,14 @@ class BreakerState(str, Enum):
 
 class TransformerTapPosition(str, Enum):
     """Transformer tap changer positions."""
-    LOWER = "lower"      # -5% to -2.5%
+
+    LOWER = "lower"  # -5% to -2.5%
     NOMINAL = "nominal"  # 0%
-    RAISE = "raise"      # +2.5% to +5%
+    RAISE = "raise"  # +2.5% to +5%
 
 
 # === ATS / Transfer Switch ===
+
 
 @dataclass
 class ATSUnit:
@@ -57,25 +63,25 @@ class ATSUnit:
     location: str
 
     # Configuration
-    ats_type: str = "mechanical"      # mechanical, electronic, hybrid
+    ats_type: str = "mechanical"  # mechanical, electronic, hybrid
     rated_current_a: float = 2500.0
     rated_voltage: float = 400.0
-    poles: int = 4                    # 3P+N
-    transfer_mode: str = "closed"     # open, closed, soft_load
+    poles: int = 4  # 3P+N
+    transfer_mode: str = "closed"  # open, closed, soft_load
 
     # Current state
-    position: str = "mains"           # mains, generator, off, transitioning, parallel
+    position: str = "mains"  # mains, generator, off, transitioning, parallel
     mains_available: bool = True
     generator_available: bool = True
 
     # Breaker states (for motorized ACB type)
-    mains_breaker: str = "closed"     # open, closed, tripped
+    mains_breaker: str = "closed"  # open, closed, tripped
     gen_breaker: str = "open"
     bus_coupler: Optional[str] = None  # For split-bus configurations
 
     # Transfer metrics
-    last_transfer_time_ms: int = 0    # Time taken for last transfer
-    transfer_count: int = 0           # Total transfer operations
+    last_transfer_time_ms: int = 0  # Time taken for last transfer
+    transfer_count: int = 0  # Total transfer operations
     last_transfer_timestamp: Optional[str] = None
     last_transfer_reason: Optional[str] = None  # "mains_fail", "test", "scheduled"
 
@@ -85,7 +91,7 @@ class ATSUnit:
 
     # Communication
     controller_ip: Optional[str] = None
-    protocol: str = "modbus"          # modbus, bacnet, proprietary
+    protocol: str = "modbus"  # modbus, bacnet, proprietary
     last_poll: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -119,6 +125,7 @@ class ATSUnit:
 
 # === MV Switchgear ===
 
+
 @dataclass
 class MVIncomer:
     """Medium Voltage incomer (typically 11kV from Eskom)."""
@@ -141,7 +148,7 @@ class MVIncomer:
     frequency_hz: float = 50.0
 
     # Status
-    breaker_state: str = "closed"     # open, closed, tripped
+    breaker_state: str = "closed"  # open, closed, tripped
     healthy: bool = True
 
     # Protection relay (e.g., Siemens SIPROTEC, ABB REF615)
@@ -153,7 +160,7 @@ class MVIncomer:
 
     # Eskom supply point
     supply_point_id: Optional[str] = None  # NRS number
-    tariff_type: Optional[str] = None      # Megaflex, Miniflex, etc.
+    tariff_type: Optional[str] = None  # Megaflex, Miniflex, etc.
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -183,6 +190,7 @@ class MVIncomer:
 
 # === Transformers ===
 
+
 @dataclass
 class Transformer:
     """MV/LV Transformer."""
@@ -209,18 +217,18 @@ class Transformer:
     ambient_temp_c: Optional[float] = None
 
     # Tap changer
-    tap_position: int = 0            # -2, -1, 0, +1, +2 typical
-    tap_range_pct: float = 5.0       # +/- 5%
+    tap_position: int = 0  # -2, -1, 0, +1, +2 typical
+    tap_range_pct: float = 5.0  # +/- 5%
     on_load_tap_changer: bool = False
 
     # Status
     healthy: bool = True
     oil_level_ok: bool = True
-    buchholz_alarm: bool = False     # Gas accumulation alarm
+    buchholz_alarm: bool = False  # Gas accumulation alarm
     pressure_relief_ok: bool = True
 
     # Cooling
-    cooling_type: str = "ONAN"       # ONAN, ONAF, etc.
+    cooling_type: str = "ONAN"  # ONAN, ONAF, etc.
     fans_running: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
@@ -253,6 +261,7 @@ class Transformer:
 
 # === LV Switchboard ===
 
+
 @dataclass
 class LVSwitchboard:
     """Low Voltage Main Switchboard (MSB)."""
@@ -268,7 +277,7 @@ class LVSwitchboard:
     fault_rating_ka: float = 50.0
 
     # Bus configuration
-    bus_sections: int = 2            # Split bus typical
+    bus_sections: int = 2  # Split bus typical
     bus_coupler_closed: bool = False
 
     # Current readings (main bus)
@@ -325,6 +334,7 @@ class LVSwitchboard:
 
 # === Power Metering ===
 
+
 @dataclass
 class PowerMeter:
     """Power/Energy meter (main incomer, sub-meter, check meter)."""
@@ -333,14 +343,14 @@ class PowerMeter:
     name: str
     site_id: str
     location: str
-    meter_type: str = "main"         # main, sub, check, generator
+    meter_type: str = "main"  # main, sub, check, generator
 
     # Meter info
     manufacturer: str = "Schneider"  # Schneider ION, Satec, Elster
     model: Optional[str] = None
     serial_number: Optional[str] = None
     ct_ratio: str = "2000/5"
-    vt_ratio: Optional[str] = None   # For MV metering
+    vt_ratio: Optional[str] = None  # For MV metering
 
     # Instantaneous readings
     voltage_l1_n: float = 230.0
@@ -374,8 +384,8 @@ class PowerMeter:
     voltage_unbalance_pct: Optional[float] = None
 
     # Tariff (for billing meters)
-    tariff_type: Optional[str] = None        # Megaflex, Miniflex, Nightsave
-    tou_period: Optional[str] = None         # peak, standard, off-peak
+    tariff_type: Optional[str] = None  # Megaflex, Miniflex, Nightsave
+    tou_period: Optional[str] = None  # peak, standard, off-peak
 
     # Communication
     protocol: str = "modbus"
@@ -425,6 +435,7 @@ class PowerMeter:
 
 # === Power Factor Correction ===
 
+
 @dataclass
 class PFCBank:
     """Power Factor Correction capacitor bank."""
@@ -435,9 +446,9 @@ class PFCBank:
     location: str
 
     # Ratings
-    total_kvar: float = 600.0        # Total bank capacity
-    steps: int = 12                   # Number of switching steps
-    step_size_kvar: float = 50.0     # kVAR per step
+    total_kvar: float = 600.0  # Total bank capacity
+    steps: int = 12  # Number of switching steps
+    step_size_kvar: float = 50.0  # kVAR per step
 
     # Current state
     active_steps: int = 0
@@ -477,6 +488,7 @@ class PFCBank:
 
 # === UPS Systems ===
 
+
 @dataclass
 class UPSSystem:
     """Uninterruptible Power Supply system."""
@@ -489,7 +501,7 @@ class UPSSystem:
     # Ratings
     rated_power_kva: float = 200.0
     rated_power_kw: float = 180.0
-    topology: str = "online"         # online (double-conversion), line-interactive, offline
+    topology: str = "online"  # online (double-conversion), line-interactive, offline
 
     # Input
     input_voltage: float = 400.0
@@ -513,7 +525,7 @@ class UPSSystem:
     battery_replace_date: Optional[str] = None  # Recommended replacement
 
     # Status
-    mode: str = "online"             # online, battery, bypass, standby, fault
+    mode: str = "online"  # online, battery, bypass, standby, fault
     on_battery: bool = False
     on_bypass: bool = False
     overload: bool = False
@@ -522,7 +534,7 @@ class UPSSystem:
     alarms: List[str] = field(default_factory=list)
 
     # Communication
-    protocol: str = "snmp"           # snmp, modbus
+    protocol: str = "snmp"  # snmp, modbus
     ip_address: Optional[str] = None
     last_poll: Optional[str] = None
 
@@ -562,6 +574,7 @@ class UPSSystem:
 
 
 # === Energy Centre Overview ===
+
 
 @dataclass
 class EnergyCentre:

@@ -117,9 +117,7 @@ def test_audit_logger_encryption():
             new_value=action["new"],
             result=AuditResultType.SUCCESS,
         )
-        print(
-            f"  Logged: {action['user']} -> {action['device']} ({entry_id})"
-        )
+        print(f"  Logged: {action['user']} -> {action['device']} ({entry_id})")
 
     # Flush to disk
     logger.flush()
@@ -137,12 +135,8 @@ def test_audit_logger_encryption():
         if data["entries"]:
             entry = data["entries"][0]
             print("\n  Sample encrypted entry:")
-            print(
-                f"    user field:      {entry.get('user', '')[:60]}..."
-            )
-            print(
-                f"    device_id field: {entry.get('device_id', '')[:60]}..."
-            )
+            print(f"    user field:      {entry.get('user', '')[:60]}...")
+            print(f"    device_id field: {entry.get('device_id', '')[:60]}...")
 
             # Check Fernet format
             if entry.get("user", "").startswith("gAAAAAB"):
@@ -196,9 +190,7 @@ def test_dict_encryption():
 
     # Encrypt only sensitive fields
     sensitive = ["user", "device_id"]
-    encrypted_dict = service.encrypt_dict(
-        original_dict, fields_to_encrypt=sensitive
-    )
+    encrypted_dict = service.encrypt_dict(original_dict, fields_to_encrypt=sensitive)
 
     print(f"\nAfter encrypting {sensitive}:")
     for key_name, value in encrypted_dict.items():
@@ -208,9 +200,7 @@ def test_dict_encryption():
             print(f"  {key_name:15} = {value}")
 
     # Decrypt
-    decrypted_dict = service.decrypt_dict(
-        encrypted_dict, fields_to_decrypt=sensitive
-    )
+    decrypted_dict = service.decrypt_dict(encrypted_dict, fields_to_decrypt=sensitive)
 
     print("\nAfter decryption:")
     for key_name, value in decrypted_dict.items():

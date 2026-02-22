@@ -64,9 +64,9 @@ async def create_sample_alerts():
     created_alerts = []
     for equipment_data in at_risk_equipment:
         # Get equipment by code
-        eq_response = client.table("equipment").select("id, building_id, name").eq(
-            "code", equipment_data["code"]
-        ).execute()
+        eq_response = (
+            client.table("equipment").select("id, building_id, name").eq("code", equipment_data["code"]).execute()
+        )
 
         if not eq_response.data:
             print(f"  ✗ Equipment {equipment_data['code']} not found - skipping")
@@ -96,10 +96,12 @@ async def create_sample_alerts():
 
             # Update equipment health score based on severity
             health_score = 30 if equipment_data["severity"] == "critical" else 60
-            update_result = client.table("equipment").update({
-                "health_score": health_score,
-                "status": equipment_data["severity"]
-            }).eq("id", equipment["id"]).execute()
+            update_result = (
+                client.table("equipment")
+                .update({"health_score": health_score, "status": equipment_data["severity"]})
+                .eq("id", equipment["id"])
+                .execute()
+            )
 
             if update_result.data:
                 print(f"    → Updated health_score to {health_score}")
@@ -118,7 +120,7 @@ async def create_sample_alerts():
     print(f"  Skipped (low probability): {result.get('skipped_low_probability', 0)}")
     print(f"  Resolved: {result.get('resolved', 0)}")
 
-    if result.get('errors'):
+    if result.get("errors"):
         print(f"  Errors: {result.get('errors')}")
 
     print("\n✓ Sample alerts and predictions ready!")
@@ -137,5 +139,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

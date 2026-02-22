@@ -47,15 +47,15 @@ class ZoneDiagnostics:
         # Parse zone_id like "Zone-L10-C"
         parts = zone_id.split("-")
         floor = parts[1]  # L10
-        zone = parts[2]   # C
-        zone_num = ord(zone) - ord('A') + 1  # A=1, B=2, etc.
+        zone = parts[2]  # C
+        zone_num = ord(zone) - ord("A") + 1  # A=1, B=2, etc.
 
         return {
             "fcu": f"FCU-{floor}-0{zone_num}",
             "vav": f"VAV-{floor}-0{zone_num}",
             "ahu": f"AHU-{floor}-01",
             "temp_sensor": f"TS-{floor}-0{zone_num}",
-            "co2_sensor": f"CO2-{floor}-0{zone_num}"
+            "co2_sensor": f"CO2-{floor}-0{zone_num}",
         }
 
     def get_equipment_status(self, equipment_codes: Dict[str, str]) -> Dict[str, Dict]:
@@ -67,12 +67,7 @@ class ZoneDiagnostics:
                 status[code] = result.data[0]
         return status
 
-    def analyze_temperature_high(
-        self,
-        zone_id: str,
-        current_temp: float,
-        setpoint: float
-    ) -> DiagnosticResult:
+    def analyze_temperature_high(self, zone_id: str, current_temp: float, setpoint: float) -> DiagnosticResult:
         """Analyze high temperature condition."""
         deviation = current_temp - setpoint
         equipment_codes = self.get_zone_equipment(zone_id)
@@ -110,7 +105,7 @@ class ZoneDiagnostics:
                 "Check valve actuator power supply (24VAC)",
                 "Verify BMS control signal (0-10V or 4-20mA)",
                 "Attempt manual override to test valve",
-                "Replace actuator if unresponsive"
+                "Replace actuator if unresponsive",
             ]
             parts_required = [f"{fcu.get('manufacturer', 'Belimo')} {fcu.get('model', 'LMV-D3')} actuator"]
             repair_hours = 2.0
@@ -126,7 +121,7 @@ class ZoneDiagnostics:
                 "Check chiller operation and leaving water temp",
                 "Verify AHU chilled water valve position",
                 "Check for air filter blockage",
-                "Inspect cooling coil for fouling"
+                "Inspect cooling coil for fouling",
             ]
             parts_required = []
             repair_hours = 4.0
@@ -139,7 +134,7 @@ class ZoneDiagnostics:
             recommended_actions = [
                 "Check zone occupancy count",
                 "Increase FCU fan speed temporarily",
-                "Lower setpoint by 1°C during peak hours"
+                "Lower setpoint by 1°C during peak hours",
             ]
             repair_hours = 0
 
@@ -164,7 +159,7 @@ class ZoneDiagnostics:
             recommended_actions=recommended_actions,
             parts_required=parts_required,
             estimated_repair_hours=repair_hours,
-            severity=severity
+            severity=severity,
         )
 
     def format_sentry_message(self, diag: DiagnosticResult) -> str:
@@ -182,7 +177,7 @@ class ZoneDiagnostics:
         eq_summary = "\n".join(eq_lines)
 
         # Actions
-        actions = "\n".join([f"  {i+1}. {a}" for i, a in enumerate(diag.recommended_actions[:3])])
+        actions = "\n".join([f"  {i + 1}. {a}" for i, a in enumerate(diag.recommended_actions[:3])])
 
         message = f"""{emoji} *{diag.severity.upper()} ALERT*
 
@@ -210,4 +205,5 @@ Reply: /ack | /dispatch | /wo {diag.faulty_equipment}"""
 def get_zone_diagnostics():
     """Get diagnostics service instance."""
     from app.database.supabase_client import get_supabase_client
+
     return ZoneDiagnostics(get_supabase_client())

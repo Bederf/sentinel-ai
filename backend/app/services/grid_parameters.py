@@ -53,10 +53,7 @@ class GridParametersService:
                 self.current_voltage_v = meter.voltage_v
                 self.last_reading_time = datetime.now(timezone.utc)
 
-                logger.debug(
-                    f"Grid meter update: {self.current_frequency_hz} Hz, "
-                    f"{self.current_voltage_v} V"
-                )
+                logger.debug(f"Grid meter update: {self.current_frequency_hz} Hz, {self.current_voltage_v} V")
 
             return meter
         except Exception as e:
@@ -80,7 +77,7 @@ class GridParametersService:
             for inv in inverters:
                 total_power_kw += inv.ac_power_kw
                 avg_frequency_hz += inv.frequency_hz
-                avg_voltage_v += getattr(inv, 'voltage_v', 400.0)
+                avg_voltage_v += getattr(inv, "voltage_v", 400.0)
 
             count = len(inverters)
             if count > 0:
@@ -90,10 +87,7 @@ class GridParametersService:
                 self.current_voltage_v = avg_voltage_v / count
                 self.last_reading_time = datetime.now(timezone.utc)
 
-                logger.debug(
-                    f"Inverter update: {self.current_power_kw} kW, "
-                    f"{self.current_frequency_hz} Hz"
-                )
+                logger.debug(f"Inverter update: {self.current_power_kw} kW, {self.current_frequency_hz} Hz")
 
             return {
                 "ac_power_kw": self.current_power_kw,
@@ -113,11 +107,7 @@ class GridParametersService:
             GridParameters object with current frequency, voltage, power
         """
         now = datetime.now(timezone.utc)
-        time_delta = (
-            (now - self.last_reading_time).total_seconds()
-            if self.last_reading_time
-            else 1.0
-        )
+        time_delta = (now - self.last_reading_time).total_seconds() if self.last_reading_time else 1.0
 
         params = GridParameters(
             timestamp=now.isoformat(),
@@ -176,9 +166,7 @@ class GridParametersService:
 
         return stage, None
 
-    def _record_to_history(
-        self, params: GridParameters, status: Dict[str, Any]
-    ) -> None:
+    def _record_to_history(self, params: GridParameters, status: Dict[str, Any]) -> None:
         """Record reading to history for trending."""
         record = {
             "timestamp": params.timestamp,
@@ -194,9 +182,7 @@ class GridParametersService:
         if len(self.reading_history) > self.max_history_length:
             self.reading_history = self.reading_history[-self.max_history_length :]
 
-    async def get_frequency_trend(
-        self, window_minutes: int = 60
-    ) -> List[Dict[str, Any]]:
+    async def get_frequency_trend(self, window_minutes: int = 60) -> List[Dict[str, Any]]:
         """Get frequency readings over a time window.
 
         Args:
@@ -213,16 +199,16 @@ class GridParametersService:
         cutoff_records = max(1, window_minutes)  # 1 reading per minute
 
         for record in self.reading_history[-cutoff_records:]:
-            filtered.append({
-                "timestamp": record["timestamp"],
-                "frequency_hz": record["frequency_hz"],
-            })
+            filtered.append(
+                {
+                    "timestamp": record["timestamp"],
+                    "frequency_hz": record["frequency_hz"],
+                }
+            )
 
         return filtered
 
-    async def get_voltage_trend(
-        self, window_minutes: int = 60
-    ) -> List[Dict[str, Any]]:
+    async def get_voltage_trend(self, window_minutes: int = 60) -> List[Dict[str, Any]]:
         """Get voltage readings over a time window.
 
         Args:
@@ -238,16 +224,16 @@ class GridParametersService:
         cutoff_records = max(1, window_minutes)
 
         for record in self.reading_history[-cutoff_records:]:
-            filtered.append({
-                "timestamp": record["timestamp"],
-                "voltage_v": record["voltage_v"],
-            })
+            filtered.append(
+                {
+                    "timestamp": record["timestamp"],
+                    "voltage_v": record["voltage_v"],
+                }
+            )
 
         return filtered
 
-    async def get_power_trend(
-        self, window_minutes: int = 60
-    ) -> List[Dict[str, Any]]:
+    async def get_power_trend(self, window_minutes: int = 60) -> List[Dict[str, Any]]:
         """Get power readings over a time window.
 
         Args:
@@ -263,10 +249,12 @@ class GridParametersService:
         cutoff_records = max(1, window_minutes)
 
         for record in self.reading_history[-cutoff_records:]:
-            filtered.append({
-                "timestamp": record["timestamp"],
-                "ac_power_kw": record["ac_power_kw"],
-            })
+            filtered.append(
+                {
+                    "timestamp": record["timestamp"],
+                    "ac_power_kw": record["ac_power_kw"],
+                }
+            )
 
         return filtered
 

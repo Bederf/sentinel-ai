@@ -128,10 +128,7 @@ class PreferencesRepository:
                 "default_energy_site_id": preferences.default_energy_site_id,
             }
 
-            result = self.client.table("dashboard_preferences").upsert(
-                data,
-                on_conflict="user_id"
-            ).execute()
+            result = self.client.table("dashboard_preferences").upsert(data, on_conflict="user_id").execute()
 
             if result.data and len(result.data) > 0:
                 return result.data[0]

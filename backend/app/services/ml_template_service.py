@@ -21,7 +21,7 @@ ROOT_CAUSE_OPTIONS = {
             "Control signal issue (0-10V)",
             "Power supply issue (24VAC)",
             "Valve seized/corroded",
-            "Other"
+            "Other",
         ],
         "fcu_fan_failure": [
             "Motor bearing failure",
@@ -29,8 +29,8 @@ ROOT_CAUSE_OPTIONS = {
             "Capacitor failed",
             "Fan blade damaged",
             "VSD/speed controller fault",
-            "Other"
-        ]
+            "Other",
+        ],
     },
     "vav": {
         "vav_damper_stuck": [
@@ -38,7 +38,7 @@ ROOT_CAUSE_OPTIONS = {
             "Damper blade jammed",
             "Linkage disconnected",
             "Controller fault",
-            "Other"
+            "Other",
         ]
     },
     "ahu": {
@@ -48,7 +48,7 @@ ROOT_CAUSE_OPTIONS = {
             "Coil fouled/blocked",
             "Filter blocked (high DP)",
             "VSD fault",
-            "Other"
+            "Other",
         ]
     },
     "generator": {
@@ -58,9 +58,9 @@ ROOT_CAUSE_OPTIONS = {
             "Fuel solenoid stuck",
             "Controller fault",
             "Safety interlock active",
-            "Other"
+            "Other",
         ]
-    }
+    },
 }
 
 
@@ -85,7 +85,7 @@ class MLTemplateService:
     def _load_templates(self) -> Dict[str, Any]:
         """Load templates from JSON file."""
         if self._templates is None:
-            with open(self.templates_path, 'r') as f:
+            with open(self.templates_path, "r") as f:
                 self._templates = json.load(f)
         return self._templates
 
@@ -187,12 +187,7 @@ class MLTemplateService:
         """
         template = self.get_template(equipment_type, service_type)
         if not template:
-            return {
-                "is_complete": False,
-                "missing_items": [],
-                "progress": "0/0",
-                "error": "Template not found"
-            }
+            return {"is_complete": False, "missing_items": [], "progress": "0/0", "error": "Template not found"}
 
         required_items = template.get("required", [])
         missing_items = [item for item in required_items if item not in collected_items]
@@ -204,7 +199,7 @@ class MLTemplateService:
             "is_complete": is_complete,
             "missing_items": missing_items,
             "progress": progress,
-            "completion_percentage": (len(collected_items) / len(required_items) * 100) if required_items else 0
+            "completion_percentage": (len(collected_items) / len(required_items) * 100) if required_items else 0,
         }
 
     def get_validation_rules(self, equipment_type: str, service_type: str) -> Dict[str, Any]:
@@ -265,7 +260,7 @@ class MLTemplateService:
         service_type: str,
         diagnostic_context: Optional[Dict[str, Any]],
         collected_items: List[str],
-        current_step: str
+        current_step: str,
     ) -> Dict[str, Any]:
         """Generate context-aware prompt based on diagnostic context.
 
@@ -285,11 +280,7 @@ class MLTemplateService:
         # If no diagnostic context, fall back to standard prompts
         if not diagnostic_context:
             standard_prompt = self.get_next_prompt(equipment_type, service_type, collected_items)
-            return {
-                "prompt": standard_prompt,
-                "type": "open_text",
-                "options": None
-            }
+            return {"prompt": standard_prompt, "type": "open_text", "options": None}
 
         fault_type = diagnostic_context.get("fault_type", "")
         fault_description = diagnostic_context.get("fault_description", "")
@@ -303,7 +294,7 @@ class MLTemplateService:
             return {
                 "prompt": f"Please take a photo of the issue BEFORE you start the repair.\n\nDetected issue: {fault_description}",
                 "type": "photo",
-                "options": None
+                "options": None,
             }
 
         # Step 1: Confirm the detected fault
@@ -311,7 +302,7 @@ class MLTemplateService:
             return {
                 "prompt": f"{faulty_equipment} repair complete - thanks!\n\nWe detected: {fault_description}\n\nDid you confirm this was the issue?",
                 "type": "choice",
-                "options": ["Yes, confirmed", "No, different issue", "Partially - multiple issues"]
+                "options": ["Yes, confirmed", "No, different issue", "Partially - multiple issues"],
             }
 
         # Step 2: Root cause selection (context-aware options)
@@ -325,13 +316,9 @@ class MLTemplateService:
                     "Control/signal issue",
                     "Wear and tear",
                     "Environmental factors",
-                    "Other"
+                    "Other",
                 ]
-            return {
-                "prompt": "What was the root cause?",
-                "type": "choice",
-                "options": options
-            }
+            return {"prompt": "What was the root cause?", "type": "choice", "options": options}
 
         # Step 3: Repair action (pre-filled from recommendations)
         if current_step == "repair_action":
@@ -340,23 +327,15 @@ class MLTemplateService:
                 options = recommended[:4]  # Max 4 options
                 if "Other repair" not in options:
                     options.append("Other repair")
-                return {
-                    "prompt": "What repair did you perform?",
-                    "type": "choice",
-                    "options": options
-                }
-            return {
-                "prompt": "What repair did you perform?",
-                "type": "open_text",
-                "options": None
-            }
+                return {"prompt": "What repair did you perform?", "type": "choice", "options": options}
+            return {"prompt": "What repair did you perform?", "type": "open_text", "options": None}
 
         # Step 4: Photo AFTER repair
         if current_step == "photo_after":
             return {
                 "prompt": "Repair complete! Please take a photo showing the completed repair.",
                 "type": "photo",
-                "options": None
+                "options": None,
             }
 
         # Step 5: Parts replaced (suggest from parts_required)
@@ -366,13 +345,9 @@ class MLTemplateService:
                 return {
                     "prompt": f"Parts suggested: {', '.join(parts)}\n\nPhoto of replacement part label?",
                     "type": "photo",
-                    "options": None
+                    "options": None,
                 }
-            return {
-                "prompt": "Photo of replacement part label?",
-                "type": "photo",
-                "options": None
-            }
+            return {"prompt": "Photo of replacement part label?", "type": "photo", "options": None}
 
         # Step 5: Verification reading (compare to original)
         if current_step == "verification_reading":
@@ -381,21 +356,13 @@ class MLTemplateService:
                     "prompt": f"Zone temp now? (was {original_reading}°C, setpoint {setpoint}°C)",
                     "type": "numeric",
                     "options": None,
-                    "validation": {"min": 15, "max": 35, "unit": "°C"}
+                    "validation": {"min": 15, "max": 35, "unit": "°C"},
                 }
-            return {
-                "prompt": "Current reading after repair?",
-                "type": "numeric",
-                "options": None
-            }
+            return {"prompt": "Current reading after repair?", "type": "numeric", "options": None}
 
         # Default: fall back to standard prompt
         standard_prompt = self.get_next_prompt(equipment_type, service_type, collected_items)
-        return {
-            "prompt": standard_prompt,
-            "type": "open_text",
-            "options": None
-        }
+        return {"prompt": standard_prompt, "type": "open_text", "options": None}
 
     def get_breakdown_flow(self, equipment_type: str, diagnostic_context: Optional[Dict[str, Any]]) -> List[str]:
         """Get the ordered flow of steps for breakdown data collection.
@@ -410,31 +377,28 @@ class MLTemplateService:
         # If we have diagnostic context, use context-aware flow
         if diagnostic_context and diagnostic_context.get("fault_type"):
             return [
-                "photo_before",        # Photo of issue BEFORE repair
+                "photo_before",  # Photo of issue BEFORE repair
                 "fault_confirmation",  # Confirm detected fault
-                "root_cause",          # Select root cause from options
-                "repair_action",       # What was done
-                "photo_after",         # Photo AFTER repair complete
-                "parts_replaced",      # Photo of replacement part label
-                "verification_reading" # Confirm repair worked
+                "root_cause",  # Select root cause from options
+                "repair_action",  # What was done
+                "photo_after",  # Photo AFTER repair complete
+                "parts_replaced",  # Photo of replacement part label
+                "verification_reading",  # Confirm repair worked
             ]
 
         # Otherwise use standard breakdown flow
         return [
-            "photo_before",        # Photo of issue BEFORE repair
+            "photo_before",  # Photo of issue BEFORE repair
             "fault_description",
             "root_cause",
             "diagnostic_steps",
             "repair_action",
-            "photo_after",         # Photo AFTER repair complete
-            "parts_replaced"
+            "photo_after",  # Photo AFTER repair complete
+            "parts_replaced",
         ]
 
     def extract_info_from_response(
-        self,
-        equipment_type: str,
-        diagnostic_context: Optional[Dict[str, Any]],
-        response_text: str
+        self, equipment_type: str, diagnostic_context: Optional[Dict[str, Any]], response_text: str
     ) -> Dict[str, Any]:
         """Extract structured information from a free-form technician response.
 
@@ -481,7 +445,7 @@ class MLTemplateService:
             "adjusted": "Adjusted settings",
             "cleaned": "Cleaned component",
             "reset": "Reset/restarted",
-            "rewired": "Rewired connections"
+            "rewired": "Rewired connections",
         }
         for keyword, action in repair_keywords.items():
             if keyword in response_lower:
@@ -518,7 +482,7 @@ class MLTemplateService:
             "fault_confirmation": "fault_confirmation",
             "root_cause": "root_cause",
             "repair_action": "repair_action",
-            "verification_reading": "verification_reading"
+            "verification_reading": "verification_reading",
         }
 
         for step, field in step_field_map.items():
@@ -542,5 +506,5 @@ class MLTemplateService:
             "remaining_steps": remaining_steps,
             "needs_photo": len(remaining_photo_steps) > 0,
             "remaining_photos": remaining_photo_steps,
-            "all_text_complete": len([s for s in remaining_steps if s not in photo_steps]) == 0
+            "all_text_complete": len([s for s in remaining_steps if s not in photo_steps]) == 0,
         }

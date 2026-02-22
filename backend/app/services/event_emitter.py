@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class EventType(str, Enum):
     """Types of events that can be emitted."""
+
     ALERT_CREATED = "alert_created"
     HEALTH_CHANGED = "health_changed"
     WORK_ORDER_UPDATED = "work_order_updated"
@@ -27,6 +28,7 @@ class EventType(str, Enum):
 @dataclass
 class Event:
     """SSE event with type and data."""
+
     event_type: EventType
     data: Dict[str, Any]
     timestamp: str = None
@@ -37,11 +39,7 @@ class Event:
 
     def to_sse(self) -> str:
         """Convert to SSE format for streaming."""
-        event_dict = {
-            "type": self.event_type.value,
-            "data": self.data,
-            "timestamp": self.timestamp
-        }
+        event_dict = {"type": self.event_type.value, "data": self.data, "timestamp": self.timestamp}
         # SSE format: "data: {json}\n\n"
         return f"data: {json.dumps(event_dict)}\n\n"
 
@@ -140,7 +138,7 @@ class EventEmitter:
         severity: str,
         health_score: int,
         message: str,
-        **kwargs
+        **kwargs,
     ) -> None:
         """Emit alert creation event.
 
@@ -164,8 +162,8 @@ class EventEmitter:
                 "severity": severity,
                 "health_score": health_score,
                 "message": message,
-                **kwargs
-            }
+                **kwargs,
+            },
         )
         await self.emit(event)
 
@@ -177,7 +175,7 @@ class EventEmitter:
         old_health_score: int,
         new_health_score: int,
         reason: str = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         """Emit health score change event.
 
@@ -199,8 +197,8 @@ class EventEmitter:
                 "old_health_score": old_health_score,
                 "new_health_score": new_health_score,
                 "reason": reason or "unknown",
-                **kwargs
-            }
+                **kwargs,
+            },
         )
         await self.emit(event)
 
@@ -211,7 +209,7 @@ class EventEmitter:
         equipment_code: str,
         status: str,
         work_order_type: str = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         """Emit work order update event.
 
@@ -231,8 +229,8 @@ class EventEmitter:
                 "equipment_code": equipment_code,
                 "status": status,
                 "work_order_type": work_order_type,
-                **kwargs
-            }
+                **kwargs,
+            },
         )
         await self.emit(event)
 
@@ -243,7 +241,7 @@ class EventEmitter:
         equipment_code: str,
         findings: str,
         recommendation: str = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         """Emit inspection completion event.
 
@@ -263,8 +261,8 @@ class EventEmitter:
                 "equipment_code": equipment_code,
                 "findings": findings,
                 "recommendation": recommendation,
-                **kwargs
-            }
+                **kwargs,
+            },
         )
         await self.emit(event)
 

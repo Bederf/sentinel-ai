@@ -10,6 +10,7 @@ Usage:
     lookup = EquipmentLookup()
     result = await lookup.lookup_fault_code("Carrier", "E4", "30XA")
 """
+
 from typing import Dict, List, Optional
 import asyncio
 import json
@@ -35,56 +36,56 @@ class EquipmentLookup:
             "name": "Carrier",
             "base_url": "https://www.carrier.com",
             "support_url": "https://support.carrier.com",
-            "search_url": "https://www.carrier.com/commercial/en/us/support-and-resources"
+            "search_url": "https://www.carrier.com/commercial/en/us/support-and-resources",
         },
         "trane": {
             "name": "Trane",
             "base_url": "https://www.trane.com",
             "support_url": "https://www.trane.com/content/trane/commercial/en_us/products/systems/chillers.html",
-            "search_url": "https://www.trane.com/search.html"
+            "search_url": "https://www.trane.com/search.html",
         },
         "daikin": {
             "name": "Daikin",
             "base_url": "https://www.daikin.com",
             "support_url": "https://www.daikinac.com",
-            "search_url": "https://www.daikinac.com/support"
+            "search_url": "https://www.daikinac.com/support",
         },
         "abb": {
             "name": "ABB",
             "base_url": "https://new.abb.com",
             "support_url": "https://new.abb.com/drives",
-            "search_url": "https://new.abb.com/search"
+            "search_url": "https://new.abb.com/search",
         },
         "danfoss": {
             "name": "Danfoss",
             "base_url": "https://www.danfoss.com",
             "support_url": "https://www.danfoss.com/en/products/drives/",
-            "search_url": "https://www.danfoss.com/search"
+            "search_url": "https://www.danfoss.com/search",
         },
         "york": {
             "name": "York",
             "base_url": "https://www.york.com",
             "support_url": "https://www.york.com/contact-us",
-            "search_url": "https://www.york.com/search"
+            "search_url": "https://www.york.com/search",
         },
         "honeywell": {
             "name": "Honeywell",
             "base_url": "https://www.honeywell.com",
             "support_url": "https://buildings.honeywell.com",
-            "search_url": "https://buildings.honeywell.com/search"
+            "search_url": "https://buildings.honeywell.com/search",
         },
         "siemens": {
             "name": "Siemens",
             "base_url": "https://new.siemens.com",
             "support_url": "https://support.industry.siemens.com",
-            "search_url": "https://new.siemens.com/search"
+            "search_url": "https://new.siemens.com/search",
         },
         "schneider": {
             "name": "Schneider Electric",
             "base_url": "https://www.se.com",
             "support_url": "https://www.se.com/ww/en/services/",
-            "search_url": "https://www.se.com/ww/en/search/"
-        }
+            "search_url": "https://www.se.com/ww/en/search/",
+        },
     }
 
     # Technical forum sources for real-world solutions
@@ -94,29 +95,29 @@ class EquipmentLookup:
             "url": "https://hvac-talk.com",
             "search_url": "/search?q={query}",
             "coverage": ["troubleshooting", "real-world fixes"],
-            "description": "Professional HVAC technician forum"
+            "description": "Professional HVAC technician forum",
         },
         {
             "name": "Eng-Tips",
             "url": "https://www.eng-tips.com",
             "search_url": "/search?q={query}",
             "coverage": ["engineering discussions"],
-            "description": "Engineering professional forums"
+            "description": "Engineering professional forums",
         },
         {
             "name": "Reddit r/HVAC",
             "url": "https://www.reddit.com/r/HVAC",
             "search_url": "/search?q={query}",
             "coverage": ["technician experiences"],
-            "description": "HVAC subreddit community"
+            "description": "HVAC subreddit community",
         },
         {
             "name": "Refrigeration Engineer",
             "url": "https://refrigerationengineer.com",
             "search_url": "/search?q={query}",
             "coverage": ["technical articles"],
-            "description": "Refrigeration technical resources"
-        }
+            "description": "Refrigeration technical resources",
+        },
     ]
 
     # South African parts suppliers - loaded from JSON
@@ -138,7 +139,7 @@ class EquipmentLookup:
         """Load fault codes database from JSON file."""
         try:
             db_path = Path(__file__).parent.parent / "data" / "fault_codes.json"
-            with open(db_path, 'r') as f:
+            with open(db_path, "r") as f:
                 self._fault_codes_db = json.load(f)
             logger.info(f"Loaded fault codes database with {self._count_total_codes()} codes")
         except FileNotFoundError:
@@ -160,7 +161,7 @@ class EquipmentLookup:
         """Load parts suppliers database from JSON file."""
         try:
             suppliers_path = Path(__file__).parent.parent / "data" / "parts_suppliers.json"
-            with open(suppliers_path, 'r') as f:
+            with open(suppliers_path, "r") as f:
                 data = json.load(f)
 
             # Convert class variables to instance variables
@@ -182,11 +183,7 @@ class EquipmentLookup:
             EquipmentLookup.PART_NUMBER_MAPPINGS = {}
 
     async def lookup_fault_code(
-        self,
-        manufacturer: str,
-        fault_code: str,
-        model: Optional[str] = None,
-        equipment_type: Optional[str] = None
+        self, manufacturer: str, fault_code: str, model: Optional[str] = None, equipment_type: Optional[str] = None
     ) -> Dict:
         """
         Look up fault code from local database with web scraping fallback.
@@ -222,7 +219,7 @@ class EquipmentLookup:
             "model": model,
             "scraped_data": None,
             "parts": [],
-            "sources": []
+            "sources": [],
         }
 
         # If not found locally or needs enrichment, scrape manufacturer
@@ -238,7 +235,9 @@ class EquipmentLookup:
         # Search for parts if causes suggest component failure
         if fault_info and self._needs_parts_search(fault_info):
             try:
-                parts = await self._search_parts(mfg_normalized, model, fault_code, fault_info.get("probable_causes", []))
+                parts = await self._search_parts(
+                    mfg_normalized, model, fault_code, fault_info.get("probable_causes", [])
+                )
                 result["parts"] = parts
             except Exception as e:
                 logger.warning(f"Parts search failed for {mfg_normalized} {fault_code}: {e}")
@@ -268,17 +267,12 @@ class EquipmentLookup:
             "honeywell": "honeywell",
             "siemens": "siemens",
             "schneider": "schneider",
-            "schneider electric": "schneider"
+            "schneider electric": "schneider",
         }
 
         return mappings.get(mfg_lower, mfg_lower)
 
-    def _lookup_local_db(
-        self,
-        manufacturer: str,
-        model: Optional[str],
-        fault_code: str
-    ) -> Optional[Dict]:
+    def _lookup_local_db(self, manufacturer: str, model: Optional[str], fault_code: str) -> Optional[Dict]:
         """
         Look up fault code in local database.
 
@@ -354,12 +348,7 @@ class EquipmentLookup:
 
         return False
 
-    async def _scrape_manufacturer(
-        self,
-        manufacturer: str,
-        model: Optional[str],
-        fault_code: str
-    ) -> Optional[Dict]:
+    async def _scrape_manufacturer(self, manufacturer: str, model: Optional[str], fault_code: str) -> Optional[Dict]:
         """
         Scrape manufacturer website for fault code documentation.
 
@@ -386,7 +375,7 @@ class EquipmentLookup:
             "source_url": f"{mfg_source['search_url']}?q={search_query.replace(' ', '+')}",
             "manufacturer": mfg_source["name"],
             "fault_code": fault_code,
-            "note": "Web scraping placeholder - implement actual scraping in production"
+            "note": "Web scraping placeholder - implement actual scraping in production",
         }
 
         # In production, actual scraping logic:
@@ -398,12 +387,7 @@ class EquipmentLookup:
 
         return scraped_info
 
-    async def _search_forums(
-        self,
-        manufacturer: str,
-        model: Optional[str],
-        fault_code: str
-    ) -> List[Dict]:
+    async def _search_forums(self, manufacturer: str, model: Optional[str], fault_code: str) -> List[Dict]:
         """
         Search technical forums for real-world solutions.
 
@@ -421,23 +405,21 @@ class EquipmentLookup:
         for forum in self.FORUM_SOURCES:
             forum_url = forum["url"] + forum["search_url"].format(query=search_query.replace(" ", "+"))
 
-            results.append({
-                "source": forum["name"],
-                "url": forum_url,
-                "description": forum.get("description", ""),
-                "coverage": forum.get("coverage", []),
-                "title": f"{manufacturer} {fault_code} - {forum['name']}",
-                "snippet": f"Search {forum['name']} for real-world solutions"
-            })
+            results.append(
+                {
+                    "source": forum["name"],
+                    "url": forum_url,
+                    "description": forum.get("description", ""),
+                    "coverage": forum.get("coverage", []),
+                    "title": f"{manufacturer} {fault_code} - {forum['name']}",
+                    "snippet": f"Search {forum['name']} for real-world solutions",
+                }
+            )
 
         return results
 
     async def _search_parts(
-        self,
-        manufacturer: str,
-        model: Optional[str],
-        fault_code: str,
-        causes: List[Dict]
+        self, manufacturer: str, model: Optional[str], fault_code: str, causes: List[Dict]
     ) -> List[Dict]:
         """
         Search SA suppliers for relevant parts based on fault and causes.
@@ -502,7 +484,7 @@ class EquipmentLookup:
                 "part_name": part_name,
                 "part_number": part_number,
                 "manufacturer": manufacturer,
-                "suppliers": []
+                "suppliers": [],
             }
 
             # Search each relevant supplier
@@ -525,11 +507,7 @@ class EquipmentLookup:
         return parts
 
     async def _search_supplier(
-        self,
-        supplier: Dict,
-        part_name: str,
-        manufacturer: str,
-        model: Optional[str]
+        self, supplier: Dict, part_name: str, manufacturer: str, model: Optional[str]
     ) -> List[Dict]:
         """
         Search specific supplier for part.
@@ -553,13 +531,15 @@ class EquipmentLookup:
 
         # Skip slow HTTP requests - return placeholder data for fast demo response
         # In production, would make actual HTTP request with timeout
-        results = [{
-            "supplier": supplier["name"],
-            "url": search_url,
-            "price": supplier.get("price_range", "Contact for price"),
-            "lead_time": supplier.get("lead_time", "2-5 days"),
-            "available": True
-        }]
+        results = [
+            {
+                "supplier": supplier["name"],
+                "url": search_url,
+                "price": supplier.get("price_range", "Contact for price"),
+                "lead_time": supplier.get("lead_time", "2-5 days"),
+                "available": True,
+            }
+        ]
 
         return results
 
@@ -569,33 +549,33 @@ class EquipmentLookup:
 
         Generic implementation - would need customization per supplier.
         """
-        soup = BeautifulSoup(html, 'lxml')
+        soup = BeautifulSoup(html, "lxml")
         results = []
 
         # Generic product parsing (look for common patterns)
-        products = soup.find_all(['div', 'article'], class_=re.compile(r'product|item|card'))
+        products = soup.find_all(["div", "article"], class_=re.compile(r"product|item|card"))
 
         for product in products[:5]:  # Limit to top 5 results
             # Try to find name/title
             name = None
-            for tag in ['h2', 'h3', 'h4', 'span', 'a']:
-                name_elem = product.find(tag, class_=re.compile(r'name|title|product'))
+            for tag in ["h2", "h3", "h4", "span", "a"]:
+                name_elem = product.find(tag, class_=re.compile(r"name|title|product"))
                 if name_elem:
                     name = name_elem.get_text(strip=True)
                     break
 
             # Try to find price
             price = None
-            for tag in ['span', 'div']:
-                price_elem = product.find(tag, class_=re.compile(r'price|cost'))
+            for tag in ["span", "div"]:
+                price_elem = product.find(tag, class_=re.compile(r"price|cost"))
                 if price_elem:
                     price = price_elem.get_text(strip=True)
                     break
 
             # Try to find part number/SKU
             part_num = None
-            for tag in ['span', 'div']:
-                sku_elem = product.find(tag, class_=re.compile(r'sku|part|mpn'))
+            for tag in ["span", "div"]:
+                sku_elem = product.find(tag, class_=re.compile(r"sku|part|mpn"))
                 if sku_elem:
                     part_num = sku_elem.get_text(strip=True)
                     break
@@ -606,27 +586,31 @@ class EquipmentLookup:
                 in_stock = "in stock" in text or "available" in text
                 lead_time = "In stock" if in_stock else "2-5 days"
 
-                results.append({
-                    "supplier": supplier_name,
-                    "name": name,
-                    "part_number": part_num if part_num else "N/A",
-                    "price": price if price else "Contact for price",
-                    "lead_time": lead_time,
-                    "available": in_stock,
-                    "url": "N/A"  # Would extract actual URL
-                })
+                results.append(
+                    {
+                        "supplier": supplier_name,
+                        "name": name,
+                        "part_number": part_num if part_num else "N/A",
+                        "price": price if price else "Contact for price",
+                        "lead_time": lead_time,
+                        "available": in_stock,
+                        "url": "N/A",  # Would extract actual URL
+                    }
+                )
 
         # If no products found, return placeholder
         if not results:
-            results = [{
-                "supplier": supplier_name,
-                "name": "Contact for part availability",
-                "part_number": "N/A",
-                "price": "Contact for price",
-                "lead_time": "Contact supplier",
-                "available": True,
-                "url": "N/A"
-            }]
+            results = [
+                {
+                    "supplier": supplier_name,
+                    "name": "Contact for part availability",
+                    "part_number": "N/A",
+                    "price": "Contact for price",
+                    "lead_time": "Contact supplier",
+                    "available": True,
+                    "url": "N/A",
+                }
+            ]
 
         return results
 
@@ -680,17 +664,13 @@ class EquipmentLookup:
                     "generic_part_number": info.get("generic"),
                     "manufacturer": info.get("manufacturer"),
                     "description": info.get("description"),
-                    "suppliers": info.get("suppliers", [])
+                    "suppliers": info.get("suppliers", []),
                 }
         return None
 
 
 # Convenience function for quick lookups
-async def lookup_fault_code_quick(
-    manufacturer: str,
-    fault_code: str,
-    model: Optional[str] = None
-) -> Dict:
+async def lookup_fault_code_quick(manufacturer: str, fault_code: str, model: Optional[str] = None) -> Dict:
     """
     Quick lookup function for fault codes.
 

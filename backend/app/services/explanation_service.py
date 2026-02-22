@@ -10,10 +10,7 @@ from dataclasses import dataclass
 
 from app.services.ollama_client import get_ollama_client
 from app.services.vector_db import get_vector_db_service
-from ml.explanations.templates import (
-    get_equipment_specific_template,
-    format_prediction_for_template
-)
+from ml.explanations.templates import get_equipment_specific_template, format_prediction_for_template
 from ml.explanations.parser import ExplanationParser
 
 logger = logging.getLogger(__name__)
@@ -22,6 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ExplanationResult:
     """Complete explanation result with parsed structure."""
+
     equipment_id: str
     equipment_type: str
     raw_explanation: str
@@ -50,10 +48,7 @@ class ExplanationService:
         self._supabase_client = supabase_client
 
     async def explain_prediction(
-        self,
-        equipment_id: str,
-        predictions: Dict[str, Any],
-        equipment_info: Optional[Dict[str, Any]] = None
+        self, equipment_id: str, predictions: Dict[str, Any], equipment_info: Optional[Dict[str, Any]] = None
     ) -> ExplanationResult:
         """Generate a comprehensive explanation for equipment predictions.
 
@@ -78,7 +73,7 @@ class ExplanationService:
             equipment_id=equipment_id,
             equipment_type=equipment_type,
             predictions=predictions.get("predictions", {}),
-            equipment_info=equipment_info
+            equipment_info=equipment_info,
         )
         template_data["rag_context"] = rag_context
 
@@ -92,14 +87,11 @@ class ExplanationService:
         if ollama_available:
             raw_explanation = await self.ollama.generate(
                 prompt,
-                temperature=0.3  # Lower temperature for more consistent output
+                temperature=0.3,  # Lower temperature for more consistent output
             )
             model_used = self.ollama.model
         else:
-            raw_explanation = self._generate_fallback_explanation(
-                template_data,
-                predictions
-            )
+            raw_explanation = self._generate_fallback_explanation(template_data, predictions)
 
         # Parse the explanation into structured format
         parsed = ExplanationParser.parse_explanation(raw_explanation)
@@ -113,18 +105,14 @@ class ExplanationService:
                 "failure_probability_30d": template_data.get("failure_prob_30d", 0) / 100,
                 "predicted_failure": template_data.get("predicted_failure", "Unknown"),
                 "risk_level": template_data.get("risk_level", "Unknown"),
-                "rul_days": template_data.get("rul_days", "Unknown")
+                "rul_days": template_data.get("rul_days", "Unknown"),
             },
             context_sources=rag_context[:500] + "..." if len(rag_context) > 500 else rag_context,
             llm_available=ollama_available,
-            model_used=model_used
+            model_used=model_used,
         )
 
-    async def _get_rag_context(
-        self,
-        equipment_type: str,
-        predictions: Dict[str, Any]
-    ) -> str:
+    async def _get_rag_context(self, equipment_type: str, predictions: Dict[str, Any]) -> str:
         """Retrieve relevant documentation context via RAG.
 
         Args:
@@ -146,25 +134,19 @@ class ExplanationService:
                 return result
 
         # Build search query from prediction info
-        failure_type = predictions.get("predictions", {}).get(
-            "failure_type", {}
-        ).get("predicted_failure", "failure")
+        failure_type = predictions.get("predictions", {}).get("failure_type", {}).get("predicted_failure", "failure")
 
         query = f"{failure_type} {equipment_type} maintenance troubleshooting"
 
         # Hybrid search for relevant documentation
-        doc_results = self.vector_db.hybrid_search(
-            query=query,
-            n_results=3,
-            equipment_type=equipment_type
-        )
+        doc_results = self.vector_db.hybrid_search(query=query, n_results=3, equipment_type=equipment_type)
 
         # Also search knowledge base
         knowledge_results = self.vector_db.search_knowledge(
             query=query,
             equipment_type=equipment_type,
             n_results=3,
-            similarity_threshold=0.2  # Lower threshold for broader matches
+            similarity_threshold=0.2,  # Lower threshold for broader matches
         )
 
         # Format document context
@@ -175,9 +157,9 @@ class ExplanationService:
 
         if doc_results:
             for r in doc_results:
-                source = r.get('document_title', 'Documentation')
-                content = r.get('content', '')[:500]
-                score = r.get('hybrid_score', r.get('similarity', 0))
+                source = r.get("document_title", "Documentation")
+                content = r.get("content", "")[:500]
+                score = r.get("hybrid_score", r.get("similarity", 0))
                 context_parts.append(f"[{source}] (relevance: {score:.2f})\n{content}")
 
         if not isinstance(knowledge_results, list):
@@ -186,9 +168,9 @@ class ExplanationService:
         if knowledge_results:
             context_parts.append("\n**Knowledge Base Entries:**")
             for k in knowledge_results:
-                title = k.get('title', 'Unknown')
-                desc = k.get('description', '')
-                solution = k.get('solution', '')
+                title = k.get("title", "Unknown")
+                desc = k.get("description", "")
+                solution = k.get("solution", "")
                 entry = f"- **{title}**: {desc}"
                 if solution:
                     entry += f"\n  Solution: {solution}"
@@ -199,11 +181,7 @@ class ExplanationService:
 
         return "\n\n".join(context_parts)
 
-    def _generate_fallback_explanation(
-        self,
-        template_data: Dict[str, Any],
-        predictions: Dict[str, Any]
-    ) -> str:
+    def _generate_fallback_explanation(self, template_data: Dict[str, Any], predictions: Dict[str, Any]) -> str:
         """Generate a basic explanation when LLM is not available.
 
         Args:
@@ -223,10 +201,10 @@ class ExplanationService:
         risk_factors = overall_risk.get("risk_factors", [])
 
         explanation = f"""### SUMMARY
-This {template_data.get('equipment_type', 'equipment')} ({template_data.get('equipment_id', '')}) has a {risk_level} risk level with {failure_prob:.1f}% failure probability in the next 30 days. The predicted failure type is {predicted_failure}.
+This {template_data.get("equipment_type", "equipment")} ({template_data.get("equipment_id", "")}) has a {risk_level} risk level with {failure_prob:.1f}% failure probability in the next 30 days. The predicted failure type is {predicted_failure}.
 
 ### KEY_FACTORS
-{chr(10).join('- ' + f for f in risk_factors) if risk_factors else '- No specific factors identified'}
+{chr(10).join("- " + f for f in risk_factors) if risk_factors else "- No specific factors identified"}
 
 ### RECOMMENDED_ACTIONS
 - [HIGH] Schedule inspection within 7 days if risk is high or critical
@@ -245,11 +223,7 @@ This {template_data.get('equipment_type', 'equipment')} ({template_data.get('equ
 """
         return explanation
 
-    async def get_quick_summary(
-        self,
-        equipment_id: str,
-        predictions: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def get_quick_summary(self, equipment_id: str, predictions: Dict[str, Any]) -> Dict[str, Any]:
         """Get a quick summary without full LLM generation.
 
         Args:
@@ -272,7 +246,7 @@ This {template_data.get('equipment_type', 'equipment')} ({template_data.get('equ
             "failure_probability_30d": survival.get("failure_probability", {}).get("30d", 0),
             "rul_estimate": survival.get("rul_estimate", {}).get("median", "Unknown"),
             "risk_factors": overall_risk.get("risk_factors", []),
-            "requires_attention": overall_risk.get("risk_level") in ["high", "critical"]
+            "requires_attention": overall_risk.get("risk_level") in ["high", "critical"],
         }
 
 

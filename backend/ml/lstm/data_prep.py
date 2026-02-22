@@ -23,7 +23,7 @@ class LSTMDataPrep:
     def __init__(
         self,
         window_size: int = 168,  # 7 days of hourly data
-        forecast_horizons: List[int] = None
+        forecast_horizons: List[int] = None,
     ):
         """
         Initialize data preparation.
@@ -37,11 +37,7 @@ class LSTMDataPrep:
         self.scaler = StandardScaler()
         self._scaler_fitted = False
 
-    def create_sequences(
-        self,
-        data: np.ndarray,
-        target_col: int = 0
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def create_sequences(self, data: np.ndarray, target_col: int = 0) -> Tuple[np.ndarray, np.ndarray]:
         """
         Create sliding window sequences for training.
 
@@ -58,13 +54,10 @@ class LSTMDataPrep:
 
         for i in range(len(data) - self.window_size - max_horizon):
             # Input window
-            window = data[i:i + self.window_size]
+            window = data[i : i + self.window_size]
 
             # Target values at each forecast horizon
-            targets = [
-                data[i + self.window_size + h - 1, target_col]
-                for h in self.forecast_horizons
-            ]
+            targets = [data[i + self.window_size + h - 1, target_col] for h in self.forecast_horizons]
 
             X.append(window)
             y.append(targets)
@@ -72,11 +65,7 @@ class LSTMDataPrep:
         return np.array(X), np.array(y)
 
     def prepare_from_dataframe(
-        self,
-        df: pd.DataFrame,
-        feature_cols: List[str],
-        target_col: str,
-        timestamp_col: str = "timestamp"
+        self, df: pd.DataFrame, feature_cols: List[str], target_col: str, timestamp_col: str = "timestamp"
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Prepare training data from a pandas DataFrame.
@@ -162,21 +151,20 @@ class LSTMDataPrep:
     def save_scaler(self, path: str):
         """Save scaler for inference."""
         import joblib
+
         joblib.dump(self.scaler, path)
         logger.info(f"Saved scaler to {path}")
 
     def load_scaler(self, path: str):
         """Load scaler from disk."""
         import joblib
+
         self.scaler = joblib.load(path)
         self._scaler_fitted = True
         logger.info(f"Loaded scaler from {path}")
 
     def generate_demo_data(
-        self,
-        n_samples: int = 5000,
-        n_features: int = 3,
-        noise_level: float = 0.1
+        self, n_samples: int = 5000, n_features: int = 3, noise_level: float = 0.1
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generate synthetic demo data for testing/development.
@@ -233,81 +221,48 @@ class EquipmentDataLoader:
                 "chw_return_temp",
                 "suction_pressure",
                 "discharge_pressure",
-                "compressor_current"
+                "compressor_current",
             ],
             "target": "chw_supply_temp",
-            "description": "Chiller supply temperature prediction"
+            "description": "Chiller supply temperature prediction",
         },
         "ahu": {
-            "features": [
-                "supply_temp",
-                "return_temp",
-                "filter_dp",
-                "fan_current",
-                "mixed_air_temp"
-            ],
+            "features": ["supply_temp", "return_temp", "filter_dp", "fan_current", "mixed_air_temp"],
             "target": "supply_temp",
-            "description": "AHU supply temperature prediction"
+            "description": "AHU supply temperature prediction",
         },
         "generator": {
-            "features": [
-                "battery_voltage",
-                "oil_pressure",
-                "coolant_temp",
-                "load_pct"
-            ],
+            "features": ["battery_voltage", "oil_pressure", "coolant_temp", "load_pct"],
             "target": "coolant_temp",
-            "description": "Generator coolant temperature prediction"
+            "description": "Generator coolant temperature prediction",
         },
         "fcu": {
-            "features": [
-                "supply_temp",
-                "fan_current",
-                "valve_position"
-            ],
+            "features": ["supply_temp", "fan_current", "valve_position"],
             "target": "supply_temp",
-            "description": "FCU supply temperature prediction"
+            "description": "FCU supply temperature prediction",
         },
         "ups": {
-            "features": [
-                "battery_voltage",
-                "load_pct",
-                "temperature"
-            ],
+            "features": ["battery_voltage", "load_pct", "temperature"],
             "target": "temperature",
-            "description": "UPS temperature prediction"
+            "description": "UPS temperature prediction",
         },
         "vav": {
-            "features": [
-                "airflow",
-                "damper_position",
-                "zone_temp",
-                "supply_temp"
-            ],
+            "features": ["airflow", "damper_position", "zone_temp", "supply_temp"],
             "target": "zone_temp",
-            "description": "VAV zone temperature prediction"
+            "description": "VAV zone temperature prediction",
         },
         "pump": {
-            "features": [
-                "flow_rate",
-                "discharge_pressure",
-                "motor_current",
-                "vibration",
-                "temperature"
-            ],
+            "features": ["flow_rate", "discharge_pressure", "motor_current", "vibration", "temperature"],
             "target": "discharge_pressure",
-            "description": "Pump discharge pressure prediction"
-        }
+            "description": "Pump discharge pressure prediction",
+        },
     }
 
     @classmethod
     def get_config(cls, equipment_type: str) -> Dict[str, Any]:
         """Get sensor configuration for equipment type."""
         if equipment_type not in cls.SENSOR_CONFIGS:
-            raise ValueError(
-                f"Unknown equipment type: {equipment_type}. "
-                f"Available: {list(cls.SENSOR_CONFIGS.keys())}"
-            )
+            raise ValueError(f"Unknown equipment type: {equipment_type}. Available: {list(cls.SENSOR_CONFIGS.keys())}")
         return cls.SENSOR_CONFIGS[equipment_type]
 
     @classmethod

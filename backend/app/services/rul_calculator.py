@@ -125,45 +125,45 @@ class RULCalculator:
         These are used when checklist templates don't cover a measurement.
         """
         common = {
-            "vibration_rms": 4.5,       # mm/s - ISO 10816 alert level
-            "vibration": 4.5,            # mm/s
+            "vibration_rms": 4.5,  # mm/s - ISO 10816 alert level
+            "vibration": 4.5,  # mm/s
         }
 
         type_specific = {
             "chiller": {
                 "compressor_discharge_temp": 90.0,  # C
-                "suction_pressure": 5.5,            # bar
-                "discharge_pressure": 18.0,         # bar
-                "oil_temperature": 65.0,            # C
-                "motor_current": 160.0,             # A
+                "suction_pressure": 5.5,  # bar
+                "discharge_pressure": 18.0,  # bar
+                "oil_temperature": 65.0,  # C
+                "motor_current": 160.0,  # A
             },
             "ahu": {
-                "filter_dp": 150.0,                 # Pa
-                "fan_vibration_rms": 3.5,           # mm/s
-                "supply_air_temp": 20.0,            # C
-                "motor_current": 50.0,              # A
+                "filter_dp": 150.0,  # Pa
+                "fan_vibration_rms": 3.5,  # mm/s
+                "supply_air_temp": 20.0,  # C
+                "motor_current": 50.0,  # A
             },
             "fcu": {
-                "filter_dp": 100.0,                 # Pa
-                "space_temp_delta": 1.0,            # C
-                "fan_vibration": 3.0,               # mm/s
+                "filter_dp": 100.0,  # Pa
+                "space_temp_delta": 1.0,  # C
+                "fan_vibration": 3.0,  # mm/s
             },
             "generator": {
-                "coolant_temp": 95.0,               # C
-                "exhaust_temp": 550.0,              # C
-                "battery_voltage": 28.0,            # V
-                "oil_pressure": 6.0,                # bar
-                "vibration_rms": 5.0,               # mm/s
+                "coolant_temp": 95.0,  # C
+                "exhaust_temp": 550.0,  # C
+                "battery_voltage": 28.0,  # V
+                "oil_pressure": 6.0,  # bar
+                "vibration_rms": 5.0,  # mm/s
             },
             "pump": {
-                "vibration_rms": 3.0,               # mm/s
-                "bearing_temp": 75.0,               # C
-                "discharge_pressure": 8.0,          # bar
-                "motor_current": 25.0,              # A
+                "vibration_rms": 3.0,  # mm/s
+                "bearing_temp": 75.0,  # C
+                "discharge_pressure": 8.0,  # bar
+                "motor_current": 25.0,  # A
             },
             "vav": {
-                "airflow_reading": 200.0,           # L/s
-                "damper_position_error": 5.0,       # %
+                "airflow_reading": 200.0,  # L/s
+                "damper_position_error": 5.0,  # %
             },
         }
 
@@ -177,11 +177,7 @@ class RULCalculator:
     # Element RUL Calculation
     # ========================================================================
 
-    def calculate_element_rul(
-        self,
-        element_trend: ElementTrend,
-        threshold: float
-    ) -> ElementRUL:
+    def calculate_element_rul(self, element_trend: ElementTrend, threshold: float) -> ElementRUL:
         """
         Calculate Remaining Useful Life for a single element.
 
@@ -290,11 +286,7 @@ class RULCalculator:
     # Equipment RUL Calculation
     # ========================================================================
 
-    async def calculate_equipment_rul(
-        self,
-        equipment_id: str,
-        days: int = 90
-    ) -> EquipmentRUL:
+    async def calculate_equipment_rul(self, equipment_id: str, days: int = 90) -> EquipmentRUL:
         """
         Calculate RUL for all elements of an equipment item.
 
@@ -340,7 +332,7 @@ class RULCalculator:
                 equipment_type=equipment_type,
                 element_ruls=[],
                 overall_risk_level=RiskLevel.LOW,
-                message="No inspection data available for RUL prediction"
+                message="No inspection data available for RUL prediction",
             )
 
         # If no elements had thresholds, still return what we have
@@ -350,7 +342,7 @@ class RULCalculator:
                 equipment_type=equipment_type,
                 element_ruls=[],
                 overall_risk_level=RiskLevel.LOW,
-                message="No threshold data available for RUL calculation"
+                message="No threshold data available for RUL calculation",
             )
 
         # Find worst element (earliest threshold breach)
@@ -375,9 +367,7 @@ class RULCalculator:
 
         # Build message
         degrading_count = sum(1 for r in element_ruls if r.days_until_threshold is not None)
-        message = self._build_rul_message(
-            element_ruls, degrading_count, worst_element_name, days_until_first
-        )
+        message = self._build_rul_message(element_ruls, degrading_count, worst_element_name, days_until_first)
 
         return EquipmentRUL(
             equipment_id=equipment_id,
@@ -455,7 +445,7 @@ class RULCalculator:
         element_ruls: List[ElementRUL],
         degrading_count: int,
         worst_element: Optional[str],
-        days_until_first: Optional[float]
+        days_until_first: Optional[float],
     ) -> str:
         """Build human-readable RUL summary message."""
         total = len(element_ruls)
@@ -464,10 +454,7 @@ class RULCalculator:
             return f"All {total} monitored elements are stable. No predicted failures."
 
         if days_until_first is not None and days_until_first <= 0:
-            return (
-                f"{worst_element} has exceeded its failure threshold. "
-                f"Immediate attention required."
-            )
+            return f"{worst_element} has exceeded its failure threshold. Immediate attention required."
 
         if worst_element and days_until_first is not None:
             return (
@@ -482,11 +469,7 @@ class RULCalculator:
     # Service Recommendations
     # ========================================================================
 
-    async def get_service_recommendations(
-        self,
-        equipment_id: str,
-        days: int = 90
-    ) -> List[ServiceRecommendation]:
+    async def get_service_recommendations(self, equipment_id: str, days: int = 90) -> List[ServiceRecommendation]:
         """
         Generate prioritized service recommendations for degrading elements.
 
@@ -518,15 +501,17 @@ class RULCalculator:
                 rul.element_name, rul.days_until_threshold, rul.current_value, rul.threshold_value, rul.unit
             )
 
-            recommendations.append(ServiceRecommendation(
-                equipment_id=equipment_id,
-                element_name=rul.element_name,
-                recommended_action=action,
-                urgency=urgency,
-                reason=reason,
-                estimated_days_remaining=rul.days_until_threshold,
-                confidence=rul.confidence,
-            ))
+            recommendations.append(
+                ServiceRecommendation(
+                    equipment_id=equipment_id,
+                    element_name=rul.element_name,
+                    recommended_action=action,
+                    urgency=urgency,
+                    reason=reason,
+                    estimated_days_remaining=rul.days_until_threshold,
+                    confidence=rul.confidence,
+                )
+            )
 
         # Sort by urgency (immediate first)
         urgency_order = {
@@ -557,7 +542,7 @@ class RULCalculator:
         days_remaining: float,
         current_value: Optional[float],
         threshold_value: float,
-        unit: str
+        unit: str,
     ) -> tuple:
         """
         Generate action and reason based on element type.

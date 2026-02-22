@@ -292,16 +292,12 @@ class SentinelHealthMonitor:
                 results["summary"]["total_critical"] += site.get("critical_alerts", 0)
                 results["summary"]["total_warning"] += site.get("warning_alerts", 0)
                 results["summary"]["total_healthy"] += (
-                    site.get("equipment_count", 0)
-                    - site.get("critical_alerts", 0)
-                    - site.get("warning_alerts", 0)
+                    site.get("equipment_count", 0) - site.get("critical_alerts", 0) - site.get("warning_alerts", 0)
                 )
 
                 # Optionally fetch detailed equipment if critical only
                 if critical_only and site.get("critical_alerts", 0) > 0:
-                    logger.info(
-                        f"Fetching critical equipment for site {site.get('code')}"
-                    )
+                    logger.info(f"Fetching critical equipment for site {site.get('code')}")
                     site_id = site.get("id")
                     if site_id:
                         alerts = await self.get_alerts_by_site(site_id)
@@ -358,16 +354,10 @@ Examples:
     )
 
     parser.add_argument("--site", help="Filter by site code (e.g., S002)")
-    parser.add_argument(
-        "--critical-only", action="store_true", help="Show only critical/warning items"
-    )
-    parser.add_argument(
-        "--json", action="store_true", help="Output as JSON instead of text"
-    )
+    parser.add_argument("--critical-only", action="store_true", help="Show only critical/warning items")
+    parser.add_argument("--json", action="store_true", help="Output as JSON instead of text")
     parser.add_argument("--log-file", help="Write output to file instead of stdout")
-    parser.add_argument(
-        "--api-url", default=API_URL, help="Backend API URL (default: $API_URL)"
-    )
+    parser.add_argument("--api-url", default=API_URL, help="Backend API URL (default: $API_URL)")
     parser.add_argument(
         "--login",
         metavar="USERNAME",
@@ -384,9 +374,7 @@ Examples:
     if args.log_file:
         file_handler = logging.FileHandler(args.log_file)
         file_handler.setLevel(logging.INFO)
-        formatter = logging.Formatter(
-            "%(asctime)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
@@ -397,6 +385,7 @@ Examples:
     # If login requested without password, prompt for it
     if username and not password:
         import getpass
+
         password = getpass.getpass(f"Password for {username}: ")
 
     # Run health monitor
@@ -441,9 +430,9 @@ Examples:
 def _format_text_output(results: Dict[str, Any]) -> str:
     """Format monitoring results as human-readable text."""
     lines = [
-        f"\n{'='*70}",
+        f"\n{'=' * 70}",
         f"SENTINEL Health Monitor - {results.get('timestamp', 'N/A')}",
-        f"{'='*70}",
+        f"{'=' * 70}",
         "",
         "Summary:",
         f"  Critical: {results['summary'].get('total_critical', 0):>3}",
@@ -453,19 +442,20 @@ def _format_text_output(results: Dict[str, Any]) -> str:
     ]
 
     for site in results.get("sites", []):
-        lines.extend([
-            f"Site: {site['code']} - {site['name']}",
-            f"  Equipment: {site['equipment']} | Generators: {site['generators']}",
-            f"  Alerts: {site['alerts']['critical']} critical, {site['alerts']['warning']} warning",
-            f"  Safety: {site['safety_status']['in_alarm']} in alarm, {site['safety_status']['in_warning']} in warning",
-        ])
+        lines.extend(
+            [
+                f"Site: {site['code']} - {site['name']}",
+                f"  Equipment: {site['equipment']} | Generators: {site['generators']}",
+                f"  Alerts: {site['alerts']['critical']} critical, {site['alerts']['warning']} warning",
+                f"  Safety: {site['safety_status']['in_alarm']} in alarm, {site['safety_status']['in_warning']} in warning",
+            ]
+        )
 
         if site.get("equipment_details"):
             lines.append("  Critical Equipment:")
             for eq in site["equipment_details"]:
                 lines.append(
-                    f"    - {eq['code']} ({eq['type']}): "
-                    f"Health={eq['health_score']:.0f}% Status={eq['status']}"
+                    f"    - {eq['code']} ({eq['type']}): Health={eq['health_score']:.0f}% Status={eq['status']}"
                 )
         lines.append("")
 

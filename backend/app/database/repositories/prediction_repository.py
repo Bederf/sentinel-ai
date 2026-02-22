@@ -16,7 +16,7 @@ class PredictionRepository:
         building_id: Optional[str] = None,
         equipment_id: Optional[str] = None,
         status: Optional[str] = None,
-        severity: Optional[str] = None
+        severity: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Get all predictions with optional filtering.
 
@@ -30,18 +30,18 @@ class PredictionRepository:
             List of predictions
         """
         # Join with equipment and buildings to get related data
-        query = self.client.table('predictions').select(
+        query = self.client.table("predictions").select(
             "*, equipment:equipment_id(id, code, name, type), building:building_id(id, code, name)"
         )
 
         if building_id:
-            query = query.eq('building_id', building_id)
+            query = query.eq("building_id", building_id)
         if equipment_id:
-            query = query.eq('equipment_id', equipment_id)
+            query = query.eq("equipment_id", equipment_id)
         if status:
-            query = query.eq('status', status)
+            query = query.eq("status", status)
         if severity:
-            query = query.eq('severity', severity)
+            query = query.eq("severity", severity)
 
         response = query.execute()
         return response.data
@@ -55,9 +55,7 @@ class PredictionRepository:
         Returns:
             Prediction data or None if not found
         """
-        response = self.client.table('predictions').select("*").eq(
-            'code', prediction_id
-        ).execute()
+        response = self.client.table("predictions").select("*").eq("code", prediction_id).execute()
 
         if response.data:
             return response.data[0]
@@ -72,7 +70,7 @@ class PredictionRepository:
         Returns:
             Prediction data or None if not found
         """
-        response = self.client.table('predictions').select("*").eq('id', uuid).execute()
+        response = self.client.table("predictions").select("*").eq("id", uuid).execute()
 
         if response.data:
             return response.data[0]
@@ -87,9 +85,13 @@ class PredictionRepository:
         Returns:
             List of active predictions
         """
-        response = self.client.table('predictions').select("*").eq(
-            'building_id', building_uuid
-        ).eq('status', 'active').execute()
+        response = (
+            self.client.table("predictions")
+            .select("*")
+            .eq("building_id", building_uuid)
+            .eq("status", "active")
+            .execute()
+        )
 
         return response.data
 
@@ -102,9 +104,13 @@ class PredictionRepository:
         Returns:
             List of active predictions
         """
-        response = self.client.table('predictions').select("*").eq(
-            'equipment_id', equipment_uuid
-        ).eq('status', 'active').execute()
+        response = (
+            self.client.table("predictions")
+            .select("*")
+            .eq("equipment_id", equipment_uuid)
+            .eq("status", "active")
+            .execute()
+        )
 
         return response.data
 
@@ -114,9 +120,9 @@ class PredictionRepository:
         Returns:
             List of critical predictions
         """
-        response = self.client.table('predictions').select("*").eq(
-            'severity', 'critical'
-        ).eq('status', 'active').execute()
+        response = (
+            self.client.table("predictions").select("*").eq("severity", "critical").eq("status", "active").execute()
+        )
 
         return response.data
 
@@ -129,9 +135,13 @@ class PredictionRepository:
         Returns:
             List of high probability predictions
         """
-        response = self.client.table('predictions').select("*").gte(
-            'probability_percent', threshold
-        ).eq('status', 'active').execute()
+        response = (
+            self.client.table("predictions")
+            .select("*")
+            .gte("probability_percent", threshold)
+            .eq("status", "active")
+            .execute()
+        )
 
         return response.data
 
@@ -144,7 +154,7 @@ class PredictionRepository:
         Returns:
             Created prediction
         """
-        response = self.client.table('predictions').insert(prediction_data).execute()
+        response = self.client.table("predictions").insert(prediction_data).execute()
         return response.data[0]
 
     def update(self, prediction_id: str, prediction_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -161,9 +171,7 @@ class PredictionRepository:
         if not prediction:
             return None
 
-        response = self.client.table('predictions').update(
-            prediction_data
-        ).eq('id', prediction['id']).execute()
+        response = self.client.table("predictions").update(prediction_data).eq("id", prediction["id"]).execute()
 
         if response.data:
             return response.data[0]
@@ -178,7 +186,7 @@ class PredictionRepository:
         Returns:
             Updated prediction or None if not found
         """
-        return self.update(prediction_id, {'status': 'acknowledged'})
+        return self.update(prediction_id, {"status": "acknowledged"})
 
     def resolve(self, prediction_id: str) -> Optional[Dict[str, Any]]:
         """Resolve a prediction.
@@ -189,7 +197,7 @@ class PredictionRepository:
         Returns:
             Updated prediction or None if not found
         """
-        return self.update(prediction_id, {'status': 'resolved'})
+        return self.update(prediction_id, {"status": "resolved"})
 
     def mark_false_positive(self, prediction_id: str) -> Optional[Dict[str, Any]]:
         """Mark a prediction as false positive.
@@ -200,7 +208,7 @@ class PredictionRepository:
         Returns:
             Updated prediction or None if not found
         """
-        return self.update(prediction_id, {'status': 'false_positive'})
+        return self.update(prediction_id, {"status": "false_positive"})
 
     def delete(self, prediction_id: str) -> bool:
         """Delete a prediction.
@@ -215,9 +223,7 @@ class PredictionRepository:
         if not prediction:
             return False
 
-        response = self.client.table('predictions').delete().eq(
-            'id', prediction['id']
-        ).execute()
+        response = self.client.table("predictions").delete().eq("id", prediction["id"]).execute()
 
         return len(response.data) > 0
 
@@ -233,9 +239,13 @@ class PredictionRepository:
         Returns:
             True if an active/acknowledged prediction exists, False otherwise
         """
-        response = self.client.table('predictions').select("id").eq(
-            'equipment_id', equipment_id
-        ).in_('status', ['active', 'acknowledged']).execute()
+        response = (
+            self.client.table("predictions")
+            .select("id")
+            .eq("equipment_id", equipment_id)
+            .in_("status", ["active", "acknowledged"])
+            .execute()
+        )
 
         return len(response.data) > 0
 
@@ -245,11 +255,9 @@ class PredictionRepository:
         Returns:
             List of equipment UUIDs with active predictions
         """
-        response = self.client.table('predictions').select("equipment_id").eq(
-            'status', 'active'
-        ).execute()
+        response = self.client.table("predictions").select("equipment_id").eq("status", "active").execute()
 
-        return [p['equipment_id'] for p in response.data]
+        return [p["equipment_id"] for p in response.data]
 
     def resolve_by_equipment(self, equipment_id: str) -> int:
         """Resolve all active predictions for equipment.
@@ -262,8 +270,12 @@ class PredictionRepository:
         Returns:
             Number of predictions resolved
         """
-        response = self.client.table('predictions').update(
-            {'status': 'resolved'}
-        ).eq('equipment_id', equipment_id).eq('status', 'active').execute()
+        response = (
+            self.client.table("predictions")
+            .update({"status": "resolved"})
+            .eq("equipment_id", equipment_id)
+            .eq("status", "active")
+            .execute()
+        )
 
         return len(response.data)

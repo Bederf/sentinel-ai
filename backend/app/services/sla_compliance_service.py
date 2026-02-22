@@ -47,6 +47,7 @@ class SLAComplianceService:
         """Lazy initialization of work order repository."""
         if self._work_order_repo is None:
             from app.database.repositories import get_work_order_repository
+
             self._work_order_repo = get_work_order_repository()
         return self._work_order_repo
 
@@ -54,6 +55,7 @@ class SLAComplianceService:
         """Lazy initialization of SLA repository."""
         if self._sla_repo is None:
             from app.database.repositories import get_sla_repository
+
             self._sla_repo = get_sla_repository()
         return self._sla_repo
 
@@ -163,9 +165,7 @@ class SLAComplianceService:
             return None
 
         # Calculate breach percentage
-        breach_percentage = self._calculate_breach_percentage(
-            metric_type, target, actual
-        )
+        breach_percentage = self._calculate_breach_percentage(metric_type, target, actual)
 
         # Determine severity
         severity = self._determine_severity(float(breach_percentage))
@@ -326,9 +326,7 @@ class SLAComplianceService:
         actual: Decimal,
     ) -> bool:
         """Determine if actual value breaches target."""
-        compliance_pct = self._calculate_compliance_percentage(
-            target, actual, metric_type
-        )
+        compliance_pct = self._calculate_compliance_percentage(target, actual, metric_type)
         return compliance_pct < Decimal("90")  # <90% is a breach
 
     def _calculate_breach_percentage(
@@ -342,9 +340,7 @@ class SLAComplianceService:
 
         How much actual exceeded target (or fell below for percentage metrics).
         """
-        compliance_pct = self._calculate_compliance_percentage(
-            target, actual, metric_type
-        )
+        compliance_pct = self._calculate_compliance_percentage(target, actual, metric_type)
 
         if compliance_pct >= Decimal("100"):
             return Decimal("0")
@@ -387,9 +383,7 @@ class SLAComplianceService:
 
         # Check if overall performance breached
         if self._is_breach(metric_type, target_value, actual_value):
-            breach_pct = self._calculate_breach_percentage(
-                metric_type, target_value, actual_value
-            )
+            breach_pct = self._calculate_breach_percentage(metric_type, target_value, actual_value)
             severity = self._determine_severity(float(breach_pct))
 
             # Create breach event for mid-period
@@ -482,6 +476,7 @@ def get_sla_compliance_service() -> SLAComplianceService:
 # Background Job
 # ============================================================================
 
+
 async def scan_sla_compliance():
     """
     Background job to scan all contracts for SLA breaches.
@@ -529,14 +524,10 @@ async def scan_sla_compliance():
 
                 except Exception as e:
                     logger.error(
-                        f"Failed to calculate SLA performance for "
-                        f"contract {contract.id}, SLA {sla_term.id}: {e}"
+                        f"Failed to calculate SLA performance for contract {contract.id}, SLA {sla_term.id}: {e}"
                     )
 
-        logger.info(
-            f"SLA compliance scan complete: {len(contracts)} contracts, "
-            f"{breach_count} breaches detected"
-        )
+        logger.info(f"SLA compliance scan complete: {len(contracts)} contracts, {breach_count} breaches detected")
 
     except Exception as e:
         logger.error(f"SLA compliance scan failed: {e}")

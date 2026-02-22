@@ -35,7 +35,7 @@ Locked Modules (will show upgrade prompts):
 
 ### User 2: Grant (Lighting Technician)
 ```
-Email: grant@wardew.co.za
+Email: grant@grantdemo.co.za
 Password: (configured in auth system)
 Site: site-002 (Grant building - same as demo simulation)
 
@@ -80,7 +80,7 @@ WHERE user_email = 'bederf@protonmail.com';
 
 -- Grant's grants
 SELECT * FROM user_module_access
-WHERE user_email = 'grant@wardew.co.za';
+WHERE user_email = 'grant@grantdemo.co.za';
 -- Result: control, lighting
 ```
 
@@ -180,7 +180,7 @@ Data: Lighting zone controls, occupancy data
 
 2. Log out
 
-3. Log in as grant@wardew.co.za
+3. Log in as grant@grantdemo.co.za
    - Should see lighting controls
    - Should see locked solar with upgrade prompt
 

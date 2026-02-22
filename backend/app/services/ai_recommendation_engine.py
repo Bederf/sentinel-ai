@@ -22,9 +22,11 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
+
 # Recommendation categories
 class RecommendationType(str, Enum):
     """Types of recommendations"""
+
     LIGHTING_OPTIMIZATION = "lighting_optimization"
     WATER_EFFICIENCY = "water_efficiency"
     HVAC_MAINTENANCE = "hvac_maintenance"
@@ -92,9 +94,7 @@ class AIRecommendationEngine:
         recommendations = []
 
         # Lighting Optimization Recommendation
-        lighting_rec = await self._calculate_lighting_recommendation(
-            lighting_kwh_current
-        )
+        lighting_rec = await self._calculate_lighting_recommendation(lighting_kwh_current)
         if lighting_rec:
             recommendations.append(lighting_rec)
 
@@ -110,9 +110,7 @@ class AIRecommendationEngine:
                 recommendations.append(hvac_rec)
 
         # Occupancy Optimization Recommendation
-        occ_rec = await self._calculate_occupancy_recommendation(
-            power_anomalies_count, cost_variance_pct
-        )
+        occ_rec = await self._calculate_occupancy_recommendation(power_anomalies_count, cost_variance_pct)
         if occ_rec:
             recommendations.append(occ_rec)
 
@@ -128,9 +126,7 @@ class AIRecommendationEngine:
             "building_id": self.building_id,
             "generated_date": datetime.now().isoformat(),
             "recommendation_count": len(recommendations),
-            "total_annual_savings_r": round(
-                sum(r["annual_savings_r"] for r in recommendations), 2
-            ),
+            "total_annual_savings_r": round(sum(r["annual_savings_r"] for r in recommendations), 2),
             "total_investment_r": round(
                 sum(r["investment_cost_r"] for r in recommendations if r["investment_cost_r"] > 0), 2
             ),
@@ -206,9 +202,9 @@ class AIRecommendationEngine:
                 "4. Installation & testing (4 weeks)",
             ],
             "messaging": {
-                "short": f"Save R{annual_savings_r/12:,.0f}/month with smart lighting",
+                "short": f"Save R{annual_savings_r / 12:,.0f}/month with smart lighting",
                 "long": (
-                    f"Install DALI controls to reduce lighting energy by {(1-current_kwh/baseline_kwh)*100:.0f}%. "
+                    f"Install DALI controls to reduce lighting energy by {(1 - current_kwh / baseline_kwh) * 100:.0f}%. "
                     f"Pays back in {payback_months:.1f} months."
                 ),
                 "urgency": "medium",
@@ -241,7 +237,7 @@ class AIRecommendationEngine:
             "title": "Water Efficiency Retrofit (Low-Flow Fixtures)",
             "description": (
                 f"Install low-flow toilets, faucets, and fixtures. "
-                f"Current consumption {current_liters/1000:.1f} kL/day can be reduced by {(1-current_liters/baseline_liters)*100:.0f}%."
+                f"Current consumption {current_liters / 1000:.1f} kL/day can be reduced by {(1 - current_liters / baseline_liters) * 100:.0f}%."
             ),
             "current_state": {
                 "daily_liters": round(current_liters, 0),
@@ -263,7 +259,7 @@ class AIRecommendationEngine:
             "implementation_timeline_weeks": 3,
             "benefits": [
                 f"Save R{annual_savings_r:,.0f}/year on water + sewerage",
-                f"Reduce water consumption by {annual_savings_liters/1000:.0f} kL/year",
+                f"Reduce water consumption by {annual_savings_liters / 1000:.0f} kL/year",
                 "Reduce municipal water strain",
                 "Lower carbon footprint (water treatment)",
             ],
@@ -277,9 +273,9 @@ class AIRecommendationEngine:
                 "3. Installation & testing (2 weeks)",
             ],
             "messaging": {
-                "short": f"Save R{annual_savings_r/12:,.0f}/month with water efficiency",
+                "short": f"Save R{annual_savings_r / 12:,.0f}/month with water efficiency",
                 "long": (
-                    f"Install low-flow fixtures to reduce water consumption by {(1-current_liters/baseline_liters)*100:.0f}%. "
+                    f"Install low-flow fixtures to reduce water consumption by {(1 - current_liters / baseline_liters) * 100:.0f}%. "
                     f"Pays back in {payback_months:.1f} months."
                 ),
                 "urgency": "medium",
@@ -428,7 +424,7 @@ class AIRecommendationEngine:
                 "4. Commissioning & optimization (1 week)",
             ],
             "messaging": {
-                "short": f"Save R{annual_savings_r/12:,.0f}/month with smart scheduling",
+                "short": f"Save R{annual_savings_r / 12:,.0f}/month with smart scheduling",
                 "long": (
                     f"Real-time occupancy-based control can reduce facility costs by {potential_savings_pct}%. "
                     f"Pays back in {payback_months:.1f} months."

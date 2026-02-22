@@ -21,6 +21,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 class MockRecommendation:
     id: str = "rec-001"
     target_equipment: str = "S002-CHILLER-B1-001"
+    site_id: str = "site-002"
     status: Any = None
     action: Dict = None
 
@@ -31,6 +32,17 @@ class MockRecommendation:
             from app.models.recommendation import RecommendationStatus
 
             self.status = RecommendationStatus.PENDING
+
+
+def _mock_gate_pass():
+    """Return a mock quality gate result that passes."""
+    gate = MagicMock()
+    gate.overall = MagicMock(value="pass")
+    gate.enforcement = MagicMock(value="normal")
+    gate.failed_rules = []
+    gate.warn_rules = []
+    gate.reason_codes = []
+    return gate
 
 
 class TestTierRoutingResultHasDecisionId:
@@ -130,10 +142,12 @@ class TestTier3SafetyFailureLogging:
         with (
             patch.object(service, "recommendations_repo", new_callable=MagicMock) as mock_repo,
             patch.object(service, "_validate_safety", new_callable=AsyncMock) as mock_safety,
+            patch.object(service, "_check_quality_gate", new_callable=AsyncMock) as mock_gate,
             patch("app.services.approval_service.ParasiteDecisionRepository") as MockParasiteRepo,
         ):
             mock_repo.get_by_id = AsyncMock(return_value=mock_rec)
             mock_safety.return_value = {"is_safe": False, "reason": "Temperature out of range"}
+            mock_gate.return_value = _mock_gate_pass()
 
             mock_parasite = MagicMock()
             mock_parasite.record_decision = AsyncMock(return_value={"id": routing_result.decision_id})
@@ -184,10 +198,12 @@ class TestTier3WriteFailureLogging:
             patch.object(service, "recommendations_repo", new_callable=MagicMock) as mock_repo,
             patch.object(service, "_validate_safety", new_callable=AsyncMock) as mock_safety,
             patch.object(service, "_execute_device_write", new_callable=AsyncMock) as mock_write,
+            patch.object(service, "_check_quality_gate", new_callable=AsyncMock) as mock_gate,
             patch("app.services.approval_service.ParasiteDecisionRepository") as MockParasiteRepo,
         ):
             mock_repo.get_by_id = AsyncMock(return_value=mock_rec)
             mock_safety.return_value = {"is_safe": True}
+            mock_gate.return_value = _mock_gate_pass()
             # Mock device_manager.read_value for current value
             service.device_manager = MagicMock()
             service.device_manager.read_value = AsyncMock(return_value={"success": True, "value": 24.0})
@@ -242,6 +258,7 @@ class TestTier3SuccessLogging:
             patch.object(service, "recommendations_repo", new_callable=MagicMock) as mock_repo,
             patch.object(service, "_validate_safety", new_callable=AsyncMock) as mock_safety,
             patch.object(service, "_execute_device_write", new_callable=AsyncMock) as mock_write,
+            patch.object(service, "_check_quality_gate", new_callable=AsyncMock) as mock_gate,
             patch("app.services.approval_service.get_cov_monitor_service") as mock_get_cov,
             patch.object(service, "_create_audit_log", new_callable=AsyncMock) as mock_audit,
             patch.object(service, "_record_module_feedback") as mock_feedback,
@@ -250,6 +267,7 @@ class TestTier3SuccessLogging:
             mock_repo.get_by_id = AsyncMock(return_value=mock_rec)
             mock_repo.upsert = AsyncMock(return_value=True)
             mock_safety.return_value = {"is_safe": True}
+            mock_gate.return_value = _mock_gate_pass()
             # Mock device_manager.read_value for current value
             service.device_manager = MagicMock()
             service.device_manager.read_value = AsyncMock(return_value={"success": True, "value": 24.0})
@@ -345,10 +363,12 @@ class TestCorrelationIdThreading:
         with (
             patch.object(service, "recommendations_repo", new_callable=MagicMock) as mock_repo,
             patch.object(service, "_validate_safety", new_callable=AsyncMock) as mock_safety,
+            patch.object(service, "_check_quality_gate", new_callable=AsyncMock) as mock_gate,
             patch("app.services.approval_service.ParasiteDecisionRepository") as MockParasiteRepo,
         ):
             mock_repo.get_by_id = AsyncMock(return_value=mock_rec)
             mock_safety.return_value = {"is_safe": False, "reason": "Out of range"}
+            mock_gate.return_value = _mock_gate_pass()
 
             mock_parasite = MagicMock()
             mock_parasite.record_decision = AsyncMock(return_value={"id": routing_result.decision_id})
@@ -394,6 +414,7 @@ class TestScheduleOutcomeMeasurementFix:
             patch.object(service, "recommendations_repo", new_callable=MagicMock) as mock_repo,
             patch.object(service, "_validate_safety", new_callable=AsyncMock) as mock_safety,
             patch.object(service, "_execute_device_write", new_callable=AsyncMock) as mock_write,
+            patch.object(service, "_check_quality_gate", new_callable=AsyncMock) as mock_gate,
             patch("app.services.approval_service.get_cov_monitor_service") as mock_get_cov,
             patch.object(service, "_create_audit_log", new_callable=AsyncMock),
             patch.object(service, "_record_module_feedback"),
@@ -402,6 +423,7 @@ class TestScheduleOutcomeMeasurementFix:
             mock_repo.get_by_id = AsyncMock(return_value=mock_rec)
             mock_repo.upsert = AsyncMock(return_value=True)
             mock_safety.return_value = {"is_safe": True}
+            mock_gate.return_value = _mock_gate_pass()
             service.device_manager = MagicMock()
             service.device_manager.read_value = AsyncMock(return_value={"success": True, "value": 24.0})
             mock_write.return_value = {"success": True}

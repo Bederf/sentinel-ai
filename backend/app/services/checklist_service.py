@@ -65,7 +65,7 @@ class ChecklistService:
         """
         if self._templates_cache is None:
             logger.info(f"Loading checklist templates from {self._templates_path}")
-            with open(self._templates_path, 'r') as f:
+            with open(self._templates_path, "r") as f:
                 data = json.load(f)
                 self._templates_cache = data.get("templates", {})
                 logger.info(f"Loaded {len(self._templates_cache)} checklist templates")
@@ -119,15 +119,10 @@ class ChecklistService:
 
         # Fall back to JSON
         templates = self._load_templates()
-        return [
-            t for t in templates.values()
-            if t.get("equipment_type") == equipment_type
-        ]
+        return [t for t in templates.values() if t.get("equipment_type") == equipment_type]
 
     def get_template_for_inspection(
-        self,
-        equipment_type: str,
-        inspection_type: str = "routine"
+        self, equipment_type: str, inspection_type: str = "routine"
     ) -> Optional[Dict[str, Any]]:
         """
         Get best matching template for equipment and inspection type.
@@ -146,10 +141,7 @@ class ChecklistService:
             try:
                 results = self.repo.get_templates_for_equipment_type(equipment_type)
                 if results:
-                    matching = [
-                        t for t in results
-                        if t.get("inspection_type") == inspection_type
-                    ]
+                    matching = [t for t in results if t.get("inspection_type") == inspection_type]
                     if matching:
                         return matching[0]
                     # Return first Supabase result as fallback
@@ -172,8 +164,7 @@ class ChecklistService:
 
         # Fall back to first available template for this equipment type
         logger.info(
-            f"No exact match for inspection_type={inspection_type}, "
-            f"using first available template for {equipment_type}"
+            f"No exact match for inspection_type={inspection_type}, using first available template for {equipment_type}"
         )
         return templates[0]
 
@@ -183,17 +174,9 @@ class ChecklistService:
         Used as internal fallback when Supabase is unavailable.
         """
         templates = self._load_templates()
-        return [
-            t for t in templates.values()
-            if t.get("equipment_type") == equipment_type
-        ]
+        return [t for t in templates.values() if t.get("equipment_type") == equipment_type]
 
-    def get_oem_template(
-        self,
-        equipment_type: str,
-        manufacturer: str,
-        model: str = None
-    ) -> Optional[Dict[str, Any]]:
+    def get_oem_template(self, equipment_type: str, manufacturer: str, model: str = None) -> Optional[Dict[str, Any]]:
         """
         Get OEM-specific template by manufacturer.
 
@@ -234,15 +217,17 @@ class ChecklistService:
                 for t in supabase_templates:
                     name = t.get("template_name", "")
                     seen_names.add(name.lower())
-                    results.append({
-                        "template_id": t.get("id"),
-                        "template_name": name,
-                        "equipment_type": t.get("equipment_type"),
-                        "inspection_type": t.get("inspection_type"),
-                        "estimated_duration_minutes": t.get("estimated_duration_minutes"),
-                        "item_count": len(t.get("checklist_items", [])),
-                        "source": "supabase",
-                    })
+                    results.append(
+                        {
+                            "template_id": t.get("id"),
+                            "template_name": name,
+                            "equipment_type": t.get("equipment_type"),
+                            "inspection_type": t.get("inspection_type"),
+                            "estimated_duration_minutes": t.get("estimated_duration_minutes"),
+                            "item_count": len(t.get("checklist_items", [])),
+                            "source": "supabase",
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Supabase template listing failed: {e}")
 
@@ -251,23 +236,21 @@ class ChecklistService:
         for t in templates.values():
             name = t.get("template_name", "")
             if name.lower() not in seen_names:
-                results.append({
-                    "template_id": t.get("template_id"),
-                    "template_name": name,
-                    "equipment_type": t.get("equipment_type"),
-                    "inspection_type": t.get("inspection_type"),
-                    "estimated_duration_minutes": t.get("estimated_duration_minutes"),
-                    "item_count": len(t.get("checklist_items", [])),
-                    "source": "json",
-                })
+                results.append(
+                    {
+                        "template_id": t.get("template_id"),
+                        "template_name": name,
+                        "equipment_type": t.get("equipment_type"),
+                        "inspection_type": t.get("inspection_type"),
+                        "estimated_duration_minutes": t.get("estimated_duration_minutes"),
+                        "item_count": len(t.get("checklist_items", [])),
+                        "source": "json",
+                    }
+                )
 
         return results
 
-    def calculate_completion_status(
-        self,
-        template: Dict[str, Any],
-        responses: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def calculate_completion_status(self, template: Dict[str, Any], responses: Dict[str, Any]) -> Dict[str, Any]:
         """
         Calculate inspection completion status from responses.
 
@@ -353,14 +336,11 @@ class ChecklistService:
             "warning_count": warning_count,
             "ok_count": ok_count,
             "failed_tolerances": failed_tolerances,
-            "overall_status": overall_status
+            "overall_status": overall_status,
         }
 
     def prepare_measurements_for_db(
-        self,
-        template: Dict[str, Any],
-        responses: Dict[str, Any],
-        task_id: str
+        self, template: Dict[str, Any], responses: Dict[str, Any], task_id: str
     ) -> List[Dict[str, Any]]:
         """
         Convert checklist responses to measurement records for database.
@@ -425,19 +405,21 @@ class ChecklistService:
             if min_tol is not None and max_tol is not None:
                 is_within_tolerance = min_tol <= value <= max_tol
 
-            measurements.append({
-                "task_id": task_id,
-                "element_id": item.get("element_id"),  # May be None
-                "measurement_type": self._infer_measurement_type(item),
-                "parameter_name": item.get("parameter_name"),
-                "value": value,
-                "unit": item.get("unit"),
-                "is_within_tolerance": is_within_tolerance,
-                "tolerance_min": min_tol,
-                "tolerance_max": max_tol,
-                "notes": notes,
-                "measured_at": measured_at
-            })
+            measurements.append(
+                {
+                    "task_id": task_id,
+                    "element_id": item.get("element_id"),  # May be None
+                    "measurement_type": self._infer_measurement_type(item),
+                    "parameter_name": item.get("parameter_name"),
+                    "value": value,
+                    "unit": item.get("unit"),
+                    "is_within_tolerance": is_within_tolerance,
+                    "tolerance_min": min_tol,
+                    "tolerance_max": max_tol,
+                    "notes": notes,
+                    "measured_at": measured_at,
+                }
+            )
 
         return measurements
 
@@ -489,11 +471,7 @@ class ChecklistService:
         # Default
         return "general"
 
-    def validate_response_format(
-        self,
-        template: Dict[str, Any],
-        responses: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def validate_response_format(self, template: Dict[str, Any], responses: Dict[str, Any]) -> Dict[str, Any]:
         """
         Validate response format against template requirements.
 
@@ -533,10 +511,7 @@ class ChecklistService:
                 valid_values = [opt.get("value") for opt in item.get("options", [])]
                 if response not in valid_values:
                     invalid_items.append(item_id)
-                    errors.append(
-                        f"Item '{item_id}' has invalid value '{response}'. "
-                        f"Valid values: {valid_values}"
-                    )
+                    errors.append(f"Item '{item_id}' has invalid value '{response}'. Valid values: {valid_values}")
 
             elif item_type == "measurement":
                 if isinstance(response, dict):
@@ -549,23 +524,19 @@ class ChecklistService:
                         float(value)
                     except (ValueError, TypeError):
                         invalid_items.append(item_id)
-                        errors.append(
-                            f"Item '{item_id}' has non-numeric value: {value}"
-                        )
+                        errors.append(f"Item '{item_id}' has non-numeric value: {value}")
 
             elif item_type == "visual_inspection":
                 if item.get("photos_required") and isinstance(response, dict):
                     if not response.get("photo_url") and not response.get("photo_urls"):
                         invalid_items.append(item_id)
-                        errors.append(
-                            f"Item '{item_id}' requires photo but none provided"
-                        )
+                        errors.append(f"Item '{item_id}' requires photo but none provided")
 
         return {
             "is_valid": len(missing_required) == 0 and len(invalid_items) == 0,
             "missing_required": missing_required,
             "invalid_items": invalid_items,
-            "errors": errors
+            "errors": errors,
         }
 
     def reload_templates(self) -> int:

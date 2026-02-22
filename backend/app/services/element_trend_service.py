@@ -47,6 +47,7 @@ class ElementTrendService:
         """Lazy-load inspection repository."""
         if self._inspection_repo is None:
             from app.database.repositories.inspection_repository import InspectionRepository
+
             self._inspection_repo = InspectionRepository()
         return self._inspection_repo
 
@@ -55,6 +56,7 @@ class ElementTrendService:
         """Lazy-load baseline repository."""
         if self._baseline_repo is None:
             from app.database.repositories.baseline_repository import BaselineRepository
+
             self._baseline_repo = BaselineRepository()
         return self._baseline_repo
 
@@ -63,10 +65,7 @@ class ElementTrendService:
     # ========================================================================
 
     async def get_element_history(
-        self,
-        equipment_id: str,
-        element_name: str,
-        days: int = 90
+        self, equipment_id: str, element_name: str, days: int = 90
     ) -> List[ElementTrendPoint]:
         """
         Get historical measurement data for an equipment element.
@@ -91,7 +90,7 @@ class ElementTrendService:
             measurements = await self.inspection_repo.get_measurements_by_equipment(
                 equipment_id=equipment_id,
                 measurement_type=None,  # All types
-                limit=500
+                limit=500,
             )
 
             for m in measurements:
@@ -101,27 +100,25 @@ class ElementTrendService:
                 if m.measurement_date < cutoff:
                     continue
 
-                points.append(ElementTrendPoint(
-                    timestamp=m.measurement_date,
-                    value=m.measured_value,
-                    unit=m.unit,
-                    deviation_percent=m.baseline_deviation_percent or 0.0,
-                    source=TrendSource.INSPECTION
-                ))
+                points.append(
+                    ElementTrendPoint(
+                        timestamp=m.measurement_date,
+                        value=m.measured_value,
+                        unit=m.unit,
+                        deviation_percent=m.baseline_deviation_percent or 0.0,
+                        source=TrendSource.INSPECTION,
+                    )
+                )
 
             logger.debug(
-                f"Found {len(points)} inspection measurements for "
-                f"{equipment_id}/{element_name} in last {days} days"
+                f"Found {len(points)} inspection measurements for {equipment_id}/{element_name} in last {days} days"
             )
         except Exception as e:
             logger.warning(f"Could not query inspection measurements: {e}")
 
         # 2. Query baseline comparison deviations
         try:
-            comparisons = await self.baseline_repo.get_recent_comparisons(
-                equipment_id=equipment_id,
-                limit=50
-            )
+            comparisons = await self.baseline_repo.get_recent_comparisons(equipment_id=equipment_id, limit=50)
 
             for comp in comparisons:
                 if comp.comparison_date < cutoff:
@@ -135,18 +132,17 @@ class ElementTrendService:
                         current_val = result_data.get("current")
                         deviation = result_data.get("deviation_percent", 0)
                         if current_val is not None:
-                            points.append(ElementTrendPoint(
-                                timestamp=comp.comparison_date,
-                                value=float(current_val),
-                                unit="",  # Unit not always stored in comparisons
-                                deviation_percent=float(deviation),
-                                source=TrendSource.BASELINE
-                            ))
+                            points.append(
+                                ElementTrendPoint(
+                                    timestamp=comp.comparison_date,
+                                    value=float(current_val),
+                                    unit="",  # Unit not always stored in comparisons
+                                    deviation_percent=float(deviation),
+                                    source=TrendSource.BASELINE,
+                                )
+                            )
 
-            logger.debug(
-                f"Found {len(points)} total data points (incl. baseline) for "
-                f"{equipment_id}/{element_name}"
-            )
+            logger.debug(f"Found {len(points)} total data points (incl. baseline) for {equipment_id}/{element_name}")
         except Exception as e:
             logger.warning(f"Could not query baseline comparisons: {e}")
 
@@ -172,10 +168,7 @@ class ElementTrendService:
     # Degradation Rate Calculation
     # ========================================================================
 
-    def calculate_degradation_rate(
-        self,
-        data_points: List[ElementTrendPoint]
-    ) -> DegradationRate:
+    def calculate_degradation_rate(self, data_points: List[ElementTrendPoint]) -> DegradationRate:
         """
         Calculate degradation rate using manual linear regression.
 
@@ -196,11 +189,7 @@ class ElementTrendService:
 
         if n < 2:
             return DegradationRate(
-                element_name=element_name,
-                rate_per_day=0.0,
-                rate_per_month=0.0,
-                unit=unit,
-                confidence=0.0
+                element_name=element_name, rate_per_day=0.0, rate_per_month=0.0, unit=unit, confidence=0.0
             )
 
         # Convert timestamps to days from first point
@@ -222,11 +211,7 @@ class ElementTrendService:
         if abs(denominator) < 1e-10:
             # All x values are the same (measurements at same time)
             return DegradationRate(
-                element_name=element_name,
-                rate_per_day=0.0,
-                rate_per_month=0.0,
-                unit=unit,
-                confidence=0.0
+                element_name=element_name, rate_per_day=0.0, rate_per_month=0.0, unit=unit, confidence=0.0
             )
 
         slope = (sum_xy - n * mean_x * mean_y) / denominator
@@ -256,18 +241,14 @@ class ElementTrendService:
             rate_per_day=round(rate_per_day, 6),
             rate_per_month=round(rate_per_month, 4),
             unit=unit,
-            confidence=round(confidence, 3)
+            confidence=round(confidence, 3),
         )
 
     # ========================================================================
     # Trend Classification
     # ========================================================================
 
-    def classify_trend(
-        self,
-        degradation_rate: DegradationRate,
-        tolerance: float = 10.0
-    ) -> TrendDirection:
+    def classify_trend(self, degradation_rate: DegradationRate, tolerance: float = 10.0) -> TrendDirection:
         """
         Classify the trend direction based on degradation rate.
 
@@ -291,7 +272,7 @@ class ElementTrendService:
 
         # Threshold calculations (per day)
         stable_threshold = tolerance * 0.01 / 30.0  # Very small daily change
-        rapid_threshold = tolerance * 0.05 / 30.0   # 5x the stable threshold
+        rapid_threshold = tolerance * 0.05 / 30.0  # 5x the stable threshold
 
         if abs(rate) < stable_threshold:
             return TrendDirection.STABLE
@@ -311,11 +292,7 @@ class ElementTrendService:
     # Equipment Trend Summary
     # ========================================================================
 
-    async def get_equipment_trend_summary(
-        self,
-        equipment_id: str,
-        days: int = 90
-    ) -> EquipmentTrendSummary:
+    async def get_equipment_trend_summary(self, equipment_id: str, days: int = 90) -> EquipmentTrendSummary:
         """
         Get comprehensive trend analysis for all elements of an equipment.
 
@@ -344,7 +321,7 @@ class ElementTrendService:
                 element_trends=[],
                 overall_trend_direction=TrendDirection.STABLE,
                 condition_score=100.0,
-                message="No inspection data available for trend analysis"
+                message="No inspection data available for trend analysis",
             )
 
         # 2. Calculate trend for each element
@@ -362,7 +339,7 @@ class ElementTrendService:
                     degradation_rate_per_day=None,
                     trend_direction=TrendDirection.STABLE,
                     r_squared=None,
-                    days_of_data=0
+                    days_of_data=0,
                 )
             else:
                 rate = self.calculate_degradation_rate(points)
@@ -380,7 +357,7 @@ class ElementTrendService:
                     degradation_rate_per_day=rate.rate_per_day,
                     trend_direction=direction,
                     r_squared=rate.confidence,
-                    days_of_data=int(days_span)
+                    days_of_data=int(days_span),
                 )
 
             element_trends.append(trend)
@@ -394,12 +371,9 @@ class ElementTrendService:
 
         # Build summary message
         degrading_count = sum(
-            1 for t in element_trends
-            if t.trend_direction in (TrendDirection.DEGRADING, TrendDirection.RAPID_DEGRADING)
+            1 for t in element_trends if t.trend_direction in (TrendDirection.DEGRADING, TrendDirection.RAPID_DEGRADING)
         )
-        message = self._build_summary_message(
-            element_trends, degrading_count, worst_element
-        )
+        message = self._build_summary_message(element_trends, degrading_count, worst_element)
 
         return EquipmentTrendSummary(
             equipment_id=equipment_id,
@@ -407,14 +381,10 @@ class ElementTrendService:
             worst_element=worst_element,
             overall_trend_direction=overall_direction,
             condition_score=condition_score,
-            message=message
+            message=message,
         )
 
-    async def _discover_elements(
-        self,
-        equipment_id: str,
-        days: int
-    ) -> Dict[str, str]:
+    async def _discover_elements(self, equipment_id: str, days: int) -> Dict[str, str]:
         """
         Discover unique element names and their measurement types
         from inspection history.
@@ -426,8 +396,7 @@ class ElementTrendService:
 
         try:
             measurements = await self.inspection_repo.get_measurements_by_equipment(
-                equipment_id=equipment_id,
-                limit=500
+                equipment_id=equipment_id, limit=500
             )
 
             cutoff = datetime.now() - timedelta(days=days)
@@ -507,18 +476,12 @@ class ElementTrendService:
             TrendDirection.RAPID_DEGRADING: 30.0,
         }
 
-        scores = [
-            direction_scores.get(t.trend_direction, 100.0)
-            for t in trends
-        ]
+        scores = [direction_scores.get(t.trend_direction, 100.0) for t in trends]
 
         return round(sum(scores) / len(scores), 1)
 
     def _build_summary_message(
-        self,
-        trends: List[ElementTrend],
-        degrading_count: int,
-        worst_element: Optional[str]
+        self, trends: List[ElementTrend], degrading_count: int, worst_element: Optional[str]
     ) -> str:
         """Build human-readable summary message."""
         total = len(trends)
@@ -527,20 +490,14 @@ class ElementTrendService:
             return f"All {total} monitored elements are stable or improving."
 
         if worst_element:
-            rapid = sum(
-                1 for t in trends
-                if t.trend_direction == TrendDirection.RAPID_DEGRADING
-            )
+            rapid = sum(1 for t in trends if t.trend_direction == TrendDirection.RAPID_DEGRADING)
             if rapid > 0:
                 return (
                     f"{degrading_count} of {total} elements degrading "
                     f"({rapid} rapidly). Worst: {worst_element}. "
                     f"Immediate attention recommended."
                 )
-            return (
-                f"{degrading_count} of {total} elements degrading. "
-                f"Worst: {worst_element}. Monitor closely."
-            )
+            return f"{degrading_count} of {total} elements degrading. Worst: {worst_element}. Monitor closely."
 
         return f"{degrading_count} of {total} elements showing degradation."
 

@@ -22,6 +22,7 @@ MODEL_TYPES = ["lstm", "autoencoder"]
 @dataclass
 class RetrainResult:
     """Result of a retraining operation."""
+
     model_id: str
     model_type: str
     equipment_type: str
@@ -46,6 +47,7 @@ class RetrainingScheduler:
         age_days, r2_score, needs_retrain bool.
         """
         from ml.registry import get_model_registry
+
         registry = get_model_registry()
         results = []
 
@@ -54,15 +56,17 @@ class RetrainingScheduler:
                 model = registry.get_active_model(model_type, equipment_type)
 
                 if model is None:
-                    results.append({
-                        "model_type": model_type,
-                        "equipment_type": equipment_type,
-                        "status": "missing",
-                        "age_days": None,
-                        "r2_score": None,
-                        "needs_retrain": True,
-                        "reason": "No active model found",
-                    })
+                    results.append(
+                        {
+                            "model_type": model_type,
+                            "equipment_type": equipment_type,
+                            "status": "missing",
+                            "age_days": None,
+                            "r2_score": None,
+                            "needs_retrain": True,
+                            "reason": "No active model found",
+                        }
+                    )
                     continue
 
                 # Calculate age
@@ -90,16 +94,18 @@ class RetrainingScheduler:
 
                 status = "stale" if is_stale else ("underperforming" if is_underperforming else "fresh")
 
-                results.append({
-                    "model_type": model_type,
-                    "equipment_type": equipment_type,
-                    "model_id": model.get("model_id"),
-                    "status": status,
-                    "age_days": age_days,
-                    "r2_score": r2_score,
-                    "needs_retrain": needs_retrain,
-                    "reason": "; ".join(reasons) if reasons else "Model is fresh and performing well",
-                })
+                results.append(
+                    {
+                        "model_type": model_type,
+                        "equipment_type": equipment_type,
+                        "model_id": model.get("model_id"),
+                        "status": status,
+                        "age_days": age_days,
+                        "r2_score": r2_score,
+                        "needs_retrain": needs_retrain,
+                        "reason": "; ".join(reasons) if reasons else "Model is fresh and performing well",
+                    }
+                )
 
         return results
 
@@ -125,9 +131,7 @@ class RetrainingScheduler:
 
         try:
             # In production this would call the actual trainer
-            logger.info(
-                f"Retraining triggered: {model_type}/{equipment_type} - reason: {reason}"
-            )
+            logger.info(f"Retraining triggered: {model_type}/{equipment_type} - reason: {reason}")
 
             if model_type == "lstm":
                 # Would call: from ml.lstm.trainer import LSTMTrainer

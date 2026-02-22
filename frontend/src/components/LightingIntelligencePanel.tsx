@@ -600,7 +600,7 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
                 className="text-sm font-medium mb-1"
                 style={{ color: '#22C55E' }}
               >
-                Wardew Smart Lighting + SENTINEL AI Intelligence
+                Tridonic Smart Lighting + SENTINEL AI Intelligence
               </p>
               <p
                 className="text-xs leading-relaxed"

@@ -14,8 +14,10 @@ from typing import Dict, Any, List, Optional
 
 # === Enums ===
 
+
 class SolarEquipmentType(str, Enum):
     """Types of solar/BESS equipment."""
+
     INVERTER = "inverter"
     STRING = "string"
     BESS_CONTAINER = "bess_container"
@@ -26,6 +28,7 @@ class SolarEquipmentType(str, Enum):
 
 class InverterStatus(str, Enum):
     """Inverter operational status."""
+
     ONLINE = "online"
     WARNING = "warning"
     FAULT = "fault"
@@ -34,6 +37,7 @@ class InverterStatus(str, Enum):
 
 class BESSMode(str, Enum):
     """BESS operating mode."""
+
     CHARGING = "charging"
     DISCHARGING = "discharging"
     IDLE = "idle"
@@ -42,14 +46,16 @@ class BESSMode(str, Enum):
 
 class QualityFlag(str, Enum):
     """Data quality flags for normalised readings."""
-    GOOD = "good"              # Fresh data, < 30s old
-    STALE = "stale"            # Data > 60s old
+
+    GOOD = "good"  # Fresh data, < 30s old
+    STALE = "stale"  # Data > 60s old
     INTERPOLATED = "interpolated"  # Gap-filled
-    SUSPECT = "suspect"        # Out of expected range
+    SUSPECT = "suspect"  # Out of expected range
 
 
 class ReadingType(str, Enum):
     """Types of normalised readings."""
+
     POWER = "power"
     ENERGY = "energy"
     VOLTAGE = "voltage"
@@ -64,6 +70,7 @@ class ReadingType(str, Enum):
 
 class DataSource(str, Enum):
     """Source of data."""
+
     MODBUS = "modbus"
     CLOUD_API = "cloud_api"
     BMS = "bms"
@@ -72,12 +79,14 @@ class DataSource(str, Enum):
 
 class ConnectorProtocol(str, Enum):
     """Communication protocol for connectors."""
+
     MODBUS_TCP = "modbus_tcp"
     CLOUD_API = "cloud_api"
     BACNET = "bacnet"
 
 
 # === Plant ===
+
 
 @dataclass
 class SolarPlant:
@@ -118,6 +127,7 @@ class SolarPlant:
 
 
 # === Inverter ===
+
 
 @dataclass
 class SolarInverter:
@@ -185,6 +195,7 @@ class SolarInverter:
 
 # === String ===
 
+
 @dataclass
 class SolarString:
     """PV string entity (L4 in hierarchy)."""
@@ -220,6 +231,7 @@ class SolarString:
 
 
 # === BESS Container ===
+
 
 @dataclass
 class BESSContainer:
@@ -266,10 +278,16 @@ class BESSContainer:
             "mode": self.mode,
             "charge_power_kw": self.charge_power_kw,
             "discharge_power_kw": self.discharge_power_kw,
-            "current_power_kw": self.discharge_power_kw if self.mode == "discharging" else (self.charge_power_kw if self.mode == "charging" else 0.0),
+            "current_power_kw": self.discharge_power_kw
+            if self.mode == "discharging"
+            else (self.charge_power_kw if self.mode == "charging" else 0.0),
             "temperature_c": self.temp_c,
             "cycle_count": self.cycles_count,
-            "estimated_runtime_min": int((self.capacity_kwh * self.soc_pct / 100) / max(self.discharge_power_kw, 1.0) * 60) if self.discharge_power_kw > 0 else 0,
+            "estimated_runtime_min": int(
+                (self.capacity_kwh * self.soc_pct / 100) / max(self.discharge_power_kw, 1.0) * 60
+            )
+            if self.discharge_power_kw > 0
+            else 0,
             "rack_count": self.rack_count,
             "alarms": self.alarms,
             "status": "fault" if self.alarms else "normal",
@@ -277,6 +295,7 @@ class BESSContainer:
 
 
 # === BESS Rack ===
+
 
 @dataclass
 class BESSRack:
@@ -305,6 +324,7 @@ class BESSRack:
 
 
 # === Grid Meter ===
+
 
 @dataclass
 class GridMeter:
@@ -350,6 +370,7 @@ class GridMeter:
 
 # === Normalised Reading ===
 
+
 @dataclass
 class NormalisedReading:
     """Protocol-agnostic normalised reading from any solar/BESS equipment."""
@@ -378,6 +399,7 @@ class NormalisedReading:
 
 # === Connector Status ===
 
+
 @dataclass
 class ConnectorStatus:
     """Status of a manufacturer connector."""
@@ -401,6 +423,7 @@ class ConnectorStatus:
 
 class GridCode(str, Enum):
     """Grid compliance standards."""
+
     NRS_097_2_3 = "nrs_097_2_3"  # South African grid code
     IEC_61727 = "iec_61727"  # International standard
     IEEE_1547 = "ieee_1547"  # US standard
@@ -408,6 +431,7 @@ class GridCode(str, Enum):
 
 class GridParameter(str, Enum):
     """Grid parameters being monitored."""
+
     FREQUENCY = "frequency"
     VOLTAGE = "voltage"
     CURRENT = "current"
@@ -418,6 +442,7 @@ class GridParameter(str, Enum):
 
 class ComplianceSeverity(str, Enum):
     """Severity of compliance violations."""
+
     CRITICAL = "critical"  # Immediate action required, trip threshold
     WARNING = "warning"  # Action recommended, pre-violation
     INFO = "info"  # Informational only
@@ -426,6 +451,7 @@ class ComplianceSeverity(str, Enum):
 @dataclass
 class FrequencyBand:
     """Frequency operating band for a grid code."""
+
     band_name: str  # "normal", "recovery", "emergency"
     min_hz: float
     max_hz: float
@@ -437,6 +463,7 @@ class FrequencyBand:
 @dataclass
 class VoltageBand:
     """Voltage operating band for a grid code (per phase)."""
+
     band_name: str  # "normal", "recovery", "emergency"
     nominal_v: float
     min_v: float
@@ -449,6 +476,7 @@ class VoltageBand:
 @dataclass
 class RampRateLimit:
     """Maximum rate of power change (percentage per minute)."""
+
     condition: str  # "normal", "curtailment", "recovery"
     max_pct_per_min: float
     applies_to: str = "ac_power"  # Which power measurement
@@ -457,6 +485,7 @@ class RampRateLimit:
 @dataclass
 class ComplianceViolation:
     """Record of a grid code violation."""
+
     timestamp: str  # ISO 8601 datetime
     system_id: str  # Inverter or site ID
     parameter: str  # frequency, voltage, ramp_rate, etc.
@@ -488,6 +517,7 @@ class ComplianceViolation:
 @dataclass
 class GridComplianceStatus:
     """Current grid compliance status snapshot."""
+
     system_id: str
     grid_code: str
     compliant: bool
@@ -521,6 +551,7 @@ class GridComplianceStatus:
 @dataclass
 class LoadShedEvent:
     """Load shedding stage transition event."""
+
     timestamp: str  # ISO 8601 datetime
     frequency_hz: float
     previous_stage: int

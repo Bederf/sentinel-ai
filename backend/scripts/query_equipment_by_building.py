@@ -2,8 +2,10 @@
 """
 Query Supabase equipment table to diagnose data population per building.
 """
+
 import sys
-sys.path.insert(0, '/opt/bms-intelligence/backend')
+
+sys.path.insert(0, "/opt/bms-intelligence/backend")
 
 from app.database.supabase_client import get_supabase_client
 import json
@@ -50,9 +52,9 @@ try:
     buildings = client.table("buildings").select("id, code, name").execute()
 
     for building in buildings.data:
-        building_id = building['id']
-        building_code = building['code']
-        building_name = building['name']
+        building_id = building["id"]
+        building_code = building["code"]
+        building_name = building["name"]
 
         # Query equipment by building
         try:
@@ -63,7 +65,9 @@ try:
 
             if equip.data and count > 0:
                 for eq in equip.data[:3]:  # Show first 3
-                    print(f"       - {eq.get('code', 'N/A')}: {eq.get('name', 'N/A')} (type: {eq.get('equipment_type', 'N/A')})")
+                    print(
+                        f"       - {eq.get('code', 'N/A')}: {eq.get('name', 'N/A')} (type: {eq.get('equipment_type', 'N/A')})"
+                    )
                 if count > 3:
                     print(f"       ... and {count - 3} more")
         except Exception as e:
@@ -91,7 +95,8 @@ except Exception as e:
 print("\n5. JSON FALLBACK DATA")
 print("-" * 70)
 from pathlib import Path
-json_equipment_file = Path('/opt/bms-intelligence/backend/app/data/equipment.json')
+
+json_equipment_file = Path("/opt/bms-intelligence/backend/app/data/equipment.json")
 if json_equipment_file.exists():
     with open(json_equipment_file) as f:
         json_data = json.load(f)
@@ -99,7 +104,7 @@ if json_equipment_file.exists():
     # Show building distribution
     building_dist = {}
     for eq in json_data:
-        building = eq.get('building_code', 'UNKNOWN')
+        building = eq.get("building_code", "UNKNOWN")
         building_dist[building] = building_dist.get(building, 0) + 1
     for building, count in sorted(building_dist.items()):
         print(f"     - {building}: {count} equipment")
@@ -110,6 +115,7 @@ else:
 print("\n6. EQUIPMENT REPOSITORY TEST")
 print("-" * 70)
 from app.database.repositories.equipment_repository import EquipmentRepository
+
 repo = EquipmentRepository()
 
 # Test get_by_building_code for site-002

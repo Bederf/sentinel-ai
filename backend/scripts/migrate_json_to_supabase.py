@@ -152,7 +152,7 @@ def migrate_sensors(supabase: Client, equipment_map: dict) -> dict:
     skipped = 0
 
     # Valid sensor types from schema
-    valid_types = {'temperature', 'humidity', 'pressure', 'flow', 'energy', 'vibration'}
+    valid_types = {"temperature", "humidity", "pressure", "flow", "energy", "vibration"}
 
     for sensor in sensors:
         equipment_id = sensor.get("equipment_id")
@@ -166,16 +166,16 @@ def migrate_sensors(supabase: Client, equipment_map: dict) -> dict:
         if sensor_type not in valid_types:
             # Try to map common types
             type_mapping = {
-                'analog': 'temperature',
-                'digital': 'temperature',
-                'power': 'energy',
-                'current': 'energy',
-                'voltage': 'energy',
-                'speed': 'flow',
-                'rpm': 'flow',
-                'level': 'pressure',
+                "analog": "temperature",
+                "digital": "temperature",
+                "power": "energy",
+                "current": "energy",
+                "voltage": "energy",
+                "speed": "flow",
+                "rpm": "flow",
+                "level": "pressure",
             }
-            sensor_type = type_mapping.get(sensor_type, 'temperature')
+            sensor_type = type_mapping.get(sensor_type, "temperature")
 
         new_id = generate_uuid(sensor["id"])
         id_map[sensor["id"]] = new_id
@@ -271,13 +271,13 @@ def migrate_predictions(supabase: Client, building_map: dict, equipment_map: dic
 
         # Map status
         status = pred.get("status", "active")
-        valid_statuses = {'active', 'acknowledged', 'resolved', 'false_positive'}
+        valid_statuses = {"active", "acknowledged", "resolved", "false_positive"}
         if status not in valid_statuses:
             status = "active"
 
         # Map severity
         severity = pred.get("severity", "medium")
-        valid_severities = {'critical', 'high', 'medium', 'low'}
+        valid_severities = {"critical", "high", "medium", "low"}
         if severity not in valid_severities:
             severity = "medium"
 
@@ -324,23 +324,23 @@ def migrate_anomalies(supabase: Client, building_map: dict, equipment_map: dict)
 
         # Map status to valid values
         status = anomaly.get("status", "active")
-        valid_statuses = {'active', 'investigating', 'resolved', 'false_positive'}
+        valid_statuses = {"active", "investigating", "resolved", "false_positive"}
         if status not in valid_statuses:
             status = "active"
 
         # Map severity
         severity = anomaly.get("severity", "warning")
-        valid_severities = {'info', 'warning', 'critical'}
+        valid_severities = {"info", "warning", "critical"}
         if severity not in valid_severities:
             severity = "warning"
 
         # Get detected_at from various possible field names
         detected_at = (
-            anomaly.get("detected_at") or
-            anomaly.get("detected_date") or
-            anomaly.get("timestamp") or
-            anomaly.get("start_date") or
-            "2026-01-28"
+            anomaly.get("detected_at")
+            or anomaly.get("detected_date")
+            or anomaly.get("timestamp")
+            or anomaly.get("start_date")
+            or "2026-01-28"
         )
 
         record = {

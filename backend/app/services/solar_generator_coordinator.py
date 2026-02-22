@@ -224,8 +224,8 @@ class SolarGeneratorCoordinator:
     """
 
     # BESS parameters (from arbitrage engine)
-    BESS_CAPACITY_KWH = 500.0  # Huawei LUNA2000-200KWH-2H1
-    BESS_RATED_POWER_KW = 250.0  # 0.5C rate
+    BESS_CAPACITY_KWH = 200.0  # Huawei LUNA2000-200KWH-2H1
+    BESS_RATED_POWER_KW = 100.0  # 0.5C rate
     BESS_MIN_SOC_PCT = 10.0
     BESS_MAX_SOC_PCT = 95.0
     GENERATOR_SOC_THRESHOLD = 20.0  # Only start generator if SOC below this
@@ -318,8 +318,7 @@ class SolarGeneratorCoordinator:
                             event_type=GeneratorEventType.LOW_SOC_START.value,
                             site_id=site_id,
                             reason=(
-                                f"LS Stage {ls_stage}: BESS sustains"
-                                f" {bess_runtime:.1f}h but LS is {ls_duration:.1f}h"
+                                f"LS Stage {ls_stage}: BESS sustains {bess_runtime:.1f}h but LS is {ls_duration:.1f}h"
                             ),
                             bess_soc_pct=soc,
                             solar_gen_kw=solar_gen,
@@ -381,7 +380,7 @@ class SolarGeneratorCoordinator:
             peak_hour = 12.0
             spread = 3.5
             solar_factor = max(0, 1.0 - ((hour - peak_hour) / spread) ** 2)
-            solar_kw = 3200 * solar_factor * rng.uniform(0.6, 1.0)
+            solar_kw = 297 * solar_factor * rng.uniform(0.6, 1.0)
 
         # BESS SOC
         if hour < 6:
@@ -463,7 +462,7 @@ class SolarGeneratorCoordinator:
             peak_hour = 12.0
             spread = 3.5
             solar_factor = max(0, 1.0 - ((hour - peak_hour) / spread) ** 2)
-            solar_kw = 3200 * solar_factor * rng.uniform(0.6, 1.0)
+            solar_kw = 297 * solar_factor * rng.uniform(0.6, 1.0)
 
         # For demo, no active load shedding (generator not needed)
         ls_active = False
@@ -650,7 +649,7 @@ class SolarGeneratorCoordinator:
             peak_hour = 12.0
             spread = 3.5
             solar_factor = max(0, 1.0 - ((hour - peak_hour) / spread) ** 2)
-            solar_kw = 3200 * solar_factor * rng.uniform(0.5, 0.9)
+            solar_kw = 297 * solar_factor * rng.uniform(0.5, 0.9)
 
         # BESS sustain calculation
         critical_load = self.DEFAULT_BUILDING_LOAD_KW * self.CRITICAL_LOAD_PCT

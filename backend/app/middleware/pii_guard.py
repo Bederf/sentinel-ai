@@ -65,13 +65,9 @@ class PIIGuard:
                 r"\b0\d{9}\b"  # 0123456789
             ),
             # Email addresses
-            "email": re.compile(
-                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
-            ),
+            "email": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
             # Credit card numbers (basic pattern, 13-19 digits with separators)
-            "credit_card": re.compile(
-                r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4,7}\b"
-            ),
+            "credit_card": re.compile(r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4,7}\b"),
         }
 
     def redact(
@@ -209,9 +205,7 @@ class PIIGuard:
                 if matches:
                     findings[pii_type] = {
                         "count": len(matches),
-                        "examples": [
-                            self._mask_pii(m) for m in matches[:3]
-                        ],
+                        "examples": [self._mask_pii(m) for m in matches[:3]],
                     }
 
         return {
@@ -255,16 +249,12 @@ def redact_request_pii(
     redacted_data = json.loads(result.redacted_text)
 
     if result.pii_found:
-        logger.info(
-            f"Redacted {result.redaction_count} PII instances: {result.pii_found}"
-        )
+        logger.info(f"Redacted {result.redaction_count} PII instances: {result.pii_found}")
 
     return redacted_data, result.redaction_map
 
 
-def restore_response_pii(
-    response_data: Dict[str, Any], redaction_map: Dict[str, str]
-) -> Dict[str, Any]:
+def restore_response_pii(response_data: Dict[str, Any], redaction_map: Dict[str, str]) -> Dict[str, Any]:
     """Restore PII in response data after LLM processing.
 
     Args:
@@ -297,10 +287,7 @@ def validate_pii_compliance(text: str, raise_on_pii: bool = False) -> bool:
     scan_result = pii_guard.scan_for_pii(text)
 
     if not scan_result["compliant"]:
-        msg = (
-            f"PII detected: {scan_result['pii_found']} "
-            f"({scan_result['total_count']} instances)"
-        )
+        msg = f"PII detected: {scan_result['pii_found']} ({scan_result['total_count']} instances)"
         if raise_on_pii:
             raise ValueError(msg)
         logger.warning(msg)

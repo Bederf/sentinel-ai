@@ -157,7 +157,9 @@ class PointMappingService:
 
         logger.info(
             "Grouped %d points into %d equipment entities (%d orphans)",
-            len(classified_points), len(groups), len(orphans),
+            len(classified_points),
+            len(groups),
+            len(orphans),
         )
 
         # Step 2: Generate equipment mappings with v2.0 naming conversion
@@ -165,9 +167,7 @@ class PointMappingService:
 
         for bms_equip_id, points in groups.items():
             # Infer equipment type from majority vote
-            type_counts = Counter(
-                p.equipment_type for p in points if p.equipment_type != "unknown"
-            )
+            type_counts = Counter(p.equipment_type for p in points if p.equipment_type != "unknown")
             equipment_type = type_counts.most_common(1)[0][0] if type_counts else "unknown"
 
             # Convert BMS ID to v2.0 format
@@ -197,9 +197,7 @@ class PointMappingService:
 
         # Step 3: Handle orphan points - group under "UNASSIGNED"
         if orphans:
-            orphan_mapping = self._generate_equipment_mapping(
-                "UNASSIGNED", orphans, site_id
-            )
+            orphan_mapping = self._generate_equipment_mapping("UNASSIGNED", orphans, site_id)
             orphan_mapping.confidence = "low"
             mappings["UNASSIGNED"] = orphan_mapping
 
@@ -217,9 +215,7 @@ class PointMappingService:
         overall equipment type for the group.
         """
         # Majority vote on equipment type
-        type_counts = Counter(
-            p.equipment_type for p in points if p.equipment_type != "unknown"
-        )
+        type_counts = Counter(p.equipment_type for p in points if p.equipment_type != "unknown")
         if type_counts:
             equipment_type = type_counts.most_common(1)[0][0]
         else:
@@ -232,9 +228,7 @@ class PointMappingService:
             ConfidenceLevel.LOW: 1,
             ConfidenceLevel.UNKNOWN: 0,
         }
-        avg_confidence = sum(
-            confidence_values.get(p.confidence, 0) for p in points
-        ) / len(points) if points else 0
+        avg_confidence = sum(confidence_values.get(p.confidence, 0) for p in points) / len(points) if points else 0
 
         if avg_confidence >= 2.5:
             group_confidence = "high"
@@ -244,25 +238,25 @@ class PointMappingService:
             group_confidence = "low"
 
         # Generate friendly name
-        equipment_name = self._generate_equipment_name(
-            equipment_id, equipment_type
-        )
+        equipment_name = self._generate_equipment_name(equipment_id, equipment_type)
 
         # Build point list for the mapping
         point_list = []
         for p in points:
-            point_list.append({
-                "original_name": p.original_name,
-                "standardized_name": p.standardized_name,
-                "point_type": p.point_type.value,
-                "point_category": p.point_category,
-                "unit": p.unit,
-                "confidence": p.confidence.value,
-                "object_type": p.object_type,
-                "instance": p.instance,
-                "present_value": p.present_value,
-                "writable": p.writable,
-            })
+            point_list.append(
+                {
+                    "original_name": p.original_name,
+                    "standardized_name": p.standardized_name,
+                    "point_type": p.point_type.value,
+                    "point_category": p.point_category,
+                    "unit": p.unit,
+                    "confidence": p.confidence.value,
+                    "object_type": p.object_type,
+                    "instance": p.instance,
+                    "present_value": p.present_value,
+                    "writable": p.writable,
+                }
+            )
 
         return EquipmentMapping(
             equipment_id=equipment_id,
@@ -277,9 +271,7 @@ class PointMappingService:
             },
         )
 
-    def _generate_equipment_name(
-        self, equipment_id: str, equipment_type: str
-    ) -> str:
+    def _generate_equipment_name(self, equipment_id: str, equipment_type: str) -> str:
         """Generate a human-friendly equipment name."""
         type_names = {
             "chiller": "Chiller",
@@ -299,9 +291,7 @@ class PointMappingService:
         type_label = type_names.get(equipment_type, equipment_type.replace("_", " ").title())
         return f"{type_label} ({equipment_id})"
 
-    def generate_equipment_model(
-        self, mapping: EquipmentMapping
-    ) -> Dict[str, Any]:
+    def generate_equipment_model(self, mapping: EquipmentMapping) -> Dict[str, Any]:
         """Generate a DeviceInterface-compatible equipment configuration.
 
         Creates a JSON structure that can be loaded by the device manager
@@ -400,9 +390,7 @@ class PointMappingService:
                 for p in mapping.points:
                     result.orphan_points.append(p.get("original_name", ""))
                 if mapping.points:
-                    result.warnings.append(
-                        f"{len(mapping.points)} orphan points not assigned to any equipment"
-                    )
+                    result.warnings.append(f"{len(mapping.points)} orphan points not assigned to any equipment")
 
             # Check for duplicates
             for p in mapping.points:
@@ -410,8 +398,7 @@ class PointMappingService:
                 if name in all_point_names:
                     result.duplicate_points.append(name)
                     result.warnings.append(
-                        f"Duplicate point '{name}' in both "
-                        f"'{all_point_names[name]}' and '{equip_id}'"
+                        f"Duplicate point '{name}' in both '{all_point_names[name]}' and '{equip_id}'"
                     )
                 else:
                     all_point_names[name] = equip_id
@@ -423,36 +410,28 @@ class PointMappingService:
 
             # Check for missing typical points
             if mapping.equipment_type in equipment_patterns:
-                typical = equipment_patterns[mapping.equipment_type].get(
-                    "typical_points", []
-                )
+                typical = equipment_patterns[mapping.equipment_type].get("typical_points", [])
                 mapped_categories = {p.get("point_category") for p in mapping.points}
 
                 missing = []
                 for tp in typical:
                     # Check if any mapped point category matches the typical point
                     tp_lower = tp.lower()
-                    found = any(
-                        cat and tp_lower in cat.lower()
-                        for cat in mapped_categories
-                    )
+                    found = any(cat and tp_lower in cat.lower() for cat in mapped_categories)
                     if not found:
                         missing.append(tp)
 
                 if missing:
                     result.missing_typical_points[equip_id] = missing
                     result.warnings.append(
-                        f"{equip_id} ({mapping.equipment_type}): "
-                        f"missing typical points: {', '.join(missing)}"
+                        f"{equip_id} ({mapping.equipment_type}): missing typical points: {', '.join(missing)}"
                     )
 
         # Set validity
         if result.errors:
             result.valid = False
         if result.orphan_points and len(result.orphan_points) > len(all_point_names) * 0.2:
-            result.warnings.append(
-                "More than 20% of points are orphaned - check discovery quality"
-            )
+            result.warnings.append("More than 20% of points are orphaned - check discovery quality")
 
         return result
 
@@ -520,9 +499,7 @@ class PointMappingService:
                 "created_at": datetime.utcnow().isoformat(),
                 "equipment_count": len(mappings),
                 "total_points": sum(len(m.points) for m in mappings.values()),
-                "equipment": {
-                    eid: m.to_dict() for eid, m in mappings.items()
-                },
+                "equipment": {eid: m.to_dict() for eid, m in mappings.items()},
             }
 
             with open(filepath, "w") as f:
@@ -547,6 +524,7 @@ class PointMappingService:
         """
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
 
             if client is None:
@@ -569,15 +547,21 @@ class PointMappingService:
                     return {"success": False, "reason": f"building.json not found for {site_id}"}
 
                 metadata = building_json.get("metadata", {})
-                insert_result = client.table("buildings").insert({
-                    "code": site_id,
-                    "name": building_json.get("name", site_id),
-                    "address": building_json.get("address", ""),
-                    "type": metadata.get("type", "office"),
-                    "region": "South Africa",  # Default region
-                    "sqm": metadata.get("sqm", 0),
-                    "floors": metadata.get("total_floors", 1),
-                }).execute()
+                insert_result = (
+                    client.table("buildings")
+                    .insert(
+                        {
+                            "code": site_id,
+                            "name": building_json.get("name", site_id),
+                            "address": building_json.get("address", ""),
+                            "type": metadata.get("type", "office"),
+                            "region": "South Africa",  # Default region
+                            "sqm": metadata.get("sqm", 0),
+                            "floors": metadata.get("total_floors", 1),
+                        }
+                    )
+                    .execute()
+                )
                 building_id = insert_result.data[0]["id"]
                 logger.info("Created building record in Supabase: %s -> %s", site_id, building_id)
 
@@ -593,26 +577,29 @@ class PointMappingService:
                     continue  # Skip existing
 
                 try:
-                    client.table("equipment").insert({
-                        "building_id": building_id,
-                        "code": mapping.equipment_id,
-                        "name": mapping.equipment_name,
-                        "equipment_type": mapping.equipment_type,
-                        "status": "normal",
-                        "metadata": {
-                            "source": "niagara_discovery",
-                            "discovery_id": discovery_id,
-                            "confidence": mapping.confidence,
-                            "point_count": len(mapping.points),
-                        },
-                    }).execute()
+                    client.table("equipment").insert(
+                        {
+                            "building_id": building_id,
+                            "code": mapping.equipment_id,
+                            "name": mapping.equipment_name,
+                            "equipment_type": mapping.equipment_type,
+                            "status": "normal",
+                            "metadata": {
+                                "source": "niagara_discovery",
+                                "discovery_id": discovery_id,
+                                "confidence": mapping.confidence,
+                                "point_count": len(mapping.points),
+                            },
+                        }
+                    ).execute()
                     equipment_created += 1
                 except Exception as e:
                     logger.warning("Failed to create equipment %s in Supabase: %s", mapping.equipment_id, e)
 
             logger.info(
                 "Saved %d equipment records to Supabase for discovery %s",
-                equipment_created, discovery_id,
+                equipment_created,
+                discovery_id,
             )
             return {"success": True, "equipment_created": equipment_created}
 
@@ -640,9 +627,7 @@ class PointMappingService:
         # Try loading from JSON
         return self._load_from_json(discovery_id)
 
-    def _load_from_json(
-        self, discovery_id: str
-    ) -> Optional[Dict[str, EquipmentMapping]]:
+    def _load_from_json(self, discovery_id: str) -> Optional[Dict[str, EquipmentMapping]]:
         """Load mappings from JSON file."""
         try:
             filepath = DATA_DIR / "mappings" / f"mapping_{discovery_id}.json"
@@ -763,9 +748,7 @@ class PointMappingService:
         self._mapping_history[discovery_id].append(history_entry)
 
         # Re-save
-        site_id = next(
-            (m.site_id for m in mappings.values() if m.site_id), ""
-        )
+        site_id = next((m.site_id for m in mappings.values() if m.site_id), "")
         self.save_mappings(discovery_id, mappings, site_id)
 
         return {
@@ -790,10 +773,7 @@ class PointMappingService:
         """
         mappings = self.get_mappings(discovery_id)
         if mappings is None:
-            return {
-                "success": False,
-                "error": f"Discovery {discovery_id} not found"
-            }
+            return {"success": False, "error": f"Discovery {discovery_id} not found"}
 
         now = datetime.utcnow().isoformat()
         equipment_models = []
@@ -811,9 +791,7 @@ class PointMappingService:
             equipment_models.append(model)
 
         # Re-save with approval status
-        site_id = next(
-            (m.site_id for m in mappings.values() if m.site_id), ""
-        )
+        site_id = next((m.site_id for m in mappings.values() if m.site_id), "")
         self.save_mappings(discovery_id, mappings, site_id)
 
         # Save equipment models to buildings directory
@@ -862,9 +840,7 @@ class PointMappingService:
                 with open(filepath, "w") as f:
                     json.dump(model, f, indent=2, default=str)
 
-            logger.info(
-                "Saved %d equipment models to %s", len(models), equip_dir
-            )
+            logger.info("Saved %d equipment models to %s", len(models), equip_dir)
             return True
 
         except Exception as e:
@@ -894,9 +870,7 @@ class PointMappingService:
             zone_service = get_zone_mapping_service()
 
             # Extract equipment list from models for zone inference
-            equipment_list = [
-                {"equipment_id": m.get("id", "")} for m in equipment_models
-            ]
+            equipment_list = [{"equipment_id": m.get("id", "")} for m in equipment_models]
 
             # Auto-generate zones
             zones = zone_service.create_zones_from_equipment(equipment_list, site_id)

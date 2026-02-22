@@ -60,12 +60,12 @@ class AuditLogger:
         """Load existing audit logs from file."""
         try:
             if self.log_file.exists():
-                with open(self.log_file, 'r') as f:
+                with open(self.log_file, "r") as f:
                     data = json.load(f)
                     # Load last N entries to respect max_entries
                     entries_data = data.get("entries", [])
                     if len(entries_data) > self.max_entries:
-                        entries_data = entries_data[-self.max_entries:]
+                        entries_data = entries_data[-self.max_entries :]
 
                     # Decrypt sensitive fields if encryption is enabled
                     decrypted_entries = []
@@ -172,12 +172,12 @@ class AuditLogger:
                 encrypted_entry = self._encrypt_audit_entry(entry_dict)
                 encrypted_entries.append(encrypted_entry)
 
-            with open(self.log_file, 'w') as f:
+            with open(self.log_file, "w") as f:
                 data = {
                     "updated_at": datetime.now().isoformat(),
                     "entry_count": len(encrypted_entries),
                     "encryption_enabled": self.encryption_service.enabled,
-                    "entries": encrypted_entries
+                    "entries": encrypted_entries,
                 }
                 json.dump(data, f, indent=2, default=str)
         except Exception as e:
@@ -193,7 +193,7 @@ class AuditLogger:
             existing_entries = []
             if self.log_file.exists():
                 try:
-                    with open(self.log_file, 'r') as f:
+                    with open(self.log_file, "r") as f:
                         data = json.load(f)
                         # Decrypt entries when loading for merge
                         for entry in data.get("entries", []):
@@ -206,7 +206,7 @@ class AuditLogger:
             # Combine and limit to max_entries
             all_entries = existing_entries + self.buffer
             if len(all_entries) > self.max_entries:
-                all_entries = all_entries[-self.max_entries:]
+                all_entries = all_entries[-self.max_entries :]
 
             # Save combined logs (encryption happens in _save_logs)
             self._save_logs(all_entries)
@@ -224,7 +224,7 @@ class AuditLogger:
         safety_validation: Optional[Dict[str, Any]] = None,
         error_message: Optional[str] = None,
         correlation_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Log a device control action.
@@ -255,7 +255,7 @@ class AuditLogger:
             safety_validation=safety_validation,
             error_message=error_message,
             correlation_id=correlation_id,
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
 
         return self._add_entry(entry)
@@ -267,7 +267,7 @@ class AuditLogger:
         validation_result: Dict[str, Any],
         result: AuditResultType,
         correlation_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Log a safety validation event.
@@ -290,7 +290,7 @@ class AuditLogger:
             result=result,
             safety_validation=validation_result,
             correlation_id=correlation_id,
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
 
         return self._add_entry(entry)
@@ -301,7 +301,7 @@ class AuditLogger:
         user: str = "system",
         result: AuditResultType = AuditResultType.SUCCESS,
         error_message: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Log a system event.
@@ -321,7 +321,7 @@ class AuditLogger:
             user=user,
             result=result,
             error_message=error_message,
-            metadata={"event_type": event_type, **(metadata or {})}
+            metadata={"event_type": event_type, **(metadata or {})},
         )
 
         return self._add_entry(entry)
@@ -335,7 +335,7 @@ class AuditLogger:
         user_agent: Optional[str] = None,
         result: AuditResultType = AuditResultType.SUCCESS,
         error_message: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Log a security-relevant event with structured output.
 
@@ -369,8 +369,8 @@ class AuditLogger:
                 "severity": severity,
                 "source_ip": source_ip,
                 "user_agent": user_agent,
-                **(metadata or {})
-            }
+                **(metadata or {}),
+            },
         )
 
         entry_id = self._add_entry(entry)
@@ -386,7 +386,7 @@ class AuditLogger:
         event_type: str,
         severity: str,
         source_ip: Optional[str] = None,
-        user_agent: Optional[str] = None
+        user_agent: Optional[str] = None,
     ) -> None:
         """Emit structured JSON log for Promtail/Loki ingestion.
 
@@ -409,7 +409,7 @@ class AuditLogger:
                 "correlation_id": entry.correlation_id,
                 "component": "sentinel-audit",
                 "error_message": entry.error_message,
-                "metadata": entry.metadata
+                "metadata": entry.metadata,
             }
 
             log_message = json.dumps(structured_event, default=str)
@@ -443,7 +443,7 @@ class AuditLogger:
         action: Optional[AuditActionType] = None,
         user: Optional[str] = None,
         result: Optional[AuditResultType] = None,
-        limit: int = 100
+        limit: int = 100,
     ) -> List[AuditLogEntry]:
         """
         Get audit logs with filtering.
@@ -464,7 +464,7 @@ class AuditLogger:
         all_entries = []
         if self.log_file.exists():
             try:
-                with open(self.log_file, 'r') as f:
+                with open(self.log_file, "r") as f:
                     data = json.load(f)
                     # Decrypt entries when loading
                     for entry in data.get("entries", []):
@@ -504,7 +504,7 @@ class AuditLogger:
         all_entries = []
         if self.log_file.exists():
             try:
-                with open(self.log_file, 'r') as f:
+                with open(self.log_file, "r") as f:
                     data = json.load(f)
                     # Decrypt entries when loading
                     for entry in data.get("entries", []):
@@ -518,13 +518,7 @@ class AuditLogger:
         all_entries.extend(self.buffer)
 
         if not all_entries:
-            return {
-                "total_entries": 0,
-                "by_action": {},
-                "by_result": {},
-                "by_user": {},
-                "recent_activity": []
-            }
+            return {"total_entries": 0, "by_action": {}, "by_result": {}, "by_user": {}, "recent_activity": []}
 
         # Calculate statistics
         by_action = {}
@@ -546,7 +540,7 @@ class AuditLogger:
             "by_result": by_result,
             "by_user": by_user,
             "recent_activity_count": len(recent),
-            "last_updated": datetime.now().isoformat()
+            "last_updated": datetime.now().isoformat(),
         }
 
     def flush(self) -> None:

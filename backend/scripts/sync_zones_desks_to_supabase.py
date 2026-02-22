@@ -114,18 +114,20 @@ def transform_desks(desks: List[Dict], building_id: str) -> List[Dict]:
             x_coord = base_x + offset_x + (idx % 5) * 0.5
             z_coord = base_z + offset_z + (idx // 5) * 0.5
 
-            transformed.append({
-                "id": str(uuid.uuid4()),
-                "building_id": building_id,
-                "desk_id": desk["desk_id"],
-                "desk_name": desk.get("desk_name", f"Desk {desk['desk_id']}"),
-                "floor": floor,
-                "zone_id": corrected_zone,
-                "context": context,
-                "x_coord": round(x_coord, 2),
-                "z_coord": round(z_coord, 2),
-                "y_coord": 0.0,
-            })
+            transformed.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "building_id": building_id,
+                    "desk_id": desk["desk_id"],
+                    "desk_name": desk.get("desk_name", f"Desk {desk['desk_id']}"),
+                    "floor": floor,
+                    "zone_id": corrected_zone,
+                    "context": context,
+                    "x_coord": round(x_coord, 2),
+                    "z_coord": round(z_coord, 2),
+                    "y_coord": 0.0,
+                }
+            )
 
     return transformed
 
@@ -135,17 +137,19 @@ def transform_zones(zones: List[Dict], building_id: str) -> List[Dict]:
     transformed = []
     for zone in zones:
         zone_id = zone["zone_id"]
-        transformed.append({
-            "id": str(uuid.uuid4()),
-            "building_id": building_id,
-            "zone_id": zone_id,
-            "zone_name": zone.get("zone_name", zone_id),
-            "floor": zone["floor"],
-            "zone_type": zone.get("zone_type", "open_office"),
-            "typical_occupancy": zone.get("typical_occupancy"),
-            "area_sqm": zone.get("area_sqm"),
-            "zone_letter": zone.get("zone_letter"),
-        })
+        transformed.append(
+            {
+                "id": str(uuid.uuid4()),
+                "building_id": building_id,
+                "zone_id": zone_id,
+                "zone_name": zone.get("zone_name", zone_id),
+                "floor": zone["floor"],
+                "zone_type": zone.get("zone_type", "open_office"),
+                "typical_occupancy": zone.get("typical_occupancy"),
+                "area_sqm": zone.get("area_sqm"),
+                "zone_letter": zone.get("zone_letter"),
+            }
+        )
     return transformed
 
 
@@ -184,10 +188,7 @@ def sync_to_supabase(building_code: str):
     # Upsert to Supabase
     try:
         print("📤 Upserting zones to Supabase...")
-        response = client.table("zones").upsert(
-            zones_transformed,
-            on_conflict="building_id,zone_id"
-        ).execute()
+        response = client.table("zones").upsert(zones_transformed, on_conflict="building_id,zone_id").execute()
         print(f"  ✓ {len(response.data)} zones synced")
 
         print("📤 Upserting desks to Supabase...")
@@ -196,10 +197,7 @@ def sync_to_supabase(building_code: str):
         total_synced = 0
         for i in range(0, len(desks_transformed), batch_size):
             batch = desks_transformed[i : i + batch_size]
-            response = client.table("desks").upsert(
-                batch,
-                on_conflict="desk_id"
-            ).execute()
+            response = client.table("desks").upsert(batch, on_conflict="desk_id").execute()
             total_synced += len(response.data)
             print(f"  ✓ Batch {i // batch_size + 1}: {len(response.data)} desks synced")
 

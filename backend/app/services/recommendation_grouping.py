@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class RecommendationObjective(str, Enum):
     """Objective categories for grouping recommendations."""
+
     LOAD_REDUCTION = "load_reduction"  # Peak shaving, demand response
     COMFORT_IMPROVEMENT = "comfort_improvement"  # Temperature, humidity, light
     EFFICIENCY = "efficiency"  # Energy optimization, off-peak usage
@@ -30,6 +31,7 @@ class RecommendationObjective(str, Enum):
 
 class SystemType(str, Enum):
     """Building systems that recommendations can affect."""
+
     HVAC = "hvac"  # Heating, ventilation, air conditioning
     LIGHTING = "lighting"  # DALI, LEDs
     POWER = "power"  # Generators, UPS, load shedding
@@ -37,6 +39,7 @@ class SystemType(str, Enum):
 
 class ExecutionOrder(str, Enum):
     """Execution order for grouped recommendations (safest to riskiest)."""
+
     LIGHTING = "lighting"  # Safest - most reversible
     HVAC = "hvac"  # Medium risk
     POWER = "power"  # Riskiest - affects system stability
@@ -45,6 +48,7 @@ class ExecutionOrder(str, Enum):
 @dataclass
 class CombinedBenefit:
     """Aggregated benefit of grouped recommendations."""
+
     energy_reduction_kw: float = 0.0  # Peak load reduction in kW
     cost_savings_per_hour: float = 0.0  # Cost savings per hour in currency
     co2_reduction_kg_per_hour: float = 0.0  # CO₂ reduction per hour
@@ -72,6 +76,7 @@ class CombinedBenefit:
 @dataclass
 class GroupedRecommendation:
     """Multiple recommendations grouped by objective."""
+
     objective: RecommendationObjective
     component_ids: List[str]  # IDs of individual recommendations
     components: List[Dict[str, Any]]  # Full recommendation details
@@ -164,10 +169,7 @@ class RecommendationGrouping:
         """Initialize grouping service."""
         pass
 
-    async def group_recommendations_by_objective(
-        self,
-        recommendations: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    async def group_recommendations_by_objective(self, recommendations: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Group recommendations by objective across all systems.
 
@@ -209,7 +211,7 @@ class RecommendationGrouping:
                 "ungrouped_count": len(individual),
                 "grouped_count": len(grouped),
                 "total_grouped_components": sum(len(g.components) for g in grouped),
-            }
+            },
         }
 
     def _classify_objective(self, recommendation: Dict[str, Any]) -> RecommendationObjective:
@@ -245,9 +247,7 @@ class RecommendationGrouping:
         return any(pattern in text_lower for pattern in patterns)
 
     def _create_grouped_recommendation(
-        self,
-        objective: RecommendationObjective,
-        recommendations: List[Dict[str, Any]]
+        self, objective: RecommendationObjective, recommendations: List[Dict[str, Any]]
     ) -> GroupedRecommendation:
         """Create grouped recommendation from multiple individual recommendations."""
 
@@ -299,12 +299,7 @@ class RecommendationGrouping:
             description=description,
         )
 
-    def _determine_priority(
-        self,
-        objective: RecommendationObjective,
-        confidence: float,
-        component_count: int
-    ) -> str:
+    def _determine_priority(self, objective: RecommendationObjective, confidence: float, component_count: int) -> str:
         """Determine priority of grouped recommendation."""
         # High priority: high confidence + load reduction
         if objective == RecommendationObjective.LOAD_REDUCTION and confidence > 0.85:
@@ -317,10 +312,7 @@ class RecommendationGrouping:
             return "low"
 
     def _create_description(
-        self,
-        objective: RecommendationObjective,
-        systems: Set[SystemType],
-        component_count: int
+        self, objective: RecommendationObjective, systems: Set[SystemType], component_count: int
     ) -> str:
         """Create human-readable description of grouped recommendation."""
         system_names = ", ".join(s.value.capitalize() for s in sorted(systems))
@@ -331,7 +323,7 @@ class RecommendationGrouping:
         self,
         hvac_recommendations: List[Dict[str, Any]],
         lighting_recommendations: List[Dict[str, Any]],
-        power_recommendations: List[Dict[str, Any]]
+        power_recommendations: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         """
         Group recommendations from all three AI optimizer outputs.

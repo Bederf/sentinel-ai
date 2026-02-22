@@ -1,19 +1,21 @@
 """Tests for encryption service."""
 
 import pytest
-from app.services.encryption_service import (
-    EncryptionService,
-    get_encryption_service,
-    reset_encryption_service
-)
+from app.services.encryption_service import EncryptionService, get_encryption_service, reset_encryption_service
 
 
 class TestEncryptionService:
     """Test AES-128 encryption and decryption using Fernet."""
 
+    def _make_service(self):
+        """Create an EncryptionService with a valid test key."""
+        from cryptography.fernet import Fernet
+
+        return EncryptionService(encryption_key=Fernet.generate_key().decode(), enabled=True)
+
     def test_encrypt_decrypt_string(self):
         """Test basic encryption and decryption of strings."""
-        service = EncryptionService(enabled=True)
+        service = self._make_service()
         original = "sensitive data with special chars: !@#$%^&*()"
 
         encrypted = service.encrypt(original)
@@ -33,12 +35,8 @@ class TestEncryptionService:
 
     def test_encrypt_decrypt_dict(self):
         """Test encrypting specific fields in a dictionary."""
-        service = EncryptionService(enabled=True)
-        data = {
-            "public_field": "not encrypted",
-            "email": "user@example.com",
-            "name": "John Doe"
-        }
+        service = self._make_service()
+        data = {"public_field": "not encrypted", "email": "user@example.com", "name": "John Doe"}
 
         encrypted = service.encrypt_dict(data, fields_to_encrypt=["email", "name"])
         assert encrypted["public_field"] == "not encrypted"
@@ -52,11 +50,11 @@ class TestEncryptionService:
 
     def test_encrypt_dict_all_fields(self):
         """Test encrypting all string fields in a dictionary."""
-        service = EncryptionService(enabled=True)
+        service = self._make_service()
         data = {
             "field1": "value1",
             "field2": "value2",
-            "field3": 123  # Not encrypted
+            "field3": 123,  # Not encrypted
         }
 
         encrypted = service.encrypt_dict(data)
@@ -113,7 +111,7 @@ class TestEncryptionService:
             "Hello, 世界!",
             "Email: test@example.com",
             "Path: /etc/passwd",
-            "JSON: {\"key\": \"value\"}",
+            'JSON: {"key": "value"}',
             "SQL: ' OR '1'='1",
         ]
 
@@ -169,7 +167,7 @@ class TestAuditLoggerEncryption:
             user="technician@facility.com",
             old_value=22.5,
             new_value=20.0,
-            result=AuditResultType.SUCCESS
+            result=AuditResultType.SUCCESS,
         )
 
         assert entry_id is not None
@@ -183,7 +181,7 @@ class TestAuditLoggerEncryption:
 
         log_file = Path(__file__).parent.parent / "app" / "data" / "audit_log.json"
         if log_file.exists():
-            with open(log_file, 'r') as f:
+            with open(log_file, "r") as f:
                 data = json.load(f)
                 if data["entries"]:
                     first_entry = data["entries"][0]

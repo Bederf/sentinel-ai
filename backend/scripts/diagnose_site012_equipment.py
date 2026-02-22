@@ -6,7 +6,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Load .env file
-load_dotenv(Path(__file__).parent.parent / '.env')
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -23,41 +23,39 @@ try:
 
     # Step 1: Get building info
     print("\n[1] Getting building info for site-012...")
-    building = building_repo.get_by_id('site-012')
+    building = building_repo.get_by_id("site-012")
     if not building:
         print("❌ Building not found!")
         sys.exit(1)
 
-    building_id = building['id']
+    building_id = building["id"]
     print(f"✓ Building UUID: {building_id}")
     print(f"✓ Building Name: {building['name']}")
 
     # Step 2: Query equipment directly from Supabase
     print("\n[2] Querying equipment table directly...")
-    equipment_result = client.table('equipment').select(
-        'id, code, name, status, health_score, type, building_id',
-        count='exact'
-    ).eq('building_id', building_id).execute()
+    equipment_result = (
+        client.table("equipment")
+        .select("id, code, name, status, health_score, type, building_id", count="exact")
+        .eq("building_id", building_id)
+        .execute()
+    )
 
     print(f"✓ Total equipment in table: {equipment_result.count}")
 
     # Step 3: Use BuildingRepository.get_equipment()
     print("\n[3] Using BuildingRepository.get_equipment()...")
-    equipment_list = building_repo.get_equipment('site-012')
+    equipment_list = building_repo.get_equipment("site-012")
     print(f"✓ Equipment from repository: {len(equipment_list)}")
 
     # Step 4: Show all equipment
     print("\n[4] Equipment breakdown by status:")
     status_counts = {}
     for eq in equipment_result.data:
-        status = eq.get('status', 'unknown')
+        status = eq.get("status", "unknown")
         if status not in status_counts:
             status_counts[status] = []
-        status_counts[status].append({
-            'code': eq['code'],
-            'name': eq['name'],
-            'health': eq.get('health_score', 'N/A')
-        })
+        status_counts[status].append({"code": eq["code"], "name": eq["name"], "health": eq.get("health_score", "N/A")})
 
     for status in sorted(status_counts.keys()):
         items = status_counts[status]
@@ -69,7 +67,7 @@ try:
 
     # Step 5: Check for duplicates
     print("\n[5] Checking for duplicate codes...")
-    codes = [eq['code'] for eq in equipment_result.data]
+    codes = [eq["code"] for eq in equipment_result.data]
     duplicates = [code for code in set(codes) if codes.count(code) > 1]
     if duplicates:
         print(f"⚠️  Found {len(duplicates)} duplicate codes:")
@@ -96,5 +94,6 @@ try:
 except Exception as e:
     print(f"❌ Error: {e}")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)

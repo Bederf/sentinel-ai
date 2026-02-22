@@ -98,11 +98,7 @@ class CCureAdapter:
 
             # Filter by timestamp if provided
             if since:
-                events = [
-                    e
-                    for e in events
-                    if datetime.fromisoformat(e["timestamp"].replace("Z", "+00:00")) > since
-                ]
+                events = [e for e in events if datetime.fromisoformat(e["timestamp"].replace("Z", "+00:00")) > since]
 
             return events[:limit]
         else:
@@ -144,9 +140,7 @@ class CCureAdapter:
                     firmware=c["firmware"],
                     encryption_mode=c["encryption_mode"],
                     tamper_status=c.get("tamper_status", "normal"),
-                    last_seen=datetime.fromisoformat(
-                        c["last_seen"].replace("Z", "+00:00")
-                    ),
+                    last_seen=datetime.fromisoformat(c["last_seen"].replace("Z", "+00:00")),
                     ip_address=c["ip_address"],
                     reader_count=c["reader_count"],
                     status=c.get("status", "online"),

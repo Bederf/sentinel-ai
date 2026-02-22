@@ -41,8 +41,10 @@ class WaterAlertThresholds(BaseModel):
     temperature_min_celsius: float = 4.0
     temperature_max_celsius: float = 60.0
 
+
 # Lazy import to avoid circular dependencies
 _occupancy_service = None
+
 
 def _get_occupancy_service():
     """Get occupancy service lazily to avoid circular imports."""
@@ -50,6 +52,7 @@ def _get_occupancy_service():
     if _occupancy_service is None:
         try:
             from app.services.security_occupancy_service import get_security_occupancy_service
+
             _occupancy_service = get_security_occupancy_service()
         except Exception:
             _occupancy_service = False  # Mark as tried but unavailable
@@ -67,7 +70,7 @@ class WaterAlertService:
         continuous_flow_threshold_lpm: float = 10.0,
         continuous_flow_duration_minutes: float = 30.0,
         continuous_flow_off_hours_start: int = 22,  # 10 PM
-        continuous_flow_off_hours_end: int = 6,     # 6 AM
+        continuous_flow_off_hours_end: int = 6,  # 6 AM
         spike_detection_threshold_percent: float = 200.0,  # 200% increase
         spike_detection_window_minutes: int = 15,
         zscore_threshold: float = 3.0,
@@ -125,10 +128,7 @@ class WaterAlertService:
         hour = timestamp.hour
 
         # Check if current time is within off-hours
-        is_off_hours = (
-            hour >= self.continuous_flow_off_hours_start or
-            hour < self.continuous_flow_off_hours_end
-        )
+        is_off_hours = hour >= self.continuous_flow_off_hours_start or hour < self.continuous_flow_off_hours_end
 
         if not is_off_hours:
             return None
@@ -209,9 +209,7 @@ class WaterAlertService:
         # Calculate baseline statistics for same hour of day
         current_hour = timestamp.hour
         hourly_flows = [
-            r["flow_rate_lpm"]
-            for r in baseline_readings
-            if datetime.fromisoformat(r["timestamp"]).hour == current_hour
+            r["flow_rate_lpm"] for r in baseline_readings if datetime.fromisoformat(r["timestamp"]).hour == current_hour
         ]
 
         if len(hourly_flows) < 5:
@@ -277,9 +275,7 @@ class WaterAlertService:
 
         # Filter to window
         window_readings = [
-            r
-            for r in recent_readings
-            if window_start <= datetime.fromisoformat(r["timestamp"]) <= timestamp
+            r for r in recent_readings if window_start <= datetime.fromisoformat(r["timestamp"]) <= timestamp
         ]
 
         if len(window_readings) < 3:
@@ -358,10 +354,7 @@ class WaterAlertService:
         hour = timestamp.hour
 
         # Check if time is within night hours (22:00-06:00)
-        is_night = (
-            hour >= self.continuous_flow_off_hours_start or
-            hour < self.continuous_flow_off_hours_end
-        )
+        is_night = hour >= self.continuous_flow_off_hours_start or hour < self.continuous_flow_off_hours_end
 
         if not is_night:
             return None
@@ -418,11 +411,7 @@ class WaterAlertService:
 
         # Calculate median
         n = len(sorted_flows)
-        median_val = (
-            sorted_flows[n // 2]
-            if n % 2 == 1
-            else (sorted_flows[n // 2 - 1] + sorted_flows[n // 2]) / 2
-        )
+        median_val = sorted_flows[n // 2] if n % 2 == 1 else (sorted_flows[n // 2 - 1] + sorted_flows[n // 2]) / 2
 
         # Calculate 95th percentile
         percentile_95_idx = int(0.95 * (len(sorted_flows) - 1))
@@ -651,8 +640,10 @@ class WaterAlertService:
             zone_id = alert.meter_id.replace("-meter", "") if alert.meter_id else "unknown"
 
             # Determine priority based on severity
-            priority = "critical" if alert.severity == AlertSeverity.CRITICAL else (
-                "high" if alert.severity == AlertSeverity.HIGH else "medium"
+            priority = (
+                "critical"
+                if alert.severity == AlertSeverity.CRITICAL
+                else ("high" if alert.severity == AlertSeverity.HIGH else "medium")
             )
 
             # Create work order
@@ -671,8 +662,7 @@ class WaterAlertService:
                 try:
                     # Look up technician for water maintenance specialty
                     technician = await self.technician_repository.get_technician_for_specialty(
-                        specialty="water_maintenance",
-                        zone_id=zone_id
+                        specialty="water_maintenance", zone_id=zone_id
                     )
                     if technician:
                         technician_id = technician.get("id")
@@ -775,8 +765,10 @@ class WaterAlertService:
             sent_at = datetime.now().isoformat()
 
             # Format Sentry message
-            severity_emoji = "🚨" if alert.severity == AlertSeverity.CRITICAL else (
-                "⚠️" if alert.severity == AlertSeverity.HIGH else "ℹ️"
+            severity_emoji = (
+                "🚨"
+                if alert.severity == AlertSeverity.CRITICAL
+                else ("⚠️" if alert.severity == AlertSeverity.HIGH else "ℹ️")
             )
 
             zone_id = alert.meter_id.replace("-meter", "") if alert.meter_id else "unknown"
@@ -795,11 +787,13 @@ class WaterAlertService:
             if technician_id:
                 message_lines.append(f"Technician: {technician_id}")
 
-            message_lines.extend([
-                "",
-                f"Command: /water_repair_{work_order_id}",
-                "Reply with repair details to submit feedback",
-            ])
+            message_lines.extend(
+                [
+                    "",
+                    f"Command: /water_repair_{work_order_id}",
+                    "Reply with repair details to submit feedback",
+                ]
+            )
 
             sentry_message = "\n".join(message_lines)
 
@@ -844,6 +838,7 @@ class WaterAlertService:
     ) -> WaterAlert:
         """Generate a WaterAlert object."""
         import uuid
+
         return WaterAlert(
             alert_id=str(uuid.uuid4()),
             meter_id=meter_id,

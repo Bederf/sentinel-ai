@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class GlobalTrainResult:
     """Result of a global model training run."""
+
     model_type: str
     equipment_type: str
     training_started: str

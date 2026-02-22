@@ -44,7 +44,7 @@ async def create_parts_order(order: PartsOrder) -> PartsOrder:
     """
     # Parse total amount
     try:
-        amount_str = order.total_amount.replace('R', '').replace(',', '').strip()
+        amount_str = order.total_amount.replace("R", "").replace(",", "").strip()
         amount = float(amount_str)
     except (ValueError, AttributeError):
         raise HTTPException(status_code=400, detail="Invalid total_amount format")
@@ -69,15 +69,9 @@ async def create_parts_order(order: PartsOrder) -> PartsOrder:
 
 
 @router.get("/", response_model=List[PartsOrder])
-async def get_parts_orders(
-    technician_id: str,
-    status: Optional[str] = None
-) -> List[PartsOrder]:
+async def get_parts_orders(technician_id: str, status: Optional[str] = None) -> List[PartsOrder]:
     """Get parts orders for technician, optionally filtered by status"""
-    orders = [
-        order for order in _orders_db.values()
-        if order.technician_id == technician_id
-    ]
+    orders = [order for order in _orders_db.values() if order.technician_id == technician_id]
 
     if status:
         orders = [order for order in orders if order.status == status]
@@ -147,12 +141,9 @@ async def get_order_tracking(order_id: str) -> dict:
         "order_reference": order.order_reference or "N/A",
         "status": order.status,
         "supplier": order.items[0].supplier if order.items else "Unknown",
-        "items": [
-            {"name": item.part_name, "qty": item.quantity}
-            for item in order.items
-        ],
+        "items": [{"name": item.part_name, "qty": item.quantity} for item in order.items],
         "tracking_number": f"TRK-{order.id[:8].upper()}" if order.status in ["shipped", "delivered"] else None,
-        "estimated_delivery": "2-3 business days" if order.status == "ordered" else None
+        "estimated_delivery": "2-3 business days" if order.status == "ordered" else None,
     }
 
     return tracking
@@ -170,19 +161,12 @@ async def sync_order_status(order_id: str) -> dict:
 
     # In production: Check order status with supplier via API
     # For now: simulate status progression
-    status_progression = {
-        "ordered": "shipped",
-        "shipped": "delivered"
-    }
+    status_progression = {"ordered": "shipped", "shipped": "delivered"}
 
     if order.status in status_progression:
         order.status = status_progression[order.status]
 
-    return {
-        "order_id": order_id,
-        "status": order.status,
-        "updated_at": datetime.now().isoformat()
-    }
+    return {"order_id": order_id, "status": order.status, "updated_at": datetime.now().isoformat()}
 
 
 async def _place_order_with_supplier(order: PartsOrder) -> str:

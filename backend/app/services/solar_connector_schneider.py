@@ -30,49 +30,49 @@ logger = logging.getLogger(__name__)
 # === Schneider Conext CL Modbus Register Map (Holding Registers) ===
 SCHNEIDER_CONEXT_REGISTERS: Dict[str, tuple] = {
     # (address, count, type, scale_factor, unit)
-    "model":           (40005, 8, "str",    1,     ""),
-    "serial":          (40013, 8, "str",    1,     ""),
-    "firmware":        (40021, 8, "str",    1,     ""),
-    "rated_power":     (40071, 2, "u32",    1,     "W"),
-    "dc_power":        (40101, 2, "i32",    1,     "W"),
-    "ac_power":        (40103, 2, "i32",    1,     "W"),
-    "dc_voltage":      (40105, 1, "u16",    10,    "V"),
-    "dc_current":      (40106, 1, "u16",    100,   "A"),
-    "ac_voltage_l1":   (40107, 1, "u16",    10,    "V"),
-    "ac_voltage_l2":   (40108, 1, "u16",    10,    "V"),
-    "ac_voltage_l3":   (40109, 1, "u16",    10,    "V"),
-    "ac_current":      (40110, 1, "u16",    100,   "A"),
-    "frequency":       (40111, 1, "u16",    100,   "Hz"),
-    "power_factor":    (40112, 1, "i16",    1000,  ""),
-    "inverter_temp":   (40113, 1, "i16",    10,    "C"),
-    "status":          (40115, 1, "u16",    1,     ""),
-    "error_code":      (40116, 2, "u32",    1,     ""),
-    "daily_yield":     (40120, 2, "u32",    1,     "Wh"),
-    "total_yield":     (40122, 2, "u32",    1,     "Wh"),
+    "model": (40005, 8, "str", 1, ""),
+    "serial": (40013, 8, "str", 1, ""),
+    "firmware": (40021, 8, "str", 1, ""),
+    "rated_power": (40071, 2, "u32", 1, "W"),
+    "dc_power": (40101, 2, "i32", 1, "W"),
+    "ac_power": (40103, 2, "i32", 1, "W"),
+    "dc_voltage": (40105, 1, "u16", 10, "V"),
+    "dc_current": (40106, 1, "u16", 100, "A"),
+    "ac_voltage_l1": (40107, 1, "u16", 10, "V"),
+    "ac_voltage_l2": (40108, 1, "u16", 10, "V"),
+    "ac_voltage_l3": (40109, 1, "u16", 10, "V"),
+    "ac_current": (40110, 1, "u16", 100, "A"),
+    "frequency": (40111, 1, "u16", 100, "Hz"),
+    "power_factor": (40112, 1, "i16", 1000, ""),
+    "inverter_temp": (40113, 1, "i16", 10, "C"),
+    "status": (40115, 1, "u16", 1, ""),
+    "error_code": (40116, 2, "u32", 1, ""),
+    "daily_yield": (40120, 2, "u32", 1, "Wh"),
+    "total_yield": (40122, 2, "u32", 1, "Wh"),
     # MPPT inputs (Conext CL has 2-5 MPPT depending on model)
-    "pv1_voltage":     (40131, 1, "u16",    10,    "V"),
-    "pv1_current":     (40132, 1, "u16",    100,   "A"),
-    "pv2_voltage":     (40133, 1, "u16",    10,    "V"),
-    "pv2_current":     (40134, 1, "u16",    100,   "A"),
+    "pv1_voltage": (40131, 1, "u16", 10, "V"),
+    "pv1_current": (40132, 1, "u16", 100, "A"),
+    "pv2_voltage": (40133, 1, "u16", 10, "V"),
+    "pv2_current": (40134, 1, "u16", 100, "A"),
 }
 
 # Schneider PM8000 / PM5110 meter registers
 SCHNEIDER_PM_REGISTERS: Dict[str, tuple] = {
-    "voltage_l1":      (3000, 2, "float32", 1,    "V"),
-    "voltage_l2":      (3002, 2, "float32", 1,    "V"),
-    "voltage_l3":      (3004, 2, "float32", 1,    "V"),
-    "current_l1":      (3006, 2, "float32", 1,    "A"),
-    "current_l2":      (3008, 2, "float32", 1,    "A"),
-    "current_l3":      (3010, 2, "float32", 1,    "A"),
-    "active_power":    (3054, 2, "float32", 1,    "kW"),
-    "reactive_power":  (3058, 2, "float32", 1,    "kVAR"),
-    "apparent_power":  (3062, 2, "float32", 1,    "kVA"),
-    "power_factor":    (3066, 2, "float32", 1,    ""),
-    "frequency":       (3110, 2, "float32", 1,    "Hz"),
-    "thd_v":           (3114, 2, "float32", 1,    "%"),
-    "thd_i":           (3118, 2, "float32", 1,    "%"),
-    "energy_import":   (3204, 2, "float32", 1,    "kWh"),
-    "energy_export":   (3208, 2, "float32", 1,    "kWh"),
+    "voltage_l1": (3000, 2, "float32", 1, "V"),
+    "voltage_l2": (3002, 2, "float32", 1, "V"),
+    "voltage_l3": (3004, 2, "float32", 1, "V"),
+    "current_l1": (3006, 2, "float32", 1, "A"),
+    "current_l2": (3008, 2, "float32", 1, "A"),
+    "current_l3": (3010, 2, "float32", 1, "A"),
+    "active_power": (3054, 2, "float32", 1, "kW"),
+    "reactive_power": (3058, 2, "float32", 1, "kVAR"),
+    "apparent_power": (3062, 2, "float32", 1, "kVA"),
+    "power_factor": (3066, 2, "float32", 1, ""),
+    "frequency": (3110, 2, "float32", 1, "Hz"),
+    "thd_v": (3114, 2, "float32", 1, "%"),
+    "thd_i": (3118, 2, "float32", 1, "%"),
+    "energy_import": (3204, 2, "float32", 1, "kWh"),
+    "energy_export": (3208, 2, "float32", 1, "kWh"),
 }
 
 # Schneider status code mapping
@@ -120,10 +120,7 @@ class SimulatedSchneiderConnector(SolarConnector):
             last_poll=datetime.now(timezone.utc).isoformat(),
             error_count=0,
         )
-        logger.info(
-            f"Schneider simulated connector online — "
-            f"{len(self._inverter_configs)} inverters"
-        )
+        logger.info(f"Schneider simulated connector online — {len(self._inverter_configs)} inverters")
         return True
 
     async def disconnect(self) -> None:
@@ -202,29 +199,27 @@ class SimulatedSchneiderConnector(SolarConnector):
 
                 # --- Simulated fault: S15 MPPT3 string 1 has bypass diode
                 #     issue — voltage drops ~15% while current stays normal ---
-                bypass_diode_fault = (
-                    inverter_id == "S002-INV-S15"
-                    and mppt == 3
-                    and s_idx == 1
-                )
+                bypass_diode_fault = inverter_id == "S002-INV-S15" and mppt == 3 and s_idx == 1
                 voltage_factor = 0.85 if bypass_diode_fault else 1.0
 
                 vmp = 37.0 * panels_on_string * solar_factor * variance * voltage_factor
                 imp = (panel_rating_w / 37.0) * solar_factor * variance
                 dc_power = (vmp * imp / 1000) if solar_factor > 0 else 0
 
-                strings.append(SolarString(
-                    string_id=string_id,
-                    inverter_id=inverter_id,
-                    mppt_tracker=mppt,
-                    panel_count=panels_on_string,
-                    panel_model=cfg.get("panel_model", "Trina TSM-260PA05"),
-                    panel_rating_w=panel_rating_w,
-                    dc_voltage_v=round(vmp, 1),
-                    dc_current_a=round(imp, 2),
-                    dc_power_kw=round(dc_power, 3),
-                    irradiance_w_m2=round(1000 * solar_factor * variance, 0),
-                ))
+                strings.append(
+                    SolarString(
+                        string_id=string_id,
+                        inverter_id=inverter_id,
+                        mppt_tracker=mppt,
+                        panel_count=panels_on_string,
+                        panel_model=cfg.get("panel_model", "Trina TSM-260PA05"),
+                        panel_rating_w=panel_rating_w,
+                        dc_voltage_v=round(vmp, 1),
+                        dc_current_a=round(imp, 2),
+                        dc_power_kw=round(dc_power, 3),
+                        irradiance_w_m2=round(1000 * solar_factor * variance, 0),
+                    )
+                )
         return strings
 
     async def read_bess(self, container_id: str) -> None:
@@ -269,41 +264,56 @@ class SimulatedSchneiderConnector(SolarConnector):
         for inv_id in self._inverter_configs:
             inv = await self.read_inverter(inv_id)
             if inv:
-                readings.extend([
-                    NormalisedReading(
-                        timestamp=now, equipment_id=inv_id,
-                        equipment_type="inverter", reading_type="power",
-                        value=inv.ac_power_kw, unit="kW",
-                        quality_flag=QualityFlag.GOOD.value,
-                        source=DataSource.SIMULATED.value,
-                    ),
-                    NormalisedReading(
-                        timestamp=now, equipment_id=inv_id,
-                        equipment_type="inverter", reading_type="temperature",
-                        value=inv.temp_c, unit="C",
-                        quality_flag=QualityFlag.GOOD.value,
-                        source=DataSource.SIMULATED.value,
-                    ),
-                    NormalisedReading(
-                        timestamp=now, equipment_id=inv_id,
-                        equipment_type="inverter", reading_type="energy",
-                        value=inv.daily_yield_kwh, unit="kWh",
-                        quality_flag=QualityFlag.GOOD.value,
-                        source=DataSource.SIMULATED.value,
-                    ),
-                ])
+                readings.extend(
+                    [
+                        NormalisedReading(
+                            timestamp=now,
+                            equipment_id=inv_id,
+                            equipment_type="inverter",
+                            reading_type="power",
+                            value=inv.ac_power_kw,
+                            unit="kW",
+                            quality_flag=QualityFlag.GOOD.value,
+                            source=DataSource.SIMULATED.value,
+                        ),
+                        NormalisedReading(
+                            timestamp=now,
+                            equipment_id=inv_id,
+                            equipment_type="inverter",
+                            reading_type="temperature",
+                            value=inv.temp_c,
+                            unit="C",
+                            quality_flag=QualityFlag.GOOD.value,
+                            source=DataSource.SIMULATED.value,
+                        ),
+                        NormalisedReading(
+                            timestamp=now,
+                            equipment_id=inv_id,
+                            equipment_type="inverter",
+                            reading_type="energy",
+                            value=inv.daily_yield_kwh,
+                            unit="kWh",
+                            quality_flag=QualityFlag.GOOD.value,
+                            source=DataSource.SIMULATED.value,
+                        ),
+                    ]
+                )
 
         for mtr_id in self._meter_configs:
             mtr = await self.read_meter(mtr_id)
             if mtr:
-                readings.append(NormalisedReading(
-                    timestamp=now, equipment_id=mtr_id,
-                    equipment_type="meter", reading_type="power",
-                    value=-mtr.export_kw,  # negative = generation
-                    unit="kW",
-                    quality_flag=QualityFlag.GOOD.value,
-                    source=DataSource.SIMULATED.value,
-                ))
+                readings.append(
+                    NormalisedReading(
+                        timestamp=now,
+                        equipment_id=mtr_id,
+                        equipment_type="meter",
+                        reading_type="power",
+                        value=-mtr.export_kw,  # negative = generation
+                        unit="kW",
+                        quality_flag=QualityFlag.GOOD.value,
+                        source=DataSource.SIMULATED.value,
+                    )
+                )
 
         self._status.last_poll = now
         return readings

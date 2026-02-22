@@ -20,45 +20,43 @@ class IntegrationRepository:
         is_active: Optional[bool] = None,
     ) -> List[Dict[str, Any]]:
         """Get log sources with optional filtering."""
-        query = self.client.table('log_sources').select("*")
+        query = self.client.table("log_sources").select("*")
 
         if building_id:
-            query = query.eq('building_id', building_id)
+            query = query.eq("building_id", building_id)
         if source_type:
-            query = query.eq('source_type', source_type)
+            query = query.eq("source_type", source_type)
         if is_active is not None:
-            query = query.eq('is_active', is_active)
+            query = query.eq("is_active", is_active)
 
-        response = query.order('created_at', desc=True).execute()
+        response = query.order("created_at", desc=True).execute()
         return response.data
 
     def get_log_source(self, source_id: str) -> Optional[Dict[str, Any]]:
         """Get log source by ID."""
-        response = self.client.table('log_sources').select("*").eq('id', source_id).execute()
+        response = self.client.table("log_sources").select("*").eq("id", source_id).execute()
         return response.data[0] if response.data else None
 
     def get_log_sources_by_ids(self, source_ids: List[str]) -> List[Dict[str, Any]]:
         """Get multiple log sources by their IDs."""
         if not source_ids:
             return []
-        response = self.client.table('log_sources').select(
-            "id,name"
-        ).in_('id', source_ids).execute()
+        response = self.client.table("log_sources").select("id,name").in_("id", source_ids).execute()
         return response.data or []
 
     def create_log_source(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new log source."""
-        response = self.client.table('log_sources').insert(data).execute()
+        response = self.client.table("log_sources").insert(data).execute()
         return response.data[0]
 
     def update_log_source(self, source_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a log source."""
-        response = self.client.table('log_sources').update(data).eq('id', source_id).execute()
+        response = self.client.table("log_sources").update(data).eq("id", source_id).execute()
         return response.data[0] if response.data else None
 
     def delete_log_source(self, source_id: str) -> bool:
         """Delete a log source."""
-        response = self.client.table('log_sources').delete().eq('id', source_id).execute()
+        response = self.client.table("log_sources").delete().eq("id", source_id).execute()
         return len(response.data) > 0
 
     def update_sync_status(
@@ -69,20 +67,20 @@ class IntegrationRepository:
         error: Optional[str] = None,
     ) -> None:
         """Update last sync status for a log source."""
-        self.client.table('log_sources').update({
-            'last_sync_at': datetime.utcnow().isoformat(),
-            'last_sync_status': status,
-            'last_sync_records': records,
-            'last_sync_error': error,
-        }).eq('id', source_id).execute()
+        self.client.table("log_sources").update(
+            {
+                "last_sync_at": datetime.utcnow().isoformat(),
+                "last_sync_status": status,
+                "last_sync_records": records,
+                "last_sync_error": error,
+            }
+        ).eq("id", source_id).execute()
 
     # ==================== Column Mappings ====================
 
     def get_column_mappings(self, source_id: str) -> List[Dict[str, Any]]:
         """Get column mappings for a log source."""
-        response = self.client.table('column_mappings').select("*").eq(
-            'log_source_id', source_id
-        ).execute()
+        response = self.client.table("column_mappings").select("*").eq("log_source_id", source_id).execute()
         return response.data
 
     def save_column_mappings(
@@ -92,13 +90,13 @@ class IntegrationRepository:
     ) -> List[Dict[str, Any]]:
         """Save column mappings (replace all for source)."""
         # Delete existing
-        self.client.table('column_mappings').delete().eq('log_source_id', source_id).execute()
+        self.client.table("column_mappings").delete().eq("log_source_id", source_id).execute()
 
         # Insert new
         if mappings:
             for m in mappings:
-                m['log_source_id'] = source_id
-            response = self.client.table('column_mappings').insert(mappings).execute()
+                m["log_source_id"] = source_id
+            response = self.client.table("column_mappings").insert(mappings).execute()
             return response.data
         return []
 
@@ -111,14 +109,12 @@ class IntegrationRepository:
         verified_only: bool = False,
     ) -> List[Dict[str, Any]]:
         """Get point-to-asset mappings for a building."""
-        query = self.client.table('point_asset_mappings').select("*").eq(
-            'building_id', building_id
-        )
+        query = self.client.table("point_asset_mappings").select("*").eq("building_id", building_id)
 
         if confidence:
-            query = query.eq('match_confidence', confidence)
+            query = query.eq("match_confidence", confidence)
         if verified_only:
-            query = query.eq('is_verified', True)
+            query = query.eq("is_verified", True)
 
         response = query.execute()
         return response.data
@@ -135,37 +131,40 @@ class IntegrationRepository:
 
         Returns dict with 'points' list and 'total' count.
         """
-        query = self.client.table('point_asset_mappings').select("*", count='exact')
+        query = self.client.table("point_asset_mappings").select("*", count="exact")
 
         if building_id:
-            query = query.eq('building_id', building_id)
+            query = query.eq("building_id", building_id)
         if confidence:
-            query = query.eq('match_confidence', confidence)
+            query = query.eq("match_confidence", confidence)
         if verified_only:
-            query = query.eq('is_verified', True)
+            query = query.eq("is_verified", True)
 
         query = query.range(offset, offset + limit - 1)
         response = query.execute()
 
         return {
-            'points': response.data,
-            'total': response.count or len(response.data),
+            "points": response.data,
+            "total": response.count or len(response.data),
         }
 
     def get_point_mapping(self, building_id: str, point_id: str) -> Optional[Dict[str, Any]]:
         """Get mapping for a specific point."""
-        response = self.client.table('point_asset_mappings').select("*").eq(
-            'building_id', building_id
-        ).eq('bms_point_id', point_id).execute()
+        response = (
+            self.client.table("point_asset_mappings")
+            .select("*")
+            .eq("building_id", building_id)
+            .eq("bms_point_id", point_id)
+            .execute()
+        )
         return response.data[0] if response.data else None
 
     def upsert_point_mapping(self, building_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create or update point mapping."""
-        data['building_id'] = building_id
-        response = self.client.table('point_asset_mappings').upsert(
-            data,
-            on_conflict='building_id,bms_point_id'
-        ).execute()
+        data["building_id"] = building_id
+        response = (
+            self.client.table("point_asset_mappings").upsert(data, on_conflict="building_id,bms_point_id").execute()
+        )
         return response.data[0]
 
     def bulk_upsert_point_mappings(
@@ -175,21 +174,27 @@ class IntegrationRepository:
     ) -> int:
         """Bulk upsert point mappings."""
         for m in mappings:
-            m['building_id'] = building_id
+            m["building_id"] = building_id
 
-        response = self.client.table('point_asset_mappings').upsert(
-            mappings,
-            on_conflict='building_id,bms_point_id'
-        ).execute()
+        response = (
+            self.client.table("point_asset_mappings").upsert(mappings, on_conflict="building_id,bms_point_id").execute()
+        )
         return len(response.data)
 
     def verify_point_mapping(self, mapping_id: str, cafm_asset_id: str) -> Dict[str, Any]:
         """Manually verify/correct a point mapping."""
-        response = self.client.table('point_asset_mappings').update({
-            'cafm_asset_id': cafm_asset_id,
-            'match_confidence': 'manual',
-            'is_verified': True,
-        }).eq('id', mapping_id).execute()
+        response = (
+            self.client.table("point_asset_mappings")
+            .update(
+                {
+                    "cafm_asset_id": cafm_asset_id,
+                    "match_confidence": "manual",
+                    "is_verified": True,
+                }
+            )
+            .eq("id", mapping_id)
+            .execute()
+        )
         return response.data[0]
 
     def get_unmatched_points(
@@ -204,33 +209,36 @@ class IntegrationRepository:
         Returns points with match_confidence = 'unmatched'.
         """
         try:
-            query = self.client.table('point_asset_mappings').select(
-                "id,bms_point_id,created_at",
-                count='exact'
-            ).eq('match_confidence', 'unmatched')
+            query = (
+                self.client.table("point_asset_mappings")
+                .select("id,bms_point_id,created_at", count="exact")
+                .eq("match_confidence", "unmatched")
+            )
 
             if building_id:
-                query = query.eq('building_id', building_id)
+                query = query.eq("building_id", building_id)
 
-            query = query.range(offset, offset + limit - 1).order('created_at', desc=True)
+            query = query.range(offset, offset + limit - 1).order("created_at", desc=True)
             response = query.execute()
 
             # Transform to expected format
             points = []
-            for p in (response.data or []):
-                points.append({
-                    'point_id': p.get('id'),
-                    'point_name': p.get('bms_point_id'),
-                    'last_seen': p.get('created_at'),
-                    'occurrence_count': 1,  # Default since we don't track this yet
-                })
+            for p in response.data or []:
+                points.append(
+                    {
+                        "point_id": p.get("id"),
+                        "point_name": p.get("bms_point_id"),
+                        "last_seen": p.get("created_at"),
+                        "occurrence_count": 1,  # Default since we don't track this yet
+                    }
+                )
 
             return {
-                'points': points,
-                'total': response.count or len(points),
+                "points": points,
+                "total": response.count or len(points),
             }
         except Exception:
-            return {'points': [], 'total': 0}
+            return {"points": [], "total": 0}
 
     # ==================== Ingested Data ====================
 
@@ -240,10 +248,9 @@ class IntegrationRepository:
             return 0
 
         # Upsert to handle duplicates
-        response = self.client.table('ingested_alarms').upsert(
-            alarms,
-            on_conflict='log_source_id,source_hash'
-        ).execute()
+        response = (
+            self.client.table("ingested_alarms").upsert(alarms, on_conflict="log_source_id,source_hash").execute()
+        )
         return len(response.data)
 
     def insert_trends(self, trends: List[Dict[str, Any]]) -> int:
@@ -251,10 +258,11 @@ class IntegrationRepository:
         if not trends:
             return 0
 
-        response = self.client.table('ingested_trends').upsert(
-            trends,
-            on_conflict='log_source_id,point_id,recorded_at'
-        ).execute()
+        response = (
+            self.client.table("ingested_trends")
+            .upsert(trends, on_conflict="log_source_id,point_id,recorded_at")
+            .execute()
+        )
         return len(response.data)
 
     def get_recent_alarms(
@@ -264,25 +272,29 @@ class IntegrationRepository:
         severity: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Get recent alarms for a building."""
-        query = self.client.table('ingested_alarms').select("*").eq(
-            'building_id', building_id
-        )
+        query = self.client.table("ingested_alarms").select("*").eq("building_id", building_id)
 
         if severity:
-            query = query.eq('severity', severity)
+            query = query.eq("severity", severity)
 
-        response = query.order('occurred_at', desc=True).limit(limit).execute()
+        response = query.order("occurred_at", desc=True).limit(limit).execute()
         return response.data
 
     # ==================== Sync Jobs ====================
 
     def create_sync_job(self, source_id: str, file_name: Optional[str] = None) -> Dict[str, Any]:
         """Create a new sync job record."""
-        response = self.client.table('sync_jobs').insert({
-            'log_source_id': source_id,
-            'status': 'running',
-            'file_name': file_name,
-        }).execute()
+        response = (
+            self.client.table("sync_jobs")
+            .insert(
+                {
+                    "log_source_id": source_id,
+                    "status": "running",
+                    "file_name": file_name,
+                }
+            )
+            .execute()
+        )
         return response.data[0]
 
     def complete_sync_job(
@@ -297,16 +309,18 @@ class IntegrationRepository:
         processing_time_ms: Optional[int] = None,
     ) -> None:
         """Complete a sync job with results."""
-        self.client.table('sync_jobs').update({
-            'completed_at': datetime.utcnow().isoformat(),
-            'status': status,
-            'records_processed': processed,
-            'records_inserted': inserted,
-            'records_skipped': skipped,
-            'records_failed': failed,
-            'error_message': error_message,
-            'processing_time_ms': processing_time_ms,
-        }).eq('id', job_id).execute()
+        self.client.table("sync_jobs").update(
+            {
+                "completed_at": datetime.utcnow().isoformat(),
+                "status": status,
+                "records_processed": processed,
+                "records_inserted": inserted,
+                "records_skipped": skipped,
+                "records_failed": failed,
+                "error_message": error_message,
+                "processing_time_ms": processing_time_ms,
+            }
+        ).eq("id", job_id).execute()
 
     def get_sync_jobs(
         self,
@@ -314,9 +328,14 @@ class IntegrationRepository:
         limit: int = 20,
     ) -> List[Dict[str, Any]]:
         """Get recent sync jobs for a source."""
-        response = self.client.table('sync_jobs').select("*").eq(
-            'log_source_id', source_id
-        ).order('started_at', desc=True).limit(limit).execute()
+        response = (
+            self.client.table("sync_jobs")
+            .select("*")
+            .eq("log_source_id", source_id)
+            .order("started_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
         return response.data
 
     # ==================== CAFM Data ====================
@@ -329,37 +348,34 @@ class IntegrationRepository:
     ) -> int:
         """Upsert synced CAFM assets."""
         for a in assets:
-            a['building_id'] = building_id
-            a['log_source_id'] = source_id
-            a['last_synced_at'] = datetime.utcnow().isoformat()
+            a["building_id"] = building_id
+            a["log_source_id"] = source_id
+            a["last_synced_at"] = datetime.utcnow().isoformat()
 
-        response = self.client.table('cafm_assets').upsert(
-            assets,
-            on_conflict='building_id,cafm_id'
-        ).execute()
+        response = self.client.table("cafm_assets").upsert(assets, on_conflict="building_id,cafm_id").execute()
         return len(response.data)
 
     def get_cafm_assets(self, building_id: str) -> List[Dict[str, Any]]:
         """Get CAFM assets for a building."""
-        response = self.client.table('cafm_assets').select("*").eq(
-            'building_id', building_id
-        ).order('asset_tag').execute()
+        response = (
+            self.client.table("cafm_assets").select("*").eq("building_id", building_id).order("asset_tag").execute()
+        )
         return response.data
 
     # ==================== Reference Data ====================
 
     def get_alarm_taxonomy(self) -> List[Dict[str, Any]]:
         """Get alarm code taxonomy."""
-        response = self.client.table('alarm_taxonomy').select("*").execute()
+        response = self.client.table("alarm_taxonomy").select("*").execute()
         return response.data
 
     def get_severity_mappings(self, source_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get severity mappings (global or per-source)."""
-        query = self.client.table('severity_mappings').select("*")
+        query = self.client.table("severity_mappings").select("*")
         if source_id:
             query = query.or_(f"log_source_id.eq.{source_id},log_source_id.is.null")
         else:
-            query = query.is_('log_source_id', 'null')
+            query = query.is_("log_source_id", "null")
         response = query.execute()
         return response.data
 
@@ -380,63 +396,63 @@ class IntegrationRepository:
         """
         try:
             # Get log sources
-            sources_query = self.client.table('log_sources').select("*")
+            sources_query = self.client.table("log_sources").select("*")
             if building_id:
-                sources_query = sources_query.eq('building_id', building_id)
+                sources_query = sources_query.eq("building_id", building_id)
             sources_response = sources_query.execute()
             sources = sources_response.data or []
         except Exception:
             # Table doesn't exist - return empty state
             return {
-                'sources_count': 0,
-                'active_sources': 0,
-                'last_sync': None,
-                'total_records_ingested': 0,
-                'total_points_mapped': 0,
-                'unmatched_points': 0,
-                'recent_errors_count': 0,
+                "sources_count": 0,
+                "active_sources": 0,
+                "last_sync": None,
+                "total_records_ingested": 0,
+                "total_points_mapped": 0,
+                "unmatched_points": 0,
+                "recent_errors_count": 0,
             }
 
         sources_count = len(sources)
-        active_sources = len([s for s in sources if s.get('is_active')])
+        active_sources = len([s for s in sources if s.get("is_active")])
 
         # Find most recent sync and sum records
         last_sync = None
         total_records_ingested = 0
         for source in sources:
-            sync_at = source.get('last_sync_at')
+            sync_at = source.get("last_sync_at")
             if sync_at:
                 if last_sync is None or sync_at > last_sync:
                     last_sync = sync_at
-            records = source.get('last_sync_records') or 0
+            records = source.get("last_sync_records") or 0
             total_records_ingested += records
 
         # Get point mappings count
         try:
-            mappings_query = self.client.table('point_asset_mappings').select("id,match_confidence")
+            mappings_query = self.client.table("point_asset_mappings").select("id,match_confidence")
             if building_id:
-                mappings_query = mappings_query.eq('building_id', building_id)
+                mappings_query = mappings_query.eq("building_id", building_id)
             mappings_response = mappings_query.execute()
             mappings = mappings_response.data or []
         except Exception:
             mappings = []
 
         total_points_mapped = len(mappings)
-        unmatched_points = len([m for m in mappings if m.get('match_confidence') == 'unmatched'])
+        unmatched_points = len([m for m in mappings if m.get("match_confidence") == "unmatched"])
 
         # Get failed sync jobs in last 24 hours
         recent_errors_count = 0
         try:
             cutoff = (datetime.utcnow() - timedelta(hours=24)).isoformat()
-            failed_jobs_query = self.client.table('sync_jobs').select("id").eq(
-                'status', 'failed'
-            ).gte('started_at', cutoff)
+            failed_jobs_query = (
+                self.client.table("sync_jobs").select("id").eq("status", "failed").gte("started_at", cutoff)
+            )
             if building_id:
                 # Need to filter by log_source building_id via join or subquery
                 # For simplicity, filter sources first then get job IDs
-                source_ids = [s['id'] for s in sources]
+                source_ids = [s["id"] for s in sources]
                 if source_ids:
-                    failed_jobs_query = failed_jobs_query.in_('log_source_id', source_ids)
+                    failed_jobs_query = failed_jobs_query.in_("log_source_id", source_ids)
                 else:
                     # No sources for this building
                     failed_jobs_query = None
@@ -448,13 +464,13 @@ class IntegrationRepository:
             pass
 
         return {
-            'sources_count': sources_count,
-            'active_sources': active_sources,
-            'last_sync': last_sync,
-            'total_records_ingested': total_records_ingested,
-            'total_points_mapped': total_points_mapped,
-            'unmatched_points': unmatched_points,
-            'recent_errors_count': recent_errors_count,
+            "sources_count": sources_count,
+            "active_sources": active_sources,
+            "last_sync": last_sync,
+            "total_records_ingested": total_records_ingested,
+            "total_points_mapped": total_points_mapped,
+            "unmatched_points": unmatched_points,
+            "recent_errors_count": recent_errors_count,
         }
 
     def get_quality_metrics(self, building_id: str) -> Dict[str, Any]:
@@ -471,51 +487,54 @@ class IntegrationRepository:
         """
         # Default values if tables don't exist
         default_response = {
-            'match_coverage': 0,
-            'data_freshness_hours': 9999,
-            'error_rate': 0,
-            'duplicate_rate': 0,
-            'overall_score': 30,  # Base score for no data
-            'trend': 'stable',
+            "match_coverage": 0,
+            "data_freshness_hours": 9999,
+            "error_rate": 0,
+            "duplicate_rate": 0,
+            "overall_score": 30,  # Base score for no data
+            "trend": "stable",
         }
 
         try:
             # Get point mappings for match coverage
-            mappings_response = self.client.table('point_asset_mappings').select(
-                "id,match_confidence"
-            ).eq('building_id', building_id).execute()
+            mappings_response = (
+                self.client.table("point_asset_mappings")
+                .select("id,match_confidence")
+                .eq("building_id", building_id)
+                .execute()
+            )
             mappings = mappings_response.data or []
         except Exception:
             return default_response
 
         total_points = len(mappings)
-        matched_points = len([m for m in mappings if m.get('match_confidence') != 'unmatched'])
+        matched_points = len([m for m in mappings if m.get("match_confidence") != "unmatched"])
         match_coverage = (matched_points / total_points * 100) if total_points > 0 else 0
 
         # Get data freshness from log sources
         try:
-            sources_response = self.client.table('log_sources').select(
-                "last_sync_at"
-            ).eq('building_id', building_id).execute()
+            sources_response = (
+                self.client.table("log_sources").select("last_sync_at").eq("building_id", building_id).execute()
+            )
             sources = sources_response.data or []
         except Exception:
             sources = []
 
-        data_freshness_hours = float('inf')
+        data_freshness_hours = float("inf")
         now = datetime.utcnow()
         for source in sources:
-            sync_at = source.get('last_sync_at')
+            sync_at = source.get("last_sync_at")
             if sync_at:
                 # Parse ISO format
                 try:
-                    sync_time = datetime.fromisoformat(sync_at.replace('Z', '+00:00').replace('+00:00', ''))
+                    sync_time = datetime.fromisoformat(sync_at.replace("Z", "+00:00").replace("+00:00", ""))
                     hours = (now - sync_time).total_seconds() / 3600
                     if hours < data_freshness_hours:
                         data_freshness_hours = hours
                 except (ValueError, TypeError):
                     pass
 
-        if data_freshness_hours == float('inf'):
+        if data_freshness_hours == float("inf"):
             data_freshness_hours = 9999  # Never synced
 
         # Get error rate from sync jobs in last 7 days
@@ -528,22 +547,24 @@ class IntegrationRepository:
             cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
 
             # Get source IDs for this building
-            source_ids_response = self.client.table('log_sources').select("id").eq(
-                'building_id', building_id
-            ).execute()
-            source_ids = [s['id'] for s in (source_ids_response.data or [])]
+            source_ids_response = self.client.table("log_sources").select("id").eq("building_id", building_id).execute()
+            source_ids = [s["id"] for s in (source_ids_response.data or [])]
 
             if source_ids:
-                jobs_response = self.client.table('sync_jobs').select(
-                    "status,records_processed,records_skipped"
-                ).in_('log_source_id', source_ids).gte('started_at', cutoff).execute()
+                jobs_response = (
+                    self.client.table("sync_jobs")
+                    .select("status,records_processed,records_skipped")
+                    .in_("log_source_id", source_ids)
+                    .gte("started_at", cutoff)
+                    .execute()
+                )
                 jobs = jobs_response.data or []
 
                 total_jobs = len(jobs)
-                failed_jobs = len([j for j in jobs if j.get('status') == 'failed'])
+                failed_jobs = len([j for j in jobs if j.get("status") == "failed"])
                 for job in jobs:
-                    total_processed += job.get('records_processed') or 0
-                    total_skipped += job.get('records_skipped') or 0
+                    total_processed += job.get("records_processed") or 0
+                    total_skipped += job.get("records_skipped") or 0
         except Exception:
             pass
 
@@ -561,22 +582,19 @@ class IntegrationRepository:
 
         # Calculate overall score: weighted average
         overall_score = (
-            match_coverage * 0.4 +
-            freshness_score * 0.3 +
-            (100 - error_rate) * 0.2 +
-            (100 - duplicate_rate) * 0.1
+            match_coverage * 0.4 + freshness_score * 0.3 + (100 - error_rate) * 0.2 + (100 - duplicate_rate) * 0.1
         )
 
         # Trend is static for now (would need historical data to calculate)
-        trend = 'stable'
+        trend = "stable"
 
         return {
-            'match_coverage': round(match_coverage, 1),
-            'data_freshness_hours': round(data_freshness_hours, 1),
-            'error_rate': round(error_rate, 1),
-            'duplicate_rate': round(duplicate_rate, 1),
-            'overall_score': round(overall_score, 1),
-            'trend': trend,
+            "match_coverage": round(match_coverage, 1),
+            "data_freshness_hours": round(data_freshness_hours, 1),
+            "error_rate": round(error_rate, 1),
+            "duplicate_rate": round(duplicate_rate, 1),
+            "overall_score": round(overall_score, 1),
+            "trend": trend,
         }
 
     def get_sync_jobs_summary(
@@ -597,22 +615,26 @@ class IntegrationRepository:
             # If building_id specified, get source IDs first
             source_ids = None
             if building_id:
-                sources_response = self.client.table('log_sources').select("id").eq(
-                    'building_id', building_id
-                ).execute()
-                source_ids = [s['id'] for s in (sources_response.data or [])]
+                sources_response = (
+                    self.client.table("log_sources").select("id").eq("building_id", building_id).execute()
+                )
+                source_ids = [s["id"] for s in (sources_response.data or [])]
                 if not source_ids:
                     return []
 
-            query = self.client.table('sync_jobs').select(
-                "id,log_source_id,status,records_processed,records_inserted,"
-                "records_failed,records_skipped,processing_time_ms,started_at,completed_at,file_name"
-            ).gte('started_at', cutoff)
+            query = (
+                self.client.table("sync_jobs")
+                .select(
+                    "id,log_source_id,status,records_processed,records_inserted,"
+                    "records_failed,records_skipped,processing_time_ms,started_at,completed_at,file_name"
+                )
+                .gte("started_at", cutoff)
+            )
 
             if source_ids:
-                query = query.in_('log_source_id', source_ids)
+                query = query.in_("log_source_id", source_ids)
 
-            response = query.order('started_at', desc=True).limit(100).execute()
+            response = query.order("started_at", desc=True).limit(100).execute()
             return response.data or []
         except Exception:
             # Tables don't exist - return empty list
@@ -635,11 +657,11 @@ class IntegrationRepository:
     ) -> Dict[str, Any]:
         """Update building status (upsert)."""
         record = {
-            'building_id': building_id,
-            'status': status,
-            'last_validated_at': datetime.utcnow().isoformat(),
-            'notes': notes,
-            'updated_at': datetime.utcnow().isoformat(),
+            "building_id": building_id,
+            "status": status,
+            "last_validated_at": datetime.utcnow().isoformat(),
+            "notes": notes,
+            "updated_at": datetime.utcnow().isoformat(),
         }
         self._building_status_store[building_id] = record
         return record
@@ -666,47 +688,51 @@ class IntegrationRepository:
             sources = []
 
         has_source = len(sources) > 0
-        items.append({
-            'id': 'data_source_configured',
-            'category': 'data_source',
-            'name': 'Data Source Configured',
-            'description': 'At least one log source exists for the building',
-            'status': 'pass' if has_source else 'fail',
-            'value': len(sources),
-            'threshold': 1,
-            'details': f"{len(sources)} log source(s) configured" if has_source else "No log sources configured",
-        })
+        items.append(
+            {
+                "id": "data_source_configured",
+                "category": "data_source",
+                "name": "Data Source Configured",
+                "description": "At least one log source exists for the building",
+                "status": "pass" if has_source else "fail",
+                "value": len(sources),
+                "threshold": 1,
+                "details": f"{len(sources)} log source(s) configured" if has_source else "No log sources configured",
+            }
+        )
         if not has_source:
-            blocking_issues.append('data_source_configured')
+            blocking_issues.append("data_source_configured")
 
         # Check 2: data_source_active
-        active_sources = [s for s in sources if s.get('is_active')]
+        active_sources = [s for s in sources if s.get("is_active")]
         has_active = len(active_sources) > 0
-        items.append({
-            'id': 'data_source_active',
-            'category': 'data_source',
-            'name': 'Active Data Source',
-            'description': 'At least one log source is active',
-            'status': 'pass' if has_active else 'fail',
-            'value': len(active_sources),
-            'threshold': 1,
-            'details': f"{len(active_sources)} active source(s)" if has_active else "No active sources",
-        })
+        items.append(
+            {
+                "id": "data_source_active",
+                "category": "data_source",
+                "name": "Active Data Source",
+                "description": "At least one log source is active",
+                "status": "pass" if has_active else "fail",
+                "value": len(active_sources),
+                "threshold": 1,
+                "details": f"{len(active_sources)} active source(s)" if has_active else "No active sources",
+            }
+        )
         if not has_active:
-            blocking_issues.append('data_source_active')
+            blocking_issues.append("data_source_active")
 
         # Check 3: recent_sync
         last_sync = None
         for source in sources:
-            sync_at = source.get('last_sync_at')
+            sync_at = source.get("last_sync_at")
             if sync_at and (last_sync is None or sync_at > last_sync):
                 last_sync = sync_at
 
-        hours_since_sync = float('inf')
+        hours_since_sync = float("inf")
         if last_sync:
             try:
                 if isinstance(last_sync, str):
-                    sync_time = datetime.fromisoformat(last_sync.replace('Z', '+00:00').replace('+00:00', ''))
+                    sync_time = datetime.fromisoformat(last_sync.replace("Z", "+00:00").replace("+00:00", ""))
                 else:
                     sync_time = last_sync
                 hours_since_sync = (datetime.utcnow() - sync_time).total_seconds() / 3600
@@ -714,18 +740,22 @@ class IntegrationRepository:
                 pass
 
         recent_sync = hours_since_sync < 24
-        items.append({
-            'id': 'recent_sync',
-            'category': 'data_source',
-            'name': 'Recent Sync',
-            'description': 'Successful sync within last 24 hours',
-            'status': 'pass' if recent_sync else ('warning' if hours_since_sync < 48 else 'fail'),
-            'value': round(hours_since_sync, 1) if hours_since_sync != float('inf') else None,
-            'threshold': 24,
-            'details': f"Last sync {round(hours_since_sync, 1)} hours ago" if hours_since_sync != float('inf') else "Never synced",
-        })
+        items.append(
+            {
+                "id": "recent_sync",
+                "category": "data_source",
+                "name": "Recent Sync",
+                "description": "Successful sync within last 24 hours",
+                "status": "pass" if recent_sync else ("warning" if hours_since_sync < 48 else "fail"),
+                "value": round(hours_since_sync, 1) if hours_since_sync != float("inf") else None,
+                "threshold": 24,
+                "details": f"Last sync {round(hours_since_sync, 1)} hours ago"
+                if hours_since_sync != float("inf")
+                else "Never synced",
+            }
+        )
         if hours_since_sync >= 48:
-            blocking_issues.append('recent_sync')
+            blocking_issues.append("recent_sync")
 
         # ==================== Point Mapping Checks ====================
 
@@ -735,99 +765,111 @@ class IntegrationRepository:
             mappings = []
 
         total_points = len(mappings)
-        matched_points = len([m for m in mappings if m.get('match_confidence') != 'unmatched'])
-        high_confidence = len([m for m in mappings if m.get('match_confidence') in ['exact', 'manual']])
+        matched_points = len([m for m in mappings if m.get("match_confidence") != "unmatched"])
+        high_confidence = len([m for m in mappings if m.get("match_confidence") in ["exact", "manual"]])
 
         # Check 4: points_discovered
         has_points = total_points > 0
-        items.append({
-            'id': 'points_discovered',
-            'category': 'point_mapping',
-            'name': 'Points Discovered',
-            'description': 'Points have been discovered from log files',
-            'status': 'pass' if has_points else 'fail',
-            'value': total_points,
-            'threshold': 1,
-            'details': f"{total_points} points discovered" if has_points else "No points discovered",
-        })
+        items.append(
+            {
+                "id": "points_discovered",
+                "category": "point_mapping",
+                "name": "Points Discovered",
+                "description": "Points have been discovered from log files",
+                "status": "pass" if has_points else "fail",
+                "value": total_points,
+                "threshold": 1,
+                "details": f"{total_points} points discovered" if has_points else "No points discovered",
+            }
+        )
         if not has_points:
-            blocking_issues.append('points_discovered')
+            blocking_issues.append("points_discovered")
 
         # Check 5: match_coverage
         match_coverage = (matched_points / total_points * 100) if total_points > 0 else 0
-        match_status = 'pass' if match_coverage >= 75 else ('warning' if match_coverage >= 50 else 'fail')
-        items.append({
-            'id': 'match_coverage',
-            'category': 'point_mapping',
-            'name': 'Match Coverage',
-            'description': 'Match coverage >= 50% (warning if <75%)',
-            'status': match_status,
-            'value': round(match_coverage, 1),
-            'threshold': 50,
-            'details': f"{round(match_coverage, 1)}% of points matched to assets",
-        })
+        match_status = "pass" if match_coverage >= 75 else ("warning" if match_coverage >= 50 else "fail")
+        items.append(
+            {
+                "id": "match_coverage",
+                "category": "point_mapping",
+                "name": "Match Coverage",
+                "description": "Match coverage >= 50% (warning if <75%)",
+                "status": match_status,
+                "value": round(match_coverage, 1),
+                "threshold": 50,
+                "details": f"{round(match_coverage, 1)}% of points matched to assets",
+            }
+        )
         if match_coverage < 50:
-            blocking_issues.append('match_coverage')
+            blocking_issues.append("match_coverage")
 
         # Check 6: high_confidence_matches
         high_confidence_pct = (high_confidence / total_points * 100) if total_points > 0 else 0
-        items.append({
-            'id': 'high_confidence_matches',
-            'category': 'point_mapping',
-            'name': 'High Confidence Matches',
-            'description': 'At least 25% of matches are high confidence',
-            'status': 'pass' if high_confidence_pct >= 25 else 'warning',
-            'value': round(high_confidence_pct, 1),
-            'threshold': 25,
-            'details': f"{round(high_confidence_pct, 1)}% high confidence matches ({high_confidence} of {total_points})",
-        })
+        items.append(
+            {
+                "id": "high_confidence_matches",
+                "category": "point_mapping",
+                "name": "High Confidence Matches",
+                "description": "At least 25% of matches are high confidence",
+                "status": "pass" if high_confidence_pct >= 25 else "warning",
+                "value": round(high_confidence_pct, 1),
+                "threshold": 25,
+                "details": f"{round(high_confidence_pct, 1)}% high confidence matches ({high_confidence} of {total_points})",
+            }
+        )
 
         # ==================== Data Quality Checks ====================
 
         quality_metrics = self.get_quality_metrics(building_id)
 
         # Check 7: error_rate
-        error_rate = quality_metrics.get('error_rate', 0)
-        items.append({
-            'id': 'error_rate',
-            'category': 'data_quality',
-            'name': 'Error Rate',
-            'description': 'Error rate < 10%',
-            'status': 'pass' if error_rate < 10 else ('warning' if error_rate < 25 else 'fail'),
-            'value': error_rate,
-            'threshold': 10,
-            'details': f"{error_rate}% of sync jobs failed",
-        })
+        error_rate = quality_metrics.get("error_rate", 0)
+        items.append(
+            {
+                "id": "error_rate",
+                "category": "data_quality",
+                "name": "Error Rate",
+                "description": "Error rate < 10%",
+                "status": "pass" if error_rate < 10 else ("warning" if error_rate < 25 else "fail"),
+                "value": error_rate,
+                "threshold": 10,
+                "details": f"{error_rate}% of sync jobs failed",
+            }
+        )
         if error_rate >= 25:
-            blocking_issues.append('error_rate')
+            blocking_issues.append("error_rate")
 
         # Check 8: duplicate_rate
-        duplicate_rate = quality_metrics.get('duplicate_rate', 0)
-        items.append({
-            'id': 'duplicate_rate',
-            'category': 'data_quality',
-            'name': 'Duplicate Rate',
-            'description': 'Duplicate rate < 20%',
-            'status': 'pass' if duplicate_rate < 20 else 'warning',
-            'value': duplicate_rate,
-            'threshold': 20,
-            'details': f"{duplicate_rate}% of records were duplicates",
-        })
+        duplicate_rate = quality_metrics.get("duplicate_rate", 0)
+        items.append(
+            {
+                "id": "duplicate_rate",
+                "category": "data_quality",
+                "name": "Duplicate Rate",
+                "description": "Duplicate rate < 20%",
+                "status": "pass" if duplicate_rate < 20 else "warning",
+                "value": duplicate_rate,
+                "threshold": 20,
+                "details": f"{duplicate_rate}% of records were duplicates",
+            }
+        )
 
         # Check 9: quality_score
-        quality_score = quality_metrics.get('overall_score', 0)
-        items.append({
-            'id': 'quality_score',
-            'category': 'data_quality',
-            'name': 'Quality Score',
-            'description': 'Overall quality score >= 60 (warning if <75)',
-            'status': 'pass' if quality_score >= 75 else ('warning' if quality_score >= 60 else 'fail'),
-            'value': quality_score,
-            'threshold': 60,
-            'details': f"Quality score: {quality_score}/100",
-        })
+        quality_score = quality_metrics.get("overall_score", 0)
+        items.append(
+            {
+                "id": "quality_score",
+                "category": "data_quality",
+                "name": "Quality Score",
+                "description": "Overall quality score >= 60 (warning if <75)",
+                "status": "pass" if quality_score >= 75 else ("warning" if quality_score >= 60 else "fail"),
+                "value": quality_score,
+                "threshold": 60,
+                "details": f"Quality score: {quality_score}/100",
+            }
+        )
         if quality_score < 60:
-            blocking_issues.append('quality_score')
+            blocking_issues.append("quality_score")
 
         # ==================== Configuration Checks ====================
 
@@ -835,50 +877,54 @@ class IntegrationRepository:
         has_mappings = False
         for source in active_sources:
             try:
-                col_mappings = self.get_column_mappings(source['id'])
+                col_mappings = self.get_column_mappings(source["id"])
                 if col_mappings:
                     has_mappings = True
                     break
             except Exception:
                 pass
 
-        items.append({
-            'id': 'column_mappings',
-            'category': 'configuration',
-            'name': 'Column Mappings',
-            'description': 'Column mappings configured for active sources',
-            'status': 'pass' if has_mappings else ('fail' if active_sources else 'not_checked'),
-            'value': 1 if has_mappings else 0,
-            'threshold': 1,
-            'details': "Column mappings configured" if has_mappings else "No column mappings found",
-        })
+        items.append(
+            {
+                "id": "column_mappings",
+                "category": "configuration",
+                "name": "Column Mappings",
+                "description": "Column mappings configured for active sources",
+                "status": "pass" if has_mappings else ("fail" if active_sources else "not_checked"),
+                "value": 1 if has_mappings else 0,
+                "threshold": 1,
+                "details": "Column mappings configured" if has_mappings else "No column mappings found",
+            }
+        )
         if active_sources and not has_mappings:
-            blocking_issues.append('column_mappings')
+            blocking_issues.append("column_mappings")
 
         # Check 11: sync_settings (always pass for MVP since we use defaults)
-        items.append({
-            'id': 'sync_settings',
-            'category': 'configuration',
-            'name': 'Sync Settings',
-            'description': 'Sync frequency and retention configured',
-            'status': 'pass',
-            'value': True,
-            'threshold': None,
-            'details': "Default sync settings applied",
-        })
+        items.append(
+            {
+                "id": "sync_settings",
+                "category": "configuration",
+                "name": "Sync Settings",
+                "description": "Sync frequency and retention configured",
+                "status": "pass",
+                "value": True,
+                "threshold": None,
+                "details": "Default sync settings applied",
+            }
+        )
 
         # Calculate summary
-        passed = len([i for i in items if i['status'] == 'pass'])
-        failed = len([i for i in items if i['status'] == 'fail'])
-        warnings = len([i for i in items if i['status'] == 'warning'])
+        passed = len([i for i in items if i["status"] == "pass"])
+        failed = len([i for i in items if i["status"] == "fail"])
+        warnings = len([i for i in items if i["status"] == "warning"])
 
         return {
-            'items': items,
-            'summary': {
-                'passed': passed,
-                'failed': failed,
-                'warnings': warnings,
+            "items": items,
+            "summary": {
+                "passed": passed,
+                "failed": failed,
+                "warnings": warnings,
             },
-            'can_activate': failed == 0,
-            'blocking_issues': blocking_issues,
+            "can_activate": failed == 0,
+            "blocking_issues": blocking_issues,
         }

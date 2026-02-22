@@ -22,6 +22,7 @@ class Desk(BaseModel):
     - DALI-2 lighting (Tridonic Scenecom)
     - Environmental context (window, orientation, heat sources)
     """
+
     desk_id: str  # e.g., "L2-D025" or "25"
     floor: str  # e.g., "Level 2"
     building: str = ""  # e.g., "Sandton" (can be inferred from folder)
@@ -44,7 +45,9 @@ class Desk(BaseModel):
     # DALI-2 Scenecom integration (Tridonic)
     dali_zone: Optional[str] = None  # DALI zone/group (e.g., "Zone-L2-C" - often matches HVAC zone)
     sensor_id: Optional[str] = None  # PIR occupancy sensor (e.g., "S002-PIR-L2-C-001")
-    luminaire_ids: Optional[List[str]] = None  # Luminaires serving this desk (e.g., ["S002-LUM-L2-001", "S002-LUM-L2-002"])
+    luminaire_ids: Optional[List[str]] = (
+        None  # Luminaires serving this desk (e.g., ["S002-LUM-L2-001", "S002-LUM-L2-002"])
+    )
     dali_controller: Optional[str] = None  # Scenecom controller (e.g., "S002-DALI-L2-01")
 
     def to_dict(self) -> Dict[str, Any]:
@@ -110,6 +113,7 @@ class HVACZone(BaseModel):
 
     Links to FCUs, VAVs, AHUs, and sensors for complete BMS context.
     """
+
     zone_id: str  # e.g., "Zone-L2-C"
     zone_name: Optional[str] = None  # e.g., "Level 2 Zone C"
     floor: Optional[str] = None
@@ -168,6 +172,7 @@ class ComfortComplaint(BaseModel):
 
     Tracks complaints for pattern analysis and escalation.
     """
+
     complaint_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: datetime = Field(default_factory=datetime.now)
     desk_id: str
@@ -214,6 +219,7 @@ class ComplaintDiagnosis(BaseModel):
 
     Combines desk context, zone context, and AI analysis for actionable insights.
     """
+
     complaint_id: str
     desk: Desk
     zone: HVACZone

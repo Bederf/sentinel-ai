@@ -113,11 +113,13 @@ class WaterAggregationService:
         all_flows = []
         for meter_id, data in meter_data.items():
             avg_flow = sum(data["flows"]) / len(data["flows"]) if data["flows"] else 0
-            meters.append({
-                "meter_id": meter_id,
-                "liters": round(data["volume_liters"], 2),
-                "avg_flow": round(avg_flow, 2),
-            })
+            meters.append(
+                {
+                    "meter_id": meter_id,
+                    "liters": round(data["volume_liters"], 2),
+                    "avg_flow": round(avg_flow, 2),
+                }
+            )
             total_volume += data["volume_liters"]
             all_flows.extend(data["flows"])
 
@@ -181,10 +183,7 @@ class WaterAggregationService:
 
         # Filter records by floor based on zone_id pattern
         # Assumption: floor can be encoded in zone_id (e.g., L1, L2, or 100-199, 200-299)
-        floor_records = [
-            r for r in building_records
-            if self._zone_is_on_floor(r.get("zone_id"), floor)
-        ]
+        floor_records = [r for r in building_records if self._zone_is_on_floor(r.get("zone_id"), floor)]
 
         if not floor_records:
             return {
@@ -213,8 +212,7 @@ class WaterAggregationService:
                     "flows": [],
                 }
             zone_data[zone_id]["volume_liters"] = max(
-                zone_data[zone_id]["volume_liters"],
-                record.get("volume_liters", 0)
+                zone_data[zone_id]["volume_liters"], record.get("volume_liters", 0)
             )
             zone_data[zone_id]["flows"].append(record.get("flow_rate_lpm", 0))
 
@@ -224,12 +222,14 @@ class WaterAggregationService:
         all_flows = []
         for zone_id, data in zone_data.items():
             avg_flow = sum(data["flows"]) / len(data["flows"]) if data["flows"] else 0
-            zones.append({
-                "zone_id": zone_id,
-                "zone_name": data.get("zone_name"),
-                "liters": round(data["volume_liters"], 2),
-                "avg_flow": round(avg_flow, 2),
-            })
+            zones.append(
+                {
+                    "zone_id": zone_id,
+                    "zone_name": data.get("zone_name"),
+                    "liters": round(data["volume_liters"], 2),
+                    "avg_flow": round(avg_flow, 2),
+                }
+            )
             total_volume += data["volume_liters"]
             all_flows.extend(data["flows"])
 
@@ -293,8 +293,7 @@ class WaterAggregationService:
                     "meter_ids": set(),
                 }
             zone_consumption[zone_id]["volume_liters"] = max(
-                zone_consumption[zone_id]["volume_liters"],
-                record.get("volume_liters", 0)
+                zone_consumption[zone_id]["volume_liters"], record.get("volume_liters", 0)
             )
             zone_consumption[zone_id]["flows"].append(record.get("flow_rate_lpm", 0))
             zone_consumption[zone_id]["meter_ids"].add(record["meter_id"])
@@ -302,25 +301,22 @@ class WaterAggregationService:
         # Calculate statistics and sort by consumption
         top_zones = []
         for rank, (zone_id, data) in enumerate(
-            sorted(
-                zone_consumption.items(),
-                key=lambda x: x[1]["volume_liters"],
-                reverse=True
-            )[:limit],
-            1
+            sorted(zone_consumption.items(), key=lambda x: x[1]["volume_liters"], reverse=True)[:limit], 1
         ):
             avg_flow = sum(data["flows"]) / len(data["flows"]) if data["flows"] else 0
             peak_flow = max(data["flows"]) if data["flows"] else 0
-            top_zones.append({
-                "rank": rank,
-                "zone_id": zone_id,
-                "zone_name": data["zone_name"],
-                "total_liters": round(data["volume_liters"], 2),
-                "avg_flow_lpm": round(avg_flow, 2),
-                "peak_flow_lpm": round(peak_flow, 2),
-                "meter_count": len(data["meter_ids"]),
-                "days": days,
-            })
+            top_zones.append(
+                {
+                    "rank": rank,
+                    "zone_id": zone_id,
+                    "zone_name": data["zone_name"],
+                    "total_liters": round(data["volume_liters"], 2),
+                    "avg_flow_lpm": round(avg_flow, 2),
+                    "peak_flow_lpm": round(peak_flow, 2),
+                    "meter_count": len(data["meter_ids"]),
+                    "days": days,
+                }
+            )
 
         return top_zones
 
@@ -388,8 +384,7 @@ class WaterAggregationService:
                     "flows": [],
                 }
             daily_data[date_str]["volume_liters"] = max(
-                daily_data[date_str]["volume_liters"],
-                record.get("volume_liters", 0)
+                daily_data[date_str]["volume_liters"], record.get("volume_liters", 0)
             )
             daily_data[date_str]["flows"].append(record.get("flow_rate_lpm", 0))
 
@@ -400,11 +395,13 @@ class WaterAggregationService:
             data = daily_data[date_str]
             avg_flow = sum(data["flows"]) / len(data["flows"]) if data["flows"] else 0
             liters = data["volume_liters"]
-            trend_data.append({
-                "date": date_str,
-                "liters": round(liters, 2),
-                "avg_flow_lpm": round(avg_flow, 2),
-            })
+            trend_data.append(
+                {
+                    "date": date_str,
+                    "liters": round(liters, 2),
+                    "avg_flow_lpm": round(avg_flow, 2),
+                }
+            )
             total_liters += liters
 
         average_daily = total_liters / len(trend_data) if trend_data else 0

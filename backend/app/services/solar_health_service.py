@@ -34,9 +34,9 @@ logger = logging.getLogger(__name__)
 
 # === Degradation thresholds (crystalline silicon) ===
 
-DEGRADATION_NORMAL_MAX = 0.8       # %/year — normal for c-Si
-DEGRADATION_ELEVATED_MAX = 1.0     # %/year — elevated, monitor
-DEGRADATION_ACCELERATED = 1.0      # %/year — above this = accelerated
+DEGRADATION_NORMAL_MAX = 0.8  # %/year — normal for c-Si
+DEGRADATION_ELEVATED_MAX = 1.0  # %/year — elevated, monitor
+DEGRADATION_ACCELERATED = 1.0  # %/year — above this = accelerated
 
 # PR baseline for new installations (Site-002 commissioning target)
 COMMISSIONING_PR = 0.84
@@ -48,8 +48,8 @@ ECONOMIC_PR_THRESHOLD = 0.65
 BESS_WARRANTY_YEARS = 15
 BESS_WARRANTY_CYCLES = 6000
 BESS_SOH_WARRANTY_THRESHOLD = 80.0  # %
-BESS_CELL_IMBALANCE_WARN = 50.0     # mV — warning threshold
-BESS_CELL_IMBALANCE_ALARM = 100.0   # mV — alarm threshold
+BESS_CELL_IMBALANCE_WARN = 50.0  # mV — warning threshold
+BESS_CELL_IMBALANCE_ALARM = 100.0  # mV — alarm threshold
 
 # Cost estimation
 AVERAGE_TARIFF_ZAR_KWH = 2.85
@@ -62,6 +62,7 @@ PEAK_SUN_HOURS_JHB = 5.5
 @dataclass
 class InverterDegradation:
     """Degradation metrics for a single inverter."""
+
     inverter_id: str
     name: str
     manufacturer: str
@@ -97,6 +98,7 @@ class InverterDegradation:
 @dataclass
 class DegradationReport:
     """Fleet-wide degradation report for a site."""
+
     site_id: str
     timestamp: str
     fleet_average_degradation: float
@@ -120,6 +122,7 @@ class DegradationReport:
 @dataclass
 class MonthlyHealthPoint:
     """Single month in a health timeline."""
+
     month: str  # YYYY-MM
     performance_ratio: float
     efficiency_pct: float
@@ -141,6 +144,7 @@ class MonthlyHealthPoint:
 @dataclass
 class HealthTimeline:
     """Monthly health timeline for an inverter."""
+
     site_id: str
     inverter_id: str
     months_requested: int
@@ -159,6 +163,7 @@ class HealthTimeline:
 @dataclass
 class EOLPrediction:
     """End-of-life prediction for an inverter."""
+
     inverter_id: str
     degradation_rate_pct_year: float
     current_pr: float
@@ -182,6 +187,7 @@ class EOLPrediction:
 @dataclass
 class BESSRackHealth:
     """Health data for an individual BESS rack."""
+
     rack_id: str
     soc_pct: float
     temp_c: float
@@ -205,6 +211,7 @@ class BESSRackHealth:
 @dataclass
 class BESSHealthReport:
     """Comprehensive BESS health report."""
+
     site_id: str
     container_id: str
     timestamp: str
@@ -242,6 +249,7 @@ class BESSHealthReport:
 @dataclass
 class BESSReplacementPrediction:
     """Prediction for when BESS needs replacement."""
+
     site_id: str
     container_id: str
     current_soh_pct: float
@@ -273,6 +281,7 @@ class BESSReplacementPrediction:
 @dataclass
 class MonthlyCycleData:
     """Monthly BESS cycle history."""
+
     month: str  # YYYY-MM
     cycle_count: int
     average_dod_pct: float
@@ -292,6 +301,7 @@ class MonthlyCycleData:
 @dataclass
 class WarrantyPackage:
     """Structured warranty evidence package for manufacturer claims."""
+
     site_id: str
     equipment_id: str
     equipment_type: str  # inverter or bess
@@ -368,9 +378,7 @@ class SolarHealthService:
                         years = self._years_since(commissioning)
                         pr_loss = rate / 100.0 * years
                         current_pr = COMMISSIONING_PR - pr_loss
-                        self._inverter_pr[inv_id] = round(
-                            max(0.60, current_pr + rng.uniform(-0.01, 0.01)), 4
-                        )
+                        self._inverter_pr[inv_id] = round(max(0.60, current_pr + rng.uniform(-0.01, 0.01)), 4)
 
             # BESS demo data
             bess_cfg = config.get("bess", {})
@@ -391,14 +399,16 @@ class SolarHealthService:
                         cell_max = cell_min + imbalance / 1000.0
                         temp = rng.uniform(24, 27)
 
-                    racks.append({
-                        "rack_id": rack_id,
-                        "soc_pct": rng.uniform(45, 55),
-                        "temp_c": temp,
-                        "cell_min_v": cell_min,
-                        "cell_max_v": cell_max,
-                        "cell_imbalance_mv": imbalance,
-                    })
+                    racks.append(
+                        {
+                            "rack_id": rack_id,
+                            "soc_pct": rng.uniform(45, 55),
+                            "temp_c": temp,
+                            "cell_min_v": cell_min,
+                            "cell_max_v": cell_max,
+                            "cell_imbalance_mv": imbalance,
+                        }
+                    )
 
                 self._bess_demo_data[site_id] = {
                     "soh_pct": 94.0,
@@ -472,27 +482,26 @@ class SolarHealthService:
                 eol_year = datetime.now().year + 30
 
             # Annual energy loss from degradation
-            annual_loss_kwh = (
-                inv.rated_power_kva * PEAK_SUN_HOURS_JHB * 365
-                * (deg_rate / 100.0)
-            )
+            annual_loss_kwh = inv.rated_power_kva * PEAK_SUN_HOURS_JHB * 365 * (deg_rate / 100.0)
             annual_loss_zar = annual_loss_kwh * AVERAGE_TARIFF_ZAR_KWH
 
-            degradation_list.append(InverterDegradation(
-                inverter_id=inv.inverter_id,
-                name=inv.name,
-                manufacturer=inv.manufacturer,
-                model=inv.model,
-                commissioning_date=comm_date,
-                years_since_commissioning=years,
-                baseline_pr=COMMISSIONING_PR,
-                current_pr=current_pr,
-                degradation_pct_year=deg_rate,
-                degradation_rating=rating,
-                predicted_eol_year=eol_year,
-                annual_loss_kwh=annual_loss_kwh,
-                annual_loss_zar=annual_loss_zar,
-            ))
+            degradation_list.append(
+                InverterDegradation(
+                    inverter_id=inv.inverter_id,
+                    name=inv.name,
+                    manufacturer=inv.manufacturer,
+                    model=inv.model,
+                    commissioning_date=comm_date,
+                    years_since_commissioning=years,
+                    baseline_pr=COMMISSIONING_PR,
+                    current_pr=current_pr,
+                    degradation_pct_year=deg_rate,
+                    degradation_rating=rating,
+                    predicted_eol_year=eol_year,
+                    annual_loss_kwh=annual_loss_kwh,
+                    annual_loss_zar=annual_loss_zar,
+                )
+            )
 
         # Sort by degradation rate (worst first)
         degradation_list.sort(key=lambda d: -d.degradation_pct_year)
@@ -513,9 +522,7 @@ class SolarHealthService:
             inverters=degradation_list,
         )
 
-    async def get_health_timeline(
-        self, site_id: str, inverter_id: str, months: int = 12
-    ) -> Optional[HealthTimeline]:
+    async def get_health_timeline(self, site_id: str, inverter_id: str, months: int = 12) -> Optional[HealthTimeline]:
         """Generate monthly health timeline for an inverter.
 
         Returns PR trend, efficiency, fault count, operating hours per month.
@@ -559,14 +566,16 @@ class SolarHealthService:
             cumulative = deg_rate * (self._years_since("2024-03-15") - months_ago / 12.0)
             cumulative = max(0, cumulative)
 
-            data.append(MonthlyHealthPoint(
-                month=month_str,
-                performance_ratio=month_pr,
-                efficiency_pct=efficiency,
-                fault_count=fault_count,
-                operating_hours=operating_hours,
-                degradation_cumulative_pct=cumulative,
-            ))
+            data.append(
+                MonthlyHealthPoint(
+                    month=month_str,
+                    performance_ratio=month_pr,
+                    efficiency_pct=efficiency,
+                    fault_count=fault_count,
+                    operating_hours=operating_hours,
+                    degradation_cumulative_pct=cumulative,
+                )
+            )
 
         return HealthTimeline(
             site_id=site_id,
@@ -575,9 +584,7 @@ class SolarHealthService:
             data=data,
         )
 
-    async def predict_end_of_life(
-        self, site_id: str, inverter_id: str
-    ) -> Optional[EOLPrediction]:
+    async def predict_end_of_life(self, site_id: str, inverter_id: str) -> Optional[EOLPrediction]:
         """Predict when an inverter's PR drops below economic threshold.
 
         Uses linear extrapolation. ML models improve this in future.
@@ -649,15 +656,17 @@ class SolarHealthService:
             else:
                 rack_status = "normal"
 
-            rack_health.append(BESSRackHealth(
-                rack_id=rack_data["rack_id"],
-                soc_pct=rack_data["soc_pct"],
-                temp_c=rack_data["temp_c"],
-                cell_min_v=rack_data["cell_min_v"],
-                cell_max_v=rack_data["cell_max_v"],
-                cell_imbalance_mv=imbalance,
-                status=rack_status,
-            ))
+            rack_health.append(
+                BESSRackHealth(
+                    rack_id=rack_data["rack_id"],
+                    soc_pct=rack_data["soc_pct"],
+                    temp_c=rack_data["temp_c"],
+                    cell_min_v=rack_data["cell_min_v"],
+                    cell_max_v=rack_data["cell_max_v"],
+                    cell_imbalance_mv=imbalance,
+                    status=rack_status,
+                )
+            )
 
         avg_temp = statistics.mean(all_temps) if all_temps else 25.0
         max_temp = max(all_temps) if all_temps else 25.0
@@ -678,9 +687,7 @@ class SolarHealthService:
                     f"({rack.cell_imbalance_mv:.0f}mV > {BESS_CELL_IMBALANCE_ALARM}mV)"
                 )
             elif rack.status == "warning":
-                fleet_avg_imbalance = statistics.mean(
-                    [r.cell_imbalance_mv for r in rack_health]
-                )
+                fleet_avg_imbalance = statistics.mean([r.cell_imbalance_mv for r in rack_health])
                 alerts.append(
                     f"{rack.rack_id} cell imbalance above fleet average "
                     f"({rack.cell_imbalance_mv:.0f}mV vs {fleet_avg_imbalance:.0f}mV)"
@@ -708,9 +715,7 @@ class SolarHealthService:
             racks=rack_health,
         )
 
-    async def predict_bess_replacement(
-        self, site_id: str
-    ) -> Optional[BESSReplacementPrediction]:
+    async def predict_bess_replacement(self, site_id: str) -> Optional[BESSReplacementPrediction]:
         """Predict when BESS needs replacement.
 
         Based on cycle count rate and SoH decline, predicts when:
@@ -808,9 +813,7 @@ class SolarHealthService:
             years_remaining=years_remaining,
         )
 
-    async def get_bess_cycle_history(
-        self, site_id: str, months: int = 12
-    ) -> List[MonthlyCycleData]:
+    async def get_bess_cycle_history(self, site_id: str, months: int = 12) -> List[MonthlyCycleData]:
         """Get monthly BESS cycle history.
 
         Returns cycle count, average DoD, equivalent full cycles per month.
@@ -844,21 +847,21 @@ class SolarHealthService:
             efc = monthly_cycles * (avg_dod / 100.0)
             avg_temp = rng.uniform(23, 28)
 
-            result.append(MonthlyCycleData(
-                month=month_str,
-                cycle_count=monthly_cycles,
-                average_dod_pct=avg_dod,
-                equivalent_full_cycles=efc,
-                avg_temp_c=avg_temp,
-            ))
+            result.append(
+                MonthlyCycleData(
+                    month=month_str,
+                    cycle_count=monthly_cycles,
+                    average_dod_pct=avg_dod,
+                    equivalent_full_cycles=efc,
+                    avg_temp_c=avg_temp,
+                )
+            )
 
         return result
 
     # === Warranty Evidence ===
 
-    async def generate_warranty_evidence(
-        self, site_id: str, equipment_id: str
-    ) -> Optional[WarrantyPackage]:
+    async def generate_warranty_evidence(self, site_id: str, equipment_id: str) -> Optional[WarrantyPackage]:
         """Generate structured warranty evidence package.
 
         Collects: equipment details, installation date, operating history,
@@ -946,10 +949,7 @@ class SolarHealthService:
                 "expected_total_degradation_pct": round(expected_max_degradation, 2),
                 "exceeds_manufacturer_specification": exceeds_spec,
                 "peer_group_average_degradation": round(
-                    statistics.mean(
-                        r for r in self._inverter_degradation.values()
-                        if r < DEGRADATION_ACCELERATED
-                    ), 2
+                    statistics.mean(r for r in self._inverter_degradation.values() if r < DEGRADATION_ACCELERATED), 2
                 ),
                 "ranking_in_fleet": "Worst" if exceeds_spec else "Normal",
             },
@@ -983,9 +983,11 @@ class SolarHealthService:
                 "reason": (
                     f"Degradation rate of {deg_rate:.2f}%/year exceeds manufacturer "
                     f"specification maximum of {DEGRADATION_NORMAL_MAX}%/year. "
-                    f"Inverter {inverter_id} is degrading {deg_rate/DEGRADATION_NORMAL_MAX:.1f}x "
-                    f"faster than specification and {deg_rate/0.65:.1f}x faster than fleet average."
-                ) if exceeds_spec else (
+                    f"Inverter {inverter_id} is degrading {deg_rate / DEGRADATION_NORMAL_MAX:.1f}x "
+                    f"faster than specification and {deg_rate / 0.65:.1f}x faster than fleet average."
+                )
+                if exceeds_spec
+                else (
                     f"Degradation rate of {deg_rate:.2f}%/year is within manufacturer "
                     f"specification of {DEGRADATION_NORMAL_MAX}%/year. No warranty claim recommended."
                 ),
@@ -1077,9 +1079,9 @@ class SolarHealthService:
                     f"{'SoH is below expected level — investigate rack-level data.' if exceeds_spec else 'SoH within expected parameters.'} "
                     f"Rack 4 cell imbalance ({max(r['cell_imbalance_mv'] for r in demo.get('racks', [{'cell_imbalance_mv': 20}])):.0f}mV) requires monitoring."
                 ),
-                "estimated_replacement_year": (
-                    await self.predict_bess_replacement(site_id)
-                ).replacement_year if await self.predict_bess_replacement(site_id) else 2039,
+                "estimated_replacement_year": (await self.predict_bess_replacement(site_id)).replacement_year
+                if await self.predict_bess_replacement(site_id)
+                else 2039,
             },
         )
 
@@ -1101,36 +1103,44 @@ class SolarHealthService:
         # Flag accelerated degradation
         for inv in degradation.inverters:
             if inv.degradation_rating == "accelerated":
-                issues.append({
-                    "severity": "warning",
-                    "equipment_id": inv.inverter_id,
-                    "type": "accelerated_degradation",
-                    "detail": (
-                        f"{inv.degradation_pct_year:.1f}%/year vs "
-                        f"{degradation.fleet_average_degradation:.2f}% fleet average"
-                    ),
-                    "action": "Generate warranty evidence",
-                })
+                issues.append(
+                    {
+                        "severity": "warning",
+                        "equipment_id": inv.inverter_id,
+                        "type": "accelerated_degradation",
+                        "detail": (
+                            f"{inv.degradation_pct_year:.1f}%/year vs "
+                            f"{degradation.fleet_average_degradation:.2f}% fleet average"
+                        ),
+                        "action": "Generate warranty evidence",
+                    }
+                )
             elif inv.degradation_rating == "elevated":
-                issues.append({
-                    "severity": "info",
-                    "equipment_id": inv.inverter_id,
-                    "type": "elevated_degradation",
-                    "detail": f"{inv.degradation_pct_year:.1f}%/year (elevated range)",
-                    "action": "Monitor monthly trend",
-                })
+                issues.append(
+                    {
+                        "severity": "info",
+                        "equipment_id": inv.inverter_id,
+                        "type": "elevated_degradation",
+                        "detail": f"{inv.degradation_pct_year:.1f}%/year (elevated range)",
+                        "action": "Monitor monthly trend",
+                    }
+                )
 
         # BESS issues
         if bess_health:
             for rack in bess_health.racks:
                 if rack.status in ("warning", "alarm"):
-                    issues.append({
-                        "severity": "info" if rack.status == "warning" else "warning",
-                        "equipment_id": rack.rack_id,
-                        "type": "cell_imbalance",
-                        "detail": f"{rack.cell_imbalance_mv:.0f}mV imbalance on {rack.rack_id}",
-                        "action": "Monitor, schedule balancing" if rack.status == "warning" else "Immediate balancing required",
-                    })
+                    issues.append(
+                        {
+                            "severity": "info" if rack.status == "warning" else "warning",
+                            "equipment_id": rack.rack_id,
+                            "type": "cell_imbalance",
+                            "detail": f"{rack.cell_imbalance_mv:.0f}mV imbalance on {rack.rack_id}",
+                            "action": "Monitor, schedule balancing"
+                            if rack.status == "warning"
+                            else "Immediate balancing required",
+                        }
+                    )
 
         result = {
             "site_id": site_id,

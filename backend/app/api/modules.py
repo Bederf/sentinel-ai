@@ -11,10 +11,7 @@ from datetime import datetime
 
 from app.services.module_registry_service import module_registry
 from app.database.repositories.module_access_repository import get_module_access_repository
-from app.models.module_registry import (
-    ModuleType, RecommendationPriority, RecommendationType,
-    AIRecommendation
-)
+from app.models.module_registry import ModuleType, RecommendationPriority, RecommendationType, AIRecommendation
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel
 from app.database.supabase_client import get_supabase_client
@@ -26,6 +23,7 @@ router = APIRouter(prefix="/modules", tags=["modules"])
 
 
 # ==================== Request/Response Models ====================
+
 
 class ActivateModuleRequest(BaseModel):
     site_id: str
@@ -94,6 +92,7 @@ class IntegrationSummaryResponse(BaseModel):
 
 # ==================== Module Management Endpoints ====================
 
+
 @router.get("/available", response_model=List[ModuleDefinitionResponse])
 async def get_available_modules():
     """Get all available module definitions."""
@@ -105,11 +104,10 @@ async def get_available_modules():
             version=m.version,
             description=m.description,
             capabilities=[
-                {"id": c.capability_id, "name": c.name, "description": c.description}
-                for c in m.capabilities
+                {"id": c.capability_id, "name": c.name, "description": c.description} for c in m.capabilities
             ],
             integrates_with=[t.value for t in m.integrates_with],
-            ai_features=m.ai_features
+            ai_features=m.ai_features,
         )
         for m in modules
     ]
@@ -133,11 +131,10 @@ async def get_module_definition(module_type: str):
         version=module_def.version,
         description=module_def.description,
         capabilities=[
-            {"id": c.capability_id, "name": c.name, "description": c.description}
-            for c in module_def.capabilities
+            {"id": c.capability_id, "name": c.name, "description": c.description} for c in module_def.capabilities
         ],
         integrates_with=[t.value for t in module_def.integrates_with],
-        ai_features=module_def.ai_features
+        ai_features=module_def.ai_features,
     )
 
 
@@ -166,7 +163,7 @@ async def get_active_modules(site_id: str, request: Request):
             status=m.status.value,
             activated_at=m.activated_at,
             health_score=m.health_score,
-            last_telemetry=m.last_telemetry
+            last_telemetry=m.last_telemetry,
         )
         for m in modules
     ]
@@ -197,7 +194,7 @@ async def get_modules_status(site_id: str, request: Request):
             status=m.status.value,
             activated_at=m.activated_at,
             health_score=m.health_score,
-            last_telemetry=m.last_telemetry
+            last_telemetry=m.last_telemetry,
         )
         for m in modules
     ]
@@ -215,10 +212,7 @@ async def activate_module(
         raise HTTPException(status_code=400, detail=f"Invalid module type: {request.module_type}")
 
     instance = module_registry.activate_module(
-        site_id=request.site_id,
-        site_name=request.site_name,
-        module_type=mt,
-        config=request.config
+        site_id=request.site_id, site_name=request.site_name, module_type=mt, config=request.config
     )
 
     return ModuleResponse(
@@ -228,7 +222,7 @@ async def activate_module(
         status=instance.status.value,
         activated_at=instance.activated_at,
         health_score=instance.health_score,
-        last_telemetry=instance.last_telemetry
+        last_telemetry=instance.last_telemetry,
     )
 
 
@@ -279,6 +273,7 @@ async def check_module_active(site_id: str, module_type: str, request: Request):
 
 # ==================== Integration Endpoints ====================
 
+
 @router.get("/site/{site_id}/integration", response_model=IntegrationSummaryResponse)
 async def get_integration_summary(site_id: str):
     """Get module integration summary for a site."""
@@ -316,13 +311,14 @@ async def update_module_health(
 
 # ==================== AI Recommendations Endpoints ====================
 
+
 @router.get("/site/{site_id}/recommendations", response_model=List[RecommendationResponse])
 async def get_recommendations(
     site_id: str,
     modules: Optional[str] = Query(None, description="Comma-separated module types to filter"),
     priorities: Optional[str] = Query(None, description="Comma-separated priorities to filter"),
     include_resolved: bool = False,
-    limit: int = Query(50, ge=1, le=200)
+    limit: int = Query(50, ge=1, le=200),
 ):
     """Get AI recommendations for a site from Supabase predictions."""
 
@@ -338,17 +334,23 @@ async def get_recommendations(
             if not building_response.data:
                 # Try with 'sandton' mapping for legacy support
                 if site_id == "site-002":
-                    building_response = client.table("buildings").select("id").ilike("name", "%sandton%").limit(1).execute()
+                    building_response = (
+                        client.table("buildings").select("id").ilike("name", "%sandton%").limit(1).execute()
+                    )
 
             if building_response.data:
                 building_id = building_response.data[0]["id"]
 
                 # Query predictions with active status
-                query = client.table("predictions").select(
-                    "id, code, equipment_id, prediction_type, probability_percent, "
-                    "recommended_action, urgency, severity, status, created_at, "
-                    "evidence, contributing_factors"
-                ).eq("building_id", building_id)
+                query = (
+                    client.table("predictions")
+                    .select(
+                        "id, code, equipment_id, prediction_type, probability_percent, "
+                        "recommended_action, urgency, severity, status, created_at, "
+                        "evidence, contributing_factors"
+                    )
+                    .eq("building_id", building_id)
+                )
 
                 if not include_resolved:
                     query = query.eq("status", "active")
@@ -402,20 +404,22 @@ async def get_recommendations(
                         if priority not in priority_list:
                             continue
 
-                    recommendations.append(RecommendationResponse(
-                        recommendation_id=pred["code"],
-                        timestamp=pred.get("created_at", datetime.now().isoformat()),
-                        source_module=source_module,
-                        recommendation_type="maintenance",
-                        priority=priority,
-                        title=f"{eq_name}: {pred.get('prediction_type', 'Issue Detected')}",
-                        description=pred.get("recommended_action", "Review equipment status"),
-                        confidence=min(pred.get("probability_percent", 50) / 100, 1.0),
-                        related_modules=[],
-                        auto_actionable=False,
-                        acknowledged=False,
-                        resolved=pred.get("status") == "resolved"
-                    ))
+                    recommendations.append(
+                        RecommendationResponse(
+                            recommendation_id=pred["code"],
+                            timestamp=pred.get("created_at", datetime.now().isoformat()),
+                            source_module=source_module,
+                            recommendation_type="maintenance",
+                            priority=priority,
+                            title=f"{eq_name}: {pred.get('prediction_type', 'Issue Detected')}",
+                            description=pred.get("recommended_action", "Review equipment status"),
+                            confidence=min(pred.get("probability_percent", 50) / 100, 1.0),
+                            related_modules=[],
+                            auto_actionable=False,
+                            acknowledged=False,
+                            resolved=pred.get("status") == "resolved",
+                        )
+                    )
 
     except Exception as e:
         logger.warning(f"Failed to fetch recommendations from Supabase: {e}")
@@ -441,26 +445,28 @@ async def get_recommendations(
             module_filter=module_filter,
             priority_filter=priority_filter,
             include_resolved=include_resolved,
-            limit=limit
+            limit=limit,
         )
 
         for r in registry_recs:
             # Avoid duplicates
             if not any(rec.recommendation_id == r.recommendation_id for rec in recommendations):
-                recommendations.append(RecommendationResponse(
-                    recommendation_id=r.recommendation_id,
-                    timestamp=r.timestamp,
-                    source_module=r.source_module.value,
-                    recommendation_type=r.recommendation_type.value,
-                    priority=r.priority.value,
-                    title=r.title,
-                    description=r.description,
-                    confidence=r.confidence,
-                    related_modules=[m.value for m in r.related_modules],
-                    auto_actionable=r.auto_actionable,
-                    acknowledged=r.acknowledged,
-                    resolved=r.resolved
-                ))
+                recommendations.append(
+                    RecommendationResponse(
+                        recommendation_id=r.recommendation_id,
+                        timestamp=r.timestamp,
+                        source_module=r.source_module.value,
+                        recommendation_type=r.recommendation_type.value,
+                        priority=r.priority.value,
+                        title=r.title,
+                        description=r.description,
+                        confidence=r.confidence,
+                        related_modules=[m.value for m in r.related_modules],
+                        auto_actionable=r.auto_actionable,
+                        acknowledged=r.acknowledged,
+                        resolved=r.resolved,
+                    )
+                )
     except Exception as e:
         logger.warning(f"Failed to fetch recommendations from module registry: {e}")
 
@@ -479,6 +485,7 @@ async def add_recommendation(site_id: str, request: RecommendationRequest):
         raise HTTPException(status_code=400, detail=f"Invalid enum value: {e}")
 
     import uuid
+
     recommendation = AIRecommendation(
         recommendation_id=f"rec-{uuid.uuid4().hex[:8]}",
         timestamp=datetime.utcnow().isoformat(),
@@ -491,7 +498,7 @@ async def add_recommendation(site_id: str, request: RecommendationRequest):
         related_modules=related,
         telemetry_context=request.telemetry_context,
         suggested_action=request.suggested_action,
-        auto_actionable=request.auto_actionable
+        auto_actionable=request.auto_actionable,
     )
 
     module_registry.add_recommendation(site_id, recommendation)
@@ -499,7 +506,7 @@ async def add_recommendation(site_id: str, request: RecommendationRequest):
     return {
         "status": "added",
         "recommendation_id": recommendation.recommendation_id,
-        "timestamp": recommendation.timestamp
+        "timestamp": recommendation.timestamp,
     }
 
 

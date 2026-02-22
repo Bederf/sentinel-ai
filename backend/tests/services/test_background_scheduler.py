@@ -14,20 +14,23 @@ class TestBackgroundScheduler:
     def test_scheduler_initialization(self):
         """Test scheduler can be initialized."""
         from app.services.background_scheduler import scheduler_service
+
         assert scheduler_service is not None
 
     def test_scheduler_has_scheduler_instance(self):
         """Test scheduler has underlying APScheduler instance."""
         from app.services.background_scheduler import scheduler_service
+
         # Should have scheduler attribute
-        assert hasattr(scheduler_service, 'scheduler')
+        assert hasattr(scheduler_service, "scheduler")
 
     def test_scheduler_has_add_methods(self):
         """Test scheduler has job addition methods."""
         from app.services.background_scheduler import scheduler_service
+
         # Should have methods to add jobs
-        assert hasattr(scheduler_service, 'add_demo_data_job')
-        assert hasattr(scheduler_service, 'add_optimization_analysis_job')
+        assert hasattr(scheduler_service, "add_demo_data_job")
+        assert hasattr(scheduler_service, "add_optimization_analysis_job")
 
 
 @pytest.mark.unit
@@ -77,14 +80,14 @@ class TestJobExecution:
         from app.services.background_scheduler import scheduler_service
 
         # Should have the private generation method
-        assert hasattr(scheduler_service, '_generate_demo_audit_data')
+        assert hasattr(scheduler_service, "_generate_demo_audit_data")
 
     def test_optimization_analysis_method_exists(self):
         """Test optimization analysis method exists on scheduler."""
         from app.services.background_scheduler import scheduler_service
 
         # Should have the private analysis method
-        assert hasattr(scheduler_service, '_run_optimization_analysis')
+        assert hasattr(scheduler_service, "_run_optimization_analysis")
 
 
 @pytest.mark.unit
@@ -138,8 +141,8 @@ class TestJobManagement:
         """Test scheduler has start/stop methods."""
         from app.services.background_scheduler import scheduler_service
 
-        assert hasattr(scheduler_service, 'start')
-        assert hasattr(scheduler_service, 'stop')
+        assert hasattr(scheduler_service, "start")
+        assert hasattr(scheduler_service, "stop")
 
     def test_scheduler_start_method(self):
         """Test scheduler can be started."""
@@ -162,7 +165,7 @@ class TestJobManagement:
             scheduler_service.add_demo_data_job(interval_seconds=180)
 
             # Should only have one job with that ID
-            job = scheduler_service.scheduler.get_job('generate_demo_audit_data')
+            job = scheduler_service.scheduler.get_job("generate_demo_audit_data")
             assert job is not None
         except Exception:
             pytest.skip("Job management not testable")
@@ -213,6 +216,7 @@ class TestJobDataAccess:
         """Test jobs can access database/repositories."""
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
             # Jobs should be able to use repositories
             # Client may be None if Supabase not configured

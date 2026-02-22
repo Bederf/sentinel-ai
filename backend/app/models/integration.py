@@ -135,6 +135,7 @@ class PointAssetMapping(PointAssetMappingCreate):
 # Parsed/Normalized Records
 class ParsedAlarm(BaseModel):
     """A single parsed alarm record."""
+
     occurred_at: datetime
     point_id: str
     asset_id: Optional[str] = None
@@ -153,6 +154,7 @@ class ParsedAlarm(BaseModel):
 
 class ParsedTrend(BaseModel):
     """A single parsed trend record."""
+
     recorded_at: datetime
     point_id: str
     asset_id: Optional[str] = None
@@ -165,6 +167,7 @@ class ParsedTrend(BaseModel):
 # Format Detection Results
 class FormatDetectionResult(BaseModel):
     """Result of auto-detecting file format."""
+
     file_format: FileFormat
     delimiter: str
     date_format: str
@@ -193,6 +196,7 @@ class ParseValidationWarning(BaseModel):
 
 class ParseResult(BaseModel):
     """Result of parsing a log file."""
+
     total_rows: int
     valid_rows: int
     error_count: int
@@ -207,6 +211,7 @@ class ParseResult(BaseModel):
 # Asset Matching Results
 class AssetMatchResult(BaseModel):
     """Result of matching a BMS point to CAFM asset."""
+
     bms_point_id: str
     extracted_asset_id: str
     parameter_name: Optional[str] = None
@@ -218,6 +223,7 @@ class AssetMatchResult(BaseModel):
 
 class BulkMatchResult(BaseModel):
     """Result of bulk point-to-asset matching."""
+
     total_points: int
     matched_exact: int
     matched_fuzzy: int
@@ -227,16 +233,21 @@ class BulkMatchResult(BaseModel):
 
 # ==================== Building Status / Go-Live Workflow ====================
 
+
 class BuildingStatus(str, Enum):
     """Building activation status for go-live workflow."""
+
     DRAFT = "draft"
     PENDING_VALIDATION = "pending_validation"
     ACTIVE = "active"
     SUSPENDED = "suspended"
+    SHADOW_LIVE = "shadow_live"
+    LIVE_CONTROL = "live_control"
 
 
 class ChecklistItem(BaseModel):
     """Single validation checklist item."""
+
     id: str
     category: str  # 'data_source', 'point_mapping', 'data_quality', 'configuration'
     name: str
@@ -249,6 +260,7 @@ class ChecklistItem(BaseModel):
 
 class ValidationChecklist(BaseModel):
     """Complete go-live validation checklist."""
+
     building_id: str
     building_name: Optional[str] = None
     status: BuildingStatus

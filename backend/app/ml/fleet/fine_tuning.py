@@ -22,6 +22,7 @@ EQUIPMENT_TYPES = ["chiller", "ahu", "fcu", "vav", "gen", "pump"]
 @dataclass
 class FineTuningResult:
     """Result of a fine-tuning operation."""
+
     success: bool
     fine_tuned_model_id: str
     site_code: str
@@ -150,9 +151,7 @@ class LocalFineTuner:
 
         return models
 
-    def fine_tune(
-        self, site_code: str, model_type: str, equipment_type: str
-    ) -> FineTuningResult:
+    def fine_tune(self, site_code: str, model_type: str, equipment_type: str) -> FineTuningResult:
         """Fine-tune a global model for a specific site.
 
         Args:
@@ -280,9 +279,7 @@ class LocalFineTuner:
         logger.info(f"Fine-tuned model for {site_code}: {model_id}")
         return result
 
-    def get_improvement_summary(
-        self, site_code: Optional[str] = None
-    ) -> Dict[str, Any]:
+    def get_improvement_summary(self, site_code: Optional[str] = None) -> Dict[str, Any]:
         """Get summary of fine-tuning improvements.
 
         Args:
@@ -315,9 +312,7 @@ class LocalFineTuner:
             "best_model": best_model,
         }
 
-    def get_fine_tune_history(
-        self, site_code: Optional[str] = None, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    def get_fine_tune_history(self, site_code: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
         """Get history of fine-tuning operations.
 
         Args:

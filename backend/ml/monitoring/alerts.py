@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class MLAlertSeverity(str, Enum):
     """Severity levels for ML system alerts."""
+
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
@@ -24,6 +25,7 @@ class MLAlertSeverity(str, Enum):
 
 class MLAlertType(str, Enum):
     """Types of ML system alerts."""
+
     FEATURE_DRIFT = "feature_drift"
     MODEL_DRIFT = "model_drift"
     MODEL_STALE = "model_stale"
@@ -165,9 +167,7 @@ class MLAlertManager:
 
         by_type = {}
         for atype in MLAlertType:
-            count = sum(
-                1 for a in self._alerts if a.alert_type == atype and not a.acknowledged
-            )
+            count = sum(1 for a in self._alerts if a.alert_type == atype and not a.acknowledged)
             if count > 0:
                 by_type[atype.value] = count
 
@@ -195,27 +195,22 @@ class MLAlertManager:
         alerts: List[MLAlert] = []
         try:
             from ml.monitoring.drift import get_drift_detector
+
             detector = get_drift_detector()
 
             from ml.monitoring.drift import EQUIPMENT_TYPES
+
             for eq_type in EQUIPMENT_TYPES:
                 result = detector.detect_feature_drift(eq_type)
                 if result["drift_detected"]:
                     drifted = result["drifted_features"]
-                    severity = (
-                        MLAlertSeverity.CRITICAL
-                        if len(drifted) >= 3
-                        else MLAlertSeverity.WARNING
-                    )
+                    severity = MLAlertSeverity.CRITICAL if len(drifted) >= 3 else MLAlertSeverity.WARNING
                     alerts.append(
                         MLAlert(
                             alert_type=MLAlertType.FEATURE_DRIFT,
                             severity=severity,
                             title=f"Feature drift detected: {eq_type}",
-                            message=(
-                                f"{len(drifted)} feature(s) drifted for {eq_type}: "
-                                f"{', '.join(drifted[:5])}"
-                            ),
+                            message=(f"{len(drifted)} feature(s) drifted for {eq_type}: {', '.join(drifted[:5])}"),
                             source=eq_type,
                             metadata={
                                 "equipment_type": eq_type,
@@ -234,9 +229,11 @@ class MLAlertManager:
         alerts: List[MLAlert] = []
         try:
             from ml.monitoring.drift import get_drift_detector
+
             detector = get_drift_detector()
 
             from ml.monitoring.drift import MODEL_TYPES
+
             for model_type in MODEL_TYPES:
                 result = detector.detect_model_drift(model_type)
                 if result["drift_detected"]:
@@ -265,6 +262,7 @@ class MLAlertManager:
         alerts: List[MLAlert] = []
         try:
             from ml.training.retraining_scheduler import get_retraining_scheduler
+
             scheduler = get_retraining_scheduler()
             checks = scheduler.check_all_models()
 
@@ -274,9 +272,7 @@ class MLAlertManager:
                         MLAlert(
                             alert_type=MLAlertType.MODEL_STALE,
                             severity=MLAlertSeverity.WARNING,
-                            title=(
-                                f"Stale model: {model['model_type']}/{model['equipment_type']}"
-                            ),
+                            title=(f"Stale model: {model['model_type']}/{model['equipment_type']}"),
                             message=(
                                 f"Model is {model.get('age_days', '?')} days old. "
                                 "Consider retraining for optimal performance."
@@ -290,10 +286,7 @@ class MLAlertManager:
                         MLAlert(
                             alert_type=MLAlertType.MODEL_UNDERPERFORMING,
                             severity=MLAlertSeverity.CRITICAL,
-                            title=(
-                                f"Underperforming: "
-                                f"{model['model_type']}/{model['equipment_type']}"
-                            ),
+                            title=(f"Underperforming: {model['model_type']}/{model['equipment_type']}"),
                             message=(
                                 f"R2 score {model.get('r2_score', '?')} is below "
                                 "minimum threshold. Retraining recommended."

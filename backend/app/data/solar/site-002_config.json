@@ -5,33 +5,20 @@
   "longitude": 27.97,
   "plants": [
     {
-      "plant_id": "site-002-roof",
+      "plant_id": "sandton-roof",
       "name": "Rooftop Array",
-      "capacity_kwp": 550,
-      "panel_count": 1000,
+      "capacity_kwp": 297,
+      "panel_count": 540,
       "panel_model": "JA Solar JAM72S30-550/MR",
       "panel_rating_w": 550,
-      "commissioning_date": "2024-03-15",
+      "commissioning_date": "2025-09-01",
       "orientation": 0,
       "tilt": 15,
       "inverters": [
-        { "id": "S002-INV-R-001", "name": "Huawei INV-1 (Roof)", "manufacturer": "huawei", "model": "SUN2000-330KTL-H2", "rated_kva": 330, "mppt_count": 12, "protocol": "modbus_tcp", "ip": "10.1.1.101", "port": 502, "unit_id": 1, "strings_per_mppt": 3, "panels_per_string": 14 },
-        { "id": "S002-INV-R-002", "name": "Huawei INV-2 (Roof)", "manufacturer": "huawei", "model": "SUN2000-330KTL-H2", "rated_kva": 330, "mppt_count": 12, "protocol": "modbus_tcp", "ip": "10.1.1.102", "port": 502, "unit_id": 1, "strings_per_mppt": 3, "panels_per_string": 14 }
-      ]
-    },
-    {
-      "plant_id": "site-002-carport",
-      "name": "Parking Carport Array",
-      "capacity_kwp": 396,
-      "panel_count": 720,
-      "panel_model": "JA Solar JAM72S30-550/MR",
-      "panel_rating_w": 550,
-      "commissioning_date": "2024-06-01",
-      "orientation": 0,
-      "tilt": 10,
-      "inverters": [
-        { "id": "S002-INV-C-001", "name": "Huawei INV-3 (Carport)", "manufacturer": "huawei", "model": "SUN2000-330KTL-H2", "rated_kva": 330, "mppt_count": 12, "protocol": "modbus_tcp", "ip": "10.1.1.103", "port": 502, "unit_id": 1, "strings_per_mppt": 3, "panels_per_string": 10 },
-        { "id": "S002-INV-C-002", "name": "Huawei INV-4 (Carport)", "manufacturer": "huawei", "model": "SUN2000-330KTL-H2", "rated_kva": 330, "mppt_count": 12, "protocol": "modbus_tcp", "ip": "10.1.1.104", "port": 502, "unit_id": 1, "strings_per_mppt": 3, "panels_per_string": 10 }
+        { "id": "S002-INV-R-001", "name": "Huawei INV-1 (Roof)", "manufacturer": "huawei", "model": "SUN2000-100KTL-M2", "rated_kva": 100, "mppt_count": 10, "protocol": "modbus_tcp", "ip": "10.1.1.101", "port": 502, "unit_id": 1, "strings_per_mppt": 1, "panels_per_string": 14 },
+        { "id": "S002-INV-R-002", "name": "Huawei INV-2 (Roof)", "manufacturer": "huawei", "model": "SUN2000-100KTL-M2", "rated_kva": 100, "mppt_count": 10, "protocol": "modbus_tcp", "ip": "10.1.1.102", "port": 502, "unit_id": 1, "strings_per_mppt": 1, "panels_per_string": 14 },
+        { "id": "S002-INV-R-003", "name": "Huawei INV-3 (Roof)", "manufacturer": "huawei", "model": "SUN2000-100KTL-M2", "rated_kva": 100, "mppt_count": 10, "protocol": "modbus_tcp", "ip": "10.1.1.103", "port": 502, "unit_id": 1, "strings_per_mppt": 1, "panels_per_string": 14 },
+        { "id": "S002-INV-R-004", "name": "Huawei INV-4 (Roof)", "manufacturer": "huawei", "model": "SUN2000-100KTL-M2", "rated_kva": 100, "mppt_count": 10, "protocol": "modbus_tcp", "ip": "10.1.1.104", "port": 502, "unit_id": 1, "strings_per_mppt": 1, "panels_per_string": 14 }
       ]
     }
   ],
@@ -40,9 +27,9 @@
     "name": "LUNA2000 BESS",
     "manufacturer": "huawei",
     "model": "LUNA2000-200KWH-2H1",
-    "capacity_kwh": 500,
-    "rated_power_kw": 250,
-    "rack_count": 3,
+    "capacity_kwh": 200,
+    "rated_power_kw": 100,
+    "rack_count": 2,
     "cell_chemistry": "LFP",
     "protocol": "modbus_tcp",
     "grid_export_enabled": true,
@@ -86,7 +73,7 @@
     "sseg_category": "B",
     "nrs_097_compliant": true,
     "export_enabled": true,
-    "max_export_kw": 946,
+    "max_export_kw": 297,
     "connection_type": "bidirectional"
   }
 }

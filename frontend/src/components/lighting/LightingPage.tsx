@@ -144,7 +144,7 @@ export function LightingPage() {
               <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 {isSimulationRunning
                   ? `Real-time daylight from simulation • Hour ${simulatedHour}:00 (Day ${daysSimulated}/365)`
-                  : 'Wardew Tridonic Integration'
+                  : 'Tridonic DALI Integration'
                 }
               </p>
             </div>

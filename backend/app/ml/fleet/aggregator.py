@@ -102,9 +102,7 @@ class FleetAggregator:
             "last_aggregation": datetime.now().isoformat(),
         }
 
-    def aggregate_failure_patterns(
-        self, equipment_type: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    def aggregate_failure_patterns(self, equipment_type: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get anonymized failure patterns across fleet.
 
         Args:
@@ -251,9 +249,7 @@ class FleetAggregator:
             "total_sites": 5,
         }
 
-    def get_benchmarks(
-        self, equipment_type: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    def get_benchmarks(self, equipment_type: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get fleet benchmarking data for equipment types.
 
         Args:
@@ -362,11 +358,7 @@ class FleetAggregator:
             status = "critical"
             message = "Urgent: Significant underperformance vs fleet"
 
-        fleet_avg = (
-            sum(b["fleet_avg_health"] for b in benchmarks) / len(benchmarks)
-            if benchmarks
-            else 72.0
-        )
+        fleet_avg = sum(b["fleet_avg_health"] for b in benchmarks) / len(benchmarks) if benchmarks else 72.0
 
         return {
             "site_health": site_health,

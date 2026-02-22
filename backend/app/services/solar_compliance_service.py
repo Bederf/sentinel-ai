@@ -27,8 +27,10 @@ logger = logging.getLogger(__name__)
 
 # === Enums ===
 
+
 class ComplianceStatus(str, Enum):
     """Traffic-light compliance status."""
+
     COMPLIANT = "compliant"
     WARNING = "warning"
     VIOLATION = "violation"
@@ -36,6 +38,7 @@ class ComplianceStatus(str, Enum):
 
 class ComplianceEventType(str, Enum):
     """Types of compliance events."""
+
     VOLTAGE_HIGH = "voltage_high"
     VOLTAGE_LOW = "voltage_low"
     FREQUENCY_HIGH = "frequency_high"
@@ -52,9 +55,11 @@ class ComplianceEventType(str, Enum):
 
 # === Dataclass Models ===
 
+
 @dataclass
 class VoltageCompliance:
     """Voltage compliance check result."""
+
     status: str  # compliant/warning/violation
     nominal_v: float = 230.0
     min_v: float = 207.0
@@ -86,6 +91,7 @@ class VoltageCompliance:
 @dataclass
 class FrequencyCompliance:
     """Frequency compliance check result."""
+
     status: str
     nominal_hz: float = 50.0
     min_hz: float = 49.0
@@ -117,6 +123,7 @@ class FrequencyCompliance:
 @dataclass
 class PowerQualityReport:
     """Power quality compliance check result."""
+
     status: str
     thd_pct: float = 0.0
     max_thd_pct: float = 5.0
@@ -151,6 +158,7 @@ class PowerQualityReport:
 @dataclass
 class ExportCompliance:
     """Export limit compliance check result."""
+
     status: str
     current_export_kw: float = 0.0
     export_limit_kw: Optional[float] = None
@@ -172,6 +180,7 @@ class ExportCompliance:
 @dataclass
 class CertificateStatus:
     """NRS 097 certificate status."""
+
     equipment: str
     cert_no: str
     standard: str
@@ -201,6 +210,7 @@ class CertificateStatus:
 @dataclass
 class ComplianceEvent:
     """A compliance event (violation, reconnection, etc.)."""
+
     timestamp: str
     event_type: str
     severity: str  # warning/violation/info
@@ -228,6 +238,7 @@ class ComplianceEvent:
 @dataclass
 class ComplianceReport:
     """Full compliance report for SSEG utility submission."""
+
     site_id: str
     site_name: str
     period: str
@@ -262,6 +273,7 @@ class ComplianceReport:
 
 
 # === Service ===
+
 
 class SolarComplianceService:
     """Monitors solar installation compliance with SA grid standards.
@@ -300,55 +312,61 @@ class SolarComplianceService:
 
         # Voltage dip during load shedding transition (4 hours ago)
         ls_time = now - timedelta(hours=4, minutes=12)
-        self._events.append(ComplianceEvent(
-            timestamp=ls_time.isoformat(),
-            event_type=ComplianceEventType.VOLTAGE_LOW.value,
-            severity="warning",
-            equipment_id="S002-MTR-GRID",
-            description=(
-                "Grid voltage dipped to 204.3V during load shedding Stage 2 "
-                "transition. Below NRS 097 minimum (207V) for 3.2 seconds. "
-                "Inverters maintained operation (above disconnect threshold 195.5V)."
-            ),
-            value=204.3,
-            limit=207.0,
-            resolved=True,
-            resolved_at=(ls_time + timedelta(seconds=3.2)).isoformat(),
-        ))
+        self._events.append(
+            ComplianceEvent(
+                timestamp=ls_time.isoformat(),
+                event_type=ComplianceEventType.VOLTAGE_LOW.value,
+                severity="warning",
+                equipment_id="S002-MTR-GRID",
+                description=(
+                    "Grid voltage dipped to 204.3V during load shedding Stage 2 "
+                    "transition. Below NRS 097 minimum (207V) for 3.2 seconds. "
+                    "Inverters maintained operation (above disconnect threshold 195.5V)."
+                ),
+                value=204.3,
+                limit=207.0,
+                resolved=True,
+                resolved_at=(ls_time + timedelta(seconds=3.2)).isoformat(),
+            )
+        )
 
         # Frequency excursion (8 hours ago)
         freq_time = now - timedelta(hours=8, minutes=45)
-        self._events.append(ComplianceEvent(
-            timestamp=freq_time.isoformat(),
-            event_type=ComplianceEventType.FREQUENCY_LOW.value,
-            severity="warning",
-            equipment_id="S002-MTR-GRID",
-            description=(
-                "Grid frequency dropped to 48.7 Hz during Eskom generation "
-                "shortfall. Below NRS 097 minimum (49.0 Hz) for 1.8 seconds. "
-                "Inverters remained connected (above disconnect threshold 47.5 Hz)."
-            ),
-            value=48.7,
-            limit=49.0,
-            resolved=True,
-            resolved_at=(freq_time + timedelta(seconds=1.8)).isoformat(),
-        ))
+        self._events.append(
+            ComplianceEvent(
+                timestamp=freq_time.isoformat(),
+                event_type=ComplianceEventType.FREQUENCY_LOW.value,
+                severity="warning",
+                equipment_id="S002-MTR-GRID",
+                description=(
+                    "Grid frequency dropped to 48.7 Hz during Eskom generation "
+                    "shortfall. Below NRS 097 minimum (49.0 Hz) for 1.8 seconds. "
+                    "Inverters remained connected (above disconnect threshold 47.5 Hz)."
+                ),
+                value=48.7,
+                limit=49.0,
+                resolved=True,
+                resolved_at=(freq_time + timedelta(seconds=1.8)).isoformat(),
+            )
+        )
 
         # Reconnection after frequency event
-        self._events.append(ComplianceEvent(
-            timestamp=(freq_time + timedelta(seconds=62)).isoformat(),
-            event_type=ComplianceEventType.RECONNECTION.value,
-            severity="info",
-            equipment_id="S002-MTR-GRID",
-            description=(
-                "Grid frequency recovered to 50.01 Hz. All inverters confirmed "
-                "reconnection after 60-second delay per NRS 097-2-1 requirements."
-            ),
-            value=50.01,
-            limit=49.0,
-            resolved=True,
-            resolved_at=(freq_time + timedelta(seconds=62)).isoformat(),
-        ))
+        self._events.append(
+            ComplianceEvent(
+                timestamp=(freq_time + timedelta(seconds=62)).isoformat(),
+                event_type=ComplianceEventType.RECONNECTION.value,
+                severity="info",
+                equipment_id="S002-MTR-GRID",
+                description=(
+                    "Grid frequency recovered to 50.01 Hz. All inverters confirmed "
+                    "reconnection after 60-second delay per NRS 097-2-1 requirements."
+                ),
+                value=50.01,
+                limit=49.0,
+                resolved=True,
+                resolved_at=(freq_time + timedelta(seconds=62)).isoformat(),
+            )
+        )
 
         logger.info("Seeded %d demo compliance events", len(self._events))
 
@@ -389,26 +407,31 @@ class SolarComplianceService:
             if phase_v < min_v or phase_v > max_v:
                 if phase_v < disc_low or phase_v > disc_high:
                     status = ComplianceStatus.VIOLATION.value
-                    violations.append({
-                        "meter_id": meter.meter_id,
-                        "voltage_v": round(phase_v, 1),
-                        "type": "disconnect_required",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    })
+                    violations.append(
+                        {
+                            "meter_id": meter.meter_id,
+                            "voltage_v": round(phase_v, 1),
+                            "type": "disconnect_required",
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
                 else:
                     if status != ComplianceStatus.VIOLATION.value:
                         status = ComplianceStatus.WARNING.value
-                    violations.append({
-                        "meter_id": meter.meter_id,
-                        "voltage_v": round(phase_v, 1),
-                        "type": "outside_normal_range",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    })
+                    violations.append(
+                        {
+                            "meter_id": meter.meter_id,
+                            "voltage_v": round(phase_v, 1),
+                            "type": "outside_normal_range",
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
 
         # Count historical violations in last 24h from events
         now = datetime.now(timezone.utc)
         v_events_24h = [
-            e for e in self._events
+            e
+            for e in self._events
             if e.event_type in (ComplianceEventType.VOLTAGE_HIGH.value, ComplianceEventType.VOLTAGE_LOW.value)
             and datetime.fromisoformat(e.timestamp) > now - timedelta(hours=24)
         ]
@@ -464,26 +487,31 @@ class SolarComplianceService:
             if freq < min_hz or freq > max_hz:
                 if freq < disc_low or freq > disc_high:
                     status = ComplianceStatus.VIOLATION.value
-                    violations.append({
-                        "meter_id": meter.meter_id,
-                        "frequency_hz": round(freq, 2),
-                        "type": "disconnect_required",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    })
+                    violations.append(
+                        {
+                            "meter_id": meter.meter_id,
+                            "frequency_hz": round(freq, 2),
+                            "type": "disconnect_required",
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
                 else:
                     if status != ComplianceStatus.VIOLATION.value:
                         status = ComplianceStatus.WARNING.value
-                    violations.append({
-                        "meter_id": meter.meter_id,
-                        "frequency_hz": round(freq, 2),
-                        "type": "outside_normal_range",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    })
+                    violations.append(
+                        {
+                            "meter_id": meter.meter_id,
+                            "frequency_hz": round(freq, 2),
+                            "type": "outside_normal_range",
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
 
         # Count historical frequency events in last 24h
         now = datetime.now(timezone.utc)
         f_events_24h = [
-            e for e in self._events
+            e
+            for e in self._events
             if e.event_type in (ComplianceEventType.FREQUENCY_HIGH.value, ComplianceEventType.FREQUENCY_LOW.value)
             and datetime.fromisoformat(e.timestamp) > now - timedelta(hours=24)
         ]
@@ -544,36 +572,44 @@ class SolarComplianceService:
 
         if avg_thd > max_thd:
             status = ComplianceStatus.VIOLATION.value
-            details.append({
-                "parameter": "THD",
-                "status": "violation",
-                "message": f"THD {avg_thd}% exceeds {max_thd}% limit",
-            })
+            details.append(
+                {
+                    "parameter": "THD",
+                    "status": "violation",
+                    "message": f"THD {avg_thd}% exceeds {max_thd}% limit",
+                }
+            )
         elif avg_thd > max_thd * 0.9:
             if status != ComplianceStatus.VIOLATION.value:
                 status = ComplianceStatus.WARNING.value
-            details.append({
-                "parameter": "THD",
-                "status": "warning",
-                "message": f"THD {avg_thd}% approaching {max_thd}% limit ({round(max_thd - avg_thd, 1)}% margin)",
-            })
+            details.append(
+                {
+                    "parameter": "THD",
+                    "status": "warning",
+                    "message": f"THD {avg_thd}% approaching {max_thd}% limit ({round(max_thd - avg_thd, 1)}% margin)",
+                }
+            )
 
         if dc_injection > max_dc:
             status = ComplianceStatus.VIOLATION.value
-            details.append({
-                "parameter": "DC Injection",
-                "status": "violation",
-                "message": f"DC injection {dc_injection}% exceeds {max_dc}% limit",
-            })
+            details.append(
+                {
+                    "parameter": "DC Injection",
+                    "status": "violation",
+                    "message": f"DC injection {dc_injection}% exceeds {max_dc}% limit",
+                }
+            )
 
         if avg_pf < pf_min:
             if status != ComplianceStatus.VIOLATION.value:
                 status = ComplianceStatus.WARNING.value
-            details.append({
-                "parameter": "Power Factor",
-                "status": "warning",
-                "message": f"Power factor {avg_pf:.3f} below {pf_min} minimum",
-            })
+            details.append(
+                {
+                    "parameter": "Power Factor",
+                    "status": "warning",
+                    "message": f"Power factor {avg_pf:.3f} below {pf_min} minimum",
+                }
+            )
 
         message = "All power quality parameters within NRS 097-2-1 limits"
         if details:
@@ -618,25 +654,16 @@ class SolarComplianceService:
         if zero_export:
             if current_export > tolerance:
                 status = ComplianceStatus.VIOLATION.value
-                message = (
-                    f"Zero-export violation: exporting {current_export:.1f} kW "
-                    f"(tolerance: {tolerance} kW)"
-                )
+                message = f"Zero-export violation: exporting {current_export:.1f} kW (tolerance: {tolerance} kW)"
             else:
                 message = f"Zero-export compliant: {current_export:.1f} kW (tolerance: {tolerance} kW)"
         elif export_limit is not None:
             if current_export > export_limit:
                 status = ComplianceStatus.VIOLATION.value
-                message = (
-                    f"Export limit exceeded: {current_export:.1f} kW / "
-                    f"{export_limit} kW limit"
-                )
+                message = f"Export limit exceeded: {current_export:.1f} kW / {export_limit} kW limit"
             elif current_export > export_limit * 0.9:
                 status = ComplianceStatus.WARNING.value
-                message = (
-                    f"Approaching export limit: {current_export:.1f} kW / "
-                    f"{export_limit} kW (90% threshold)"
-                )
+                message = f"Approaching export limit: {current_export:.1f} kW / {export_limit} kW (90% threshold)"
             else:
                 message = f"Export within limit: {current_export:.1f} kW / {export_limit} kW"
         else:
@@ -682,31 +709,28 @@ class SolarComplianceService:
 
             if not edition_current and cert_status == "valid":
                 cert_status = "edition_outdated"
-                message = (
-                    f"Certified under {cert.get('standard', 'unknown')}; "
-                    f"current edition is {current_edition}"
-                )
+                message = f"Certified under {cert.get('standard', 'unknown')}; current edition is {current_edition}"
 
-            results.append(CertificateStatus(
-                equipment=cert.get("equipment", ""),
-                cert_no=cert.get("cert_no", ""),
-                standard=cert.get("standard", ""),
-                date=cert.get("date", ""),
-                issuer=cert.get("issuer", ""),
-                expiry=expiry,
-                status=cert_status,
-                edition_current=edition_current,
-                days_to_expiry=days_to_expiry,
-                message=message,
-            ))
+            results.append(
+                CertificateStatus(
+                    equipment=cert.get("equipment", ""),
+                    cert_no=cert.get("cert_no", ""),
+                    standard=cert.get("standard", ""),
+                    date=cert.get("date", ""),
+                    issuer=cert.get("issuer", ""),
+                    expiry=expiry,
+                    status=cert_status,
+                    edition_current=edition_current,
+                    days_to_expiry=days_to_expiry,
+                    message=message,
+                )
+            )
 
         return results
 
     # === Compliance Report ===
 
-    async def generate_compliance_report(
-        self, site_id: str, period: str = "month"
-    ) -> Optional[ComplianceReport]:
+    async def generate_compliance_report(self, site_id: str, period: str = "month") -> Optional[ComplianceReport]:
         """Generate full SSEG compliance report for utility submission."""
         ingestion = get_solar_ingestion_service()
         sites = ingestion.get_registered_sites()
@@ -809,20 +833,14 @@ class SolarComplianceService:
         if from_ts:
             try:
                 from_dt = datetime.fromisoformat(from_ts)
-                events = [
-                    e for e in events
-                    if datetime.fromisoformat(e.timestamp) >= from_dt
-                ]
+                events = [e for e in events if datetime.fromisoformat(e.timestamp) >= from_dt]
             except ValueError:
                 pass
 
         if to_ts:
             try:
                 to_dt = datetime.fromisoformat(to_ts)
-                events = [
-                    e for e in events
-                    if datetime.fromisoformat(e.timestamp) <= to_dt
-                ]
+                events = [e for e in events if datetime.fromisoformat(e.timestamp) <= to_dt]
             except ValueError:
                 pass
 
@@ -894,9 +912,7 @@ class SolarComplianceService:
                     "current_export_kw": export.current_export_kw,
                 },
                 "certificates": {
-                    "status": "compliant" if all(
-                        c.status == "valid" for c in certificates
-                    ) else "warning",
+                    "status": "compliant" if all(c.status == "valid" for c in certificates) else "warning",
                     "valid_count": sum(1 for c in certificates if c.status == "valid"),
                     "expired_count": sum(1 for c in certificates if c.status == "expired"),
                 },

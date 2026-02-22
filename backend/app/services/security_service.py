@@ -44,15 +44,9 @@ class SecurityService:
         cameras = self.get_cameras()
         alarm_zones = self.get_alarm_zones()
 
-        doors_secure = sum(
-            1 for d in doors if d.status in (DoorStatus.LOCKED, DoorStatus.CLOSED)
-        )
-        cameras_online = sum(
-            1 for c in cameras if c.status == CameraStatus.ONLINE
-        )
-        alarm_zones_armed = sum(
-            1 for az in alarm_zones if az.status == AlarmStatus.ARMED
-        )
+        doors_secure = sum(1 for d in doors if d.status in (DoorStatus.LOCKED, DoorStatus.CLOSED))
+        cameras_online = sum(1 for c in cameras if c.status == CameraStatus.ONLINE)
+        alarm_zones_armed = sum(1 for az in alarm_zones if az.status == AlarmStatus.ARMED)
 
         # Count active alerts (denied events in last 24h + triggered alarms + camera faults)
         active_alerts = 0
@@ -62,6 +56,7 @@ class SecurityService:
 
         # Calculate building occupancy from badge events
         from app.services.security_occupancy_service import get_security_occupancy_service
+
         occ_service = get_security_occupancy_service()
         building_occ = occ_service.get_building_occupancy()
         occupancy_total = building_occ.get("total_occupancy", 0)
@@ -83,13 +78,15 @@ class SecurityService:
         zones = []
         for z in raw_zones:
             try:
-                zones.append(AccessZone(
-                    zone_id=z.get("zone_id", ""),
-                    name=z.get("name", ""),
-                    floor=z.get("floor", ""),
-                    access_level=AccessLevel(z.get("access_level", "restricted")),
-                    doors=z.get("doors", []),
-                ))
+                zones.append(
+                    AccessZone(
+                        zone_id=z.get("zone_id", ""),
+                        name=z.get("name", ""),
+                        floor=z.get("floor", ""),
+                        access_level=AccessLevel(z.get("access_level", "restricted")),
+                        doors=z.get("doors", []),
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Error parsing access zone: {e}")
         return zones
@@ -100,14 +97,16 @@ class SecurityService:
         doors = []
         for d in raw_doors:
             try:
-                doors.append(Door(
-                    door_id=d.get("door_id", ""),
-                    name=d.get("name", ""),
-                    zone_id=d.get("zone_id", ""),
-                    status=DoorStatus(d.get("status", "locked")),
-                    reader_type=ReaderType(d.get("reader_type", "card")),
-                    last_event_time=d.get("last_event_time"),
-                ))
+                doors.append(
+                    Door(
+                        door_id=d.get("door_id", ""),
+                        name=d.get("name", ""),
+                        zone_id=d.get("zone_id", ""),
+                        status=DoorStatus(d.get("status", "locked")),
+                        reader_type=ReaderType(d.get("reader_type", "card")),
+                        last_event_time=d.get("last_event_time"),
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Error parsing door: {e}")
         return doors
@@ -136,17 +135,19 @@ class SecurityService:
         events = []
         for e in raw_events:
             try:
-                events.append(BadgeEvent(
-                    event_id=e.get("event_id", ""),
-                    door_id=e.get("door_id", ""),
-                    zone_id=e.get("zone_id", ""),
-                    badge_id=e.get("badge_id", ""),
-                    person_name=e.get("person_name", ""),
-                    direction=EventDirection(e.get("direction", "entry")),
-                    timestamp=e.get("timestamp", datetime.utcnow()),
-                    granted=e.get("granted", True),
-                    reason=e.get("reason", ""),
-                ))
+                events.append(
+                    BadgeEvent(
+                        event_id=e.get("event_id", ""),
+                        door_id=e.get("door_id", ""),
+                        zone_id=e.get("zone_id", ""),
+                        badge_id=e.get("badge_id", ""),
+                        person_name=e.get("person_name", ""),
+                        direction=EventDirection(e.get("direction", "entry")),
+                        timestamp=e.get("timestamp", datetime.utcnow()),
+                        granted=e.get("granted", True),
+                        reason=e.get("reason", ""),
+                    )
+                )
             except Exception as e_err:
                 logger.warning(f"Error parsing badge event: {e_err}")
         return events
@@ -192,17 +193,19 @@ class SecurityService:
         cameras = []
         for c in raw_cameras:
             try:
-                cameras.append(Camera(
-                    camera_id=c.get("camera_id", ""),
-                    name=c.get("name", ""),
-                    zone_id=c.get("zone_id", ""),
-                    floor=c.get("floor", ""),
-                    status=CameraStatus(c.get("status", "online")),
-                    type=c.get("type", "fixed"),
-                    resolution=c.get("resolution", "1080p"),
-                    has_analytics=c.get("has_analytics", False),
-                    motion_detected=c.get("motion_detected", False),
-                ))
+                cameras.append(
+                    Camera(
+                        camera_id=c.get("camera_id", ""),
+                        name=c.get("name", ""),
+                        zone_id=c.get("zone_id", ""),
+                        floor=c.get("floor", ""),
+                        status=CameraStatus(c.get("status", "online")),
+                        type=c.get("type", "fixed"),
+                        resolution=c.get("resolution", "1080p"),
+                        has_analytics=c.get("has_analytics", False),
+                        motion_detected=c.get("motion_detected", False),
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Error parsing camera: {e}")
         return cameras
@@ -234,36 +237,47 @@ class SecurityService:
         zones = []
         for az in raw_zones:
             try:
-                zones.append(AlarmZone(
-                    zone_id=az.get("zone_id", ""),
-                    name=az.get("name", ""),
-                    status=AlarmStatus(az.get("status", "disarmed")),
-                    arm_type=ArmType(az.get("arm_type", "full")),
-                ))
+                zones.append(
+                    AlarmZone(
+                        zone_id=az.get("zone_id", ""),
+                        name=az.get("name", ""),
+                        status=AlarmStatus(az.get("status", "disarmed")),
+                        arm_type=ArmType(az.get("arm_type", "full")),
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Error parsing alarm zone: {e}")
         return zones
 
     def arm_alarm_zone(self, zone_id: str, arm_type: str = "full") -> Dict[str, Any]:
         """Arm an alarm zone."""
-        self._repo.update_alarm_zone_status(zone_id, {
-            "status": "armed",
-            "arm_type": arm_type,
-        })
+        self._repo.update_alarm_zone_status(
+            zone_id,
+            {
+                "status": "armed",
+                "arm_type": arm_type,
+            },
+        )
         return {"zone_id": zone_id, "status": "armed", "arm_type": arm_type}
 
     def disarm_alarm_zone(self, zone_id: str) -> Dict[str, Any]:
         """Disarm an alarm zone."""
-        self._repo.update_alarm_zone_status(zone_id, {
-            "status": "disarmed",
-        })
+        self._repo.update_alarm_zone_status(
+            zone_id,
+            {
+                "status": "disarmed",
+            },
+        )
         return {"zone_id": zone_id, "status": "disarmed"}
 
     def trigger_alarm(self, zone_id: str) -> Dict[str, Any]:
         """Trigger an alarm zone (demo)."""
-        self._repo.update_alarm_zone_status(zone_id, {
-            "status": "triggered",
-        })
+        self._repo.update_alarm_zone_status(
+            zone_id,
+            {
+                "status": "triggered",
+            },
+        )
         return {
             "zone_id": zone_id,
             "status": "triggered",

@@ -42,10 +42,7 @@ class TestControlTierBehavior:
 
     async def test_tier1_monitor_only(self, service):
         """Tier 1: Display only, no execution."""
-        with patch.object(
-            service.profile_service,
-            "load_site_profile_config"
-        ) as mock_load:
+        with patch.object(service.profile_service, "load_site_profile_config") as mock_load:
             config = SiteProfileConfig(
                 site_id="site-002",
                 active_profile="cost",
@@ -70,10 +67,7 @@ class TestControlTierBehavior:
 
     async def test_tier1_all_risk_levels_pending(self, service):
         """Tier 1: All risk levels pending (including low-risk)."""
-        with patch.object(
-            service.profile_service,
-            "load_site_profile_config"
-        ) as mock_load:
+        with patch.object(service.profile_service, "load_site_profile_config") as mock_load:
             config = SiteProfileConfig(
                 site_id="site-002",
                 active_profile="cost",
@@ -109,10 +103,7 @@ class TestControlTierBehavior:
 
     async def test_tier2_all_pending_until_approved(self, service):
         """Tier 2: All recommendations pending until approved."""
-        with patch.object(
-            service.profile_service,
-            "load_site_profile_config"
-        ) as mock_load:
+        with patch.object(service.profile_service, "load_site_profile_config") as mock_load:
             config = SiteProfileConfig(
                 site_id="site-002",
                 active_profile="cost",
@@ -136,10 +127,7 @@ class TestControlTierBehavior:
 
     async def test_tier2_low_risk_also_requires_approval(self, service):
         """Tier 2: Even low-risk actions require approval."""
-        with patch.object(
-            service.profile_service,
-            "load_site_profile_config"
-        ) as mock_load:
+        with patch.object(service.profile_service, "load_site_profile_config") as mock_load:
             config = SiteProfileConfig(
                 site_id="site-002",
                 active_profile="cost",
@@ -164,10 +152,7 @@ class TestControlTierBehavior:
 
     async def test_tier2_high_risk_also_requires_approval(self, service):
         """Tier 2: High-risk actions also require approval (same as low-risk)."""
-        with patch.object(
-            service.profile_service,
-            "load_site_profile_config"
-        ) as mock_load:
+        with patch.object(service.profile_service, "load_site_profile_config") as mock_load:
             config = SiteProfileConfig(
                 site_id="site-002",
                 active_profile="cost",
@@ -196,10 +181,7 @@ class TestControlTierBehavior:
 
     async def test_tier3_low_risk_auto_execute(self, service):
         """Tier 3: Low-risk auto-executed."""
-        with patch.object(
-            service.profile_service,
-            "load_site_profile_config"
-        ) as mock_load:
+        with patch.object(service.profile_service, "load_site_profile_config") as mock_load:
             config = SiteProfileConfig(
                 site_id="site-002",
                 active_profile="cost",
@@ -207,9 +189,7 @@ class TestControlTierBehavior:
             )
             mock_load.return_value = config
 
-            with patch.object(
-                service, "execute_recommendation", new_callable=AsyncMock
-            ) as mock_execute:
+            with patch.object(service, "execute_recommendation", new_callable=AsyncMock) as mock_execute:
                 rec_data = {
                     "site_id": "site-002",
                     "action_type": "hvac_setpoint_change",  # LOW risk
@@ -229,10 +209,7 @@ class TestControlTierBehavior:
 
     async def test_tier3_medium_risk_auto_execute(self, service):
         """Tier 3: Medium-risk auto-executed."""
-        with patch.object(
-            service.profile_service,
-            "load_site_profile_config"
-        ) as mock_load:
+        with patch.object(service.profile_service, "load_site_profile_config") as mock_load:
             config = SiteProfileConfig(
                 site_id="site-002",
                 active_profile="cost",
@@ -240,9 +217,7 @@ class TestControlTierBehavior:
             )
             mock_load.return_value = config
 
-            with patch.object(
-                service, "execute_recommendation", new_callable=AsyncMock
-            ) as mock_execute:
+            with patch.object(service, "execute_recommendation", new_callable=AsyncMock) as mock_execute:
                 rec_data = {
                     "site_id": "site-002",
                     "action_type": "equipment_staging",  # MEDIUM risk
@@ -262,10 +237,7 @@ class TestControlTierBehavior:
 
     async def test_tier3_high_risk_requires_approval(self, service):
         """Tier 3: High-risk actions require approval."""
-        with patch.object(
-            service.profile_service,
-            "load_site_profile_config"
-        ) as mock_load:
+        with patch.object(service.profile_service, "load_site_profile_config") as mock_load:
             config = SiteProfileConfig(
                 site_id="site-002",
                 active_profile="cost",
@@ -289,10 +261,7 @@ class TestControlTierBehavior:
 
     async def test_tier3_critical_risk_requires_approval(self, service):
         """Tier 3: Critical-risk actions require approval."""
-        with patch.object(
-            service.profile_service,
-            "load_site_profile_config"
-        ) as mock_load:
+        with patch.object(service.profile_service, "load_site_profile_config") as mock_load:
             config = SiteProfileConfig(
                 site_id="site-002",
                 active_profile="cost",
@@ -426,9 +395,7 @@ class TestRecommendationExecution:
         )
 
         with patch("app.services.recommendation_service.device_manager") as mock_dm:
-            mock_dm.apply_action = AsyncMock(
-                return_value={"success": True, "point": "supply_setpoint"}
-            )
+            mock_dm.apply_action = AsyncMock(return_value={"success": True, "point": "supply_setpoint"})
 
             result = await service.execute_recommendation(rec.id, rec)
 

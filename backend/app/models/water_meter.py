@@ -15,35 +15,39 @@ from uuid import uuid4
 
 class MeterType(Enum):
     """Types of water meters."""
-    MAIN = "main"                    # Building main inlet
-    SUBMETER = "submeter"            # Tenant/floor submeter
-    IRRIGATION = "irrigation"        # Landscaping water
+
+    MAIN = "main"  # Building main inlet
+    SUBMETER = "submeter"  # Tenant/floor submeter
+    IRRIGATION = "irrigation"  # Landscaping water
     COOLING_TOWER = "cooling_tower"  # HVAC makeup water
-    DOMESTIC = "domestic"            # Restrooms/kitchens
-    FIRE = "fire"                    # Fire suppression system
+    DOMESTIC = "domestic"  # Restrooms/kitchens
+    FIRE = "fire"  # Fire suppression system
 
 
 class AlertType(Enum):
     """Types of water leak alerts."""
-    CONTINUOUS_FLOW = "continuous_flow"      # Flow during off-hours
-    UNUSUAL_PATTERN = "unusual_pattern"      # Statistical anomaly
-    SPIKE = "spike"                          # Sudden flow increase
-    NIGHT_FLOW = "night_flow"                # Minimum night flow exceeded
+
+    CONTINUOUS_FLOW = "continuous_flow"  # Flow during off-hours
+    UNUSUAL_PATTERN = "unusual_pattern"  # Statistical anomaly
+    SPIKE = "spike"  # Sudden flow increase
+    NIGHT_FLOW = "night_flow"  # Minimum night flow exceeded
 
 
 class AlertSeverity(Enum):
     """Severity levels for water alerts."""
-    LOW = "low"          # Informational, investigate soon
-    MEDIUM = "medium"    # Potential issue, investigate today
-    HIGH = "high"        # Likely leak, investigate immediately
-    CRITICAL = "critical" # Major leak, emergency action required
+
+    LOW = "low"  # Informational, investigate soon
+    MEDIUM = "medium"  # Potential issue, investigate today
+    HIGH = "high"  # Likely leak, investigate immediately
+    CRITICAL = "critical"  # Major leak, emergency action required
 
 
 class AlertStatus(Enum):
     """Status of water alerts."""
-    ACTIVE = "active"          # Alert is current and unresolved
+
+    ACTIVE = "active"  # Alert is current and unresolved
     ACKNOWLEDGED = "acknowledged"  # Alert seen but not resolved
-    RESOLVED = "resolved"      # Issue fixed, alert closed
+    RESOLVED = "resolved"  # Issue fixed, alert closed
     FALSE_POSITIVE = "false_positive"  # Alert determined to be not a leak
 
 
@@ -64,6 +68,7 @@ class WaterMeter:
         baseline_flow_lpm: Expected minimum flow during off-hours
         metadata: Additional meter properties
     """
+
     meter_id: str
     site: str
     meter_type: MeterType
@@ -129,6 +134,7 @@ class WaterConsumption:
         cost_center: For accounting attribution (optional)
         billing_period_id: Links to billing cycle (optional)
     """
+
     meter_id: str
     timestamp: datetime
     volume_liters: float
@@ -201,6 +207,7 @@ class WaterAlert:
         resolved_by: User who resolved the alert
         resolution_notes: Notes on how the issue was fixed
     """
+
     alert_id: str
     meter_id: str
     site: str
@@ -271,6 +278,7 @@ class WaterTrend:
         baseline_comparison_percent: Change from baseline
         trend_direction: "up", "down", or "stable"
     """
+
     site: str
     period: str
     start_date: datetime
@@ -314,6 +322,7 @@ class WaterTariff:
         fixed_monthly_charge: Fixed monthly charge
         notes: Additional notes about tariff
     """
+
     id: str = field(default_factory=lambda: str(uuid4()))
     site: str = ""
     name: str = ""
@@ -351,8 +360,12 @@ class WaterTariff:
             id=data.get("id", str(uuid4())),
             site=data["site"],
             name=data["name"],
-            effective_date=datetime.fromisoformat(data["effective_date"]) if isinstance(data["effective_date"], str) else data["effective_date"],
-            end_date=datetime.fromisoformat(data["end_date"]) if data.get("end_date") and isinstance(data["end_date"], str) else data.get("end_date"),
+            effective_date=datetime.fromisoformat(data["effective_date"])
+            if isinstance(data["effective_date"], str)
+            else data["effective_date"],
+            end_date=datetime.fromisoformat(data["end_date"])
+            if data.get("end_date") and isinstance(data["end_date"], str)
+            else data.get("end_date"),
             tier_1_liters=data.get("tier_1_liters", 0.0),
             tier_1_rate_per_liter=data.get("tier_1_rate_per_liter", 0.0),
             tier_2_liters=data.get("tier_2_liters", 1000.0),
@@ -382,6 +395,7 @@ class WaterCost:
         total_cost: Total cost (tier costs + fixed charge)
         calculated_at: Timestamp of calculation
     """
+
     id: str = field(default_factory=lambda: str(uuid4()))
     site: str = ""
     consumption_id: str = ""
@@ -422,7 +436,9 @@ class WaterCost:
             site=data["site"],
             consumption_id=data["consumption_id"],
             zone_id=data.get("zone_id"),
-            period_date=datetime.fromisoformat(data["period_date"]) if isinstance(data["period_date"], str) else data["period_date"],
+            period_date=datetime.fromisoformat(data["period_date"])
+            if isinstance(data["period_date"], str)
+            else data["period_date"],
             consumption_liters=data.get("consumption_liters", 0.0),
             tariff_id=data["tariff_id"],
             tier_1_cost=data.get("tier_1_cost", 0.0),
@@ -430,5 +446,7 @@ class WaterCost:
             tier_3_cost=data.get("tier_3_cost", 0.0),
             fixed_charge=data.get("fixed_charge", 0.0),
             total_cost=data.get("total_cost", 0.0),
-            calculated_at=datetime.fromisoformat(data["calculated_at"]) if isinstance(data.get("calculated_at"), str) else data.get("calculated_at", datetime.now()),
+            calculated_at=datetime.fromisoformat(data["calculated_at"])
+            if isinstance(data.get("calculated_at"), str)
+            else data.get("calculated_at", datetime.now()),
         )

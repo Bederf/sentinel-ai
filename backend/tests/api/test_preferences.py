@@ -24,6 +24,7 @@ client = TestClient(app)
 # Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def default_preferences():
     """Default preferences for testing."""
@@ -59,6 +60,7 @@ def preferences_repository():
 @pytest.fixture
 def mock_supabase_unavailable(monkeypatch):
     """Mock Supabase as unavailable, forcing JSON fallback."""
+
     def mock_get_supabase_client():
         raise Exception("Supabase unavailable")
 
@@ -68,6 +70,7 @@ def mock_supabase_unavailable(monkeypatch):
 # ============================================================================
 # API Endpoint Tests
 # ============================================================================
+
 
 class TestGetDashboardPreferences:
     """Tests for GET /api/preferences/dashboard endpoint."""
@@ -85,10 +88,7 @@ class TestGetDashboardPreferences:
 
     def test_get_dashboard_preferences_named_user(self):
         """Test getting preferences for named user (with X-User-ID header)."""
-        response = client.get(
-            "/api/preferences/dashboard",
-            headers={"X-User-ID": "user-123"}
-        )
+        response = client.get("/api/preferences/dashboard", headers={"X-User-ID": "user-123"})
 
         assert response.status_code == 200
         data = response.json()
@@ -97,10 +97,7 @@ class TestGetDashboardPreferences:
 
     def test_get_dashboard_preferences_not_found(self):
         """Test getting preferences for new user returns defaults."""
-        response = client.get(
-            "/api/preferences/dashboard",
-            headers={"X-User-ID": "new-user-xyz"}
-        )
+        response = client.get("/api/preferences/dashboard", headers={"X-User-ID": "new-user-xyz"})
 
         assert response.status_code == 200
         data = response.json()
@@ -125,9 +122,7 @@ class TestUpdateDashboardPreferences:
     def test_update_dashboard_preferences_upsert(self, custom_preferences):
         """Test creating new preferences (upsert for new user)."""
         response = client.put(
-            "/api/preferences/dashboard",
-            json=custom_preferences,
-            headers={"X-User-ID": "test-user-update"}
+            "/api/preferences/dashboard", json=custom_preferences, headers={"X-User-ID": "test-user-update"}
         )
 
         assert response.status_code == 200
@@ -151,16 +146,12 @@ class TestUpdateDashboardPreferences:
                 "section_order": DEFAULT_SECTIONS,
                 "default_energy_period": 20,
             },
-            headers={"X-User-ID": user_id}
+            headers={"X-User-ID": user_id},
         )
         assert response1.status_code == 200
 
         # Then update them
-        response2 = client.put(
-            "/api/preferences/dashboard",
-            json=custom_preferences,
-            headers={"X-User-ID": user_id}
-        )
+        response2 = client.put("/api/preferences/dashboard", json=custom_preferences, headers={"X-User-ID": user_id})
 
         assert response2.status_code == 200
         data = response2.json()
@@ -178,11 +169,7 @@ class TestUpdateDashboardPreferences:
             "default_energy_site_id": "site-002",
         }
 
-        response = client.put(
-            "/api/preferences/dashboard",
-            json=prefs,
-            headers={"X-User-ID": user_id}
-        )
+        response = client.put("/api/preferences/dashboard", json=prefs, headers={"X-User-ID": user_id})
 
         assert response.status_code == 200
         data = response.json()
@@ -209,14 +196,11 @@ class TestResetDashboardPreferences:
                 "section_order": ["energy-analytics"],
                 "default_energy_period": 45,
             },
-            headers={"X-User-ID": user_id}
+            headers={"X-User-ID": user_id},
         )
 
         # Then delete
-        response = client.delete(
-            "/api/preferences/dashboard",
-            headers={"X-User-ID": user_id}
-        )
+        response = client.delete("/api/preferences/dashboard", headers={"X-User-ID": user_id})
 
         assert response.status_code == 200
         data = response.json()
@@ -228,6 +212,7 @@ class TestResetDashboardPreferences:
 # ============================================================================
 # Validation Tests
 # ============================================================================
+
 
 class TestValidation:
     """Tests for Pydantic model validation."""
@@ -244,7 +229,7 @@ class TestValidation:
                 "section_order": DEFAULT_SECTIONS,
                 "default_energy_period": invalid_period,
             },
-            headers={"X-User-ID": "test-user"}
+            headers={"X-User-ID": "test-user"},
         )
 
         # Should fail validation (422 Unprocessable Entity)
@@ -262,7 +247,7 @@ class TestValidation:
                     "section_order": DEFAULT_SECTIONS,
                     "default_energy_period": period,
                 },
-                headers={"X-User-ID": f"test-user-period-{period}"}
+                headers={"X-User-ID": f"test-user-period-{period}"},
             )
 
             assert response.status_code == 200
@@ -278,7 +263,7 @@ class TestValidation:
                 # Missing visible_sections, kpi_card_order, section_order
                 "default_energy_period": 30,
             },
-            headers={"X-User-ID": "test-user-missing"}
+            headers={"X-User-ID": "test-user-missing"},
         )
 
         # Should succeed with defaults for missing fields
@@ -293,16 +278,14 @@ class TestValidation:
 # Header Parsing Tests
 # ============================================================================
 
+
 class TestHeaderParsing:
     """Tests for X-User-ID header extraction."""
 
     def test_x_user_id_header_extraction(self):
         """Test that X-User-ID header is correctly extracted."""
         user_id = "custom-user-123"
-        response = client.get(
-            "/api/preferences/dashboard",
-            headers={"X-User-ID": user_id}
-        )
+        response = client.get("/api/preferences/dashboard", headers={"X-User-ID": user_id})
 
         assert response.status_code == 200
         data = response.json()
@@ -318,10 +301,7 @@ class TestHeaderParsing:
 
     def test_empty_x_user_id_defaults_to_default_user(self):
         """Test that empty X-User-ID defaults to 'default-user'."""
-        response = client.get(
-            "/api/preferences/dashboard",
-            headers={"X-User-ID": ""}
-        )
+        response = client.get("/api/preferences/dashboard", headers={"X-User-ID": ""})
 
         assert response.status_code == 200
         data = response.json()
@@ -331,6 +311,7 @@ class TestHeaderParsing:
 # ============================================================================
 # Repository Tests
 # ============================================================================
+
 
 class TestPreferencesRepository:
     """Tests for PreferencesRepository implementation."""
@@ -420,6 +401,7 @@ class TestPreferencesRepository:
 # Integration Tests
 # ============================================================================
 
+
 class TestIntegration:
     """Integration tests for complete workflows."""
 
@@ -437,15 +419,12 @@ class TestIntegration:
                 "section_order": DEFAULT_SECTIONS,
                 "default_energy_period": 40,
             },
-            headers={"X-User-ID": user_id}
+            headers={"X-User-ID": user_id},
         )
         assert create_response.status_code == 200
 
         # 2. Read preferences
-        read_response = client.get(
-            "/api/preferences/dashboard",
-            headers={"X-User-ID": user_id}
-        )
+        read_response = client.get("/api/preferences/dashboard", headers={"X-User-ID": user_id})
         assert read_response.status_code == 200
         data = read_response.json()
         assert data["preferences"]["default_energy_period"] == 40
@@ -460,24 +439,18 @@ class TestIntegration:
                 "section_order": ["energy-analytics"],
                 "default_energy_period": 60,
             },
-            headers={"X-User-ID": user_id}
+            headers={"X-User-ID": user_id},
         )
         assert update_response.status_code == 200
 
         # 4. Verify update
-        verify_response = client.get(
-            "/api/preferences/dashboard",
-            headers={"X-User-ID": user_id}
-        )
+        verify_response = client.get("/api/preferences/dashboard", headers={"X-User-ID": user_id})
         assert verify_response.status_code == 200
         data = verify_response.json()
         assert data["preferences"]["default_energy_period"] == 60
 
         # 5. Delete preferences
-        delete_response = client.delete(
-            "/api/preferences/dashboard",
-            headers={"X-User-ID": user_id}
-        )
+        delete_response = client.delete("/api/preferences/dashboard", headers={"X-User-ID": user_id})
         assert delete_response.status_code == 200
 
     def test_multiple_users_isolation(self):
@@ -492,7 +465,7 @@ class TestIntegration:
                 "section_order": DEFAULT_SECTIONS,
                 "default_energy_period": 30,
             },
-            headers={"X-User-ID": "user-1"}
+            headers={"X-User-ID": "user-1"},
         )
         assert response1.status_code == 200
 
@@ -506,20 +479,14 @@ class TestIntegration:
                 "section_order": ["energy-analytics"],
                 "default_energy_period": 60,
             },
-            headers={"X-User-ID": "user-2"}
+            headers={"X-User-ID": "user-2"},
         )
         assert response2.status_code == 200
 
         # Verify user 1 preferences unchanged
-        get1 = client.get(
-            "/api/preferences/dashboard",
-            headers={"X-User-ID": "user-1"}
-        )
+        get1 = client.get("/api/preferences/dashboard", headers={"X-User-ID": "user-1"})
         assert get1.json()["preferences"]["default_energy_period"] == 30
 
         # Verify user 2 preferences unchanged
-        get2 = client.get(
-            "/api/preferences/dashboard",
-            headers={"X-User-ID": "user-2"}
-        )
+        get2 = client.get("/api/preferences/dashboard", headers={"X-User-ID": "user-2"})
         assert get2.json()["preferences"]["default_energy_period"] == 60

@@ -24,6 +24,7 @@ from app.ml.models.dispatch_predictor import (
 
 # === Task 1: Price Forecasting & Arbitrage Analysis ===
 
+
 class TestPriceForecasting:
     """Test price forecasting within 100ms and accuracy."""
 
@@ -60,17 +61,9 @@ class TestPriceForecasting:
         forecasts = forecaster.forecast_24h()
 
         # Check off-peak hours (22-05) have lowest prices
-        off_peak_prices = [
-            forecasts[i].final_price_r_per_kwh
-            for i in range(24)
-            if (i >= 22 or i < 5)
-        ]
+        off_peak_prices = [forecasts[i].final_price_r_per_kwh for i in range(24) if (i >= 22 or i < 5)]
         # Check peak hours (09-17) have highest prices
-        peak_prices = [
-            forecasts[i].final_price_r_per_kwh
-            for i in range(24)
-            if (9 <= i < 17)
-        ]
+        peak_prices = [forecasts[i].final_price_r_per_kwh for i in range(24) if (9 <= i < 17)]
 
         assert min(off_peak_prices) < max(peak_prices), "Off-peak should be cheaper than peak"
 
@@ -87,8 +80,7 @@ class TestArbitrageAnalysis:
         windows = analyzer.find_arbitrage_windows(forecasts, max_windows=5)
 
         assert len(windows) >= 1, "At least 1 arbitrage window should be found"
-        assert all(w.charge_end_hour < w.discharge_start_hour for w in windows), \
-            "Discharge should happen after charge"
+        assert all(w.charge_end_hour < w.discharge_start_hour for w in windows), "Discharge should happen after charge"
 
     def test_revenue_calculation_includes_degradation(self):
         """Verify revenue accounts for R0.05/kWh degradation cost."""
@@ -100,16 +92,14 @@ class TestArbitrageAnalysis:
 
         if windows:
             window = windows[0]
-            assert window.battery_degradation_cost_r > 0, \
-                "Degradation cost should be positive"
-            assert window.net_revenue_r < window.expected_revenue_r, \
-                "Net revenue should be less than gross revenue"
+            assert window.battery_degradation_cost_r > 0, "Degradation cost should be positive"
+            assert window.net_revenue_r < window.expected_revenue_r, "Net revenue should be less than gross revenue"
 
             # Verify degradation calculation
             expected_degradation = window.expected_energy_kwh * 0.05
-            assert (
-                abs(window.battery_degradation_cost_r - expected_degradation) < 10
-            ), f"Degradation cost {window.battery_degradation_cost_r} != {expected_degradation}"
+            assert abs(window.battery_degradation_cost_r - expected_degradation) < 10, (
+                f"Degradation cost {window.battery_degradation_cost_r} != {expected_degradation}"
+            )
 
     def test_arbitrage_windows_respect_constraints(self):
         """Verify windows respect SOC and temperature limits."""
@@ -130,6 +120,7 @@ class TestArbitrageAnalysis:
 
 
 # === Task 2: BESS Dispatch Engine ===
+
 
 class TestBESSDispatchEngine:
     """Test dispatch execution with constraint validation."""
@@ -168,10 +159,7 @@ class TestBESSDispatchEngine:
 
         assert not command.success, "Charge should be blocked at low temp"
         assert command.actual_power_kw == 0.0
-        assert any(
-            c.constraint_type == ConstraintType.TEMPERATURE_LOW.value
-            for c in command.constraints_applied
-        )
+        assert any(c.constraint_type == ConstraintType.TEMPERATURE_LOW.value for c in command.constraints_applied)
 
     def test_soc_constraints_enforced(self):
         """Verify SOC min/max limits enforced."""
@@ -193,10 +181,7 @@ class TestBESSDispatchEngine:
         )
 
         assert not command.success, "Discharge should be blocked at low SOC"
-        assert any(
-            c.constraint_type == ConstraintType.SOC_MIN.value
-            for c in command.constraints_applied
-        )
+        assert any(c.constraint_type == ConstraintType.SOC_MIN.value for c in command.constraints_applied)
 
     def test_grid_frequency_constraint(self):
         """Verify discharge limited when grid frequency high."""
@@ -217,12 +202,8 @@ class TestBESSDispatchEngine:
         )
 
         # Should be reduced but not blocked
-        assert command.actual_power_kw < 2000.0, \
-            "Discharge should be reduced at high frequency"
-        assert any(
-            c.constraint_type == ConstraintType.FREQUENCY_HIGH.value
-            for c in command.constraints_applied
-        )
+        assert command.actual_power_kw < 2000.0, "Discharge should be reduced at high frequency"
+        assert any(c.constraint_type == ConstraintType.FREQUENCY_HIGH.value for c in command.constraints_applied)
 
     def test_load_shedding_response_by_stage(self):
         """Verify dispatch adjusts correctly per LS stage."""
@@ -275,6 +256,7 @@ class TestBESSDispatchEngine:
 
 # === Task 3: ML Dispatch Prediction ===
 
+
 class TestDispatchPrediction:
     """Test ML-based dispatch action prediction."""
 
@@ -324,15 +306,14 @@ class TestDispatchPrediction:
         forecasts = forecaster.forecast_24h()
         forecast_dicts = [f.to_dict() for f in forecasts]
 
-        schedule = predictor.predict_daily_dispatch_schedule(
-            price_forecasts=forecast_dicts
-        )
+        schedule = predictor.predict_daily_dispatch_schedule(price_forecasts=forecast_dicts)
 
         assert len(schedule) == 24, "Should have 24 hourly predictions"
         assert all(p.action in ["charge", "discharge", "idle"] for p in schedule)
 
 
 # === Integration Tests ===
+
 
 class TestEndToEndArbitrage:
     """End-to-end tests of arbitrage optimization."""
@@ -379,6 +360,7 @@ class TestEndToEndArbitrage:
 
 
 # === Performance Benchmarks ===
+
 
 class TestPerformanceTargets:
     """Verify all performance targets are met."""

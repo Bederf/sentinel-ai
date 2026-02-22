@@ -18,9 +18,7 @@ from app.middleware.auth_middleware import validate_jwt_token
 logger = logging.getLogger(__name__)
 
 
-async def get_current_user(
-    authorization: Optional[str] = Header(None)
-) -> User:
+async def get_current_user(authorization: Optional[str] = Header(None)) -> User:
     """
     Get the current authenticated user from request headers.
 
@@ -39,12 +37,7 @@ async def get_current_user(
     """
     # No authorization header - return demo user for development
     if not authorization:
-        return User(
-            id="demo-user",
-            username="demo_technician",
-            email="demo@sentinel.bms",
-            role="technician"
-        )
+        return User(id="demo-user", username="demo_technician", email="demo@sentinel.bms", role="technician")
 
     # Parse Bearer token
     if authorization.startswith("Bearer "):
@@ -54,10 +47,7 @@ async def get_current_user(
         payload = validate_jwt_token(token, required_token_type="access")
 
         if payload is None:
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid or expired authentication token"
-            )
+            raise HTTPException(status_code=401, detail="Invalid or expired authentication token")
 
         # Extract user information from validated token
         user_id = payload.get("sub", "unknown")
@@ -66,18 +56,10 @@ async def get_current_user(
         full_name = payload.get("full_name", "")
         username = full_name or email.split("@")[0] if email else user_id
 
-        return User(
-            id=user_id,
-            username=username,
-            email=email,
-            role=role
-        )
+        return User(id=user_id, username=username, email=email, role=role)
 
     # API key authentication (stub - not yet implemented)
-    raise HTTPException(
-        status_code=401,
-        detail="Invalid authorization header format"
-    )
+    raise HTTPException(status_code=401, detail="Invalid authorization header format")
 
 
 def verify_admin_user(current_user: User) -> User:
@@ -94,10 +76,7 @@ def verify_admin_user(current_user: User) -> User:
         HTTPException: If user is not admin
     """
     if current_user.role != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Admin privileges required"
-        )
+        raise HTTPException(status_code=403, detail="Admin privileges required")
     return current_user
 
 
@@ -130,9 +109,7 @@ class AuthorizationService:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def check_authorization(
-        self, user_role: str, required_level: AuthorizationLevel
-    ) -> bool:
+    def check_authorization(self, user_role: str, required_level: AuthorizationLevel) -> bool:
         """Check if a user role meets or exceeds the required authorization level.
 
         Args:
@@ -155,11 +132,7 @@ class AuthorizationService:
             List of command type strings the user can execute.
         """
         user_level = self.get_user_authorization_level(user_role)
-        return [
-            cmd_type
-            for cmd_type, required_level in COMMAND_AUTHORIZATION.items()
-            if user_level >= required_level
-        ]
+        return [cmd_type for cmd_type, required_level in COMMAND_AUTHORIZATION.items() if user_level >= required_level]
 
     def get_user_authorization_level(self, user_role: str) -> AuthorizationLevel:
         """Get the authorization level for a given user role.
@@ -170,9 +143,7 @@ class AuthorizationService:
         Returns:
             AuthorizationLevel for the role. Defaults to VIEW_ONLY for unknown roles.
         """
-        return self._authorization_levels.get(
-            user_role.lower(), AuthorizationLevel.VIEW_ONLY
-        )
+        return self._authorization_levels.get(user_role.lower(), AuthorizationLevel.VIEW_ONLY)
 
 
 def get_authorization_service() -> AuthorizationService:

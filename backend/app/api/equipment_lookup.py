@@ -37,8 +37,10 @@ def get_lookup() -> EquipmentLookup:
 # Response Models
 # ============================================================================
 
+
 class ProbableCause(BaseModel):
     """Probable cause for a fault."""
+
     cause: str
     likelihood: str
     component: Optional[str] = None
@@ -47,12 +49,14 @@ class ProbableCause(BaseModel):
 
 class RecommendedFix(BaseModel):
     """Recommended fix for a fault."""
+
     immediate: List[str] = []
     scenarios: Dict[str, str] = {}
 
 
 class FaultInfo(BaseModel):
     """Fault code information."""
+
     code: str
     name: str
     severity: str
@@ -64,6 +68,7 @@ class FaultInfo(BaseModel):
 
 class SupplierResult(BaseModel):
     """Part supplier search result."""
+
     supplier: str
     name: Optional[str] = None
     part_number: Optional[str] = None
@@ -75,6 +80,7 @@ class SupplierResult(BaseModel):
 
 class GenericAlternative(BaseModel):
     """Generic alternative for OEM part."""
+
     category: str
     generic_part_number: Optional[str] = None
     manufacturer: Optional[str] = None
@@ -84,6 +90,7 @@ class GenericAlternative(BaseModel):
 
 class PartResult(BaseModel):
     """Part search result."""
+
     part_name: str
     part_number: Optional[str] = None
     manufacturer: Optional[str] = None
@@ -93,6 +100,7 @@ class PartResult(BaseModel):
 
 class ForumResult(BaseModel):
     """Forum search result."""
+
     source: str
     url: str
     title: Optional[str] = None
@@ -103,6 +111,7 @@ class ForumResult(BaseModel):
 
 class FaultCodeResponse(BaseModel):
     """Response for fault code lookup."""
+
     fault: Optional[FaultInfo] = None
     manufacturer: str
     model: Optional[str] = None
@@ -114,6 +123,7 @@ class FaultCodeResponse(BaseModel):
 
 class SearchSuggestion(BaseModel):
     """Search suggestion from keyword matching."""
+
     problem: str
     solution: str
     source: str
@@ -121,6 +131,7 @@ class SearchSuggestion(BaseModel):
 
 class SearchResponse(BaseModel):
     """Response for natural language search."""
+
     query_type: str
     fault: Optional[FaultInfo] = None
     manufacturer: Optional[str] = None
@@ -135,12 +146,13 @@ class SearchResponse(BaseModel):
 # API Endpoints
 # ============================================================================
 
+
 @router.get("/fault-code", response_model=FaultCodeResponse)
 async def get_fault_code(
     manufacturer: str = Query(..., description="Equipment manufacturer (e.g., Carrier, Trane, Daikin)"),
     fault_code: str = Query(..., description="Fault code (e.g., E4, FAULT_001, ALARM_1)"),
     model: Optional[str] = Query(None, description="Equipment model (e.g., 30XA, RTAC)"),
-    equipment_type: Optional[str] = Query(None, description="Equipment type (chiller, ahu, vsd)")
+    equipment_type: Optional[str] = Query(None, description="Equipment type (chiller, ahu, vsd)"),
 ) -> FaultCodeResponse:
     """
     Look up fault code and get diagnosis, fix, and parts.
@@ -160,17 +172,11 @@ async def get_fault_code(
 
     try:
         result = await lookup.lookup_fault_code(
-            manufacturer=manufacturer,
-            fault_code=fault_code,
-            model=model,
-            equipment_type=equipment_type
+            manufacturer=manufacturer, fault_code=fault_code, model=model, equipment_type=equipment_type
         )
 
         if not result.get("fault"):
-            raise HTTPException(
-                status_code=404,
-                detail=f"Fault code '{fault_code}' not found for {manufacturer}"
-            )
+            raise HTTPException(status_code=404, detail=f"Fault code '{fault_code}' not found for {manufacturer}")
 
         # Convert to response model
         fault_info = result.get("fault")
@@ -181,8 +187,7 @@ async def get_fault_code(
             recommended_fix = None
             if isinstance(rec_fix, dict):
                 recommended_fix = RecommendedFix(
-                    immediate=rec_fix.get("immediate", []),
-                    scenarios=rec_fix.get("scenarios", {})
+                    immediate=rec_fix.get("immediate", []), scenarios=rec_fix.get("scenarios", {})
                 )
             elif isinstance(rec_fix, str):
                 recommended_fix = RecommendedFix(immediate=[rec_fix], scenarios={})
@@ -192,35 +197,31 @@ async def get_fault_code(
                 name=fault_info.get("name", "Unknown"),
                 severity=fault_info.get("severity", "medium"),
                 description=fault_info.get("description", ""),
-                probable_causes=[
-                    ProbableCause(**cause) for cause in fault_info.get("probable_causes", [])
-                ],
+                probable_causes=[ProbableCause(**cause) for cause in fault_info.get("probable_causes", [])],
                 recommended_fix=recommended_fix,
-                safety_notes=fault_info.get("safety_notes")
+                safety_notes=fault_info.get("safety_notes"),
             )
 
         # Convert parts
         parts = []
         for part in result.get("parts", []):
-            suppliers = [
-                SupplierResult(**s) for s in part.get("suppliers", [])
-            ]
+            suppliers = [SupplierResult(**s) for s in part.get("suppliers", [])]
             generic = None
             if part.get("generic_alternative"):
                 generic = GenericAlternative(**part["generic_alternative"])
 
-            parts.append(PartResult(
-                part_name=part.get("part_name", ""),
-                part_number=part.get("part_number"),
-                manufacturer=part.get("manufacturer"),
-                suppliers=suppliers,
-                generic_alternative=generic
-            ))
+            parts.append(
+                PartResult(
+                    part_name=part.get("part_name", ""),
+                    part_number=part.get("part_number"),
+                    manufacturer=part.get("manufacturer"),
+                    suppliers=suppliers,
+                    generic_alternative=generic,
+                )
+            )
 
         # Convert forum results
-        forums = [
-            ForumResult(**f) for f in result.get("forum_solutions", [])
-        ]
+        forums = [ForumResult(**f) for f in result.get("forum_solutions", [])]
 
         return FaultCodeResponse(
             fault=fault,
@@ -229,7 +230,7 @@ async def get_fault_code(
             parts=parts,
             forum_solutions=forums,
             sources=result.get("sources", []),
-            scraped_data=result.get("scraped_data")
+            scraped_data=result.get("scraped_data"),
         )
 
     except HTTPException:
@@ -244,7 +245,7 @@ async def search_parts(
     part_number: Optional[str] = Query(None, description="OEM or generic part number"),
     part_description: Optional[str] = Query(None, description="Part description to search"),
     manufacturer: Optional[str] = Query(None, description="Filter by manufacturer"),
-    include_alternatives: bool = Query(True, description="Include generic alternatives")
+    include_alternatives: bool = Query(True, description="Include generic alternatives"),
 ) -> List[PartResult]:
     """
     Search for parts across South African suppliers.
@@ -261,10 +262,7 @@ async def search_parts(
         GET /api/equipment-lookup/parts?part_description=oil+filter
     """
     if not part_number and not part_description:
-        raise HTTPException(
-            status_code=400,
-            detail="Either part_number or part_description is required"
-        )
+        raise HTTPException(status_code=400, detail="Either part_number or part_description is required")
 
     lookup = get_lookup()
 
@@ -299,7 +297,7 @@ async def search_parts(
 async def search_equipment_issue(
     query: str = Query(..., description="Natural language query"),
     manufacturer: Optional[str] = Query(None, description="Filter by manufacturer"),
-    model: Optional[str] = Query(None, description="Filter by model")
+    model: Optional[str] = Query(None, description="Filter by model"),
 ) -> SearchResponse:
     """
     Natural language search for equipment issues.
@@ -335,10 +333,9 @@ async def search_equipment_issue(
 # Helper Functions
 # ============================================================================
 
+
 async def _search_by_part_number(
-    lookup: EquipmentLookup,
-    part_number: str,
-    manufacturer: Optional[str] = None
+    lookup: EquipmentLookup, part_number: str, manufacturer: Optional[str] = None
 ) -> List[PartResult]:
     """Search suppliers by exact part number."""
     results = []
@@ -349,35 +346,32 @@ async def _search_by_part_number(
         if manufacturer and not lookup._supplier_relevant(supplier, manufacturer):
             continue
 
-        supplier_results = await lookup._search_supplier(
-            supplier, query, manufacturer or "", None
-        )
+        supplier_results = await lookup._search_supplier(supplier, query, manufacturer or "", None)
 
         if supplier_results:
-            results.append(PartResult(
-                part_name=query,
-                part_number=part_number,
-                manufacturer=manufacturer,
-                suppliers=[SupplierResult(**s) for s in supplier_results]
-            ))
+            results.append(
+                PartResult(
+                    part_name=query,
+                    part_number=part_number,
+                    manufacturer=manufacturer,
+                    suppliers=[SupplierResult(**s) for s in supplier_results],
+                )
+            )
             break  # One result per part number
 
     # If no supplier results, return basic info
     if not results:
-        results.append(PartResult(
-            part_name=f"Part {part_number}",
-            part_number=part_number,
-            manufacturer=manufacturer,
-            suppliers=[]
-        ))
+        results.append(
+            PartResult(
+                part_name=f"Part {part_number}", part_number=part_number, manufacturer=manufacturer, suppliers=[]
+            )
+        )
 
     return results
 
 
 async def _search_by_description(
-    lookup: EquipmentLookup,
-    description: str,
-    manufacturer: Optional[str] = None
+    lookup: EquipmentLookup, description: str, manufacturer: Optional[str] = None
 ) -> List[PartResult]:
     """Search suppliers by part description."""
     results = []
@@ -398,7 +392,7 @@ async def _search_by_description(
         "contactor": "Contactor",
         "belt": "Drive Belt",
         "bearing": "Bearing",
-        "fan": "Fan Motor"
+        "fan": "Fan Motor",
     }
 
     matched_parts = set()
@@ -418,27 +412,24 @@ async def _search_by_description(
                 continue
 
             try:
-                supplier_results = await lookup._search_supplier(
-                    supplier, part_name, manufacturer or "", None
-                )
+                supplier_results = await lookup._search_supplier(supplier, part_name, manufacturer or "", None)
                 suppliers_list.extend([SupplierResult(**s) for s in supplier_results])
             except Exception:
                 pass
 
-        results.append(PartResult(
-            part_name=part_name,
-            manufacturer=manufacturer,
-            suppliers=suppliers_list[:5]  # Limit to 5 suppliers per part
-        ))
+        results.append(
+            PartResult(
+                part_name=part_name,
+                manufacturer=manufacturer,
+                suppliers=suppliers_list[:5],  # Limit to 5 suppliers per part
+            )
+        )
 
     return results
 
 
 async def _natural_language_search(
-    lookup: EquipmentLookup,
-    query: str,
-    manufacturer: Optional[str] = None,
-    model: Optional[str] = None
+    lookup: EquipmentLookup, query: str, manufacturer: Optional[str] = None, model: Optional[str] = None
 ) -> SearchResponse:
     """
     Parse natural language query and return relevant results.
@@ -452,9 +443,9 @@ async def _natural_language_search(
 
     # Extract fault code patterns - ordered from most specific to least specific
     fault_patterns = [
-        r'([A-Z]+[_-]?\d+)',  # FAULT_001, ALARM_1, E4 - catches codes with prefix
-        r'(?:^|\s)([EFAUHLueh]\d+)(?:\s|$)',  # E4, F1, A1, H1, L1, U4 - single letter codes
-        r'(?:fault|error|code|alarm)\s*[:#]?\s*([a-zA-Z0-9_-]+)',  # "fault E4", "error 29"
+        r"([A-Z]+[_-]?\d+)",  # FAULT_001, ALARM_1, E4 - catches codes with prefix
+        r"(?:^|\s)([EFAUHLueh]\d+)(?:\s|$)",  # E4, F1, A1, H1, L1, U4 - single letter codes
+        r"(?:fault|error|code|alarm)\s*[:#]?\s*([a-zA-Z0-9_-]+)",  # "fault E4", "error 29"
     ]
 
     fault_code = None
@@ -483,8 +474,7 @@ async def _natural_language_search(
                 recommended_fix = None
                 if isinstance(rec_fix, dict):
                     recommended_fix = RecommendedFix(
-                        immediate=rec_fix.get("immediate", []),
-                        scenarios=rec_fix.get("scenarios", {})
+                        immediate=rec_fix.get("immediate", []), scenarios=rec_fix.get("scenarios", {})
                     )
                 elif isinstance(rec_fix, str):
                     recommended_fix = RecommendedFix(immediate=[rec_fix], scenarios={})
@@ -494,11 +484,9 @@ async def _natural_language_search(
                     name=fault_info.get("name", "Unknown"),
                     severity=fault_info.get("severity", "medium"),
                     description=fault_info.get("description", ""),
-                    probable_causes=[
-                        ProbableCause(**cause) for cause in fault_info.get("probable_causes", [])
-                    ],
+                    probable_causes=[ProbableCause(**cause) for cause in fault_info.get("probable_causes", [])],
                     recommended_fix=recommended_fix,
-                    safety_notes=fault_info.get("safety_notes")
+                    safety_notes=fault_info.get("safety_notes"),
                 )
 
                 parts = []
@@ -507,13 +495,15 @@ async def _natural_language_search(
                     generic = None
                     if part.get("generic_alternative"):
                         generic = GenericAlternative(**part["generic_alternative"])
-                    parts.append(PartResult(
-                        part_name=part.get("part_name", ""),
-                        part_number=part.get("part_number"),
-                        manufacturer=part.get("manufacturer"),
-                        suppliers=suppliers,
-                        generic_alternative=generic
-                    ))
+                    parts.append(
+                        PartResult(
+                            part_name=part.get("part_name", ""),
+                            part_number=part.get("part_number"),
+                            manufacturer=part.get("manufacturer"),
+                            suppliers=suppliers,
+                            generic_alternative=generic,
+                        )
+                    )
 
                 forums = [ForumResult(**f) for f in result.get("forum_solutions", [])]
 
@@ -523,7 +513,7 @@ async def _natural_language_search(
                     manufacturer=manufacturer,
                     model=model,
                     parts=parts,
-                    forum_solutions=forums
+                    forum_solutions=forums,
                 )
         except Exception as e:
             logger.warning(f"Fault code lookup failed during search: {e}")
@@ -533,10 +523,7 @@ async def _natural_language_search(
 
 
 async def _keyword_search(
-    lookup: EquipmentLookup,
-    query: str,
-    manufacturer: Optional[str],
-    model: Optional[str]
+    lookup: EquipmentLookup, query: str, manufacturer: Optional[str], model: Optional[str]
 ) -> SearchResponse:
     """Fallback keyword search when no fault code detected."""
 
@@ -544,60 +531,60 @@ async def _keyword_search(
     problem_keywords = {
         "noise": {
             "solution": "Check bearings, belts, fan blades for wear or imbalance",
-            "parts": ["Bearing", "Drive Belt", "Fan Motor"]
+            "parts": ["Bearing", "Drive Belt", "Fan Motor"],
         },
         "loud": {
             "solution": "Check bearings, belts, fan blades for wear or imbalance",
-            "parts": ["Bearing", "Drive Belt", "Fan Motor"]
+            "parts": ["Bearing", "Drive Belt", "Fan Motor"],
         },
         "vibration": {
             "solution": "Check mounting bolts, alignment, bearings, shaft balance",
-            "parts": ["Bearing", "Motor Mount"]
+            "parts": ["Bearing", "Motor Mount"],
         },
         "leak": {
             "solution": "Check seals, gaskets, connections, refrigerant charge",
-            "parts": ["Seal Kit", "Gasket", "O-Ring"]
+            "parts": ["Seal Kit", "Gasket", "O-Ring"],
         },
         "leaking": {
             "solution": "Check seals, gaskets, connections, refrigerant charge",
-            "parts": ["Seal Kit", "Gasket", "O-Ring"]
+            "parts": ["Seal Kit", "Gasket", "O-Ring"],
         },
         "overheat": {
             "solution": "Check airflow, filters, refrigerant charge, thermal protection",
-            "parts": ["Air Filter", "Thermal Switch", "Fan Motor"]
+            "parts": ["Air Filter", "Thermal Switch", "Fan Motor"],
         },
         "hot": {
             "solution": "Check airflow, filters, refrigerant charge, thermal protection",
-            "parts": ["Air Filter", "Thermal Switch", "Fan Motor"]
+            "parts": ["Air Filter", "Thermal Switch", "Fan Motor"],
         },
         "not cooling": {
             "solution": "Check refrigerant charge, compressor, condenser airflow, expansion valve",
-            "parts": ["Expansion Valve", "Condenser Fan", "Compressor"]
+            "parts": ["Expansion Valve", "Condenser Fan", "Compressor"],
         },
         "not heating": {
             "solution": "Check reversing valve, defrost cycle, heat strips",
-            "parts": ["Reversing Valve", "Heat Strip", "Defrost Timer"]
+            "parts": ["Reversing Valve", "Heat Strip", "Defrost Timer"],
         },
         "tripping": {
             "solution": "Check for overcurrent, short circuit, ground fault, overload",
-            "parts": ["Circuit Breaker", "Contactor", "Overload Relay"]
+            "parts": ["Circuit Breaker", "Contactor", "Overload Relay"],
         },
         "won't start": {
             "solution": "Check power supply, contactor, capacitor, control board",
-            "parts": ["Contactor", "Capacitor", "Control Board"]
+            "parts": ["Contactor", "Capacitor", "Control Board"],
         },
         "short cycling": {
             "solution": "Check refrigerant charge, thermostat, high/low pressure switches",
-            "parts": ["Pressure Switch", "Thermostat", "Refrigerant"]
+            "parts": ["Pressure Switch", "Thermostat", "Refrigerant"],
         },
         "freezing": {
             "solution": "Check airflow, refrigerant charge, expansion valve, defrost",
-            "parts": ["Air Filter", "Expansion Valve", "Defrost Timer"]
+            "parts": ["Air Filter", "Expansion Valve", "Defrost Timer"],
         },
         "ice": {
             "solution": "Check airflow, refrigerant charge, expansion valve, defrost",
-            "parts": ["Air Filter", "Expansion Valve", "Defrost Timer"]
-        }
+            "parts": ["Air Filter", "Expansion Valve", "Defrost Timer"],
+        },
     }
 
     suggestions = []
@@ -606,11 +593,13 @@ async def _keyword_search(
 
     for keyword, info in problem_keywords.items():
         if keyword in query_lower:
-            suggestions.append(SearchSuggestion(
-                problem=keyword.replace("_", " ").title(),
-                solution=info["solution"],
-                source="General troubleshooting guide"
-            ))
+            suggestions.append(
+                SearchSuggestion(
+                    problem=keyword.replace("_", " ").title(),
+                    solution=info["solution"],
+                    source="General troubleshooting guide",
+                )
+            )
             related_parts.update(info.get("parts", []))
 
     # Search for related parts
@@ -620,31 +609,27 @@ async def _keyword_search(
             suppliers = []
             for supplier in lookup.SA_PARTS_SUPPLIERS[:3]:  # Check top 3 suppliers
                 try:
-                    results = await lookup._search_supplier(
-                        supplier, part_name, manufacturer or "", model
-                    )
+                    results = await lookup._search_supplier(supplier, part_name, manufacturer or "", model)
                     suppliers.extend([SupplierResult(**s) for s in results])
                 except Exception:
                     pass
 
-            parts.append(PartResult(
-                part_name=part_name,
-                manufacturer=manufacturer,
-                suppliers=suppliers[:3]
-            ))
+            parts.append(PartResult(part_name=part_name, manufacturer=manufacturer, suppliers=suppliers[:3]))
 
     # Get forum search results
     search_query = f"{manufacturer or ''} {model or ''} {query}".strip()
     forums = []
     for forum in lookup.FORUM_SOURCES:
         forum_url = forum["url"] + forum["search_url"].format(query=search_query.replace(" ", "+"))
-        forums.append(ForumResult(
-            source=forum["name"],
-            url=forum_url,
-            title=f"Search {forum['name']} for: {query}",
-            description=forum.get("description", ""),
-            coverage=forum.get("coverage", [])
-        ))
+        forums.append(
+            ForumResult(
+                source=forum["name"],
+                url=forum_url,
+                title=f"Search {forum['name']} for: {query}",
+                description=forum.get("description", ""),
+                coverage=forum.get("coverage", []),
+            )
+        )
 
     return SearchResponse(
         query_type="keyword",
@@ -653,5 +638,5 @@ async def _keyword_search(
         suggestions=suggestions,
         parts=parts,
         forum_solutions=forums,
-        note="Try including a fault code for more specific results" if not suggestions else None
+        note="Try including a fault code for more specific results" if not suggestions else None,
     )

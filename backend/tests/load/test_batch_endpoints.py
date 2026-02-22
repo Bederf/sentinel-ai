@@ -26,6 +26,7 @@ TEST_BATCH_SIZE = 10  # Request 10 items per batch call
 
 # ===== Fixtures =====
 
+
 @pytest.fixture
 def client():
     """Create test client."""
@@ -33,6 +34,7 @@ def client():
 
 
 # ===== Test Scenarios =====
+
 
 def test_batch_commands_success(client):
     """Test: Batch commands endpoint accepts valid request."""
@@ -57,8 +59,7 @@ def test_batch_commands_success(client):
     )
 
     # Should succeed (200) or handle auth gracefully (401/403)
-    assert response.status_code in [200, 401, 403], \
-        f"Expected 200/401/403, got {response.status_code}: {response.text}"
+    assert response.status_code in [200, 401, 403], f"Expected 200/401/403, got {response.status_code}: {response.text}"
 
 
 @pytest.mark.slow
@@ -109,10 +110,7 @@ def test_concurrent_batch_requests_no_429(client):
     async def run_concurrent_test():
         """Run concurrent requests."""
         async with httpx.AsyncClient() as session:
-            tasks = [
-                make_request_async(session, i)
-                for i in range(CONCURRENT_REQUESTS)
-            ]
+            tasks = [make_request_async(session, i) for i in range(CONCURRENT_REQUESTS)]
 
             start_time = time.time()
             results = await asyncio.gather(*tasks)
@@ -146,14 +144,15 @@ def test_concurrent_batch_requests_no_429(client):
     print(f"Avg Time per Request: {avg_time_ms:.1f}ms")
 
     # Assertions
-    assert error_429_count == 0, \
-        f"Got {error_429_count} rate limit (429) errors - rate limiting not working"
+    assert error_429_count == 0, f"Got {error_429_count} rate limit (429) errors - rate limiting not working"
 
-    assert success_count >= (CONCURRENT_REQUESTS * 0.95), \
-        f"Only {success_count}/{CONCURRENT_REQUESTS} requests succeeded ({success_count/CONCURRENT_REQUESTS*100:.1f}%)"
+    assert success_count >= (CONCURRENT_REQUESTS * 0.95), (
+        f"Only {success_count}/{CONCURRENT_REQUESTS} requests succeeded ({success_count / CONCURRENT_REQUESTS * 100:.1f}%)"
+    )
 
-    assert avg_time_ms < TARGET_RESPONSE_TIME_MS, \
+    assert avg_time_ms < TARGET_RESPONSE_TIME_MS, (
         f"Avg response time {avg_time_ms:.1f}ms exceeds target {TARGET_RESPONSE_TIME_MS}ms"
+    )
 
 
 @pytest.mark.slow
@@ -191,14 +190,13 @@ def test_sequential_requests_meet_timing(client):
         request_times.append(elapsed)
 
         # All requests should complete (no 429)
-        assert response.status_code in [200, 401, 403], \
-            f"Request {i}: Expected 200/401/403, got {response.status_code}"
+        assert response.status_code in [200, 401, 403], f"Request {i}: Expected 200/401/403, got {response.status_code}"
 
     total_time = time.time() - start_total
 
     print("\n=== Sequential Request Timing ===")
     print(f"10 Requests Total Time: {total_time:.2f}s")
-    print(f"Per-Request Average: {(total_time/10)*1000:.1f}ms")
+    print(f"Per-Request Average: {(total_time / 10) * 1000:.1f}ms")
     print("With 1000ms batch window, expect ~5 batches = ~5 seconds minimum")
     print(f"Actual: {total_time:.2f}s ✓")
 
@@ -227,11 +225,13 @@ def test_concurrent_requests_via_testclient(client):
             "/api/remote/commands/batch",
             json=batch_request,
         )
-        results.append({
-            "status": response.status_code,
-            "is_429": response.status_code == 429,
-            "is_success": response.status_code in [200, 401, 403],
-        })
+        results.append(
+            {
+                "status": response.status_code,
+                "is_429": response.status_code == 429,
+                "is_success": response.status_code in [200, 401, 403],
+            }
+        )
 
     # Verify results
     error_429_count = sum(1 for r in results if r["is_429"])
@@ -242,14 +242,13 @@ def test_concurrent_requests_via_testclient(client):
     print(f"Success: {success_count}")
     print(f"429 Errors: {error_429_count}")
 
-    assert error_429_count == 0, \
-        f"Got {error_429_count} rate limit errors out of {len(results)}"
+    assert error_429_count == 0, f"Got {error_429_count} rate limit errors out of {len(results)}"
 
-    assert success_count >= 45, \
-        f"Only {success_count}/50 requests succeeded"
+    assert success_count >= 45, f"Only {success_count}/50 requests succeeded"
 
 
 # ===== Validation Tests =====
+
 
 def test_batch_request_validation(client):
     """Test: Invalid batch requests are rejected gracefully."""
@@ -269,8 +268,7 @@ def test_batch_request_validation(client):
     )
 
     # Should fail validation (422)
-    assert response.status_code in [422, 400], \
-        f"Expected validation error, got {response.status_code}"
+    assert response.status_code in [422, 400], f"Expected validation error, got {response.status_code}"
 
 
 def test_batch_size_limits(client):
@@ -294,11 +292,11 @@ def test_batch_size_limits(client):
 
     # Should either succeed, fail validation, or return error
     # but not hang or crash
-    assert response.status_code in [200, 400, 413, 422, 401, 403], \
-        f"Unexpected status {response.status_code}"
+    assert response.status_code in [200, 400, 413, 422, 401, 403], f"Unexpected status {response.status_code}"
 
 
 # ===== Performance Benchmarks =====
+
 
 @pytest.mark.slow
 def test_response_time_percentiles(client):

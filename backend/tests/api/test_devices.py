@@ -87,15 +87,8 @@ class TestDeviceAPI:
                                 break
 
                         if writable_point:
-                            control_data = {
-                                "point": writable_point,
-                                "value": 22.0,
-                                "priority": 8
-                            }
-                            response = await async_client.post(
-                                f"/api/devices/{device_id}/control",
-                                json=control_data
-                            )
+                            control_data = {"point": writable_point, "value": 22.0, "priority": 8}
+                            response = await async_client.post(f"/api/devices/{device_id}/control", json=control_data)
 
                             # Control may succeed, be blocked by safety, or fail for various reasons
                             # 200/201 = success, 400 = validation/safety block, 404 = device not found

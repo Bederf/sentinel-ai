@@ -19,6 +19,7 @@ router = APIRouter(prefix="/simulation", tags=["simulation"])
 # Global simulation service instance
 simulation_service = create_simulation_service()
 
+
 @router.on_event("startup")
 async def startup_event():
     """Start the simulation service on API startup.
@@ -34,6 +35,7 @@ async def startup_event():
     # except Exception as e:
     #     logger.error(f"Failed to start simulation service: {e}")
 
+
 @router.on_event("shutdown")
 async def shutdown_event():
     """Stop the simulation service on API shutdown"""
@@ -43,6 +45,7 @@ async def shutdown_event():
     except Exception as e:
         logger.error(f"Error stopping simulation service: {e}")
 
+
 @router.get("/status")
 async def get_simulation_status():
     """Get current simulation status"""
@@ -50,8 +53,9 @@ async def get_simulation_status():
         "is_running": simulation_service.is_running,
         "simulation_speed": simulation_service.simulation_speed,
         "total_equipment": len(simulation_service.equipment),
-        "last_update": datetime.now().isoformat()
+        "last_update": datetime.now().isoformat(),
     }
+
 
 @router.get("/equipment")
 async def get_equipment(
@@ -59,28 +63,23 @@ async def get_equipment(
     building: Optional[str] = Query(None, description="Filter by building"),
     health_threshold: Optional[float] = Query(None, description="Filter by health score threshold"),
     include_faults: bool = Query(True, description="Include fault codes"),
-    limit: int = Query(100, description="Maximum number of results")
+    limit: int = Query(100, description="Maximum number of results"),
 ):
     """Get simulated equipment data"""
     try:
         equipment_data = simulation_service.get_real_time_data()
 
         if equipment_type:
-            equipment_data["equipment"] = [
-                eq for eq in equipment_data["equipment"]
-                if eq.get("type") == equipment_type
-            ]
+            equipment_data["equipment"] = [eq for eq in equipment_data["equipment"] if eq.get("type") == equipment_type]
 
         if building:
             equipment_data["equipment"] = [
-                eq for eq in equipment_data["equipment"]
-                if building.lower() in eq.get("location", "").lower()
+                eq for eq in equipment_data["equipment"] if building.lower() in eq.get("location", "").lower()
             ]
 
         if health_threshold is not None:
             equipment_data["equipment"] = [
-                eq for eq in equipment_data["equipment"]
-                if eq.get("health_score", 0) >= health_threshold
+                eq for eq in equipment_data["equipment"] if eq.get("health_score", 0) >= health_threshold
             ]
 
         # Limit results
@@ -96,6 +95,7 @@ async def get_equipment(
         logger.error(f"Error getting equipment data: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting equipment data: {e}")
 
+
 @router.get("/equipment/{equipment_id}")
 async def get_equipment_by_id(equipment_id: str):
     """Get specific equipment by ID"""
@@ -110,12 +110,9 @@ async def get_equipment_by_id(equipment_id: str):
         logger.error(f"Error getting equipment {equipment_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting equipment: {e}")
 
+
 @router.post("/fault/inject")
-async def inject_fault(
-    equipment_id: str,
-    fault_code: str,
-    description: Optional[str] = None
-):
+async def inject_fault(equipment_id: str, fault_code: str, description: Optional[str] = None):
     """Manually inject a fault for testing"""
     try:
         simulation_service.inject_fault(equipment_id, fault_code)
@@ -124,11 +121,12 @@ async def inject_fault(
             "success": True,
             "message": f"Fault {fault_code} injected into {equipment_id}",
             "description": description,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
         logger.error(f"Error injecting fault: {e}")
         raise HTTPException(status_code=500, detail=f"Error injecting fault: {e}")
+
 
 @router.delete("/fault/clear/{equipment_id}")
 async def clear_faults(equipment_id: str):
@@ -139,11 +137,12 @@ async def clear_faults(equipment_id: str):
         return {
             "success": True,
             "message": f"Faults cleared from {equipment_id}",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
         logger.error(f"Error clearing faults: {e}")
         raise HTTPException(status_code=500, detail=f"Error clearing faults: {e}")
+
 
 @router.post("/control/speed")
 async def set_simulation_speed(speed: float = Query(..., description="Simulation speed multiplier", ge=0.1, le=10.0)):
@@ -155,7 +154,7 @@ async def set_simulation_speed(speed: float = Query(..., description="Simulation
             "success": True,
             "message": f"Simulation speed set to {speed}x",
             "current_speed": speed,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
         logger.error(f"Error setting simulation speed: {e}")
@@ -171,7 +170,7 @@ async def stop_simulation():
             "success": True,
             "message": "Simulation stopped",
             "is_running": simulation_service.is_running,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
         logger.error(f"Error stopping simulation: {e}")
@@ -187,11 +186,12 @@ async def start_simulation():
             "success": True,
             "message": "Simulation started",
             "is_running": simulation_service.is_running,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
         logger.error(f"Error starting simulation: {e}")
         raise HTTPException(status_code=500, detail=f"Error starting simulation: {e}")
+
 
 @router.get("/stats")
 async def get_simulation_stats():
@@ -203,10 +203,10 @@ async def get_simulation_stats():
         logger.error(f"Error getting simulation stats: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting simulation stats: {e}")
 
+
 @router.post("/scenario/{scenario_name}")
 async def run_scenario(
-    scenario_name: str,
-    duration_minutes: int = Query(60, description="Duration in minutes", ge=1, le=1440)
+    scenario_name: str, duration_minutes: int = Query(60, description="Duration in minutes", ge=1, le=1440)
 ):
     """Run a predefined simulation scenario"""
     scenarios = {
@@ -214,7 +214,7 @@ async def run_scenario(
         "winter_night": "Low ambient temperature, minimal occupancy",
         "fault_cascade": "Multiple equipment failures in sequence",
         "maintenance_mode": "Equipment offline for maintenance",
-        "energy_saving": "Optimized for minimum energy consumption"
+        "energy_saving": "Optimized for minimum energy consumption",
     }
 
     if scenario_name not in scenarios:
@@ -230,11 +230,12 @@ async def run_scenario(
             "description": scenarios[scenario_name],
             "duration_minutes": duration_minutes,
             "message": f"Scenario {scenario_name} started",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
         logger.error(f"Error running scenario {scenario_name}: {e}")
         raise HTTPException(status_code=500, detail=f"Error running scenario: {e}")
+
 
 @router.get("/health")
 async def get_system_health():
@@ -259,13 +260,14 @@ async def get_system_health():
             "recommendations": [
                 f"Average equipment health: {avg_health:.1f}%",
                 f"{equipment_with_faults} equipment items have faults",
-                f"{total_equipment - equipment_with_faults} equipment items operating normally"
+                f"{total_equipment - equipment_with_faults} equipment items operating normally",
             ],
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
         logger.error(f"Error getting system health: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting system health: {e}")
+
 
 @router.get("/alerts")
 async def get_simulation_alerts():
@@ -282,9 +284,9 @@ async def get_simulation_alerts():
             "by_severity": {
                 "critical": len([a for a in active_alerts if a["severity"] == "critical"]),
                 "warning": len([a for a in active_alerts if a["severity"] == "warning"]),
-                "info": len([a for a in active_alerts if a["severity"] == "info"])
+                "info": len([a for a in active_alerts if a["severity"] == "info"]),
             },
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
         logger.error(f"Error getting simulation alerts: {e}")
@@ -293,8 +295,7 @@ async def get_simulation_alerts():
 
 @router.post("/alerts/{alert_id}/acknowledge")
 async def acknowledge_simulation_alert(
-    alert_id: str,
-    acknowledged_by: str = Query("Facilities Manager", description="Name of person acknowledging")
+    alert_id: str, acknowledged_by: str = Query("Facilities Manager", description="Name of person acknowledging")
 ):
     """Acknowledge a simulation alert"""
     try:
@@ -303,7 +304,7 @@ async def acknowledge_simulation_alert(
             return {
                 "success": True,
                 "message": f"Alert {alert_id} acknowledged by {acknowledged_by}",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
         else:
             raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
@@ -320,11 +321,7 @@ async def clear_simulation_alert(alert_id: str):
     try:
         success = simulation_service.clear_alert(alert_id)
         if success:
-            return {
-                "success": True,
-                "message": f"Alert {alert_id} cleared",
-                "timestamp": datetime.now().isoformat()
-            }
+            return {"success": True, "message": f"Alert {alert_id} cleared", "timestamp": datetime.now().isoformat()}
         else:
             raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
     except HTTPException:
@@ -376,14 +373,13 @@ async def get_equipment_status(equipment_id: str):
         "days_since_maintenance": (datetime.now() - eq.last_maintenance).days,
         "sensor_readings": eq.sensor_readings,
         "active_alerts": eq_alerts,
-        "timestamp": eq.timestamp.isoformat()
+        "timestamp": eq.timestamp.isoformat(),
     }
 
 
 @router.post("/scenario/degrade/{equipment_id}")
 async def force_equipment_degradation(
-    equipment_id: str,
-    amount: float = Query(10.0, description="Amount to degrade health (0-50)", ge=0, le=50)
+    equipment_id: str, amount: float = Query(10.0, description="Amount to degrade health (0-50)", ge=0, le=50)
 ):
     """Force equipment health to degrade (for demo purposes)"""
     if equipment_id not in simulation_service.equipment:
@@ -402,7 +398,7 @@ async def force_equipment_degradation(
         "old_health": old_health,
         "new_health": eq.health_score,
         "status": eq.status,
-        "message": f"Degraded {eq.name} health by {amount}%"
+        "message": f"Degraded {eq.name} health by {amount}%",
     }
 
 
@@ -507,9 +503,7 @@ from app.services.prediction_generator import get_prediction_generator
 from app.database.repositories.prediction_repository import PredictionRepository
 from app.services.maintenance_recommender import get_maintenance_recommender
 from app.services.module_registry_service import ModuleRegistryService
-from app.models.module_registry import (
-    AIRecommendation, ModuleType, RecommendationType, RecommendationPriority
-)
+from app.models.module_registry import AIRecommendation, ModuleType, RecommendationType, RecommendationPriority
 import uuid
 
 
@@ -553,14 +547,17 @@ async def trigger_demo_warnings(
     logger.info(f"Demo: Triggering {count} warnings for {building_name} ({site_code})")
 
     # Get healthy equipment from building (health >= 70)
-    equipment_resp = client.table("equipment").select(
-        "id, code, name, type, health_score"
-    ).eq("building_id", building_id).gte("health_score", 70).execute()
+    equipment_resp = (
+        client.table("equipment")
+        .select("id, code, name, type, health_score")
+        .eq("building_id", building_id)
+        .gte("health_score", 70)
+        .execute()
+    )
 
     if not equipment_resp.data:
         raise HTTPException(
-            status_code=400,
-            detail=f"No healthy equipment found in {building_name} to trigger warnings"
+            status_code=400, detail=f"No healthy equipment found in {building_name} to trigger warnings"
         )
 
     # Select random subset
@@ -591,11 +588,13 @@ async def trigger_demo_warnings(
             new_health = random.randint(55, 75)
 
             # Update health to warning state and status to 'warning'
-            client.table("equipment").update({
-                "health_score": new_health,
-                "status": "warning",
-                "updated_at": datetime.now().isoformat(),
-            }).eq("id", eq["id"]).execute()
+            client.table("equipment").update(
+                {
+                    "health_score": new_health,
+                    "status": "warning",
+                    "updated_at": datetime.now().isoformat(),
+                }
+            ).eq("id", eq["id"]).execute()
 
             # Create alert
             alert_result = alert_service.create_alert_for_equipment(
@@ -607,13 +606,15 @@ async def trigger_demo_warnings(
                 notify_telegram=True,
             )
 
-            results["equipment_affected"].append({
-                "name": eq["name"],
-                "code": eq.get("code", ""),
-                "type": eq.get("type", ""),
-                "old_health": old_health,
-                "new_health": new_health,
-            })
+            results["equipment_affected"].append(
+                {
+                    "name": eq["name"],
+                    "code": eq.get("code", ""),
+                    "type": eq.get("type", ""),
+                    "old_health": old_health,
+                    "new_health": new_health,
+                }
+            )
 
             if alert_result.get("alert"):
                 results["alerts_created"] += 1
@@ -646,7 +647,7 @@ async def trigger_demo_warnings(
                 equipment_id=eq.get("code", eq["id"]),
                 equipment_type=eq.get("type", "unknown"),
                 risk_level="high",  # Warning state = high risk
-                predicted_failure="health_degradation"
+                predicted_failure="health_degradation",
             )
 
             # Create AIRecommendation for module registry
@@ -754,11 +755,13 @@ async def reset_demo_to_healthy(
 
         if equipment_resp.data:
             for eq in equipment_resp.data:
-                client.table("equipment").update({
-                    "health_score": 92,
-                    "status": "normal",
-                    "updated_at": datetime.now().isoformat(),
-                }).eq("id", eq["id"]).execute()
+                client.table("equipment").update(
+                    {
+                        "health_score": 92,
+                        "status": "normal",
+                        "updated_at": datetime.now().isoformat(),
+                    }
+                ).eq("id", eq["id"]).execute()
                 results["equipment_reset"] += 1
 
     except Exception as e:
@@ -788,11 +791,7 @@ async def reset_demo_to_healthy(
 
     # Resolve all AI recommendations for site
     try:
-        active_recs = module_registry.get_recommendations(
-            site_id=site_code,
-            include_resolved=False,
-            limit=100
-        )
+        active_recs = module_registry.get_recommendations(site_id=site_code, include_resolved=False, limit=100)
         for rec in active_recs:
             module_registry.resolve_recommendation(site_code, rec.recommendation_id)
             results["recommendations_resolved"] += 1
@@ -829,12 +828,14 @@ async def get_scheduler_status():
     """Get status of all background scheduler jobs."""
     jobs = []
     for job in scheduler_service.scheduler.get_jobs():
-        jobs.append({
-            "id": job.id,
-            "name": job.name,
-            "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
-            "paused": job.next_run_time is None,
-        })
+        jobs.append(
+            {
+                "id": job.id,
+                "name": job.name,
+                "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+                "paused": job.next_run_time is None,
+            }
+        )
 
     return {
         "running": scheduler_service.scheduler.running,
@@ -908,4 +909,4 @@ async def resume_all_scheduler_jobs():
 
 
 # Export the router
-__all__ = ['router', 'simulation_service', 'health_simulation_service']
+__all__ = ["router", "simulation_service", "health_simulation_service"]

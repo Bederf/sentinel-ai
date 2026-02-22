@@ -6,7 +6,6 @@ Phase 45-02: Fleet Learning and Cross-Site Insights.
 """
 
 
-
 # --- FleetAggregator Tests ---
 
 
@@ -15,6 +14,7 @@ class TestFleetAggregator:
 
     def _get_aggregator(self):
         from ml.fleet.aggregator import FleetAggregator
+
         return FleetAggregator()
 
     def test_aggregate_failure_patterns_returns_all(self):
@@ -62,9 +62,7 @@ class TestFleetAggregator:
     def test_get_similar_failures_exclude_site_reduces_count(self):
         aggregator = self._get_aggregator()
         all_similar = aggregator.get_similar_failures(equipment_type="CHILLER")
-        excluded = aggregator.get_similar_failures(
-            equipment_type="CHILLER", exclude_site="site-002"
-        )
+        excluded = aggregator.get_similar_failures(equipment_type="CHILLER", exclude_site="site-002")
         # Excluding a site should reduce counts
         for a, e in zip(all_similar, excluded):
             assert e["fleet_occurrences"] <= a["fleet_occurrences"]
@@ -112,10 +110,7 @@ class TestFleetAggregator:
         aggregator = self._get_aggregator()
         risk = aggregator.get_risk_distribution()
         assert "distribution" in risk
-        total_pct = sum(
-            risk["distribution"][level]["percentage"]
-            for level in ("critical", "high", "medium", "low")
-        )
+        total_pct = sum(risk["distribution"][level]["percentage"] for level in ("critical", "high", "medium", "low"))
         # Should add up to approximately 100%
         assert 98 <= total_pct <= 102
 
@@ -128,6 +123,7 @@ class TestGlobalModelTrainer:
 
     def _get_trainer(self):
         from ml.fleet.global_model import GlobalModelTrainer
+
         return GlobalModelTrainer()
 
     def test_list_global_models(self):
@@ -201,6 +197,7 @@ class TestLocalFineTuner:
 
     def _get_tuner(self):
         from ml.fleet.fine_tuning import LocalFineTuner
+
         return LocalFineTuner()
 
     def test_list_fine_tuned_models(self):
@@ -274,18 +271,21 @@ class TestSingletons:
 
     def test_fleet_aggregator_singleton(self):
         from ml.fleet.aggregator import get_fleet_aggregator
+
         a1 = get_fleet_aggregator()
         a2 = get_fleet_aggregator()
         assert a1 is a2
 
     def test_global_model_trainer_singleton(self):
         from ml.fleet.global_model import get_global_model_trainer
+
         t1 = get_global_model_trainer()
         t2 = get_global_model_trainer()
         assert t1 is t2
 
     def test_local_fine_tuner_singleton(self):
         from ml.fleet.fine_tuning import get_local_fine_tuner
+
         f1 = get_local_fine_tuner()
         f2 = get_local_fine_tuner()
         assert f1 is f2

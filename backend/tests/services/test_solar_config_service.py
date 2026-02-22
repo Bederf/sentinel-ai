@@ -24,35 +24,35 @@ class TestSiteConfigLoading:
         assert isinstance(cfg, SiteConfig)
         assert cfg.site_id == "site-002"
 
-    def test_bess_capacity_500kwh(self):
+    def test_bess_capacity_200kwh(self):
         cfg = get_site_solar_config("site-002")
-        assert cfg.bess.capacity_kwh == 500.0
+        assert cfg.bess.capacity_kwh == 200.0
 
-    def test_bess_rated_power_250kw(self):
+    def test_bess_rated_power_100kw(self):
         cfg = get_site_solar_config("site-002")
-        assert cfg.bess.rated_power_kw == 250.0
+        assert cfg.bess.rated_power_kw == 100.0
 
     def test_bess_model(self):
         cfg = get_site_solar_config("site-002")
         assert "LUNA2000" in cfg.bess.model
 
-    def test_pv_total_capacity_946kwp(self):
+    def test_pv_total_capacity_297kwp(self):
         cfg = get_site_solar_config("site-002")
-        assert cfg.pv.total_capacity_kwp == 946.0
+        assert cfg.pv.total_capacity_kwp == 297.0
 
-    def test_pv_roof_550_carport_396(self):
+    def test_pv_all_roof_no_carport(self):
         cfg = get_site_solar_config("site-002")
-        assert cfg.pv.roof_capacity_kwp == 550.0
-        assert cfg.pv.carport_capacity_kwp == 396.0
-        assert cfg.pv.roof_capacity_kwp + cfg.pv.carport_capacity_kwp == cfg.pv.total_capacity_kwp
+        assert cfg.pv.roof_capacity_kwp == 297.0
+        assert cfg.pv.carport_capacity_kwp == 0.0
+        assert cfg.pv.roof_capacity_kwp == cfg.pv.total_capacity_kwp
 
     def test_grid_nmd_1820(self):
         cfg = get_site_solar_config("site-002")
         assert cfg.grid.nmd_limit_kva == 1820.0
 
-    def test_grid_max_export_946(self):
+    def test_grid_max_export_297(self):
         cfg = get_site_solar_config("site-002")
-        assert cfg.grid.max_export_kw == 946.0
+        assert cfg.grid.max_export_kw == 297.0
 
     def test_grid_sseg_category_b(self):
         cfg = get_site_solar_config("site-002")
@@ -191,3 +191,15 @@ class TestNoStaleConstants:
     def test_no_3875(self):
         cfg = get_site_solar_config("site-002")
         assert cfg.pv.total_capacity_kwp != 3875.0
+
+    def test_no_946_pv(self):
+        cfg = get_site_solar_config("site-002")
+        assert cfg.pv.total_capacity_kwp != 946.0
+
+    def test_no_500_bess(self):
+        cfg = get_site_solar_config("site-002")
+        assert cfg.bess.capacity_kwh != 500.0
+
+    def test_no_250_bess_power(self):
+        cfg = get_site_solar_config("site-002")
+        assert cfg.bess.rated_power_kw != 250.0

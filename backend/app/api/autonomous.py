@@ -53,10 +53,7 @@ async def disable_autonomous_mode():
 
 @router.get("/decisions")
 async def get_autonomous_decisions(
-    limit: Optional[int] = 100,
-    offset: Optional[int] = 0,
-    device_id: Optional[str] = None,
-    status: Optional[str] = None
+    limit: Optional[int] = 100, offset: Optional[int] = 0, device_id: Optional[str] = None, status: Optional[str] = None
 ):
     """Get autonomous decision history."""
     if not autonomous_decision_engine._initialized:
@@ -74,16 +71,13 @@ async def get_autonomous_decisions(
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
 
     decisions = autonomous_decision_engine.get_decision_history(
-        limit=limit,
-        offset=offset,
-        device_id=device_id,
-        status=status_enum
+        limit=limit, offset=offset, device_id=device_id, status=status_enum
     )
 
     return {
         "data": [d.to_dict() for d in decisions],
         "count": len(decisions),
-        "total": len(autonomous_decision_engine.decision_history)
+        "total": len(autonomous_decision_engine.decision_history),
     }
 
 
@@ -94,10 +88,7 @@ async def get_autonomous_decision(decision_id: str):
         await autonomous_decision_engine.initialize()
 
     # Search for decision in history
-    decision = next(
-        (d for d in autonomous_decision_engine.decision_history if d.id == decision_id),
-        None
-    )
+    decision = next((d for d in autonomous_decision_engine.decision_history if d.id == decision_id), None)
 
     if not decision:
         raise HTTPException(status_code=404, detail=f"Decision {decision_id} not found")
@@ -112,18 +103,14 @@ async def approve_autonomous_decision(decision_id: str):
         await autonomous_decision_engine.initialize()
 
     # Search for decision
-    decision = next(
-        (d for d in autonomous_decision_engine.decision_history if d.id == decision_id),
-        None
-    )
+    decision = next((d for d in autonomous_decision_engine.decision_history if d.id == decision_id), None)
 
     if not decision:
         raise HTTPException(status_code=404, detail=f"Decision {decision_id} not found")
 
     if decision.status.value != "pending":
         raise HTTPException(
-            status_code=400,
-            detail=f"Decision {decision_id} has status {decision.status.value}, not pending"
+            status_code=400, detail=f"Decision {decision_id} has status {decision.status.value}, not pending"
         )
 
     # Execute the approved decision
@@ -133,13 +120,13 @@ async def approve_autonomous_decision(decision_id: str):
             device_id=decision.device_id,
             point_name=decision.point_name,
             target_value=decision.target_value,
-            decision_rationale=f"Manual approval: {decision.decision_rationale}"
+            decision_rationale=f"Manual approval: {decision.decision_rationale}",
         )
 
         return {
             "success": True,
             "message": f"Decision {decision_id} approved and executed",
-            "execution_result": result.to_dict()
+            "execution_result": result.to_dict(),
         }
 
     except Exception as e:
@@ -151,10 +138,7 @@ async def get_boundary_status(device_id: Optional[str] = None):
     """Get current boundary status for all or a specific device."""
     if not safety_boundary_service:
         logger.warning("SafetyBoundaryService not properly initialized")
-        return {
-            "data": {},
-            "message": "Boundary monitoring temporarily unavailable"
-        }
+        return {"data": {}, "message": "Boundary monitoring temporarily unavailable"}
 
     devices = await device_manager.list_devices()
 
@@ -176,13 +160,10 @@ async def get_boundary_status(device_id: Optional[str] = None):
                 "device_id": device.id,
                 "device_name": device.name,
                 "error": str(e),
-                "overall_status": "error"
+                "overall_status": "error",
             }
 
-    return {
-        "data": device_statuses,
-        "count": len(device_statuses)
-    }
+    return {"data": device_statuses, "count": len(device_statuses)}
 
 
 @router.post("/boundaries/update")
@@ -193,10 +174,7 @@ async def update_boundary_config(request: Dict[str, Any]):
     new_boundaries = request.get("new_boundaries", {})
 
     if not device_id or not point_name:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing required fields: device_id, point_name"
-        )
+        raise HTTPException(status_code=400, detail="Missing required fields: device_id, point_name")
 
     device = await device_manager.get_device(device_id)
     if not device:
@@ -204,16 +182,11 @@ async def update_boundary_config(request: Dict[str, Any]):
 
     try:
         success = await safety_boundary_service.update_boundary_config(
-            device_id=device_id,
-            point_name=point_name,
-            new_boundaries=new_boundaries
+            device_id=device_id, point_name=point_name, new_boundaries=new_boundaries
         )
 
         if success:
-            return {
-                "success": True,
-                "message": f"Boundary configuration updated for {device_id}.{point_name}"
-            }
+            return {"success": True, "message": f"Boundary configuration updated for {device_id}.{point_name}"}
         else:
             raise HTTPException(status_code=500, detail="Failed to update boundary configuration")
 
@@ -233,10 +206,7 @@ async def get_autonomous_performance(days: Optional[int] = 7):
     start_date = end_date - timedelta(days=days)
 
     # Filter decisions for the date range
-    period_decisions = [
-        d for d in autonomous_decision_engine.decision_history
-        if start_date <= d.timestamp <= end_date
-    ]
+    period_decisions = [d for d in autonomous_decision_engine.decision_history if start_date <= d.timestamp <= end_date]
 
     total = len(period_decisions)
     successful = len([d for d in period_decisions if d.status.value == "success"])
@@ -247,14 +217,8 @@ async def get_autonomous_performance(days: Optional[int] = 7):
     success_rate = (successful / total * 100) if total > 0 else 0
 
     # Calculate average execution time
-    execution_times = [
-        d.execution_time_ms for d in period_decisions
-        if d.execution_time_ms is not None
-    ]
-    avg_execution_time = (
-        sum(execution_times) / len(execution_times)
-        if execution_times else 0
-    )
+    execution_times = [d.execution_time_ms for d in period_decisions if d.execution_time_ms is not None]
+    avg_execution_time = sum(execution_times) / len(execution_times) if execution_times else 0
 
     return {
         "period_days": days,
@@ -265,7 +229,7 @@ async def get_autonomous_performance(days: Optional[int] = 7):
         "cancelled": cancelled,
         "success_rate": round(success_rate, 2),
         "avg_execution_time_ms": round(avg_execution_time, 2),
-        "safety_score": await calculate_safety_score(period_decisions)
+        "safety_score": await calculate_safety_score(period_decisions),
     }
 
 
@@ -277,10 +241,7 @@ async def calculate_safety_score(decisions):
         return 100.0
 
     # Count blocked/failed decisions (indicates safety system working)
-    blocked_or_failed = len([
-        d for d in decisions
-        if d.status in (DecisionStatus.BLOCKED, DecisionStatus.FAILED)
-    ])
+    blocked_or_failed = len([d for d in decisions if d.status in (DecisionStatus.BLOCKED, DecisionStatus.FAILED)])
 
     # More blocked/failed decisions = higher safety score (system is protective)
     # But too many might indicate system is too restrictive
@@ -310,7 +271,7 @@ async def test_autonomous_decision():
     # Find a controllable point
     controllable_point = None
     for point_name, point in device.points.items():
-        if hasattr(point, 'writable') and point.writable:
+        if hasattr(point, "writable") and point.writable:
             controllable_point = point_name
             break
 
@@ -325,14 +286,10 @@ async def test_autonomous_decision():
             device_id=device.id,
             point_name=controllable_point,
             target_value=22.0,  # Safe default value
-            decision_rationale="Test autonomous decision execution"
+            decision_rationale="Test autonomous decision execution",
         )
 
-        return {
-            "success": True,
-            "message": "Test decision executed successfully",
-            "decision": decision.to_dict()
-        }
+        return {"success": True, "message": "Test decision executed successfully", "decision": decision.to_dict()}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Test decision failed: {str(e)}")

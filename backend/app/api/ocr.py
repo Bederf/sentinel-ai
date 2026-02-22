@@ -23,23 +23,19 @@ router = APIRouter(prefix="/ocr", tags=["ocr"])
 # Max image size: 5MB
 MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
-ALLOWED_MEDIA_TYPES = {
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
-    "image/gif",
-    "image/webp"
-}
+ALLOWED_MEDIA_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"}
 
 
 class CorrectionRequest(BaseModel):
     """Request for submitting a correction."""
+
     correction: str = Field(..., description="Corrected value for the field")
     telegram_user_id: Optional[str] = Field(None, description="Telegram user ID")
 
 
 class OCRProcessRequest(BaseModel):
     """Request for processing service sheet via base64."""
+
     image: str = Field(..., description="Base64-encoded image data")
     media_type: str = Field(default="image/jpeg", description="Image MIME type")
     equipment_id: str = Field(..., description="Equipment identifier")
@@ -52,7 +48,7 @@ async def process_service_sheet(
     file: UploadFile = File(...),
     equipment_id: str = Form(...),
     service_type: str = Form(...),
-    service_record_id: str = Form(...)
+    service_record_id: str = Form(...),
 ):
     """
     Process service sheet photo through 3-stage OCR pipeline.
@@ -74,19 +70,13 @@ async def process_service_sheet(
     """
     # Validate file type
     if file.content_type not in ALLOWED_MEDIA_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File must be an image. Allowed types: {ALLOWED_MEDIA_TYPES}"
-        )
+        raise HTTPException(status_code=400, detail=f"File must be an image. Allowed types: {ALLOWED_MEDIA_TYPES}")
 
     # Read image data
     image_data = await file.read()
 
     if len(image_data) > MAX_IMAGE_SIZE:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Image exceeds {MAX_IMAGE_SIZE // (1024 * 1024)}MB limit"
-        )
+        raise HTTPException(status_code=400, detail=f"Image exceeds {MAX_IMAGE_SIZE // (1024 * 1024)}MB limit")
 
     # Get OCR service
     ocr_service = get_ocr_service()
@@ -97,7 +87,7 @@ async def process_service_sheet(
             equipment_id=equipment_id,
             service_type=service_type,
             service_record_id=service_record_id,
-            media_type=file.content_type
+            media_type=file.content_type,
         )
 
         return result
@@ -128,10 +118,7 @@ async def process_service_sheet_base64(request: OCRProcessRequest):
         raise HTTPException(status_code=400, detail=f"Invalid base64 image: {e}")
 
     if len(image_data) > MAX_IMAGE_SIZE:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Image exceeds {MAX_IMAGE_SIZE // (1024 * 1024)}MB limit"
-        )
+        raise HTTPException(status_code=400, detail=f"Image exceeds {MAX_IMAGE_SIZE // (1024 * 1024)}MB limit")
 
     # Get OCR service
     ocr_service = get_ocr_service()
@@ -142,7 +129,7 @@ async def process_service_sheet_base64(request: OCRProcessRequest):
             equipment_id=request.equipment_id,
             service_type=request.service_type,
             service_record_id=request.service_record_id,
-            media_type=request.media_type
+            media_type=request.media_type,
         )
 
         return result
@@ -176,17 +163,14 @@ async def get_ocr_status(service_record_id: str):
             "status": "needs_review",
             "corrections_pending": status["total_issues"] - status["current_index"],
             "corrections_made": status["corrections_made"],
-            "progress": f"{status['current_index']}/{status['total_issues']}"
+            "progress": f"{status['current_index']}/{status['total_issues']}",
         }
 
     return {"status": "unknown", "message": "No active processing for this record"}
 
 
 @router.post("/correction/{service_record_id}")
-async def submit_correction(
-    service_record_id: str,
-    request: CorrectionRequest
-):
+async def submit_correction(service_record_id: str, request: CorrectionRequest):
     """
     Submit a correction for an OCR field.
 
@@ -198,15 +182,9 @@ async def submit_correction(
     correction_handler = get_ocr_correction_handler()
 
     if not correction_handler.has_pending_correction(service_record_id):
-        raise HTTPException(
-            status_code=404,
-            detail="No pending correction session for this service record"
-        )
+        raise HTTPException(status_code=404, detail="No pending correction session for this service record")
 
-    result = await correction_handler.process_correction_response(
-        service_record_id,
-        request.correction
-    )
+    result = await correction_handler.process_correction_response(service_record_id, request.correction)
 
     return result
 
@@ -219,11 +197,7 @@ async def get_correction_status(service_record_id: str):
 
 
 @router.post("/correction/{service_record_id}/start")
-async def start_correction_flow(
-    service_record_id: str,
-    pipeline_result: dict,
-    telegram_user_id: str = Form(...)
-):
+async def start_correction_flow(service_record_id: str, pipeline_result: dict, telegram_user_id: str = Form(...)):
     """
     Start correction flow for a service record.
 
@@ -233,11 +207,7 @@ async def start_correction_flow(
     """
     correction_handler = get_ocr_correction_handler()
 
-    result = await correction_handler.start_correction_flow(
-        service_record_id,
-        pipeline_result,
-        telegram_user_id
-    )
+    result = await correction_handler.start_correction_flow(service_record_id, pipeline_result, telegram_user_id)
 
     return result
 
@@ -250,7 +220,4 @@ async def cancel_correction_flow(service_record_id: str):
     if correction_handler.cancel_correction_flow(service_record_id):
         return {"success": True, "message": "Correction flow cancelled"}
     else:
-        raise HTTPException(
-            status_code=404,
-            detail="No active correction flow for this service record"
-        )
+        raise HTTPException(status_code=404, detail="No active correction flow for this service record")

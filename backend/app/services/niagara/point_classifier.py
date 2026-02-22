@@ -26,14 +26,16 @@ DATA_DIR = Path(__file__).parent.parent.parent / "data" / "niagara"
 
 class ConfidenceLevel(str, Enum):
     """Classification confidence levels."""
-    HIGH = "high"      # Exact regex or keyword match
+
+    HIGH = "high"  # Exact regex or keyword match
     MEDIUM = "medium"  # Partial match or inferred
-    LOW = "low"        # Best guess, needs review
+    LOW = "low"  # Best guess, needs review
     UNKNOWN = "unknown"  # Could not classify
 
 
 class PointType(str, Enum):
     """BMS point functional types."""
+
     SENSOR = "sensor"
     SETPOINT = "setpoint"
     COMMAND = "command"
@@ -189,27 +191,19 @@ class PointClassifier:
         equipment_type, equip_confidence = self._match_equipment_type(search_text)
 
         # Step 3: Match point category (temperature, pressure, etc.)
-        point_category, category_brick, category_unit, cat_confidence = (
-            self._match_point_category(search_text)
-        )
+        point_category, category_brick, category_unit, cat_confidence = self._match_point_category(search_text)
 
         # Step 4: Infer point type
-        point_type = self._infer_point_type(
-            search_text, object_type, writable, point_category
-        )
+        point_type = self._infer_point_type(search_text, object_type, writable, point_category)
 
         # Step 5: Resolve units
         resolved_unit = self._resolve_unit(units, category_unit)
 
         # Step 6: Generate standardized name
-        standardized_name = self._generate_standardized_name(
-            equipment_id, equipment_type, point_category, point_type
-        )
+        standardized_name = self._generate_standardized_name(equipment_id, equipment_type, point_category, point_type)
 
         # Step 7: Calculate overall confidence
-        confidence = self._calculate_confidence(
-            equip_confidence, cat_confidence, equipment_type, point_category
-        )
+        confidence = self._calculate_confidence(equip_confidence, cat_confidence, equipment_type, point_category)
 
         # Build tags list
         tags = self._build_tags(equipment_type, point_category, point_type)
@@ -265,9 +259,7 @@ class PointClassifier:
             results.append(result)
         return results
 
-    def get_classification_summary(
-        self, classified_points: List[ClassifiedPoint]
-    ) -> Dict[str, Any]:
+    def get_classification_summary(self, classified_points: List[ClassifiedPoint]) -> Dict[str, Any]:
         """Generate a summary of classification results.
 
         Args:
@@ -283,17 +275,11 @@ class PointClassifier:
 
         for cp in classified_points:
             # Equipment type counts
-            equipment_counts[cp.equipment_type] = (
-                equipment_counts.get(cp.equipment_type, 0) + 1
-            )
+            equipment_counts[cp.equipment_type] = equipment_counts.get(cp.equipment_type, 0) + 1
             # Confidence counts
-            confidence_counts[cp.confidence.value] = (
-                confidence_counts.get(cp.confidence.value, 0) + 1
-            )
+            confidence_counts[cp.confidence.value] = confidence_counts.get(cp.confidence.value, 0) + 1
             # Point type counts
-            point_type_counts[cp.point_type.value] = (
-                point_type_counts.get(cp.point_type.value, 0) + 1
-            )
+            point_type_counts[cp.point_type.value] = point_type_counts.get(cp.point_type.value, 0) + 1
             # Track unique equipment IDs
             if cp.equipment_id:
                 if cp.equipment_type not in equipment_ids:
@@ -306,13 +292,9 @@ class PointClassifier:
             "equipment_type_counts": equipment_counts,
             "confidence_counts": confidence_counts,
             "point_type_counts": point_type_counts,
-            "unique_equipment": {
-                eq_type: len(ids)
-                for eq_type, ids in equipment_ids.items()
-            },
+            "unique_equipment": {eq_type: len(ids) for eq_type, ids in equipment_ids.items()},
             "equipment_ids": equipment_ids,
-            "needs_review": confidence_counts.get("low", 0)
-            + confidence_counts.get("unknown", 0),
+            "needs_review": confidence_counts.get("low", 0) + confidence_counts.get("unknown", 0),
         }
 
     # ------------------------------------------------------------------
@@ -336,7 +318,7 @@ class PointClassifier:
         # Stops at the first underscore that separates the prefix from the point name
         # Uses [A-Za-z0-9] (no underscore) in dash-groups to prevent matching past dashes
         match = re.match(
-            r'^([A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*)_',
+            r"^([A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*)_",
             point_name,
         )
         if match:
@@ -349,9 +331,7 @@ class PointClassifier:
 
         return ""
 
-    def _match_equipment_type(
-        self, search_text: str
-    ) -> Tuple[str, ConfidenceLevel]:
+    def _match_equipment_type(self, search_text: str) -> Tuple[str, ConfidenceLevel]:
         """Match equipment type using regex patterns.
 
         Returns:
@@ -370,9 +350,7 @@ class PointClassifier:
                     # Check for exact vs partial match
                     # If the equipment abbreviation appears at the start or
                     # as a prefix, it's a high confidence match
-                    if re.match(
-                        rf"^{pattern}", search_text.split()[0], re.IGNORECASE
-                    ):
+                    if re.match(rf"^{pattern}", search_text.split()[0], re.IGNORECASE):
                         best_match = eq_type
                         best_confidence = ConfidenceLevel.HIGH
                         break  # Exact match, no need to continue
@@ -386,9 +364,7 @@ class PointClassifier:
 
         return best_match, best_confidence
 
-    def _match_point_category(
-        self, search_text: str
-    ) -> Tuple[str, str, str, ConfidenceLevel]:
+    def _match_point_category(self, search_text: str) -> Tuple[str, str, str, ConfidenceLevel]:
         """Match point category using keyword tags.
 
         Returns:
@@ -547,8 +523,10 @@ class PointClassifier:
         if equipment_type == "unknown" or point_category == "unknown":
             # If at least one dimension is confidently identified,
             # treat as medium to reduce excessive "low" classifications.
-            if equip_confidence in [ConfidenceLevel.HIGH, ConfidenceLevel.MEDIUM] \
-                    or cat_confidence in [ConfidenceLevel.HIGH, ConfidenceLevel.MEDIUM]:
+            if equip_confidence in [ConfidenceLevel.HIGH, ConfidenceLevel.MEDIUM] or cat_confidence in [
+                ConfidenceLevel.HIGH,
+                ConfidenceLevel.MEDIUM,
+            ]:
                 return ConfidenceLevel.MEDIUM
             return ConfidenceLevel.LOW
 

@@ -43,6 +43,10 @@ class NotificationService:
             ChannelType.SMS: BulkSMSProvider(),
         }
 
+    async def initialize(self):
+        """Initialize notification service (no-op, providers ready from __init__)."""
+        pass
+
     async def notify_technician(
         self,
         technician_id: UUID,

@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class ActionPriority(str, Enum):
     """Priority levels for recommended actions."""
+
     HIGH = "HIGH"
     MEDIUM = "MEDIUM"
     LOW = "LOW"
@@ -23,6 +24,7 @@ class ActionPriority(str, Enum):
 @dataclass
 class RecommendedAction:
     """A recommended maintenance action."""
+
     action: str
     priority: ActionPriority = ActionPriority.MEDIUM
 
@@ -33,21 +35,19 @@ class RecommendedAction:
 @dataclass
 class PartNeeded:
     """A part needed for maintenance."""
+
     name: str
     quantity: Optional[str] = None
     part_number: Optional[str] = None
 
     def to_dict(self) -> dict:
-        return {
-            "name": self.name,
-            "quantity": self.quantity,
-            "part_number": self.part_number
-        }
+        return {"name": self.name, "quantity": self.quantity, "part_number": self.part_number}
 
 
 @dataclass
 class ParsedExplanation:
     """Structured explanation parsed from LLM output."""
+
     summary: str = ""
     key_factors: List[str] = field(default_factory=list)
     recommended_actions: List[RecommendedAction] = field(default_factory=list)
@@ -67,13 +67,14 @@ class ParsedExplanation:
             "labor_estimate": self.labor_estimate,
             "additional_notes": self.additional_notes,
             "parse_success": self.parse_success,
-            "parse_errors": self.parse_errors
+            "parse_errors": self.parse_errors,
         }
 
 
 @dataclass
 class ParsedRecommendation:
     """Structured recommendation parsed from maintenance template."""
+
     immediate_actions: List[str] = field(default_factory=list)
     scheduled_maintenance: List[Dict[str, str]] = field(default_factory=list)
     preventive_measures: List[str] = field(default_factory=list)
@@ -93,7 +94,7 @@ class ParsedRecommendation:
             "technician_skills": self.technician_skills,
             "estimated_downtime": self.estimated_downtime,
             "parse_success": self.parse_success,
-            "parse_errors": self.parse_errors
+            "parse_errors": self.parse_errors,
         }
 
 
@@ -107,7 +108,7 @@ class ExplanationParser:
         "RECOMMENDED_ACTIONS",
         "PARTS_NEEDED",
         "LABOR_ESTIMATE",
-        "ADDITIONAL_NOTES"
+        "ADDITIONAL_NOTES",
     ]
 
     RECOMMENDATION_SECTIONS = [
@@ -116,7 +117,7 @@ class ExplanationParser:
         "PREVENTIVE_MEASURES",
         "SPARE_PARTS",
         "TECHNICIAN_SKILLS",
-        "ESTIMATED_DOWNTIME"
+        "ESTIMATED_DOWNTIME",
     ]
 
     @classmethod
@@ -141,9 +142,7 @@ class ExplanationParser:
             result.key_factors = cls._parse_list_items(sections.get("KEY_FACTORS", ""))
 
             # Parse recommended actions with priorities
-            result.recommended_actions = cls._parse_actions(
-                sections.get("RECOMMENDED_ACTIONS", "")
-            )
+            result.recommended_actions = cls._parse_actions(sections.get("RECOMMENDED_ACTIONS", ""))
 
             # Parse parts needed
             result.parts_needed = cls._parse_parts(sections.get("PARTS_NEEDED", ""))
@@ -182,34 +181,22 @@ class ExplanationParser:
             sections = cls._extract_sections(text, cls.RECOMMENDATION_SECTIONS)
 
             # Parse immediate actions
-            result.immediate_actions = cls._parse_list_items(
-                sections.get("IMMEDIATE_ACTIONS", "")
-            )
+            result.immediate_actions = cls._parse_list_items(sections.get("IMMEDIATE_ACTIONS", ""))
 
             # Parse scheduled maintenance with timeline
-            result.scheduled_maintenance = cls._parse_scheduled_items(
-                sections.get("SCHEDULED_MAINTENANCE", "")
-            )
+            result.scheduled_maintenance = cls._parse_scheduled_items(sections.get("SCHEDULED_MAINTENANCE", ""))
 
             # Parse preventive measures
-            result.preventive_measures = cls._parse_list_items(
-                sections.get("PREVENTIVE_MEASURES", "")
-            )
+            result.preventive_measures = cls._parse_list_items(sections.get("PREVENTIVE_MEASURES", ""))
 
             # Parse spare parts with details
-            result.spare_parts = cls._parse_detailed_parts(
-                sections.get("SPARE_PARTS", "")
-            )
+            result.spare_parts = cls._parse_detailed_parts(sections.get("SPARE_PARTS", ""))
 
             # Parse technician skills
-            result.technician_skills = cls._parse_list_items(
-                sections.get("TECHNICIAN_SKILLS", "")
-            )
+            result.technician_skills = cls._parse_list_items(sections.get("TECHNICIAN_SKILLS", ""))
 
             # Parse estimated downtime
-            result.estimated_downtime = cls._clean_text(
-                sections.get("ESTIMATED_DOWNTIME", "")
-            )
+            result.estimated_downtime = cls._clean_text(sections.get("ESTIMATED_DOWNTIME", ""))
 
         except Exception as e:
             logger.error(f"Error parsing recommendation: {e}")
@@ -239,7 +226,7 @@ class ExplanationParser:
                 rf"###\s*{section}\s*\n(.*?)(?=###|$)",
                 rf"##\s*{section}\s*\n(.*?)(?=##|$)",
                 rf"\*\*{section}\*\*\s*\n(.*?)(?=\*\*[A-Z_]+\*\*|$)",
-                rf"{section}:\s*\n(.*?)(?=[A-Z_]+:|$)"
+                rf"{section}:\s*\n(.*?)(?=[A-Z_]+:|$)",
             ]
 
             for pattern in patterns:
@@ -264,11 +251,11 @@ class ExplanationParser:
             return ""
 
         # Remove markdown artifacts
-        text = re.sub(r'\[([^\]]+)\]', r'\1', text)  # [text] -> text
-        text = re.sub(r'\*+', '', text)  # Remove asterisks
+        text = re.sub(r"\[([^\]]+)\]", r"\1", text)  # [text] -> text
+        text = re.sub(r"\*+", "", text)  # Remove asterisks
 
         # Clean whitespace
-        text = ' '.join(text.split())
+        text = " ".join(text.split())
 
         return text.strip()
 
@@ -286,15 +273,15 @@ class ExplanationParser:
             return []
 
         items = []
-        lines = text.split('\n')
+        lines = text.split("\n")
 
         for line in lines:
             line = line.strip()
             # Match lines starting with -, *, or numbers
-            match = re.match(r'^[\-\*\d\.]+\s*(.+)', line)
+            match = re.match(r"^[\-\*\d\.]+\s*(.+)", line)
             if match:
                 item = cls._clean_text(match.group(1))
-                if item and item.lower() not in ['none', 'n/a', 'none anticipated']:
+                if item and item.lower() not in ["none", "n/a", "none anticipated"]:
                     items.append(item)
 
         return items
@@ -313,15 +300,15 @@ class ExplanationParser:
             return []
 
         actions = []
-        lines = text.split('\n')
+        lines = text.split("\n")
 
         for line in lines:
             line = line.strip()
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
 
             # Match: - [PRIORITY] Action text
-            match = re.match(r'^[\-\*]\s*\[?(HIGH|MEDIUM|LOW)\]?\s*(.+)', line, re.IGNORECASE)
+            match = re.match(r"^[\-\*]\s*\[?(HIGH|MEDIUM|LOW)\]?\s*(.+)", line, re.IGNORECASE)
             if match:
                 priority_str = match.group(1).upper()
                 action_text = cls._clean_text(match.group(2))
@@ -335,14 +322,11 @@ class ExplanationParser:
                     actions.append(RecommendedAction(action=action_text, priority=priority))
             else:
                 # Try matching without priority marker
-                match = re.match(r'^[\-\*\d\.]+\s*(.+)', line)
+                match = re.match(r"^[\-\*\d\.]+\s*(.+)", line)
                 if match:
                     action_text = cls._clean_text(match.group(1))
-                    if action_text and action_text.lower() not in ['none', 'n/a']:
-                        actions.append(RecommendedAction(
-                            action=action_text,
-                            priority=ActionPriority.MEDIUM
-                        ))
+                    if action_text and action_text.lower() not in ["none", "n/a"]:
+                        actions.append(RecommendedAction(action=action_text, priority=ActionPriority.MEDIUM))
 
         return actions
 
@@ -360,20 +344,20 @@ class ExplanationParser:
             return []
 
         parts = []
-        lines = text.split('\n')
+        lines = text.split("\n")
 
         for line in lines:
             line = line.strip()
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
 
             # Match: - Part name (quantity)
-            match = re.match(r'^[\-\*]\s*(.+?)(?:\s*\(([^)]+)\))?\s*$', line)
+            match = re.match(r"^[\-\*]\s*(.+?)(?:\s*\(([^)]+)\))?\s*$", line)
             if match:
                 name = cls._clean_text(match.group(1))
                 quantity = match.group(2) if match.group(2) else None
 
-                if name and name.lower() not in ['none', 'n/a', 'none anticipated']:
+                if name and name.lower() not in ["none", "n/a", "none anticipated"]:
                     parts.append(PartNeeded(name=name, quantity=quantity))
 
         return parts
@@ -392,30 +376,24 @@ class ExplanationParser:
             return []
 
         items = []
-        lines = text.split('\n')
+        lines = text.split("\n")
 
         for line in lines:
             line = line.strip()
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
 
             # Match: - [Timeline] Action
-            match = re.match(r'^[\-\*]\s*\[([^\]]+)\]\s*(.+)', line)
+            match = re.match(r"^[\-\*]\s*\[([^\]]+)\]\s*(.+)", line)
             if match:
-                items.append({
-                    "timeline": cls._clean_text(match.group(1)),
-                    "action": cls._clean_text(match.group(2))
-                })
+                items.append({"timeline": cls._clean_text(match.group(1)), "action": cls._clean_text(match.group(2))})
             else:
                 # Try without timeline brackets
-                match = re.match(r'^[\-\*]\s*(.+)', line)
+                match = re.match(r"^[\-\*]\s*(.+)", line)
                 if match:
                     action = cls._clean_text(match.group(1))
-                    if action and action.lower() not in ['none', 'n/a']:
-                        items.append({
-                            "timeline": "As scheduled",
-                            "action": action
-                        })
+                    if action and action.lower() not in ["none", "n/a"]:
+                        items.append({"timeline": "As scheduled", "action": action})
 
         return items
 
@@ -433,24 +411,24 @@ class ExplanationParser:
             return []
 
         parts = []
-        lines = text.split('\n')
+        lines = text.split("\n")
 
         for line in lines:
             line = line.strip()
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
 
             # Match: - Name | Part Number | Quantity
-            match = re.match(r'^[\-\*]\s*(.+)', line)
+            match = re.match(r"^[\-\*]\s*(.+)", line)
             if match:
                 content = match.group(1)
-                segments = [s.strip() for s in content.split('|')]
+                segments = [s.strip() for s in content.split("|")]
 
-                if segments and segments[0].lower() not in ['none', 'n/a']:
+                if segments and segments[0].lower() not in ["none", "n/a"]:
                     part = PartNeeded(
                         name=cls._clean_text(segments[0]),
                         part_number=cls._clean_text(segments[1]) if len(segments) > 1 else None,
-                        quantity=cls._clean_text(segments[2]) if len(segments) > 2 else None
+                        quantity=cls._clean_text(segments[2]) if len(segments) > 2 else None,
                     )
                     parts.append(part)
 

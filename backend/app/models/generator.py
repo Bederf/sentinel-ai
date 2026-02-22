@@ -11,28 +11,31 @@ from typing import List, Dict, Any, Optional
 
 class GeneratorStatus(str, Enum):
     """Operating status of a generator."""
-    STANDBY = "standby"           # Ready to start
-    RUNNING = "running"           # Engine running, not on load
-    ON_LOAD = "on_load"           # Running and supplying load
-    COOLING = "cooling"           # Post-run cooldown
-    MAINTENANCE = "maintenance"   # Out of service
-    FAULT = "fault"               # Alarm condition
-    OFFLINE = "offline"           # Not communicating
+
+    STANDBY = "standby"  # Ready to start
+    RUNNING = "running"  # Engine running, not on load
+    ON_LOAD = "on_load"  # Running and supplying load
+    COOLING = "cooling"  # Post-run cooldown
+    MAINTENANCE = "maintenance"  # Out of service
+    FAULT = "fault"  # Alarm condition
+    OFFLINE = "offline"  # Not communicating
 
 
 class ControllerModel(str, Enum):
     """DeepSea controller models."""
-    DSE7320 = "DSE7320"           # Standard AMF/ATS controller
-    DSE7420 = "DSE7420"           # Advanced with load share
-    DSE8610 = "DSE8610"           # Parallel/synchronizing
-    DSE8660 = "DSE8660"           # Advanced parallel
+
+    DSE7320 = "DSE7320"  # Standard AMF/ATS controller
+    DSE7420 = "DSE7420"  # Advanced with load share
+    DSE8610 = "DSE8610"  # Parallel/synchronizing
+    DSE8660 = "DSE8660"  # Advanced parallel
 
 
 class TransferMode(str, Enum):
     """ATS transfer mode."""
-    OPEN = "open"                 # Open transition (break before make)
-    CLOSED = "closed"             # Closed transition (brief parallel)
-    SOFT_LOAD = "soft_load"       # Ramped load transfer
+
+    OPEN = "open"  # Open transition (break before make)
+    CLOSED = "closed"  # Closed transition (brief parallel)
+    SOFT_LOAD = "soft_load"  # Ramped load transfer
 
 
 @dataclass

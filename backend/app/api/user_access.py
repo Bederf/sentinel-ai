@@ -31,18 +31,21 @@ self_service_router = APIRouter(prefix="/api/user-access", tags=["user-access"])
 
 class GrantAccessRequest(BaseModel):
     """Request to grant building access."""
+
     user_email: EmailStr
     building_code: str  # e.g., 'site-002'
 
 
 class RevokeAccessRequest(BaseModel):
     """Request to revoke building access."""
+
     user_email: EmailStr
     building_code: str
 
 
 class BuildingAccessInfo(BaseModel):
     """Building access info for a user."""
+
     building_id: str
     building_code: str
     building_name: str
@@ -53,18 +56,21 @@ class BuildingAccessInfo(BaseModel):
 
 class UserAccessResponse(BaseModel):
     """Response with user's building access list."""
+
     user_email: str
     buildings: List[BuildingAccessInfo]
 
 
 class BuildingUsersResponse(BaseModel):
     """Response with users who have access to a building."""
+
     building_code: str
     users: List[dict]
 
 
 class ModuleGrantRequest(BaseModel):
     """Admin request to set module grants for a user and site."""
+
     user_email: EmailStr
     site_code: str
     modules: List[str]
@@ -72,6 +78,7 @@ class ModuleGrantRequest(BaseModel):
 
 class AccessRequestDecisionRequest(BaseModel):
     """Admin approval/rejection decision for a pending access request."""
+
     approve: bool = True
     granted_modules: Optional[List[str]] = None
     review_notes: Optional[str] = None
@@ -101,14 +108,16 @@ async def get_user_buildings(
     buildings = []
     for access in access_list:
         building = access.get("buildings", {})
-        buildings.append(BuildingAccessInfo(
-            building_id=building.get("id", ""),
-            building_code=building.get("code", ""),
-            building_name=building.get("name", ""),
-            region=building.get("region"),
-            granted_by=access.get("granted_by"),
-            granted_at=access.get("granted_at"),
-        ))
+        buildings.append(
+            BuildingAccessInfo(
+                building_id=building.get("id", ""),
+                building_code=building.get("code", ""),
+                building_name=building.get("name", ""),
+                region=building.get("region"),
+                granted_by=access.get("granted_by"),
+                granted_at=access.get("granted_at"),
+            )
+        )
 
     return UserAccessResponse(
         user_email=email.lower(),
@@ -134,10 +143,7 @@ async def grant_access(
     building = building_repo.get_by_id(request.building_code)
 
     if not building:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Building '{request.building_code}' not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Building '{request.building_code}' not found")
 
     building_id = building.get("id")
 
@@ -150,19 +156,13 @@ async def grant_access(
     )
 
     if result:
-        logger.info(
-            f"Admin {auth.email} granted {request.user_email} "
-            f"access to {request.building_code}"
-        )
+        logger.info(f"Admin {auth.email} granted {request.user_email} access to {request.building_code}")
         return {
             "success": True,
             "message": f"Granted {request.user_email} access to {request.building_code}",
         }
     else:
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to grant access"
-        )
+        raise HTTPException(status_code=500, detail="Failed to grant access")
 
 
 @router.delete("/revoke")
@@ -183,10 +183,7 @@ async def revoke_access(
     building = building_repo.get_by_id(request.building_code)
 
     if not building:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Building '{request.building_code}' not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Building '{request.building_code}' not found")
 
     building_id = building.get("id")
 
@@ -198,18 +195,14 @@ async def revoke_access(
     )
 
     if success:
-        logger.info(
-            f"Admin {auth.email} revoked {request.user_email} "
-            f"access to {request.building_code}"
-        )
+        logger.info(f"Admin {auth.email} revoked {request.user_email} access to {request.building_code}")
         return {
             "success": True,
             "message": f"Revoked {request.user_email} access to {request.building_code}",
         }
     else:
         raise HTTPException(
-            status_code=404,
-            detail=f"No access record found for {request.user_email} to {request.building_code}"
+            status_code=404, detail=f"No access record found for {request.user_email} to {request.building_code}"
         )
 
 
@@ -231,10 +224,7 @@ async def get_building_users(
     building = building_repo.get_by_id(building_code)
 
     if not building:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Building '{building_code}' not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Building '{building_code}' not found")
 
     building_id = building.get("id")
 

@@ -102,14 +102,7 @@ async def test_boundary_status_calculation(setup_boundary_service):
     mock_device = MagicMock()
     mock_device.id = "test_device"
     mock_device.name = "Test Device"
-    mock_device.points = {
-        "temperature": MagicMock(
-            value=24.0,
-            min_bound=16.0,
-            max_bound=28.0,
-            writable=False
-        )
-    }
+    mock_device.points = {"temperature": MagicMock(value=24.0, min_bound=16.0, max_bound=28.0, writable=False)}
 
     # Calculate boundary status
     status = await service.get_boundary_status_summary(mock_device)
@@ -147,7 +140,7 @@ async def test_boundary_approach_percentage(setup_boundary_service):
     test_cases = [
         (16.0, 16.0, 28.0, 0.0, "At minimum"),
         (22.0, 16.0, 28.0, 50.0, "Midpoint"),
-        (26.4, 16.0, 28.0, 85.0, "Approaching maximum"),
+        (26.2, 16.0, 28.0, 85.0, "Approaching maximum"),
         (28.0, 16.0, 28.0, 100.0, "At maximum"),
     ]
 
@@ -166,25 +159,25 @@ async def test_escalation_level_from_boundary_approach(setup_boundary_service):
     service = setup_boundary_service
 
     test_cases = [
-        (50.0, EscalationLevel.LEVEL_0, "Normal"),
-        (77.0, EscalationLevel.LEVEL_1, "Warning"),
-        (86.0, EscalationLevel.LEVEL_2, "Alert"),
-        (96.0, EscalationLevel.LEVEL_3, "Critical"),
-        (100.0, EscalationLevel.LEVEL_4, "Emergency"),
+        (50.0, EscalationLevel.NONE, "Normal"),
+        (77.0, EscalationLevel.WARNING, "Warning"),
+        (86.0, EscalationLevel.ALERT, "Alert"),
+        (96.0, EscalationLevel.CRITICAL, "Critical"),
+        (100.0, EscalationLevel.EMERGENCY, "Emergency"),
     ]
 
     for approach_percent, expected_level, description in test_cases:
         # Determine escalation level
         if approach_percent < 75:
-            level = EscalationLevel.LEVEL_0
+            level = EscalationLevel.NONE
         elif approach_percent < 85:
-            level = EscalationLevel.LEVEL_1
+            level = EscalationLevel.WARNING
         elif approach_percent < 95:
-            level = EscalationLevel.LEVEL_2
+            level = EscalationLevel.ALERT
         elif approach_percent < 100:
-            level = EscalationLevel.LEVEL_3
+            level = EscalationLevel.CRITICAL
         else:
-            level = EscalationLevel.LEVEL_4
+            level = EscalationLevel.EMERGENCY
 
         assert level == expected_level, f"Failed for {description}"
 
@@ -244,17 +237,10 @@ async def test_boundary_configuration_update(setup_boundary_service):
 
     device_id = "config_test"
     point_name = "temperature"
-    new_boundaries = {
-        "min_bound": 14.0,
-        "max_bound": 30.0,
-        "warning_threshold": 0.75,
-        "critical_threshold": 0.95
-    }
+    new_boundaries = {"min_bound": 14.0, "max_bound": 30.0, "warning_threshold": 0.75, "critical_threshold": 0.95}
 
     success = await service.update_boundary_config(
-        device_id=device_id,
-        point_name=point_name,
-        new_boundaries=new_boundaries
+        device_id=device_id, point_name=point_name, new_boundaries=new_boundaries
     )
 
     # Configuration should be updated
@@ -269,16 +255,14 @@ async def test_boundary_violation_logging(setup_boundary_service):
     # Create boundary status showing violation
     boundary_status = BoundaryStatus(
         device_id="violation_test",
-        device_name="Violation Test Device",
-        points_status={
-            "temperature": {
-                "current_value": 29.0,  # Exceeds max of 28
-                "min_bound": 16.0,
-                "max_bound": 28.0
-            }
-        },
+        point_name="temperature",
+        current_value=29.0,
+        boundary_min=16.0,
+        boundary_max=28.0,
         approach_percentage=103.6,  # Exceeds 100%
-        escalation_level=EscalationLevel.LEVEL_4
+        escalation_level=EscalationLevel.EMERGENCY,
+        warnings=["Temperature exceeds maximum boundary"],
+        last_updated=datetime.now(),
     )
 
     # Log violation
@@ -321,15 +305,10 @@ async def test_concurrent_boundary_checks(setup_boundary_service):
     import asyncio
 
     mock_devices = [
-        MagicMock(id=f"device_{i}", name=f"Device {i}",
-                  points={"temp": MagicMock(value=22.0)})
-        for i in range(5)
+        MagicMock(id=f"device_{i}", name=f"Device {i}", points={"temp": MagicMock(value=22.0)}) for i in range(5)
     ]
 
-    checks = [
-        service.get_boundary_status_summary(device)
-        for device in mock_devices
-    ]
+    checks = [service.get_boundary_status_summary(device) for device in mock_devices]
 
     results = await asyncio.gather(*checks)
     assert len(results) == 5

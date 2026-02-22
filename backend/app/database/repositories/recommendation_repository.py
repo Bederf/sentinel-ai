@@ -257,6 +257,26 @@ class RecommendationRepository:
             logger.error(f"Error in upsert for recommendation {rec.id}: {e}")
             raise
 
+    # Tridonic DALI-2 handles these natively — filter out AI duplicates
+    _TRIDONIC_NATIVE_PHRASES = frozenset(
+        [
+            "supplement lighting",
+            "Tridonic harvesting",
+            "increase artificial lighting",
+            "full artificial lighting",
+            "security lighting only",
+            "Daylight harvesting - avg lux",
+            "Zone unoccupied",
+        ]
+    )
+
+    def _is_tridonic_native(self, rec: dict) -> bool:
+        """Return True if this recommendation duplicates Tridonic native behaviour."""
+        reason = rec.get("reason", "")
+        action = rec.get("action", {})
+        point = action.get("point", "") if isinstance(action, dict) else ""
+        return point == "brightness_level" or any(phrase in reason for phrase in self._TRIDONIC_NATIVE_PHRASES)
+
     def _load_all(self) -> None:
         """Load all recommendations from JSON (fallback)."""
         filepath = DATA_DIR / "recommendations.json"
@@ -264,7 +284,9 @@ class RecommendationRepository:
             try:
                 with open(filepath) as f:
                     data = json.load(f)
-                    self._recommendations = data.get("recommendations", {})
+                    raw = data.get("recommendations", {})
+                    # Filter out DALI brightness recs — Tridonic handles natively
+                    self._recommendations = {k: v for k, v in raw.items() if not self._is_tridonic_native(v)}
             except Exception as e:
                 logger.error(f"Error loading recommendations.json: {e}")
                 self._recommendations = {}

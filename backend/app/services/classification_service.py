@@ -87,6 +87,7 @@ class FailureClassificationService:
             # Try JSON fallback
             import json
             from pathlib import Path
+
             equipment_file = Path(__file__).parent.parent / "data" / "equipment.json"
             with open(equipment_file) as f:
                 all_equipment = json.load(f)
@@ -103,14 +104,12 @@ class FailureClassificationService:
 
         # Get current features
         try:
-            features = self.feature_service.compute_features(
-                equipment_id=equipment_id,
-                equipment_type=equipment_type
-            )
+            features = self.feature_service.compute_features(equipment_id=equipment_id, equipment_type=equipment_type)
         except Exception as e:
             logger.error(f"Failed to compute features for {equipment_id}: {e}")
             # Use default features
             from ml.classifier.data_prep import ClassifierDataPrep
+
             data_prep = ClassifierDataPrep()
             features = data_prep._get_default_features(equipment_type)
 
@@ -137,7 +136,7 @@ class FailureClassificationService:
             "confidence": predictions["confidence"],
             "all_failure_probabilities": predictions["all_probabilities"],
             "contributing_factors": explanation,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
     def get_fleet_failure_risks(self, min_confidence: float = 0.5) -> List[Dict]:
@@ -155,6 +154,7 @@ class FailureClassificationService:
             # Try JSON fallback
             import json
             from pathlib import Path
+
             equipment_file = Path(__file__).parent.parent / "data" / "equipment.json"
             with open(equipment_file) as f:
                 equipment_list = json.load(f)
@@ -168,12 +168,14 @@ class FailureClassificationService:
                 pred = self.predict_failure_type(equipment_id)
 
                 if pred["confidence"] >= min_confidence:
-                    results.append({
-                        "equipment_id": equipment_id,
-                        "equipment_type": pred["equipment_type"],
-                        "predicted_failure": pred["predicted_failure"],
-                        "confidence": pred["confidence"]
-                    })
+                    results.append(
+                        {
+                            "equipment_id": equipment_id,
+                            "equipment_type": pred["equipment_type"],
+                            "predicted_failure": pred["predicted_failure"],
+                            "confidence": pred["confidence"],
+                        }
+                    )
             except Exception as e:
                 logger.debug(f"Could not classify {equipment_id}: {e}")
                 continue
@@ -216,7 +218,7 @@ class FailureClassificationService:
         return {
             "equipment_type": equipment_type,
             "model_path": model_info["model_path"],
-            "metadata": model_info.get("metadata", {})
+            "metadata": model_info.get("metadata", {}),
         }
 
     def list_available_models(self) -> List[Dict]:

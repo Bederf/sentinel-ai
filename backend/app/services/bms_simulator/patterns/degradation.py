@@ -154,14 +154,16 @@ class DegradationPattern:
             for j, threshold in enumerate(self.config.alarm_thresholds):
                 if deg >= threshold:
                     # Check if this is a new alarm (wasn't triggered in previous interval)
-                    if i == 0 or degradation[i-1] < threshold:
-                        alarms.append({
-                            "timestamp": ts,
-                            "threshold_index": j,
-                            "threshold_value": threshold,
-                            "actual_degradation": deg,
-                            "value": values[i],
-                        })
+                    if i == 0 or degradation[i - 1] < threshold:
+                        alarms.append(
+                            {
+                                "timestamp": ts,
+                                "threshold_index": j,
+                                "threshold_value": threshold,
+                                "actual_degradation": deg,
+                                "value": values[i],
+                            }
+                        )
 
         # Clip to range
         values = np.clip(values, value_range[0], value_range[1])
@@ -249,10 +251,7 @@ class DegradationPattern:
         """
         # Generate timestamps
         n_intervals = days * 24 * 60 // interval_minutes
-        timestamps = np.array([
-            start_date + timedelta(minutes=i * interval_minutes)
-            for i in range(n_intervals)
-        ])
+        timestamps = np.array([start_date + timedelta(minutes=i * interval_minutes) for i in range(n_intervals)])
 
         # Select appropriate profile based on equipment type
         if equipment_type == "chiller":
@@ -282,13 +281,15 @@ class DegradationPattern:
         formatted_alarms = []
         for alarm in alarms:
             severity = self._get_severity_from_threshold_index(alarm["threshold_index"])
-            formatted_alarms.append({
-                "timestamp": alarm["timestamp"].isoformat(),
-                "equipment_id": equipment_id,
-                "equipment_type": equipment_type,
-                "severity": severity,
-                "degradation_pct": alarm["actual_degradation"] * 100,
-            })
+            formatted_alarms.append(
+                {
+                    "timestamp": alarm["timestamp"].isoformat(),
+                    "equipment_id": equipment_id,
+                    "equipment_type": equipment_type,
+                    "severity": severity,
+                    "degradation_pct": alarm["actual_degradation"] * 100,
+                }
+            )
 
         return degradation_factor, formatted_alarms
 
@@ -322,8 +323,12 @@ class DegradationPattern:
         # Some points increase with degradation (vibration, pressure, current)
         # Some points decrease (efficiency, flow in case of restriction)
         increasing_points = [
-            "compressor_amps", "filter_pressure", "vibration",
-            "chw_supply_temp", "discharge_temp", "co2_level"
+            "compressor_amps",
+            "filter_pressure",
+            "vibration",
+            "chw_supply_temp",
+            "discharge_temp",
+            "co2_level",
         ]
 
         if any(pt in point_type.lower() for pt in increasing_points):

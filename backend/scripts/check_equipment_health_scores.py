@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from collections import defaultdict
 
 # Load .env file
-load_dotenv(Path(__file__).parent.parent / '.env')
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -21,10 +21,9 @@ try:
 
     # Get all equipment with health scores
     print("\n[1] Querying all equipment health scores...")
-    equipment_result = client.table('equipment').select(
-        'code, name, type, health_score, status',
-        count='exact'
-    ).execute()
+    equipment_result = (
+        client.table("equipment").select("code, name, type, health_score, status", count="exact").execute()
+    )
 
     print(f"✓ Total equipment: {equipment_result.count}")
 
@@ -34,12 +33,12 @@ try:
     health_distribution = defaultdict(int)
     status_with_health = defaultdict(list)
 
-    for eq in (equipment_result.data or []):
-        health = eq.get('health_score', 'NULL')
-        status = eq.get('status', 'unknown')
+    for eq in equipment_result.data or []:
+        health = eq.get("health_score", "NULL")
+        status = eq.get("status", "unknown")
 
         health_distribution[health] += 1
-        status_with_health[f"{health}_{status}"].append(eq['code'])
+        status_with_health[f"{health}_{status}"].append(eq["code"])
 
     # Show health score distribution
     print("\nHealth Score Distribution:")
@@ -51,9 +50,9 @@ try:
     # Show breakdown by status
     print("\n[3] Health Score Breakdown by Status:")
     status_health = defaultdict(lambda: defaultdict(int))
-    for eq in (equipment_result.data or []):
-        health = eq.get('health_score', 'NULL')
-        status = eq.get('status', 'unknown')
+    for eq in equipment_result.data or []:
+        health = eq.get("health_score", "NULL")
+        status = eq.get("status", "unknown")
         status_health[status][health] += 1
 
     for status in sorted(status_health.keys()):
@@ -64,7 +63,7 @@ try:
 
     # Show unique health score values
     print("\n[4] Unique Health Score Values:")
-    unique_scores = sorted(set(eq.get('health_score') for eq in (equipment_result.data or [])))
+    unique_scores = sorted(set(eq.get("health_score") for eq in (equipment_result.data or [])))
     print(f"  Found {len(unique_scores)} unique health score values:")
     for score in unique_scores:
         count = health_distribution[score]
@@ -80,12 +79,15 @@ try:
     # Sample some equipment
     print("\n[5] Sample Equipment:")
     for eq in (equipment_result.data or [])[:10]:
-        print(f"  {eq['code']}: {eq['name']} ({eq['type']}) - Health: {eq.get('health_score', 'N/A')}%, Status: {eq.get('status')}")
+        print(
+            f"  {eq['code']}: {eq['name']} ({eq['type']}) - Health: {eq.get('health_score', 'N/A')}%, Status: {eq.get('status')}"
+        )
 
     print("\n" + "=" * 70)
 
 except Exception as e:
     print(f"❌ Error: {e}")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)

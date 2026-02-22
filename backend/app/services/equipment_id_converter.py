@@ -92,12 +92,7 @@ class EquipmentIDConverter:
 
     def _load_site_zone_mappings(self) -> Dict[str, Dict[str, Any]]:
         """Load site-specific zone mappings from config file."""
-        config_path = (
-            Path(__file__).parent.parent
-            / "data"
-            / "niagara"
-            / "site_zone_mappings.json"
-        )
+        config_path = Path(__file__).parent.parent / "data" / "niagara" / "site_zone_mappings.json"
 
         if config_path.exists():
             try:
@@ -154,9 +149,7 @@ class EquipmentIDConverter:
         if not floor_zone:
             floor = "B1"  # Default to basement
             zone_or_seq = "001"  # Default sequence
-            logger.warning(
-                f"Could not parse floor/zone from '{bms_id}', using defaults: {floor}/{zone_or_seq}"
-            )
+            logger.warning(f"Could not parse floor/zone from '{bms_id}', using defaults: {floor}/{zone_or_seq}")
         else:
             floor = floor_zone.get("floor", "B1")
             zone_value = floor_zone.get("zone", "001")
@@ -171,9 +164,7 @@ class EquipmentIDConverter:
 
         # Build v2.0 format
         v2_id = f"{site_prefix}-{normalized_type}-{floor}-{zone_or_seq}"
-        logger.info(
-            f"Converted '{bms_id}' → '{v2_id}' (type: {normalized_type}, floor: {floor}, zone: {zone_or_seq})"
-        )
+        logger.info(f"Converted '{bms_id}' → '{v2_id}' (type: {normalized_type}, floor: {floor}, zone: {zone_or_seq})")
 
         return v2_id
 
@@ -319,13 +310,9 @@ class EquipmentIDConverter:
                 return mappings
 
         # Fall back to default
-        return self.site_zone_mappings.get("default", {}).get(
-            "zone_number_to_letter", self.DEFAULT_ZONE_MAP
-        )
+        return self.site_zone_mappings.get("default", {}).get("zone_number_to_letter", self.DEFAULT_ZONE_MAP)
 
-    def map_zone_number_to_letter(
-        self, zone_num: str, site_id: str
-    ) -> str:
+    def map_zone_number_to_letter(self, zone_num: str, site_id: str) -> str:
         """Convert numeric zone to letter per site-specific mapping.
 
         Args:

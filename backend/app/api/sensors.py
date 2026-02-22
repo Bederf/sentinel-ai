@@ -232,10 +232,7 @@ async def get_sensor_readings(
         sensor_name=sensor["name"],
         unit=sensor["unit"],
         total=len(sensor_readings),
-        readings=[
-            ReadingResponse(timestamp=r["timestamp"], value=r["value"])
-            for r in sensor_readings
-        ],
+        readings=[ReadingResponse(timestamp=r["timestamp"], value=r["value"]) for r in sensor_readings],
     )
 
 
@@ -274,9 +271,7 @@ async def get_site_energy(
 
     # Create equipment type lookup
     eq_lookup = {eq["id"]: eq["type"] for eq in equipment}
-    sensor_eq_type = {
-        s["id"]: eq_lookup.get(s["equipment_id"], "unknown") for s in site_sensors
-    }
+    sensor_eq_type = {s["id"]: eq_lookup.get(s["equipment_id"], "unknown") for s in site_sensors}
 
     # Filter readings
     site_readings = [r for r in readings if r["sensor_id"] in sensor_ids]
@@ -301,9 +296,7 @@ async def get_site_energy(
 
         eq_type = sensor_eq_type.get(reading["sensor_id"], "unknown")
         timestamp_data[ts]["total"] += reading["value"]
-        timestamp_data[ts]["by_type"][eq_type] = (
-            timestamp_data[ts]["by_type"].get(eq_type, 0) + reading["value"]
-        )
+        timestamp_data[ts]["by_type"][eq_type] = timestamp_data[ts]["by_type"].get(eq_type, 0) + reading["value"]
 
     # Build data points
     data_points = []

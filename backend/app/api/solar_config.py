@@ -37,9 +37,7 @@ class SolarPlant(BaseModel):
 
     plant_id: str = Field(..., description="Unique plant ID (e.g., S002-rooftop)")
     name: str = Field(..., description="Human-readable plant name")
-    capacity_kwp: float = Field(
-        ..., gt=0, description="Installed capacity in kWp"
-    )
+    capacity_kwp: float = Field(..., gt=0, description="Installed capacity in kWp")
     panel_model: Optional[str] = Field(None, description="Solar panel model")
     panel_count: int = Field(..., gt=0, description="Number of panels")
     commissioning_date: Optional[str] = Field(None, description="ISO 8601 date")
@@ -63,9 +61,7 @@ class SolarInverter(BaseModel):
 class BESSConfig(BaseModel):
     """Battery energy storage system configuration."""
 
-    equipment_id: str = Field(
-        ..., description="Equipment code (e.g., S002-BESS-B1-001)"
-    )
+    equipment_id: str = Field(..., description="Equipment code (e.g., S002-BESS-B1-001)")
     manufacturer: str = Field(..., description="BESS manufacturer")
     model: str = Field(..., description="BESS model")
     capacity_kwh: float = Field(..., gt=0, description="Storage capacity in kWh")
@@ -78,9 +74,7 @@ class BESSConfig(BaseModel):
 class GridMeterConfig(BaseModel):
     """Grid connection meter configuration."""
 
-    equipment_id: str = Field(
-        ..., description="Equipment code (e.g., S002-MTR-R-GRID)"
-    )
+    equipment_id: str = Field(..., description="Equipment code (e.g., S002-MTR-R-GRID)")
     manufacturer: str = Field(..., description="Meter manufacturer")
     modbus_ip: str = Field(..., description="Modbus TCP IP address")
     modbus_port: int = Field(default=502, description="Modbus TCP port")
@@ -91,17 +85,11 @@ class SolarConfig(BaseModel):
     """Complete solar site configuration."""
 
     plants: list[SolarPlant] = Field(..., description="Solar plants")
-    inverters: dict[str, list[SolarInverter]] = Field(
-        default_factory=dict, description="Inverters per plant"
-    )
+    inverters: dict[str, list[SolarInverter]] = Field(default_factory=dict, description="Inverters per plant")
     bess: Optional[BESSConfig] = Field(None, description="Battery storage config")
-    grid_meter: Optional[GridMeterConfig] = Field(
-        None, description="Grid meter config"
-    )
+    grid_meter: Optional[GridMeterConfig] = Field(None, description="Grid meter config")
     utility: str = Field(default="City Power", description="Utility provider")
-    tariff: str = Field(
-        default="standard", description="Tariff code or custom rates"
-    )
+    tariff: str = Field(default="standard", description="Tariff code or custom rates")
 
 
 class SolarSiteRequest(BaseModel):
@@ -151,9 +139,7 @@ def validate_equipment_code(code: str, expected_type: str) -> None:
         raise ValueError(f"Code {code} does not match expected type {expected_type}")
 
 
-def validate_inverter_coverage(
-    plant: SolarPlant, inverters: list[SolarInverter]
-) -> dict:
+def validate_inverter_coverage(plant: SolarPlant, inverters: list[SolarInverter]) -> dict:
     """Validate inverter capacity covers plant capacity.
 
     Args:

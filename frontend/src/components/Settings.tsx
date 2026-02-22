@@ -77,7 +77,7 @@ export function Settings({ onError }: SettingsProps) {
       return "auditor";
     }
   })();
-  const demoUserEmails = ['grant@wardew.co.za', 'bederf@protonmail.com', 'bederf@gmail.com'];
+  const demoUserEmails = ['grant@grantdemo.co.za', 'bederf@protonmail.com', 'bederf@gmail.com'];
   const isDemoUser = !!(currentUserEmail && demoUserEmails.includes(currentUserEmail.toLowerCase()));
   const canManageFeatureAccess = currentUserRole === "admin";
   const [saveSuccess, setSaveSuccess] = useState(false);

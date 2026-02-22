@@ -27,7 +27,7 @@ User logs in
     ↓
 Backend auth.py checks email
     ↓
-grant@wardew.co.za → Create grant_hvac_dali_ai_annual task
+grant@grantdemo.co.za → Create grant_hvac_dali_ai_annual task
 bederf@protonmail.com → Create grant_solar_bess_ai_annual task
     ↓
 Insert task in lifecycle_simulation_tasks (status='queued')
@@ -50,7 +50,7 @@ Simulation starts running (stores in memory + database)
 
 ```python
 # Grant auto-start (365-day HVAC+DALI+AI demo)
-if email == "grant@wardew.co.za":
+if email == "grant@grantdemo.co.za":
     task_id = str(uuid.uuid4())
     client.table("lifecycle_simulation_tasks").insert({
         "task_id": task_id,
@@ -472,7 +472,7 @@ Time: 30m   progress: 100%, days: 365, hour: 6
 # Login as Grant (auto-starts grant_hvac_dali_ai_annual)
 curl -X POST http://localhost:9095/api/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "grant@wardew.co.za"}' | jq .
+  -d '{"email": "grant@grantdemo.co.za"}' | jq .
 
 # Response includes:
 {
@@ -605,7 +605,7 @@ const useSimulation = (taskId: string) => {
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ USER LOGS IN (grant@wardew.co.za)                              │
+│ USER LOGS IN (grant@grantdemo.co.za)                              │
 └────────────────────┬────────────────────────────────────────────┘
                      │
                      ▼

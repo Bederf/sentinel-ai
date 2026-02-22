@@ -22,9 +22,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 async def test_api_error_fallback():
     """Test fallback when Claude API raises APIError."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Testing: APIError Fallback (simulating 500 error)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     from app.services.hybrid_ai_service import HybridAIService
     from anthropic import APIError
@@ -40,14 +40,14 @@ async def test_api_error_fallback():
     # Create APIError with proper signature (body param is required)
     api_error = APIError(message="Internal server error", request=mock_request, body=None)
 
-    with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+    with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
         mock_claude.stream_response.side_effect = api_error
 
         # Mock Ollama to succeed
         async def mock_ollama(*args, **kwargs):
             return "[OLLAMA] Here are optimization recommendations based on current building data..."
 
-        with patch.object(hybrid_ai, 'query_ollama', new=mock_ollama):
+        with patch.object(hybrid_ai, "query_ollama", new=mock_ollama):
             try:
                 response_chunks = []
                 async for chunk in hybrid_ai.stream_response("Show me optimization recommendations", use_tools=False):
@@ -72,15 +72,16 @@ async def test_api_error_fallback():
             except Exception as e:
                 print(f"\n❌ FAILED - Exception not handled: {type(e).__name__}: {e}")
                 import traceback
+
                 traceback.print_exc()
                 return False
 
 
 async def test_connection_error_fallback():
     """Test fallback when Claude API connection fails."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Testing: APIConnectionError Fallback")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     from app.services.hybrid_ai_service import HybridAIService
     from anthropic import APIConnectionError
@@ -95,13 +96,13 @@ async def test_connection_error_fallback():
     # Create error with proper signature (message is keyword-only)
     conn_error = APIConnectionError(request=mock_request, message="Connection to api.anthropic.com failed")
 
-    with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+    with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
         mock_claude.stream_response.side_effect = conn_error
 
         async def mock_ollama(*args, **kwargs):
             return "[OLLAMA] AHU-7 status: Online, health 72%, last serviced 2025-12-15"
 
-        with patch.object(hybrid_ai, 'query_ollama', new=mock_ollama):
+        with patch.object(hybrid_ai, "query_ollama", new=mock_ollama):
             try:
                 response_chunks = []
                 async for chunk in hybrid_ai.stream_response("What's the status of AHU-7?", use_tools=False):
@@ -116,15 +117,16 @@ async def test_connection_error_fallback():
             except Exception as e:
                 print(f"\n❌ FAILED: {e}")
                 import traceback
+
                 traceback.print_exc()
                 return False
 
 
 async def test_rate_limit_fallback():
     """Test fallback when rate limit is hit."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Testing: RateLimitError Fallback")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     from app.services.hybrid_ai_service import HybridAIService
     from anthropic import RateLimitError
@@ -141,13 +143,13 @@ async def test_rate_limit_fallback():
     # Create error with proper signature (body is required)
     rate_error = RateLimitError(message="Rate limit exceeded", response=mock_response, body=None)
 
-    with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+    with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
         mock_claude.stream_response.side_effect = rate_error
 
         async def mock_ollama(*args, **kwargs):
             return "[OLLAMA] Equipment in warning: CH-1 (68%), UPS-1 (65%), AHU-7 (72%)"
 
-        with patch.object(hybrid_ai, 'query_ollama', new=mock_ollama):
+        with patch.object(hybrid_ai, "query_ollama", new=mock_ollama):
             try:
                 response_chunks = []
                 async for chunk in hybrid_ai.stream_response("List warning status equipment", use_tools=False):
@@ -162,21 +164,22 @@ async def test_rate_limit_fallback():
             except Exception as e:
                 print(f"\n❌ FAILED: {e}")
                 import traceback
+
                 traceback.print_exc()
                 return False
 
 
 async def test_normal_operation():
     """Test that normal Claude operation doesn't trigger fallback."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Testing: Normal Claude Operation (No Fallback)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     from app.services.hybrid_ai_service import HybridAIService
 
     hybrid_ai = HybridAIService()
 
-    with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+    with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
         # Mock successful Claude response
         async def mock_claude_success(*args, **kwargs):
             yield "Building occupancy is currently 56% (170/300 desks occupied)"
@@ -187,7 +190,7 @@ async def test_normal_operation():
         async def mock_ollama_fail(*args, **kwargs):
             raise Exception("Ollama should not have been called!")
 
-        with patch.object(hybrid_ai, 'query_ollama', new=mock_ollama_fail):
+        with patch.object(hybrid_ai, "query_ollama", new=mock_ollama_fail):
             try:
                 response_chunks = []
                 async for chunk in hybrid_ai.stream_response("What is the building occupancy?", use_tools=False):
@@ -206,9 +209,9 @@ async def test_normal_operation():
 
 async def test_both_ais_fail():
     """Test graceful handling when both Claude and Ollama fail."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Testing: Both AI Services Fail")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     from app.services.hybrid_ai_service import HybridAIService
     from anthropic import APIError
@@ -219,14 +222,14 @@ async def test_both_ais_fail():
     mock_request = MagicMock(spec=httpx.Request)
     api_error = APIError(message="Service unavailable", request=mock_request, body=None)
 
-    with patch('app.services.hybrid_ai_service.claude_service') as mock_claude:
+    with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
         mock_claude.stream_response.side_effect = api_error
 
         # Mock Ollama to also fail
         async def mock_ollama_fail(*args, **kwargs):
             raise Exception("Ollama service not responding")
 
-        with patch.object(hybrid_ai, 'query_ollama', new=mock_ollama_fail):
+        with patch.object(hybrid_ai, "query_ollama", new=mock_ollama_fail):
             try:
                 response_chunks = []
                 async for chunk in hybrid_ai.stream_response("Test query", use_tools=False):
@@ -245,9 +248,9 @@ async def test_both_ais_fail():
 
 async def main():
     """Run all test scenarios."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("HYBRID AI FALLBACK MECHANISM - MANUAL TEST SUITE")
-    print("="*60)
+    print("=" * 60)
 
     tests = [
         ("APIError (500)", test_api_error_fallback),
@@ -264,9 +267,9 @@ async def main():
         results.append((name, result))
 
     # Summary
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("TEST SUMMARY")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     passed = sum(1 for _, r in results if r)
     total = len(results)

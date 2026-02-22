@@ -52,8 +52,7 @@ class SystemHealthService:
         # In the future, we can add authenticated endpoint checks here
         component_scores = dict(default_scores)
         component_details = {
-            key: {"status": "healthy", "note": "Default healthy score"}
-            for key in default_scores.keys()
+            key: {"status": "healthy", "note": "Default healthy score"} for key in default_scores.keys()
         }
         errors = []
 
@@ -134,13 +133,19 @@ class SystemHealthService:
             Snapshot ID
         """
         try:
-            response = self.client.table("system_health_snapshots").insert({
-                "timestamp": snapshot["timestamp"],
-                "overall_status": snapshot["overall_status"],
-                "overall_score": snapshot["overall_score"],
-                "component_scores": snapshot["component_scores"],
-                "details": snapshot["component_details"],
-            }).execute()
+            response = (
+                self.client.table("system_health_snapshots")
+                .insert(
+                    {
+                        "timestamp": snapshot["timestamp"],
+                        "overall_status": snapshot["overall_status"],
+                        "overall_score": snapshot["overall_score"],
+                        "component_scores": snapshot["component_scores"],
+                        "details": snapshot["component_details"],
+                    }
+                )
+                .execute()
+            )
 
             if response.data:
                 return response.data[0]["id"]
@@ -176,16 +181,20 @@ class SystemHealthService:
 
         try:
             # Fetch snapshots from database
-            response = self.client.table("system_health_snapshots").select(
-                "*"
-            ).filter(
-                "timestamp",
-                "gte",
-                start_time,
-            ).order(
-                "timestamp",
-                desc=False,
-            ).execute()
+            response = (
+                self.client.table("system_health_snapshots")
+                .select("*")
+                .filter(
+                    "timestamp",
+                    "gte",
+                    start_time,
+                )
+                .order(
+                    "timestamp",
+                    desc=False,
+                )
+                .execute()
+            )
 
             snapshots = response.data or []
 
@@ -269,11 +278,13 @@ class SystemHealthService:
 
         # Store pending diagnostic record
         try:
-            self.client.table("system_diagnostics").insert({
-                "diagnostic_id": diagnostic_id,
-                "target": target,
-                "status": "pending",
-            }).execute()
+            self.client.table("system_diagnostics").insert(
+                {
+                    "diagnostic_id": diagnostic_id,
+                    "target": target,
+                    "status": "pending",
+                }
+            ).execute()
         except Exception as e:
             print(f"Error creating diagnostic record: {e}")
             return diagnostic_id
@@ -293,10 +304,12 @@ class SystemHealthService:
         """Execute diagnostics workflow (runs in background)."""
         try:
             # Update status to running
-            self.client.table("system_diagnostics").update({
-                "status": "running",
-                "timestamp": datetime.utcnow().isoformat(),
-            }).eq("diagnostic_id", diagnostic_id).execute()
+            self.client.table("system_diagnostics").update(
+                {
+                    "status": "running",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            ).eq("diagnostic_id", diagnostic_id).execute()
 
             start_time = datetime.utcnow()
             results = {}
@@ -358,20 +371,24 @@ class SystemHealthService:
             duration = (datetime.utcnow() - start_time).total_seconds()
 
             # Update diagnostic record with results
-            self.client.table("system_diagnostics").update({
-                "status": "completed",
-                "duration_seconds": int(duration),
-                "results": results,
-                "recommendations": recommendations,
-            }).eq("diagnostic_id", diagnostic_id).execute()
+            self.client.table("system_diagnostics").update(
+                {
+                    "status": "completed",
+                    "duration_seconds": int(duration),
+                    "results": results,
+                    "recommendations": recommendations,
+                }
+            ).eq("diagnostic_id", diagnostic_id).execute()
 
         except Exception as e:
             # Mark as failed
             try:
-                self.client.table("system_diagnostics").update({
-                    "status": "failed",
-                    "error_message": str(e),
-                }).eq("diagnostic_id", diagnostic_id).execute()
+                self.client.table("system_diagnostics").update(
+                    {
+                        "status": "failed",
+                        "error_message": str(e),
+                    }
+                ).eq("diagnostic_id", diagnostic_id).execute()
             except:
                 pass
 
@@ -433,9 +450,7 @@ class SystemHealthService:
             Diagnostic result with status and findings
         """
         try:
-            response = self.client.table("system_diagnostics").select(
-                "*"
-            ).eq("diagnostic_id", diagnostic_id).execute()
+            response = self.client.table("system_diagnostics").select("*").eq("diagnostic_id", diagnostic_id).execute()
 
             if response.data:
                 return response.data[0]
@@ -468,13 +483,19 @@ class SystemHealthService:
             Error log ID
         """
         try:
-            response = self.client.table("system_error_logs").insert({
-                "category": category,
-                "severity": severity,
-                "component": component,
-                "message": message,
-                "details": details or {},
-            }).execute()
+            response = (
+                self.client.table("system_error_logs")
+                .insert(
+                    {
+                        "category": category,
+                        "severity": severity,
+                        "component": component,
+                        "message": message,
+                        "details": details or {},
+                    }
+                )
+                .execute()
+            )
 
             if response.data:
                 return response.data[0]["id"]
@@ -514,10 +535,14 @@ class SystemHealthService:
             if resolved is not None:
                 query = query.eq("resolved", resolved)
 
-            response = query.order(
-                "timestamp",
-                desc=True,
-            ).range(offset, offset + limit - 1).execute()
+            response = (
+                query.order(
+                    "timestamp",
+                    desc=True,
+                )
+                .range(offset, offset + limit - 1)
+                .execute()
+            )
 
             return {
                 "total": response.count or 0,
@@ -543,9 +568,7 @@ class SystemHealthService:
         """
         try:
             # Get unresolved errors
-            errors_response = self.client.table("system_error_logs").select(
-                "*"
-            ).eq("resolved", False).execute()
+            errors_response = self.client.table("system_error_logs").select("*").eq("resolved", False).execute()
 
             errors = errors_response.data or []
             resolved_count = 0
@@ -559,10 +582,12 @@ class SystemHealthService:
                 component_detail = current_health.get("component_details", {}).get(error_component, {})
                 if component_detail.get("status") in ["ok", "healthy"]:
                     # Mark error as resolved
-                    self.client.table("system_error_logs").update({
-                        "resolved": True,
-                        "resolved_at": datetime.utcnow().isoformat(),
-                    }).eq("id", error["id"]).execute()
+                    self.client.table("system_error_logs").update(
+                        {
+                            "resolved": True,
+                            "resolved_at": datetime.utcnow().isoformat(),
+                        }
+                    ).eq("id", error["id"]).execute()
                     resolved_count += 1
 
             return resolved_count

@@ -26,6 +26,7 @@ def _get_tf():
     global _tf, _keras
     if _tf is None:
         import tensorflow as tf
+
         _tf = tf
         _keras = tf.keras
         tf.get_logger().setLevel("ERROR")
@@ -41,7 +42,7 @@ class SensorAutoencoder:
         n_features: int = 5,
         latent_dim: int = 16,
         lstm_units: Tuple[int, int] = (64, 32),
-        dropout_rate: float = 0.2
+        dropout_rate: float = 0.2,
     ):
         """
         Initialize autoencoder.
@@ -73,64 +74,44 @@ class SensorAutoencoder:
 
         # === Encoder ===
         x = keras.layers.LSTM(
-            self.lstm_units[0],
-            return_sequences=True,
-            kernel_regularizer=keras.regularizers.l2(0.001)
+            self.lstm_units[0], return_sequences=True, kernel_regularizer=keras.regularizers.l2(0.001)
         )(inputs)
         x = keras.layers.BatchNormalization()(x)
         x = keras.layers.Dropout(self.dropout_rate)(x)
 
         x = keras.layers.LSTM(
-            self.lstm_units[1],
-            return_sequences=False,
-            kernel_regularizer=keras.regularizers.l2(0.001)
+            self.lstm_units[1], return_sequences=False, kernel_regularizer=keras.regularizers.l2(0.001)
         )(x)
         x = keras.layers.BatchNormalization()(x)
 
         # Latent space representation
-        latent = keras.layers.Dense(
-            self.latent_dim,
-            activation="relu",
-            name="latent"
-        )(x)
+        latent = keras.layers.Dense(self.latent_dim, activation="relu", name="latent")(x)
 
         # === Decoder ===
         x = keras.layers.RepeatVector(self.window_size)(latent)
 
         x = keras.layers.LSTM(
-            self.lstm_units[1],
-            return_sequences=True,
-            kernel_regularizer=keras.regularizers.l2(0.001)
+            self.lstm_units[1], return_sequences=True, kernel_regularizer=keras.regularizers.l2(0.001)
         )(x)
         x = keras.layers.BatchNormalization()(x)
         x = keras.layers.Dropout(self.dropout_rate)(x)
 
         x = keras.layers.LSTM(
-            self.lstm_units[0],
-            return_sequences=True,
-            kernel_regularizer=keras.regularizers.l2(0.001)
+            self.lstm_units[0], return_sequences=True, kernel_regularizer=keras.regularizers.l2(0.001)
         )(x)
         x = keras.layers.BatchNormalization()(x)
 
         # Output - reconstruct all features for each timestep
-        outputs = keras.layers.TimeDistributed(
-            keras.layers.Dense(self.n_features)
-        )(x)
+        outputs = keras.layers.TimeDistributed(keras.layers.Dense(self.n_features))(x)
 
         # Full autoencoder model
         self.model = keras.Model(inputs, outputs, name="autoencoder")
-        self.model.compile(
-            optimizer=keras.optimizers.Adam(learning_rate=0.001),
-            loss="mse"
-        )
+        self.model.compile(optimizer=keras.optimizers.Adam(learning_rate=0.001), loss="mse")
 
         # Encoder-only model (for latent space analysis)
         self.encoder = keras.Model(inputs, latent, name="encoder")
 
-        logger.info(
-            f"Built autoencoder: {self.lstm_units} → latent({self.latent_dim}) → "
-            f"{self.lstm_units[::-1]}"
-        )
+        logger.info(f"Built autoencoder: {self.lstm_units} → latent({self.latent_dim}) → {self.lstm_units[::-1]}")
 
         return self
 
@@ -141,7 +122,7 @@ class SensorAutoencoder:
         epochs: int = 100,
         batch_size: int = 32,
         patience: int = 10,
-        verbose: int = 1
+        verbose: int = 1,
     ) -> Dict[str, Any]:
         """
         Train autoencoder on NORMAL data only.
@@ -170,43 +151,34 @@ class SensorAutoencoder:
                 monitor="val_loss" if X_val is not None else "loss",
                 patience=patience,
                 restore_best_weights=True,
-                verbose=verbose
+                verbose=verbose,
             ),
             keras.callbacks.ReduceLROnPlateau(
-                monitor="val_loss" if X_val is not None else "loss",
-                factor=0.5,
-                patience=patience // 2,
-                min_lr=1e-6
-            )
+                monitor="val_loss" if X_val is not None else "loss", factor=0.5, patience=patience // 2, min_lr=1e-6
+            ),
         ]
 
         # Autoencoder: input = output (reconstruct input)
         validation_data = (X_val, X_val) if X_val is not None else None
 
         history = self.model.fit(
-            X_train, X_train,  # Reconstruct input
+            X_train,
+            X_train,  # Reconstruct input
             validation_data=validation_data,
             epochs=epochs,
             batch_size=batch_size,
             callbacks=callbacks,
-            verbose=verbose
+            verbose=verbose,
         )
 
         # Calibrate anomaly threshold on training data
         self._calibrate_threshold(X_train)
 
-        logger.info(
-            f"Training complete: loss={history.history['loss'][-1]:.6f}, "
-            f"threshold={self.threshold:.6f}"
-        )
+        logger.info(f"Training complete: loss={history.history['loss'][-1]:.6f}, threshold={self.threshold:.6f}")
 
         return history.history
 
-    def _calibrate_threshold(
-        self,
-        X_normal: np.ndarray,
-        percentile: float = None
-    ):
+    def _calibrate_threshold(self, X_normal: np.ndarray, percentile: float = None):
         """
         Calibrate anomaly threshold based on reconstruction errors on normal data.
 
@@ -262,11 +234,7 @@ class SensorAutoencoder:
         """
         return self.get_reconstruction_error(X)
 
-    def is_anomaly(
-        self,
-        X: np.ndarray,
-        threshold: float = None
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def is_anomaly(self, X: np.ndarray, threshold: float = None) -> Tuple[np.ndarray, np.ndarray]:
         """
         Detect anomalies in input windows.
 
@@ -342,10 +310,7 @@ class SensorAutoencoder:
 
         # Rebuild encoder from loaded model
         latent_layer = instance.model.get_layer("latent")
-        instance.encoder = keras.Model(
-            instance.model.input,
-            latent_layer.output
-        )
+        instance.encoder = keras.Model(instance.model.input, latent_layer.output)
         instance.latent_dim = latent_layer.output_shape[-1]
 
         logger.info(f"Loaded autoencoder from {path}")
@@ -357,6 +322,7 @@ class SensorAutoencoder:
             return "Model not built"
 
         import io
+
         stream = io.StringIO()
         self.model.summary(print_fn=lambda x: stream.write(x + "\n"))
         return stream.getvalue()
@@ -370,5 +336,5 @@ class SensorAutoencoder:
             "lstm_units": self.lstm_units,
             "dropout_rate": self.dropout_rate,
             "threshold": self.threshold,
-            "threshold_percentile": self.threshold_percentile
+            "threshold_percentile": self.threshold_percentile,
         }

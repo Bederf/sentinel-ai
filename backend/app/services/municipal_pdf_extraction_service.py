@@ -41,6 +41,7 @@ class MunicipalPdfExtractionService:
         # Try PyMuPDF
         try:
             import fitz  # PyMuPDF
+
             doc = fitz.open(pdf_path)
             text = "\n".join(page.get_text("text") for page in doc)
             if text and len(text.strip()) > 50:
@@ -51,6 +52,7 @@ class MunicipalPdfExtractionService:
         # Try pdfplumber
         try:
             import pdfplumber
+
             text_parts = []
             with pdfplumber.open(pdf_path) as pdf:
                 for page in pdf.pages:
@@ -65,6 +67,7 @@ class MunicipalPdfExtractionService:
     async def _fallback_ocr(self, pdf_path: Path) -> Optional[Dict[str, Any]]:
         try:
             from app.services.municipal_ocr_service import MunicipalInvoiceOCRService
+
             ocr_service = MunicipalInvoiceOCRService()
             result = ocr_service.parse_invoice(str(pdf_path))
             if hasattr(result, "__await__"):

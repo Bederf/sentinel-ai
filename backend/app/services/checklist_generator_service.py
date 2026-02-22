@@ -42,6 +42,7 @@ class ChecklistGeneratorService:
                 from app.database.repositories.checklist_template_repository import (
                     get_checklist_template_repository,
                 )
+
                 self._repo = get_checklist_template_repository()
             except Exception as e:
                 logger.warning(f"Could not initialize checklist template repository: {e}")
@@ -78,28 +79,19 @@ class ChecklistGeneratorService:
         if self.repo:
             existing = self.repo.get_oem_template(equipment_type, manufacturer, model)
             if existing:
-                logger.info(
-                    f"OEM templates already exist for {manufacturer} {model} {equipment_type}"
-                )
+                logger.info(f"OEM templates already exist for {manufacturer} {model} {equipment_type}")
                 # Return all variants for this OEM
                 all_templates = self.repo.get_templates_for_equipment_type(equipment_type)
-                oem_templates = [
-                    t for t in all_templates
-                    if manufacturer.lower() in t.get("template_name", "").lower()
-                ]
+                oem_templates = [t for t in all_templates if manufacturer.lower() in t.get("template_name", "").lower()]
                 if oem_templates:
                     return oem_templates
 
         # Demo mode: return pre-built templates
         if settings.demo_mode:
-            return self._generate_demo_templates(
-                equipment_type, manufacturer, model, capacity
-            )
+            return self._generate_demo_templates(equipment_type, manufacturer, model, capacity)
 
         # Build and call Claude API
-        prompt = self._build_prompt(
-            equipment_type, manufacturer, model, capacity, additional_specs
-        )
+        prompt = self._build_prompt(equipment_type, manufacturer, model, capacity, additional_specs)
 
         try:
             from anthropic import Anthropic
@@ -113,9 +105,7 @@ class ChecklistGeneratorService:
             )
             response_text = message.content[0].text
 
-            templates = self._parse_response(
-                response_text, equipment_type, manufacturer, model
-            )
+            templates = self._parse_response(response_text, equipment_type, manufacturer, model)
 
             # Store in Supabase
             stored_templates = []
@@ -130,13 +120,9 @@ class ChecklistGeneratorService:
         except Exception as e:
             logger.error(f"Claude API checklist generation failed: {e}")
             # Fall back to demo templates on API failure
-            return self._generate_demo_templates(
-                equipment_type, manufacturer, model, capacity
-            )
+            return self._generate_demo_templates(equipment_type, manufacturer, model, capacity)
 
-    async def generate_for_equipment(
-        self, equipment_code: str
-    ) -> List[Dict[str, Any]]:
+    async def generate_for_equipment(self, equipment_code: str) -> List[Dict[str, Any]]:
         """Generate checklists for equipment by looking up its metadata.
 
         Args:
@@ -157,23 +143,13 @@ class ChecklistGeneratorService:
 
             # Extract manufacturer/model from metadata or equipment fields
             metadata = equipment.get("metadata", {}) or {}
-            manufacturer = (
-                metadata.get("manufacturer")
-                or equipment.get("manufacturer")
-                or ""
-            )
-            model = (
-                metadata.get("model")
-                or equipment.get("model")
-                or ""
-            )
+            manufacturer = metadata.get("manufacturer") or equipment.get("manufacturer") or ""
+            model = metadata.get("model") or equipment.get("model") or ""
             equipment_type = equipment.get("equipment_type", "").lower()
             capacity = metadata.get("capacity") or metadata.get("capacity_kw")
 
             if not manufacturer:
-                logger.warning(
-                    f"No manufacturer data for {equipment_code}, skipping checklist generation"
-                )
+                logger.warning(f"No manufacturer data for {equipment_code}, skipping checklist generation")
                 return []
 
             return await self.generate_checklists(
@@ -290,8 +266,8 @@ Respond with ONLY the JSON array of 3 templates. No markdown, no explanation, ju
         """
         # Strip markdown code blocks if present
         text = response_text.strip()
-        text = re.sub(r'^```(?:json)?\s*\n?', '', text)
-        text = re.sub(r'\n?```\s*$', '', text)
+        text = re.sub(r"^```(?:json)?\s*\n?", "", text)
+        text = re.sub(r"\n?```\s*$", "", text)
         text = text.strip()
 
         try:
@@ -299,7 +275,7 @@ Respond with ONLY the JSON array of 3 templates. No markdown, no explanation, ju
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse Claude JSON response: {e}")
             # Try to extract JSON array from response
-            match = re.search(r'\[[\s\S]*\]', text)
+            match = re.search(r"\[[\s\S]*\]", text)
             if match:
                 try:
                     parsed = json.loads(match.group())
@@ -325,21 +301,15 @@ Respond with ONLY the JSON array of 3 templates. No markdown, no explanation, ju
             template.setdefault("created_by", "ai_generator")
 
             if not template.get("template_name"):
-                template["template_name"] = (
-                    f"{manufacturer} {model} {equipment_type} Inspection"
-                )
+                template["template_name"] = f"{manufacturer} {model} {equipment_type} Inspection"
 
             if not template.get("checklist_items"):
-                logger.warning(
-                    f"Template '{template.get('template_name')}' has no checklist_items, skipping"
-                )
+                logger.warning(f"Template '{template.get('template_name')}' has no checklist_items, skipping")
                 continue
 
             valid_templates.append(template)
 
-        logger.info(
-            f"Parsed {len(valid_templates)} valid templates from Claude response"
-        )
+        logger.info(f"Parsed {len(valid_templates)} valid templates from Claude response")
         return valid_templates
 
     def _generate_demo_templates(
@@ -474,8 +444,11 @@ Respond with ONLY the JSON array of 3 templates. No markdown, no explanation, ju
                 "is_active": True,
                 "created_by": "ai_generator_demo",
                 "required_tools": [
-                    "Multimeter", "Vibration meter", "IR thermometer",
-                    "Torque wrench", "Filter set",
+                    "Multimeter",
+                    "Vibration meter",
+                    "IR thermometer",
+                    "Torque wrench",
+                    "Filter set",
                 ],
                 "required_skills": [equipment_type, "preventive_maintenance"],
                 "safety_requirements": [
@@ -483,8 +456,10 @@ Respond with ONLY the JSON array of 3 templates. No markdown, no explanation, ju
                     "Permit to work for electrical isolation",
                 ],
                 "ppe_required": [
-                    "Safety glasses", "Hearing protection",
-                    "Steel-toe boots", "Gloves",
+                    "Safety glasses",
+                    "Hearing protection",
+                    "Steel-toe boots",
+                    "Gloves",
                 ],
                 "checklist_items": [
                     {
@@ -583,11 +558,17 @@ Respond with ONLY the JSON array of 3 templates. No markdown, no explanation, ju
                 "is_active": True,
                 "created_by": "ai_generator_demo",
                 "required_tools": [
-                    "Multimeter", "Vibration analyzer", "IR thermometer",
-                    "Torque wrench", "Pressure gauge set", "Refrigerant recovery unit",
+                    "Multimeter",
+                    "Vibration analyzer",
+                    "IR thermometer",
+                    "Torque wrench",
+                    "Pressure gauge set",
+                    "Refrigerant recovery unit",
                 ],
                 "required_skills": [
-                    equipment_type, "major_service", "refrigerant_handling",
+                    equipment_type,
+                    "major_service",
+                    "refrigerant_handling",
                 ],
                 "safety_requirements": [
                     "Lock-out/Tag-out required",
@@ -595,8 +576,11 @@ Respond with ONLY the JSON array of 3 templates. No markdown, no explanation, ju
                     "Refrigerant handling certification required",
                 ],
                 "ppe_required": [
-                    "Safety glasses", "Hearing protection",
-                    "Steel-toe boots", "Chemical-resistant gloves", "Face shield",
+                    "Safety glasses",
+                    "Hearing protection",
+                    "Steel-toe boots",
+                    "Chemical-resistant gloves",
+                    "Face shield",
                 ],
                 "checklist_items": [
                     {

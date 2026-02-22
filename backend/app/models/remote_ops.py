@@ -16,14 +16,16 @@ class AuthorizationLevel(IntEnum):
 
     Higher levels include all permissions of lower levels.
     """
-    VIEW_ONLY = 1   # Can view building status and readings
-    OPERATOR = 2    # Can run diagnostics and assess dispatch need
+
+    VIEW_ONLY = 1  # Can view building status and readings
+    OPERATOR = 2  # Can run diagnostics and assess dispatch need
     TECHNICIAN = 3  # Can adjust setpoints and override schedules
-    ENGINEER = 4    # Can start/stop equipment, reset faults, fire panel reset
+    ENGINEER = 4  # Can start/stop equipment, reset faults, fire panel reset
 
 
 class RemoteCommandType(str):
     """Command types that can be executed remotely."""
+
     STATUS_CHECK = "status_check"
     SETPOINT_ADJUST = "setpoint_adjust"
     SCHEDULE_OVERRIDE = "schedule_override"
@@ -47,6 +49,7 @@ COMMAND_AUTHORIZATION: Dict[str, AuthorizationLevel] = {
 
 class RemoteCommand(BaseModel):
     """A remote command with authorization requirements."""
+
     command_type: str
     required_level: AuthorizationLevel
     description: Optional[str] = None
@@ -56,23 +59,22 @@ class RemoteCommand(BaseModel):
         """Create a RemoteCommand from a command type string."""
         level = COMMAND_AUTHORIZATION.get(command_type, AuthorizationLevel.ENGINEER)
         return cls(
-            command_type=command_type,
-            required_level=level,
-            description=f"Remote {command_type.replace('_', ' ')}"
+            command_type=command_type, required_level=level, description=f"Remote {command_type.replace('_', ' ')}"
         )
 
 
 class RemoteDiagnosticRequest(BaseModel):
     """Request for a remote diagnostic on equipment."""
+
     equipment_id: str
     diagnostic_type: str = Field(
-        default="quick_status",
-        description="Type of diagnostic: quick_status, full_diagnostic, trend_analysis"
+        default="quick_status", description="Type of diagnostic: quick_status, full_diagnostic, trend_analysis"
     )
 
 
 class RemoteDiagnosticReport(BaseModel):
     """Report from a remote diagnostic assessment."""
+
     equipment_id: str
     timestamp: datetime = Field(default_factory=datetime.now)
     diagnostic_type: str
@@ -87,6 +89,7 @@ class RemoteDiagnosticReport(BaseModel):
 
 class RemoteSessionAction(BaseModel):
     """A single action within a remote session."""
+
     action_type: str
     target: Optional[str] = None
     details: Optional[str] = None
@@ -96,6 +99,7 @@ class RemoteSessionAction(BaseModel):
 
 class RemoteSessionLog(BaseModel):
     """Log of a remote monitoring session."""
+
     session_id: str
     user_id: str
     user_role: str
@@ -106,12 +110,10 @@ class RemoteSessionLog(BaseModel):
 
 class DispatchDecision(BaseModel):
     """Decision on whether to dispatch a technician."""
+
     dispatch_required: bool
     reason: str
-    urgency: str = Field(
-        default="low",
-        description="Urgency level: critical, high, medium, low"
-    )
+    urgency: str = Field(default="low", description="Urgency level: critical, high, medium, low")
     estimated_onsite_time_minutes: int = 0
     remote_actions_taken: List[str] = Field(default_factory=list)
     bundled_tasks: List[str] = Field(default_factory=list)

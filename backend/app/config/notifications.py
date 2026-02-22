@@ -115,17 +115,17 @@ SENTINEL Building Management System
 
 # Escalation Thresholds (in percentage of boundary approach)
 ESCALATION_THRESHOLDS = {
-    "warning": 75,    # 75% approach - Just log
-    "alert": 85,      # 85% approach - Email notification
-    "critical": 95,   # 95% approach - Slack + Dashboard + SMS
-    "emergency": 100, # 100% approach - Stop autonomous + All channels
+    "warning": 75,  # 75% approach - Just log
+    "alert": 85,  # 85% approach - Email notification
+    "critical": 95,  # 95% approach - Slack + Dashboard + SMS
+    "emergency": 100,  # 100% approach - Stop autonomous + All channels
 }
 
 # Notification Cooldown (minimum time between notifications of same type)
 NOTIFICATION_COOLDOWN_MINUTES = {
-    "warning": 5,    # 5 minutes
-    "alert": 10,     # 10 minutes
-    "critical": 1,   # 1 minute (immediate for critical)
+    "warning": 5,  # 5 minutes
+    "alert": 10,  # 10 minutes
+    "critical": 1,  # 1 minute (immediate for critical)
     "emergency": 0,  # No cooldown for emergencies
 }
 
@@ -133,17 +133,18 @@ NOTIFICATION_COOLDOWN_MINUTES = {
 RATE_LIMITS = {
     "email": {
         "max_per_hour": 10,  # Max 10 emails per hour
-        "burst": 2,          # Allow short bursts
+        "burst": 2,  # Allow short bursts
     },
     "slack": {
-        "max_per_minute": 5, # Max 5 Slack messages per minute
+        "max_per_minute": 5,  # Max 5 Slack messages per minute
         "burst": 1,
     },
     "sms": {
-        "max_per_day": 5,    # Max 5 SMS per day (cost management)
+        "max_per_day": 5,  # Max 5 SMS per day (cost management)
         "burst": 1,
     },
 }
+
 
 def get_notification_config() -> Dict[str, Any]:
     """Get complete notification configuration."""
@@ -162,5 +163,5 @@ def get_notification_config() -> Dict[str, Any]:
             "email": len(EMAIL_RECIPIENTS) > 0 and bool(EMAIL_CONFIG["password"]),
             "slack": bool(SLACK_CONFIG["webhooks"]["critical"]),
             "sms": SMS_CONFIG["enabled"] and len(SMS_CONFIG["recipients"]) > 0,
-        }
+        },
     }

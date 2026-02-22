@@ -75,13 +75,8 @@ class MCPServerStdio:
 
         return {
             "protocolVersion": "2024-11-05",
-            "serverInfo": {
-                "name": "simbiot-mcp",
-                "version": "1.0.0"
-            },
-            "capabilities": {
-                "tools": {}
-            }
+            "serverInfo": {"name": "simbiot-mcp", "version": "1.0.0"},
+            "capabilities": {"tools": {}},
         }
 
     async def handle_tools_list(self, request_id: int) -> Dict:
@@ -96,35 +91,12 @@ class MCPServerStdio:
 
         try:
             result = await self.server.call_tool(tool_name, **arguments)
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": json.dumps(result, indent=2)
-                    }
-                ]
-            }
+            return {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]}
         except ValueError as e:
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": f"Error: {str(e)}"
-                    }
-                ],
-                "isError": True
-            }
+            return {"content": [{"type": "text", "text": f"Error: {str(e)}"}], "isError": True}
         except Exception as e:
             logger.error(f"Tool execution error: {e}", exc_info=True)
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": f"Internal error: {str(e)}"
-                    }
-                ],
-                "isError": True
-            }
+            return {"content": [{"type": "text", "text": f"Internal error: {str(e)}"}], "isError": True}
 
     async def handle_request(self, request: Dict):
         """Handle an incoming JSON-RPC request."""
@@ -152,21 +124,13 @@ class MCPServerStdio:
 
             else:
                 await self.send_response(
-                    error={
-                        "code": -32601,
-                        "message": f"Method not found: {method}"
-                    },
-                    request_id=request_id
+                    error={"code": -32601, "message": f"Method not found: {method}"}, request_id=request_id
                 )
 
         except Exception as e:
             logger.error(f"Error handling request: {e}", exc_info=True)
             await self.send_response(
-                error={
-                    "code": -32603,
-                    "message": f"Internal error: {str(e)}"
-                },
-                request_id=request_id
+                error={"code": -32603, "message": f"Internal error: {str(e)}"}, request_id=request_id
             )
 
     async def run(self):
@@ -193,10 +157,7 @@ class MCPServerStdio:
 
 async def main():
     """Entry point for stdio MCP server."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     server = MCPServerStdio()
     await server.run()

@@ -8,11 +8,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Callable
 
-from app.models.autonomous_decision import (
-    BoundaryStatus,
-    EscalationLevel,
-    EscalationEvent
-)
+from app.models.autonomous_decision import BoundaryStatus, EscalationLevel, EscalationEvent
 from app.services.notification_service import notification_service
 
 logger = logging.getLogger(__name__)
@@ -38,10 +34,7 @@ class EscalationEngine:
         self._initialized = True
         logger.info("EscalationEngine initialized")
 
-    async def evaluate_escalation(
-        self,
-        boundary_status: BoundaryStatus
-    ) -> Optional[EscalationEvent]:
+    async def evaluate_escalation(self, boundary_status: BoundaryStatus) -> Optional[EscalationEvent]:
         """
         Evaluate boundary status and trigger appropriate escalation if needed.
 
@@ -85,9 +78,7 @@ class EscalationEngine:
             acknowledged_at=None,
             auto_resolved=False,
             warnings=boundary_status.warnings.copy(),
-            metadata={
-                "boundary_status": boundary_status.to_dict()
-            }
+            metadata={"boundary_status": boundary_status.to_dict()},
         )
 
         # Store escalation event
@@ -133,6 +124,7 @@ class EscalationEngine:
 
                 # Trigger emergency handler
                 from app.services.emergency_handler import emergency_handler
+
                 await emergency_handler.handle_emergency(event)
 
                 logger.error(f"Level 4 EMERGENCY: {event.device_name} - Auto-stop triggered")
@@ -141,10 +133,7 @@ class EscalationEngine:
             logger.error(f"Error triggering notifications for escalation {event.id}: {e}")
 
     async def acknowledge_escalation(
-        self,
-        escalation_id: str,
-        acknowledged_by: str,
-        comment: Optional[str] = None
+        self, escalation_id: str, acknowledged_by: str, comment: Optional[str] = None
     ) -> bool:
         """
         Acknowledge an escalation event.
@@ -182,10 +171,7 @@ class EscalationEngine:
             logger.info(f"Escalation cleared: {escalation_key}")
 
     async def get_escalation_history(
-        self,
-        limit: int = 100,
-        escalation_level: Optional[EscalationLevel] = None,
-        acknowledged: Optional[bool] = None
+        self, limit: int = 100, escalation_level: Optional[EscalationLevel] = None, acknowledged: Optional[bool] = None
     ) -> List[EscalationEvent]:
         """
         Get escalation history with optional filtering.
@@ -251,7 +237,7 @@ class EscalationEngine:
         self,
         device_id: str = "test_device",
         point_name: str = "test_point",
-        escalation_level: EscalationLevel = EscalationLevel.WARNING
+        escalation_level: EscalationLevel = EscalationLevel.WARNING,
     ) -> EscalationEvent:
         """
         Test escalation system by creating a test escalation.
@@ -276,7 +262,7 @@ class EscalationEngine:
             approach_percentage=85.0 if escalation_level == EscalationLevel.ALERT else 95.0,
             escalation_level=escalation_level,
             warnings=[f"Test {escalation_level.name} escalation"],
-            last_updated=datetime.now()
+            last_updated=datetime.now(),
         )
 
         return await self.evaluate_escalation(test_boundary)

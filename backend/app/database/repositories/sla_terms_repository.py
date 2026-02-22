@@ -32,9 +32,9 @@ class SLATermsRepository:
             return []
 
         try:
-            result = self.client.table("sla_terms").select(
-                "*"
-            ).eq("contract_id", contract_id).order("sla_type").execute()
+            result = (
+                self.client.table("sla_terms").select("*").eq("contract_id", contract_id).order("sla_type").execute()
+            )
 
             return result.data or []
 
@@ -61,10 +61,7 @@ class SLATermsRepository:
 
             if result.data and len(result.data) > 0:
                 created = result.data[0]
-                logger.info(
-                    f"Created SLA term: {created.get('sla_type')} "
-                    f"for contract {created.get('contract_id')}"
-                )
+                logger.info(f"Created SLA term: {created.get('sla_type')} for contract {created.get('contract_id')}")
                 return created
             return None
 
@@ -115,9 +112,7 @@ class SLATermsRepository:
             return None
 
         try:
-            result = self.client.table("sla_terms").update(
-                data
-            ).eq("id", term_id).execute()
+            result = self.client.table("sla_terms").update(data).eq("id", term_id).execute()
 
             if result.data and len(result.data) > 0:
                 return result.data[0]
@@ -163,9 +158,7 @@ class SLATermsRepository:
             return False
 
         try:
-            self.client.table("sla_terms").delete().eq(
-                "contract_id", contract_id
-            ).execute()
+            self.client.table("sla_terms").delete().eq("contract_id", contract_id).execute()
             logger.info(f"Deleted all SLA terms for contract: {contract_id}")
             return True
 

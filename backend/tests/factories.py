@@ -7,7 +7,6 @@ from datetime import datetime
 import uuid
 
 
-
 class DeviceFactory:
     """Factory for creating test Device instances."""
 
@@ -17,7 +16,7 @@ class DeviceFactory:
         name: Optional[str] = None,
         device_type: str = "hvac",
         protocol: str = "mock",
-        **kwargs
+        **kwargs,
     ) -> dict:
         """Create a test device dictionary."""
         return {
@@ -30,19 +29,22 @@ class DeviceFactory:
             "description": kwargs.get("description", "Test device description"),
             "manufacturer": kwargs.get("manufacturer", "Test Manufacturer"),
             "model": kwargs.get("model", "Test Model"),
-            "points": kwargs.get("points", {
-                "setpoint": {
-                    "name": "setpoint",
-                    "point_type": "analog_output",
-                    "description": "Temperature setpoint",
-                    "unit": "°C",
-                    "min_value": 16.0,
-                    "max_value": 28.0,
-                    "default_value": 22.0,
-                    "writable": True,
-                    "priority": 8,
+            "points": kwargs.get(
+                "points",
+                {
+                    "setpoint": {
+                        "name": "setpoint",
+                        "point_type": "analog_output",
+                        "description": "Temperature setpoint",
+                        "unit": "°C",
+                        "min_value": 16.0,
+                        "max_value": 28.0,
+                        "default_value": 22.0,
+                        "writable": True,
+                        "priority": 8,
+                    },
                 },
-            }),
+            ),
             "metadata": kwargs.get("metadata", {}),
         }
 
@@ -65,7 +67,7 @@ class DeviceFactory:
                     "priority": 8,
                 },
             },
-            **kwargs
+            **kwargs,
         )
 
     @staticmethod
@@ -87,7 +89,7 @@ class DeviceFactory:
                     "priority": 8,
                 },
             },
-            **kwargs
+            **kwargs,
         )
 
 
@@ -95,11 +97,7 @@ class SiteFactory:
     """Factory for creating test Site instances."""
 
     @staticmethod
-    def create(
-        site_id: Optional[str] = None,
-        name: Optional[str] = None,
-        **kwargs
-    ) -> dict:
+    def create(site_id: Optional[str] = None, name: Optional[str] = None, **kwargs) -> dict:
         """Create a test site dictionary."""
         return {
             "id": site_id or f"test-site-{uuid.uuid4().hex[:8]}",
@@ -122,7 +120,7 @@ class SafetyRuleFactory:
         device_type: str = "hvac",
         min_temp: float = 16.0,
         max_temp: float = 28.0,
-        **kwargs
+        **kwargs,
     ) -> dict:
         """Create a temperature range safety rule."""
         return {
@@ -143,10 +141,7 @@ class SafetyRuleFactory:
 
     @staticmethod
     def create_runtime_limit(
-        rule_id: Optional[str] = None,
-        device_type: str = "hvac",
-        min_runtime_minutes: int = 5,
-        **kwargs
+        rule_id: Optional[str] = None, device_type: str = "hvac", min_runtime_minutes: int = 5, **kwargs
     ) -> dict:
         """Create a runtime limit safety rule."""
         return {
@@ -169,12 +164,7 @@ class AuditLogFactory:
     """Factory for creating test AuditLogEntry instances."""
 
     @staticmethod
-    def create(
-        log_id: Optional[str] = None,
-        action: str = "DEVICE_CONTROL",
-        result: str = "SUCCESS",
-        **kwargs
-    ) -> dict:
+    def create(log_id: Optional[str] = None, action: str = "DEVICE_CONTROL", result: str = "SUCCESS", **kwargs) -> dict:
         """Create a test audit log entry."""
         return {
             "id": log_id or f"test-audit-{uuid.uuid4().hex[:8]}",
@@ -186,11 +176,14 @@ class AuditLogFactory:
             "old_value": kwargs.get("old_value", 21.5),
             "new_value": kwargs.get("new_value", 22.0),
             "result": result,
-            "safety_validation": kwargs.get("safety_validation", {
-                "rules_checked": ["temperature_range"],
-                "passed_rules": ["temperature_range"] if result == "SUCCESS" else [],
-                "failed_rules": [] if result == "SUCCESS" else ["temperature_range"],
-            }),
+            "safety_validation": kwargs.get(
+                "safety_validation",
+                {
+                    "rules_checked": ["temperature_range"],
+                    "passed_rules": ["temperature_range"] if result == "SUCCESS" else [],
+                    "failed_rules": [] if result == "SUCCESS" else ["temperature_range"],
+                },
+            ),
             "error_message": kwargs.get("error_message"),
             "metadata": kwargs.get("metadata", {}),
         }
@@ -206,13 +199,10 @@ class AuditLogFactory:
                 "passed_rules": [],
                 "failed_rules": ["temperature_range"],
             },
-            **kwargs
+            **kwargs,
         )
 
     @staticmethod
     def create_success(**kwargs) -> dict:
         """Create a successful audit log entry."""
-        return AuditLogFactory.create(
-            result="SUCCESS",
-            **kwargs
-        )
+        return AuditLogFactory.create(result="SUCCESS", **kwargs)

@@ -25,10 +25,7 @@ class BaselineReportService:
         self.building_loader = get_building_loader()
 
     async def generate_json_report(
-        self,
-        equipment_id: str,
-        include_element_baselines: bool = True,
-        include_comparison_history: bool = True
+        self, equipment_id: str, include_element_baselines: bool = True, include_comparison_history: bool = True
     ) -> Dict[str, Any]:
         """
         Generate comprehensive baseline report in JSON format.
@@ -47,9 +44,7 @@ class BaselineReportService:
             raise ValueError(f"Equipment {equipment_id} not found")
 
         # Get active baseline
-        active_baseline = await self.baseline_service.repository.get_active_equipment_baseline(
-            equipment_id
-        )
+        active_baseline = await self.baseline_service.repository.get_active_equipment_baseline(equipment_id)
 
         # Get baseline history
         baseline_history = await self.baseline_service.get_baseline_history(equipment_id, limit=10)
@@ -59,21 +54,14 @@ class BaselineReportService:
         if include_element_baselines:
             elements = await self.baseline_service.repository.get_equipment_elements(equipment_id)
             for element in elements:
-                element_baseline = await self.baseline_service.repository.get_active_element_baseline(
-                    element.id
-                )
+                element_baseline = await self.baseline_service.repository.get_active_element_baseline(element.id)
                 if element_baseline:
-                    element_baselines.append({
-                        "element": element,
-                        "baseline": element_baseline
-                    })
+                    element_baselines.append({"element": element, "baseline": element_baseline})
 
         # Get comparison history if requested
         comparison_history = []
         if include_comparison_history:
-            comparison_history = await self.baseline_service.repository.get_recent_comparisons(
-                equipment_id, limit=10
-            )
+            comparison_history = await self.baseline_service.repository.get_recent_comparisons(equipment_id, limit=10)
 
         # Calculate deviation statistics
         deviation_stats = self._calculate_deviation_stats(comparison_history)
@@ -86,7 +74,7 @@ class BaselineReportService:
             "report_metadata": {
                 "generated_at": datetime.now().isoformat(),
                 "report_type": "equipment_baseline_assessment",
-                "version": "1.0"
+                "version": "1.0",
             },
             "equipment_info": {
                 "equipment_id": equipment.equipment_id,
@@ -94,32 +82,27 @@ class BaselineReportService:
                 "type": equipment.equipment_type,
                 "site_id": equipment.site_id,
                 "location": equipment.location,
-                "criticality": equipment.criticality
+                "criticality": equipment.criticality,
             },
             "baseline_status": {
                 "has_active_baseline": active_baseline is not None,
                 "active_baseline": active_baseline,
                 "baseline_history_count": len(baseline_history),
-                "last_baseline_date": summary.get("last_baseline_date")
+                "last_baseline_date": summary.get("last_baseline_date"),
             },
             "element_baselines": element_baselines,
             "comparison_history": comparison_history,
             "deviation_statistics": deviation_stats,
-            "summary": summary
+            "summary": summary,
         }
 
         # Add recommendations if deviations found
         if deviation_stats["critical_count"] > 0 or deviation_stats["warning_count"] > 0:
-            report["recommendations"] = self._generate_recommendations(
-                deviation_stats, equipment
-            )
+            report["recommendations"] = self._generate_recommendations(deviation_stats, equipment)
 
         return report
 
-    def _calculate_deviation_stats(
-        self,
-        comparison_history: List[BaselineComparison]
-    ) -> Dict[str, Any]:
+    def _calculate_deviation_stats(self, comparison_history: List[BaselineComparison]) -> Dict[str, Any]:
         """Calculate deviation statistics from comparison history."""
         if not comparison_history:
             return {
@@ -129,7 +112,7 @@ class BaselineReportService:
                 "normal_count": 0,
                 "average_deviation": 0.0,
                 "max_deviation": 0.0,
-                "trend": "stable"
+                "trend": "stable",
             }
 
         critical_count = sum(1 for c in comparison_history if c.overall_status == "critical")
@@ -161,46 +144,48 @@ class BaselineReportService:
             "normal_count": normal_count,
             "average_deviation": round(avg_deviation, 2),
             "max_deviation": round(max_deviation, 2),
-            "trend": trend
+            "trend": trend,
         }
 
-    def _generate_recommendations(
-        self,
-        deviation_stats: Dict[str, Any],
-        equipment: Any
-    ) -> List[Dict[str, Any]]:
+    def _generate_recommendations(self, deviation_stats: Dict[str, Any], equipment: Any) -> List[Dict[str, Any]]:
         """Generate maintenance recommendations based on deviations."""
         recommendations = []
 
         if deviation_stats["critical_count"] > 0:
-            recommendations.append({
-                "priority": "high",
-                "type": "immediate_action",
-                "title": "Critical Deviations Detected",
-                "description": f"{deviation_stats['critical_count']} recent comparisons show critical deviations.",
-                "recommended_action": "Schedule immediate inspection and maintenance",
-                "estimated_cost_range": {"min": 5000, "max": 25000}
-            })
+            recommendations.append(
+                {
+                    "priority": "high",
+                    "type": "immediate_action",
+                    "title": "Critical Deviations Detected",
+                    "description": f"{deviation_stats['critical_count']} recent comparisons show critical deviations.",
+                    "recommended_action": "Schedule immediate inspection and maintenance",
+                    "estimated_cost_range": {"min": 5000, "max": 25000},
+                }
+            )
 
         if deviation_stats["warning_count"] > 2:
-            recommendations.append({
-                "priority": "medium",
-                "type": "preventive_maintenance",
-                "title": "Multiple Warning Deviations",
-                "description": "Multiple warning-level deviations indicate equipment degradation.",
-                "recommended_action": "Schedule preventive maintenance within 30 days",
-                "estimated_cost_range": {"min": 2000, "max": 8000}
-            })
+            recommendations.append(
+                {
+                    "priority": "medium",
+                    "type": "preventive_maintenance",
+                    "title": "Multiple Warning Deviations",
+                    "description": "Multiple warning-level deviations indicate equipment degradation.",
+                    "recommended_action": "Schedule preventive maintenance within 30 days",
+                    "estimated_cost_range": {"min": 2000, "max": 8000},
+                }
+            )
 
         if deviation_stats["trend"] == "deteriorating":
-            recommendations.append({
-                "priority": "high",
-                "type": "investigation",
-                "title": "Deteriorating Trend",
-                "description": "Equipment performance is trending away from baseline.",
-                "recommended_action": "Investigate root cause and schedule corrective maintenance",
-                "estimated_cost_range": {"min": 3000, "max": 15000}
-            })
+            recommendations.append(
+                {
+                    "priority": "high",
+                    "type": "investigation",
+                    "title": "Deteriorating Trend",
+                    "description": "Equipment performance is trending away from baseline.",
+                    "recommended_action": "Investigate root cause and schedule corrective maintenance",
+                    "estimated_cost_range": {"min": 3000, "max": 15000},
+                }
+            )
 
         # RUL estimation based on deviation trend
         if deviation_stats["max_deviation"] > 30:
@@ -212,14 +197,16 @@ class BaselineReportService:
         else:
             rul_days = 365
 
-        recommendations.append({
-            "priority": "info",
-            "type": "rul_estimate",
-            "title": "Remaining Useful Life Estimate",
-            "description": "Based on deviation trend analysis",
-            "estimated_rul_days": rul_days,
-            "confidence": "medium" if deviation_stats["total_comparisons"] > 5 else "low"
-        })
+        recommendations.append(
+            {
+                "priority": "info",
+                "type": "rul_estimate",
+                "title": "Remaining Useful Life Estimate",
+                "description": "Based on deviation trend analysis",
+                "estimated_rul_days": rul_days,
+                "confidence": "medium" if deviation_stats["total_comparisons"] > 5 else "low",
+            }
+        )
 
         return recommendations
 
@@ -234,7 +221,7 @@ class BaselineReportService:
             "vibration": "mm/s",
             "sound": "dBA",
             "percent": "%",
-            "dp": "Pa"
+            "dp": "Pa",
         }
 
         unit = ""
@@ -267,25 +254,25 @@ class BaselineReportService:
         buffer.write(f"Equipment: {json_report['equipment_info']['name']}\n".encode())
         buffer.write(f"Generated: {json_report['report_metadata']['generated_at']}\n\n".encode())
 
-        if json_report['baseline_status']['has_active_baseline']:
+        if json_report["baseline_status"]["has_active_baseline"]:
             buffer.write("BASELINE STATUS: ACTIVE\n".encode())
-            baseline = json_report['baseline_status']['active_baseline']
+            baseline = json_report["baseline_status"]["active_baseline"]
             buffer.write(f"Last Baseline: {baseline['baseline_date']}\n".encode())
             buffer.write(f"Captured By: {baseline['captured_by']}\n\n".encode())
         else:
             buffer.write("BASELINE STATUS: NO ACTIVE BASELINE\n\n".encode())
 
         buffer.write("DEVIATION STATISTICS:\n".encode())
-        stats = json_report['deviation_statistics']
+        stats = json_report["deviation_statistics"]
         buffer.write(f"Total Comparisons: {stats['total_comparisons']}\n".encode())
         buffer.write(f"Normal: {stats['normal_count']}\n".encode())
         buffer.write(f"Warning: {stats['warning_count']}\n".encode())
         buffer.write(f"Critical: {stats['critical_count']}\n".encode())
         buffer.write(f"Max Deviation: {stats['max_deviation']}%\n\n".encode())
 
-        if 'recommendations' in json_report:
+        if "recommendations" in json_report:
             buffer.write("RECOMMENDATIONS:\n".encode())
-            for rec in json_report['recommendations']:
+            for rec in json_report["recommendations"]:
                 buffer.write(f"- {rec['title']} ({rec['priority']})\n".encode())
 
         return buffer.getvalue()
@@ -322,31 +309,31 @@ class BaselineReportService:
         <body>
             <div class="header">
                 <h1>Equipment Baseline Assessment Report</h1>
-                <h2>{json_report['equipment_info']['name']}</h2>
-                <p><strong>Generated:</strong> {json_report['report_metadata']['generated_at']}</p>
+                <h2>{json_report["equipment_info"]["name"]}</h2>
+                <p><strong>Generated:</strong> {json_report["report_metadata"]["generated_at"]}</p>
             </div>
 
             <div class="section">
                 <h2>Equipment Information</h2>
                 <ul>
-                    <li><strong>ID:</strong> {json_report['equipment_info']['equipment_id']}</li>
-                    <li><strong>Type:</strong> {json_report['equipment_info']['type']}</li>
-                    <li><strong>Location:</strong> {json_report['equipment_info']['location']}</li>
-                    <li><strong>Criticality:</strong> {json_report['equipment_info']['criticality']}</li>
+                    <li><strong>ID:</strong> {json_report["equipment_info"]["equipment_id"]}</li>
+                    <li><strong>Type:</strong> {json_report["equipment_info"]["type"]}</li>
+                    <li><strong>Location:</strong> {json_report["equipment_info"]["location"]}</li>
+                    <li><strong>Criticality:</strong> {json_report["equipment_info"]["criticality"]}</li>
                 </ul>
             </div>
 
             <div class="section">
                 <h2>Baseline Status</h2>
-                <p><strong>Active Baseline:</strong> {"Yes" if json_report['baseline_status']['has_active_baseline'] else "No"}</p>
+                <p><strong>Active Baseline:</strong> {"Yes" if json_report["baseline_status"]["has_active_baseline"] else "No"}</p>
         """
 
-        if json_report['baseline_status']['has_active_baseline']:
-            baseline = json_report['baseline_status']['active_baseline']
+        if json_report["baseline_status"]["has_active_baseline"]:
+            baseline = json_report["baseline_status"]["active_baseline"]
             html += f"""
-                <p><strong>Last Updated:</strong> {baseline['baseline_date']}</p>
-                <p><strong>Captured By:</strong> {baseline['captured_by']}</p>
-                <p><strong>Type:</strong> {baseline['baseline_type']}</p>
+                <p><strong>Last Updated:</strong> {baseline["baseline_date"]}</p>
+                <p><strong>Captured By:</strong> {baseline["captured_by"]}</p>
+                <p><strong>Type:</strong> {baseline["baseline_type"]}</p>
             """
 
         html += f"""
@@ -356,29 +343,29 @@ class BaselineReportService:
                 <h2>Deviation Statistics</h2>
                 <table>
                     <tr><th>Metric</th><th>Value</th></tr>
-                    <tr><td>Total Comparisons</td><td>{json_report['deviation_statistics']['total_comparisons']}</td></tr>
-                    <tr><td class="status-normal">Normal</td><td>{json_report['deviation_statistics']['normal_count']}</td></tr>
-                    <tr><td class="status-warning">Warning</td><td>{json_report['deviation_statistics']['warning_count']}</td></tr>
-                    <tr><td class="status-critical">Critical</td><td>{json_report['deviation_statistics']['critical_count']}</td></tr>
-                    <tr><td>Max Deviation</td><td>{json_report['deviation_statistics']['max_deviation']}%</td></tr>
-                    <tr><td>Trend</td><td>{json_report['deviation_statistics']['trend']}</td></tr>
+                    <tr><td>Total Comparisons</td><td>{json_report["deviation_statistics"]["total_comparisons"]}</td></tr>
+                    <tr><td class="status-normal">Normal</td><td>{json_report["deviation_statistics"]["normal_count"]}</td></tr>
+                    <tr><td class="status-warning">Warning</td><td>{json_report["deviation_statistics"]["warning_count"]}</td></tr>
+                    <tr><td class="status-critical">Critical</td><td>{json_report["deviation_statistics"]["critical_count"]}</td></tr>
+                    <tr><td>Max Deviation</td><td>{json_report["deviation_statistics"]["max_deviation"]}%</td></tr>
+                    <tr><td>Trend</td><td>{json_report["deviation_statistics"]["trend"]}</td></tr>
                 </table>
             </div>
         """
 
-        if 'recommendations' in json_report:
+        if "recommendations" in json_report:
             html += """
                 <div class="section">
                     <h2>Recommendations</h2>
                     <table>
                         <tr><th>Priority</th><th>Recommendation</th><th>Action</th></tr>
             """
-            for rec in json_report['recommendations']:
+            for rec in json_report["recommendations"]:
                 html += f"""
                     <tr>
-                        <td>{rec['priority']}</td>
-                        <td>{rec['title']}</td>
-                        <td>{rec['recommended_action']}</td>
+                        <td>{rec["priority"]}</td>
+                        <td>{rec["title"]}</td>
+                        <td>{rec["recommended_action"]}</td>
                     </tr>
                 """
             html += "</table></div>"

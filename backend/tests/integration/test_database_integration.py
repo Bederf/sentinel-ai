@@ -38,8 +38,7 @@ class TestDatabaseConnection:
             if devices_response.json():
                 device_id = devices_response.json()[0]["id"]
                 test_client.post(
-                    f"/api/devices/{device_id}/control",
-                    json={"point": "setpoint", "value": 22.0, "priority": 8}
+                    f"/api/devices/{device_id}/control", json={"point": "setpoint", "value": 22.0, "priority": 8}
                 )
 
             # Get audit logs again
@@ -84,6 +83,7 @@ class TestSupabaseIntegration:
         """Test Supabase client can be initialized."""
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
             # Client should be None if SUPABASE_URL not set, or a valid client
             assert client is None or hasattr(client, "table")
@@ -96,6 +96,7 @@ class TestSupabaseIntegration:
         """Test Supabase query building works correctly."""
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
 
             if client is not None:
@@ -134,8 +135,7 @@ class TestDataValidation:
         """Test data types are enforced."""
         # Try to send wrong data types
         response = test_client.post(
-            "/api/devices/S001-CHILLER-B1-001/control",
-            json={"point": "test", "value": "not_a_number"}
+            "/api/devices/S001-CHILLER-B1-001/control", json={"point": "test", "value": "not_a_number"}
         )
         # Should reject wrong type for value field
         # Note: FastAPI may accept string and try to coerce
@@ -180,10 +180,7 @@ class TestTransactionHandling:
     def test_transaction_rollback_on_error(self, test_client):
         """Test transactions are rolled back on errors."""
         # Try to perform an action that should fail
-        response = test_client.post(
-            "/api/devices/invalid-device-id/control",
-            json={"point": "test", "value": 10}
-        )
+        response = test_client.post("/api/devices/invalid-device-id/control", json={"point": "test", "value": 10})
 
         # Should fail gracefully
         assert response.status_code in [400, 404, 422]

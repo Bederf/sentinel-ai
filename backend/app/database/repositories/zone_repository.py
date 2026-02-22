@@ -29,7 +29,7 @@ class ZoneRepository:
                 return query.execute()
             except Exception as e:
                 error_msg = str(e)
-                if '429' in error_msg or 'rate limit' in error_msg.lower():
+                if "429" in error_msg or "rate limit" in error_msg.lower():
                     last_error = e
                     if attempt < max_retries:
                         logger.warning(f"Rate limit hit, retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
@@ -85,11 +85,7 @@ class ZoneRepository:
             Zone data or None if not found
         """
         response = (
-            self.client.table("zones")
-            .select("*")
-            .eq("building_id", building_id)
-            .eq("zone_id", zone_id)
-            .execute()
+            self.client.table("zones").select("*").eq("building_id", building_id).eq("zone_id", zone_id).execute()
         )
 
         if response.data:
@@ -121,13 +117,7 @@ class ZoneRepository:
         Returns:
             List of zones on the floor
         """
-        response = (
-            self.client.table("zones")
-            .select("*")
-            .eq("building_id", building_id)
-            .eq("floor", floor)
-            .execute()
-        )
+        response = self.client.table("zones").select("*").eq("building_id", building_id).eq("floor", floor).execute()
         return response.data
 
     def create(self, zone_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -177,11 +167,7 @@ class ZoneRepository:
         Returns:
             Upserted zone data
         """
-        response = (
-            self.client.table("zones")
-            .upsert(zone_data, on_conflict="building_id,zone_id")
-            .execute()
-        )
+        response = self.client.table("zones").upsert(zone_data, on_conflict="building_id,zone_id").execute()
         return response.data[0] if response.data else {}
 
     def upsert_many(self, zones: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -196,11 +182,7 @@ class ZoneRepository:
         if not zones:
             return []
 
-        response = (
-            self.client.table("zones")
-            .upsert(zones, on_conflict="building_id,zone_id")
-            .execute()
-        )
+        response = self.client.table("zones").upsert(zones, on_conflict="building_id,zone_id").execute()
         return response.data
 
     def delete(self, zone_id: str) -> bool:
@@ -247,12 +229,7 @@ class ZoneRepository:
             Dict mapping zone_id → {x, z} centroid coordinates
         """
         # Query the zone_centroids view
-        response = (
-            self.client.table("zone_centroids")
-            .select("*")
-            .eq("building_id", building_id)
-            .execute()
-        )
+        response = self.client.table("zone_centroids").select("*").eq("building_id", building_id).execute()
 
         centroids = {}
         for row in response.data:

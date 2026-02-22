@@ -56,12 +56,27 @@ async def index_guide():
         source="internal_documentation",
         summary="Comprehensive guide for automation specialists integrating external systems with SENTINEL BMS. Covers device control APIs, safety interlocks, real-time streaming, work order automation, and common integration scenarios.",
         keywords=[
-            "integration", "automation", "API", "device control", "real-time data",
-            "work orders", "webhooks", "MQTT", "BACnet", "Modbus", "DALI",
-            "safety interlocks", "REST API", "WebSocket", "alerts",
-            "equipment control", "maintenance", "predictive", "workflow"
+            "integration",
+            "automation",
+            "API",
+            "device control",
+            "real-time data",
+            "work orders",
+            "webhooks",
+            "MQTT",
+            "BACnet",
+            "Modbus",
+            "DALI",
+            "safety interlocks",
+            "REST API",
+            "WebSocket",
+            "alerts",
+            "equipment control",
+            "maintenance",
+            "predictive",
+            "workflow",
         ],
-        failure_modes=None
+        failure_modes=None,
     )
 
     if not doc:
@@ -72,7 +87,7 @@ async def index_guide():
 
     # Chunk and embed the document
     logger.info("Chunking and embedding document...")
-    chunk_count = vector_db.chunk_and_embed_document(doc['id'])
+    chunk_count = vector_db.chunk_and_embed_document(doc["id"])
 
     if chunk_count > 0:
         logger.info(f"✓ Successfully indexed guide with {chunk_count} chunks")

@@ -11,7 +11,7 @@ from app.mcp.equipment_server import (
     lookup_fault_code_tool,
     lookup_parts_tool,
     search_equipment_issue_tool,
-    MCP_TOOLS as EQUIPMENT_MCP_TOOLS
+    MCP_TOOLS as EQUIPMENT_MCP_TOOLS,
 )
 
 from app.mcp.simbiot_server import (
@@ -32,18 +32,12 @@ from app.mcp.simbiot_server import (
     # Work order tools
     get_work_orders_tool,
     create_work_order_tool,
-    MCP_TOOLS as SIMBIOT_MCP_TOOLS
+    MCP_TOOLS as SIMBIOT_MCP_TOOLS,
 )
 
-from app.mcp.simbiot_stdio import (
-    MCPServerStdio,
-    main as simbiot_stdio_main
-)
+from app.mcp.simbiot_stdio import MCPServerStdio, main as simbiot_stdio_main
 
-from app.mcp.openai_connector_server import (
-    OpenAIConnectorMCPServer,
-    get_openai_connector_server
-)
+from app.mcp.openai_connector_server import OpenAIConnectorMCPServer, get_openai_connector_server
 
 __all__ = [
     # Equipment MCP
@@ -76,5 +70,5 @@ __all__ = [
     "simbiot_stdio_main",
     # OpenAI ChatGPT Connector
     "OpenAIConnectorMCPServer",
-    "get_openai_connector_server"
+    "get_openai_connector_server",
 ]

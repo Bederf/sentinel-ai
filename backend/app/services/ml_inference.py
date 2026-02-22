@@ -26,6 +26,7 @@ def _get_registry():
     global _registry
     if _registry is None:
         from ml.registry import get_model_registry
+
         _registry = get_model_registry()
     return _registry
 
@@ -63,12 +64,7 @@ class LSTMInferenceService:
 
         return model
 
-    def predict(
-        self,
-        equipment_id: str,
-        equipment_type: str,
-        sensor_data: np.ndarray = None
-    ) -> Dict[str, Any]:
+    def predict(self, equipment_id: str, equipment_type: str, sensor_data: np.ndarray = None) -> Dict[str, Any]:
         """
         Get 24/48/72h predictions for equipment.
 
@@ -84,11 +80,7 @@ class LSTMInferenceService:
         try:
             model = self._load_model(equipment_type)
         except ValueError as e:
-            return {
-                "equipment_id": equipment_id,
-                "error": str(e),
-                "predictions": None
-            }
+            return {"equipment_id": equipment_id, "error": str(e), "predictions": None}
 
         # Use provided data or generate demo data
         if sensor_data is None:
@@ -101,7 +93,7 @@ class LSTMInferenceService:
             return {
                 "equipment_id": equipment_id,
                 "error": f"Insufficient data: {len(sensor_data)} hours (need 168)",
-                "predictions": None
+                "predictions": None,
             }
 
         # Prepare input
@@ -131,13 +123,11 @@ class LSTMInferenceService:
             "predictions": {
                 "24h": float(predictions[0]) if len(predictions) > 0 else None,
                 "48h": float(predictions[1]) if len(predictions) > 1 else None,
-                "72h": float(predictions[2]) if len(predictions) > 2 else None
+                "72h": float(predictions[2]) if len(predictions) > 2 else None,
             },
             "confidence": 0.85,  # Placeholder - would calculate from model uncertainty
             "timestamp": datetime.utcnow().isoformat(),
-            "model_info": {
-                "model_id": self.registry.get_active_model("lstm", equipment_type)["model_id"]
-            }
+            "model_info": {"model_id": self.registry.get_active_model("lstm", equipment_type)["model_id"]},
         }
 
     def _generate_demo_input(self, equipment_type: str) -> np.ndarray:
@@ -145,13 +135,7 @@ class LSTMInferenceService:
         np.random.seed(int(datetime.now().timestamp()) % 1000)
 
         # Equipment-specific feature counts
-        feature_counts = {
-            "chiller": 5,
-            "ahu": 5,
-            "generator": 4,
-            "fcu": 3,
-            "ups": 3
-        }
+        feature_counts = {"chiller": 5, "ahu": 5, "generator": 4, "fcu": 3, "ups": 3}
         n_features = feature_counts.get(equipment_type, 3)
 
         # Generate 168 hours of synthetic data
@@ -166,12 +150,7 @@ class LSTMInferenceService:
 
         return data
 
-    def get_trend(
-        self,
-        equipment_id: str,
-        equipment_type: str,
-        hours_history: int = 168
-    ) -> Dict[str, Any]:
+    def get_trend(self, equipment_id: str, equipment_type: str, hours_history: int = 168) -> Dict[str, Any]:
         """Get historical + predicted trend data for visualization."""
         # Get predictions
         prediction = self.predict(equipment_id, equipment_type)
@@ -194,10 +173,10 @@ class LSTMInferenceService:
                 "y_predicted": [
                     prediction["predictions"]["24h"],
                     prediction["predictions"]["48h"],
-                    prediction["predictions"]["72h"]
-                ]
+                    prediction["predictions"]["72h"],
+                ],
             },
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
 
@@ -234,12 +213,7 @@ class AnomalyDetectionService:
 
         return model
 
-    def check_equipment(
-        self,
-        equipment_id: str,
-        equipment_type: str,
-        sensor_data: np.ndarray = None
-    ) -> Dict[str, Any]:
+    def check_equipment(self, equipment_id: str, equipment_type: str, sensor_data: np.ndarray = None) -> Dict[str, Any]:
         """
         Check equipment for anomalies.
 
@@ -254,11 +228,7 @@ class AnomalyDetectionService:
         try:
             model = self._load_model(equipment_type)
         except ValueError as e:
-            return {
-                "equipment_id": equipment_id,
-                "error": str(e),
-                "is_anomaly": None
-            }
+            return {"equipment_id": equipment_id, "error": str(e), "is_anomaly": None}
 
         # Use provided data or generate demo data
         if sensor_data is None:
@@ -269,7 +239,7 @@ class AnomalyDetectionService:
             return {
                 "equipment_id": equipment_id,
                 "error": f"Insufficient data: {len(sensor_data)} hours (need 24)",
-                "is_anomaly": None
+                "is_anomaly": None,
             }
 
         # Prepare input (last 24 hours)
@@ -298,9 +268,7 @@ class AnomalyDetectionService:
             "score_pct": (score / threshold * 100) if threshold > 0 else 0,
             "severity": self._classify_severity(score, threshold),
             "timestamp": datetime.utcnow().isoformat(),
-            "model_info": {
-                "model_id": self.registry.get_active_model("autoencoder", equipment_type)["model_id"]
-            }
+            "model_info": {"model_id": self.registry.get_active_model("autoencoder", equipment_type)["model_id"]},
         }
 
     def _classify_severity(self, score: float, threshold: float) -> str:
@@ -318,19 +286,11 @@ class AnomalyDetectionService:
         else:
             return "critical"
 
-    def _generate_demo_window(
-        self,
-        equipment_type: str,
-        inject_anomaly: bool = False
-    ) -> np.ndarray:
+    def _generate_demo_window(self, equipment_type: str, inject_anomaly: bool = False) -> np.ndarray:
         """Generate demo 24-hour window for testing."""
         np.random.seed(int(datetime.now().timestamp()) % 1000)
 
-        feature_counts = {
-            "chiller": 5,
-            "ahu": 5,
-            "generator": 5
-        }
+        feature_counts = {"chiller": 5, "ahu": 5, "generator": 5}
         n_features = feature_counts.get(equipment_type, 5)
 
         hours = np.arange(24)
@@ -350,10 +310,7 @@ class AnomalyDetectionService:
 
         return data
 
-    def check_all_equipment(
-        self,
-        equipment_list: List[Dict[str, str]] = None
-    ) -> List[Dict[str, Any]]:
+    def check_all_equipment(self, equipment_list: List[Dict[str, str]] = None) -> List[Dict[str, Any]]:
         """
         Check multiple equipment for anomalies.
 
@@ -377,22 +334,13 @@ class AnomalyDetectionService:
         results = []
         for eq in equipment_list:
             try:
-                result = self.check_equipment(
-                    eq["equipment_id"],
-                    eq["equipment_type"]
-                )
+                result = self.check_equipment(eq["equipment_id"], eq["equipment_type"])
                 results.append(result)
             except Exception as e:
-                results.append({
-                    "equipment_id": eq["equipment_id"],
-                    "error": str(e)
-                })
+                results.append({"equipment_id": eq["equipment_id"], "error": str(e)})
 
         # Sort by anomaly score (highest first)
-        results.sort(
-            key=lambda r: r.get("anomaly_score", 0),
-            reverse=True
-        )
+        results.sort(key=lambda r: r.get("anomaly_score", 0), reverse=True)
 
         return results
 
@@ -401,12 +349,7 @@ class AnomalyDetectionService:
         all_results = self.check_all_equipment()
         return [r for r in all_results if r.get("is_anomaly", False)]
 
-    def get_anomaly_history(
-        self,
-        equipment_id: str,
-        equipment_type: str,
-        days: int = 7
-    ) -> List[Dict[str, Any]]:
+    def get_anomaly_history(self, equipment_id: str, equipment_type: str, days: int = 7) -> List[Dict[str, Any]]:
         """Get anomaly score history for trending (demo implementation)."""
         try:
             model = self._load_model(equipment_type)
@@ -423,12 +366,14 @@ class AnomalyDetectionService:
             # Generate random but consistent score
             score = abs(np.random.normal(model.threshold * 0.6, model.threshold * 0.2))
 
-            history.append({
-                "date": date.date().isoformat(),
-                "score": float(score),
-                "threshold": float(model.threshold),
-                "is_anomaly": score > model.threshold
-            })
+            history.append(
+                {
+                    "date": date.date().isoformat(),
+                    "score": float(score),
+                    "threshold": float(model.threshold),
+                    "is_anomaly": score > model.threshold,
+                }
+            )
 
         return history
 

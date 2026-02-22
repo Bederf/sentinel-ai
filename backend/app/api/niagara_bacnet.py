@@ -146,9 +146,7 @@ async def test_bacnet_connection(
 )
 async def discover_device_points(
     device_id: int,
-    object_type: str | None = Query(
-        None, alias="type", description="Filter by BACnet object type"
-    ),
+    object_type: str | None = Query(None, alias="type", description="Filter by BACnet object type"),
     use_cache: bool = Query(True, description="Use cached point list"),
 ):
     """
@@ -210,9 +208,7 @@ async def read_point(
     device_id: int,
     object_type: str,
     instance: int,
-    property_name: str = Query(
-        "presentValue", description="BACnet property to read"
-    ),
+    property_name: str = Query("presentValue", description="BACnet property to read"),
 ):
     """
     Read a single point value from a BACnet device.
@@ -351,10 +347,7 @@ async def create_cov_subscription(request: BACnetCOVSubscribeRequest):
         return BACnetCOVSubscriptionResponse(
             subscription_id=sub.subscription_id,
             device_id=sub.device_id,
-            points=[
-                BACnetCOVPoint(object_type=ot, instance=inst)
-                for ot, inst in sub.points
-            ],
+            points=[BACnetCOVPoint(object_type=ot, instance=inst) for ot, inst in sub.points],
             lifetime=sub.lifetime,
             created_at=sub.created_at.isoformat(),
             expires_at=sub.expires_at.isoformat(),
@@ -383,10 +376,7 @@ async def list_cov_subscriptions():
         BACnetCOVSubscriptionResponse(
             subscription_id=sub.subscription_id,
             device_id=sub.device_id,
-            points=[
-                BACnetCOVPoint(object_type=ot, instance=inst)
-                for ot, inst in sub.points
-            ],
+            points=[BACnetCOVPoint(object_type=ot, instance=inst) for ot, inst in sub.points],
             lifetime=sub.lifetime,
             created_at=sub.created_at.isoformat(),
             expires_at=sub.expires_at.isoformat(),

@@ -23,10 +23,10 @@ class HVACZoneRepository:
         Returns:
             List of HVAC zones
         """
-        query = self.client.table('hvac_zones').select("*")
+        query = self.client.table("hvac_zones").select("*")
 
         if building_id:
-            query = query.eq('building_id', building_id)
+            query = query.eq("building_id", building_id)
 
         response = query.execute()
         return response.data
@@ -41,18 +41,14 @@ class HVACZoneRepository:
             List of HVAC zones
         """
         # First get the building UUID
-        building_response = self.client.table('buildings').select('id').eq(
-            'code', building_code
-        ).execute()
+        building_response = self.client.table("buildings").select("id").eq("code", building_code).execute()
 
         if not building_response.data:
             return []
 
-        building_uuid = building_response.data[0]['id']
+        building_uuid = building_response.data[0]["id"]
 
-        response = self.client.table('hvac_zones').select("*").eq(
-            'building_id', building_uuid
-        ).execute()
+        response = self.client.table("hvac_zones").select("*").eq("building_id", building_uuid).execute()
 
         return response.data
 
@@ -65,9 +61,7 @@ class HVACZoneRepository:
         Returns:
             Zone data or None if not found
         """
-        response = self.client.table('hvac_zones').select("*").eq(
-            'zone_id', zone_id
-        ).execute()
+        response = self.client.table("hvac_zones").select("*").eq("zone_id", zone_id).execute()
 
         if response.data:
             return response.data[0]
@@ -82,9 +76,7 @@ class HVACZoneRepository:
         Returns:
             Zone data or None if not found
         """
-        response = self.client.table('hvac_zones').select("*").eq(
-            'id', uuid
-        ).execute()
+        response = self.client.table("hvac_zones").select("*").eq("id", uuid).execute()
 
         if response.data:
             return response.data[0]
@@ -99,12 +91,10 @@ class HVACZoneRepository:
         Returns:
             Building UUID or None
         """
-        response = self.client.table('buildings').select('id').eq(
-            'code', building_code
-        ).execute()
+        response = self.client.table("buildings").select("id").eq("code", building_code).execute()
 
         if response.data:
-            return response.data[0]['id']
+            return response.data[0]["id"]
         return None
 
     def upsert(self, zone_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -116,10 +106,7 @@ class HVACZoneRepository:
         Returns:
             Upserted zone data
         """
-        response = self.client.table('hvac_zones').upsert(
-            zone_data,
-            on_conflict='zone_id'
-        ).execute()
+        response = self.client.table("hvac_zones").upsert(zone_data, on_conflict="zone_id").execute()
         return response.data[0] if response.data else {}
 
     def upsert_many(self, zones: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -134,10 +121,7 @@ class HVACZoneRepository:
         if not zones:
             return []
 
-        response = self.client.table('hvac_zones').upsert(
-            zones,
-            on_conflict='zone_id'
-        ).execute()
+        response = self.client.table("hvac_zones").upsert(zones, on_conflict="zone_id").execute()
         return response.data
 
     def create(self, zone_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -149,7 +133,7 @@ class HVACZoneRepository:
         Returns:
             Created zone
         """
-        response = self.client.table('hvac_zones').insert(zone_data).execute()
+        response = self.client.table("hvac_zones").insert(zone_data).execute()
         return response.data[0]
 
     def update(self, zone_id: str, zone_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -162,9 +146,7 @@ class HVACZoneRepository:
         Returns:
             Updated zone or None if not found
         """
-        response = self.client.table('hvac_zones').update(
-            zone_data
-        ).eq('zone_id', zone_id).execute()
+        response = self.client.table("hvac_zones").update(zone_data).eq("zone_id", zone_id).execute()
 
         if response.data:
             return response.data[0]
@@ -179,9 +161,7 @@ class HVACZoneRepository:
         Returns:
             True if deleted, False if not found
         """
-        response = self.client.table('hvac_zones').delete().eq(
-            'zone_id', zone_id
-        ).execute()
+        response = self.client.table("hvac_zones").delete().eq("zone_id", zone_id).execute()
 
         return len(response.data) > 0
 
@@ -198,9 +178,7 @@ class HVACZoneRepository:
         if not building_uuid:
             return 0
 
-        response = self.client.table('hvac_zones').delete().eq(
-            'building_id', building_uuid
-        ).execute()
+        response = self.client.table("hvac_zones").delete().eq("building_id", building_uuid).execute()
 
         return len(response.data)
 
@@ -214,7 +192,7 @@ class HVACZoneRepository:
         Returns:
             Updated zone or None if not found
         """
-        return self.update(zone_id, {'setpoint': setpoint})
+        return self.update(zone_id, {"setpoint": setpoint})
 
     def update_status(self, zone_id: str, status: str) -> Optional[Dict[str, Any]]:
         """Update zone status.
@@ -226,7 +204,7 @@ class HVACZoneRepository:
         Returns:
             Updated zone or None if not found
         """
-        return self.update(zone_id, {'status': status})
+        return self.update(zone_id, {"status": status})
 
     def update_current_temp(self, zone_id: str, temp: float) -> Optional[Dict[str, Any]]:
         """Update current zone temperature.
@@ -238,4 +216,4 @@ class HVACZoneRepository:
         Returns:
             Updated zone or None if not found
         """
-        return self.update(zone_id, {'current_temp': temp})
+        return self.update(zone_id, {"current_temp": temp})

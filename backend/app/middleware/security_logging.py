@@ -64,31 +64,60 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
 
     # BMS control endpoints (log all access with full detail)
     CONTROL_ENDPOINTS = {
-        "/control",       # device control
-        "/approve",       # approval actions
-        "/execute",       # execution actions
-        "/override",      # safety overrides
-        "/activate",      # activation actions
+        "/control",  # device control
+        "/approve",  # approval actions
+        "/execute",  # execution actions
+        "/override",  # safety overrides
+        "/activate",  # activation actions
     }
 
     # Suspicious user agent patterns (automated tools, scanners)
     SUSPICIOUS_USER_AGENTS = [
-        "curl", "wget", "python-requests", "httpx", "axios",
-        "postman", "insomnia", "burp", "owasp", "zap",
-        "nmap", "nikto", "sqlmap", "gobuster", "dirb",
-        "dirbuster", "wpscan", "masscan", "nuclei", "nessus",
-        "scanner", "crawler", "spider", "scraper",
+        "curl",
+        "wget",
+        "python-requests",
+        "httpx",
+        "axios",
+        "postman",
+        "insomnia",
+        "burp",
+        "owasp",
+        "zap",
+        "nmap",
+        "nikto",
+        "sqlmap",
+        "gobuster",
+        "dirb",
+        "dirbuster",
+        "wpscan",
+        "masscan",
+        "nuclei",
+        "nessus",
+        "scanner",
+        "crawler",
+        "spider",
+        "scraper",
     ]
 
     # Suspicious path patterns (injection, traversal)
     SUSPICIOUS_PATH_PATTERNS = [
-        "../", "..\\",                     # Path traversal
-        "' OR ", "\" OR ", "1=1",          # SQL injection
-        "<script", "javascript:",          # XSS
-        "/etc/passwd", "/etc/shadow",      # File access
-        ".env", "wp-admin", "wp-login",    # Common probes
-        "/admin", "/phpmyadmin",           # Admin panel probes
-        "cmd=", "exec(", "system(",        # Command injection
+        "../",
+        "..\\",  # Path traversal
+        "' OR ",
+        '" OR ',
+        "1=1",  # SQL injection
+        "<script",
+        "javascript:",  # XSS
+        "/etc/passwd",
+        "/etc/shadow",  # File access
+        ".env",
+        "wp-admin",
+        "wp-login",  # Common probes
+        "/admin",
+        "/phpmyadmin",  # Admin panel probes
+        "cmd=",
+        "exec(",
+        "system(",  # Command injection
     ]
 
     def __init__(self, app: ASGIApp):
@@ -113,9 +142,7 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
         start_time = time.time()
 
         # Check for suspicious patterns BEFORE processing
-        self._check_suspicious_request(
-            path, method, source_ip, user_agent, correlation_id
-        )
+        self._check_suspicious_request(path, method, source_ip, user_agent, correlation_id)
 
         # Check if this is a BMS control action
         is_control = any(path.endswith(ep) for ep in self.CONTROL_ENDPOINTS)
@@ -137,7 +164,7 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
                     status_code=response.status_code,
                     duration_ms=duration_ms,
                     correlation_id=correlation_id,
-                    details={"reason": "unauthorized"}
+                    details={"reason": "unauthorized"},
                 )
             elif response.status_code == 403:
                 self._log_security_event(
@@ -150,7 +177,7 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
                     status_code=response.status_code,
                     duration_ms=duration_ms,
                     correlation_id=correlation_id,
-                    details={"reason": "forbidden"}
+                    details={"reason": "forbidden"},
                 )
             elif response.status_code >= 500:
                 self._log_security_event(
@@ -163,7 +190,7 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
                     status_code=response.status_code,
                     duration_ms=duration_ms,
                     correlation_id=correlation_id,
-                    details={"reason": "internal_server_error"}
+                    details={"reason": "internal_server_error"},
                 )
             elif is_control and method in ["POST", "PUT", "PATCH"]:
                 self._log_security_event(
@@ -176,7 +203,7 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
                     status_code=response.status_code,
                     duration_ms=duration_ms,
                     correlation_id=correlation_id,
-                    details={"control_type": self._get_control_type(path)}
+                    details={"control_type": self._get_control_type(path)},
                 )
             elif is_sensitive and method in ["POST", "PUT", "PATCH", "DELETE"]:
                 self._log_security_event(
@@ -189,7 +216,7 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
                     status_code=response.status_code,
                     duration_ms=duration_ms,
                     correlation_id=correlation_id,
-                    details={}
+                    details={},
                 )
 
             # Add security headers
@@ -209,10 +236,7 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
                 status_code=500,
                 duration_ms=duration_ms,
                 correlation_id=correlation_id,
-                details={
-                    "exception_type": type(e).__name__,
-                    "exception_message": str(e)[:200]
-                }
+                details={"exception_type": type(e).__name__, "exception_message": str(e)[:200]},
             )
             raise
 
@@ -249,12 +273,7 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
             return False
 
     def _check_suspicious_request(
-        self,
-        path: str,
-        method: str,
-        source_ip: Optional[str],
-        user_agent: str,
-        correlation_id: str
+        self, path: str, method: str, source_ip: Optional[str], user_agent: str, correlation_id: str
     ) -> None:
         """Check for suspicious request patterns and log if detected."""
         user_agent_lower = user_agent.lower()
@@ -272,7 +291,7 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
                         path=path,
                         method=method,
                         correlation_id=correlation_id,
-                        details={"matched_pattern": pattern}
+                        details={"matched_pattern": pattern},
                     )
                     break
 
@@ -287,7 +306,7 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
                     path=path,
                     method=method,
                     correlation_id=correlation_id,
-                    details={"matched_pattern": pattern}
+                    details={"matched_pattern": pattern},
                 )
                 break
 
@@ -322,7 +341,7 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
         status_code: Optional[int] = None,
         duration_ms: Optional[float] = None,
         correlation_id: str = "",
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Log a structured security event to the security logger.
 
@@ -340,7 +359,7 @@ class SecurityLoggingMiddleware(BaseHTTPMiddleware):
             "duration_ms": round(duration_ms, 2) if duration_ms else None,
             "correlation_id": correlation_id,
             "component": "sentinel-backend",
-            "details": details or {}
+            "details": details or {},
         }
 
         # Log at appropriate level based on severity
@@ -390,7 +409,7 @@ def log_security_event(
     path: str = "",
     method: str = "",
     status_code: Optional[int] = None,
-    details: Optional[Dict[str, Any]] = None
+    details: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Convenience function for explicit security event logging from services.
 
@@ -421,7 +440,7 @@ def log_security_event(
         "method": method,
         "status_code": status_code,
         "component": "sentinel-backend",
-        "details": details or {}
+        "details": details or {},
     }
 
     log_message = json.dumps(event, default=str)

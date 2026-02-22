@@ -122,20 +122,25 @@ class RemoteCommandService:
         safety_warnings: List[str] = []
 
         # 1. Authorization check
-        required_level = COMMAND_AUTHORIZATION.get(
-            command_type, AuthorizationLevel.ENGINEER
-        )
+        required_level = COMMAND_AUTHORIZATION.get(command_type, AuthorizationLevel.ENGINEER)
         if not self._auth_service.check_authorization(user_role, required_level):
             self._log_command(
-                command_id, user_id, user_role, device_id, command_type,
-                point, value, reason, success=False,
+                command_id,
+                user_id,
+                user_role,
+                device_id,
+                command_type,
+                point,
+                value,
+                reason,
+                success=False,
                 error="Insufficient authorization",
             )
             return {
                 "success": False,
                 "command_id": command_id,
                 "error": f"Insufficient authorization. Requires {required_level.name}, "
-                         f"user has {self._auth_service.get_user_authorization_level(user_role).name}",
+                f"user has {self._auth_service.get_user_authorization_level(user_role).name}",
                 "safety_warnings": [],
             }
 
@@ -143,8 +148,15 @@ class RemoteCommandService:
         rate_result = self._check_rate_limit(user_id)
         if rate_result["blocked"]:
             self._log_command(
-                command_id, user_id, user_role, device_id, command_type,
-                point, value, reason, success=False,
+                command_id,
+                user_id,
+                user_role,
+                device_id,
+                command_type,
+                point,
+                value,
+                reason,
+                success=False,
                 error="Rate limit exceeded",
             )
             return {
@@ -157,13 +169,18 @@ class RemoteCommandService:
             safety_warnings.append(rate_result["warning"])
 
         # 3. Command-specific authorization checks (not safety - these are role checks)
-        auth_result = self._check_command_authorization(
-            command_type, user_role, device_id
-        )
+        auth_result = self._check_command_authorization(command_type, user_role, device_id)
         if not auth_result["allowed"]:
             self._log_command(
-                command_id, user_id, user_role, device_id, command_type,
-                point, value, reason, success=False,
+                command_id,
+                user_id,
+                user_role,
+                device_id,
+                command_type,
+                point,
+                value,
+                reason,
+                success=False,
                 error=auth_result["error"],
             )
             return {
@@ -189,8 +206,15 @@ class RemoteCommandService:
                 # Status checks don't write anything
                 result_data = await self._execute_status_check(device_id)
                 self._log_command(
-                    command_id, user_id, user_role, device_id, command_type,
-                    point, value, reason, success=True,
+                    command_id,
+                    user_id,
+                    user_role,
+                    device_id,
+                    command_type,
+                    point,
+                    value,
+                    reason,
+                    success=True,
                 )
                 return {
                     "success": True,
@@ -201,12 +225,16 @@ class RemoteCommandService:
                 }
 
             if command_type == "fault_reset":
-                result_data = await self._execute_fault_reset(
-                    device_id, user_id, reason
-                )
+                result_data = await self._execute_fault_reset(device_id, user_id, reason)
                 self._log_command(
-                    command_id, user_id, user_role, device_id, command_type,
-                    point, value, reason,
+                    command_id,
+                    user_id,
+                    user_role,
+                    device_id,
+                    command_type,
+                    point,
+                    value,
+                    reason,
                     success=result_data["success"],
                     error=result_data.get("error"),
                     previous_value=result_data.get("previous_status"),
@@ -239,16 +267,21 @@ class RemoteCommandService:
             # device_manager.write_device_value() calls SafetyEngine.validate_control()
             # which enforces all configured safety rules from safety_rules.json
             if point and value is not None:
-                success = await device_manager.write_device_value(
-                    device_id, point, value, priority=8, user=user_id
-                )
+                success = await device_manager.write_device_value(device_id, point, value, priority=8, user=user_id)
             else:
                 success = True  # Commands without point/value
 
             if not success:
                 self._log_command(
-                    command_id, user_id, user_role, device_id, command_type,
-                    point, value, reason, success=False,
+                    command_id,
+                    user_id,
+                    user_role,
+                    device_id,
+                    command_type,
+                    point,
+                    value,
+                    reason,
+                    success=False,
                     error="Device write failed",
                 )
                 return {
@@ -261,8 +294,16 @@ class RemoteCommandService:
         except ValueError as e:
             # SafetyEngine blocks raise ValueError with descriptive message
             self._log_command(
-                command_id, user_id, user_role, device_id, command_type,
-                point, value, reason, success=False, error=str(e),
+                command_id,
+                user_id,
+                user_role,
+                device_id,
+                command_type,
+                point,
+                value,
+                reason,
+                success=False,
+                error=str(e),
             )
             return {
                 "success": False,
@@ -273,8 +314,16 @@ class RemoteCommandService:
         except Exception as e:
             logger.error(f"Command execution error: {e}")
             self._log_command(
-                command_id, user_id, user_role, device_id, command_type,
-                point, value, reason, success=False, error=str(e),
+                command_id,
+                user_id,
+                user_role,
+                device_id,
+                command_type,
+                point,
+                value,
+                reason,
+                success=False,
+                error=str(e),
             )
             return {
                 "success": False,
@@ -309,8 +358,15 @@ class RemoteCommandService:
 
         # 8. Record in history
         self._log_command(
-            command_id, user_id, user_role, device_id, command_type,
-            point, value, reason, success=True,
+            command_id,
+            user_id,
+            user_role,
+            device_id,
+            command_type,
+            point,
+            value,
+            reason,
+            success=True,
             previous_value=previous_value,
             expires_at=expires_at,
         )
@@ -365,10 +421,7 @@ class RemoteCommandService:
             "expires_at": expires_at.isoformat(),
         }
 
-        logger.info(
-            f"Override {command_id} scheduled: {device_id}/{point} "
-            f"reverts at {expires_at.isoformat()}"
-        )
+        logger.info(f"Override {command_id} scheduled: {device_id}/{point} reverts at {expires_at.isoformat()}")
         return expires_at
 
     async def check_expired_overrides(self) -> List[Dict[str, Any]]:
@@ -431,9 +484,7 @@ class RemoteCommandService:
 
         return reverted
 
-    async def rollback_command(
-        self, command_id: str, user_id: str, user_role: str
-    ) -> Dict[str, Any]:
+    async def rollback_command(self, command_id: str, user_id: str, user_role: str) -> Dict[str, Any]:
         """Manually revert a command to its pre-command state.
 
         Args:
@@ -473,9 +524,7 @@ class RemoteCommandService:
 
         # Authorization: must be command owner or ENGINEER
         if override["user_id"] != user_id:
-            if not self._auth_service.check_authorization(
-                user_role, AuthorizationLevel.ENGINEER
-            ):
+            if not self._auth_service.check_authorization(user_role, AuthorizationLevel.ENGINEER):
                 return {
                     "success": False,
                     "error": "Only the command owner or an ENGINEER can rollback",
@@ -533,9 +582,7 @@ class RemoteCommandService:
                 "error": f"Rollback failed: {e}",
             }
 
-    def get_active_overrides(
-        self, site_id: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    def get_active_overrides(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """List active overrides, optionally filtered by site_id.
 
         Args:
@@ -547,9 +594,9 @@ class RemoteCommandService:
         overrides = list(self._active_overrides.values())
         if site_id:
             overrides = [
-                o for o in overrides
-                if o["device_id"].startswith(site_id.replace("site-", "S").upper())
-                or site_id in o["device_id"]
+                o
+                for o in overrides
+                if o["device_id"].startswith(site_id.replace("site-", "S").upper()) or site_id in o["device_id"]
             ]
         return overrides
 
@@ -604,9 +651,7 @@ class RemoteCommandService:
 
         # Fire panel reset requires ENGINEER and gets ALARM-level audit
         if command_type == "fire_panel_reset":
-            if not self._auth_service.check_authorization(
-                user_role, AuthorizationLevel.ENGINEER
-            ):
+            if not self._auth_service.check_authorization(user_role, AuthorizationLevel.ENGINEER):
                 return {
                     "allowed": False,
                     "error": "Fire panel reset requires ENGINEER level authorization",
@@ -627,9 +672,7 @@ class RemoteCommandService:
         # Door unlock - inform about auto-lock duration
         if command_type == "door_unlock":
             durations = self._override_durations
-            warnings.append(
-                f"Door will auto-lock after {durations['door_unlock_minutes']} minutes"
-            )
+            warnings.append(f"Door will auto-lock after {durations['door_unlock_minutes']} minutes")
 
         return {"allowed": True, "error": None, "warnings": warnings}
 
@@ -645,9 +688,7 @@ class RemoteCommandService:
 
         # Clean old entries
         if user_id in self._rate_limit_counters:
-            self._rate_limit_counters[user_id] = [
-                ts for ts in self._rate_limit_counters[user_id] if ts > one_hour_ago
-            ]
+            self._rate_limit_counters[user_id] = [ts for ts in self._rate_limit_counters[user_id] if ts > one_hour_ago]
         else:
             self._rate_limit_counters[user_id] = []
 
@@ -659,10 +700,7 @@ class RemoteCommandService:
         if count >= max_commands:
             return {
                 "blocked": True,
-                "message": (
-                    f"Maximum {max_commands} "
-                    f"commands per hour exceeded ({count} in last hour)"
-                ),
+                "message": (f"Maximum {max_commands} commands per hour exceeded ({count} in last hour)"),
                 "warning": None,
             }
 
@@ -709,9 +747,7 @@ class RemoteCommandService:
             "points": points_data,
         }
 
-    async def _execute_fault_reset(
-        self, device_id: str, user_id: str, reason: str
-    ) -> Dict[str, Any]:
+    async def _execute_fault_reset(self, device_id: str, user_id: str, reason: str) -> Dict[str, Any]:
         """Execute a fault reset on a device/equipment.
 
         Performs three actions:
@@ -752,10 +788,7 @@ class RemoteCommandService:
                 device.status = DeviceStatus.ONLINE
                 device.updated_at = datetime.now().isoformat()
                 result["device_reset"] = True
-                logger.info(
-                    f"Fault reset: device {device_id} status "
-                    f"{result['previous_status']} -> online"
-                )
+                logger.info(f"Fault reset: device {device_id} status {result['previous_status']} -> online")
             else:
                 logger.info(
                     f"Fault reset: device {device_id} was not in FAULT state "
@@ -765,14 +798,12 @@ class RemoteCommandService:
                 device.updated_at = datetime.now().isoformat()
                 result["device_reset"] = True
         else:
-            logger.info(
-                f"Fault reset: device {device_id} not in device_manager, "
-                f"attempting Supabase equipment lookup"
-            )
+            logger.info(f"Fault reset: device {device_id} not in device_manager, attempting Supabase equipment lookup")
 
         # 2. Update equipment in Supabase
         try:
             from app.database.repositories.equipment_repository import EquipmentRepository
+
             equip_repo = EquipmentRepository()
             equipment = equip_repo.get_by_id(device_id)
 
@@ -784,10 +815,13 @@ class RemoteCommandService:
 
                 # Reset to normal with healthy score
                 new_health = max(85, previous_health)
-                equip_repo.update(device_id, {
-                    "status": "normal",
-                    "health_score": new_health,
-                })
+                equip_repo.update(
+                    device_id,
+                    {
+                        "status": "normal",
+                        "health_score": new_health,
+                    },
+                )
                 result["equipment_updated"] = True
                 logger.info(
                     f"Fault reset: equipment {device_id} "
@@ -798,6 +832,7 @@ class RemoteCommandService:
                 # 3. Resolve active predictions for this equipment
                 try:
                     from app.database.repositories.prediction_repository import PredictionRepository
+
                     pred_repo = PredictionRepository()
                     equipment_uuid = equipment.get("id")
                     if equipment_uuid:
@@ -805,8 +840,7 @@ class RemoteCommandService:
                         result["predictions_resolved"] = resolved_count
                         if resolved_count > 0:
                             logger.info(
-                                f"Fault reset: resolved {resolved_count} active "
-                                f"predictions for equipment {device_id}"
+                                f"Fault reset: resolved {resolved_count} active predictions for equipment {device_id}"
                             )
                 except Exception as e:
                     logger.warning(f"Fault reset: failed to resolve predictions: {e}")
@@ -821,9 +855,7 @@ class RemoteCommandService:
         result["success"] = result["device_reset"] or result["equipment_updated"]
 
         if not result["success"]:
-            result["error"] = (
-                f"Device/equipment {device_id} not found in device_manager or Supabase"
-            )
+            result["error"] = f"Device/equipment {device_id} not found in device_manager or Supabase"
 
         return result
 
@@ -843,21 +875,23 @@ class RemoteCommandService:
         expires_at: Optional[datetime] = None,
     ) -> None:
         """Record command in in-memory history."""
-        self._command_history.append({
-            "command_id": command_id,
-            "user_id": user_id,
-            "user_role": user_role,
-            "device_id": device_id,
-            "command_type": command_type,
-            "point": point,
-            "value": value,
-            "reason": reason,
-            "success": success,
-            "error": error,
-            "previous_value": previous_value,
-            "expires_at": expires_at.isoformat() if expires_at else None,
-            "executed_at": datetime.now().isoformat(),
-        })
+        self._command_history.append(
+            {
+                "command_id": command_id,
+                "user_id": user_id,
+                "user_role": user_role,
+                "device_id": device_id,
+                "command_type": command_type,
+                "point": point,
+                "value": value,
+                "reason": reason,
+                "success": success,
+                "error": error,
+                "previous_value": previous_value,
+                "expires_at": expires_at.isoformat() if expires_at else None,
+                "executed_at": datetime.now().isoformat(),
+            }
+        )
         # Cap history size
         if len(self._command_history) > 500:
             self._command_history = self._command_history[-500:]

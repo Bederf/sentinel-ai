@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class ModbusDeviceType(IntEnum):
     """Common Modbus device types."""
+
     GENERATOR = 1
     POWER_METER = 2
     UPS = 3
@@ -33,6 +34,7 @@ class ModbusDeviceType(IntEnum):
 @dataclass
 class ModbusDeviceInfo:
     """Discovered Modbus device information."""
+
     unit_id: int  # Modbus slave address
     device_type: ModbusDeviceType = ModbusDeviceType.UNKNOWN
     device_name: str = ""
@@ -99,11 +101,7 @@ REGISTER_MAPS = {
 class ModbusDiscoveryService:
     """Service for discovering Modbus device information."""
 
-    def __init__(
-        self,
-        default_port: int = 502,
-        timeout: float = 5.0
-    ):
+    def __init__(self, default_port: int = 502, timeout: float = 5.0):
         """Initialize Modbus discovery service.
 
         Args:
@@ -114,11 +112,7 @@ class ModbusDiscoveryService:
         self.timeout = timeout
 
     async def discover_device(
-        self,
-        ip_address: str,
-        unit_id: int = 1,
-        port: Optional[int] = None,
-        device_profile: Optional[str] = None
+        self, ip_address: str, unit_id: int = 1, port: Optional[int] = None, device_profile: Optional[str] = None
     ) -> Optional[ModbusDeviceInfo]:
         """Discover a Modbus device.
 
@@ -139,6 +133,7 @@ class ModbusDiscoveryService:
             # For now, return basic info if we can reach the device
 
             import socket
+
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(self.timeout)
             result = sock.connect_ex((ip_address, port))
@@ -166,7 +161,7 @@ class ModbusDiscoveryService:
         ip_address: str,
         unit_id: int = 1,
         port: Optional[int] = None,
-        device_profile: Optional[str] = None
+        device_profile: Optional[str] = None,
     ) -> dict:
         """Discover Modbus device and save to equipment metadata.
 
@@ -218,7 +213,7 @@ class ModbusDiscoveryService:
                 operating_data={
                     "rated_capacity": device.rated_capacity,
                     "runtime_hours": device.runtime_hours,
-                }
+                },
             )
             result["saved"] = True
             result["status"] = "success"
@@ -274,12 +269,7 @@ class SimulatedModbusDiscovery:
     }
 
     @classmethod
-    def generate_device_info(
-        cls,
-        equipment_code: str,
-        equipment_type: str = "generator",
-        unit_id: int = 1
-    ) -> dict:
+    def generate_device_info(cls, equipment_code: str, equipment_type: str = "generator", unit_id: int = 1) -> dict:
         """Generate simulated Modbus device info.
 
         Args:
@@ -334,5 +324,5 @@ class SimulatedModbusDiscovery:
                 "runtime_hours": runtime,
                 "transfer_count": random.randint(10, 500) if equipment_type == "ats" else None,
                 "battery_cycles": random.randint(5, 50) if equipment_type == "ups" else None,
-            }
+            },
         }

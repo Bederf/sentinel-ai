@@ -99,11 +99,13 @@ class SustainabilityService:
             for b in buildings:
                 b_dict = b if isinstance(b, dict) else {}
                 metadata = b_dict.get("metadata", {})
-                sites.append({
-                    "id": b_dict.get("id"),
-                    "name": b_dict.get("display_name") or b_dict.get("name") or b_dict.get("id"),
-                    "sqm": metadata.get("sqm", 1000),
-                })
+                sites.append(
+                    {
+                        "id": b_dict.get("id"),
+                        "name": b_dict.get("display_name") or b_dict.get("name") or b_dict.get("id"),
+                        "sqm": metadata.get("sqm", 1000),
+                    }
+                )
 
             equipment = load_equipment()
             data_points = generate_energy_data(sites, equipment, days=days, site_id=site_id)
@@ -141,13 +143,15 @@ class SustainabilityService:
             var = random.uniform(0.85, 1.15)
 
             total = daily_base * factor * var
-            result.append({
-                "date": date.isoformat(),
-                "hvac_kwh": round(total * hvac_pct, 1),
-                "lighting_kwh": round(total * lighting_pct, 1),
-                "other_kwh": round(total * other_pct, 1),
-                "total_kwh": round(total, 1),
-            })
+            result.append(
+                {
+                    "date": date.isoformat(),
+                    "hvac_kwh": round(total * hvac_pct, 1),
+                    "lighting_kwh": round(total * lighting_pct, 1),
+                    "other_kwh": round(total * other_pct, 1),
+                    "total_kwh": round(total, 1),
+                }
+            )
 
         return result
 
@@ -163,7 +167,7 @@ class SustainabilityService:
             total_litres = 0.0
             for gen in generators:
                 fuel_rate = 0.0
-                if hasattr(gen, 'engine') and gen.engine:
+                if hasattr(gen, "engine") and gen.engine:
                     fuel_rate = gen.engine.get("fuel_rate_lph", 0.0)
                 elif isinstance(gen, dict):
                     engine = gen.get("engine", {})
@@ -241,9 +245,7 @@ class SustainabilityService:
             breakdown_by_system=breakdown,
         )
 
-    def get_emissions_history(
-        self, site_id: str, months: int = 12
-    ) -> List[EmissionsSnapshot]:
+    def get_emissions_history(self, site_id: str, months: int = 12) -> List[EmissionsSnapshot]:
         """Get monthly emissions snapshots for the past N months."""
         config = self.get_config(site_id)
         ef = config.emission_factors
@@ -285,11 +287,7 @@ class SustainabilityService:
             water_co2 = config.monthly_water_kl * ef.water_kg_co2_per_kl
             waste_co2 = config.monthly_waste_tons * ef.waste_kg_co2_per_ton
             avg_employees = config.occupancy_capacity * (config.avg_occupancy_pct / 100.0)
-            commute_co2 = (
-                avg_employees
-                * config.working_days_per_month
-                * ef.commute_kg_co2_per_person_day
-            )
+            commute_co2 = avg_employees * config.working_days_per_month * ef.commute_kg_co2_per_person_day
             scope3 = water_co2 + waste_co2 + commute_co2
 
             hvac_kwh = sum(d["hvac_kwh"] for d in month_data)
@@ -357,22 +355,21 @@ class SustainabilityService:
             },
             "vs_typical": {
                 "energy_pct": round(
-                    ((energy_intensity - bm.energy_typical_kwh_per_sqm_yr)
-                     / bm.energy_typical_kwh_per_sqm_yr) * 100, 1
+                    ((energy_intensity - bm.energy_typical_kwh_per_sqm_yr) / bm.energy_typical_kwh_per_sqm_yr) * 100, 1
                 ),
                 "carbon_pct": round(
-                    ((carbon_intensity - bm.carbon_typical_kg_per_sqm_yr)
-                     / bm.carbon_typical_kg_per_sqm_yr) * 100, 1
+                    ((carbon_intensity - bm.carbon_typical_kg_per_sqm_yr) / bm.carbon_typical_kg_per_sqm_yr) * 100, 1
                 ),
             },
             "vs_efficient": {
                 "energy_pct": round(
-                    ((energy_intensity - bm.energy_efficient_kwh_per_sqm_yr)
-                     / bm.energy_efficient_kwh_per_sqm_yr) * 100, 1
+                    ((energy_intensity - bm.energy_efficient_kwh_per_sqm_yr) / bm.energy_efficient_kwh_per_sqm_yr)
+                    * 100,
+                    1,
                 ),
                 "carbon_pct": round(
-                    ((carbon_intensity - bm.carbon_efficient_kg_per_sqm_yr)
-                     / bm.carbon_efficient_kg_per_sqm_yr) * 100, 1
+                    ((carbon_intensity - bm.carbon_efficient_kg_per_sqm_yr) / bm.carbon_efficient_kg_per_sqm_yr) * 100,
+                    1,
                 ),
             },
         }
@@ -395,11 +392,13 @@ class SustainabilityService:
                 with open(categories_path) as f:
                     cat_data = json.load(f)
                 for c in cat_data.get("categories", []):
-                    categories.append(GreenStarCategory(
-                        category_id=c["category_id"],
-                        name=c["name"],
-                        max_points=c["max_points"],
-                    ))
+                    categories.append(
+                        GreenStarCategory(
+                            category_id=c["category_id"],
+                            name=c["name"],
+                            max_points=c["max_points"],
+                        )
+                    )
             assessment = GreenStarAssessment(site_id=site_id, categories=categories)
 
         self._assessments[site_id] = assessment
@@ -414,9 +413,7 @@ class SustainabilityService:
         for cat in assessment.categories:
             if cat.category_id == category_id:
                 if points > cat.max_points:
-                    raise ValueError(
-                        f"Points ({points}) exceed max ({cat.max_points}) for {category_id}"
-                    )
+                    raise ValueError(f"Points ({points}) exceed max ({cat.max_points}) for {category_id}")
                 cat.achieved_points = points
                 if notes is not None:
                     cat.notes = notes

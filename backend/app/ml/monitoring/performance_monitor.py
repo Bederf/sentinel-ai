@@ -12,7 +12,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -23,10 +23,11 @@ LOG_DIR = Path(__file__).parent.parent.parent / "data" / "simulation_logs"
 @dataclass
 class ConfusionMatrix:
     """Confusion matrix for binary classification (fault vs no fault)."""
-    true_positives: int = 0      # Fault predicted AND repaired
-    false_positives: int = 0     # Fault predicted but NOT repaired
-    false_negatives: int = 0     # NO fault predicted but WAS repaired
-    true_negatives: int = 0      # NO fault predicted and NOT repaired
+
+    true_positives: int = 0  # Fault predicted AND repaired
+    false_positives: int = 0  # Fault predicted but NOT repaired
+    false_negatives: int = 0  # NO fault predicted but WAS repaired
+    true_negatives: int = 0  # NO fault predicted and NOT repaired
 
 
 class PerformanceMonitor:
@@ -36,11 +37,7 @@ class PerformanceMonitor:
         self.log_dir = log_dir
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-    def evaluate_predictions(
-        self,
-        days_back: int = 7,
-        building_code: str = "site-002"
-    ) -> Dict[str, Any]:
+    def evaluate_predictions(self, days_back: int = 7, building_code: str = "site-002") -> Dict[str, Any]:
         """
         Evaluate prediction accuracy against actual simulation outcomes.
 
@@ -82,7 +79,7 @@ class PerformanceMonitor:
                 equipment_predictions[equipment_id] = {
                     "fault_predicted": False,
                     "repair_completed": False,
-                    "fault_details": {}
+                    "fault_details": {},
                 }
 
             # Track fault events (predictions)
@@ -97,7 +94,7 @@ class PerformanceMonitor:
         # Build confusion matrix from predictions
         for eq_id, pred in equipment_predictions.items():
             predicted = pred["fault_predicted"]  # Model predicted fault
-            actual = pred["repair_completed"]     # Actual: repair happened
+            actual = pred["repair_completed"]  # Actual: repair happened
 
             if predicted and actual:
                 confusion.true_positives += 1
@@ -116,10 +113,7 @@ class PerformanceMonitor:
             "period_days": days_back,
             "building_code": building_code,
             "predictions_count": len(equipment_predictions),
-            "alerts_count": len([
-                e for e in all_events
-                if e.get("event_type") == "alert_generated"
-            ]),
+            "alerts_count": len([e for e in all_events if e.get("event_type") == "alert_generated"]),
             "metrics": {
                 "accuracy": metrics["accuracy"],
                 "precision": metrics["precision"],
@@ -239,11 +233,7 @@ class PerformanceMonitor:
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
 
         # F1 Score: 2 * (Precision * Recall) / (Precision + Recall)
-        f1_score = (
-            2 * (precision * recall) / (precision + recall)
-            if (precision + recall) > 0
-            else 0.0
-        )
+        f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
 
         return {
             "accuracy": round(accuracy, 4),

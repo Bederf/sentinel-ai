@@ -25,6 +25,7 @@ router = APIRouter()
 # Response Models
 class FailurePredictionResponse(BaseModel):
     """Response for failure type prediction."""
+
     equipment_id: str
     equipment_type: str
     predicted_failure: str
@@ -36,6 +37,7 @@ class FailurePredictionResponse(BaseModel):
 
 class FleetFailureRisk(BaseModel):
     """Fleet-wide failure risk item."""
+
     equipment_id: str
     equipment_type: str
     predicted_failure: str
@@ -44,12 +46,14 @@ class FleetFailureRisk(BaseModel):
 
 class FeatureImportanceItem(BaseModel):
     """Feature importance item."""
+
     feature: str
     importance: float
 
 
 class ModelInfo(BaseModel):
     """Model information."""
+
     equipment_type: str
     model_path: str
     metadata: Dict
@@ -77,9 +81,7 @@ async def get_failure_type_prediction(equipment_id: str):
 
 
 @router.get("/fleet/risks", response_model=List[FleetFailureRisk])
-async def get_fleet_failure_risks(
-    min_confidence: float = Query(default=0.5, ge=0.0, le=1.0)
-):
+async def get_fleet_failure_risks(min_confidence: float = Query(default=0.5, ge=0.0, le=1.0)):
     """Get failure type predictions for all equipment.
 
     Args:
@@ -97,10 +99,7 @@ async def get_fleet_failure_risks(
 
 
 @router.get("/feature-importance/{equipment_type}", response_model=List[FeatureImportanceItem])
-async def get_feature_importance(
-    equipment_type: str,
-    top_n: int = Query(default=20, ge=1, le=100)
-):
+async def get_feature_importance(equipment_type: str, top_n: int = Query(default=20, ge=1, le=100)):
     """Get feature importance for an equipment type.
 
     Args:
@@ -166,23 +165,18 @@ async def health_check():
         service = get_classification_service()
         models = service.list_available_models()
 
-        return {
-            "status": "healthy",
-            "n_models": len(models),
-            "equipment_types": [m["equipment_type"] for m in models]
-        }
+        return {"status": "healthy", "n_models": len(models), "equipment_types": [m["equipment_type"] for m in models]}
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        return {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+        return {"status": "unhealthy", "error": str(e)}
 
 
 # === Comprehensive Prediction Endpoint ===
 
+
 class ComprehensivePredictionResponse(BaseModel):
     """Comprehensive prediction combining all ML models."""
+
     equipment_id: str
     equipment_type: str
     predictions: Dict
@@ -217,6 +211,7 @@ async def get_comprehensive_prediction(equipment_id: str):
         # Try JSON fallback
         import json
         from pathlib import Path
+
         equipment_file = Path(__file__).parent.parent / "data" / "equipment.json"
         with open(equipment_file) as f:
             all_equipment = json.load(f)
@@ -228,11 +223,7 @@ async def get_comprehensive_prediction(equipment_id: str):
 
     equipment_type = equipment.get("equipment_type") if isinstance(equipment, dict) else equipment.equipment_type
 
-    results = {
-        "equipment_id": equipment_id,
-        "equipment_type": equipment_type,
-        "predictions": {}
-    }
+    results = {"equipment_id": equipment_id, "equipment_type": equipment_type, "predictions": {}}
 
     # LSTM forecast
     try:
@@ -295,14 +286,16 @@ def calculate_overall_risk(predictions: Dict) -> Dict:
         prob_30d = predictions["survival"]["failure_probability"]["30d"]
         risk_score += int(prob_30d * 40)
         if prob_30d > 0.3:
-            risk_factors.append(f"{int(prob_30d*100)}% failure probability in 30 days")
+            risk_factors.append(f"{int(prob_30d * 100)}% failure probability in 30 days")
 
     # Failure type confidence contributes
     if "failure_type" in predictions and "confidence" in predictions["failure_type"]:
         conf = predictions["failure_type"]["confidence"]
         if conf > 0.7:
             risk_score += 20
-            risk_factors.append(f"High confidence ({int(conf*100)}%) {predictions['failure_type']['predicted_failure']} risk")
+            risk_factors.append(
+                f"High confidence ({int(conf * 100)}%) {predictions['failure_type']['predicted_failure']} risk"
+            )
 
     # Determine risk level
     if risk_score > 70:
@@ -314,8 +307,4 @@ def calculate_overall_risk(predictions: Dict) -> Dict:
     else:
         risk_level = "low"
 
-    return {
-        "risk_score": min(100, risk_score),
-        "risk_level": risk_level,
-        "risk_factors": risk_factors
-    }
+    return {"risk_score": min(100, risk_score), "risk_level": risk_level, "risk_factors": risk_factors}

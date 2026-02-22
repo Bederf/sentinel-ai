@@ -21,7 +21,7 @@
 
 3. **Enter email:**
    - `bederf@protonmail.com` - Solar Engineer (has SOLAR + CONTROL)
-   - `grant@wardew.co.za` - Lighting Technician (has LIGHTING + CONTROL)
+   - `grant@grantdemo.co.za` - Lighting Technician (has LIGHTING + CONTROL)
 
 4. **Click "Login"** - You'll be automatically authenticated
 
@@ -48,7 +48,7 @@
 
 ---
 
-### Grant (grant@wardew.co.za)
+### Grant (grant@grantdemo.co.za)
 **Modules Granted:**
 - ✅ control
 - ✅ lighting
@@ -120,7 +120,7 @@ curl -H "Authorization: Bearer $BEDERF_TOKEN" \
 
 ### Test Module Access (Grant CANNOT access SOLAR)
 ```bash
-GRANT_TOKEN=$(curl -s -X POST "http://localhost:9095/api/auth/login?email=grant@wardew.co.za" | jq -r .access_token)
+GRANT_TOKEN=$(curl -s -X POST "http://localhost:9095/api/auth/login?email=grant@grantdemo.co.za" | jq -r .access_token)
 
 curl -H "Authorization: Bearer $GRANT_TOKEN" \
   http://localhost:9095/api/solar/generation/site-002

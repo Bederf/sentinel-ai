@@ -11,10 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_thermal_runway(
-    current_temp: float,
-    comfort_limit: float,
-    building_params: Dict,
-    weather_forecast: Dict
+    current_temp: float, comfort_limit: float, building_params: Dict, weather_forecast: Dict
 ) -> int:
     """
     Calculate minutes until building temperature breaches comfort limit.
@@ -76,11 +73,7 @@ def calculate_thermal_runway(
     return minutes_to_limit
 
 
-def calculate_precooling_benefit(
-    building_params: Dict,
-    pre_cooling_temp: float,
-    pre_cooling_duration: int
-) -> int:
+def calculate_precooling_benefit(building_params: Dict, pre_cooling_temp: float, pre_cooling_duration: int) -> int:
     """
     Calculate extended thermal runway minutes from pre-cooling.
 
@@ -132,10 +125,7 @@ def calculate_precooling_benefit(
 
 
 def generate_thermal_curve(
-    start_temp: float,
-    comfort_limit: float,
-    outage_duration: int,
-    building_params: Dict
+    start_temp: float, comfort_limit: float, outage_duration: int, building_params: Dict
 ) -> List[Tuple[float, float]]:
     """
     Generate temperature points over time during an outage.
@@ -150,11 +140,7 @@ def generate_thermal_curve(
         List of (time_minutes, temperature) points
     """
     # Use default weather forecast for curve generation
-    weather_forecast = {
-        "outside_temp": 32.0,
-        "solar_load": 0.7,
-        "humidity": 65
-    }
+    weather_forecast = {"outside_temp": 32.0, "solar_load": 0.7, "humidity": 65}
 
     # Calculate temperature at each time point
     points = []
@@ -182,9 +168,7 @@ def generate_thermal_curve(
         # Calculate temperature using the runway function
         # For curve generation, we need incremental calculation
         # Simplified: linear interpolation based on runway calculation
-        runway = calculate_thermal_runway(
-            start_temp, comfort_limit, building_params, weather_forecast
-        )
+        runway = calculate_thermal_runway(start_temp, comfort_limit, building_params, weather_forecast)
 
         if runway == 0:
             # Already at comfort limit
@@ -206,8 +190,7 @@ def generate_thermal_curve(
         points.append((float(time_minutes), round(temp, 1)))
 
     logger.debug(
-        f"Generated thermal curve: {len(points)} points, "
-        f"{start_temp}°C → {points[-1][1]}°C over {outage_duration}min"
+        f"Generated thermal curve: {len(points)} points, {start_temp}°C → {points[-1][1]}°C over {outage_duration}min"
     )
 
     return points
@@ -226,7 +209,7 @@ def get_gateway_theatre_params() -> Dict:
         "internal_heat_gain": 0.5,  # Moderate internal heat from people/equipment
         "building_type": "shopping_mall",
         "floor_area_sqm": 85000,
-        "occupancy": 1200
+        "occupancy": 1200,
     }
 
 
@@ -243,7 +226,7 @@ def get_sandton_city_params() -> Dict:
         "internal_heat_gain": 0.6,  # Higher internal heat (more equipment)
         "building_type": "office_tower",
         "floor_area_sqm": 65000,
-        "occupancy": 800
+        "occupancy": 800,
     }
 
 
@@ -260,7 +243,7 @@ def get_centurion_mall_params() -> Dict:
         "internal_heat_gain": 0.7,  # High internal heat
         "building_type": "mixed_use",
         "floor_area_sqm": 95000,
-        "occupancy": 1500
+        "occupancy": 1500,
     }
 
 
@@ -268,6 +251,7 @@ def get_centurion_mall_params() -> Dict:
 if __name__ == "__main__":
     # Configure logging
     import sys
+
     logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
 
     # Test with Gateway Theatre parameters

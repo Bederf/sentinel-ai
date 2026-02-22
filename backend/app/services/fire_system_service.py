@@ -90,17 +90,19 @@ class FireSystemService:
         alarms = []
         for a in raw_alarms:
             try:
-                alarms.append(FireAlarm(
-                    alarm_id=a.get("alarm_id", ""),
-                    zone_id=a.get("zone_id", ""),
-                    alarm_type=AlarmType(a.get("alarm_type", "fault")),
-                    severity=AlarmSeverity(a.get("severity", "fault")),
-                    description=a.get("description", ""),
-                    acknowledged=a.get("acknowledged", False),
-                    acknowledged_by=a.get("acknowledged_by"),
-                    cleared=a.get("cleared", False),
-                    created_at=a.get("created_at", datetime.utcnow()),
-                ))
+                alarms.append(
+                    FireAlarm(
+                        alarm_id=a.get("alarm_id", ""),
+                        zone_id=a.get("zone_id", ""),
+                        alarm_type=AlarmType(a.get("alarm_type", "fault")),
+                        severity=AlarmSeverity(a.get("severity", "fault")),
+                        description=a.get("description", ""),
+                        acknowledged=a.get("acknowledged", False),
+                        acknowledged_by=a.get("acknowledged_by"),
+                        cleared=a.get("cleared", False),
+                        created_at=a.get("created_at", datetime.utcnow()),
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Error parsing alarm: {e}")
         return alarms
@@ -128,16 +130,18 @@ class FireSystemService:
         zones = []
         for z in raw_zones:
             try:
-                zones.append(FireZone(
-                    zone_id=z.get("zone_id", ""),
-                    zone_name=z.get("zone_name", ""),
-                    floor=z.get("floor", ""),
-                    zone_type=FireZoneType(z.get("zone_type", "office")),
-                    smoke_detectors=z.get("smoke_detectors", 0),
-                    heat_detectors=z.get("heat_detectors", 0),
-                    beam_detectors=z.get("beam_detectors", 0),
-                    manual_call_points=z.get("manual_call_points", 0),
-                ))
+                zones.append(
+                    FireZone(
+                        zone_id=z.get("zone_id", ""),
+                        zone_name=z.get("zone_name", ""),
+                        floor=z.get("floor", ""),
+                        zone_type=FireZoneType(z.get("zone_type", "office")),
+                        smoke_detectors=z.get("smoke_detectors", 0),
+                        heat_detectors=z.get("heat_detectors", 0),
+                        beam_detectors=z.get("beam_detectors", 0),
+                        manual_call_points=z.get("manual_call_points", 0),
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Error parsing zone: {e}")
         return zones
@@ -148,16 +152,18 @@ class FireSystemService:
         dampers = []
         for d in raw_dampers:
             try:
-                dampers.append(DamperStatus(
-                    damper_id=d.get("damper_id", ""),
-                    equipment_id=d.get("equipment_id"),
-                    zone_id=d.get("zone_id"),
-                    floor=d.get("floor", ""),
-                    position=d.get("position", 100),
-                    target_position=d.get("target_position", 100),
-                    status=DamperStatusEnum(d.get("status", "open")),
-                    last_tested=d.get("last_tested"),
-                ))
+                dampers.append(
+                    DamperStatus(
+                        damper_id=d.get("damper_id", ""),
+                        equipment_id=d.get("equipment_id"),
+                        zone_id=d.get("zone_id"),
+                        floor=d.get("floor", ""),
+                        position=d.get("position", 100),
+                        target_position=d.get("target_position", 100),
+                        status=DamperStatusEnum(d.get("status", "open")),
+                        last_tested=d.get("last_tested"),
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Error parsing damper: {e}")
         return dampers
@@ -168,14 +174,16 @@ class FireSystemService:
         pressurization = []
         for p in raw_press:
             try:
-                pressurization.append(StairwellPressure(
-                    stairwell_id=p.get("stairwell_id", ""),
-                    floor=p.get("floor", ""),
-                    current_pressure_pa=float(p.get("current_pressure_pa", 0)),
-                    target_pressure_pa=float(p.get("target_pressure_pa", 50)),
-                    fan_status=FanStatus(p.get("fan_status", "off")),
-                    fan_speed_pct=int(p.get("fan_speed_pct", 0)),
-                ))
+                pressurization.append(
+                    StairwellPressure(
+                        stairwell_id=p.get("stairwell_id", ""),
+                        floor=p.get("floor", ""),
+                        current_pressure_pa=float(p.get("current_pressure_pa", 0)),
+                        target_pressure_pa=float(p.get("target_pressure_pa", 50)),
+                        fan_status=FanStatus(p.get("fan_status", "off")),
+                        fan_speed_pct=int(p.get("fan_speed_pct", 0)),
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Error parsing pressurization: {e}")
         return pressurization
@@ -188,18 +196,22 @@ class FireSystemService:
             try:
                 effects = []
                 for e in m.get("effects", []):
-                    effects.append(CauseEffectEffect(
-                        target_type=e.get("target_type", "hvac"),
-                        target_id=e.get("target_id", ""),
-                        action=e.get("action", ""),
-                        delay_seconds=e.get("delay_seconds", 0),
-                        priority=e.get("priority", 1),
-                    ))
-                entries.append(CauseEffectEntry(
-                    trigger_zone=m.get("trigger_zone", ""),
-                    trigger_type=m.get("trigger_type", ""),
-                    effects=effects,
-                ))
+                    effects.append(
+                        CauseEffectEffect(
+                            target_type=e.get("target_type", "hvac"),
+                            target_id=e.get("target_id", ""),
+                            action=e.get("action", ""),
+                            delay_seconds=e.get("delay_seconds", 0),
+                            priority=e.get("priority", 1),
+                        )
+                    )
+                entries.append(
+                    CauseEffectEntry(
+                        trigger_zone=m.get("trigger_zone", ""),
+                        trigger_type=m.get("trigger_type", ""),
+                        effects=effects,
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Error parsing cause-effect entry: {e}")
         return entries
@@ -295,21 +307,26 @@ class FireSystemService:
         from app.services.fire_hvac_coordinator import get_fire_hvac_coordinator
 
         # Mark alarm as cleared via repository (dual-write)
-        self._repo.update_alarm(alarm_id, {
-            "acknowledged": True,
-            "acknowledged_by": "operator",
-            "acknowledged_at": datetime.utcnow().isoformat(),
-            "cleared": True,
-            "cleared_at": datetime.utcnow().isoformat(),
-        })
+        self._repo.update_alarm(
+            alarm_id,
+            {
+                "acknowledged": True,
+                "acknowledged_by": "operator",
+                "acknowledged_at": datetime.utcnow().isoformat(),
+                "cleared": True,
+                "cleared_at": datetime.utcnow().isoformat(),
+            },
+        )
 
         # Log the clear action
-        self._repo.log_action({
-            "action_type": "alarm_cleared",
-            "zone_id": "unknown",
-            "description": f"Alarm {alarm_id} cleared by operator",
-            "mode": "normal",
-        })
+        self._repo.log_action(
+            {
+                "action_type": "alarm_cleared",
+                "zone_id": "unknown",
+                "description": f"Alarm {alarm_id} cleared by operator",
+                "mode": "normal",
+            }
+        )
 
         # Check remaining active alarms
         remaining = self._repo.get_active_alarms()
@@ -372,12 +389,14 @@ class FireSystemService:
                         triggered_effects.append(effect)
 
         # Log the simulation action
-        self._repo.log_action({
-            "action_type": "simulate_alarm",
-            "zone_id": zone_id,
-            "description": f"Simulated {alarm_type} alarm in {zone_id}",
-            "mode": "demo",
-        })
+        self._repo.log_action(
+            {
+                "action_type": "simulate_alarm",
+                "zone_id": zone_id,
+                "description": f"Simulated {alarm_type} alarm in {zone_id}",
+                "mode": "demo",
+            }
+        )
 
         # Save alarm to repository
         self._repo.create_alarm(alarm_data)

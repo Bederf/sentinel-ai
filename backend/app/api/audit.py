@@ -25,6 +25,7 @@ audit_logger = AuditLogger()
 # Response models
 class AuditLogEntryResponse(BaseModel):
     """Audit log entry response model."""
+
     id: str
     timestamp: datetime
     action: str
@@ -55,12 +56,13 @@ class AuditLogEntryResponse(BaseModel):
             safety_validation=entry.safety_validation,
             error_message=entry.error_message,
             correlation_id=entry.correlation_id,
-            metadata=entry.metadata
+            metadata=entry.metadata,
         )
 
 
 class AuditLogsResponse(BaseModel):
     """Audit logs response with pagination."""
+
     entries: List[AuditLogEntryResponse]
     total_count: int
     page: int
@@ -70,6 +72,7 @@ class AuditLogsResponse(BaseModel):
 
 class AuditStatsResponse(BaseModel):
     """Audit statistics response."""
+
     total_entries: int
     by_action: dict
     by_result: dict
@@ -110,7 +113,7 @@ async def get_audit_logs(
             action=action,
             user=user,
             result=result,
-            limit=limit
+            limit=limit,
         )
 
         # Check if there are more results
@@ -125,11 +128,7 @@ async def get_audit_logs(
         total_count = len(logs) + (page_size if has_more else 0)
 
         return AuditLogsResponse(
-            entries=entries,
-            total_count=total_count,
-            page=page,
-            page_size=page_size,
-            has_more=has_more
+            entries=entries, total_count=total_count, page=page, page_size=page_size, has_more=has_more
         )
 
     except Exception as e:
@@ -172,7 +171,11 @@ async def get_audit_stats() -> AuditStatsResponse:
         stats = audit_logger.get_stats()
 
         # Parse last_updated from stats
-        last_updated = datetime.fromisoformat(stats["last_updated"]) if isinstance(stats["last_updated"], str) else stats["last_updated"]
+        last_updated = (
+            datetime.fromisoformat(stats["last_updated"])
+            if isinstance(stats["last_updated"], str)
+            else stats["last_updated"]
+        )
 
         return AuditStatsResponse(
             total_entries=stats["total_entries"],
@@ -180,7 +183,7 @@ async def get_audit_stats() -> AuditStatsResponse:
             by_result=stats["by_result"],
             by_user=stats["by_user"],
             recent_activity_count=stats["recent_activity_count"],
-            last_updated=last_updated
+            last_updated=last_updated,
         )
 
     except Exception as e:
@@ -213,27 +216,58 @@ async def generate_demo_audit_data() -> dict:
         # Covers all equipment types for comprehensive audit trail
         demo_devices = [
             # HVAC - Chillers
-            "S002-CHILLER-B1-001", "S002-CHILLER-B1-002", "S002-CHILLER-B1-003",
+            "S002-CHILLER-B1-001",
+            "S002-CHILLER-B1-002",
+            "S002-CHILLER-B1-003",
             # HVAC - AHUs (one per floor)
-            "S002-AHU-L0-01", "S002-AHU-L1-01", "S002-AHU-L2-01",
+            "S002-AHU-L0-01",
+            "S002-AHU-L1-01",
+            "S002-AHU-L2-01",
             # HVAC - FCUs (sample across floors)
-            "S002-FCU-L0-A", "S002-FCU-L0-C", "S002-FCU-L1-A", "S002-FCU-L1-C", "S002-FCU-L1-E",
-            "S002-FCU-L2-A", "S002-FCU-L2-C", "S002-FCU-L2-E",
+            "S002-FCU-L0-A",
+            "S002-FCU-L0-C",
+            "S002-FCU-L1-A",
+            "S002-FCU-L1-C",
+            "S002-FCU-L1-E",
+            "S002-FCU-L2-A",
+            "S002-FCU-L2-C",
+            "S002-FCU-L2-E",
             # HVAC - VAVs (sample across floors)
-            "S002-VAV-L0-C", "S002-VAV-L0-E",
-            "S002-VAV-L1-A", "S002-VAV-L1-C", "S002-VAV-L1-E",
-            "S002-VAV-L2-A", "S002-VAV-L2-C", "S002-VAV-L2-E",
+            "S002-VAV-L0-C",
+            "S002-VAV-L0-E",
+            "S002-VAV-L1-A",
+            "S002-VAV-L1-C",
+            "S002-VAV-L1-E",
+            "S002-VAV-L2-A",
+            "S002-VAV-L2-C",
+            "S002-VAV-L2-E",
             # Lighting - DALI controllers (sample)
-            "S002-DALI-L0-01", "S002-DALI-L1-01", "S002-DALI-L1-05", "S002-DALI-L2-01", "S002-DALI-L2-05",
+            "S002-DALI-L0-01",
+            "S002-DALI-L1-01",
+            "S002-DALI-L1-05",
+            "S002-DALI-L2-01",
+            "S002-DALI-L2-05",
             # Lighting - Luminaire groups (sample)
-            "S002-LUM-L0-A", "S002-LUM-L1-A", "S002-LUM-L1-E", "S002-LUM-L2-A", "S002-LUM-L2-E",
+            "S002-LUM-L0-A",
+            "S002-LUM-L1-A",
+            "S002-LUM-L1-E",
+            "S002-LUM-L2-A",
+            "S002-LUM-L2-E",
             # Energy Centre - Generators
-            "S002-GEN-B1-001", "S002-GEN-B1-002", "S002-GEN-B1-003", "S002-GEN-B1-004",
+            "S002-GEN-B1-001",
+            "S002-GEN-B1-002",
+            "S002-GEN-B1-003",
+            "S002-GEN-B1-004",
             # Energy Centre - UPS, ATS, Transformers
-            "S002-UPS-B1-001", "S002-UPS-B1-002", "S002-ATS-B1-001",
-            "S002-TX-B1-001", "S002-TX-B1-002",
+            "S002-UPS-B1-001",
+            "S002-UPS-B1-002",
+            "S002-ATS-B1-001",
+            "S002-TX-B1-001",
+            "S002-TX-B1-002",
             # Energy Centre - Switchboard, meters
-            "S002-MSB-B1-001", "S002-MTR-B1-MAIN", "S002-MTR-B1-GEN",
+            "S002-MSB-B1-001",
+            "S002-MTR-B1-MAIN",
+            "S002-MTR-B1-GEN",
             # Sensors (at-risk)
             "S002-CO2-L1-E",
         ]
@@ -289,12 +323,9 @@ async def generate_demo_audit_data() -> dict:
                         AuditResultType.SUCCESS: 70,
                         AuditResultType.WARNING: 15,
                         AuditResultType.BLOCKED: 10,
-                        AuditResultType.FAILED: 5
+                        AuditResultType.FAILED: 5,
                     }
-                    result = random.choices(
-                        list(result_weights.keys()),
-                        weights=list(result_weights.values())
-                    )[0]
+                    result = random.choices(list(result_weights.keys()), weights=list(result_weights.values()))[0]
 
                 # Create safety validation based on result
                 safety_validation = None
@@ -305,7 +336,7 @@ async def generate_demo_audit_data() -> dict:
                         "rules_checked": ["temperature_range", "pressure_limits"],
                         "passed_rules": ["temperature_range"],
                         "failed_rules": ["pressure_limits"],
-                        "details": "Pressure exceeds safe operating limits"
+                        "details": "Pressure exceeds safe operating limits",
                     }
                     error_message = "Safety validation failed: Pressure limit exceeded"
                 elif result == AuditResultType.WARNING:
@@ -313,13 +344,13 @@ async def generate_demo_audit_data() -> dict:
                         "rules_checked": ["temperature_range", "minimum_runtime"],
                         "passed_rules": ["temperature_range"],
                         "warnings": ["minimum_runtime"],
-                        "details": "Minimum runtime requirement not met (warning only)"
+                        "details": "Minimum runtime requirement not met (warning only)",
                     }
                 elif result == AuditResultType.SUCCESS:
                     safety_validation = {
                         "rules_checked": ["temperature_range", "pressure_limits"],
                         "passed_rules": ["temperature_range", "pressure_limits"],
-                        "details": "All safety checks passed"
+                        "details": "All safety checks passed",
                     }
 
                 # Build metadata - SENTINEL entries include AI optimization context
@@ -354,7 +385,7 @@ async def generate_demo_audit_data() -> dict:
         return {
             "status": "success",
             "entries_created": entries_created,
-            "message": f"Generated {entries_created} demo audit log entries spanning last 7 days"
+            "message": f"Generated {entries_created} demo audit log entries spanning last 7 days",
         }
 
     except Exception as e:

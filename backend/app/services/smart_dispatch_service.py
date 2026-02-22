@@ -101,9 +101,7 @@ class SmartDispatchService:
         self._completed_dispatches: List[Dict[str, Any]] = []
         self._load_technicians()
         self._initialized = True
-        logger.info(
-            f"SmartDispatchService initialized with {len(self._technicians)} technicians"
-        )
+        logger.info(f"SmartDispatchService initialized with {len(self._technicians)} technicians")
 
     def _load_technicians(self) -> None:
         """Load technician data from JSON file."""
@@ -142,9 +140,7 @@ class SmartDispatchService:
         monitoring = get_remote_monitoring_service()
 
         # Get full diagnostic
-        report = await monitoring.get_equipment_diagnostic(
-            equipment_id, "full_diagnostic"
-        )
+        report = await monitoring.get_equipment_diagnostic(equipment_id, "full_diagnostic")
 
         # Determine site from equipment ID prefix
         site_id = self._site_id_from_equipment(equipment_id)
@@ -169,9 +165,7 @@ class SmartDispatchService:
         # Check if a simple remote action could fix it
         if report.anomalies and not report.requires_dispatch:
             # Anomalies detected but no safety violations -- suggest remote first
-            remote_suggestions = self._suggest_remote_actions(
-                equipment_id, report.anomalies, report.recommendations
-            )
+            remote_suggestions = self._suggest_remote_actions(equipment_id, report.anomalies, report.recommendations)
             if remote_suggestions:
                 remote_actions.extend(remote_suggestions)
                 return {
@@ -229,9 +223,7 @@ class SmartDispatchService:
     # Task bundling ("while you're there")
     # ------------------------------------------------------------------
 
-    async def bundle_tasks(
-        self, site_id: str, primary_equipment_id: str
-    ) -> List[Dict[str, Any]]:
+    async def bundle_tasks(self, site_id: str, primary_equipment_id: str) -> List[Dict[str, Any]]:
         """Find additional tasks at the same site to bundle with dispatch.
 
         Gathers:
@@ -254,18 +246,18 @@ class SmartDispatchService:
             work_orders = work_order_service.get_work_orders(site_id=site_id)
             for wo in work_orders:
                 if wo.status in ("open", "pending"):
-                    tasks.append({
-                        "task_id": wo.id,
-                        "task_type": "work_order",
-                        "description": wo.description,
-                        "equipment_id": wo.equipment_id,
-                        "priority": wo.priority,
-                        "floor": self._floor_from_equipment(wo.equipment_id),
-                        "estimated_minutes": TASK_DURATION_ESTIMATES.get(
-                            "work_order", 60
-                        ),
-                        "source": "work_order",
-                    })
+                    tasks.append(
+                        {
+                            "task_id": wo.id,
+                            "task_type": "work_order",
+                            "description": wo.description,
+                            "equipment_id": wo.equipment_id,
+                            "priority": wo.priority,
+                            "floor": self._floor_from_equipment(wo.equipment_id),
+                            "estimated_minutes": TASK_DURATION_ESTIMATES.get("work_order", 60),
+                            "source": "work_order",
+                        }
+                    )
         except Exception as e:
             logger.warning(f"Could not fetch work orders for {site_id}: {e}")
 
@@ -277,29 +269,23 @@ class SmartDispatchService:
                     continue  # Skip primary -- it's the reason we're dispatching
 
                 try:
-                    safety_status = await device_manager.get_device_safety_status(
-                        device.id
-                    )
+                    safety_status = await device_manager.get_device_safety_status(device.id)
                     overall = safety_status.get("overall_status", "safe")
                     if overall in ("warning", "alarm", "critical"):
-                        task_type = (
-                            "device_alarm"
-                            if overall in ("alarm", "critical")
-                            else "device_warning"
+                        task_type = "device_alarm" if overall in ("alarm", "critical") else "device_warning"
+                        tasks.append(
+                            {
+                                "task_id": f"dev-{device.id}",
+                                "task_type": task_type,
+                                "description": f"{device.name} in {overall} state",
+                                "equipment_id": device.id,
+                                "priority": "high" if overall != "warning" else "medium",
+                                "floor": self._floor_from_equipment(device.id),
+                                "estimated_minutes": TASK_DURATION_ESTIMATES.get(task_type, 30),
+                                "source": "device_status",
+                                "violations": safety_status.get("violations", []),
+                            }
                         )
-                        tasks.append({
-                            "task_id": f"dev-{device.id}",
-                            "task_type": task_type,
-                            "description": f"{device.name} in {overall} state",
-                            "equipment_id": device.id,
-                            "priority": "high" if overall != "warning" else "medium",
-                            "floor": self._floor_from_equipment(device.id),
-                            "estimated_minutes": TASK_DURATION_ESTIMATES.get(
-                                task_type, 30
-                            ),
-                            "source": "device_status",
-                            "violations": safety_status.get("violations", []),
-                        })
                 except Exception:
                     pass  # safety engine may not cover this device
         except Exception as e:
@@ -315,18 +301,18 @@ class SmartDispatchService:
                     if zone.get("status") == "fault":
                         fcu_id = zone.get("fcu_id", "")
                         if fcu_id and fcu_id != primary_equipment_id:
-                            tasks.append({
-                                "task_id": f"insp-{zone['zone_id']}",
-                                "task_type": "overdue_inspection",
-                                "description": f"Inspect {zone['zone_name']} - FCU in fault state",
-                                "equipment_id": fcu_id,
-                                "priority": "medium",
-                                "floor": zone.get("floor", "unknown"),
-                                "estimated_minutes": TASK_DURATION_ESTIMATES.get(
-                                    "overdue_inspection", 45
-                                ),
-                                "source": "inspection_schedule",
-                            })
+                            tasks.append(
+                                {
+                                    "task_id": f"insp-{zone['zone_id']}",
+                                    "task_type": "overdue_inspection",
+                                    "description": f"Inspect {zone['zone_name']} - FCU in fault state",
+                                    "equipment_id": fcu_id,
+                                    "priority": "medium",
+                                    "floor": zone.get("floor", "unknown"),
+                                    "estimated_minutes": TASK_DURATION_ESTIMATES.get("overdue_inspection", 45),
+                                    "source": "inspection_schedule",
+                                }
+                            )
         except Exception as e:
             logger.warning(f"Could not check inspection schedule: {e}")
 
@@ -342,9 +328,7 @@ class SmartDispatchService:
                 unique_tasks.append(task)
 
         # Sort by floor for efficient routing
-        unique_tasks.sort(
-            key=lambda t: FLOOR_ORDER.get(t.get("floor", ""), 99)
-        )
+        unique_tasks.sort(key=lambda t: FLOOR_ORDER.get(t.get("floor", ""), 99))
 
         return unique_tasks
 
@@ -352,9 +336,7 @@ class SmartDispatchService:
     # Technician assignment
     # ------------------------------------------------------------------
 
-    def find_best_technician(
-        self, site_id: str, required_specialization: str = "general"
-    ) -> Dict[str, Any]:
+    def find_best_technician(self, site_id: str, required_specialization: str = "general") -> Dict[str, Any]:
         """Find the best technician for a dispatch.
 
         Priority:
@@ -385,30 +367,20 @@ class SmartDispatchService:
             ):
                 return {
                     "technician": tech,
-                    "assignment_reason": (
-                        f"Already onsite at {site_id} with {required_specialization} specialization"
-                    ),
+                    "assignment_reason": (f"Already onsite at {site_id} with {required_specialization} specialization"),
                 }
 
         # 2. Available with matching specialization
         for tech in self._technicians:
-            if (
-                tech["status"] == "available"
-                and required_specialization in tech.get("specializations", [])
-            ):
+            if tech["status"] == "available" and required_specialization in tech.get("specializations", []):
                 return {
                     "technician": tech,
-                    "assignment_reason": (
-                        f"Available with {required_specialization} specialization"
-                    ),
+                    "assignment_reason": (f"Available with {required_specialization} specialization"),
                 }
 
         # 3. Available with general skills
         for tech in self._technicians:
-            if (
-                tech["status"] == "available"
-                and "general" in tech.get("specializations", [])
-            ):
+            if tech["status"] == "available" and "general" in tech.get("specializations", []):
                 return {
                     "technician": tech,
                     "assignment_reason": "Available with general skills",
@@ -468,18 +440,14 @@ class SmartDispatchService:
         tools_needed = self._infer_tools_needed(bundled_tasks)
 
         # Estimated total onsite time
-        total_minutes = sum(
-            t.get("estimated_minutes", 30) for t in bundled_tasks
-        )
+        total_minutes = sum(t.get("estimated_minutes", 30) for t in bundled_tasks)
         # Add 15 min for travel between floors if multiple floors
         floors_involved = set(t.get("floor") for t in bundled_tasks if t.get("floor"))
         if len(floors_involved) > 1:
             total_minutes += (len(floors_involved) - 1) * 15
 
         # Technician info
-        tech = next(
-            (t for t in self._technicians if t["id"] == technician_id), None
-        )
+        tech = next((t for t in self._technicians if t["id"] == technician_id), None)
 
         return {
             "briefing_id": str(uuid.uuid4()),
@@ -506,9 +474,7 @@ class SmartDispatchService:
             "tools_needed": tools_needed,
             "estimated_onsite_minutes": total_minutes,
             "estimated_onsite_time": (
-                f"{total_minutes // 60}h {total_minutes % 60}m"
-                if total_minutes >= 60
-                else f"{total_minutes}m"
+                f"{total_minutes // 60}h {total_minutes % 60}m" if total_minutes >= 60 else f"{total_minutes}m"
             ),
             "safety_notes": [
                 "Sign in at reception and collect building access card",
@@ -549,9 +515,7 @@ class SmartDispatchService:
 
         # Assign technician
         if technician_id:
-            tech = next(
-                (t for t in self._technicians if t["id"] == technician_id), None
-            )
+            tech = next((t for t in self._technicians if t["id"] == technician_id), None)
             assignment_reason = "Manually assigned"
         else:
             result = self.find_best_technician(site_id, specialization)
@@ -576,9 +540,7 @@ class SmartDispatchService:
             "equipment_id": equipment_id,
             "priority": "high",
             "floor": self._floor_from_equipment(equipment_id),
-            "estimated_minutes": TASK_DURATION_ESTIMATES.get(
-                "anomaly_investigation", 30
-            ),
+            "estimated_minutes": TASK_DURATION_ESTIMATES.get("anomaly_investigation", 30),
             "source": "dispatch_trigger",
         }
         all_tasks = [primary_task] + bundled
@@ -586,23 +548,21 @@ class SmartDispatchService:
         # Add any explicitly requested additional tasks
         if additional_tasks:
             for task in additional_tasks:
-                all_tasks.append({
-                    "task_id": task.get("task_id", f"extra-{uuid.uuid4().hex[:8]}"),
-                    "task_type": task.get("task_type", "work_order"),
-                    "description": task.get("description", "Additional task"),
-                    "equipment_id": task.get("equipment_id"),
-                    "priority": task.get("priority", "medium"),
-                    "floor": self._floor_from_equipment(
-                        task.get("equipment_id")
-                    ),
-                    "estimated_minutes": task.get("estimated_minutes", 30),
-                    "source": "manual",
-                })
+                all_tasks.append(
+                    {
+                        "task_id": task.get("task_id", f"extra-{uuid.uuid4().hex[:8]}"),
+                        "task_type": task.get("task_type", "work_order"),
+                        "description": task.get("description", "Additional task"),
+                        "equipment_id": task.get("equipment_id"),
+                        "priority": task.get("priority", "medium"),
+                        "floor": self._floor_from_equipment(task.get("equipment_id")),
+                        "estimated_minutes": task.get("estimated_minutes", 30),
+                        "source": "manual",
+                    }
+                )
 
         # Generate briefing
-        briefing = await self.generate_site_briefing(
-            site_id, tech["id"], all_tasks
-        )
+        briefing = await self.generate_site_briefing(site_id, tech["id"], all_tasks)
 
         # Record active dispatch
         self._active_dispatches[dispatch_id] = {
@@ -677,9 +637,7 @@ class SmartDispatchService:
             "message": f"Checked in at {dispatch['site_id']}. {len(dispatch['tasks'])} tasks to complete.",
         }
 
-    def complete_task(
-        self, dispatch_id: str, task_id: str, result: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def complete_task(self, dispatch_id: str, task_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
         """Mark a single task within a dispatch as completed.
 
         Args:
@@ -695,17 +653,17 @@ class SmartDispatchService:
             return {"success": False, "error": f"Dispatch {dispatch_id} not found"}
 
         # Find the task
-        task = next(
-            (t for t in dispatch["tasks"] if t["task_id"] == task_id), None
-        )
+        task = next((t for t in dispatch["tasks"] if t["task_id"] == task_id), None)
         if not task:
             return {"success": False, "error": f"Task {task_id} not found in dispatch"}
 
-        dispatch["tasks_completed"].append({
-            "task_id": task_id,
-            "completed_at": datetime.now().isoformat(),
-            "result": result,
-        })
+        dispatch["tasks_completed"].append(
+            {
+                "task_id": task_id,
+                "completed_at": datetime.now().isoformat(),
+                "result": result,
+            }
+        )
 
         remaining = len(dispatch["tasks"]) - len(dispatch["tasks_completed"])
         return {
@@ -771,11 +729,7 @@ class SmartDispatchService:
                 "onsite_duration_minutes": round(onsite_duration, 1),
                 "tasks_completed": tasks_completed,
                 "tasks_total": tasks_total,
-                "completion_rate_pct": (
-                    round(tasks_completed / tasks_total * 100, 1)
-                    if tasks_total
-                    else 0
-                ),
+                "completion_rate_pct": (round(tasks_completed / tasks_total * 100, 1) if tasks_total else 0),
                 "bundled_tasks_completed": max(0, tasks_completed - 1),
             },
             "overall_notes": overall_notes,
@@ -848,17 +802,11 @@ class SmartDispatchService:
         anomaly_text = " ".join(anomalies).lower()
 
         if "setpoint" in anomaly_text or "temperature" in anomaly_text:
-            suggestions.append(
-                f"Try remote setpoint adjustment on {equipment_id}"
-            )
+            suggestions.append(f"Try remote setpoint adjustment on {equipment_id}")
         if "communication" in anomaly_text or "offline" in anomaly_text:
-            suggestions.append(
-                f"Attempt remote fault reset on {equipment_id}"
-            )
+            suggestions.append(f"Attempt remote fault reset on {equipment_id}")
         if "schedule" in anomaly_text:
-            suggestions.append(
-                f"Apply schedule override on {equipment_id}"
-            )
+            suggestions.append(f"Apply schedule override on {equipment_id}")
         if not suggestions and recommendations:
             # Pass through recommendations as remote action options
             for rec in recommendations[:2]:
@@ -902,9 +850,7 @@ class SmartDispatchService:
             "parking": "Not configured",
         }
 
-    def _build_floor_routing(
-        self, tasks: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def _build_floor_routing(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Group tasks by floor for efficient routing.
 
         Returns floor-by-floor route from lowest to highest.
@@ -914,30 +860,30 @@ class SmartDispatchService:
             floor = task.get("floor", "unknown")
             if floor not in floors:
                 floors[floor] = []
-            floors[floor].append({
-                "task_id": task["task_id"],
-                "description": task["description"],
-                "equipment_id": task.get("equipment_id"),
-                "estimated_minutes": task.get("estimated_minutes", 30),
-            })
+            floors[floor].append(
+                {
+                    "task_id": task["task_id"],
+                    "description": task["description"],
+                    "equipment_id": task.get("equipment_id"),
+                    "estimated_minutes": task.get("estimated_minutes", 30),
+                }
+            )
 
         # Sort by floor order
         routing = []
         for floor in sorted(floors.keys(), key=lambda f: FLOOR_ORDER.get(f, 99)):
-            routing.append({
-                "floor": floor,
-                "task_count": len(floors[floor]),
-                "tasks": floors[floor],
-                "estimated_minutes": sum(
-                    t.get("estimated_minutes", 30) for t in floors[floor]
-                ),
-            })
+            routing.append(
+                {
+                    "floor": floor,
+                    "task_count": len(floors[floor]),
+                    "tasks": floors[floor],
+                    "estimated_minutes": sum(t.get("estimated_minutes", 30) for t in floors[floor]),
+                }
+            )
 
         return routing
 
-    async def _get_equipment_details(
-        self, tasks: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    async def _get_equipment_details(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Get detailed equipment info for each task.
 
         Reads current device status, location, and relevant readings.
@@ -958,15 +904,9 @@ class SmartDispatchService:
                 if device:
                     detail["device_name"] = device.name
                     detail["device_type"] = (
-                        device.device_type.value
-                        if hasattr(device.device_type, "value")
-                        else str(device.device_type)
+                        device.device_type.value if hasattr(device.device_type, "value") else str(device.device_type)
                     )
-                    detail["status"] = (
-                        device.status.value
-                        if hasattr(device.status, "value")
-                        else str(device.status)
-                    )
+                    detail["status"] = device.status.value if hasattr(device.status, "value") else str(device.status)
                     loc = getattr(device, "device_location", None)
                     if loc:
                         detail["location"] = {
@@ -987,9 +927,7 @@ class SmartDispatchService:
 
         return details
 
-    def _infer_tools_needed(
-        self, tasks: List[Dict[str, Any]]
-    ) -> List[str]:
+    def _infer_tools_needed(self, tasks: List[Dict[str, Any]]) -> List[str]:
         """Infer tools and parts needed from task types.
 
         Deduplicates across all tasks.

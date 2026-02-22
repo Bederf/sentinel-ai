@@ -308,10 +308,7 @@ class DiurnalPattern:
         """
         # Simple seasonal adjustment based on day of year
         # Peak in summer (day ~180), minimum in winter (day ~0/365)
-        seasonal_factors = np.array([
-            np.sin(2 * np.pi * ts.timetuple().tm_yday / 365)
-            for ts in timestamps
-        ])
+        seasonal_factors = np.array([np.sin(2 * np.pi * ts.timetuple().tm_yday / 365) for ts in timestamps])
 
         # Apply seasonal variation
         adjustment = seasonality_amplitude * values * seasonal_factors

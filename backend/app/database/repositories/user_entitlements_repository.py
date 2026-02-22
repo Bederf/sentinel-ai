@@ -36,7 +36,7 @@ class UserEntitlementsRepository:
                 "admin@demo.local": PRESET_ENTITLEMENTS["full"]["modules"],
                 "demo@sentinel.local": PRESET_ENTITLEMENTS["full"]["modules"],
             }
-            with open(self.entitlements_file, 'w') as f:
+            with open(self.entitlements_file, "w") as f:
                 json.dump(seed_data, f, indent=2)
             logger.info("Created seed user entitlements file")
 
@@ -57,16 +57,20 @@ class UserEntitlementsRepository:
         # 1. Try Supabase
         try:
             client = get_supabase_client()
-            response = client.table("user_entitlements").select(
-                "user_id, user_email, modules"
-            ).eq("user_email", user_email).single().execute()
+            response = (
+                client.table("user_entitlements")
+                .select("user_id, user_email, modules")
+                .eq("user_email", user_email)
+                .single()
+                .execute()
+            )
 
             if response.data:
                 return UserEntitlementProfile(
                     user_id=response.data.get("user_id", user_email),
                     user_email=response.data.get("user_email", user_email),
                     entitlements=response.data.get("modules", []),
-                    last_updated=response.data.get("updated_at", "")
+                    last_updated=response.data.get("updated_at", ""),
                 )
         except Exception as e:
             logger.debug(f"Supabase entitlements query failed for {user_email}: {e}")
@@ -78,10 +82,7 @@ class UserEntitlementsRepository:
                     data = json.load(f)
                     if user_email in data:
                         return UserEntitlementProfile(
-                            user_id=user_email,
-                            user_email=user_email,
-                            entitlements=data[user_email],
-                            last_updated=""
+                            user_id=user_email, user_email=user_email, entitlements=data[user_email], last_updated=""
                         )
         except Exception as e:
             logger.debug(f"JSON entitlements query failed for {user_email}: {e}")
@@ -91,10 +92,7 @@ class UserEntitlementsRepository:
         return None
 
     async def set_user_entitlements(
-        self,
-        user_email: str,
-        modules: list[str],
-        user_id: Optional[str] = None
+        self, user_email: str, modules: list[str], user_id: Optional[str] = None
     ) -> UserEntitlementProfile:
         """Set/update module entitlements for a user.
 
@@ -114,11 +112,9 @@ class UserEntitlementsRepository:
         try:
             client = get_supabase_client()
             # Upsert: update if exists, insert if not
-            client.table("user_entitlements").upsert({
-                "user_id": user_id,
-                "user_email": user_email,
-                "modules": modules
-            }).execute()
+            client.table("user_entitlements").upsert(
+                {"user_id": user_id, "user_email": user_email, "modules": modules}
+            ).execute()
             logger.info(f"Updated entitlements in Supabase for {user_email}: {modules}")
         except Exception as e:
             logger.debug(f"Supabase update failed for {user_email}, using JSON: {e}")
@@ -131,24 +127,16 @@ class UserEntitlementsRepository:
                         data = json.load(f)
 
                 data[user_email] = modules
-                with open(self.entitlements_file, 'w') as f:
+                with open(self.entitlements_file, "w") as f:
                     json.dump(data, f, indent=2)
                 logger.info(f"Updated entitlements in JSON file for {user_email}: {modules}")
             except Exception as json_e:
                 logger.error(f"Failed to update entitlements for {user_email}: {json_e}")
 
-        return UserEntitlementProfile(
-            user_id=user_id,
-            user_email=user_email,
-            entitlements=modules,
-            last_updated=""
-        )
+        return UserEntitlementProfile(user_id=user_id, user_email=user_email, entitlements=modules, last_updated="")
 
     async def apply_preset_to_user(
-        self,
-        user_email: str,
-        preset_name: str,
-        user_id: Optional[str] = None
+        self, user_email: str, preset_name: str, user_id: Optional[str] = None
     ) -> Optional[UserEntitlementProfile]:
         """Apply a preset (grant, bederf, full) to a user.
 

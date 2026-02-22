@@ -21,20 +21,153 @@ Usage:
 import asyncio
 import json
 import logging
+import secrets
 import time
-from typing import Dict, Optional
+import uuid
+from typing import Dict, Optional, Tuple
+from urllib.parse import urlparse
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
+from app.config.settings import settings
 from app.mcp import SIMBIOTMCPServer
+from app.models.auth import AuthContext
 
 # Keep-alive configuration
 SSE_HEARTBEAT_INTERVAL_SECONDS = 15  # Send heartbeat every 15 seconds
-SSE_COMMENT_INTERVAL_SECONDS = 5     # Send SSE comment every 5 seconds (proxy keep-alive)
-SSE_CONNECTION_TIMEOUT_SECONDS = 300 # Close connection after 5 min of no traffic from client
+SSE_COMMENT_INTERVAL_SECONDS = 5  # Send SSE comment every 5 seconds (proxy keep-alive)
+SSE_CONNECTION_TIMEOUT_SECONDS = 300  # Close connection after 5 min of no traffic from client
+
+# Payload size guard
+_MAX_PAYLOAD_BYTES = 1_048_576  # 1 MB max request payload
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# JSON-RPC 2.0 Allowed methods
+# ---------------------------------------------------------------------------
+
+_ALLOWED_JSONRPC_METHODS = frozenset(
+    {
+        "initialize",
+        "tools/list",
+        "tools/call",
+        "ping",
+        "notifications/initialized",
+    }
+)
+
+_ALLOWED_JSONRPC_FIELDS = frozenset({"jsonrpc", "method", "params", "id"})
+
+
+# ---------------------------------------------------------------------------
+# JSON-RPC 2.0 envelope validation
+# ---------------------------------------------------------------------------
+
+
+def _validate_jsonrpc_envelope(data: dict) -> Tuple[bool, Optional[str], int]:
+    """Validate a JSON-RPC 2.0 envelope.
+
+    Returns:
+        (True, None, 0) if valid.
+        (False, error_message, http_status) if invalid.
+    """
+    # Check for unknown top-level fields
+    unknown = set(data.keys()) - _ALLOWED_JSONRPC_FIELDS
+    if unknown:
+        return False, f"Unknown top-level fields: {unknown}", 400
+
+    # jsonrpc version must be "2.0"
+    if data.get("jsonrpc") != "2.0":
+        return False, "jsonrpc must be '2.0'", 400
+
+    # method must be a known string
+    method = data.get("method")
+    if not isinstance(method, str) or method not in _ALLOWED_JSONRPC_METHODS:
+        return False, f"Unknown method: {method}", 400
+
+    # id is required for non-notification methods
+    is_notification = isinstance(method, str) and method.startswith("notifications/")
+    if not is_notification and "id" not in data:
+        return False, "Missing required field: id", 400
+
+    # params must be a dict if present
+    if "params" in data and not isinstance(data["params"], dict):
+        return False, "params must be an object (dict), not array or scalar", 400
+
+    return True, None, 0
+
+
+# ---------------------------------------------------------------------------
+# Host / Origin enforcement
+# ---------------------------------------------------------------------------
+
+_LOCALHOST_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _validate_host_origin(request) -> None:
+    """Enforce Host/Origin localhost restriction in non-production environments.
+
+    In production mode (settings.environment == 'production'), all hosts are allowed.
+    Otherwise, Host and Origin headers must resolve to localhost/127.0.0.1.
+
+    Raises HTTPException(403) if validation fails.
+    """
+    if settings.environment == "production":
+        return
+
+    # Check Host header
+    host_header = request.headers.get("host", "")
+    host_name = host_header.split(":")[0].lower() if host_header else ""
+    if host_name and host_name not in _LOCALHOST_HOSTS:
+        raise HTTPException(status_code=403, detail="Non-localhost Host header rejected in development mode")
+
+    # Check Origin header (if present)
+    origin_header = request.headers.get("origin")
+    if origin_header:
+        parsed = urlparse(origin_header)
+        origin_host = parsed.hostname or ""
+        if origin_host not in _LOCALHOST_HOSTS:
+            raise HTTPException(status_code=403, detail="Non-localhost Origin header rejected in development mode")
+
+
+# ---------------------------------------------------------------------------
+# MCP Tickets — single-use session handover tokens
+# ---------------------------------------------------------------------------
+
+_MCP_TICKETS: Dict[str, Dict] = {}
+
+
+def _create_mcp_ticket(auth_ctx: AuthContext) -> str:
+    """Create a single-use ticket that carries the given auth context.
+
+    Returns the ticket token string.
+    """
+    ticket_id = secrets.token_urlsafe(32)
+    _MCP_TICKETS[ticket_id] = {
+        "auth_ctx": auth_ctx,
+        "created_at": time.time(),
+        "used": False,
+    }
+    return ticket_id
+
+
+def _validate_mcp_ticket(ticket: str) -> Optional[AuthContext]:
+    """Validate and consume a single-use MCP ticket.
+
+    Returns the AuthContext if the ticket is valid and unused, else None.
+    The ticket is marked as used on successful validation.
+    """
+    entry = _MCP_TICKETS.get(ticket)
+    if entry is None:
+        return None
+    if entry["used"]:
+        return None
+    entry["used"] = True
+    return entry["auth_ctx"]
+
+
 router = APIRouter(prefix="/api/mcp/sse", tags=["MCP-SSE"])
 
 
@@ -58,13 +191,8 @@ class MCPServerSSE:
 
         return {
             "protocolVersion": "2024-11-05",
-            "serverInfo": {
-                "name": "simbiot-mcp",
-                "version": "1.0.0"
-            },
-            "capabilities": {
-                "tools": {}
-            }
+            "serverInfo": {"name": "simbiot-mcp", "version": "1.0.0"},
+            "capabilities": {"tools": {}},
         }
 
     async def handle_tools_list(self) -> Dict:
@@ -72,41 +200,34 @@ class MCPServerSSE:
         tools = self.server.list_tools()
         return {"tools": tools}
 
-    async def handle_tools_call(self, params: Dict) -> Dict:
+    async def handle_tools_call(self, params: Dict, auth_ctx=None) -> Dict:
         """Execute a tool call."""
         tool_name = params.get("name")
         arguments = params.get("arguments", {})
 
         try:
-            result = await self.server.call_tool(tool_name, **arguments)
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": json.dumps(result, indent=2)
-                    }
-                ]
-            }
+            kwargs = dict(arguments)
+            if auth_ctx is not None:
+                kwargs["_auth_context"] = auth_ctx
+            result = await self.server.call_tool(tool_name, **kwargs)
+            return {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]}
         except ValueError as e:
+            request_id = str(uuid.uuid4())
+            logger.warning(f"Tool input error [{request_id}]: {e}")
             return {
                 "content": [
-                    {
-                        "type": "text",
-                        "text": f"Error: {str(e)}"
-                    }
+                    {"type": "text", "text": json.dumps({"error": "invalid_request", "request_id": request_id})}
                 ],
-                "isError": True
+                "isError": True,
             }
         except Exception as e:
-            logger.error(f"Tool execution error: {e}", exc_info=True)
+            request_id = str(uuid.uuid4())
+            logger.error(f"Tool execution error [{request_id}]: {e}", exc_info=True)
             return {
                 "content": [
-                    {
-                        "type": "text",
-                        "text": f"Internal error: {str(e)}"
-                    }
+                    {"type": "text", "text": json.dumps({"error": "internal_error", "request_id": request_id})}
                 ],
-                "isError": True
+                "isError": True,
             }
 
     async def handle_request(self, request: Dict) -> Optional[Dict]:
@@ -130,21 +251,11 @@ class MCPServerSSE:
                 return {}
 
             else:
-                return {
-                    "error": {
-                        "code": -32601,
-                        "message": f"Method not found: {method}"
-                    }
-                }
+                return {"error": {"code": -32601, "message": f"Method not found: {method}"}}
 
         except Exception as e:
             logger.error(f"Error handling request: {e}", exc_info=True)
-            return {
-                "error": {
-                    "code": -32603,
-                    "message": f"Internal error: {str(e)}"
-                }
-            }
+            return {"error": {"code": -32603, "message": "Internal error"}}
 
     async def event_stream(self):
         """Generate SSE events for MCP protocol.
@@ -160,11 +271,7 @@ class MCPServerSSE:
         last_comment = time.time()
 
         # Send initialized notification
-        yield await self.send_sse({
-            "jsonrpc": "2.0",
-            "method": "notifications/initialized",
-            "params": {}
-        })
+        yield await self.send_sse({"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
 
         try:
             # Keep connection alive with dual keep-alive strategy
@@ -181,12 +288,9 @@ class MCPServerSSE:
 
                 # Send heartbeat ping every 15 seconds
                 if time_since_heartbeat >= SSE_HEARTBEAT_INTERVAL_SECONDS:
-                    yield await self.send_sse({
-                        "jsonrpc": "2.0",
-                        "method": "ping",
-                        "params": {},
-                        "_timestamp": current_time
-                    })
+                    yield await self.send_sse(
+                        {"jsonrpc": "2.0", "method": "ping", "params": {}, "_timestamp": current_time}
+                    )
                     last_heartbeat = current_time
                     connection_uptime = current_time - connection_start
                     logger.debug(f"SSE heartbeat sent (connection uptime: {connection_uptime:.0f}s)")
@@ -241,8 +345,8 @@ async def mcp_sse_endpoint():
             "X-Content-Type-Options": "nosniff",
             # Prevent nginx/proxy timeouts
             "Expires": "0",
-            "Pragma": "no-cache"
-        }
+            "Pragma": "no-cache",
+        },
     )
 
 
@@ -260,5 +364,5 @@ async def mcp_request_endpoint(request: Dict):
         "jsonrpc": "2.0",
         "id": request.get("id"),
         "result": response,
-        "error": response.get("error") if isinstance(response, dict) and "error" in response else None
+        "error": response.get("error") if isinstance(response, dict) and "error" in response else None,
     }

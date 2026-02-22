@@ -22,6 +22,7 @@ router = APIRouter(prefix="/api/approval", tags=["approval_workflow"])
 
 class ApprovalStatus(str, Enum):
     """Approval status enum."""
+
     PENDING = "pending_approval"
     APPROVED = "approved"
     REJECTED = "rejected"
@@ -29,6 +30,7 @@ class ApprovalStatus(str, Enum):
 
 class ApprovalRequest(BaseModel):
     """Approval request model."""
+
     order_id: str
     requester_id: str
     amount: float
@@ -39,6 +41,7 @@ class ApprovalRequest(BaseModel):
 
 class ApprovalResponse(BaseModel):
     """Approval response model."""
+
     order_id: str
     status: ApprovalStatus
     approver_id: Optional[str] = None
@@ -58,9 +61,7 @@ class NotificationService:
         self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:9096")
         self.enabled = bool(self.smtp_user)
 
-    async def send_approval_email(
-        self, approval: ApprovalRequest, approvers: List[str]
-    ) -> None:
+    async def send_approval_email(self, approval: ApprovalRequest, approvers: List[str]) -> None:
         """Send approval request email to supervisors."""
         if not self.enabled:
             logger.info(f"Email notifications disabled. Would send to: {approvers}")
@@ -74,9 +75,7 @@ class NotificationService:
             except Exception as e:
                 logger.error(f"Failed to send approval email to {approver}: {e}")
 
-    def _create_approval_message(
-        self, approval: ApprovalRequest, to_email: str
-    ) -> MIMEMultipart:
+    def _create_approval_message(self, approval: ApprovalRequest, to_email: str) -> MIMEMultipart:
         """Create approval email message."""
         message = MIMEMultipart("alternative")
         message["From"] = self.smtp_user
@@ -128,9 +127,7 @@ class NotificationService:
 
     async def _send_email(self, message: MIMEMultipart) -> None:
         """Send email via SMTP (runs in thread pool)."""
-        await asyncio.to_thread(
-            self._send_email_sync, message
-        )
+        await asyncio.to_thread(self._send_email_sync, message)
 
     def _send_email_sync(self, message: MIMEMultipart) -> None:
         """Synchronous email sending."""
@@ -143,9 +140,7 @@ class NotificationService:
             logger.error(f"SMTP error: {e}")
             raise
 
-    async def send_approval_notification(
-        self, order_id: str, approver_id: str, status: ApprovalStatus
-    ) -> None:
+    async def send_approval_notification(self, order_id: str, approver_id: str, status: ApprovalStatus) -> None:
         """Send notification about approval decision."""
         if not self.enabled:
             logger.info(f"Would notify {approver_id} of {status} for order {order_id}")
@@ -162,8 +157,8 @@ class NotificationService:
               <body style="font-family: Arial, sans-serif;">
                 <h2>Order Approval Confirmation</h2>
                 <p><strong>Order ID:</strong> {order_id}</p>
-                <p><strong>Status:</strong> {status.value.replace('_', ' ').title()}</p>
-                <p>The order has been {status.value.replace('_', ' ')}.</p>
+                <p><strong>Status:</strong> {status.value.replace("_", " ").title()}</p>
+                <p>The order has been {status.value.replace("_", " ")}.</p>
               </body>
             </html>
             """
@@ -186,15 +181,11 @@ class ApprovalWorkflow:
         """Initialize approval workflow."""
         self.notifications = NotificationService()
 
-    async def request_approval(
-        self, order: dict, background_tasks: BackgroundTasks
-    ) -> ApprovalRequest:
+    async def request_approval(self, order: dict, background_tasks: BackgroundTasks) -> ApprovalRequest:
         """Initiate approval workflow."""
         # Calculate total amount
         amount = sum(
-            item.get("quantity", 1) * float(
-                item.get("unit_price", "0").replace("R", "").replace(",", "")
-            )
+            item.get("quantity", 1) * float(item.get("unit_price", "0").replace("R", "").replace(",", ""))
             for item in order.get("items", [])
         )
 
@@ -211,9 +202,7 @@ class ApprovalWorkflow:
         approvers = await self._get_approvers(order.get("site_id", ""))
 
         # Send notifications in background
-        background_tasks.add_task(
-            self.notifications.send_approval_email, approval, approvers
-        )
+        background_tasks.add_task(self.notifications.send_approval_email, approval, approvers)
 
         # Store approval request
         _approvals[order["id"]] = {
@@ -327,9 +316,7 @@ async def approve_order(
 ) -> ApprovalResponse:
     """Approve parts order."""
     try:
-        response = await _workflow.approve_order(
-            order_id, auth.user_id, background_tasks
-        )
+        response = await _workflow.approve_order(order_id, auth.user_id, background_tasks)
         return response
     except HTTPException:
         raise
@@ -347,9 +334,7 @@ async def reject_order(
 ) -> ApprovalResponse:
     """Reject parts order."""
     try:
-        response = await _workflow.reject_order(
-            order_id, auth.user_id, reason, background_tasks
-        )
+        response = await _workflow.reject_order(order_id, auth.user_id, reason, background_tasks)
         return response
     except HTTPException:
         raise
@@ -359,9 +344,7 @@ async def reject_order(
 
 
 @router.get("/{order_id}/status")
-async def get_approval_status(
-    order_id: str, auth: AuthContext = Depends(require_auth)
-) -> dict:
+async def get_approval_status(order_id: str, auth: AuthContext = Depends(require_auth)) -> dict:
     """Get approval status for order."""
     if order_id not in _approvals:
         raise HTTPException(status_code=404, detail="Order not found")

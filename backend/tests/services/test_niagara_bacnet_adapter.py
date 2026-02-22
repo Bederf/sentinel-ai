@@ -36,6 +36,7 @@ from app.services.niagara.bacnet_client import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def bacnet_device() -> Device:
     """Create a Device configured for BACnet protocol."""
@@ -125,6 +126,7 @@ def adapter(bacnet_device, mock_client):
 # Adapter Lifecycle
 # ---------------------------------------------------------------------------
 
+
 class TestAdapterLifecycle:
     """Tests for connect/disconnect lifecycle."""
 
@@ -145,9 +147,7 @@ class TestAdapterLifecycle:
         result = await adapter._protocol_connect()
 
         assert result is True
-        mock_client.read_point.assert_called_once_with(
-            1234, "device", 1234, property_name="objectName"
-        )
+        mock_client.read_point.assert_called_once_with(1234, "device", 1234, property_name="objectName")
 
     @pytest.mark.asyncio
     async def test_connect_returns_false_on_timeout(self, adapter, mock_client):
@@ -182,6 +182,7 @@ class TestAdapterLifecycle:
 # ---------------------------------------------------------------------------
 # Read Operations
 # ---------------------------------------------------------------------------
+
 
 class TestAdapterRead:
     """Tests for reading point values."""
@@ -250,6 +251,7 @@ class TestAdapterRead:
 # Write Operations
 # ---------------------------------------------------------------------------
 
+
 class TestAdapterWrite:
     """Tests for writing point values."""
 
@@ -294,6 +296,7 @@ class TestAdapterWrite:
 # ---------------------------------------------------------------------------
 # Point Scanning
 # ---------------------------------------------------------------------------
+
 
 class TestAdapterScan:
     """Tests for point discovery/scanning."""
@@ -340,6 +343,7 @@ class TestAdapterScan:
 # Status
 # ---------------------------------------------------------------------------
 
+
 class TestAdapterStatus:
     """Tests for device status checking."""
 
@@ -372,6 +376,7 @@ class TestAdapterStatus:
 # BACnet device ID extraction
 # ---------------------------------------------------------------------------
 
+
 class TestBACnetDeviceId:
     """Tests for bacnet_device_id property."""
 
@@ -391,10 +396,7 @@ class TestBACnetDeviceId:
             device_type=DeviceType.HVAC,
             protocol=ProtocolType.BACNET,
             site_id="site-001",
-            device_location=DeviceLocation(
-                building="Test", floor="L1", zone="A", room="MR1",
-                description="Test"
-            ),
+            device_location=DeviceLocation(building="Test", floor="L1", zone="A", room="MR1", description="Test"),
             equipment=DeviceEquipment(manufacturer="Test", model="Test"),
             metadata={},  # No bacnet_device_id
         )
@@ -409,6 +411,7 @@ class TestBACnetDeviceId:
 # ---------------------------------------------------------------------------
 # Utility functions
 # ---------------------------------------------------------------------------
+
 
 class TestUtilityFunctions:
     """Tests for mapping/conversion utility functions."""

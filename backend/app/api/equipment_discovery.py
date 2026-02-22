@@ -23,6 +23,7 @@ router = APIRouter()
 
 class UnifiedDiscoveryRequest(BaseModel):
     """Request to discover any equipment type."""
+
     equipment_code: str = Field(..., description="Equipment code (e.g., S002-CHILLER-B1-001)")
     protocol: str = Field(..., description="Protocol: dali, bacnet, modbus, or auto")
     equipment_type: Optional[str] = Field(None, description="Equipment type for profile selection")
@@ -48,6 +49,7 @@ class UnifiedDiscoveryRequest(BaseModel):
 
 class BulkDiscoveryRequest(BaseModel):
     """Request for bulk discovery of multiple equipment."""
+
     equipment_list: list[dict] = Field(..., description="List of equipment with code and protocol info")
     use_simulated: bool = Field(True, description="Use simulated data for unreachable devices")
 
@@ -109,7 +111,7 @@ async def discover_equipment(request: UnifiedDiscoveryRequest) -> dict:
                         equipment_id=request.equipment_code,
                         network_info=data.get("network_info"),
                         device_info=data.get("device_info"),
-                        operating_data=data.get("operating_data")
+                        operating_data=data.get("operating_data"),
                     )
                     result["saved"] = True
                 except Exception as e:
@@ -163,11 +165,9 @@ async def bulk_discover_equipment(request: BulkDiscoveryRequest) -> dict:
                 error_count += 1
 
         except Exception as e:
-            results.append({
-                "equipment_code": item.get("equipment_code", item.get("code")),
-                "status": "error",
-                "error": str(e)
-            })
+            results.append(
+                {"equipment_code": item.get("equipment_code", item.get("code")), "status": "error", "error": str(e)}
+            )
             error_count += 1
 
     return {
@@ -181,8 +181,7 @@ async def bulk_discover_equipment(request: BulkDiscoveryRequest) -> dict:
 
 @router.get("/equipment/{equipment_code}/discover")
 async def auto_discover_equipment(
-    equipment_code: str,
-    use_simulated: bool = Query(True, description="Use simulated data if real discovery fails")
+    equipment_code: str, use_simulated: bool = Query(True, description="Use simulated data if real discovery fails")
 ) -> dict:
     """Auto-discover equipment by code.
 
@@ -354,11 +353,7 @@ async def _discover_modbus(request: UnifiedDiscoveryRequest) -> Optional[dict]:
     return None
 
 
-def _get_simulated_data(
-    equipment_code: str,
-    protocol: str,
-    equipment_type: Optional[str]
-) -> dict:
+def _get_simulated_data(equipment_code: str, protocol: str, equipment_type: Optional[str]) -> dict:
     """Get simulated discovery data.
 
     Args:

@@ -144,6 +144,7 @@ class WaterMeterAdapter(DeviceInterface):
 
         # Add some variation
         import random
+
         self._mock_flow_rate = base_flow + random.uniform(-3, 3)
         return round(max(0, self._mock_flow_rate), 2)
 

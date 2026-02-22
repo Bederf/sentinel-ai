@@ -71,9 +71,7 @@ class RerankerService:
 
             elapsed = time.monotonic() - start
             if elapsed > RERANK_TIMEOUT_SECONDS:
-                logger.warning(
-                    f"Reranking took {elapsed:.1f}s (>{RERANK_TIMEOUT_SECONDS}s) " f"for {len(chunks)} chunks"
-                )
+                logger.warning(f"Reranking took {elapsed:.1f}s (>{RERANK_TIMEOUT_SECONDS}s) for {len(chunks)} chunks")
 
             # Attach scores and sort descending
             scored = []
@@ -84,9 +82,7 @@ class RerankerService:
 
             scored.sort(key=lambda c: c["rerank_score"], reverse=True)
 
-            logger.debug(
-                f"Reranked {len(chunks)} chunks in {elapsed:.3f}s, " f"top score: {scored[0]['rerank_score']:.4f}"
-            )
+            logger.debug(f"Reranked {len(chunks)} chunks in {elapsed:.3f}s, top score: {scored[0]['rerank_score']:.4f}")
 
             return scored[:top_k]
 

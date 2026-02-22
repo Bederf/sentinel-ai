@@ -7,10 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Literal
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 from app.config.settings import settings
 from app.database.repositories import BuildingRepository
@@ -183,15 +181,20 @@ def get_equipment_status_breakdown(building_uuid: str) -> dict:
     """
     try:
         from app.database.supabase_client import get_supabase_client
+
         client = get_supabase_client()
 
         # Count equipment by status
         counts = {"total": 0, "ok": 0, "warning": 0, "critical": 0}
 
         for status, key in [("normal", "ok"), ("warning", "warning"), ("critical", "critical")]:
-            result = client.table("equipment").select("id", count="exact").eq(
-                "building_id", building_uuid
-            ).eq("status", status).execute()
+            result = (
+                client.table("equipment")
+                .select("id", count="exact")
+                .eq("building_id", building_uuid)
+                .eq("status", status)
+                .execute()
+            )
             counts[key] = result.count or 0
             counts["total"] += counts[key]
 
@@ -214,12 +217,18 @@ def get_prediction_risk_count(building_uuid: str) -> int:
     """
     try:
         from app.database.supabase_client import get_supabase_client
+
         client = get_supabase_client()
 
         # Count predictions with warning or critical severity
-        result = client.table("predictions").select("id", count="exact").eq(
-            "building_id", building_uuid
-        ).eq("status", "active").in_("severity", ["warning", "critical"]).execute()
+        result = (
+            client.table("predictions")
+            .select("id", count="exact")
+            .eq("building_id", building_uuid)
+            .eq("status", "active")
+            .in_("severity", ["warning", "critical"])
+            .execute()
+        )
 
         return result.count or 0
     except Exception as e:
@@ -232,17 +241,11 @@ def calculate_site_status(site_alerts: list[dict]) -> Literal["normal", "warning
     if not site_alerts:
         return "normal"
 
-    has_critical = any(
-        a.get("severity", "").lower() == "critical"
-        for a in site_alerts
-    )
+    has_critical = any(a.get("severity", "").lower() == "critical" for a in site_alerts)
     if has_critical:
         return "critical"
 
-    has_warning = any(
-        a.get("severity", "").lower() in ["warning", "high"]
-        for a in site_alerts
-    )
+    has_warning = any(a.get("severity", "").lower() in ["warning", "high"] for a in site_alerts)
     if has_warning:
         return "warning"
 
@@ -254,7 +257,7 @@ def db_to_site_dict(
     equipment_count: int = 0,
     alert_count: int = 0,
     asset_summary: Optional[dict] = None,
-    equipment_status: Optional[dict] = None
+    equipment_status: Optional[dict] = None,
 ) -> dict:
     """Convert database building record to API-compatible site dict.
 
@@ -309,12 +312,14 @@ def db_to_site_dict(
 
 class OperatingHours(BaseModel):
     """Operating hours model."""
+
     start: str
     end: str
 
 
 class SiteBase(BaseModel):
     """Base site model."""
+
     id: str
     name: str
     address: str
@@ -334,6 +339,7 @@ class SiteBase(BaseModel):
 
 class EquipmentStatusBreakdown(BaseModel):
     """Equipment status breakdown."""
+
     total: int = 0
     ok: int = 0
     warning: int = 0
@@ -342,6 +348,7 @@ class EquipmentStatusBreakdown(BaseModel):
 
 class SiteResponse(SiteBase):
     """Site response with computed fields."""
+
     equipment_count: int = 0
     active_alerts: int = 0
     alert_count: int = 0
@@ -356,6 +363,7 @@ class SiteResponse(SiteBase):
 
 class SiteListResponse(BaseModel):
     """Response for site list."""
+
     total: int
     sites: list[SiteResponse]
 
@@ -364,7 +372,7 @@ def get_sites_from_supabase(
     region: Optional[str] = None,
     site_type: Optional[str] = None,
     user_email: Optional[str] = None,
-    user_role: Optional[SentinelRole] = None
+    user_role: Optional[SentinelRole] = None,
 ) -> tuple[list[dict], bool]:
     """Try to get sites from Supabase. Returns (sites, success).
 
@@ -380,10 +388,7 @@ def get_sites_from_supabase(
         # Filter by user access if auth context provided
         if user_email and user_role:
             buildings = repo.get_all_for_user(
-                user_email=user_email,
-                user_role=user_role,
-                region=region,
-                site_type=site_type
+                user_email=user_email, user_role=user_role, region=region, site_type=site_type
             )
         else:
             buildings = repo.get_all(region=region, site_type=site_type)
@@ -401,10 +406,11 @@ def get_sites_from_supabase(
             # Get actual equipment count from equipment table (not from buildings.equipment_count column)
             try:
                 from app.database.supabase_client import get_supabase_client
+
                 client = get_supabase_client()
-                eq_result = client.table('equipment').select('id', count='exact').eq(
-                    'building_id', building_uuid
-                ).execute()
+                eq_result = (
+                    client.table("equipment").select("id", count="exact").eq("building_id", building_uuid).execute()
+                )
                 eq_count = eq_result.count or 0
             except Exception as e:
                 logger.warning(f"Failed to get equipment count from Supabase for {building_code}: {e}")
@@ -443,10 +449,9 @@ def get_site_from_supabase(site_id: str) -> tuple[Optional[dict], bool]:
         # Get actual equipment count from equipment table (not from buildings.equipment_count column)
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
-            eq_result = client.table('equipment').select('id', count='exact').eq(
-                'building_id', building_uuid
-            ).execute()
+            eq_result = client.table("equipment").select("id", count="exact").eq("building_id", building_uuid).execute()
             eq_count = eq_result.count or 0
         except Exception as e:
             logger.warning(f"Failed to get equipment count from Supabase for {site_id}: {e}")
@@ -483,10 +488,7 @@ async def list_sites(
 
     # Try Supabase first (with user filtering)
     sites, success = get_sites_from_supabase(
-        region=region,
-        site_type=site_type,
-        user_email=user_email,
-        user_role=user_role
+        region=region, site_type=site_type, user_email=user_email, user_role=user_role
     )
 
     if success and sites:
@@ -511,6 +513,7 @@ async def list_sites(
     # Apply demo site access restrictions for non-admin users
     if user_email and user_role != SentinelRole.ADMIN:
         from app.config.demo_configs import has_demo_site_access
+
         sites = [s for s in sites if has_demo_site_access(user_email, s.get("code", s.get("id")))]
 
     if region:
@@ -525,9 +528,7 @@ async def list_sites(
         # Get aggregated asset counts from all JSON sources
         asset_counts = get_json_asset_counts(site_id)
 
-        site_alerts = [
-            a for a in alerts if a.get("site_id") == site_id and a.get("status") == "active"
-        ]
+        site_alerts = [a for a in alerts if a.get("site_id") == site_id and a.get("status") == "active"]
         status = calculate_site_status(site_alerts)
         alert_count = len(site_alerts)
 
@@ -554,6 +555,7 @@ async def list_sites(
 
 class DemoBuilding(BaseModel):
     """Demo building available for discovery simulation."""
+
     id: str
     name: str
     type: str
@@ -598,13 +600,15 @@ async def list_demo_buildings() -> List[DemoBuilding]:
         metadata = building.get("metadata", {})
         building_type = metadata.get("type", "office")
 
-        demo_buildings.append(DemoBuilding(
-            id=site_id,
-            name=building.get("name", site_id),
-            type=building_type,
-            equipment_count=equipment_count,
-            description=f"{equipment_count} equipment, {building_type.replace('_', ' ')}",
-        ))
+        demo_buildings.append(
+            DemoBuilding(
+                id=site_id,
+                name=building.get("name", site_id),
+                type=building_type,
+                equipment_count=equipment_count,
+                description=f"{equipment_count} equipment, {building_type.replace('_', ' ')}",
+            )
+        )
 
     return demo_buildings
 
@@ -614,6 +618,7 @@ async def list_demo_buildings() -> List[DemoBuilding]:
 
 class CreateSiteRequest(BaseModel):
     """Request to create a new site."""
+
     name: str = Field(..., description="Site name")
     address: str = Field("", description="Site address")
     region: str = Field("Gauteng", description="Region/province")
@@ -624,6 +629,7 @@ class CreateSiteRequest(BaseModel):
 
 class CreateSiteResponse(BaseModel):
     """Response from site creation."""
+
     id: str
     name: str
     status: str
@@ -631,6 +637,7 @@ class CreateSiteResponse(BaseModel):
 
 class NextSiteIdResponse(BaseModel):
     """Response with next available site ID."""
+
     next_id: str
 
 
@@ -755,18 +762,21 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
     if not settings.use_json_storage:
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
             if client:
-                client.table("buildings").insert({
-                    "code": site_id,
-                    "name": request.name,
-                    "address": request.address,
-                    "type": request.type,
-                    "region": request.region,
-                    "sqm": request.sqm,
-                    "floors": len(request.floors) if request.floors else 1,
-                    "timezone": "Africa/Johannesburg",
-                }).execute()
+                client.table("buildings").insert(
+                    {
+                        "code": site_id,
+                        "name": request.name,
+                        "address": request.address,
+                        "type": request.type,
+                        "region": request.region,
+                        "sqm": request.sqm,
+                        "floors": len(request.floors) if request.floors else 1,
+                        "timezone": "Africa/Johannesburg",
+                    }
+                ).execute()
                 logger.info(f"Created building in Supabase: {site_id}")
 
                 # Auto-seed municipal tariff schedule + account based on region
@@ -817,16 +827,18 @@ def _seed_municipal_tariff_and_account(client, site_id: str, region: str) -> Non
 
     # Upsert tariff schedule
     try:
-        client.table("municipal_tariff_schedules").upsert({
-            "municipality": municipality,
-            "tariff_name": tariff_name,
-            "utility_type": "electricity",
-            "effective_date": f"{datetime.now().year}-01-01",
-            "tariff_data": tariff_data or {},
-            "nersa_approved": False,
-            "source_url": "auto-seeded",
-            "notes": "Auto-seeded from site creation",
-        }).execute()
+        client.table("municipal_tariff_schedules").upsert(
+            {
+                "municipality": municipality,
+                "tariff_name": tariff_name,
+                "utility_type": "electricity",
+                "effective_date": f"{datetime.now().year}-01-01",
+                "tariff_data": tariff_data or {},
+                "nersa_approved": False,
+                "source_url": "auto-seeded",
+                "notes": "Auto-seeded from site creation",
+            }
+        ).execute()
     except Exception as exc:
         logger.info("Tariff schedule auto-seed failed: %s", exc)
 
@@ -844,14 +856,16 @@ def _seed_municipal_tariff_and_account(client, site_id: str, region: str) -> Non
             .execute()
         )
         if not account_result.data:
-            client.table("municipal_accounts").insert({
-                "site_id": site_id,
-                "municipality": municipality,
-                "utility_type": "electricity",
-                "account_number": account_number,
-                "tariff_type": tariff_name,
-                "main_meter_id": f"{site_id.replace('site-', 'S').upper()}-MTR-E-MAIN",
-            }).execute()
+            client.table("municipal_accounts").insert(
+                {
+                    "site_id": site_id,
+                    "municipality": municipality,
+                    "utility_type": "electricity",
+                    "account_number": account_number,
+                    "tariff_type": tariff_name,
+                    "main_meter_id": f"{site_id.replace('site-', 'S').upper()}-MTR-E-MAIN",
+                }
+            ).execute()
     except Exception as exc:
         logger.info("Municipal account auto-seed failed: %s", exc)
 
@@ -891,9 +905,7 @@ async def get_site(site_id: str) -> SiteResponse:
     # Get aggregated asset counts from all JSON sources
     asset_counts = get_json_asset_counts(site_id)
 
-    site_alerts = [
-        a for a in alerts if a.get("site_id") == site_id and a.get("status") == "active"
-    ]
+    site_alerts = [a for a in alerts if a.get("site_id") == site_id and a.get("status") == "active"]
     alert_count = len(site_alerts)
     status = calculate_site_status(site_alerts)
 
@@ -912,23 +924,18 @@ async def get_site(site_id: str) -> SiteResponse:
 
 class BatchSiteRequest(BaseModel):
     """Request for batch site retrieval."""
+
     site_ids: List[str] = Field(
-        ...,
-        min_items=1,
-        max_items=100,
-        description="List of site IDs to retrieve (max 100 per request)"
+        ..., min_items=1, max_items=100, description="List of site IDs to retrieve (max 100 per request)"
     )
 
 
 class BatchSiteResponse(BaseModel):
     """Response from batch site retrieval."""
-    results: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Dict of site_id -> SiteResponse data"
-    )
+
+    results: Dict[str, Any] = Field(default_factory=dict, description="Dict of site_id -> SiteResponse data")
     errors: Dict[str, str] = Field(
-        default_factory=dict,
-        description="Dict of site_id -> error message for missing/failed sites"
+        default_factory=dict, description="Dict of site_id -> error message for missing/failed sites"
     )
 
 
@@ -937,44 +944,41 @@ class BatchSiteResponse(BaseModel):
     response_model=BatchSiteResponse,
     summary="Get multiple sites in a single batch request",
     description="Fetch data for up to 100 sites in one call. "
-                "Prevents 429 rate limit errors when multiple dashboard cards load simultaneously."
+    "Prevents 429 rate limit errors when multiple dashboard cards load simultaneously.",
 )
 async def batch_get_sites(payload: BatchSiteRequest) -> BatchSiteResponse:
     """Get multiple sites efficiently in a single request.
-    
+
     Deduplicates site IDs and fetches all sites using single Supabase query.
     Returns dict keyed by site_id for O(1) client-side lookup.
-    
+
     Args:
         payload: BatchSiteRequest with site_ids list (max 100)
-    
+
     Returns:
         BatchSiteResponse with results dict and errors dict
-    
+
     Raises:
         HTTPException: 400 if > 100 sites requested
     """
     # Deduplicate site IDs
     unique_site_ids = list(set(payload.site_ids))
-    
+
     if len(unique_site_ids) > 100:
-        raise HTTPException(
-            status_code=400,
-            detail="Maximum 100 unique site IDs per request"
-        )
-    
+        raise HTTPException(status_code=400, detail="Maximum 100 unique site IDs per request")
+
     results: Dict[str, Any] = {}
     errors: Dict[str, str] = {}
-    
+
     # Load shared data once
     alerts = load_alerts()
-    
+
     # Fetch each site (try Supabase first, fallback to JSON)
     for site_id in unique_site_ids:
         try:
             # Try Supabase first
             site, success = get_site_from_supabase(site_id)
-            
+
             if success and site:
                 status = "normal"
                 if site.get("alert_count", 0) > 0:
@@ -985,25 +989,22 @@ async def batch_get_sites(payload: BatchSiteRequest) -> BatchSiteResponse:
                     "status": status,
                 }
                 continue
-            
+
             # Fallback to JSON
             sites = load_sites()
             site = next((s for s in sites if s["id"] == site_id), None)
             if not site:
                 errors[site_id] = "Site not found"
                 continue
-            
+
             # Get aggregated asset counts
             asset_counts = get_json_asset_counts(site_id)
-            
+
             # Get alerts for this site
-            site_alerts = [
-                a for a in alerts 
-                if a.get("site_id") == site_id and a.get("status") == "active"
-            ]
+            site_alerts = [a for a in alerts if a.get("site_id") == site_id and a.get("status") == "active"]
             site_status = calculate_site_status(site_alerts)
             alert_count = len(site_alerts)
-            
+
             # Build response
             site_response = {
                 **site,
@@ -1015,9 +1016,9 @@ async def batch_get_sites(payload: BatchSiteRequest) -> BatchSiteResponse:
                 "asset_breakdown": asset_counts["breakdown"],
             }
             results[site_id] = site_response
-            
+
         except Exception as e:
             logger.error(f"Error getting site {site_id}: {e}")
             errors[site_id] = str(e)
-    
+
     return BatchSiteResponse(results=results, errors=errors)

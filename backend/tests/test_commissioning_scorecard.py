@@ -432,6 +432,25 @@ class TestConsecutiveDays:
 # ==================== Group E: Promotion ====================
 
 
+def _mock_quality_gate_pass():
+    """Return a patch context that makes the quality gate pre-check pass.
+
+    The Phase 109 quality gate evaluator runs inside promote_to_live()
+    before the scorecard check.  We mock it to return GateStatus.PASS so
+    the scorecard-level promotion logic is exercised instead.
+    """
+    from app.services.quality_gate_policy import GateStatus
+
+    mock_evaluator = MagicMock()
+    mock_evaluator.collect_metrics = AsyncMock(return_value={})
+    mock_result = MagicMock()
+    mock_result.overall = GateStatus.PASS
+    mock_result.failed_rules = []
+    mock_evaluator.evaluate.return_value = mock_result
+    mock_cls = MagicMock(return_value=mock_evaluator)
+    return patch("app.services.quality_gate_evaluator.QualityGateEvaluator", mock_cls)
+
+
 class TestPromotion:
     @pytest.fixture
     def svc(self):
@@ -481,7 +500,10 @@ class TestPromotion:
 
         mock_settings = MagicMock()
         mock_settings.resolved_ingestion_mode = IngestionMode.SHADOW_LIVE
-        with patch("app.services.commissioning_service.app_settings", mock_settings):
+        with (
+            patch("app.services.commissioning_service.app_settings", mock_settings),
+            _mock_quality_gate_pass(),
+        ):
             result = await svc.promote_to_live("bld-1")
             assert result.success is True
             assert result.new_mode == "live_control"
@@ -497,22 +519,28 @@ class TestPromotion:
 
         mock_settings = MagicMock()
         mock_settings.resolved_ingestion_mode = IngestionMode.SHADOW_LIVE
-        with patch("app.services.commissioning_service.app_settings", mock_settings):
+        with (
+            patch("app.services.commissioning_service.app_settings", mock_settings),
+            _mock_quality_gate_pass(),
+        ):
             result = await svc.promote_to_live("bld-1")
             assert result.success is False
-            assert "match_coverage" in result.blocking_reasons
+            assert any("match_coverage" in r for r in result.blocking_reasons)
 
     @pytest.mark.asyncio
     async def test_promotion_blocked_by_consecutive_days(self, svc):
         self._setup_passing_svc(svc)
-        # Clear history → 0 consecutive days (the run_scorecard call adds 1, but need >= 2)
+        # Clear history -> 0 consecutive days (the run_scorecard call adds 1, but need >= 2)
         svc._scorecard_history["bld-1"] = []
 
         from app.config.settings import IngestionMode
 
         mock_settings = MagicMock()
         mock_settings.resolved_ingestion_mode = IngestionMode.SHADOW_LIVE
-        with patch("app.services.commissioning_service.app_settings", mock_settings):
+        with (
+            patch("app.services.commissioning_service.app_settings", mock_settings),
+            _mock_quality_gate_pass(),
+        ):
             result = await svc.promote_to_live("bld-1")
             assert result.success is False
             assert any("consecutive_days" in r for r in result.blocking_reasons)
@@ -527,7 +555,10 @@ class TestPromotion:
 
         mock_settings = MagicMock()
         mock_settings.resolved_ingestion_mode = IngestionMode.SHADOW_LIVE
-        with patch("app.services.commissioning_service.app_settings", mock_settings):
+        with (
+            patch("app.services.commissioning_service.app_settings", mock_settings),
+            _mock_quality_gate_pass(),
+        ):
             result = await svc.promote_to_live("bld-1")
             assert result.success is False
             assert "truth_check_missing" in result.blocking_reasons

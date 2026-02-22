@@ -24,15 +24,12 @@ from typing import Dict, List
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.models.baseline import (
-    BaselineStatus,
-    BaselineSource
-)
+from app.models.baseline import BaselineStatus, BaselineSource
 from app.models.inspection import (
     InspectionScheduleFrequency,
     InspectionOverallStatus,
     DeficiencySeverity,
-    DeficiencyCategory
+    DeficiencyCategory,
 )
 
 
@@ -44,7 +41,7 @@ DEMO_BUILDING = {
     "building_id": "sandton-mall-demo",
     "name": "Sandton City Mall",
     "address": "83 5th St, Sandton, South Africa",
-    "description": "Demo building for SENTINEL asset management workflow"
+    "description": "Demo building for SENTINEL asset management workflow",
 }
 
 DEMO_EQUIPMENT = [
@@ -59,7 +56,7 @@ DEMO_EQUIPMENT = [
         "criticality": "high",
         "location": "Basement Plant Room",
         "serial_number": "YRK-YCIV-2005-001",
-        "story": "degradation"  # Active monitoring → Anomaly → Repair validated
+        "story": "degradation",  # Active monitoring → Anomaly → Repair validated
     },
     {
         "equipment_id": "generator-002",
@@ -72,7 +69,7 @@ DEMO_EQUIPMENT = [
         "criticality": "high",
         "location": "Generator Yard",
         "serial_number": "CUM-C500D5-2018-002",
-        "story": "success"  # Healthy with routine inspections
+        "story": "success",  # Healthy with routine inspections
     },
     {
         "equipment_id": "ahu-003",
@@ -85,8 +82,8 @@ DEMO_EQUIPMENT = [
         "criticality": "medium",
         "location": "Level 3 Plant Room",
         "serial_number": "CAR-39M120-2019-003",
-        "story": "current_issue"  # Anomaly just detected, inspection pending
-    }
+        "story": "current_issue",  # Anomaly just detected, inspection pending
+    },
 ]
 
 
@@ -106,14 +103,10 @@ CHILLER_001_BASELINES = [
             "chw_supply_temp": 7.2,
             "chw_return_temp": 12.5,
             "suction_pressure": 4.2,
-            "discharge_pressure": 15.8
+            "discharge_pressure": 15.8,
         },
-        "measurement_conditions": {
-            "ambient_temp": 22.0,
-            "load_percentage": 75,
-            "weather": "clear"
-        },
-        "notes": "Commissioning baseline - all values normal"
+        "measurement_conditions": {"ambient_temp": 22.0, "load_percentage": 75, "weather": "clear"},
+        "notes": "Commissioning baseline - all values normal",
     },
     {
         "baseline_type": "periodic",
@@ -126,14 +119,10 @@ CHILLER_001_BASELINES = [
             "chw_supply_temp": 7.5,
             "chw_return_temp": 12.8,
             "suction_pressure": 4.1,
-            "discharge_pressure": 15.5
+            "discharge_pressure": 15.5,
         },
-        "measurement_conditions": {
-            "ambient_temp": 24.0,
-            "load_percentage": 80,
-            "weather": "partly_cloudy"
-        },
-        "notes": "Scheduled quarterly check - vibration elevated 39% from baseline"
+        "measurement_conditions": {"ambient_temp": 24.0, "load_percentage": 80, "weather": "partly_cloudy"},
+        "notes": "Scheduled quarterly check - vibration elevated 39% from baseline",
     },
     {
         "baseline_type": "periodic",
@@ -146,14 +135,10 @@ CHILLER_001_BASELINES = [
             "chw_supply_temp": 8.8,
             "chw_return_temp": 14.2,
             "suction_pressure": 3.8,
-            "discharge_pressure": 14.2
+            "discharge_pressure": 14.2,
         },
-        "measurement_conditions": {
-            "ambient_temp": 28.0,
-            "load_percentage": 85,
-            "weather": "hot"
-        },
-        "notes": "Special inspection - critical bearing failure imminent. Vibration 133% above baseline."
+        "measurement_conditions": {"ambient_temp": 28.0, "load_percentage": 85, "weather": "hot"},
+        "notes": "Special inspection - critical bearing failure imminent. Vibration 133% above baseline.",
     },
     {
         "baseline_type": "post_repair",
@@ -166,15 +151,11 @@ CHILLER_001_BASELINES = [
             "chw_supply_temp": 7.1,
             "chw_return_temp": 12.4,
             "suction_pressure": 4.2,
-            "discharge_pressure": 15.7
+            "discharge_pressure": 15.7,
         },
-        "measurement_conditions": {
-            "ambient_temp": 23.0,
-            "load_percentage": 75,
-            "weather": "clear"
-        },
-        "notes": "Post-repair baseline after compressor bearing replacement. All values normal."
-    }
+        "measurement_conditions": {"ambient_temp": 23.0, "load_percentage": 75, "weather": "clear"},
+        "notes": "Post-repair baseline after compressor bearing replacement. All values normal.",
+    },
 ]
 
 
@@ -195,14 +176,10 @@ GENERATOR_002_BASELINES = [
             "frequency": 50.0,
             "voltage_l1": 400.0,
             "voltage_l2": 400.0,
-            "voltage_l3": 400.0
+            "voltage_l3": 400.0,
         },
-        "measurement_conditions": {
-            "ambient_temp": 25.0,
-            "load_kw": 250,
-            "fuel_level": 85
-        },
-        "notes": "Commissioning baseline after installation"
+        "measurement_conditions": {"ambient_temp": 25.0, "load_kw": 250, "fuel_level": 85},
+        "notes": "Commissioning baseline after installation",
     },
     {
         "baseline_type": "periodic",
@@ -216,15 +193,11 @@ GENERATOR_002_BASELINES = [
             "frequency": 49.95,
             "voltage_l1": 398.0,
             "voltage_l2": 399.0,
-            "voltage_l3": 398.5
+            "voltage_l3": 398.5,
         },
-        "measurement_conditions": {
-            "ambient_temp": 24.0,
-            "load_kw": 275,
-            "fuel_level": 80
-        },
-        "notes": "Annual inspection - all values within normal range. No deviations."
-    }
+        "measurement_conditions": {"ambient_temp": 24.0, "load_kw": 275, "fuel_level": 80},
+        "notes": "Annual inspection - all values within normal range. No deviations.",
+    },
 ]
 
 
@@ -243,13 +216,10 @@ AHU_003_BASELINES = [
             "filter_pressure_drop": 75,
             "supply_air_temp": 14.0,
             "return_air_temp": 24.0,
-            "vibration_level": 2.2
+            "vibration_level": 2.2,
         },
-        "measurement_conditions": {
-            "ambient_temp": 23.0,
-            "damper_position": 80
-        },
-        "notes": "Commissioning baseline"
+        "measurement_conditions": {"ambient_temp": 23.0, "damper_position": 80},
+        "notes": "Commissioning baseline",
     },
     {
         "baseline_type": "periodic",
@@ -261,14 +231,11 @@ AHU_003_BASELINES = [
             "filter_pressure_drop": 180,  # +140%
             "supply_air_temp": 16.5,
             "return_air_temp": 25.0,
-            "vibration_level": 3.8  # +73%
+            "vibration_level": 3.8,  # +73%
         },
-        "measurement_conditions": {
-            "ambient_temp": 26.0,
-            "damper_position": 85
-        },
-        "notes": "Automated baseline - ML detected anomaly. Fan motor showing early bearing degradation."
-    }
+        "measurement_conditions": {"ambient_temp": 26.0, "damper_position": 85},
+        "notes": "Automated baseline - ML detected anomaly. Fan motor showing early bearing degradation.",
+    },
 ]
 
 
@@ -282,28 +249,28 @@ CHILLER_001_INSPECTIONS = [
         "inspector": "Mike Chen",
         "status": InspectionOverallStatus.PASS,
         "findings": "All parameters normal. No issues detected.",
-        "deficiencies": []
+        "deficiencies": [],
     },
     {
         "inspection_date": "2025-10-01T10:00:00Z",
         "inspector": "Sarah Johnson",
         "status": InspectionOverallStatus.PASS,
         "findings": "All parameters normal. Minor cleaning required on condenser coils.",
-        "deficiencies": []
+        "deficiencies": [],
     },
     {
         "inspection_date": "2025-11-01T10:00:00Z",
         "inspector": "Mike Chen",
         "status": InspectionOverallStatus.PASS,
         "findings": "Vibration elevated (2.5 vs 1.8 baseline). Recommend monitoring.",
-        "deficiencies": []
+        "deficiencies": [],
     },
     {
         "inspection_date": "2025-12-01T10:00:00Z",
         "inspector": "Sarah Johnson",
         "status": InspectionOverallStatus.PASS,
         "findings": "Vibration increasing (3.1 vs 1.8 baseline). Recommend trending analysis.",
-        "deficiencies": []
+        "deficiencies": [],
     },
     {
         "inspection_date": "2026-01-01T10:00:00Z",
@@ -319,17 +286,17 @@ CHILLER_001_INSPECTIONS = [
                 "recommended_action": "Replace compressor bearing before catastrophic failure",
                 "estimated_repair_cost_min": 5000,
                 "estimated_repair_cost_max": 8000,
-                "estimated_repair_hours": 6
+                "estimated_repair_hours": 6,
             }
-        ]
+        ],
     },
     {
         "inspection_date": "2026-01-22T10:00:00Z",
         "inspector": "Sarah Johnson",
         "status": InspectionOverallStatus.PASS,
         "findings": "Post-repair verification. Vibration back to normal (1.9 mm/s). Repair successful.",
-        "deficiencies": []
-    }
+        "deficiencies": [],
+    },
 ]
 
 
@@ -348,7 +315,7 @@ ML_PREDICTIONS = {
             {"factor": "Motor current increase", "weight": 0.25, "value": "+16% from baseline"},
             {"factor": "Bearing temperature", "weight": 0.20, "value": "85°C vs 45°C baseline"},
             {"factor": "Asset age", "weight": 0.10, "value": "21 years (exceeds 20-year life)"},
-            {"factor": "Repeat calls", "weight": 0.05, "value": "3 vibration complaints in 6 months"}
+            {"factor": "Repeat calls", "weight": 0.05, "value": "3 vibration complaints in 6 months"},
         ],
         "explanation": "The chiller shows declining efficiency indicating refrigerant leak and bearing wear. Vibration levels are 111% above baseline with bearing temperature at critical 85°C. Asset age exceeds recommended 20-year lifespan.",
         "actions": [
@@ -356,9 +323,9 @@ ML_PREDICTIONS = {
                 "description": "Replace compressor bearing",
                 "urgency": "critical",
                 "estimated_time_hours": 6,
-                "estimated_cost": 6500
+                "estimated_cost": 6500,
             }
-        ]
+        ],
     },
     "generator-002": {
         "prediction_type": "healthy",
@@ -367,7 +334,7 @@ ML_PREDICTIONS = {
         "confidence": "high",
         "contributing_factors": [],
         "explanation": "All parameters within normal range. No anomalies detected. Asset is 7 years old with no significant wear indicators.",
-        "actions": []
+        "actions": [],
     },
     "ahu-003": {
         "prediction_type": "failure",
@@ -378,7 +345,7 @@ ML_PREDICTIONS = {
             {"factor": "Fan motor vibration", "weight": 0.45, "value": "+73% from baseline"},
             {"factor": "Motor current increase", "weight": 0.30, "value": "+18% from baseline"},
             {"factor": "Filter pressure drop", "weight": 0.15, "value": "+140% (clogged)"},
-            {"factor": "Age-related wear", "weight": 0.10, "value": "7 years moderate usage"}
+            {"factor": "Age-related wear", "weight": 0.10, "value": "7 years moderate usage"},
         ],
         "explanation": "Fan motor showing early signs of bearing degradation. Vibration up 73% with elevated current draw. Filter severely clogged - replace immediately.",
         "actions": [
@@ -386,22 +353,23 @@ ML_PREDICTIONS = {
                 "description": "Replace fan motor bearings",
                 "urgency": "high",
                 "estimated_time_hours": 4,
-                "estimated_cost": 2800
+                "estimated_cost": 2800,
             },
             {
                 "description": "Replace air filter",
                 "urgency": "high",
                 "estimated_time_hours": 0.5,
-                "estimated_cost": 150
-            }
-        ]
-    }
+                "estimated_cost": 150,
+            },
+        ],
+    },
 }
 
 
 # ============================================================================
 # Data Storage Helpers
 # ============================================================================
+
 
 class DemoDataStore:
     """In-memory storage for demo workflow data."""
@@ -474,6 +442,7 @@ class DemoDataStore:
 # Setup Functions
 # ============================================================================
 
+
 async def setup_chiller_001_lifecycle(store: DemoDataStore):
     """Create complete lifecycle data for chiller-001 degradation story."""
     print("  Setting up Chiller-001 lifecycle data...")
@@ -491,7 +460,7 @@ async def setup_chiller_001_lifecycle(store: DemoDataStore):
             "baseline_values": bl_data["baseline_values"],
             "measurement_conditions": bl_data["measurement_conditions"],
             "source_type": BaselineSource.MANUAL,
-            "notes": bl_data["notes"]
+            "notes": bl_data["notes"],
         }
         store.add_baseline(equipment_id, baseline)
 
@@ -504,17 +473,16 @@ async def setup_chiller_001_lifecycle(store: DemoDataStore):
             "overall_status": insp_data["status"],
             "findings": insp_data["findings"],
             "checklist_results": {},
-            "deficiencies": insp_data["deficiencies"]
+            "deficiencies": insp_data["deficiencies"],
         }
         store.add_inspection(equipment_id, inspection)
 
         # Track deficiencies separately
         for def_data in insp_data.get("deficiencies", []):
-            store.add_deficiency(equipment_id, {
-                **def_data,
-                "equipment_id": equipment_id,
-                "discovered_date": insp_data["inspection_date"]
-            })
+            store.add_deficiency(
+                equipment_id,
+                {**def_data, "equipment_id": equipment_id, "discovered_date": insp_data["inspection_date"]},
+            )
 
     # 3. Add monthly inspection schedule
     schedule = {
@@ -524,7 +492,7 @@ async def setup_chiller_001_lifecycle(store: DemoDataStore):
         "frequency_type": InspectionScheduleFrequency.MONTHLY,
         "estimated_duration_minutes": 90,
         "assigned_to": "Mike Chen",
-        "is_active": True
+        "is_active": True,
     }
     store.add_schedule(equipment_id, schedule)
 
@@ -547,7 +515,7 @@ async def setup_chiller_001_lifecycle(store: DemoDataStore):
         "actual_cost": 6200,
         "estimated_hours": 6,
         "actual_hours": 5.5,
-        "completion_date": "2026-01-20T16:00:00Z"
+        "completion_date": "2026-01-20T16:00:00Z",
     }
     store.add_work_order(equipment_id, work_order)
 
@@ -575,7 +543,7 @@ async def setup_generator_002_healthy(store: DemoDataStore):
             "baseline_values": bl_data["baseline_values"],
             "measurement_conditions": bl_data["measurement_conditions"],
             "source_type": BaselineSource.MANUAL,
-            "notes": bl_data["notes"]
+            "notes": bl_data["notes"],
         }
         store.add_baseline(equipment_id, baseline)
 
@@ -587,7 +555,7 @@ async def setup_generator_002_healthy(store: DemoDataStore):
         "frequency_type": InspectionScheduleFrequency.QUARTERLY,
         "estimated_duration_minutes": 120,
         "assigned_to": "John Smith",
-        "is_active": True
+        "is_active": True,
     }
     store.add_schedule(equipment_id, schedule)
 
@@ -619,7 +587,7 @@ async def setup_ahu_003_issue(store: DemoDataStore):
             "baseline_values": bl_data["baseline_values"],
             "measurement_conditions": bl_data["measurement_conditions"],
             "source_type": BaselineSource.AUTOMATED if bl_data["captured_by"] == "Automated" else BaselineSource.MANUAL,
-            "notes": bl_data["notes"]
+            "notes": bl_data["notes"],
         }
         store.add_baseline(equipment_id, baseline)
 
@@ -631,7 +599,7 @@ async def setup_ahu_003_issue(store: DemoDataStore):
         "frequency_type": InspectionScheduleFrequency.MONTHLY,
         "estimated_duration_minutes": 60,
         "assigned_to": "Mike Chen",
-        "is_active": True
+        "is_active": True,
     }
     store.add_schedule(equipment_id, schedule)
 
@@ -650,19 +618,22 @@ async def setup_ahu_003_issue(store: DemoDataStore):
         "due_date": (datetime.now() + timedelta(days=1)).isoformat(),
         "assigned_to": "Mike Chen",
         "triggered_by": "ml_anomaly",
-        "description": "ML detected fan motor bearing degradation. Verify and inspect."
+        "description": "ML detected fan motor bearing degradation. Verify and inspect.",
     }
     # Store as inspection
-    store.add_inspection(equipment_id, {
-        "equipment_id": equipment_id,
-        "inspection_date": inspection_task["due_date"],
-        "inspector": inspection_task["assigned_to"],
-        "overall_status": InspectionOverallStatus.PASS,
-        "findings": "Scheduled inspection pending",
-        "checklist_results": {},
-        "deficiencies": [],
-        "_task": inspection_task
-    })
+    store.add_inspection(
+        equipment_id,
+        {
+            "equipment_id": equipment_id,
+            "inspection_date": inspection_task["due_date"],
+            "inspector": inspection_task["assigned_to"],
+            "overall_status": InspectionOverallStatus.PASS,
+            "findings": "Scheduled inspection pending",
+            "checklist_results": {},
+            "deficiencies": [],
+            "_task": inspection_task,
+        },
+    )
 
     print(f"    ✓ {len(AHU_003_BASELINES)} baselines")
     print("    ✓ 1 schedule")
@@ -714,52 +685,49 @@ async def setup_demo_workflow_data():
 
     # Save building data
     building_file = output_dir / "building.json"
-    with open(building_file, 'w') as f:
-        json.dump({
-            **DEMO_BUILDING,
-            "equipment": [eq["equipment_id"] for eq in DEMO_EQUIPMENT]
-        }, f, indent=2)
+    with open(building_file, "w") as f:
+        json.dump({**DEMO_BUILDING, "equipment": [eq["equipment_id"] for eq in DEMO_EQUIPMENT]}, f, indent=2)
     print(f"   ✓ {building_file}")
 
     # Save equipment data
     equipment_file = output_dir / "equipment.json"
-    with open(equipment_file, 'w') as f:
+    with open(equipment_file, "w") as f:
         json.dump({eq["equipment_id"]: eq for eq in DEMO_EQUIPMENT}, f, indent=2)
     print(f"   ✓ {equipment_file}")
 
     # Save baselines
     baselines_file = output_dir / "baselines.json"
-    with open(baselines_file, 'w') as f:
+    with open(baselines_file, "w") as f:
         json.dump(store.baselines, f, indent=2)
     print(f"   ✓ {baselines_file}")
 
     # Save inspections
     inspections_file = output_dir / "inspections.json"
-    with open(inspections_file, 'w') as f:
+    with open(inspections_file, "w") as f:
         json.dump(store.inspections, f, indent=2)
     print(f"   ✓ {inspections_file}")
 
     # Save schedules
     schedules_file = output_dir / "schedules.json"
-    with open(schedules_file, 'w') as f:
+    with open(schedules_file, "w") as f:
         json.dump(store.inspection_schedules, f, indent=2)
     print(f"   ✓ {schedules_file}")
 
     # Save deficiencies
     deficiencies_file = output_dir / "deficiencies.json"
-    with open(deficiencies_file, 'w') as f:
+    with open(deficiencies_file, "w") as f:
         json.dump(store.deficiencies, f, indent=2)
     print(f"   ✓ {deficiencies_file}")
 
     # Save work orders
     work_orders_file = output_dir / "work_orders.json"
-    with open(work_orders_file, 'w') as f:
+    with open(work_orders_file, "w") as f:
         json.dump(store.work_orders, f, indent=2)
     print(f"   ✓ {work_orders_file}")
 
     # Save ML predictions
     predictions_file = output_dir / "ml_predictions.json"
-    with open(predictions_file, 'w') as f:
+    with open(predictions_file, "w") as f:
         json.dump(store.ml_predictions, f, indent=2)
     print(f"   ✓ {predictions_file}")
 

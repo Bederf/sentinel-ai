@@ -27,7 +27,7 @@ from app.models.pricing import (
     RenewalQuote,
     ContractComparable,
     RenegotiationAnalysis,
-    RenegotiationOption
+    RenegotiationOption,
 )
 from app.database.repositories.sla_repository import get_sla_repository
 from app.services.profitability_service import get_profitability_service
@@ -54,7 +54,7 @@ class PricingEngine:
         budget_repo: Optional[BudgetRepository] = None,
         condition_repo: Optional[ConditionAssessmentRepository] = None,
         contract_repo: Optional[ContractRepository] = None,
-        config: Optional[PricingConfig] = None
+        config: Optional[PricingConfig] = None,
     ):
         """Initialize pricing engine with repositories and configuration."""
         self.budget_repo = budget_repo or BudgetRepository()
@@ -67,7 +67,7 @@ class PricingEngine:
         request: QuoteRequest,
         condition_score_delta: int = 0,
         risk_buffer_multiplier: Decimal = Decimal("1.0"),
-        target_margin_pct_override: Optional[Decimal] = None
+        target_margin_pct_override: Optional[Decimal] = None,
     ) -> QuoteResponse:
         """
         Calculate recommended price for contract quote.
@@ -82,37 +82,21 @@ class PricingEngine:
         base_cost = self._calculate_base_cost(request.equipment_codes)
 
         # Step 2: Get condition factors
-        condition_factors = self._get_condition_factors(
-            request.equipment_codes, score_delta=condition_score_delta
-        )
-        condition_adj = self._calculate_condition_adjustment(
-            base_cost, condition_factors
-        )
+        condition_factors = self._get_condition_factors(request.equipment_codes, score_delta=condition_score_delta)
+        condition_adj = self._calculate_condition_adjustment(base_cost, condition_factors)
 
         # Step 3: Get age adjustments
-        age_adj = self._calculate_age_adjustment(
-            base_cost, condition_factors
-        )
+        age_adj = self._calculate_age_adjustment(base_cost, condition_factors)
 
         # Step 4: Get ML risk buffers
-        risk_buffers = self._get_risk_buffers(
-            request.equipment_codes, multiplier=risk_buffer_multiplier
-        )
+        risk_buffers = self._get_risk_buffers(request.equipment_codes, multiplier=risk_buffer_multiplier)
         risk_adj = self._calculate_risk_buffer(base_cost, risk_buffers)
 
         # Step 5: SLA tier adjustment
-        sla_adj = self._calculate_sla_adjustment(
-            base_cost, request.sla_tier
-        )
+        sla_adj = self._calculate_sla_adjustment(base_cost, request.sla_tier)
 
         # Step 6: Calculate total adjusted cost
-        total_cost = (
-            base_cost
-            + condition_adj
-            + age_adj
-            + risk_adj
-            + sla_adj
-        )
+        total_cost = base_cost + condition_adj + age_adj + risk_adj + sla_adj
 
         # Step 7: Apply target margin
         target_margin = (
@@ -134,19 +118,15 @@ class PricingEngine:
                 "age_adjustment": age_adj,
                 "risk_buffer": risk_adj,
                 "sla_adjustment": sla_adj,
-                "margin": margin_amount
+                "margin": margin_amount,
             },
             risk_factors=self._identify_risk_factors(condition_factors, risk_buffers),
             assumptions=self._list_assumptions(request),
             market_comparison=self._get_market_comparison(request) if request.include_benchmarks else None,
-            valid_until=date.today() + timedelta(days=30)
+            valid_until=date.today() + timedelta(days=30),
         )
 
-    def calculate_what_if(
-        self,
-        request: QuoteRequest,
-        scenarios: List[WhatIfScenario]
-    ) -> WhatIfResponse:
+    def calculate_what_if(self, request: QuoteRequest, scenarios: List[WhatIfScenario]) -> WhatIfResponse:
         """
         Run what-if analysis for pricing scenarios.
         """
@@ -163,38 +143,38 @@ class PricingEngine:
                 equipment_codes=equipment_codes,
                 sla_tier=scenario.sla_tier or request.sla_tier,
                 contract_months=request.contract_months,
-                include_benchmarks=request.include_benchmarks
+                include_benchmarks=request.include_benchmarks,
             )
 
             scenario_quote = self.calculate_price(
                 scenario_request,
                 condition_score_delta=scenario.condition_score_delta,
                 risk_buffer_multiplier=scenario.risk_buffer_multiplier,
-                target_margin_pct_override=scenario.target_margin_pct
+                target_margin_pct_override=scenario.target_margin_pct,
             )
 
             delta = scenario_quote.recommended_fee_zar - base_quote.recommended_fee_zar
-            delta_pct = (delta / base_quote.recommended_fee_zar * Decimal("100")) if base_quote.recommended_fee_zar > 0 else Decimal("0")
+            delta_pct = (
+                (delta / base_quote.recommended_fee_zar * Decimal("100"))
+                if base_quote.recommended_fee_zar > 0
+                else Decimal("0")
+            )
 
-            results.append(WhatIfScenarioResult(
-                name=scenario.name,
-                recommended_fee_zar=scenario_quote.recommended_fee_zar,
-                delta_zar=delta,
-                delta_pct=delta_pct,
-                cost_breakdown=scenario_quote.cost_breakdown,
-                risk_factors=scenario_quote.risk_factors,
-                assumptions=scenario_quote.assumptions
-            ))
+            results.append(
+                WhatIfScenarioResult(
+                    name=scenario.name,
+                    recommended_fee_zar=scenario_quote.recommended_fee_zar,
+                    delta_zar=delta,
+                    delta_pct=delta_pct,
+                    cost_breakdown=scenario_quote.cost_breakdown,
+                    risk_factors=scenario_quote.risk_factors,
+                    assumptions=scenario_quote.assumptions,
+                )
+            )
 
-        return WhatIfResponse(
-            base_quote=base_quote,
-            scenarios=results
-        )
+        return WhatIfResponse(base_quote=base_quote, scenarios=results)
 
-    def calculate_renewal_pricing(
-        self,
-        request: RenewalPricingRequest
-    ) -> RenewalPricingResponse:
+    def calculate_renewal_pricing(self, request: RenewalPricingRequest) -> RenewalPricingResponse:
         """
         Calculate renewal pricing recommendation based on actual costs.
         """
@@ -233,9 +213,7 @@ class PricingEngine:
         # Margin trend adjustment (best-effort)
         trend_buffer = Decimal("0")
         try:
-            trends = get_profitability_service().calculate_profitability_trends(
-                request.contract_id, months=6
-            )
+            trends = get_profitability_service().calculate_profitability_trends(request.contract_id, months=6)
             if len(trends) >= 6:
                 last_three = sum(Decimal(str(t.margin_pct)) for t in trends[-3:]) / Decimal("3")
                 prev_three = sum(Decimal(str(t.margin_pct)) for t in trends[:3]) / Decimal("3")
@@ -277,7 +255,7 @@ class PricingEngine:
             recommended_monthly_fee_zar=recommended_fee,
             delta_zar=delta,
             delta_pct=delta_pct,
-            notes=notes
+            notes=notes,
         )
 
     def calculate_renewal_price(self, contract_id: str) -> RenewalQuote:
@@ -307,7 +285,7 @@ class PricingEngine:
             equipment_codes=equipment_codes,
             sla_tier=sla_tier,
             contract_months=contract.get("contract_months", 12),
-            include_benchmarks=True
+            include_benchmarks=True,
         )
 
         # Calculate current pricing
@@ -320,7 +298,10 @@ class PricingEngine:
         fee_change_pct = (fee_change / original_fee * Decimal("100")) if original_fee > 0 else Decimal("0")
 
         # Analyze what changed
-        if "condition" in current_quote.cost_breakdown and current_quote.cost_breakdown.get("condition_adjustment", 0) != 0:
+        if (
+            "condition" in current_quote.cost_breakdown
+            and current_quote.cost_breakdown.get("condition_adjustment", 0) != 0
+        ):
             drivers.append("Equipment condition deteriorated")
 
         if "age" in current_quote.cost_breakdown and current_quote.cost_breakdown.get("age_adjustment", 0) != 0:
@@ -351,14 +332,11 @@ class PricingEngine:
             fee_change_pct=fee_change_pct,
             drivers=drivers,
             confidence=confidence,
-            assumptions=current_quote.assumptions
+            assumptions=current_quote.assumptions,
         )
 
     def get_comparable_contracts(
-        self,
-        equipment_types: List[str],
-        sla_tier: SLATier,
-        limit: int = 10
+        self, equipment_types: List[str], sla_tier: SLATier, limit: int = 10
     ) -> List[ContractComparable]:
         """
         Find similar contracts in portfolio for benchmarking.
@@ -373,9 +351,7 @@ class PricingEngine:
         """
         try:
             similar = self.contract_repo.find_similar_contracts(
-                equipment_types=equipment_types,
-                sla_tier=sla_tier,
-                limit=limit
+                equipment_types=equipment_types, sla_tier=sla_tier, limit=limit
             )
 
             comparables = []
@@ -392,7 +368,7 @@ class PricingEngine:
                     equipment_types=equipment_types,
                     monthly_fee=Decimal(str(contract.get("monthly_fee_zar", 0))),
                     sla_tier=SLATier(contract.get("sla_tier", "standard")),
-                    profitability=profitability_pct
+                    profitability=profitability_pct,
                 )
                 comparables.append(comparable)
 
@@ -401,9 +377,7 @@ class PricingEngine:
             return []
 
     def calculate_renegotiation_terms(
-        self,
-        contract_id: str,
-        options_requested: Optional[str] = None
+        self, contract_id: str, options_requested: Optional[str] = None
     ) -> RenegotiationAnalysis:
         """
         Analyze renegotiation options for contract renewal.
@@ -434,7 +408,7 @@ class PricingEngine:
             equipment_codes=equipment_codes,
             sla_tier=sla_tier,
             contract_months=12,
-            include_benchmarks=False
+            include_benchmarks=False,
         )
         base_quote = self.calculate_price(quote_request)
 
@@ -443,23 +417,27 @@ class PricingEngine:
         # Option 1: Maintain margin (raise fee)
         if options_requested is None or options_requested == "maintain":
             margin_pct = self._get_target_margin(sla_tier)
-            base_cost = base_quote.recommended_fee_zar - (base_quote.recommended_fee_zar * (margin_pct / Decimal("100")))
+            base_cost = base_quote.recommended_fee_zar - (
+                base_quote.recommended_fee_zar * (margin_pct / Decimal("100"))
+            )
             new_fee = base_cost * (Decimal("1") + (margin_pct / Decimal("100")))
             fee_increase = new_fee - current_fee
             npv = fee_increase * Decimal("12") * Decimal("3")  # 3-year horizon
 
-            options.append(RenegotiationOption(
-                option_type="maintain",
-                description="Increase contract fee to maintain current margin %",
-                recommended_fee=new_fee,
-                estimated_npv_zar=npv,
-                roi_pct=(fee_increase / current_fee * Decimal("100")) if current_fee > 0 else Decimal("0"),
-                implementation_notes=[
-                    "Present to client as cost passthrough for inflation",
-                    "Minimal service changes needed",
-                    "Higher acceptance risk if market rates are stable"
-                ]
-            ))
+            options.append(
+                RenegotiationOption(
+                    option_type="maintain",
+                    description="Increase contract fee to maintain current margin %",
+                    recommended_fee=new_fee,
+                    estimated_npv_zar=npv,
+                    roi_pct=(fee_increase / current_fee * Decimal("100")) if current_fee > 0 else Decimal("0"),
+                    implementation_notes=[
+                        "Present to client as cost passthrough for inflation",
+                        "Minimal service changes needed",
+                        "Higher acceptance risk if market rates are stable",
+                    ],
+                )
+            )
 
         # Option 2: Invest in maintenance (reduce risk, maintain fee)
         if options_requested is None or options_requested == "invest":
@@ -470,19 +448,23 @@ class PricingEngine:
             net_improvement = cost_reduction - maintenance_investment
             npv = net_improvement * Decimal("12") * Decimal("3")  # 3-year horizon
 
-            options.append(RenegotiationOption(
-                option_type="invest",
-                description="Invest 50% of risk reduction in preventive maintenance",
-                recommended_fee=current_fee,  # Keep fee same
-                estimated_npv_zar=npv,
-                roi_pct=(net_improvement / maintenance_investment * Decimal("100")) if maintenance_investment > 0 else Decimal("0"),
-                implementation_notes=[
-                    "Fee remains unchanged from client perspective",
-                    "Requires new preventive maintenance program",
-                    "Builds customer loyalty and longer-term relationship",
-                    "Risk reduction improves service quality metrics"
-                ]
-            ))
+            options.append(
+                RenegotiationOption(
+                    option_type="invest",
+                    description="Invest 50% of risk reduction in preventive maintenance",
+                    recommended_fee=current_fee,  # Keep fee same
+                    estimated_npv_zar=npv,
+                    roi_pct=(net_improvement / maintenance_investment * Decimal("100"))
+                    if maintenance_investment > 0
+                    else Decimal("0"),
+                    implementation_notes=[
+                        "Fee remains unchanged from client perspective",
+                        "Requires new preventive maintenance program",
+                        "Builds customer loyalty and longer-term relationship",
+                        "Risk reduction improves service quality metrics",
+                    ],
+                )
+            )
 
         # Option 3: Add services (justify higher fee)
         if options_requested is None or options_requested == "expand":
@@ -492,25 +474,29 @@ class PricingEngine:
             new_value_delivered = service_addition * Decimal("12") * Decimal("3")
             npv = new_value_delivered
 
-            options.append(RenegotiationOption(
-                option_type="expand",
-                description="Add predictive maintenance and real-time monitoring services",
-                recommended_fee=new_fee,
-                estimated_npv_zar=npv,
-                roi_pct=Decimal("150"),  # 15% fee increase with 100% uptake of new services
-                implementation_notes=[
-                    "Requires deployment of monitoring infrastructure",
-                    "Enables data-driven preventive maintenance",
-                    "Justifies 15% fee increase with clear ROI to client",
-                    "Highest revenue but requires service capability investment"
-                ]
-            ))
+            options.append(
+                RenegotiationOption(
+                    option_type="expand",
+                    description="Add predictive maintenance and real-time monitoring services",
+                    recommended_fee=new_fee,
+                    estimated_npv_zar=npv,
+                    roi_pct=Decimal("150"),  # 15% fee increase with 100% uptake of new services
+                    implementation_notes=[
+                        "Requires deployment of monitoring infrastructure",
+                        "Enables data-driven preventive maintenance",
+                        "Justifies 15% fee increase with clear ROI to client",
+                        "Highest revenue but requires service capability investment",
+                    ],
+                )
+            )
 
         # Recommend best option (usually maintain for steady state)
         recommended_option = "maintain"
         if options:
             # If risk buffer is high, recommend invest; if services needed, recommend expand
-            if base_quote.cost_breakdown.get("risk_buffer", Decimal("0")) > base_quote.recommended_fee_zar * Decimal("0.2"):
+            if base_quote.cost_breakdown.get("risk_buffer", Decimal("0")) > base_quote.recommended_fee_zar * Decimal(
+                "0.2"
+            ):
                 recommended_option = "invest"
             elif "High failure risk" in base_quote.risk_factors:
                 recommended_option = "expand"
@@ -522,8 +508,8 @@ class PricingEngine:
             market_context={
                 "current_fee": float(current_fee),
                 "base_cost": float(base_quote.recommended_fee_zar),
-                "margin_pct": float(self._get_target_margin(sla_tier))
-            }
+                "margin_pct": float(self._get_target_margin(sla_tier)),
+            },
         )
 
     def _get_contract_equipment_codes(self, contract_id: str) -> List[str]:
@@ -539,11 +525,7 @@ class PricingEngine:
         except Exception:
             return ["unknown"]
 
-    def get_benchmarks_for_contract(
-        self,
-        contract_id: str,
-        limit: int = 5
-    ) -> PricingBenchmarkResponse:
+    def get_benchmarks_for_contract(self, contract_id: str, limit: int = 5) -> PricingBenchmarkResponse:
         """
         Get benchmarking metrics for similar contracts.
         """
@@ -554,10 +536,7 @@ class PricingEngine:
             if eq.get("type"):
                 equipment_types.append(eq.get("type"))
 
-        similar = self.contract_repo.find_similar_contracts(
-            equipment_types=equipment_types,
-            limit=limit
-        )
+        similar = self.contract_repo.find_similar_contracts(equipment_types=equipment_types, limit=limit)
 
         fees = [Decimal(str(c.get("monthly_fee_zar") or 0)) for c in similar] if similar else []
         if not fees:
@@ -566,7 +545,7 @@ class PricingEngine:
                 similar_contracts=0,
                 average_monthly_fee_zar=Decimal("0"),
                 min_monthly_fee_zar=Decimal("0"),
-                max_monthly_fee_zar=Decimal("0")
+                max_monthly_fee_zar=Decimal("0"),
             )
 
         return PricingBenchmarkResponse(
@@ -574,7 +553,7 @@ class PricingEngine:
             similar_contracts=len(fees),
             average_monthly_fee_zar=sum(fees) / Decimal(len(fees)),
             min_monthly_fee_zar=min(fees),
-            max_monthly_fee_zar=max(fees)
+            max_monthly_fee_zar=max(fees),
         )
 
     def _calculate_base_cost(self, equipment_codes: List[str]) -> Decimal:
@@ -596,8 +575,8 @@ class PricingEngine:
             if equipment_type in templates:
                 template = templates[equipment_type]
                 monthly = sum(
-                    Decimal(str(v)) for v in
-                    template.get("typical_monthly_breakdown", {}).values()
+                    Decimal(str(v))
+                    for v in template.get("typical_monthly_breakdown", {}).values()
                     if v  # Skip None/0 values
                 )
                 total_monthly += monthly
@@ -607,11 +586,7 @@ class PricingEngine:
 
         return total_monthly
 
-    def _calculate_condition_adjustment(
-        self,
-        base_cost: Decimal,
-        factors: List[ConditionFactor]
-    ) -> Decimal:
+    def _calculate_condition_adjustment(self, base_cost: Decimal, factors: List[ConditionFactor]) -> Decimal:
         """
         Calculate cost adjustment based on equipment condition.
 
@@ -625,20 +600,13 @@ class PricingEngine:
 
         for factor in factors:
             # Use config multipliers
-            multiplier = self.config.condition_multipliers.get(
-                factor.overall_score,
-                Decimal("1.0")
-            )
+            multiplier = self.config.condition_multipliers.get(factor.overall_score, Decimal("1.0"))
             cost_share = base_cost / Decimal(len(factors))
             adjustment += cost_share * (multiplier - Decimal("1.0"))
 
         return adjustment
 
-    def _calculate_age_adjustment(
-        self,
-        base_cost: Decimal,
-        factors: List[ConditionFactor]
-    ) -> Decimal:
+    def _calculate_age_adjustment(self, base_cost: Decimal, factors: List[ConditionFactor]) -> Decimal:
         """
         Calculate cost adjustment based on equipment age.
 
@@ -668,11 +636,7 @@ class PricingEngine:
 
         return adjustment
 
-    def _calculate_risk_buffer(
-        self,
-        base_cost: Decimal,
-        buffers: List[RiskBuffer]
-    ) -> Decimal:
+    def _calculate_risk_buffer(self, base_cost: Decimal, buffers: List[RiskBuffer]) -> Decimal:
         """
         Calculate risk buffer from ML failure predictions.
 
@@ -691,20 +655,13 @@ class PricingEngine:
         avg_buffer_pct = total_buffer_pct / Decimal(len(buffers))
         return base_cost * (avg_buffer_pct / Decimal("100"))
 
-    def _calculate_sla_adjustment(
-        self,
-        base_cost: Decimal,
-        sla_tier: SLATier
-    ) -> Decimal:
+    def _calculate_sla_adjustment(self, base_cost: Decimal, sla_tier: SLATier) -> Decimal:
         """
         Calculate SLA tier premium adjustment.
 
         Premium tiers require more resources, faster response.
         """
-        multiplier = self.config.sla_multipliers.get(
-            sla_tier.value,
-            Decimal("1.0")
-        )
+        multiplier = self.config.sla_multipliers.get(sla_tier.value, Decimal("1.0"))
         return base_cost * (multiplier - Decimal("1.0"))
 
     def _get_target_margin(self, sla_tier: SLATier) -> Decimal:
@@ -718,11 +675,7 @@ class PricingEngine:
                 return margin_target.margin_pct
         return self.config.default_margin_pct
 
-    def _get_condition_factors(
-        self,
-        equipment_codes: List[str],
-        score_delta: int = 0
-    ) -> List[ConditionFactor]:
+    def _get_condition_factors(self, equipment_codes: List[str], score_delta: int = 0) -> List[ConditionFactor]:
         """
         Get condition assessment data for equipment.
 
@@ -746,7 +699,7 @@ class PricingEngine:
                         overall_score=adjusted_score,
                         age_years=age_years,
                         condition_multiplier=Decimal("1.0"),  # Calculated later
-                        age_multiplier=Decimal("1.0")  # Calculated later
+                        age_multiplier=Decimal("1.0"),  # Calculated later
                     )
                     factors.append(factor)
             except Exception:
@@ -755,11 +708,7 @@ class PricingEngine:
 
         return factors
 
-    def _get_risk_buffers(
-        self,
-        equipment_codes: List[str],
-        multiplier: Decimal = Decimal("1.0")
-    ) -> List[RiskBuffer]:
+    def _get_risk_buffers(self, equipment_codes: List[str], multiplier: Decimal = Decimal("1.0")) -> List[RiskBuffer]:
         """
         Get ML prediction risk buffers for equipment.
 
@@ -779,7 +728,7 @@ class PricingEngine:
                         equipment_id=code,
                         failure_probability=failure_prob,
                         health_score=prediction.get("health_score", 80),
-                        risk_buffer_pct=Decimal("0")  # Calculated later
+                        risk_buffer_pct=Decimal("0"),  # Calculated later
                     )
                     buffers.append(buffer)
             except Exception:
@@ -793,13 +742,11 @@ class PricingEngine:
         return {
             "min": recommended_fee * Decimal("0.9"),  # -10%
             "target": recommended_fee,
-            "max": recommended_fee * Decimal("1.1")   # +10%
+            "max": recommended_fee * Decimal("1.1"),  # +10%
         }
 
     def _identify_risk_factors(
-        self,
-        condition_factors: List[ConditionFactor],
-        risk_buffers: List[RiskBuffer]
+        self, condition_factors: List[ConditionFactor], risk_buffers: List[RiskBuffer]
     ) -> List[str]:
         """Identify key risk factors for quote."""
         factors = []
@@ -813,8 +760,7 @@ class PricingEngine:
         for rb in risk_buffers:
             if rb.failure_probability > Decimal("0.3"):
                 factors.append(
-                    f"High failure risk: {rb.equipment_id} "
-                    f"({rb.failure_probability * 100:.0f}% probability)"
+                    f"High failure risk: {rb.equipment_id} ({rb.failure_probability * 100:.0f}% probability)"
                 )
 
         return factors if factors else ["No significant risk factors identified"]
@@ -826,7 +772,7 @@ class PricingEngine:
             f"SLA tier: {request.sla_tier.value}",
             "Assumes normal operating conditions",
             "Excludes act of god events",
-            "Based on current equipment condition assessments"
+            "Based on current equipment condition assessments",
         ]
 
     def _get_market_comparison(self, request: QuoteRequest) -> Optional[Dict[str, Any]]:
@@ -834,8 +780,7 @@ class PricingEngine:
         try:
             # Find similar contracts in portfolio
             similar = self.contract_repo.find_similar_contracts(
-                equipment_types=request.equipment_codes,
-                sla_tier=request.sla_tier
+                equipment_types=request.equipment_codes, sla_tier=request.sla_tier
             )
 
             if similar and len(similar) > 0:
@@ -844,7 +789,7 @@ class PricingEngine:
                     "similar_contracts": len(similar),
                     "average_monthly_fee": sum(fees) / Decimal(len(fees)),
                     "min_monthly_fee": min(fees),
-                    "max_monthly_fee": max(fees)
+                    "max_monthly_fee": max(fees),
                 }
         except Exception:
             pass
@@ -866,6 +811,7 @@ class PricingEngine:
 
         try:
             from datetime import datetime
+
             install_date = datetime.fromisoformat(installed_date.replace("Z", "+00:00"))
             age_days = (datetime.now(install_date.tzinfo) - install_date).days
             return age_days / 365.25
@@ -881,6 +827,7 @@ class PricingEngine:
         try:
             # Import ML service
             from app.services.ml_prediction_service import MLPredictionService
+
             ml_service = MLPredictionService()
             prediction = ml_service.get_prediction(equipment_code)
             return prediction
@@ -888,61 +835,19 @@ class PricingEngine:
             # Return default if ML unavailable
             return {
                 "probability": 0.1,  # 10% default risk
-                "health_score": 80
+                "health_score": 80,
             }
 
     def _get_default_templates(self) -> Dict[str, Any]:
         """Get default budget templates if repository unavailable."""
         return {
-            "chiller": {
-                "typical_monthly_breakdown": {
-                    "labor": 4500,
-                    "parts": 2500,
-                    "callout": 800
-                }
-            },
-            "ahu": {
-                "typical_monthly_breakdown": {
-                    "labor": 2200,
-                    "parts": 1200,
-                    "callout": 600
-                }
-            },
-            "fcu": {
-                "typical_monthly_breakdown": {
-                    "labor": 800,
-                    "parts": 400,
-                    "callout": 300
-                }
-            },
-            "vav": {
-                "typical_monthly_breakdown": {
-                    "labor": 400,
-                    "parts": 200,
-                    "callout": 200
-                }
-            },
-            "pump": {
-                "typical_monthly_breakdown": {
-                    "labor": 600,
-                    "parts": 300,
-                    "callout": 200
-                }
-            },
-            "generator": {
-                "typical_monthly_breakdown": {
-                    "labor": 3500,
-                    "parts": 2000,
-                    "callout": 500
-                }
-            },
-            "ups": {
-                "typical_monthly_breakdown": {
-                    "labor": 800,
-                    "parts": 500,
-                    "callout": 200
-                }
-            }
+            "chiller": {"typical_monthly_breakdown": {"labor": 4500, "parts": 2500, "callout": 800}},
+            "ahu": {"typical_monthly_breakdown": {"labor": 2200, "parts": 1200, "callout": 600}},
+            "fcu": {"typical_monthly_breakdown": {"labor": 800, "parts": 400, "callout": 300}},
+            "vav": {"typical_monthly_breakdown": {"labor": 400, "parts": 200, "callout": 200}},
+            "pump": {"typical_monthly_breakdown": {"labor": 600, "parts": 300, "callout": 200}},
+            "generator": {"typical_monthly_breakdown": {"labor": 3500, "parts": 2000, "callout": 500}},
+            "ups": {"typical_monthly_breakdown": {"labor": 800, "parts": 500, "callout": 200}},
         }
 
 

@@ -6,7 +6,8 @@ from typing import TypeVar, Callable, Any
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 async def retry_on_rate_limit(
     func: Callable[..., T],
@@ -14,7 +15,7 @@ async def retry_on_rate_limit(
     max_retries: int = 3,
     initial_delay: float = 1.0,
     backoff_factor: float = 2.0,
-    **kwargs
+    **kwargs,
 ) -> T:
     """Retry a function with exponential backoff on rate limit errors.
 
@@ -44,7 +45,7 @@ async def retry_on_rate_limit(
         except Exception as e:
             # Check if it's a rate limit error
             error_msg = str(e)
-            if '429' in error_msg or 'rate limit' in error_msg.lower():
+            if "429" in error_msg or "rate limit" in error_msg.lower():
                 last_error = e
                 if attempt < max_retries:
                     logger.warning(f"Rate limit hit, retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
@@ -67,7 +68,7 @@ def sync_retry_on_rate_limit(
     max_retries: int = 3,
     initial_delay: float = 0.5,
     backoff_factor: float = 2.0,
-    **kwargs
+    **kwargs,
 ) -> T:
     """Synchronous version of retry_on_rate_limit.
 
@@ -83,7 +84,7 @@ def sync_retry_on_rate_limit(
             return func(*args, **kwargs)
         except Exception as e:
             error_msg = str(e)
-            if '429' in error_msg or 'rate limit' in error_msg.lower():
+            if "429" in error_msg or "rate limit" in error_msg.lower():
                 last_error = e
                 if attempt < max_retries:
                     logger.warning(f"Rate limit hit, retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")

@@ -14,7 +14,7 @@ from app.services.maintenance_recommender import (
 @pytest.fixture
 def mock_ollama():
     """Mock Ollama client."""
-    with patch('app.services.maintenance_recommender.get_ollama_client') as mock:
+    with patch("app.services.maintenance_recommender.get_ollama_client") as mock:
         client = AsyncMock()
         client.is_available = AsyncMock(return_value=False)
         client.generate = AsyncMock(return_value="No LLM response")
@@ -25,7 +25,7 @@ def mock_ollama():
 @pytest.fixture
 def mock_vector_db():
     """Mock vector DB service."""
-    with patch('app.services.maintenance_recommender.get_vector_db_service') as mock:
+    with patch("app.services.maintenance_recommender.get_vector_db_service") as mock:
         service = Mock()
         service.search_knowledge = Mock(return_value=[])
         mock.return_value = service
@@ -91,7 +91,7 @@ class TestMaintenanceRecommender:
         """Test fallback recommendation for critical chiller risk."""
         predictions = {
             "overall_risk": {"risk_level": "critical"},
-            "predictions": {"failure_type": {"predicted_failure": "Compressor failure"}}
+            "predictions": {"failure_type": {"predicted_failure": "Compressor failure"}},
         }
 
         result = await recommender.generate_recommendation(
@@ -113,7 +113,7 @@ class TestMaintenanceRecommender:
         """Test fallback recommendation for high-risk AHU."""
         predictions = {
             "overall_risk": {"risk_level": "high"},
-            "predictions": {"failure_type": {"predicted_failure": "Belt failure"}}
+            "predictions": {"failure_type": {"predicted_failure": "Belt failure"}},
         }
 
         result = await recommender.generate_recommendation(
@@ -132,7 +132,7 @@ class TestMaintenanceRecommender:
         """Test fallback recommendation for medium-risk generator."""
         predictions = {
             "overall_risk": {"risk_level": "medium"},
-            "predictions": {"failure_type": {"predicted_failure": "Battery degradation"}}
+            "predictions": {"failure_type": {"predicted_failure": "Battery degradation"}},
         }
 
         result = await recommender.generate_recommendation(
@@ -150,7 +150,7 @@ class TestMaintenanceRecommender:
         """Test fallback recommendation for low risk."""
         predictions = {
             "overall_risk": {"risk_level": "low"},
-            "predictions": {"failure_type": {"predicted_failure": "Unknown"}}
+            "predictions": {"failure_type": {"predicted_failure": "Unknown"}},
         }
 
         result = await recommender.generate_recommendation(
@@ -167,7 +167,7 @@ class TestMaintenanceRecommender:
         """Test fallback for unknown equipment type uses default actions."""
         predictions = {
             "overall_risk": {"risk_level": "high"},
-            "predictions": {"failure_type": {"predicted_failure": "Unknown"}}
+            "predictions": {"failure_type": {"predicted_failure": "Unknown"}},
         }
 
         result = await recommender.generate_recommendation(
@@ -186,7 +186,7 @@ class TestMaintenanceRecommender:
         """Test passing maintenance history (used by LLM path)."""
         predictions = {
             "overall_risk": {"risk_level": "medium"},
-            "predictions": {"failure_type": {"predicted_failure": "Filter clog"}}
+            "predictions": {"failure_type": {"predicted_failure": "Filter clog"}},
         }
         history = [
             {"date": "2026-01-01", "description": "Filter replaced"},
@@ -208,7 +208,8 @@ class TestMaintenanceRecommender:
     async def test_generate_with_llm_available(self, recommender, mock_ollama):
         """Test recommendation generation when LLM is available."""
         mock_ollama.is_available = AsyncMock(return_value=True)
-        mock_ollama.generate = AsyncMock(return_value="""
+        mock_ollama.generate = AsyncMock(
+            return_value="""
 ### IMMEDIATE_ACTIONS
 - Check refrigerant levels immediately
 - Inspect compressor contacts
@@ -227,11 +228,12 @@ class TestMaintenanceRecommender:
 
 ### ESTIMATED_DOWNTIME
 2-4 hours
-""")
+"""
+        )
 
         predictions = {
             "overall_risk": {"risk_level": "high"},
-            "predictions": {"failure_type": {"predicted_failure": "Compressor issue"}}
+            "predictions": {"failure_type": {"predicted_failure": "Compressor issue"}},
         }
 
         result = await recommender.generate_recommendation(
@@ -269,17 +271,15 @@ class TestMaintenanceRecommender:
         predictions_map = {
             "ch-001": {
                 "overall_risk": {"risk_level": "high"},
-                "predictions": {"failure_type": {"predicted_failure": "Refrigerant leak"}}
+                "predictions": {"failure_type": {"predicted_failure": "Refrigerant leak"}},
             },
             "ahu-001": {
                 "overall_risk": {"risk_level": "low"},
-                "predictions": {"failure_type": {"predicted_failure": "Normal"}}
+                "predictions": {"failure_type": {"predicted_failure": "Normal"}},
             },
         }
 
-        results = await recommender.get_fleet_recommendations(
-            equipment_list, predictions_map
-        )
+        results = await recommender.get_fleet_recommendations(equipment_list, predictions_map)
 
         assert len(results) == 2
         # Should be sorted by priority (urgent before routine)
@@ -296,14 +296,12 @@ class TestMaintenanceRecommender:
         predictions_map = {
             "ch-001": {
                 "overall_risk": {"risk_level": "medium"},
-                "predictions": {"failure_type": {"predicted_failure": "Normal"}}
+                "predictions": {"failure_type": {"predicted_failure": "Normal"}},
             },
             # ch-002 missing from predictions
         }
 
-        results = await recommender.get_fleet_recommendations(
-            equipment_list, predictions_map
-        )
+        results = await recommender.get_fleet_recommendations(equipment_list, predictions_map)
 
         assert len(results) == 1
         assert results[0].equipment_id == "ch-001"

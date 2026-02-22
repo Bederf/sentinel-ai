@@ -9,6 +9,7 @@ from pathlib import Path
 
 from app.services.bms_simulation_service import create_simulation_service
 
+
 class SimulationBridge:
     """Bridge between simulation data and existing equipment API format"""
 
@@ -38,7 +39,9 @@ class SimulationBridge:
             "health_score": sim_equipment["health_score"],
             "status": sim_equipment["status"],
             "installation_date": "2023-01-01",  # Simulated
-            "last_maintenance": sim_equipment["last_maintenance"].isoformat() if isinstance(sim_equipment["last_maintenance"], datetime) else sim_equipment["last_maintenance"],
+            "last_maintenance": sim_equipment["last_maintenance"].isoformat()
+            if isinstance(sim_equipment["last_maintenance"], datetime)
+            else sim_equipment["last_maintenance"],
             "next_maintenance": (datetime.now() + timedelta(days=30)).isoformat(),
             "warranty_expiry": "2025-01-01",  # Simulated
             "specifications": self._generate_specifications(sim_equipment),
@@ -46,7 +49,9 @@ class SimulationBridge:
             "documents": [],  # No documents for simulated equipment
             "tags": [sim_equipment["type"], "simulated"],
             "created_at": datetime.now().isoformat(),
-            "updated_at": sim_equipment["timestamp"].isoformat() if isinstance(sim_equipment["timestamp"], datetime) else sim_equipment["timestamp"]
+            "updated_at": sim_equipment["timestamp"].isoformat()
+            if isinstance(sim_equipment["timestamp"], datetime)
+            else sim_equipment["timestamp"],
         }
 
     def convert_simulation_to_sensor_format(self, sim_equipment: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -66,13 +71,15 @@ class SimulationBridge:
                 "type": self._get_sensor_type(sensor_name),
                 "unit": self._get_sensor_unit(sensor_name),
                 "current_value": value,
-                "timestamp": sim_equipment["timestamp"].isoformat() if isinstance(sim_equipment["timestamp"], datetime) else sim_equipment["timestamp"],
+                "timestamp": sim_equipment["timestamp"].isoformat()
+                if isinstance(sim_equipment["timestamp"], datetime)
+                else sim_equipment["timestamp"],
                 "quality": "good",
                 "min_value": value * 0.8,  # Simulated range
                 "max_value": value * 1.2,
                 "threshold_low": value * 0.9,
                 "threshold_high": value * 1.1,
-                "description": f"{sensor_name.replace('_', ' ')} for {sim_equipment['name']}"
+                "description": f"{sensor_name.replace('_', ' ')} for {sim_equipment['name']}",
             }
             sensors.append(sensor)
 
@@ -102,7 +109,7 @@ class SimulationBridge:
                 "acknowledged": False,
                 "assigned_to": None,
                 "priority": self._get_priority_for_fault(fault_code),
-                "tags": ["fault", "simulated"]
+                "tags": ["fault", "simulated"],
             }
             alerts.append(alert)
 
@@ -142,30 +149,10 @@ class SimulationBridge:
         equipment_type = sim_equipment["type"]
 
         models = {
-            "Carrier": {
-                "ahu": "39AQA",
-                "chiller": "30XA",
-                "fcu": "42QH",
-                "ups": "APC Smart-UPS"
-            },
-            "York": {
-                "ahu": "YAHU",
-                "chiller": "YMC2",
-                "fcu": "YFCU",
-                "ups": "APC Smart-UPS"
-            },
-            "Trane": {
-                "ahu": "Tracer",
-                "chiller": "CGAM",
-                "fcu": "FCU",
-                "ups": "APC Smart-UPS"
-            },
-            "Daikin": {
-                "ahu": "VAM",
-                "chiller": "EWQ",
-                "fcu": "FCU",
-                "ups": "APC Smart-UPS"
-            }
+            "Carrier": {"ahu": "39AQA", "chiller": "30XA", "fcu": "42QH", "ups": "APC Smart-UPS"},
+            "York": {"ahu": "YAHU", "chiller": "YMC2", "fcu": "YFCU", "ups": "APC Smart-UPS"},
+            "Trane": {"ahu": "Tracer", "chiller": "CGAM", "fcu": "FCU", "ups": "APC Smart-UPS"},
+            "Daikin": {"ahu": "VAM", "chiller": "EWQ", "fcu": "FCU", "ups": "APC Smart-UPS"},
         }
 
         return models.get(manufacturer, {}).get(equipment_type, f"{manufacturer}-{equipment_type.upper()}")
@@ -175,7 +162,8 @@ class SimulationBridge:
         if "Level" in location or "Floor" in location:
             # Extract number from "Level 1" or "Floor 2"
             import re
-            match = re.search(r'(\d+)', location)
+
+            match = re.search(r"(\d+)", location)
             return match.group(1) if match else "1"
         return "1"
 
@@ -183,7 +171,8 @@ class SimulationBridge:
         """Extract zone from location string"""
         if "Zone" in location:
             import re
-            match = re.search(r'Zone\s+(\d+)', location)
+
+            match = re.search(r"Zone\s+(\d+)", location)
             return match.group(1) if match else "1"
         return "1"
 
@@ -191,7 +180,8 @@ class SimulationBridge:
         """Extract room from location string"""
         if "Room" in location:
             import re
-            match = re.search(r'Room\s+(\d+)', location)
+
+            match = re.search(r"Room\s+(\d+)", location)
             return match.group(1) if match else "01"
         return "01"
 
@@ -205,7 +195,7 @@ class SimulationBridge:
             "flow": "flow_rate",
             "humidity": "humidity",
             "speed": "speed",
-            "level": "level"
+            "level": "level",
         }
 
         for key, value in sensor_type_map.items():
@@ -224,7 +214,7 @@ class SimulationBridge:
             "flow": "L/min",
             "humidity": "%RH",
             "speed": "rpm",
-            "level": "%"
+            "level": "%",
         }
 
         for key, value in unit_map.items():
@@ -240,14 +230,14 @@ class SimulationBridge:
                 "E1": "High pressure switch open - Check condenser coil",
                 "E2": "Low pressure switch open - Check for refrigerant leak",
                 "E14": "Outdoor fan motor fault - Motor may need replacement",
-                "E21": "Compressor overload - Check electrical connections"
+                "E21": "Compressor overload - Check electrical connections",
             },
             "York": {
                 "F1": "High pressure fault - Clean condenser coils",
                 "F2": "Low pressure fault - Check refrigerant levels",
                 "F14": "Indoor fan fault - Inspect fan motor",
-                "F21": "Temperature sensor fault - Replace sensor"
-            }
+                "F21": "Temperature sensor fault - Replace sensor",
+            },
         }
 
         return fault_descriptions.get(manufacturer, {}).get(code, f"{manufacturer} fault code {code}")
@@ -265,11 +255,7 @@ class SimulationBridge:
     def _get_priority_for_fault(self, fault_code: str) -> int:
         """Determine priority (1-5) based on fault code"""
         severity = self._get_severity_for_fault(fault_code)
-        severity_map = {
-            "critical": 5,
-            "major": 4,
-            "minor": 2
-        }
+        severity_map = {"critical": 5, "major": 4, "minor": 2}
         return severity_map.get(severity, 3)
 
     def _generate_specifications(self, sim_equipment: Dict[str, Any]) -> Dict[str, Any]:
@@ -282,22 +268,16 @@ class SimulationBridge:
             "noise_level": "<65dB",
             "weight": "Standard",
             "dimensions": "Standard",
-            "certifications": ["ISO 9001", "CE", "RoHS"]
+            "certifications": ["ISO 9001", "CE", "RoHS"],
         }
 
         # Add type-specific specs
         if sim_equipment["type"] == "chiller":
-            specs.update({
-                "refrigerant": "R410A",
-                "compressor_type": "Scroll",
-                "condenser_type": "Air-cooled"
-            })
+            specs.update({"refrigerant": "R410A", "compressor_type": "Scroll", "condenser_type": "Air-cooled"})
         elif sim_equipment["type"] == "ahu":
-            specs.update({
-                "fan_type": "Centrifugal",
-                "filter_type": "Bag filter",
-                "coil_type": "Copper tube, aluminum fin"
-            })
+            specs.update(
+                {"fan_type": "Centrifugal", "filter_type": "Bag filter", "coil_type": "Copper tube, aluminum fin"}
+            )
 
         return specs
 
@@ -306,4 +286,4 @@ class SimulationBridge:
 simulation_bridge = SimulationBridge()
 
 # Export for use
-__all__ = ['simulation_bridge', 'SimulationBridge']
+__all__ = ["simulation_bridge", "SimulationBridge"]

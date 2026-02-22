@@ -3,16 +3,13 @@
 import asyncio
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
-from app.services.explanation_service import (
-    ExplanationService,
-    ExplanationResult
-)
+from app.services.explanation_service import ExplanationService, ExplanationResult
 
 
 @pytest.fixture
 def mock_ollama_client():
     """Mock Ollama client."""
-    with patch('app.services.explanation_service.get_ollama_client') as mock_get:
+    with patch("app.services.explanation_service.get_ollama_client") as mock_get:
         client = Mock()
         client.is_available = AsyncMock(return_value=True)
         client.generate = AsyncMock(return_value="Test explanation")
@@ -24,7 +21,7 @@ def mock_ollama_client():
 @pytest.fixture
 def mock_vector_db():
     """Mock vector DB service."""
-    with patch('app.services.explanation_service.get_vector_db_service') as mock_get:
+    with patch("app.services.explanation_service.get_vector_db_service") as mock_get:
         db = Mock()
         db.get_rag_context = AsyncMock(return_value="Test RAG context")
         mock_get.return_value = db
@@ -53,7 +50,7 @@ class TestExplanationService:
         predictions = {
             "equipment_type": "chiller",
             "predictions": {"24h": 12.5, "48h": 13.2, "72h": 14.1},
-            "confidence": 0.85
+            "confidence": 0.85,
         }
         mock_ollama_client.generate.return_value = """## Analysis Summary
 The chiller efficiency is within normal parameters.
@@ -67,10 +64,7 @@ No immediate action required. Continue monitoring.
 """
 
         # Execute
-        result = await explanation_service.explain_prediction(
-            equipment_id="chiller-001",
-            predictions=predictions
-        )
+        result = await explanation_service.explain_prediction(equipment_id="chiller-001", predictions=predictions)
 
         # Assert
         assert isinstance(result, ExplanationResult)
@@ -83,16 +77,10 @@ No immediate action required. Continue monitoring.
         """Test fallback explanation when Ollama is unavailable."""
         # Setup
         mock_ollama_client.is_available.return_value = False
-        predictions = {
-            "equipment_type": "chiller",
-            "predictions": {"24h": 15.0}
-        }
+        predictions = {"equipment_type": "chiller", "predictions": {"24h": 15.0}}
 
         # Execute
-        result = await explanation_service.explain_prediction(
-            equipment_id="chiller-001",
-            predictions=predictions
-        )
+        result = await explanation_service.explain_prediction(equipment_id="chiller-001", predictions=predictions)
 
         # Assert
         assert isinstance(result, ExplanationResult)
@@ -104,20 +92,11 @@ No immediate action required. Continue monitoring.
         """Test prediction data formatting for template."""
         from ml.explanations.templates import format_prediction_for_template
 
-        predictions = {
-            "24h": 12.5, "48h": 13.0, "72h": 13.5
-        }
-        equipment_info = {
-            "manufacturer": "Trane",
-            "model": "CGAM-100",
-            "capacity": 100
-        }
+        predictions = {"24h": 12.5, "48h": 13.0, "72h": 13.5}
+        equipment_info = {"manufacturer": "Trane", "model": "CGAM-100", "capacity": 100}
 
         result = format_prediction_for_template(
-            equipment_id="chiller-001",
-            equipment_type="chiller",
-            predictions=predictions,
-            equipment_info=equipment_info
+            equipment_id="chiller-001", equipment_type="chiller", predictions=predictions, equipment_info=equipment_info
         )
 
         assert result["equipment_id"] == "chiller-001"
@@ -141,11 +120,7 @@ No immediate action required. Continue monitoring.
         """Test contributing factors formatting."""
         from ml.explanations.templates import format_contributing_factors
 
-        factors = {
-            "load_conditions": "High",
-            "ambient_temp": 35.0,
-            "efficiency_trend": "declining"
-        }
+        factors = {"load_conditions": "High", "ambient_temp": 35.0, "efficiency_trend": "declining"}
 
         formatted = format_contributing_factors(factors)
 
@@ -155,17 +130,10 @@ No immediate action required. Continue monitoring.
 
     async def test_vector_db_integration(self, explanation_service, mock_vector_db):
         """Test vector DB integration for RAG context."""
-        predictions = {
-            "equipment_type": "chiller",
-            "predictions": {"24h": 14.0},
-            "anomaly_score": 0.3
-        }
+        predictions = {"equipment_type": "chiller", "predictions": {"24h": 14.0}, "anomaly_score": 0.3}
 
         # Execute
-        result = await explanation_service.explain_prediction(
-            equipment_id="chiller-001",
-            predictions=predictions
-        )
+        result = await explanation_service.explain_prediction(equipment_id="chiller-001", predictions=predictions)
 
         # Assert
         mock_vector_db.get_rag_context.assert_called_once()
@@ -189,16 +157,10 @@ The generator load is approaching maximum capacity.
 3. Schedule maintenance check
 """
 
-        predictions = {
-            "equipment_type": "generator",
-            "predictions": {"24h": 85.0}
-        }
+        predictions = {"equipment_type": "generator", "predictions": {"24h": 85.0}}
 
         # Execute
-        result = await explanation_service.explain_prediction(
-            equipment_id="generator-001",
-            predictions=predictions
-        )
+        result = await explanation_service.explain_prediction(equipment_id="generator-001", predictions=predictions)
 
         # Assert
         assert result.parsed is not None
@@ -208,19 +170,13 @@ The generator load is approaching maximum capacity.
 
     async def test_concurrent_explanations(self, explanation_service, mock_ollama_client):
         """Test generating multiple explanations concurrently."""
-        predictions1 = {
-            "equipment_type": "chiller",
-            "predictions": {"24h": 12.0}
-        }
-        predictions2 = {
-            "equipment_type": "ahu",
-            "predictions": {"24h": 22.0}
-        }
+        predictions1 = {"equipment_type": "chiller", "predictions": {"24h": 12.0}}
+        predictions2 = {"equipment_type": "ahu", "predictions": {"24h": 22.0}}
 
         # Execute concurrently
         results = await asyncio.gather(
             explanation_service.explain_prediction("chiller-001", predictions1),
-            explanation_service.explain_prediction("ahu-001", predictions2)
+            explanation_service.explain_prediction("ahu-001", predictions2),
         )
 
         # Assert

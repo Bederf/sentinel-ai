@@ -7,23 +7,24 @@ Handles the approval workflow for equipment control recommendations:
 - Audit trail recording
 """
 
+import hashlib
+import json
 import logging
-from datetime import datetime
-from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, Optional, Tuple
 
+from app.config.settings import settings
+from app.database.repositories.audit_repository import AuditRepository
+from app.database.repositories.parasite_decision_repository import ParasiteDecisionRepository
+from app.database.repositories.recommendation_repository import RecommendationRepository
 from app.models.recommendation import Recommendation, RecommendationStatus
-from app.services.safety_interlocks import SafetyEngine
+from app.services.cov_monitor_service import COVVerificationResult, get_cov_monitor_service
+from app.services.decision_event_logger import emit_decision_event
 from app.services.device_abstraction import device_manager
 from app.services.ml_feedback_service import get_ml_feedback_service
-from app.database.repositories.recommendation_repository import RecommendationRepository
-from app.database.repositories.audit_repository import AuditRepository
-
+from app.services.safety_interlocks import SafetyEngine
 from app.services.tier_routing_engine import TierRoutingResult
-from app.services.cov_monitor_service import get_cov_monitor_service, COVVerificationResult
-from app.services.decision_event_logger import emit_decision_event
-from app.database.repositories.parasite_decision_repository import ParasiteDecisionRepository
-from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -103,8 +104,8 @@ class ApprovalService:
     def _audit_gate_block(self, recommendation_id: str, error_code: str, gate_result) -> None:
         """Log a quality gate block to the audit trail."""
         try:
-            from app.services.audit_logger import AuditLogger
             from app.models.audit_log import AuditResultType
+            from app.services.audit_logger import AuditLogger
 
             audit = AuditLogger()
             audit.log_system_event(
@@ -236,53 +237,74 @@ class ApprovalService:
                     error_message="Recommendation action missing point or value",
                 )
 
+            # AEGIS Phase 0: BESS dispatch — skip device write, mark as blocked
+            is_bess_dispatch = recommendation.action_type == "bess_dispatch"
+
             # Read current value for rollback capability
             original_value = None
-            try:
-                # Try to read current value if device_manager supports it
-                if hasattr(self.device_manager, "read_value"):
-                    current_result = await self.device_manager.read_value(
-                        equipment_id=equipment_id, point_name=control_point
+            if not is_bess_dispatch:
+                try:
+                    # Try to read current value if device_manager supports it
+                    if hasattr(self.device_manager, "read_value"):
+                        current_result = await self.device_manager.read_value(
+                            equipment_id=equipment_id, point_name=control_point
+                        )
+                        original_value = current_result.get("value") if current_result.get("success") else None
+                except Exception as e:
+                    logger.warning(f"Could not read current device value: {e}")
+                    # Continue with approval even if we can't read the original value
+            else:
+                # For BESS, use the original_value from the action payload
+                original_value = recommendation.action.get("original_value")
+
+            if is_bess_dispatch:
+                # AEGIS: Log approval, skip device write, mark as blocked
+                logger.info(
+                    f"AEGIS: BESS dispatch approved for {recommendation_id}, "
+                    f"write blocked (aegis_bess_writer_enabled=False)"
+                )
+                write_result = {
+                    "success": True,
+                    "write_status": "blocked",
+                    "reason": "AEGIS_WRITE_BLOCKED: No Modbus writer configured",
+                }
+                cov_verified = False
+            else:
+                # Execute write to Niagara device
+                logger.info(f"Writing to device {equipment_id}: {control_point} = {target_value}")
+                write_result = {"success": True, "message": "Demo mode - device write simulated"}
+                try:
+                    write_result = await self._execute_device_write(
+                        equipment_id=equipment_id, point_name=control_point, target_value=target_value
                     )
-                    original_value = current_result.get("value") if current_result.get("success") else None
-            except Exception as e:
-                logger.warning(f"Could not read current device value: {e}")
-                # Continue with approval even if we can't read the original value
+                except Exception as e:
+                    logger.warning(f"Device write not available in demo mode: {e}")
+                    # In demo mode, we allow approval to proceed without actual device write
 
-            # Execute write to Niagara device
-            logger.info(f"Writing to device {equipment_id}: {control_point} = {target_value}")
-            write_result = {"success": True, "message": "Demo mode - device write simulated"}
-            try:
-                write_result = await self._execute_device_write(
-                    equipment_id=equipment_id, point_name=control_point, target_value=target_value
-                )
-            except Exception as e:
-                logger.warning(f"Device write not available in demo mode: {e}")
-                # In demo mode, we allow approval to proceed without actual device write
+                if not write_result.get("success", True):
+                    logger.error(f"Device write failed: {write_result.get('error')}")
+                    return ApprovalResult(
+                        success=False,
+                        recommendation_id=recommendation_id,
+                        status="failed",
+                        error_message=f"Device write failed: {write_result.get('error')}",
+                    )
 
-            if not write_result.get("success", True):
-                logger.error(f"Device write failed: {write_result.get('error')}")
-                return ApprovalResult(
-                    success=False,
-                    recommendation_id=recommendation_id,
-                    status="failed",
-                    error_message=f"Device write failed: {write_result.get('error')}",
-                )
+                # Verify COV feedback (confirm device actually accepted the change)
+                cov_verified = True  # Default to verified in demo mode
+                try:
+                    cov_verified = await self._verify_cov_feedback(
+                        equipment_id=equipment_id, point_name=control_point, expected_value=target_value
+                    )
+                except Exception as e:
+                    logger.warning(f"COV feedback verification not available: {e}, proceeding with approval")
 
-            # Verify COV feedback (confirm device actually accepted the change)
-            cov_verified = True  # Default to verified in demo mode
-            try:
-                cov_verified = await self._verify_cov_feedback(
-                    equipment_id=equipment_id, point_name=control_point, expected_value=target_value
-                )
-            except Exception as e:
-                logger.warning(f"COV feedback verification not available: {e}, proceeding with approval")
-
-            if not cov_verified:
-                logger.warning(f"COV feedback verification failed for {equipment_id}.{control_point}")
+                if not cov_verified:
+                    logger.warning(f"COV feedback verification failed for {equipment_id}.{control_point}")
 
             # Update recommendation status
-            recommendation.status = RecommendationStatus.EXECUTED
+            # BESS dispatch stays APPROVED (not EXECUTED) since write is blocked
+            recommendation.status = RecommendationStatus.APPROVED if is_bess_dispatch else RecommendationStatus.EXECUTED
             recommendation.approved_by = approved_by
             recommendation.approval_reason = approval_notes
             recommendation.executed_at = datetime.utcnow()
@@ -313,6 +335,26 @@ class ApprovalService:
 
             # Record Tier 2 decision in parasite_decisions
             parasite_repo = ParasiteDecisionRepository()
+            pd_write_status = "blocked" if is_bess_dispatch else "success"
+            dispatch_action_type = None
+            if isinstance(target_value, dict):
+                dispatch_action_type = target_value.get("action")
+            command_hash = hashlib.sha256(
+                json.dumps(target_value, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+            ).hexdigest()[:16]
+            pd_factors = {
+                "created_by": "approval_service",
+                "approved_by": approved_by,
+                "approval_notes": approval_notes or "",
+                "approval_outcome": "approved",
+                "dispatch_action_type": dispatch_action_type,
+                "command_hash": command_hash,
+            }
+            if is_bess_dispatch:
+                pd_factors["aegis_write_blocked"] = True
+                pd_factors["aegis_reason"] = "AEGIS_WRITE_BLOCKED"
+                pd_factors["execution_mode"] = "blocked"
+                pd_factors["block_reason_code"] = "AEGIS_WRITE_BLOCKED"
             await parasite_repo.record_decision(
                 {
                     "correlation_id": correlation_id,
@@ -321,15 +363,15 @@ class ApprovalService:
                     "equipment_code": equipment_id,
                     "tier": "tier2",
                     "decision_type": "tier2_approved",
-                    "write_status": "success",
+                    "write_status": pd_write_status,
                     "cov_verified": cov_verified,
+                    "point_name": control_point,
                     "control_point": control_point,
                     "target_value": target_value,
                     "original_value": original_value,
-                    "contributing_factors": {
-                        "approved_by": approved_by,
-                        "approval_notes": approval_notes or "",
-                    },
+                    "actor": "human_tier2",
+                    "mode": settings.resolved_ingestion_mode.value,
+                    "contributing_factors": pd_factors,
                 }
             )
 
@@ -370,7 +412,7 @@ class ApprovalService:
             return ApprovalResult(
                 success=True,
                 recommendation_id=recommendation_id,
-                status="executed",
+                status="approved" if is_bess_dispatch else "executed",
                 executed_at=recommendation.executed_at,
                 cov_verified=cov_verified,
                 execution_result=recommendation.execution_result,
@@ -446,9 +488,14 @@ class ApprovalService:
                     "tier": "tier2",
                     "decision_type": "tier2_rejected",
                     "write_status": "rejected",
+                    "actor": "human_tier2",
+                    "mode": settings.resolved_ingestion_mode.value,
+                    "rejection_category": "user_rejected",
                     "contributing_factors": {
+                        "created_by": "approval_service",
                         "rejected_by": rejected_by,
                         "reason": reason,
+                        "approval_outcome": "rejected",
                     },
                 }
             )
@@ -882,11 +929,21 @@ class ApprovalService:
                         "id": routing_result.decision_id,
                         "correlation_id": routing_result.correlation_id,
                         "recommendation_id": recommendation_id,
+                        "site_id": recommendation.site_id or "",
                         "tier": "tier3",
                         "decision_type": "tier3_auto_execute",
                         "write_status": "failed",
                         "failure_reason": f"Safety constraint violation: {safety_result.get('reason')}",
                         "equipment_code": equipment_id,
+                        "actor": "auto_tier3",
+                        "mode": mode,
+                        "gate_status": gate_result.overall.value if gate_result else None,
+                        "enforcement": gate_result.enforcement.value if gate_result else None,
+                        "gate_snapshot_id": getattr(gate_result, "snapshot_id", None),
+                        "safety_result": "blocked",
+                        "safety_rules_triggered": safety_result.get("rules_triggered", []),
+                        "rejection_category": "safety_block",
+                        "confidence_score": routing_result.confidence_score,
                     }
                 )
                 return ApprovalResult(
@@ -942,11 +999,23 @@ class ApprovalService:
                         "id": routing_result.decision_id,
                         "correlation_id": routing_result.correlation_id,
                         "recommendation_id": recommendation_id,
+                        "site_id": recommendation.site_id or "",
                         "tier": "tier3",
                         "decision_type": "tier3_auto_execute",
                         "write_status": "failed",
                         "failure_reason": f"Device write failed: {write_result.get('error')}",
                         "equipment_code": equipment_id,
+                        "point_name": control_point,
+                        "control_point": control_point,
+                        "target_value": target_value,
+                        "original_value": original_value,
+                        "actor": "auto_tier3",
+                        "mode": mode,
+                        "gate_status": gate_result.overall.value if gate_result else None,
+                        "enforcement": gate_result.enforcement.value if gate_result else None,
+                        "gate_snapshot_id": getattr(gate_result, "snapshot_id", None),
+                        "safety_result": "allowed",
+                        "confidence_score": routing_result.confidence_score,
                     }
                 )
                 return ApprovalResult(
@@ -1084,20 +1153,32 @@ class ApprovalService:
             )
 
             # Log to parasite_decisions as success
+            cov_latency_ms = int(cov_result.elapsed_seconds * 1000) if cov_result.elapsed_seconds else None
             parasite_repo = ParasiteDecisionRepository()
             await parasite_repo.record_decision(
                 {
                     "id": routing_result.decision_id,
                     "correlation_id": routing_result.correlation_id,
                     "recommendation_id": recommendation_id,
+                    "site_id": recommendation.site_id or "",
                     "tier": "tier3",
                     "decision_type": "tier3_auto_execute",
                     "write_status": "success",
                     "cov_verified": cov_result.verified,
+                    "cov_latency_ms": cov_latency_ms,
                     "equipment_code": equipment_id,
+                    "point_name": control_point,
                     "control_point": control_point,
                     "target_value": target_value,
                     "original_value": original_value,
+                    "actual_value": cov_result.actual_value,
+                    "actor": "auto_tier3",
+                    "mode": mode,
+                    "gate_status": gate_result.overall.value if gate_result else None,
+                    "enforcement": gate_result.enforcement.value if gate_result else None,
+                    "gate_snapshot_id": getattr(gate_result, "snapshot_id", None),
+                    "safety_result": "allowed",
+                    "confidence_score": routing_result.confidence_score,
                 }
             )
 

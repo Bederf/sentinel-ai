@@ -65,9 +65,7 @@ class FeatureComputeService:
         try:
             with open(self._definitions_path, "r") as f:
                 self._definitions = json.load(f)
-            logger.info(
-                f"Loaded feature definitions v{self._definitions.get('version', 'unknown')}"
-            )
+            logger.info(f"Loaded feature definitions v{self._definitions.get('version', 'unknown')}")
         except Exception as e:
             logger.error(f"Failed to load feature definitions: {e}")
             self._definitions = {"version": "unknown", "common": [], "chiller": [], "ahu": [], "generator": []}
@@ -78,15 +76,11 @@ class FeatureComputeService:
         Returns:
             FeatureDefinitionsResponse with common and equipment-specific features
         """
-        common = [
-            FeatureDefinition(**f) for f in self._definitions.get("common", [])
-        ]
+        common = [FeatureDefinition(**f) for f in self._definitions.get("common", [])]
         equipment_specific = {}
         for eq_type in ["chiller", "ahu", "generator"]:
             if eq_type in self._definitions:
-                equipment_specific[eq_type] = [
-                    FeatureDefinition(**f) for f in self._definitions[eq_type]
-                ]
+                equipment_specific[eq_type] = [FeatureDefinition(**f) for f in self._definitions[eq_type]]
 
         return FeatureDefinitionsResponse(
             version=self._definitions.get("version", "unknown"),
@@ -228,9 +222,7 @@ class FeatureComputeService:
             total_computation_time_ms=round(total_time_ms, 2),
         )
 
-    def _compute_aggregation(
-        self, values: List[float], aggregation: str
-    ) -> Optional[float]:
+    def _compute_aggregation(self, values: List[float], aggregation: str) -> Optional[float]:
         """Compute aggregation for a list of values.
 
         Args:
@@ -251,7 +243,7 @@ class FeatureComputeService:
                 return 0.0
             mean = sum(values) / len(values)
             variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
-            return round(variance ** 0.5, 4)
+            return round(variance**0.5, 4)
 
         elif aggregation == "min":
             return round(min(values), 4)

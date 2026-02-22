@@ -52,12 +52,7 @@ class CostCaptureService:
         self.contract_repo = contract_repo or ContractRepository()
         self.work_order_repo = work_order_repo or WorkOrderRepository()
 
-    async def capture_actuals_for_contract(
-        self,
-        contract_id: str,
-        year: int,
-        month: int
-    ) -> CostCaptureSummary:
+    async def capture_actuals_for_contract(self, contract_id: str, year: int, month: int) -> CostCaptureSummary:
         """
         Capture work order costs for a contract in a given month.
 
@@ -77,10 +72,7 @@ class CostCaptureService:
         work_orders = []
         if equipment_ids:
             work_orders = await self.work_order_repo.get_work_orders_for_equipment_list(
-                equipment_ids=equipment_ids,
-                start_date=period_start,
-                end_date=period_end,
-                status="completed"
+                equipment_ids=equipment_ids, start_date=period_start, end_date=period_end, status="completed"
             )
 
         labor_total = 0.0
@@ -104,31 +96,29 @@ class CostCaptureService:
             # Attach contract_id if missing (best effort)
             if not wo.get("contract_id"):
                 try:
-                    await self.work_order_repo.update_work_order(
-                        wo["id"], {"contract_id": contract_id}
-                    )
+                    await self.work_order_repo.update_work_order(wo["id"], {"contract_id": contract_id})
                 except Exception:
                     pass
 
         total_actual = labor_total + parts_total + subcontractor_total + callout_total + consumables_total
 
         budget = self._get_or_create_budget(
-            contract_id=contract_id,
-            contract_code=contract.get("code", "CONTRACT"),
-            year=year,
-            month=month
+            contract_id=contract_id, contract_code=contract.get("code", "CONTRACT"), year=year, month=month
         )
 
         budget_id = budget.get("id") if budget else None
 
         if budget_id:
-            self.budget_repo.update(budget_id, {
-                "labor_actual_zar": labor_total,
-                "parts_actual_zar": parts_total,
-                "subcontractor_actual_zar": subcontractor_total,
-                "callout_actual_zar": callout_total,
-                "consumables_actual_zar": consumables_total,
-            })
+            self.budget_repo.update(
+                budget_id,
+                {
+                    "labor_actual_zar": labor_total,
+                    "parts_actual_zar": parts_total,
+                    "subcontractor_actual_zar": subcontractor_total,
+                    "callout_actual_zar": callout_total,
+                    "consumables_actual_zar": consumables_total,
+                },
+            )
 
             # Evaluate variance and create alerts if thresholds breached
             variance_service = get_budget_variance_service()
@@ -146,15 +136,11 @@ class CostCaptureService:
             callout_actual_zar=round(callout_total, 2),
             consumables_actual_zar=round(consumables_total, 2),
             total_actual_zar=round(total_actual, 2),
-            budget_id=budget_id
+            budget_id=budget_id,
         )
 
     def _get_or_create_budget(
-        self,
-        contract_id: str,
-        contract_code: str,
-        year: int,
-        month: int
+        self, contract_id: str, contract_code: str, year: int, month: int
     ) -> Optional[Dict[str, Any]]:
         budgets = self.budget_repo.get_by_contract(contract_id, year=year)
         for budget in budgets:
@@ -174,7 +160,7 @@ class CostCaptureService:
             "subcontractor_budget_zar": 0,
             "callout_budget_zar": 0,
             "status": "draft",
-            "notes": "Auto-created for actual cost capture"
+            "notes": "Auto-created for actual cost capture",
         }
         return self.budget_repo.create(payload)
 

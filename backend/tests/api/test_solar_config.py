@@ -1,7 +1,6 @@
 """Tests for solar configuration API endpoints."""
 
 
-
 def test_create_solar_site_success(test_client) -> None:
     """Test successful solar site creation."""
     request_data = {
@@ -367,6 +366,4 @@ def test_equipment_code_pattern_invalid(test_client) -> None:
         assert response.status_code == 200
         data = response.json()
         # Invalid code should produce format error
-        assert data["valid"] is False or any(
-            "Invalid equipment code" in error for error in data["errors"]
-        )
+        assert data["valid"] is False or any("Invalid equipment code" in error for error in data["errors"])

@@ -41,6 +41,7 @@ router = APIRouter(prefix="/contracts", tags=["contracts"])
 
 class StatusChangeRequest(BaseModel):
     """Request body for contract status change."""
+
     status: str
     reason: Optional[str] = None
 
@@ -224,9 +225,7 @@ async def change_contract_status(contract_id: str, body: StatusChangeRequest):
     target_status = body.status.lower()
 
     if target_status == "active":
-        result = svc.approve_contract(
-            contract_id, approved_by=body.reason or "api_user"
-        )
+        result = svc.approve_contract(contract_id, approved_by=body.reason or "api_user")
     elif target_status == "suspended":
         result = svc.suspend_contract(contract_id, reason=body.reason)
     elif target_status == "expired":
@@ -245,23 +244,18 @@ async def change_contract_status(contract_id: str, body: StatusChangeRequest):
         update_data: Dict[str, Any] = {"status": "terminated"}
         if body.reason:
             existing_notes = contract.get("notes") or ""
-            update_data["notes"] = (
-                existing_notes
-                + f"\n[TERMINATED {datetime.utcnow().isoformat()}] {body.reason}"
-            )
+            update_data["notes"] = existing_notes + f"\n[TERMINATED {datetime.utcnow().isoformat()}] {body.reason}"
         result = svc._contract_repo.update(contract_id, update_data)
     else:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid target status: '{body.status}'. "
-            "Valid: active, suspended, expired, terminated",
+            detail=f"Invalid target status: '{body.status}'. Valid: active, suspended, expired, terminated",
         )
 
     if result is None:
         raise HTTPException(
             status_code=400,
-            detail=f"Status change to '{body.status}' failed. "
-            "Check current status allows this transition.",
+            detail=f"Status change to '{body.status}' failed. Check current status allows this transition.",
         )
     return result
 
@@ -517,18 +511,9 @@ async def capture_budget_actuals(
     from app.services.cost_capture_service import get_cost_capture_service
 
     service = get_cost_capture_service()
-    summary = await service.capture_actuals_for_contract(
-        contract_id=contract_id,
-        year=year,
-        month=month
-    )
+    summary = await service.capture_actuals_for_contract(contract_id=contract_id, year=year, month=month)
 
-    return {
-        "contract_id": contract_id,
-        "year": year,
-        "month": month,
-        "summary": summary.__dict__
-    }
+    return {"contract_id": contract_id, "year": year, "month": month, "summary": summary.__dict__}
 
 
 @router.get("/{contract_id}/budget-variance/alerts")
@@ -545,13 +530,7 @@ async def list_budget_variance_alerts(
     from app.services.budget_variance_service import get_budget_variance_service
 
     service = get_budget_variance_service()
-    alerts = service.list_alerts(
-        contract_id,
-        year=year,
-        month=month,
-        status=status,
-        severity=severity
-    )
+    alerts = service.list_alerts(contract_id, year=year, month=month, status=status, severity=severity)
     return {"contract_id": contract_id, "alerts": alerts, "count": len(alerts)}
 
 
@@ -568,20 +547,13 @@ async def evaluate_budget_variance(
 
     service = get_budget_variance_service()
     result = service.evaluate_budget(contract_id, year, month)
-    equipment_results = service.evaluate_equipment_type_budgets(
-        contract_id, year, month
-    )
-    return {
-        "contract_id": contract_id,
-        "result": result.__dict__,
-        "equipment_type_results": equipment_results
-    }
+    equipment_results = service.evaluate_equipment_type_budgets(contract_id, year, month)
+    return {"contract_id": contract_id, "result": result.__dict__, "equipment_type_results": equipment_results}
 
 
 @router.patch("/budget-variance/alerts/{alert_id}")
 async def update_budget_alert_status(
-    alert_id: str,
-    status: str = Query(..., description="Alert status (open, acknowledged, resolved)")
+    alert_id: str, status: str = Query(..., description="Alert status (open, acknowledged, resolved)")
 ):
     """
     Update budget alert status.
@@ -635,15 +607,13 @@ async def export_budget_report(
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
 
     csv_bytes = export_budget_report_csv(report)
     filename = f"budget-report-{contract_id}-{year}.csv"
     return Response(
-        content=csv_bytes,
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        content=csv_bytes, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 
@@ -684,10 +654,7 @@ async def get_budget_template(equipment_type: str):
     template = repo.get_template(equipment_type)
 
     if not template:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No budget template found for equipment type: {equipment_type}"
-        )
+        raise HTTPException(status_code=404, detail=f"No budget template found for equipment type: {equipment_type}")
 
     return template
 
@@ -697,7 +664,7 @@ async def create_budget_from_template(
     contract_id: str = Query(..., description="Contract UUID"),
     equipment_type: str = Query(..., description="Equipment type for template lookup"),
     year: int = Query(..., description="Budget year", ge=2020, le=2100),
-    month: Optional[int] = Query(None, description="Budget month (1-12), if None creates annual budget", ge=1, le=12)
+    month: Optional[int] = Query(None, description="Budget month (1-12), if None creates annual budget", ge=1, le=12),
 ):
     """
     Create a budget entry using equipment-type template defaults.
@@ -725,17 +692,14 @@ async def create_budget_from_template(
         raise HTTPException(
             status_code=404,
             detail=f"No budget template found for equipment type: {equipment_type}. "
-                   f"Available types: chiller, ahu, generator, dali_controller, power_meter"
+            f"Available types: chiller, ahu, generator, dali_controller, power_meter",
         )
 
     # Create budget from template
     budget = repo.create_from_template(contract_id, equipment_type, year, month)
 
     if not budget:
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to create budget from template"
-        )
+        raise HTTPException(status_code=500, detail="Failed to create budget from template")
 
     return budget
 
@@ -862,9 +826,7 @@ async def get_contract_profitability(
     end_date = date.fromisoformat(period_end)
 
     service = get_profitability_service()
-    profitability = service.calculate_contract_profitability(
-        contract_id, start_date, end_date
-    )
+    profitability = service.calculate_contract_profitability(contract_id, start_date, end_date)
     return profitability
 
 
@@ -987,9 +949,7 @@ async def get_contract_asset_roi_list(
     end_date = date.fromisoformat(period_end)
 
     service = get_profitability_service()
-    assets = service.calculate_contract_asset_roi_list(
-        contract_id, start_date, end_date, limit=limit
-    )
+    assets = service.calculate_contract_asset_roi_list(contract_id, start_date, end_date, limit=limit)
     return {"contract_id": contract_id, "assets": assets, "count": len(assets)}
 
 
@@ -1025,9 +985,7 @@ async def get_contract_profitability_report(
     end_date = date.fromisoformat(period_end)
 
     service = get_profitability_service()
-    report = service.generate_contract_report(
-        contract_id, start_date, end_date, asset_limit=asset_limit
-    )
+    report = service.generate_contract_report(contract_id, start_date, end_date, asset_limit=asset_limit)
     return report
 
 
@@ -1063,9 +1021,7 @@ async def export_contract_profitability_report(
     end_date = date.fromisoformat(period_end)
 
     service = get_profitability_service()
-    report = service.generate_contract_report(
-        contract_id, start_date, end_date, asset_limit=asset_limit
-    )
+    report = service.generate_contract_report(contract_id, start_date, end_date, asset_limit=asset_limit)
 
     fmt = format.lower()
     if fmt == "pdf":
@@ -1074,15 +1030,13 @@ async def export_contract_profitability_report(
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
 
     csv_bytes = export_report_csv(report)
     filename = f"profitability-report-{contract_id}.csv"
     return Response(
-        content=csv_bytes,
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        content=csv_bytes, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 
@@ -1138,8 +1092,7 @@ async def get_sla_breaches(
             severity_enum = SLABreachSeverity(severity)
         except ValueError:
             raise HTTPException(
-                status_code=400,
-                detail=f"Invalid severity: {severity}. Must be: minor, major, critical"
+                status_code=400, detail=f"Invalid severity: {severity}. Must be: minor, major, critical"
             )
 
     breaches = repo.get_breach_events(contract_id, severity_enum)
@@ -1194,16 +1147,13 @@ async def recalculate_sla(
     current_month_start = date.today().replace(day=1)
     # Calculate last day of current month
     if current_month_start.month == 12:
-        current_month_end = current_month_start.replace(
-            year=current_month_start.year + 1,
-            month=1,
-            day=1
-        ) - __import__("datetime").timedelta(days=1)
+        current_month_end = current_month_start.replace(year=current_month_start.year + 1, month=1, day=1) - __import__(
+            "datetime"
+        ).timedelta(days=1)
     else:
-        current_month_end = current_month_start.replace(
-            month=current_month_start.month + 1,
-            day=1
-        ) - __import__("datetime").timedelta(days=1)
+        current_month_end = current_month_start.replace(month=current_month_start.month + 1, day=1) - __import__(
+            "datetime"
+        ).timedelta(days=1)
 
     # Get SLA terms for contract
     contracts = repo.get_contracts_with_sla()
@@ -1227,22 +1177,26 @@ async def recalculate_sla(
             # Store performance record
             repo.create_performance_record(performance)
 
-            results.append({
-                "sla_term_id": sla_term["id"],
-                "sla_type": sla_term["sla_type"],
-                "compliance_status": performance.compliance_status.value,
-                "compliance_percentage": performance.compliance_percentage,
-                "breach_count": performance.breach_count,
-                "clawback_amount_zar": performance.clawback_amount_zar,
-            })
+            results.append(
+                {
+                    "sla_term_id": sla_term["id"],
+                    "sla_type": sla_term["sla_type"],
+                    "compliance_status": performance.compliance_status.value,
+                    "compliance_percentage": performance.compliance_percentage,
+                    "breach_count": performance.breach_count,
+                    "clawback_amount_zar": performance.clawback_amount_zar,
+                }
+            )
 
         except Exception as e:
             logger.error(f"Failed to recalculate SLA {sla_term['id']}: {e}")
-            results.append({
-                "sla_term_id": sla_term["id"],
-                "sla_type": sla_term["sla_type"],
-                "error": str(e),
-            })
+            results.append(
+                {
+                    "sla_term_id": sla_term["id"],
+                    "sla_type": sla_term["sla_type"],
+                    "error": str(e),
+                }
+            )
 
     return {
         "contract_id": contract_id,

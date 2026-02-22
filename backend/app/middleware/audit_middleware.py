@@ -24,9 +24,19 @@ logger = logging.getLogger(__name__)
 # Sensitive data sanitisation (Phase 58-04 M-4 + Phase 65-04 PII masking)
 # ---------------------------------------------------------------------------
 _SENSITIVE_KEYS = {
-    "password", "token", "secret", "api_key", "apikey",
-    "authorization", "access_token", "refresh_token",
-    "jwt", "credential", "credit_card", "ssn", "email",
+    "password",
+    "token",
+    "secret",
+    "api_key",
+    "apikey",
+    "authorization",
+    "access_token",
+    "refresh_token",
+    "jwt",
+    "credential",
+    "credit_card",
+    "ssn",
+    "email",
 }
 
 # Email regex for PII masking
@@ -126,21 +136,15 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
             # Log successful control action
             if response.status_code < 400:  # Success
-                await self._log_successful_action(
-                    request, response, user, correlation_id, request_start
-                )
+                await self._log_successful_action(request, response, user, correlation_id, request_start)
             else:  # Error
-                await self._log_failed_action(
-                    request, response, user, correlation_id, request_start
-                )
+                await self._log_failed_action(request, response, user, correlation_id, request_start)
 
             return response
 
         except Exception as e:
             # Log exception
-            await self._log_exception(
-                request, e, user, correlation_id, request_start
-            )
+            await self._log_exception(request, e, user, correlation_id, request_start)
             raise
 
     def _extract_user(self, request: Request) -> str:
@@ -180,12 +184,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         return False
 
     async def _log_successful_action(
-        self,
-        request: Request,
-        response: Response,
-        user: str,
-        correlation_id: str,
-        request_start: datetime
+        self, request: Request, response: Response, user: str, correlation_id: str, request_start: datetime
     ) -> None:
         """Log successful control action."""
         try:
@@ -219,24 +218,16 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     "response_status": response.status_code,
                     "duration_ms": round(duration_ms, 2),
                     "correlation_id": correlation_id,
-                }
+                },
             )
 
-            logger.info(
-                f"Audit logged: {action_type} by {user} "
-                f"(device: {device_id or 'N/A'}) - SUCCESS"
-            )
+            logger.info(f"Audit logged: {action_type} by {user} (device: {device_id or 'N/A'}) - SUCCESS")
 
         except Exception as e:
             logger.error(f"Failed to log successful action: {e}")
 
     async def _log_failed_action(
-        self,
-        request: Request,
-        response: Response,
-        user: str,
-        correlation_id: str,
-        request_start: datetime
+        self, request: Request, response: Response, user: str, correlation_id: str, request_start: datetime
     ) -> None:
         """Log failed control action."""
         try:
@@ -257,13 +248,16 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 body = b""
                 async for chunk in response.body_iterator:
                     body += chunk
+
                 # Reset iterator for downstream use (must be async iterator)
                 async def body_iterator():
                     yield body
+
                 response.body_iterator = body_iterator()
 
                 if body:
                     import json
+
                     error_data = json.loads(body.decode())
                     error_message = error_data.get("detail", error_message)
             except:
@@ -282,24 +276,18 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     "response_status": response.status_code,
                     "duration_ms": round(duration_ms, 2),
                     "correlation_id": correlation_id,
-                }
+                },
             )
 
             logger.warning(
-                f"Audit logged: {action_type} by {user} "
-                f"(device: {device_id or 'N/A'}) - FAILED: {error_message}"
+                f"Audit logged: {action_type} by {user} (device: {device_id or 'N/A'}) - FAILED: {error_message}"
             )
 
         except Exception as e:
             logger.error(f"Failed to log failed action: {e}")
 
     async def _log_exception(
-        self,
-        request: Request,
-        exception: Exception,
-        user: str,
-        correlation_id: str,
-        request_start: datetime
+        self, request: Request, exception: Exception, user: str, correlation_id: str, request_start: datetime
     ) -> None:
         """Log exception during request processing."""
         try:
@@ -317,12 +305,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     "exception_type": type(exception).__name__,
                     "duration_ms": round(duration_ms, 2),
                     "correlation_id": correlation_id,
-                }
+                },
             )
 
-            logger.error(
-                f"Audit logged: {action_type} by {user} - EXCEPTION: {exception}"
-            )
+            logger.error(f"Audit logged: {action_type} by {user} - EXCEPTION: {exception}")
 
         except Exception as e:
             logger.error(f"Failed to log exception: {e}")

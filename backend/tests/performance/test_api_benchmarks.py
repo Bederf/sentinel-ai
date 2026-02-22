@@ -16,6 +16,7 @@ class TestAPIPerformance:
 
     def test_health_endpoint_performance(self, test_client: TestClient, benchmark):
         """Benchmark health check endpoint."""
+
         def make_request():
             return test_client.get("/api/health")
 
@@ -26,6 +27,7 @@ class TestAPIPerformance:
 
     def test_sites_list_performance(self, test_client: TestClient, benchmark):
         """Benchmark sites list endpoint."""
+
         def make_request():
             return test_client.get("/api/sites")
 
@@ -36,6 +38,7 @@ class TestAPIPerformance:
 
     def test_devices_list_performance(self, test_client: TestClient, benchmark):
         """Benchmark devices list endpoint."""
+
         def make_request():
             return test_client.get("/api/devices")
 
@@ -61,6 +64,7 @@ class TestAPIPerformance:
 
     def test_audit_log_list_performance(self, test_client: TestClient, benchmark):
         """Benchmark audit log list endpoint."""
+
         def make_request():
             return test_client.get("/api/audit/logs?limit=50")
 
@@ -78,6 +82,7 @@ class TestOptimizationPerformance:
 
     def test_optimization_recommendations_performance(self, test_client: TestClient, benchmark):
         """Benchmark optimization recommendations endpoint."""
+
         def make_request():
             return test_client.get("/api/optimization/recommendations")
 
@@ -90,6 +95,7 @@ class TestOptimizationPerformance:
 
     def test_optimization_analysis_performance(self, test_client: TestClient, benchmark):
         """Benchmark optimization analysis endpoint."""
+
         def make_request():
             return test_client.post("/api/optimization/analyze")
 
@@ -113,8 +119,7 @@ class TestDeviceControlPerformance:
 
             def make_request():
                 return test_client.post(
-                    "/api/safety/validate",
-                    json={"device_id": device_id, "point_name": "cooling_setpoint", "value": 22}
+                    "/api/safety/validate", json={"device_id": device_id, "point_name": "cooling_setpoint", "value": 22}
                 )
 
             result = benchmark(make_request)
@@ -129,10 +134,7 @@ class TestDeviceControlPerformance:
             device_id = devices[0]["id"]
 
             def make_request():
-                return test_client.post(
-                    f"/api/devices/{device_id}/control",
-                    json={"point_name": "test", "value": 10}
-                )
+                return test_client.post(f"/api/devices/{device_id}/control", json={"point_name": "test", "value": 10})
 
             result = benchmark(make_request)
             # May be blocked, but should be fast
@@ -151,8 +153,7 @@ class TestSafetyValidationPerformance:
 
             def make_request():
                 return test_client.post(
-                    "/api/safety/validate",
-                    json={"device_id": device_id, "point_name": "cooling_setpoint", "value": 25}
+                    "/api/safety/validate", json={"device_id": device_id, "point_name": "cooling_setpoint", "value": 25}
                 )
 
             result = benchmark(make_request)
@@ -167,6 +168,7 @@ class TestDatabasePerformance:
 
     def test_repository_query_performance(self, test_client: TestClient, benchmark):
         """Benchmark repository query performance."""
+
         def make_request():
             return test_client.get("/api/devices")
 
@@ -182,10 +184,7 @@ class TestDatabasePerformance:
             device_id = devices[0]["id"]
 
             def make_request():
-                return test_client.post(
-                    f"/api/devices/{device_id}/control",
-                    json={"point_name": "test", "value": 10}
-                )
+                return test_client.post(f"/api/devices/{device_id}/control", json={"point_name": "test", "value": 10})
 
             result = benchmark(make_request)
             # Audit write should be fast
@@ -228,10 +227,7 @@ class TestConcurrentRequests:
         device_id = devices[0]["id"]
 
         def make_request():
-            return test_client.post(
-                f"/api/devices/{device_id}/control",
-                json={"point": "test", "value": 10}
-            )
+            return test_client.post(f"/api/devices/{device_id}/control", json={"point": "test", "value": 10})
 
         # Make 20 concurrent write requests
         start_time = time.time()
@@ -291,6 +287,7 @@ class TestCachingPerformance:
 
     def test_cache_miss_performance(self, test_client: TestClient, benchmark):
         """Benchmark cache misses."""
+
         # Clear cache by requesting different endpoint
         def make_request():
             return test_client.get("/api/devices")
@@ -343,8 +340,7 @@ class TestResponseTimeTargets:
             device_id = devices[0]["id"]
 
             response = test_client.post(
-                "/api/safety/validate",
-                json={"device_id": device_id, "point_name": "cooling_setpoint", "value": 22}
+                "/api/safety/validate", json={"device_id": device_id, "point_name": "cooling_setpoint", "value": 22}
             )
 
             # SLA: < 300ms for write operations (includes safety validation)

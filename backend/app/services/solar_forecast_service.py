@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SolarPosition:
     """Sun position at a specific time and location."""
+
     hour: int
     declination_deg: float
     hour_angle_deg: float
@@ -66,6 +67,7 @@ class SolarPosition:
 @dataclass
 class HourlyGeneration:
     """Forecast generation for a single hour."""
+
     hour: str  # ISO timestamp e.g. 2026-02-06T15:00
     generation_kw: float
     confidence_high_kw: float
@@ -87,6 +89,7 @@ class HourlyGeneration:
 @dataclass
 class DailyTotal:
     """Aggregated generation forecast for a full day."""
+
     date: str  # YYYY-MM-DD
     expected_kwh: float
     clear_sky_kwh: float
@@ -104,6 +107,7 @@ class DailyTotal:
 @dataclass
 class ForecastAccuracy:
     """Accuracy metrics for the forecast vs actual generation."""
+
     site_id: str
     period_days: int
     rmse_kw: float  # Root mean square error
@@ -127,6 +131,7 @@ class ForecastAccuracy:
 @dataclass
 class GenerationForecast:
     """Complete generation forecast response."""
+
     site_id: str
     generated_at: str  # ISO timestamp
     model: str  # persistence / clear_sky / historical / weighted_ensemble
@@ -177,10 +182,7 @@ class SolarGeometry:
         delta = math.radians(declination_deg)
         omega = math.radians(hour_angle_deg)
 
-        sin_alpha = (
-            math.sin(phi) * math.sin(delta)
-            + math.cos(phi) * math.cos(delta) * math.cos(omega)
-        )
+        sin_alpha = math.sin(phi) * math.sin(delta) + math.cos(phi) * math.cos(delta) * math.cos(omega)
         # Clamp to [-1, 1] for numerical safety
         sin_alpha = max(-1.0, min(1.0, sin_alpha))
         return math.degrees(math.asin(sin_alpha))
@@ -216,7 +218,7 @@ class SolarGeometry:
             return 0.0
         # Meinel model with JHB altitude correction
         altitude_factor = 1.06  # 1,753m elevation correction
-        ghi = 1353.0 * (0.7 ** (air_mass_val ** 0.678)) * altitude_factor
+        ghi = 1353.0 * (0.7 ** (air_mass_val**0.678)) * altitude_factor
         return min(ghi, 1100.0)  # Cap at reasonable maximum
 
     @classmethod
@@ -312,9 +314,7 @@ class SolarForecastService:
                     "tilt": config.get("plants", [{}])[0].get("tilt", 10),
                     "orientation": config.get("plants", [{}])[0].get("orientation", 0),
                 }
-                logger.info(
-                    "Loaded solar site %s (%.1f kWp) for forecast", site_id, total_capacity
-                )
+                logger.info("Loaded solar site %s (%.1f kWp) for forecast", site_id, total_capacity)
             except Exception as e:
                 logger.error("Failed to load solar config %s: %s", config_path, e)
 
@@ -474,14 +474,16 @@ class SolarForecastService:
             cloud_factor = (gen_kw / clear_sky_kw) if clear_sky_kw > 0 else 0.0
 
             hour_ts = forecast_dt.strftime("%Y-%m-%dT%H:%M")
-            hourly_entries.append(HourlyGeneration(
-                hour=hour_ts,
-                generation_kw=gen_kw,
-                confidence_high_kw=confidence_high,
-                confidence_low_kw=confidence_low,
-                clear_sky_kw=clear_sky_kw,
-                cloud_factor=cloud_factor,
-            ))
+            hourly_entries.append(
+                HourlyGeneration(
+                    hour=hour_ts,
+                    generation_kw=gen_kw,
+                    confidence_high_kw=confidence_high,
+                    confidence_low_kw=confidence_low,
+                    clear_sky_kw=clear_sky_kw,
+                    cloud_factor=cloud_factor,
+                )
+            )
 
             # Accumulate daily totals
             if date_str not in daily_kwh:
@@ -494,12 +496,14 @@ class SolarForecastService:
         for dt_str in sorted(daily_kwh.keys()):
             exp = daily_kwh[dt_str]["expected"]
             cs = daily_kwh[dt_str]["clear_sky"]
-            daily_totals.append(DailyTotal(
-                date=dt_str,
-                expected_kwh=exp,
-                clear_sky_kwh=cs,
-                cloud_factor=(exp / cs) if cs > 0 else 0.0,
-            ))
+            daily_totals.append(
+                DailyTotal(
+                    date=dt_str,
+                    expected_kwh=exp,
+                    clear_sky_kwh=cs,
+                    cloud_factor=(exp / cs) if cs > 0 else 0.0,
+                )
+            )
 
         # Get accuracy metrics
         accuracy = self.get_forecast_accuracy(site_id)
@@ -535,14 +539,16 @@ class SolarForecastService:
         for hour in range(24):
             cs_kw = self._get_clear_sky_generation(lat, lng, capacity, d, hour)
             hour_ts = datetime(d.year, d.month, d.day, hour, 0).strftime("%Y-%m-%dT%H:%M")
-            profile.append(HourlyGeneration(
-                hour=hour_ts,
-                generation_kw=cs_kw,
-                confidence_high_kw=cs_kw,
-                confidence_low_kw=cs_kw * 0.90,  # 10% uncertainty even for clear sky
-                clear_sky_kw=cs_kw,
-                cloud_factor=1.0,
-            ))
+            profile.append(
+                HourlyGeneration(
+                    hour=hour_ts,
+                    generation_kw=cs_kw,
+                    confidence_high_kw=cs_kw,
+                    confidence_low_kw=cs_kw * 0.90,  # 10% uncertainty even for clear sky
+                    clear_sky_kw=cs_kw,
+                    cloud_factor=1.0,
+                )
+            )
         return profile
 
     def calculate_solar_geometry(
@@ -629,16 +635,10 @@ class SolarForecastService:
         capacity = config["capacity_kwp"]
 
         # Calculate clear-sky total
-        clear_sky_total = sum(
-            self._get_clear_sky_generation(lat, lng, capacity, d, h)
-            for h in range(24)
-        )
+        clear_sky_total = sum(self._get_clear_sky_generation(lat, lng, capacity, d, h) for h in range(24))
 
         # Get ensemble forecast total
-        forecast_total = sum(
-            self._ensemble_forecast(site_id, lat, lng, capacity, d, h)
-            for h in range(24)
-        )
+        forecast_total = sum(self._ensemble_forecast(site_id, lat, lng, capacity, d, h) for h in range(24))
 
         if clear_sky_total <= 0:
             return False
@@ -665,11 +665,7 @@ class SolarForecastService:
         effective_irradiance = pos.ghi_wm2 * 1.05
 
         return (
-            capacity_kwp
-            * (effective_irradiance / 1000.0)
-            * self.TEMP_DERATE
-            * self.SOILING_FACTOR
-            * self.SYSTEM_LOSSES
+            capacity_kwp * (effective_irradiance / 1000.0) * self.TEMP_DERATE * self.SOILING_FACTOR * self.SYSTEM_LOSSES
         )
 
     def _persistence_forecast(self, site_id: str, hour: int) -> float:
@@ -725,8 +721,7 @@ class SolarForecastService:
 
         # Temperature estimate (seasonal — JHB)
         month = forecast_date.month
-        seasonal_temps = {1: 25, 2: 24, 3: 22, 4: 19, 5: 16, 6: 13,
-                         7: 13, 8: 16, 9: 19, 10: 21, 11: 23, 12: 25}
+        seasonal_temps = {1: 25, 2: 24, 3: 22, 4: 19, 5: 16, 6: 13, 7: 13, 8: 16, 9: 19, 10: 21, 11: 23, 12: 25}
         temp = seasonal_temps.get(month, 20)
 
         # Yesterday generation (from persistence cache)
@@ -783,9 +778,7 @@ class SolarForecastService:
             except Exception as e:
                 logger.error("Failed to train ML model for %s: %s", site_id, e)
 
-    def _train_site_model(
-        self, site_id: str, config: Dict
-    ) -> Optional["_GradientBoostingModel"]:
+    def _train_site_model(self, site_id: str, config: Dict) -> Optional["_GradientBoostingModel"]:
         """Train ML model for a single site on 90 days of synthetic data.
 
         Features: hour_of_day, day_of_year, cloud_cover, temperature, yesterday_gen
@@ -808,8 +801,7 @@ class SolarForecastService:
 
             # Seasonal temperature
             month = d.month
-            seasonal_temps = {1: 25, 2: 24, 3: 22, 4: 19, 5: 16, 6: 13,
-                              7: 13, 8: 16, 9: 19, 10: 21, 11: 23, 12: 25}
+            seasonal_temps = {1: 25, 2: 24, 3: 22, 4: 19, 5: 16, 6: 13, 7: 13, 8: 16, 9: 19, 10: 21, 11: 23, 12: 25}
             temp = seasonal_temps.get(month, 20)
 
             # Yesterday's profile for feature
@@ -850,7 +842,10 @@ class SolarForecastService:
         }
         logger.info(
             "ML model for %s: RMSE=%.1f kW (%.1f%% of capacity), MAE=%.1f kW",
-            site_id, rmse, self._ml_accuracy[site_id]["rmse_pct_of_capacity"], mae,
+            site_id,
+            rmse,
+            self._ml_accuracy[site_id]["rmse_pct_of_capacity"],
+            mae,
         )
 
         return model
@@ -869,9 +864,7 @@ class SolarForecastService:
             return True
         return False
 
-    def get_ml_forecast(
-        self, site_id: str, hours_ahead: int = 24
-    ) -> List[HourlyGeneration]:
+    def get_ml_forecast(self, site_id: str, hours_ahead: int = 24) -> List[HourlyGeneration]:
         """Get ML-only forecast for a site.
 
         Returns hourly generation predictions using only the gradient boosting model.
@@ -898,14 +891,16 @@ class SolarForecastService:
             uncertainty_pct = min(0.30, 0.05 + offset * 0.005)
             hour_ts = forecast_dt.strftime("%Y-%m-%dT%H:%M")
 
-            result.append(HourlyGeneration(
-                hour=hour_ts,
-                generation_kw=gen_kw,
-                confidence_high_kw=gen_kw * (1.0 + uncertainty_pct),
-                confidence_low_kw=max(0.0, gen_kw * (1.0 - uncertainty_pct)),
-                clear_sky_kw=cs_kw,
-                cloud_factor=(gen_kw / cs_kw) if cs_kw > 0 else 0.0,
-            ))
+            result.append(
+                HourlyGeneration(
+                    hour=hour_ts,
+                    generation_kw=gen_kw,
+                    confidence_high_kw=gen_kw * (1.0 + uncertainty_pct),
+                    confidence_low_kw=max(0.0, gen_kw * (1.0 - uncertainty_pct)),
+                    clear_sky_kw=cs_kw,
+                    cloud_factor=(gen_kw / cs_kw) if cs_kw > 0 else 0.0,
+                )
+            )
 
         return result
 
@@ -1012,9 +1007,8 @@ class _GradientBoostingModel:
                 right_mean = sum(right_residuals) / len(right_residuals)
 
                 # MSE reduction
-                mse = (
-                    sum((r - left_mean) ** 2 for r in left_residuals)
-                    + sum((r - right_mean) ** 2 for r in right_residuals)
+                mse = sum((r - left_mean) ** 2 for r in left_residuals) + sum(
+                    (r - right_mean) ** 2 for r in right_residuals
                 )
 
                 if mse < best_mse:

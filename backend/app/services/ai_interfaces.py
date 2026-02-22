@@ -24,6 +24,7 @@ from typing import Dict, Any, List, Optional
 
 # Document the expected contracts (for documentation purposes)
 
+
 async def execute_tool(
     tool_name: str,
     tool_input: Dict[str, Any],
@@ -45,6 +46,7 @@ async def execute_tool(
     """
     # Runtime import to prevent circular dependency
     from app.services.chat_tools import execute_tool as _execute_tool
+
     return await _execute_tool(
         tool_name,
         tool_input,
@@ -69,6 +71,7 @@ def get_chat_tools(
     """
     # Runtime import to prevent circular dependency
     from app.services.chat_tools import get_chat_tools as _get_chat_tools
+
     return _get_chat_tools(site_id, user_email=user_email, user_role=user_role)
 
 

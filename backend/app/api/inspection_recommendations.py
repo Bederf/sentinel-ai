@@ -18,11 +18,13 @@ router = APIRouter(prefix="/api/inspections", tags=["inspections"])
 
 class GetRecommendationRequest(BaseModel):
     """Request to get recommendation for inspection work order."""
+
     work_order_id: str
 
 
 class CreateRepairWorkOrderRequest(BaseModel):
     """Request to create repair work order from inspection recommendation."""
+
     work_order_id: str
     equipment_code: str
     recommendation_reason: str
@@ -31,10 +33,7 @@ class CreateRepairWorkOrderRequest(BaseModel):
 
 
 @router.get("/{work_order_id}/recommendation")
-async def get_inspection_recommendation(
-    request: Request,
-    work_order_id: str
-) -> dict:
+async def get_inspection_recommendation(request: Request, work_order_id: str) -> dict:
     """
     Get recommendation after inspection work order is completed.
 
@@ -52,9 +51,12 @@ async def get_inspection_recommendation(
     client = get_supabase_client()
 
     # Fetch work order
-    wo_result = client.table("work_orders").select(
-        "id, equipment_id, status, notes, created_at"
-    ).eq("id", work_order_id).execute()
+    wo_result = (
+        client.table("work_orders")
+        .select("id, equipment_id, status, notes, created_at")
+        .eq("id", work_order_id)
+        .execute()
+    )
 
     if not wo_result.data:
         raise HTTPException(status_code=404, detail=f"Work order {work_order_id} not found")
@@ -66,9 +68,12 @@ async def get_inspection_recommendation(
         logger.warning(f"Work order {work_order_id} is not an inspection WO")
 
     # Fetch equipment for context
-    equipment = client.table("equipment").select(
-        "id, code, name, health_score, status"
-    ).eq("id", work_order["equipment_id"]).execute()
+    equipment = (
+        client.table("equipment")
+        .select("id, code, name, health_score, status")
+        .eq("id", work_order["equipment_id"])
+        .execute()
+    )
 
     if not equipment.data:
         raise HTTPException(status_code=404, detail="Equipment not found")
@@ -81,9 +86,7 @@ async def get_inspection_recommendation(
     # Analyze inspection
     analyzer = get_inspection_analyzer()
     analysis = analyzer.analyze_inspection_completion(
-        findings=findings,
-        equipment_code=eq["code"],
-        health_after=eq.get("health_score", 70)
+        findings=findings, equipment_code=eq["code"], health_after=eq.get("health_score", 70)
     )
 
     return {
@@ -91,15 +94,13 @@ async def get_inspection_recommendation(
         "equipment_code": eq["code"],
         "equipment_name": eq.get("name"),
         "current_health": eq.get("health_score"),
-        "recommendation": analysis.to_dict()
+        "recommendation": analysis.to_dict(),
     }
 
 
 @router.post("/{work_order_id}/create-repair-wo")
 async def create_repair_work_order_from_inspection(
-    request: Request,
-    work_order_id: str,
-    body: CreateRepairWorkOrderRequest
+    request: Request, work_order_id: str, body: CreateRepairWorkOrderRequest
 ) -> dict:
     """
     Create a repair/maintenance work order based on inspection recommendation.
@@ -125,17 +126,15 @@ async def create_repair_work_order_from_inspection(
     client = get_supabase_client()
 
     # Fetch original inspection WO for reference
-    inspection_wo = client.table("work_orders").select("id").eq(
-        "id", work_order_id
-    ).execute()
+    inspection_wo = client.table("work_orders").select("id").eq("id", work_order_id).execute()
 
     if not inspection_wo.data:
         raise HTTPException(status_code=404, detail="Inspection WO not found")
 
     # Get equipment
-    equipment = client.table("equipment").select(
-        "id, code, name, building_id"
-    ).eq("code", body.equipment_code).execute()
+    equipment = (
+        client.table("equipment").select("id, code, name, building_id").eq("code", body.equipment_code).execute()
+    )
 
     if not equipment.data:
         raise HTTPException(status_code=404, detail="Equipment not found")
@@ -145,6 +144,7 @@ async def create_repair_work_order_from_inspection(
     # Get technician for this equipment
     try:
         from app.database.repositories.technician_repository import TechnicianRepository
+
         tech_repo = TechnicianRepository()
         technician = tech_repo.get_technician_for_equipment_code(body.equipment_code)
         assigned_to = technician.get("id") if technician else None
@@ -169,7 +169,7 @@ async def create_repair_work_order_from_inspection(
         "assigned_to": assigned_to,
         "created_by": "inspection_analyzer",
         "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat()
+        "updated_at": datetime.utcnow().isoformat(),
     }
 
     # Insert repair work order
@@ -184,15 +184,18 @@ async def create_repair_work_order_from_inspection(
     try:
         from app.services.event_emitter import get_event_emitter
         import asyncio
+
         emitter = get_event_emitter()
-        asyncio.create_task(emitter.emit_work_order_updated(
-            work_order_id=repair_wo_id,
-            equipment_id=eq["id"],
-            equipment_code=body.equipment_code,
-            status="assigned",
-            work_order_type="maintenance",
-            priority=body.priority
-        ))
+        asyncio.create_task(
+            emitter.emit_work_order_updated(
+                work_order_id=repair_wo_id,
+                equipment_id=eq["id"],
+                equipment_code=body.equipment_code,
+                status="assigned",
+                work_order_type="maintenance",
+                priority=body.priority,
+            )
+        )
     except Exception as e:
         logger.warning(f"Failed to emit work order event: {e}")
 
@@ -203,5 +206,5 @@ async def create_repair_work_order_from_inspection(
         "status": "assigned",
         "priority": body.priority,
         "parts_needed": body.parts_needed,
-        "message": "Repair work order created from inspection findings"
+        "message": "Repair work order created from inspection findings",
     }

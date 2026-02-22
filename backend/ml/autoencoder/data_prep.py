@@ -25,7 +25,7 @@ class AutoencoderDataPrep:
     def __init__(
         self,
         window_size: int = 24,  # 24 hours
-        overlap: float = 0.5  # 50% window overlap
+        overlap: float = 0.5,  # 50% window overlap
     ):
         """
         Initialize data preparation.
@@ -40,11 +40,7 @@ class AutoencoderDataPrep:
         self.scaler = StandardScaler()
         self._scaler_fitted = False
 
-    def create_windows(
-        self,
-        data: np.ndarray,
-        exclude_periods: List[Tuple[int, int]] = None
-    ) -> np.ndarray:
+    def create_windows(self, data: np.ndarray, exclude_periods: List[Tuple[int, int]] = None) -> np.ndarray:
         """
         Create sliding windows from time-series data.
 
@@ -71,7 +67,7 @@ class AutoencoderDataPrep:
                     break
 
             if not excluded:
-                window = data[i:i + self.window_size]
+                window = data[i : i + self.window_size]
                 windows.append(window)
 
             i += self.step_size
@@ -85,7 +81,7 @@ class AutoencoderDataPrep:
         timestamp_col: str = "timestamp",
         failure_dates: List[datetime] = None,
         exclude_days_before: int = 7,
-        exclude_days_after: int = 3
+        exclude_days_after: int = 3,
     ) -> np.ndarray:
         """
         Prepare training data from normal operation periods only.
@@ -166,20 +162,18 @@ class AutoencoderDataPrep:
     def save_scaler(self, path: str):
         """Save scaler for inference."""
         import joblib
+
         joblib.dump(self.scaler, path)
 
     def load_scaler(self, path: str):
         """Load scaler from disk."""
         import joblib
+
         self.scaler = joblib.load(path)
         self._scaler_fitted = True
 
     def generate_demo_data(
-        self,
-        n_hours: int = 2000,
-        n_features: int = 5,
-        n_anomalies: int = 5,
-        anomaly_magnitude: float = 3.0
+        self, n_hours: int = 2000, n_features: int = 5, n_anomalies: int = 5, anomaly_magnitude: float = 3.0
     ) -> Tuple[np.ndarray, np.ndarray, List[int]]:
         """
         Generate synthetic demo data with known anomalies.
@@ -210,11 +204,7 @@ class AutoencoderDataPrep:
             data[:, i] = base + daily + trend + noise
 
         # Inject anomalies at random positions
-        anomaly_starts = np.random.choice(
-            range(100, n_hours - 100),
-            size=n_anomalies,
-            replace=False
-        )
+        anomaly_starts = np.random.choice(range(100, n_hours - 100), size=n_anomalies, replace=False)
 
         anomaly_windows = []
         for start in anomaly_starts:
@@ -226,9 +216,9 @@ class AutoencoderDataPrep:
             anomaly_type = np.random.choice(["shift_up", "shift_down", "spike"])
 
             if anomaly_type == "shift_up":
-                data[start:start + duration, feature] += anomaly_magnitude * 5
+                data[start : start + duration, feature] += anomaly_magnitude * 5
             elif anomaly_type == "shift_down":
-                data[start:start + duration, feature] -= anomaly_magnitude * 5
+                data[start : start + duration, feature] -= anomaly_magnitude * 5
             else:  # spike
                 data[start, feature] += anomaly_magnitude * 10
 
@@ -266,63 +256,32 @@ AUTOENCODER_SENSOR_CONFIGS: Dict[str, Dict[str, Any]] = {
             "chw_return_temp",
             "suction_pressure",
             "discharge_pressure",
-            "compressor_current"
+            "compressor_current",
         ],
-        "description": "Chiller operating pattern anomaly detection"
+        "description": "Chiller operating pattern anomaly detection",
     },
     "ahu": {
-        "features": [
-            "supply_temp",
-            "return_temp",
-            "filter_dp",
-            "fan_current",
-            "mixed_air_temp"
-        ],
-        "description": "AHU operating pattern anomaly detection"
+        "features": ["supply_temp", "return_temp", "filter_dp", "fan_current", "mixed_air_temp"],
+        "description": "AHU operating pattern anomaly detection",
     },
     "generator": {
-        "features": [
-            "battery_voltage",
-            "oil_pressure",
-            "coolant_temp",
-            "rpm",
-            "load_pct"
-        ],
-        "description": "Generator operating pattern anomaly detection"
+        "features": ["battery_voltage", "oil_pressure", "coolant_temp", "rpm", "load_pct"],
+        "description": "Generator operating pattern anomaly detection",
     },
     "fcu": {
-        "features": [
-            "supply_temp",
-            "fan_current",
-            "valve_position"
-        ],
-        "description": "FCU operating pattern anomaly detection"
+        "features": ["supply_temp", "fan_current", "valve_position"],
+        "description": "FCU operating pattern anomaly detection",
     },
     "ups": {
-        "features": [
-            "battery_voltage",
-            "load_pct",
-            "temperature"
-        ],
-        "description": "UPS operating pattern anomaly detection"
+        "features": ["battery_voltage", "load_pct", "temperature"],
+        "description": "UPS operating pattern anomaly detection",
     },
     "vav": {
-        "features": [
-            "airflow",
-            "damper_position",
-            "zone_temp",
-            "supply_temp"
-        ],
-        "description": "VAV operating pattern anomaly detection"
+        "features": ["airflow", "damper_position", "zone_temp", "supply_temp"],
+        "description": "VAV operating pattern anomaly detection",
     },
     "pump": {
-        "features": [
-            "flow_rate",
-            "discharge_pressure",
-            "motor_current",
-            "vibration",
-            "temperature"
-        ],
-        "description": "Pump operating pattern anomaly detection"
-    }
+        "features": ["flow_rate", "discharge_pressure", "motor_current", "vibration", "temperature"],
+        "description": "Pump operating pattern anomaly detection",
+    },
 }

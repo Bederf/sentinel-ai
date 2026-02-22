@@ -39,9 +39,7 @@ class ErrorSanitizationMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             return response
         except HTTPException as http_exc:
-            return self._create_sanitized_response(
-                http_exc.status_code, http_exc.detail, request
-            )
+            return self._create_sanitized_response(http_exc.status_code, http_exc.detail, request)
         except Exception as exc:
             logger.error(
                 f"Unhandled exception in {request.url.path}: {type(exc).__name__}",
@@ -53,9 +51,7 @@ class ErrorSanitizationMiddleware(BaseHTTPMiddleware):
                 request,
             )
 
-    def _create_sanitized_response(
-        self, status_code: int, detail: str, request: Request
-    ) -> JSONResponse:
+    def _create_sanitized_response(self, status_code: int, detail: str, request: Request) -> JSONResponse:
         """Create a sanitized error response."""
         if not self.debug_mode:
             detail = self._sanitize_error_message(status_code, detail)
@@ -96,10 +92,7 @@ class ErrorSanitizationMiddleware(BaseHTTPMiddleware):
 
         # For auth errors, preserve some detail
         if status_code in [401, 403]:
-            if any(
-                keyword in detail.lower()
-                for keyword in ["token", "expired", "invalid", "required"]
-            ):
+            if any(keyword in detail.lower() for keyword in ["token", "expired", "invalid", "required"]):
                 return detail
 
         # For validation errors, provide limited detail
@@ -158,4 +151,5 @@ class SafeHTTPException(HTTPException):
     Use this when you want to return a specific error message
     that won't be sanitized by ErrorSanitizationMiddleware.
     """
+
     pass

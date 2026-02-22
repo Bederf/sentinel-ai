@@ -44,20 +44,15 @@ def test_hvac_formula_golden_output(monkeypatch):
         "generator": {
             "expected_life_years": 20,
             "service_interval_days": 90,
-            "weights": {
-                "age_factor": 0.2,
-                "service_compliance": 0.3,
-                "runtime_hours": 0.2,
-                "fault_history": 0.3
-            },
+            "weights": {"age_factor": 0.2, "service_compliance": 0.3, "runtime_hours": 0.2, "fault_history": 0.3},
             "thresholds": {
                 "runtime_hours_warning": 20000,
                 "runtime_hours_critical": 40000,
                 "age_warning_years": 15,
                 "age_critical_years": 18,
                 "service_overdue_days_warning": 30,
-                "service_overdue_days_critical": 90
-            }
+                "service_overdue_days_critical": 90,
+            },
         }
     }
     monkeypatch.setattr(hvac, "load_json", lambda _path: config)

@@ -48,7 +48,9 @@ class QueryHandler:
         classified = self.classifier.classify(query)
         logger.info(
             "Classified query: intent=%s confidence=%.2f equipment=%s",
-            classified.intent.value, classified.confidence, classified.equipment_ids
+            classified.intent.value,
+            classified.confidence,
+            classified.equipment_ids,
         )
 
         # Step 2: Gather context and build prompt
@@ -63,9 +65,7 @@ class QueryHandler:
         # Step 3: Generate response
         ollama_available = await self.ollama.is_available()
         if ollama_available:
-            response_text = await self.ollama.generate(
-                prompt, temperature=0.3
-            )
+            response_text = await self.ollama.generate(prompt, temperature=0.3)
             model_used = self.ollama.default_model
         else:
             response_text = self._generate_offline_response(classified, context)
@@ -82,16 +82,12 @@ class QueryHandler:
             "llm_available": ollama_available,
         }
 
-    async def _gather_context(
-        self, classified: ClassifiedQuery
-    ) -> Dict[str, Any]:
+    async def _gather_context(self, classified: ClassifiedQuery) -> Dict[str, Any]:
         """Gather relevant context based on intent and entities."""
         context: Dict[str, Any] = {}
 
         # Get equipment data if IDs are present
-        equipment_id = (
-            classified.equipment_ids[0] if classified.equipment_ids else None
-        )
+        equipment_id = classified.equipment_ids[0] if classified.equipment_ids else None
         if equipment_id:
             equipment = self.equipment_repo.get_by_id(equipment_id)
             if equipment:
@@ -113,19 +109,13 @@ class QueryHandler:
 
         # Intent-specific context gathering
         if classified.intent == Intent.WHY_PREDICTION:
-            context.update(
-                await self._get_prediction_context(equipment_id, classified)
-            )
+            context.update(await self._get_prediction_context(equipment_id, classified))
         elif classified.intent == Intent.MAINTENANCE_DUE:
-            context.update(
-                await self._get_maintenance_context(equipment_id, classified)
-            )
+            context.update(await self._get_maintenance_context(equipment_id, classified))
         elif classified.intent == Intent.COMPARE_EQUIPMENT:
             context.update(self._get_comparison_context(classified))
         elif classified.intent == Intent.EXPLAIN_ANOMALY:
-            context.update(
-                self._get_anomaly_context(equipment_id, classified)
-            )
+            context.update(self._get_anomaly_context(equipment_id, classified))
 
         return context
 
@@ -139,9 +129,7 @@ class QueryHandler:
         if not equipment_id:
             return ctx
 
-        equipment = ctx.get("equipment") or self.equipment_repo.get_by_id(
-            equipment_id
-        )
+        equipment = ctx.get("equipment") or self.equipment_repo.get_by_id(equipment_id)
         if equipment:
             ctx["prediction_data"] = (
                 f"Health Score: {equipment.get('health_score', 'N/A')}%\n"
@@ -162,15 +150,11 @@ class QueryHandler:
 
         equipment = self.equipment_repo.get_by_id(equipment_id)
         if equipment:
-            ctx["maintenance_history"] = equipment.get(
-                "last_maintenance", "No maintenance history available"
-            )
+            ctx["maintenance_history"] = equipment.get("last_maintenance", "No maintenance history available")
             ctx["rul_days"] = equipment.get("rul_days", "Unknown")
         return ctx
 
-    def _get_comparison_context(
-        self, classified: ClassifiedQuery
-    ) -> Dict[str, Any]:
+    def _get_comparison_context(self, classified: ClassifiedQuery) -> Dict[str, Any]:
         """Gather context for equipment comparison."""
         ctx: Dict[str, Any] = {}
         if len(classified.equipment_ids) >= 2:
@@ -194,27 +178,18 @@ class QueryHandler:
             ctx["anomaly_alerts"] = alerts or []
         return ctx
 
-    def _build_prompt(
-        self, classified: ClassifiedQuery, context: Dict[str, Any]
-    ) -> str:
+    def _build_prompt(self, classified: ClassifiedQuery, context: Dict[str, Any]) -> str:
         """Build the appropriate prompt template with context."""
-        template = INTENT_PROMPTS.get(
-            classified.intent.value, INTENT_PROMPTS["general_query"]
-        )
+        template = INTENT_PROMPTS.get(classified.intent.value, INTENT_PROMPTS["general_query"])
 
         equipment = context.get("equipment", {})
-        equipment_id = (
-            classified.equipment_ids[0] if classified.equipment_ids else "N/A"
-        )
+        equipment_id = classified.equipment_ids[0] if classified.equipment_ids else "N/A"
 
         # Common template variables
         variables = {
             "system": SYSTEM_PROMPT,
             "equipment_id": equipment_id,
-            "equipment_type": (
-                classified.equipment_type
-                or equipment.get("type", "unknown")
-            ),
+            "equipment_type": (classified.equipment_type or equipment.get("type", "unknown")),
             "health_score": equipment.get("health_score", "N/A"),
             "risk_level": equipment.get("risk_level", "unknown"),
             "status": equipment.get("status", "unknown"),
@@ -225,40 +200,20 @@ class QueryHandler:
 
         # Intent-specific variables
         if classified.intent == Intent.WHY_PREDICTION:
-            variables["prediction_data"] = context.get(
-                "prediction_data", "No prediction data available"
-            )
+            variables["prediction_data"] = context.get("prediction_data", "No prediction data available")
         elif classified.intent == Intent.MAINTENANCE_DUE:
-            variables["maintenance_history"] = context.get(
-                "maintenance_history", "No maintenance history"
-            )
+            variables["maintenance_history"] = context.get("maintenance_history", "No maintenance history")
             variables["rul_days"] = context.get("rul_days", "Unknown")
-            variables["last_service"] = equipment.get(
-                "last_maintenance", "Unknown"
-            )
-            variables["sensor_readings"] = self._format_sensor_readings(
-                equipment
-            )
+            variables["last_service"] = equipment.get("last_maintenance", "Unknown")
+            variables["sensor_readings"] = self._format_sensor_readings(equipment)
         elif classified.intent == Intent.EXPLAIN_ANOMALY:
-            variables["anomaly_data"] = self._format_alerts(
-                context.get("anomaly_alerts", [])
-            )
-            variables["sensor_readings"] = self._format_sensor_readings(
-                equipment
-            )
+            variables["anomaly_data"] = self._format_alerts(context.get("anomaly_alerts", []))
+            variables["sensor_readings"] = self._format_sensor_readings(equipment)
         elif classified.intent == Intent.COMPARE_EQUIPMENT:
             eq_a = context.get("equipment_a", {})
             eq_b = context.get("equipment_b", {})
-            variables["equipment_a_id"] = (
-                classified.equipment_ids[0]
-                if len(classified.equipment_ids) > 0
-                else "N/A"
-            )
-            variables["equipment_b_id"] = (
-                classified.equipment_ids[1]
-                if len(classified.equipment_ids) > 1
-                else "N/A"
-            )
+            variables["equipment_a_id"] = classified.equipment_ids[0] if len(classified.equipment_ids) > 0 else "N/A"
+            variables["equipment_b_id"] = classified.equipment_ids[1] if len(classified.equipment_ids) > 1 else "N/A"
             variables["equipment_a_type"] = eq_a.get("type", "unknown")
             variables["equipment_b_type"] = eq_b.get("type", "unknown")
             variables["equipment_a_health"] = eq_a.get("health_score", "N/A")
@@ -271,12 +226,8 @@ class QueryHandler:
             variables["time_range"] = classified.time_range or "7d"
             variables["trend_data"] = "Trend data not yet available via local query"
         elif classified.intent == Intent.EQUIPMENT_STATUS:
-            variables["sensor_readings"] = self._format_sensor_readings(
-                equipment
-            )
-            variables["recent_alerts"] = self._format_alerts(
-                context.get("alerts", [])
-            )
+            variables["sensor_readings"] = self._format_sensor_readings(equipment)
+            variables["recent_alerts"] = self._format_alerts(context.get("alerts", []))
 
         try:
             return template.format(**variables)
@@ -293,14 +244,10 @@ class QueryHandler:
             f"equipment to the best of your ability."
         )
 
-    def _generate_offline_response(
-        self, classified: ClassifiedQuery, context: Dict[str, Any]
-    ) -> str:
+    def _generate_offline_response(self, classified: ClassifiedQuery, context: Dict[str, Any]) -> str:
         """Generate a response when Ollama is not available."""
         equipment = context.get("equipment", {})
-        equipment_id = (
-            classified.equipment_ids[0] if classified.equipment_ids else None
-        )
+        equipment_id = classified.equipment_ids[0] if classified.equipment_ids else None
 
         parts = []
         if classified.intent == Intent.EQUIPMENT_STATUS and equipment:
@@ -311,9 +258,7 @@ class QueryHandler:
             )
             alerts = context.get("alerts", [])
             if alerts:
-                parts.append(
-                    f"\n{len(alerts)} active alert(s) for this equipment."
-                )
+                parts.append(f"\n{len(alerts)} active alert(s) for this equipment.")
         elif classified.intent == Intent.MAINTENANCE_DUE and equipment:
             rul = context.get("rul_days", "Unknown")
             parts.append(

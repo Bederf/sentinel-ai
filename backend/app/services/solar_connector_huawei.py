@@ -4,7 +4,7 @@ Supports:
   - Modbus TCP register reads (holding registers)
   - Simulated data for demo (bell-curve solar, TOU BESS dispatch)
 
-Register maps sourced from Huawei SUN2000-330KTL-H2 Modbus Interface Definition.
+Register maps sourced from Huawei SUN2000-100KTL-M2 Modbus Interface Definition.
 """
 
 import logging
@@ -154,7 +154,7 @@ class SimulatedHuaweiConnector(SolarConnector):
         sast_hour = (now.hour + 2) % 24 + now.minute / 60.0
         solar_factor = _solar_power_factor(sast_hour)
 
-        rated_kva = cfg.get("rated_kva", 330)
+        rated_kva = cfg.get("rated_kva", 100)
         # Add per-inverter variance (+-3%)
         inv_variance = 1.0 + random.uniform(-0.03, 0.03)
 
@@ -177,10 +177,10 @@ class SimulatedHuaweiConnector(SolarConnector):
             site_id=cfg.get("site_id", ""),
             name=cfg.get("name", inverter_id),
             manufacturer="Huawei",
-            model=cfg.get("model", "SUN2000-330KTL-H2"),
+            model=cfg.get("model", "SUN2000-100KTL-M2"),
             serial=cfg.get("serial", f"HW{inverter_id[-3:]}SIM"),
             rated_power_kva=rated_kva,
-            mppt_count=cfg.get("mppt_count", 12),
+            mppt_count=cfg.get("mppt_count", 10),
             firmware_version="V200R001C00SPC136",
             protocol="modbus_tcp",
             ip_address=cfg.get("ip", "10.1.1.101"),
@@ -217,7 +217,7 @@ class SimulatedHuaweiConnector(SolarConnector):
         sast_hour = (now.hour + 2) % 24 + now.minute / 60.0
         solar_factor = _solar_power_factor(sast_hour)
 
-        mppt_count = cfg.get("mppt_count", 12)
+        mppt_count = cfg.get("mppt_count", 10)
         strings_per_mppt = cfg.get("strings_per_mppt", 4)
         panel_rating_w = cfg.get("panel_rating_w", 615)
 
@@ -264,8 +264,8 @@ class SimulatedHuaweiConnector(SolarConnector):
         mode = _bess_mode_for_hour(sast_hour)
 
         cfg = self._bess_config
-        rated_kw = cfg.get("rated_power_kw", 250)
-        capacity_kwh = cfg.get("capacity_kwh", 500)
+        rated_kw = cfg.get("rated_power_kw", 100)
+        capacity_kwh = cfg.get("capacity_kwh", 200)
 
         # SOC follows TOU pattern
         if mode == "discharging":
@@ -290,7 +290,7 @@ class SimulatedHuaweiConnector(SolarConnector):
             model=cfg.get("model", "LUNA2000-200KWH-2H1"),
             capacity_kwh=capacity_kwh,
             rated_power_kw=rated_kw,
-            rack_count=cfg.get("rack_count", 6),
+            rack_count=cfg.get("rack_count", 2),
             cell_chemistry="LFP",
             protocol="modbus_tcp",
             soc_pct=round(soc, 1),
@@ -321,12 +321,12 @@ class SimulatedHuaweiConnector(SolarConnector):
         # Building base load ~800 kW
         building_load = 800 + random.uniform(-50, 50)
         # Total solar generation estimate
-        total_pv_kw = 3300 * solar_factor * 0.95
+        total_pv_kw = 297 * solar_factor * 0.95
         # BESS contribution
         bess_kw = 0
         mode = _bess_mode_for_hour(sast_hour)
         if mode == "discharging":
-            bess_kw = 250 * random.uniform(0.6, 0.85)
+            bess_kw = 100 * random.uniform(0.6, 0.85)
 
         net_grid = building_load - total_pv_kw - bess_kw
         import_kw = max(0, net_grid)

@@ -32,7 +32,7 @@ class PhyphoxAnalyzer:
         image_data: bytes,
         measurement_type: str,  # "vibration" or "audio"
         equipment_id: str,
-        media_type: str = "image/jpeg"
+        media_type: str = "image/jpeg",
     ) -> Dict[str, Any]:
         """
         Extract spectrum data from phyphox screenshot.
@@ -54,20 +54,18 @@ class PhyphoxAnalyzer:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=1024,
-                messages=[{
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": base64_image
-                            }
-                        },
-                        {"type": "text", "text": prompt}
-                    ]
-                }]
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {"type": "base64", "media_type": media_type, "data": base64_image},
+                            },
+                            {"type": "text", "text": prompt},
+                        ],
+                    }
+                ],
             )
 
             # Parse structured response
@@ -75,12 +73,7 @@ class PhyphoxAnalyzer:
 
         except Exception as e:
             logger.error(f"phyphox screenshot analysis failed: {e}")
-            return {
-                'measurement_type': measurement_type,
-                'source': 'screenshot',
-                'error': str(e),
-                'confidence': 0.0
-            }
+            return {"measurement_type": measurement_type, "source": "screenshot", "error": str(e), "confidence": 0.0}
 
     def _get_extraction_prompt(self, measurement_type: str) -> str:
         """Get Vision API prompt for data extraction."""
@@ -124,21 +117,21 @@ Only return valid JSON, no other text."""
         """Parse Vision API response to structured data."""
         try:
             # Extract JSON from response
-            json_start = response_text.find('{')
-            json_end = response_text.rfind('}') + 1
+            json_start = response_text.find("{")
+            json_end = response_text.rfind("}") + 1
             if json_start >= 0 and json_end > json_start:
                 data = json.loads(response_text[json_start:json_end])
-                data['source'] = 'screenshot'
+                data["source"] = "screenshot"
                 return data
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse JSON from Vision response: {e}")
 
         return {
-            'measurement_type': measurement_type,
-            'source': 'screenshot',
-            'error': 'Failed to parse spectrum data',
-            'raw_response': response_text[:500],
-            'confidence': 0.0
+            "measurement_type": measurement_type,
+            "source": "screenshot",
+            "error": "Failed to parse spectrum data",
+            "raw_response": response_text[:500],
+            "confidence": 0.0,
         }
 
 

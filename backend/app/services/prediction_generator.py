@@ -89,7 +89,9 @@ class PredictionGeneratorService:
                     # Store prediction
                     self.prediction_repo.create(prediction)
                     results["generated"] += 1
-                    logger.info(f"Generated prediction for {equipment.get('name')} (health: {equipment.get('health_score')}%)")
+                    logger.info(
+                        f"Generated prediction for {equipment.get('name')} (health: {equipment.get('health_score')}%)"
+                    )
 
                 except Exception as e:
                     error_msg = f"Error generating prediction for {equipment.get('id')}: {str(e)}"
@@ -124,9 +126,12 @@ class PredictionGeneratorService:
             List of equipment records with health below threshold
         """
         try:
-            response = self.supabase.table("equipment").select(
-                "*, building:buildings(id, name, code)"
-            ).lt("health_score", threshold).execute()
+            response = (
+                self.supabase.table("equipment")
+                .select("*, building:buildings(id, name, code)")
+                .lt("health_score", threshold)
+                .execute()
+            )
 
             return response.data or []
 
@@ -253,9 +258,7 @@ class PredictionGeneratorService:
             },
         }
 
-    def _calculate_financial_impact(
-        self, equipment_type: str, severity: str
-    ) -> Dict[str, int]:
+    def _calculate_financial_impact(self, equipment_type: str, severity: str) -> Dict[str, int]:
         """Calculate estimated financial impact."""
         # Base costs by equipment type (ZAR)
         base_costs = {
@@ -307,11 +310,13 @@ class PredictionGeneratorService:
 
         # Health score factor
         if health_score < 70:
-            factors.append({
-                "factor": "Low Health Score",
-                "weight": 0.4,
-                "description": f"Equipment health at {health_score}%, below acceptable threshold",
-            })
+            factors.append(
+                {
+                    "factor": "Low Health Score",
+                    "weight": 0.4,
+                    "description": f"Equipment health at {health_score}%, below acceptable threshold",
+                }
+            )
 
         # Age factor (if available)
         install_date = equipment.get("install_date")
@@ -319,36 +324,40 @@ class PredictionGeneratorService:
             try:
                 age_years = (datetime.now() - datetime.fromisoformat(install_date.replace("Z", "+00:00"))).days / 365
                 if age_years > 10:
-                    factors.append({
-                        "factor": "Equipment Age",
-                        "weight": 0.3,
-                        "description": f"Equipment is {age_years:.1f} years old",
-                    })
+                    factors.append(
+                        {
+                            "factor": "Equipment Age",
+                            "weight": 0.3,
+                            "description": f"Equipment is {age_years:.1f} years old",
+                        }
+                    )
             except Exception:
                 pass
 
         # Runtime factor (if available)
         runtime = equipment.get("runtime_hours", 0)
         if runtime > 20000:
-            factors.append({
-                "factor": "High Runtime",
-                "weight": 0.2,
-                "description": f"Equipment has {runtime:,} operating hours",
-            })
+            factors.append(
+                {
+                    "factor": "High Runtime",
+                    "weight": 0.2,
+                    "description": f"Equipment has {runtime:,} operating hours",
+                }
+            )
 
         # Default factor if none found
         if not factors:
-            factors.append({
-                "factor": "Health Monitoring",
-                "weight": 0.5,
-                "description": "Detected through automated health monitoring",
-            })
+            factors.append(
+                {
+                    "factor": "Health Monitoring",
+                    "weight": 0.5,
+                    "description": "Detected through automated health monitoring",
+                }
+            )
 
         return factors
 
-    def _get_recommended_action(
-        self, equipment_type: str, severity: str, prediction_type: str
-    ) -> str:
+    def _get_recommended_action(self, equipment_type: str, severity: str, prediction_type: str) -> str:
         """Generate recommended action based on prediction."""
         actions = {
             "compressor_failure": "Schedule compressor inspection and vibration analysis",
@@ -391,9 +400,13 @@ class PredictionGeneratorService:
                 return 0
 
             # Check which have improved
-            response = self.supabase.table("equipment").select("id, health_score").in_(
-                "id", active_ids
-            ).gte("health_score", threshold).execute()
+            response = (
+                self.supabase.table("equipment")
+                .select("id, health_score")
+                .in_("id", active_ids)
+                .gte("health_score", threshold)
+                .execute()
+            )
 
             improved_equipment = response.data or []
 

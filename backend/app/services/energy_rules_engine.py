@@ -15,10 +15,7 @@ Rules:
 
 from datetime import date
 from typing import Optional, List
-from app.models.energy_rules import (
-    BuildingState, RuleResult, RulesEngineOutput, SystemBreakdown,
-    LearningCurvePhase
-)
+from app.models.energy_rules import BuildingState, RuleResult, RulesEngineOutput, SystemBreakdown, LearningCurvePhase
 
 # ==================== RULE THRESHOLDS (Tunable) ====================
 
@@ -64,7 +61,7 @@ SYSTEM_ALLOCATION = {
 DEFAULT_DEPLOYMENT_DATE = date(2025, 1, 1)
 
 # Global singleton instance
-_energy_rules_engine: Optional['EnergyRulesEngine'] = None
+_energy_rules_engine: Optional["EnergyRulesEngine"] = None
 
 
 class EnergyRulesEngine:
@@ -90,6 +87,7 @@ class EnergyRulesEngine:
         if deployment_date is None:
             try:
                 from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
+
                 orchestrator = get_lifecycle_orchestrator()
                 if orchestrator.simulation_start_time:
                     deployment_date = orchestrator.simulation_start_time.date()
@@ -103,10 +101,7 @@ class EnergyRulesEngine:
         self.deployment_date = deployment_date
 
     def evaluate_rules(
-        self,
-        building_state: BuildingState,
-        active_modules: List[str],
-        baseline_kwh: float
+        self, building_state: BuildingState, active_modules: List[str], baseline_kwh: float
     ) -> RulesEngineOutput:
         """Evaluate all 5 rules and calculate total savings.
 
@@ -151,7 +146,7 @@ class EnergyRulesEngine:
             rules_applied=rule_results,
             confidence=round(confidence, 3),
             method="rules_based",
-            learning_phase=learning_phase
+            learning_phase=learning_phase,
         )
 
     # ==================== RULE IMPLEMENTATIONS ====================
@@ -169,7 +164,7 @@ class EnergyRulesEngine:
                 savings_percent=0.0,
                 active=False,
                 reason=f"Chiller load {state.chiller_load_percent}% is below threshold {CHILLER_STAGING_THRESHOLD}%",
-                conditions_met={"chiller_load_high": False}
+                conditions_met={"chiller_load_high": False},
             )
 
         # Scale linearly from 60% → 0%, 100% → 5%
@@ -183,7 +178,7 @@ class EnergyRulesEngine:
             savings_percent=round(savings, 2),
             active=True,
             reason=f"Chiller load {state.chiller_load_percent}% triggers optimization",
-            conditions_met={"chiller_load_high": True}
+            conditions_met={"chiller_load_high": True},
         )
 
     def _evaluate_rule_2_thermal_precooling(self, state: BuildingState) -> RuleResult:
@@ -194,7 +189,7 @@ class EnergyRulesEngine:
         """
         conditions_met = {
             "off_peak": state.tariff_band == "off_peak",
-            "high_temp": state.ambient_temp_c > PRECOOLING_TEMP_THRESHOLD
+            "high_temp": state.ambient_temp_c > PRECOOLING_TEMP_THRESHOLD,
         }
 
         if not all(conditions_met.values()):
@@ -210,7 +205,7 @@ class EnergyRulesEngine:
                 savings_percent=0.0,
                 active=False,
                 reason=reason.strip("; "),
-                conditions_met=conditions_met
+                conditions_met=conditions_met,
             )
 
         # Scale linearly from 20°C → 0%, 35°C → 3%
@@ -224,7 +219,7 @@ class EnergyRulesEngine:
             savings_percent=round(savings, 2),
             active=True,
             reason=f"Off-peak + temp {state.ambient_temp_c}°C triggers pre-cooling",
-            conditions_met=conditions_met
+            conditions_met=conditions_met,
         )
 
     def _evaluate_rule_3_occupancy_hvac(self, state: BuildingState) -> RuleResult:
@@ -241,7 +236,7 @@ class EnergyRulesEngine:
                 savings_percent=0.0,
                 active=False,
                 reason=f"Occupancy {state.occupancy_percent}% above threshold {OCCUPANCY_HVAC_THRESHOLD}%",
-                conditions_met=conditions_met
+                conditions_met=conditions_met,
             )
 
         # Scale inversely: 30% → 0%, 0% → 2%
@@ -253,14 +248,10 @@ class EnergyRulesEngine:
             savings_percent=round(savings, 2),
             active=True,
             reason=f"Low occupancy {state.occupancy_percent}% triggers HVAC reduction",
-            conditions_met=conditions_met
+            conditions_met=conditions_met,
         )
 
-    def _evaluate_rule_4_daylight_harvesting(
-        self,
-        state: BuildingState,
-        active_modules: List[str]
-    ) -> RuleResult:
+    def _evaluate_rule_4_daylight_harvesting(self, state: BuildingState, active_modules: List[str]) -> RuleResult:
         """Rule 4: Daylight harvesting (4% max, DALI-only).
 
         Reduces artificial lighting when daylight is sufficient.
@@ -279,14 +270,14 @@ class EnergyRulesEngine:
                 savings_percent=0.0,
                 active=False,
                 reason="DALI module not active",
-                conditions_met={"dali_active": False, "sufficient_daylight": False, "daytime": False}
+                conditions_met={"dali_active": False, "sufficient_daylight": False, "daytime": False},
             )
 
         # Check other conditions
         conditions_met = {
             "dali_active": True,
             "sufficient_daylight": state.daylight_lux > DAYLIGHT_HARVESTING_THRESHOLD,
-            "daytime": DAYLIGHT_HARVESTING_HOURS[0] <= state.current_hour < DAYLIGHT_HARVESTING_HOURS[1]
+            "daytime": DAYLIGHT_HARVESTING_HOURS[0] <= state.current_hour < DAYLIGHT_HARVESTING_HOURS[1],
         }
 
         if not all(v for k, v in conditions_met.items() if k != "dali_active"):
@@ -302,7 +293,7 @@ class EnergyRulesEngine:
                 savings_percent=0.0,
                 active=False,
                 reason=reason.strip("; "),
-                conditions_met=conditions_met
+                conditions_met=conditions_met,
             )
 
         # Scale: 500 lux → 0%, 1000 lux → 4%
@@ -316,7 +307,7 @@ class EnergyRulesEngine:
             savings_percent=round(savings, 2),
             active=True,
             reason=f"DALI + sufficient daylight {state.daylight_lux} lux at {state.current_hour:02d}:00",
-            conditions_met=conditions_met
+            conditions_met=conditions_met,
         )
 
     def _evaluate_rule_5_peak_load_shaving(self, state: BuildingState) -> RuleResult:
@@ -327,7 +318,7 @@ class EnergyRulesEngine:
         """
         conditions_met = {
             "peak_tariff": state.tariff_band == "peak",
-            "high_demand": state.peak_demand_kw > PEAK_DEMAND_THRESHOLD
+            "high_demand": state.peak_demand_kw > PEAK_DEMAND_THRESHOLD,
         }
 
         if not all(conditions_met.values()):
@@ -343,7 +334,7 @@ class EnergyRulesEngine:
                 savings_percent=0.0,
                 active=False,
                 reason=reason.strip("; "),
-                conditions_met=conditions_met
+                conditions_met=conditions_met,
             )
 
         # Scale: 100 kW → 0%, 200 kW → 2%
@@ -357,7 +348,7 @@ class EnergyRulesEngine:
             savings_percent=round(savings, 2),
             active=True,
             reason=f"Peak tariff + high demand {state.peak_demand_kw:.1f} kW triggers shaving",
-            conditions_met=conditions_met
+            conditions_met=conditions_met,
         )
 
     # ==================== LEARNING CURVE & BREAKDOWN ====================
@@ -407,11 +398,7 @@ class EnergyRulesEngine:
         else:
             return LearningCurvePhase.PHASE_4_STABLE
 
-    def _calculate_system_breakdown(
-        self,
-        rules: List[RuleResult],
-        total_delta_kwh: float
-    ) -> SystemBreakdown:
+    def _calculate_system_breakdown(self, rules: List[RuleResult], total_delta_kwh: float) -> SystemBreakdown:
         """Allocate savings to HVAC/Lighting/Power systems.
 
         Uses SYSTEM_ALLOCATION matrix to distribute each rule's
@@ -433,16 +420,11 @@ class EnergyRulesEngine:
             power_kwh += rule_kwh * allocation.get("power", 0.0)
 
         return SystemBreakdown(
-            hvac_kwh=round(hvac_kwh, 2),
-            lighting_kwh=round(lighting_kwh, 2),
-            power_kwh=round(power_kwh, 2)
+            hvac_kwh=round(hvac_kwh, 2), lighting_kwh=round(lighting_kwh, 2), power_kwh=round(power_kwh, 2)
         )
 
 
-def get_energy_rules_engine(
-    site_id: str = "site-002",
-    deployment_date: Optional[date] = None
-) -> EnergyRulesEngine:
+def get_energy_rules_engine(site_id: str = "site-002", deployment_date: Optional[date] = None) -> EnergyRulesEngine:
     """Get or create singleton rules engine instance.
 
     Args:
@@ -459,6 +441,7 @@ def get_energy_rules_engine(
     if deployment_date is None and _energy_rules_engine is None:
         try:
             from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
+
             orchestrator = get_lifecycle_orchestrator()
             if orchestrator.simulation_start_time:
                 deployment_date = orchestrator.simulation_start_time.date()
@@ -466,9 +449,6 @@ def get_energy_rules_engine(
             pass
 
     if _energy_rules_engine is None or _energy_rules_engine.site_id != site_id:
-        _energy_rules_engine = EnergyRulesEngine(
-            site_id=site_id,
-            deployment_date=deployment_date
-        )
+        _energy_rules_engine = EnergyRulesEngine(site_id=site_id, deployment_date=deployment_date)
 
     return _energy_rules_engine

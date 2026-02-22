@@ -18,8 +18,10 @@ from pydantic import BaseModel, Field
 # Core Models
 # ============================================================================
 
+
 class RepairOutcome(BaseModel):
     """Records a repair event with metadata."""
+
     equipment_id: str = Field(..., description="Equipment identifier (v2.0 format)")
     work_order_id: str = Field(..., description="Work order reference")
     repair_type: str = Field(..., description="Type of repair (e.g., bearing_replacement, filter_change)")
@@ -34,33 +36,26 @@ class RepairOutcome(BaseModel):
 
 class ElementImprovement(BaseModel):
     """Per-element improvement detail from pre/post repair comparison."""
+
     element_name: str = Field(..., description="Element/measurement point name")
     pre_value: float = Field(..., description="Pre-repair measurement value")
     post_value: float = Field(..., description="Post-repair measurement value")
     baseline_value: float = Field(..., description="Original baseline value")
     improvement_percent: float = Field(..., description="Improvement as percentage")
     back_to_baseline: bool = Field(default=False, description="Whether element returned to baseline")
-    status: str = Field(
-        default="unchanged",
-        description="Status: improved, unchanged, or worsened"
-    )
+    status: str = Field(default="unchanged", description="Status: improved, unchanged, or worsened")
 
 
 class EffectivenessScore(BaseModel):
     """Computed effectiveness result from pre/post repair comparison."""
+
     work_order_id: str = Field(..., description="Work order reference")
     equipment_id: str = Field(..., description="Equipment identifier")
     pre_baseline_id: str = Field(default="", description="Pre-repair baseline ID")
     post_baseline_id: str = Field(default="", description="Post-repair baseline ID")
-    effectiveness_score: float = Field(
-        ...,
-        ge=0,
-        le=100,
-        description="Overall effectiveness score (0-100)"
-    )
+    effectiveness_score: float = Field(..., ge=0, le=100, description="Overall effectiveness score (0-100)")
     element_improvements: Dict[str, ElementImprovement] = Field(
-        default_factory=dict,
-        description="Per-element improvement details"
+        default_factory=dict, description="Per-element improvement details"
     )
     repair_successful: bool = Field(default=False, description="Whether repair met success threshold")
     back_to_baseline: bool = Field(default=False, description="Whether all elements returned to baseline")
@@ -72,12 +67,12 @@ class EffectivenessScore(BaseModel):
 
 class HealthScoreUpdate(BaseModel):
     """Equipment health recalculation result."""
+
     equipment_id: str = Field(..., description="Equipment identifier")
     previous_score: float = Field(default=100.0, ge=0, le=100, description="Previous health score")
     new_score: float = Field(default=100.0, ge=0, le=100, description="Newly calculated health score")
     contributing_factors: Dict[str, float] = Field(
-        default_factory=dict,
-        description="Factors contributing to score (element_name -> score contribution)"
+        default_factory=dict, description="Factors contributing to score (element_name -> score contribution)"
     )
     updated_at: datetime = Field(default_factory=datetime.now, description="When score was updated")
 
@@ -86,18 +81,20 @@ class HealthScoreUpdate(BaseModel):
 # Request / Response Models
 # ============================================================================
 
+
 class RepairEffectivenessRequest(BaseModel):
     """API request for repair effectiveness validation."""
+
     equipment_id: str = Field(..., description="Equipment identifier")
     work_order_id: str = Field(..., description="Work order reference")
     post_repair_readings: Optional[Dict[str, float]] = Field(
-        None,
-        description="Post-repair readings (if None, fetch from BMS)"
+        None, description="Post-repair readings (if None, fetch from BMS)"
     )
 
 
 class RepairHistoryEntry(BaseModel):
     """Summary entry for repair history queries."""
+
     work_order_id: str = Field(..., description="Work order reference")
     equipment_id: str = Field(..., description="Equipment identifier")
     repair_date: datetime = Field(..., description="When repair was performed")

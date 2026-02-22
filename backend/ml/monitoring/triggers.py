@@ -112,6 +112,7 @@ class RetrainingTrigger:
         triggers: List[Dict[str, Any]] = []
         try:
             from ml.monitoring.drift import get_drift_detector, EQUIPMENT_TYPES
+
             detector = get_drift_detector()
 
             threshold = self._config["feature_drift_threshold"]
@@ -121,15 +122,16 @@ class RetrainingTrigger:
                 if result["features_drifted"] >= threshold:
                     # Trigger for both model types
                     for model_type in ["lstm", "autoencoder"]:
-                        triggers.append({
-                            "model_type": model_type,
-                            "equipment_type": eq_type,
-                            "reason": (
-                                f"Feature drift: {result['features_drifted']} features "
-                                f"drifted for {eq_type}"
-                            ),
-                            "drift_result": result,
-                        })
+                        triggers.append(
+                            {
+                                "model_type": model_type,
+                                "equipment_type": eq_type,
+                                "reason": (
+                                    f"Feature drift: {result['features_drifted']} features drifted for {eq_type}"
+                                ),
+                                "drift_result": result,
+                            }
+                        )
         except Exception as e:
             logger.error(f"Feature drift evaluation failed: {e}")
 
@@ -144,27 +146,25 @@ class RetrainingTrigger:
 
         try:
             from ml.monitoring.drift import get_drift_detector, MODEL_TYPES
+
             detector = get_drift_detector()
 
             for model_type in MODEL_TYPES:
                 result = detector.detect_model_drift(model_type)
                 if result["drift_detected"]:
-                    triggers.append({
-                        "model_type": model_type,
-                        "reason": (
-                            f"Model drift: {model_type} accuracy degraded by "
-                            f"{result['degradation_pct']}%"
-                        ),
-                        "drift_result": result,
-                    })
+                    triggers.append(
+                        {
+                            "model_type": model_type,
+                            "reason": (f"Model drift: {model_type} accuracy degraded by {result['degradation_pct']}%"),
+                            "drift_result": result,
+                        }
+                    )
         except Exception as e:
             logger.error(f"Model drift evaluation failed: {e}")
 
         return triggers
 
-    def _trigger_retrain(
-        self, model_type: str, equipment_type: str, reason: str
-    ) -> Dict[str, Any]:
+    def _trigger_retrain(self, model_type: str, equipment_type: str, reason: str) -> Dict[str, Any]:
         """Trigger a model retraining operation.
 
         Args:
@@ -194,11 +194,10 @@ class RetrainingTrigger:
 
         try:
             from ml.training.retraining_scheduler import get_retraining_scheduler
+
             scheduler = get_retraining_scheduler()
 
-            retrain_result = scheduler.trigger_retraining(
-                model_type, equipment_type, reason
-            )
+            retrain_result = scheduler.trigger_retraining(model_type, equipment_type, reason)
 
             result["success"] = retrain_result.success
             result["retrain_result"] = {

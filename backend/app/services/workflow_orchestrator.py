@@ -43,6 +43,7 @@ except ImportError:
     def get_audit_logger():
         return None
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -55,6 +56,7 @@ from enum import Enum
 
 class WorkflowState(str, Enum):
     """Asset lifecycle states"""
+
     ONBOARDING = "onboarding"
     BASELINE_CAPTURE = "baseline_capture"
     MONITORING = "monitoring"
@@ -72,6 +74,7 @@ class WorkflowState(str, Enum):
 
 class OnboardAssetRequest(BaseModel):
     """Request to onboard new asset"""
+
     site_id: str
     site_name: str
     site_address: str
@@ -82,6 +85,7 @@ class OnboardAssetRequest(BaseModel):
 
 class OnboardAssetResponse(BaseModel):
     """Response from asset onboarding"""
+
     success: bool
     site_id: str
     equipment_onboarded: int
@@ -92,6 +96,7 @@ class OnboardAssetResponse(BaseModel):
 
 class WorkflowStatusResponse(BaseModel):
     """Response for workflow status query"""
+
     success: bool
     equipment_id: str
     current_state: WorkflowState
@@ -104,6 +109,7 @@ class WorkflowStatusResponse(BaseModel):
 
 class MLAnomalyTrigger(BaseModel):
     """ML anomaly trigger for inspection"""
+
     equipment_id: str
     trigger_source: str = "ml_anomaly"
     anomaly_type: str
@@ -115,6 +121,7 @@ class MLAnomalyTrigger(BaseModel):
 
 class InspectionTriggerResponse(BaseModel):
     """Response from inspection trigger"""
+
     success: bool
     inspection_task_id: str
     equipment_id: str
@@ -126,6 +133,7 @@ class InspectionTriggerResponse(BaseModel):
 
 class RepairValidationRequest(BaseModel):
     """Request to validate repair effectiveness"""
+
     equipment_id: str
     work_order_id: str
     pre_repair_baseline_id: str
@@ -134,6 +142,7 @@ class RepairValidationRequest(BaseModel):
 
 class RepairValidationResponse(BaseModel):
     """Response from repair validation"""
+
     success: bool
     equipment_id: str
     work_order_id: str
@@ -144,6 +153,7 @@ class RepairValidationResponse(BaseModel):
 
 class StateTransition(BaseModel):
     """Record of state transition"""
+
     from_state: WorkflowState
     to_state: WorkflowState
     transition_time: datetime
@@ -154,6 +164,7 @@ class StateTransition(BaseModel):
 # ============================================================================
 # Workflow Orchestrator
 # ============================================================================
+
 
 class AssetWorkflowOrchestrator:
     """
@@ -187,10 +198,7 @@ class AssetWorkflowOrchestrator:
     # Public API Methods
     # ========================================================================
 
-    async def onboard_asset(
-        self,
-        request: OnboardAssetRequest
-    ) -> OnboardAssetResponse:
+    async def onboard_asset(self, request: OnboardAssetRequest) -> OnboardAssetResponse:
         """
         Onboard new asset via SIMBIOT and capture initial baseline.
 
@@ -223,28 +231,23 @@ class AssetWorkflowOrchestrator:
                         equipment_id=equipment_id,
                         baseline_values=baseline_values,
                         captured_by=request.captured_by,
-                        notes=request.notes
+                        notes=request.notes,
                     )
                     baselines_captured += 1
 
                 # Transition to monitoring
                 self._set_state(equipment_id, WorkflowState.MONITORING)
 
-                equipment_results.append({
-                    "equipment_id": equipment_id,
-                    "baseline_id": baseline_id,
-                    "state": WorkflowState.MONITORING
-                })
+                equipment_results.append(
+                    {"equipment_id": equipment_id, "baseline_id": baseline_id, "state": WorkflowState.MONITORING}
+                )
 
                 # Audit log
                 await self._audit_log(
                     equipment_id=equipment_id,
                     action="asset_onboarded",
-                    details={
-                            "site_id": request.site_id,
-                            "baseline_id": baseline_id
-                        }
-                    )
+                    details={"site_id": request.site_id, "baseline_id": baseline_id},
+                )
 
             return OnboardAssetResponse(
                 success=True,
@@ -252,17 +255,14 @@ class AssetWorkflowOrchestrator:
                 equipment_onboarded=len(request.equipment),
                 baselines_captured=baselines_captured,
                 workflow_state=WorkflowState.MONITORING,
-                equipment=equipment_results
+                equipment=equipment_results,
             )
 
         except Exception as e:
             logger.error(f"Error onboarding asset: {e}")
             raise
 
-    async def get_workflow_status(
-        self,
-        equipment_id: str
-    ) -> WorkflowStatusResponse:
+    async def get_workflow_status(self, equipment_id: str) -> WorkflowStatusResponse:
         """Get current workflow status for equipment"""
         current_state = self._equipment_states.get(equipment_id, WorkflowState.ONBOARDING)
         state_history = self._get_state_history(equipment_id)
@@ -281,13 +281,10 @@ class AssetWorkflowOrchestrator:
             active_inspection=active_inspection,
             active_repair=active_repair,
             last_anomaly=last_anomaly,
-            baseline_status=baseline_status
+            baseline_status=baseline_status,
         )
 
-    async def trigger_inspection_from_anomaly(
-        self,
-        trigger: MLAnomalyTrigger
-    ) -> InspectionTriggerResponse:
+    async def trigger_inspection_from_anomaly(self, trigger: MLAnomalyTrigger) -> InspectionTriggerResponse:
         """
         Trigger inspection task from ML anomaly detection.
 
@@ -315,8 +312,8 @@ class AssetWorkflowOrchestrator:
                     "trigger_source": trigger.trigger_source,
                     "anomaly_type": trigger.anomaly_type,
                     "probability": trigger.probability,
-                    "task_id": task_id
-                }
+                    "task_id": task_id,
+                },
             )
 
             return InspectionTriggerResponse(
@@ -326,20 +323,14 @@ class AssetWorkflowOrchestrator:
                 scheduled_date=scheduled_date,
                 priority=trigger.priority,
                 reason=f"ML anomaly detected: {trigger.anomaly_type} ({trigger.probability:.0%} probability)",
-                workflow_transition={
-                    "from_state": from_state,
-                    "to_state": WorkflowState.INSPECTION_SCHEDULED
-                }
+                workflow_transition={"from_state": from_state, "to_state": WorkflowState.INSPECTION_SCHEDULED},
             )
 
         except Exception as e:
             logger.error(f"Error triggering inspection: {e}")
             raise
 
-    async def validate_repair_effectiveness(
-        self,
-        request: RepairValidationRequest
-    ) -> RepairValidationResponse:
+    async def validate_repair_effectiveness(self, request: RepairValidationRequest) -> RepairValidationResponse:
         """
         Validate repair effectiveness by comparing pre/post baselines.
 
@@ -356,24 +347,20 @@ class AssetWorkflowOrchestrator:
                 raise ValueError("Missing pre or post repair baseline")
 
             # Compare baselines and calculate effectiveness
-            effectiveness = await self._calculate_effectiveness(
-                pre_baseline=pre_baseline,
-                post_baseline=post_baseline
-            )
+            effectiveness = await self._calculate_effectiveness(pre_baseline=pre_baseline, post_baseline=post_baseline)
 
             # Update state
-            from_state = self._equipment_states.get(
-                equipment_id,
-                WorkflowState.POST_REPAIR_BASELINE
+            from_state = self._equipment_states.get(equipment_id, WorkflowState.POST_REPAIR_BASELINE)
+            to_state = (
+                WorkflowState.EFFECTIVENESS_VALIDATED
+                if effectiveness["repair_successful"]
+                else WorkflowState.REPAIR_SCHEDULED
             )
-            to_state = WorkflowState.EFFECTIVENESS_VALIDATED if effectiveness["repair_successful"] else WorkflowState.REPAIR_SCHEDULED
             self._set_state(equipment_id, to_state)
 
             # Record ML feedback
             ml_feedback_recorded = await self._record_ml_feedback(
-                equipment_id=equipment_id,
-                work_order_id=request.work_order_id,
-                effectiveness=effectiveness
+                equipment_id=equipment_id, work_order_id=request.work_order_id, effectiveness=effectiveness
             )
 
             # If successful, transition back to monitoring
@@ -387,8 +374,8 @@ class AssetWorkflowOrchestrator:
                 details={
                     "work_order_id": request.work_order_id,
                     "effectiveness_score": effectiveness["score"],
-                    "repair_successful": effectiveness["repair_successful"]
-                }
+                    "repair_successful": effectiveness["repair_successful"],
+                },
             )
 
             return RepairValidationResponse(
@@ -398,9 +385,9 @@ class AssetWorkflowOrchestrator:
                 effectiveness=effectiveness,
                 workflow_transition={
                     "from_state": from_state,
-                    "to_state": WorkflowState.BACK_TO_NORMAL if effectiveness["repair_successful"] else to_state
+                    "to_state": WorkflowState.BACK_TO_NORMAL if effectiveness["repair_successful"] else to_state,
                 },
-                ml_feedback_recorded=ml_feedback_recorded
+                ml_feedback_recorded=ml_feedback_recorded,
             )
 
         except Exception as e:
@@ -423,7 +410,7 @@ class AssetWorkflowOrchestrator:
                 to_state=state,
                 transition_time=now,
                 trigger_reason="workflow_transition",
-                duration_seconds=None  # Calculate if needed
+                duration_seconds=None,  # Calculate if needed
             )
             if equipment_id not in self._state_history:
                 self._state_history[equipment_id] = []
@@ -440,17 +427,13 @@ class AssetWorkflowOrchestrator:
                 "state": h.to_state,
                 "entered_at": h.transition_time.isoformat(),
                 "exited_at": None,
-                "duration_seconds": h.duration_seconds
+                "duration_seconds": h.duration_seconds,
             }
             for h in history
         ]
 
     async def _capture_initial_baseline(
-        self,
-        equipment_id: str,
-        baseline_values: Dict[str, float],
-        captured_by: str,
-        notes: Optional[str]
+        self, equipment_id: str, baseline_values: Dict[str, float], captured_by: str, notes: Optional[str]
     ) -> str:
         """Capture initial baseline for equipment"""
         # Future: Call baseline service
@@ -464,35 +447,15 @@ class AssetWorkflowOrchestrator:
         baseline_id_lower = baseline_id.lower()
 
         if "post" in baseline_id_lower and "bad" not in baseline_id_lower:
-            return {
-                "id": baseline_id,
-                "baseline_values": {
-                    "vibration_rms": 1.0,
-                    "motor_current": 80.0
-                }
-            }
+            return {"id": baseline_id, "baseline_values": {"vibration_rms": 1.0, "motor_current": 80.0}}
 
         if "pre" in baseline_id_lower:
-            return {
-                "id": baseline_id,
-                "baseline_values": {
-                    "vibration_rms": 3.5,
-                    "motor_current": 180.0
-                }
-            }
+            return {"id": baseline_id, "baseline_values": {"vibration_rms": 3.5, "motor_current": 180.0}}
 
-        return {
-            "id": baseline_id,
-            "baseline_values": {
-                "vibration_rms": 1.8,
-                "motor_current": 145.2
-            }
-        }
+        return {"id": baseline_id, "baseline_values": {"vibration_rms": 1.8, "motor_current": 145.2}}
 
     async def _calculate_effectiveness(
-        self,
-        pre_baseline: Dict[str, Any],
-        post_baseline: Dict[str, Any]
+        self, pre_baseline: Dict[str, Any], post_baseline: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Calculate repair effectiveness from baseline comparison"""
         pre_values = pre_baseline.get("baseline_values", {})
@@ -507,31 +470,25 @@ class AssetWorkflowOrchestrator:
                     "pre_value": pre_value,
                     "post_value": post_value,
                     "improvement_percent": improvement,
-                    "back_to_baseline": abs(improvement) < 15
+                    "back_to_baseline": abs(improvement) < 15,
                 }
 
-        avg_improvement = sum(
-            v["improvement_percent"] for v in improvements.values()
-        ) / len(improvements) if improvements else 0
+        avg_improvement = (
+            sum(v["improvement_percent"] for v in improvements.values()) / len(improvements) if improvements else 0
+        )
 
         return {
             "score": avg_improvement,
             "repair_successful": avg_improvement > 50,
-            "back_to_baseline": all(
-                v.get("back_to_baseline", False) for v in improvements.values()
-            ),
-            "improvements": improvements
+            "back_to_baseline": all(v.get("back_to_baseline", False) for v in improvements.values()),
+            "improvements": improvements,
         }
 
-    async def _record_ml_feedback(
-        self,
-        equipment_id: str,
-        work_order_id: str,
-        effectiveness: Dict[str, Any]
-    ) -> bool:
+    async def _record_ml_feedback(self, equipment_id: str, work_order_id: str, effectiveness: Dict[str, Any]) -> bool:
         """Record repair outcome for ML training via MLFeedbackService."""
         try:
             from app.services.ml_feedback_service import get_ml_feedback_service
+
             ml_service = get_ml_feedback_service()
             ml_service.record_repair_feedback(
                 equipment_id=equipment_id,
@@ -539,7 +496,7 @@ class AssetWorkflowOrchestrator:
                 effectiveness_score=effectiveness.get("score", 0.0),
                 repair_successful=effectiveness.get("repair_successful", False),
                 failure_type=None,
-                prediction_id=None
+                prediction_id=None,
             )
             return True
         except Exception as e:
@@ -549,11 +506,7 @@ class AssetWorkflowOrchestrator:
     async def _get_baseline_status(self, equipment_id: str) -> Dict[str, Any]:
         """Get baseline status for equipment"""
         # Future: Call baseline service
-        return {
-            "has_baseline": True,
-            "last_capture": datetime.now().isoformat(),
-            "deviation_status": "normal"
-        }
+        return {"has_baseline": True, "last_capture": datetime.now().isoformat(), "deviation_status": "normal"}
 
     async def _get_active_inspection(self, equipment_id: str) -> Optional[Dict[str, Any]]:
         """Get active inspection for equipment"""
@@ -570,19 +523,10 @@ class AssetWorkflowOrchestrator:
         # Future: Call ML service
         return None
 
-    async def _audit_log(
-        self,
-        equipment_id: str,
-        action: str,
-        details: Dict[str, Any]
-    ):
+    async def _audit_log(self, equipment_id: str, action: str, details: Dict[str, Any]):
         """Log workflow action to audit log"""
         if self.audit_logger:
-            await self.audit_logger.log_workflow_event(
-                equipment_id=equipment_id,
-                action=action,
-                details=details
-            )
+            await self.audit_logger.log_workflow_event(equipment_id=equipment_id, action=action, details=details)
         else:
             logger.info(f"Audit: {equipment_id} - {action} - {details}")
 

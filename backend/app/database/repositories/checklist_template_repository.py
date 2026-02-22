@@ -25,6 +25,7 @@ class ChecklistTemplateRepository:
     def __init__(self):
         """Initialize the repository with a Supabase client."""
         from app.database.supabase_client import get_supabase_client
+
         self.client = get_supabase_client()
         self._table = "inspection_checklist_templates"
 
@@ -61,19 +62,13 @@ class ChecklistTemplateRepository:
             Template dict or None if not found.
         """
         try:
-            response = self.client.table(self._table).select("*").eq(
-                "id", template_id
-            ).execute()
+            response = self.client.table(self._table).select("*").eq("id", template_id).execute()
             return response.data[0] if response.data else None
         except Exception as e:
             logger.warning(f"Failed to get checklist template {template_id}: {e}")
             return None
 
-    def get_templates_for_equipment_type(
-        self,
-        equipment_type: str,
-        is_active: bool = True
-    ) -> List[Dict[str, Any]]:
+    def get_templates_for_equipment_type(self, equipment_type: str, is_active: bool = True) -> List[Dict[str, Any]]:
         """Get all templates for an equipment type.
 
         Args:
@@ -84,22 +79,20 @@ class ChecklistTemplateRepository:
             List of matching template dicts.
         """
         try:
-            response = self.client.table(self._table).select("*").eq(
-                "equipment_type", equipment_type
-            ).eq("is_active", is_active).execute()
+            response = (
+                self.client.table(self._table)
+                .select("*")
+                .eq("equipment_type", equipment_type)
+                .eq("is_active", is_active)
+                .execute()
+            )
             return response.data or []
         except Exception as e:
-            logger.warning(
-                f"Failed to get templates for equipment_type={equipment_type}: {e}"
-            )
+            logger.warning(f"Failed to get templates for equipment_type={equipment_type}: {e}")
             return []
 
     def get_oem_template(
-        self,
-        equipment_type: str,
-        manufacturer: str,
-        model: str = None,
-        inspection_type: str = None
+        self, equipment_type: str, manufacturer: str, model: str = None, inspection_type: str = None
     ) -> Optional[Dict[str, Any]]:
         """Get OEM-specific template by manufacturer name matching.
 
@@ -117,9 +110,9 @@ class ChecklistTemplateRepository:
             Matching template dict or None.
         """
         try:
-            query = self.client.table(self._table).select("*").eq(
-                "equipment_type", equipment_type
-            ).eq("is_active", True)
+            query = (
+                self.client.table(self._table).select("*").eq("equipment_type", equipment_type).eq("is_active", True)
+            )
 
             if inspection_type:
                 query = query.eq("inspection_type", inspection_type)
@@ -129,10 +122,12 @@ class ChecklistTemplateRepository:
 
             if model:
                 # Try with model first for more specific match
-                model_query = self.client.table(self._table).select("*").eq(
-                    "equipment_type", equipment_type
-                ).eq("is_active", True).ilike(
-                    "template_name", f"%{manufacturer}%{model}%"
+                model_query = (
+                    self.client.table(self._table)
+                    .select("*")
+                    .eq("equipment_type", equipment_type)
+                    .eq("is_active", True)
+                    .ilike("template_name", f"%{manufacturer}%{model}%")
                 )
                 if inspection_type:
                     model_query = model_query.eq("inspection_type", inspection_type)
@@ -145,9 +140,7 @@ class ChecklistTemplateRepository:
             response = query.execute()
             return response.data[0] if response.data else None
         except Exception as e:
-            logger.warning(
-                f"Failed to get OEM template for {manufacturer} {equipment_type}: {e}"
-            )
+            logger.warning(f"Failed to get OEM template for {manufacturer} {equipment_type}: {e}")
             return None
 
     def upsert_template(self, template_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -166,10 +159,11 @@ class ChecklistTemplateRepository:
         template_data.setdefault("version", 1)
 
         try:
-            response = self.client.table(self._table).upsert(
-                template_data,
-                on_conflict="template_name,equipment_type"
-            ).execute()
+            response = (
+                self.client.table(self._table)
+                .upsert(template_data, on_conflict="template_name,equipment_type")
+                .execute()
+            )
             return response.data[0] if response.data else {}
         except Exception as e:
             logger.error(f"Failed to upsert checklist template: {e}")
@@ -179,11 +173,7 @@ class ChecklistTemplateRepository:
             except Exception:
                 return {}
 
-    def update_template(
-        self,
-        template_id: str,
-        updates: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def update_template(self, template_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a template by UUID.
 
         Auto-increments version if checklist_items are being updated.
@@ -202,9 +192,7 @@ class ChecklistTemplateRepository:
                 if existing:
                     updates["version"] = existing.get("version", 0) + 1
 
-            response = self.client.table(self._table).update(
-                updates
-            ).eq("id", template_id).execute()
+            response = self.client.table(self._table).update(updates).eq("id", template_id).execute()
             return response.data[0] if response.data else None
         except Exception as e:
             logger.error(f"Failed to update checklist template {template_id}: {e}")
@@ -220,9 +208,9 @@ class ChecklistTemplateRepository:
             List of template dicts.
         """
         try:
-            response = self.client.table(self._table).select("*").eq(
-                "is_active", is_active
-            ).order("equipment_type").execute()
+            response = (
+                self.client.table(self._table).select("*").eq("is_active", is_active).order("equipment_type").execute()
+            )
             return response.data or []
         except Exception as e:
             logger.warning(f"Failed to list checklist templates: {e}")
@@ -238,9 +226,7 @@ class ChecklistTemplateRepository:
             True if soft-deleted, False on failure.
         """
         try:
-            response = self.client.table(self._table).update(
-                {"is_active": False}
-            ).eq("id", template_id).execute()
+            response = self.client.table(self._table).update({"is_active": False}).eq("id", template_id).execute()
             return bool(response.data)
         except Exception as e:
             logger.error(f"Failed to delete checklist template {template_id}: {e}")

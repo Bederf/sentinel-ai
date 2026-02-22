@@ -27,11 +27,11 @@ logger = logging.getLogger(__name__)
 # All other modules (Control, Solar, Lighting, Assets, etc.) are PAID ADD-ONS
 # and require explicit grants via user_module_access table.
 BASE_MODULES: set[str] = {
-    ModuleType.HVAC.value,           # Base: monitoring only, no automated control
-    ModuleType.ENERGY.value,         # Base: energy monitoring, consumption data
-    ModuleType.ML.value,             # Base: feedback loop for recommendation improvement
+    ModuleType.HVAC.value,  # Base: monitoring only, no automated control
+    ModuleType.ENERGY.value,  # Base: energy monitoring, consumption data
+    ModuleType.ML.value,  # Base: feedback loop for recommendation improvement
     ModuleType.NOTIFICATIONS.value,  # Base: alert notifications
-    ModuleType.INTEGRATIONS.value,   # Base: system health / SIMBIOT connection status
+    ModuleType.INTEGRATIONS.value,  # Base: system health / SIMBIOT connection status
 }
 
 
@@ -88,9 +88,15 @@ class ModuleAccessRepository:
 
         try:
             # Single pending request per user/site. Update payload if it already exists.
-            existing = self.client.table("access_requests").select("id").eq(
-                "user_email", email
-            ).eq("site_code", site_code).eq("status", "pending").limit(1).execute()
+            existing = (
+                self.client.table("access_requests")
+                .select("id")
+                .eq("user_email", email)
+                .eq("site_code", site_code)
+                .eq("status", "pending")
+                .limit(1)
+                .execute()
+            )
             if existing.data:
                 request_id = existing.data[0]["id"]
                 result = self.client.table("access_requests").update(payload).eq("id", request_id).execute()
@@ -175,7 +181,9 @@ class ModuleAccessRepository:
 
         try:
             if replace_existing:
-                self.client.table("user_module_access").delete().eq("user_email", email).eq("site_code", site_code).execute()
+                self.client.table("user_module_access").delete().eq("user_email", email).eq(
+                    "site_code", site_code
+                ).execute()
 
             if not modules:
                 return True
@@ -209,9 +217,13 @@ class ModuleAccessRepository:
 
         email = self._normalize_email(user_email)
         try:
-            result = self.client.table("user_module_access").select("module_type").eq(
-                "user_email", email
-            ).eq("site_code", site_code).execute()
+            result = (
+                self.client.table("user_module_access")
+                .select("module_type")
+                .eq("user_email", email)
+                .eq("site_code", site_code)
+                .execute()
+            )
             return [row["module_type"] for row in (result.data or []) if row.get("module_type")]
         except Exception as exc:
             logger.error("Failed getting user modules for %s @ %s: %s", email, site_code, exc)
@@ -248,17 +260,13 @@ class ModuleAccessRepository:
 
         # Check demo site access first (site-level restriction)
         if not has_demo_site_access(user_email, site_code):
-            logger.warning(
-                f"Demo user blocked by site restriction: user={user_email} site={site_code}"
-            )
+            logger.warning(f"Demo user blocked by site restriction: user={user_email} site={site_code}")
             return False
 
         # Check demo configs (synced with frontend access-control.ts)
         # This allows demo users to access modules without explicit database grants
         if has_demo_module_access(user_email, module_type.value):
-            logger.info(
-                f"Demo config grant: user={user_email} module={module_type.value} site={site_code}"
-            )
+            logger.info(f"Demo config grant: user={user_email} module={module_type.value} site={site_code}")
             return True
 
         # Fall back to explicit database grants

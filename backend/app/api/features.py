@@ -30,22 +30,21 @@ router = APIRouter(prefix="/api/features", tags=["features"])
 # Response models
 class DatasetListResponse(BaseModel):
     """Response containing list of training datasets."""
-    datasets: List[TrainingDatasetMetadata] = Field(
-        ..., description="List of available training datasets"
-    )
+
+    datasets: List[TrainingDatasetMetadata] = Field(..., description="List of available training datasets")
     count: int = Field(..., description="Total count of datasets")
 
 
 class TrainingDataResponse(BaseModel):
     """Response after generating training data."""
+
     success: bool = Field(..., description="Whether generation succeeded")
     message: str = Field(..., description="Status message")
-    metadata: Optional[TrainingDatasetMetadata] = Field(
-        None, description="Dataset metadata if saved"
-    )
+    metadata: Optional[TrainingDatasetMetadata] = Field(None, description="Dataset metadata if saved")
 
 
 # Feature Definition Endpoints
+
 
 @router.get("/definitions", response_model=FeatureDefinitionsResponse)
 async def get_feature_definitions():
@@ -79,6 +78,7 @@ async def get_feature_definitions_for_type(equipment_type: str):
 
 
 # Real-time Feature Endpoints
+
 
 @router.get("/equipment/{equipment_id}", response_model=ComputedFeatures)
 async def get_equipment_features(
@@ -129,6 +129,7 @@ async def compute_batch_features(request: FeatureBatchRequest):
 
 
 # Training Data Endpoints
+
 
 @router.post("/training-data", response_model=TrainingDataResponse)
 async def generate_training_data(request: TrainingDataRequest):

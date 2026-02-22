@@ -24,43 +24,44 @@ logger = logging.getLogger(__name__)
 # === Efficiency thresholds ===
 
 EFFICIENCY_THRESHOLDS = {
-    "excellent": 0.95,    # >95% system efficiency
-    "good": 0.90,         # 90-95% acceptable
-    "acceptable": 0.85,   # 85-90% needs attention
-    "poor": 0.0,          # <85% investigate
+    "excellent": 0.95,  # >95% system efficiency
+    "good": 0.90,  # 90-95% acceptable
+    "acceptable": 0.85,  # 85-90% needs attention
+    "poor": 0.0,  # <85% investigate
 }
 
 AVAILABILITY_THRESHOLDS = {
-    "excellent": 0.99,    # >99% uptime
-    "good": 0.95,         # 95-99%
-    "acceptable": 0.90,   # 90-95%
-    "poor": 0.0,          # <90% investigate
+    "excellent": 0.99,  # >99% uptime
+    "good": 0.95,  # 95-99%
+    "acceptable": 0.90,  # 90-95%
+    "poor": 0.0,  # <90% investigate
 }
 
 # System loss factors for efficiency calculation
 SYSTEM_LOSSES = {
-    "wiring_dc": 0.015,       # DC wiring losses
-    "wiring_ac": 0.010,       # AC wiring losses
-    "soiling": 0.030,         # Panel soiling (SA conditions)
-    "mismatch": 0.020,        # Module mismatch
-    "temperature": 0.050,     # Temperature derating (Johannesburg avg ~25°C)
-    "inverter": 0.030,        # Inverter conversion losses
-    "clipping": 0.010,        # Inverter clipping at peak
+    "wiring_dc": 0.015,  # DC wiring losses
+    "wiring_ac": 0.010,  # AC wiring losses
+    "soiling": 0.030,  # Panel soiling (SA conditions)
+    "mismatch": 0.020,  # Module mismatch
+    "temperature": 0.050,  # Temperature derating (Johannesburg avg ~25°C)
+    "inverter": 0.030,  # Inverter conversion losses
+    "clipping": 0.010,  # Inverter clipping at peak
 }
 
 # Temperature coefficient for PV panels
 TEMP_COEFFICIENT = -0.004  # -0.4% per °C above 25°C STC
 
 # Soiling and degradation thresholds
-SOILING_ALERT_THRESHOLD = 0.05         # 5% loss triggers alert
-SOILING_CLEANING_THRESHOLD = 0.10      # 10% loss triggers work order
-ANNUAL_DEGRADATION_WARNING = 0.02      # >2% annual degradation
-ANNUAL_DEGRADATION_NORMAL = 0.008      # Expected 0.5-0.8% per year
+SOILING_ALERT_THRESHOLD = 0.05  # 5% loss triggers alert
+SOILING_CLEANING_THRESHOLD = 0.10  # 10% loss triggers work order
+ANNUAL_DEGRADATION_WARNING = 0.02  # >2% annual degradation
+ANNUAL_DEGRADATION_NORMAL = 0.008  # Expected 0.5-0.8% per year
 
 
 @dataclass
 class PerformanceBaseline:
     """7-day rolling baseline for a single inverter."""
+
     inverter_id: str
     inverter_type: str  # manufacturer + model
     capacity_kva: float
@@ -99,6 +100,7 @@ class PerformanceBaseline:
 @dataclass
 class PeerComparisonReport:
     """Peer comparison metrics for an inverter against same model fleet."""
+
     inverter_id: str
     inverter_type: str
     comparison_period: str  # day, week, month
@@ -110,8 +112,8 @@ class PeerComparisonReport:
 
     # Peer statistics (same manufacturer + model)
     peer_count: int = 1
-    peer_efficiency_p50: float = 0.90    # Median
-    peer_efficiency_p10: float = 0.85    # 10th percentile
+    peer_efficiency_p50: float = 0.90  # Median
+    peer_efficiency_p10: float = 0.85  # 10th percentile
     peer_efficiency_p25: float = 0.88
     peer_efficiency_p75: float = 0.92
     peer_efficiency_p90: float = 0.94
@@ -164,6 +166,7 @@ class PeerComparisonReport:
 @dataclass
 class SoilingAnalysis:
     """Soiling and degradation analysis for a site/plant."""
+
     site_id: str
     plant_id: str
     timestamp: str
@@ -342,9 +345,7 @@ class SolarPerformanceAnalyzer:
                 efficiency_7d_avg=baseline_data.get("efficiency_7d_avg", 0.90),
                 availability_7d_avg=baseline_data.get("availability_7d_avg", 0.99),
                 temp_rise_c=baseline_data.get("temp_rise_c", 15.0),
-                string_voltage_balance_7d_avg=baseline_data.get(
-                    "string_voltage_balance_7d_avg", 1.01
-                ),
+                string_voltage_balance_7d_avg=baseline_data.get("string_voltage_balance_7d_avg", 1.01),
             )
             return baseline
 
@@ -433,7 +434,9 @@ class SolarPerformanceAnalyzer:
         if efficiency_deviation > 10:
             recommendation = f"CRITICAL: Efficiency {efficiency_deviation:.1f}% below peers. Investigate immediately. Potential fault in inverter or strings."
         elif efficiency_deviation > 5:
-            recommendation = f"WARNING: Efficiency {efficiency_deviation:.1f}% below peers. Schedule diagnostics within 24h."
+            recommendation = (
+                f"WARNING: Efficiency {efficiency_deviation:.1f}% below peers. Schedule diagnostics within 24h."
+            )
         elif efficiency_deviation < -5:
             recommendation = "Excellent performance. Above peer average. Maintain current operations."
 
@@ -656,8 +659,7 @@ class SolarPerformanceAnalyzer:
         # Keep only last 30 days
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
         self._soiling_history[site_id] = [
-            a for a in self._soiling_history[site_id]
-            if datetime.fromisoformat(a.timestamp) > cutoff_date
+            a for a in self._soiling_history[site_id] if datetime.fromisoformat(a.timestamp) > cutoff_date
         ]
 
         return analysis

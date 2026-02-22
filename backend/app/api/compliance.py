@@ -24,6 +24,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/compliance", tags=["compliance"])
 
 
+def _attr(obj, key, default=None):
+    """Get attribute from dict or object (repo may return either)."""
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
 def get_compliance_repo() -> ComplianceRepository:
     """Dependency injection for ComplianceRepository."""
     return ComplianceRepository()
@@ -52,8 +59,8 @@ async def generate_ohs_checklist(
 
         task = await repo.create_inspection_task(template, zone_id)
         return {
-            "task_id": str(task.id),
-            "items_count": len(template.get("checklist_items", [])),
+            "task_id": str(_attr(task, "id")),
+            "items_count": len(_attr(template, "checklist_items", [])),
         }
 
     except Exception as e:
@@ -81,7 +88,7 @@ async def complete_ohs_checklist(
             auditor_info={"role": "OHS Inspector"},
         )
 
-        return {"result_id": str(result.id), "audit_id": str(audit.id)}
+        return {"result_id": str(_attr(result, "id")), "audit_id": str(_attr(audit, "id"))}
 
     except Exception as e:
         logger.error(f"Failed to complete OHS checklist: {e}")
@@ -118,7 +125,7 @@ async def schedule_fire_equipment_inspection(
     try:
         # For now, use equipment_id as location reference
         schedule = await repo.create_fire_inspection_schedule("extinguisher", equipment_id)
-        return {"schedule_id": str(schedule.id), "next_due": schedule.next_due_date}
+        return {"schedule_id": str(_attr(schedule, "id")), "next_due": _attr(schedule, "next_due_date")}
 
     except Exception as e:
         logger.error(f"Failed to schedule fire inspection: {e}")
@@ -135,11 +142,9 @@ async def record_fire_equipment_charge(
     """Record fire equipment pressure test."""
     try:
         test_datetime = datetime.fromisoformat(test_date)
-        tracking = await repo.update_fire_equipment_pressure(
-            equipment_id, pressure, test_datetime
-        )
+        tracking = await repo.update_fire_equipment_pressure(equipment_id, pressure, test_datetime)
 
-        return {"equipment_id": str(tracking.id), "pressure": tracking.charge_pressure}
+        return {"equipment_id": str(_attr(tracking, "id")), "pressure": _attr(tracking, "charge_pressure")}
 
     except Exception as e:
         logger.error(f"Failed to record pressure test: {e}")
@@ -162,7 +167,7 @@ async def schedule_emergency_light_tests(
         schedules = await repo.create_emergency_light_schedules(light_codes, auto_test)
         return {
             "count": len(schedules),
-            "schedules": [{"id": str(s.id)} for s in schedules],
+            "schedules": [{"id": str(_attr(s, "id"))} for s in schedules],
         }
 
     except Exception as e:
@@ -174,9 +179,7 @@ async def schedule_emergency_light_tests(
 async def record_emergency_light_test(
     light_code: str,
     battery_health_percent: int = Query(..., description="Battery health 0-100%"),
-    test_result: str = Query(
-        ..., description="Test result: pass, fail, warning"
-    ),
+    test_result: str = Query(..., description="Test result: pass, fail, warning"),
     repo: ComplianceRepository = Depends(get_compliance_repo),
 ) -> dict:
     """Record emergency light test result (battery health trend tracking)."""
@@ -184,9 +187,7 @@ async def record_emergency_light_test(
         if not 0 <= battery_health_percent <= 100:
             raise ValueError("Battery health must be 0-100%")
 
-        result = await repo.record_emergency_light_test(
-            light_code, battery_health_percent, test_result
-        )
+        result = await repo.record_emergency_light_test(light_code, battery_health_percent, test_result)
 
         return {"light_code": light_code, "battery_health": battery_health_percent}
 
@@ -204,19 +205,15 @@ async def record_emergency_light_test(
 async def assess_legionella_risk(
     tower_code: str = Query(..., description="Cooling tower code"),
     water_temp: float = Query(..., description="Water temperature in Celsius"),
-    last_treatment: str = Query(
-        ..., description="Last treatment date ISO format"
-    ),
+    last_treatment: str = Query(..., description="Last treatment date ISO format"),
     repo: ComplianceRepository = Depends(get_compliance_repo),
 ) -> dict:
     """Assess legionella risk for cooling tower (SABS standard)."""
     try:
         treatment_date = datetime.fromisoformat(last_treatment)
-        assessment = await repo.assess_legionella_risk(
-            tower_code, water_temp, treatment_date
-        )
+        assessment = await repo.assess_legionella_risk(tower_code, water_temp, treatment_date)
 
-        return {"tower_code": tower_code, "risk_level": assessment.risk_level}
+        return {"tower_code": tower_code, "risk_level": _attr(assessment, "risk_level")}
 
     except Exception as e:
         logger.error(f"Failed to assess legionella risk: {e}")
@@ -231,7 +228,7 @@ async def create_legionella_maintenance_task(
     """Create legionella maintenance task based on risk level."""
     try:
         schedule = await repo.create_legionella_maintenance_task(risk_assessment_id)
-        return {"schedule_id": str(schedule.id)}
+        return {"schedule_id": str(_attr(schedule, "id"))}
 
     except Exception as e:
         logger.error(f"Failed to create legionella task: {e}")
@@ -251,9 +248,10 @@ async def track_electrical_certificate(
     """Track electrical Certificate of Compliance (5-year South African standard)."""
     try:
         saved = await repo.create_electrical_compliance(certificate)
+        expiry = _attr(saved, "expiry_date")
         return {
-            "certificate_id": str(saved.id),
-            "expiry_date": saved.expiry_date.isoformat() if saved.expiry_date else None,
+            "certificate_id": str(_attr(saved, "id")),
+            "expiry_date": expiry.isoformat() if hasattr(expiry, "isoformat") else expiry,
         }
 
     except Exception as e:
@@ -293,7 +291,7 @@ async def schedule_lift_inspection(
     """Schedule lift inspection."""
     try:
         schedule = await repo.create_lift_inspection_schedule(lift_code, inspection_type)
-        return {"schedule_id": str(schedule.id), "inspection_type": inspection_type}
+        return {"schedule_id": str(_attr(schedule, "id")), "inspection_type": inspection_type}
 
     except Exception as e:
         logger.error(f"Failed to schedule lift inspection: {e}")
@@ -348,9 +346,7 @@ async def list_compliance_audits(
 ) -> dict:
     """List compliance audits for site."""
     try:
-        audits = await repo.get_compliance_audits(
-            site_code, compliance_type, status, limit
-        )
+        audits = await repo.get_compliance_audits(site_code, compliance_type, status, limit)
         return {"audits": audits, "count": len(audits)}
 
     except Exception as e:
