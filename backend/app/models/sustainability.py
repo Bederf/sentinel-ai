@@ -13,7 +13,7 @@ Scopes:
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 @dataclass
@@ -61,6 +61,19 @@ class EmissionsSnapshot:
     energy_intensity_kwh_per_sqm: float = 0.0
     breakdown_by_system: Dict[str, float] = field(default_factory=dict)
 
+    # Per-system carbon breakdown (plan 111-02)
+    hvac_kg_co2: float = 0.0
+    lighting_kg_co2: float = 0.0
+    other_kg_co2: float = 0.0
+    solar_offset_kg_co2: float = 0.0
+    net_scope2_kg_co2: float = 0.0  # scope2 after solar offset
+
+    # Source data — replaces hardcoded estimates (plan 111-02)
+    actual_diesel_liters: Optional[float] = None  # From daily_sustainability_metrics
+    actual_water_kl: Optional[float] = None  # From daily_sustainability_metrics
+    solar_generation_kwh: Optional[float] = None  # From daily_sustainability_metrics
+    data_source: str = "estimated"  # "estimated" | "measured" | "simulation"
+
     @property
     def total_kg_co2(self) -> float:
         return self.scope1_kg_co2 + self.scope2_kg_co2 + self.scope3_kg_co2
@@ -78,6 +91,21 @@ class EmissionsSnapshot:
             "carbon_intensity_kg_per_sqm": round(self.carbon_intensity_kg_per_sqm, 2),
             "energy_intensity_kwh_per_sqm": round(self.energy_intensity_kwh_per_sqm, 2),
             "breakdown_by_system": {k: round(v, 2) for k, v in self.breakdown_by_system.items()},
+            # Per-system carbon breakdown
+            "hvac_kg_co2": round(self.hvac_kg_co2, 2),
+            "lighting_kg_co2": round(self.lighting_kg_co2, 2),
+            "other_kg_co2": round(self.other_kg_co2, 2),
+            "solar_offset_kg_co2": round(self.solar_offset_kg_co2, 2),
+            "net_scope2_kg_co2": round(self.net_scope2_kg_co2, 2),
+            # Source data
+            "actual_diesel_liters": round(self.actual_diesel_liters, 2)
+            if self.actual_diesel_liters is not None
+            else None,
+            "actual_water_kl": round(self.actual_water_kl, 2) if self.actual_water_kl is not None else None,
+            "solar_generation_kwh": round(self.solar_generation_kwh, 2)
+            if self.solar_generation_kwh is not None
+            else None,
+            "data_source": self.data_source,
         }
 
 
