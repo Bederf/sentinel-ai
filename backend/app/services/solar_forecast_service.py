@@ -439,8 +439,6 @@ class SolarForecastService:
         capacity = config["capacity_kwp"]
         now = datetime.now(timezone.utc)
         sast_now = now + timedelta(hours=2)
-        current_hour = sast_now.hour
-
         hourly_entries: List[HourlyGeneration] = []
         daily_kwh: Dict[str, Dict[str, float]] = {}  # date -> {expected, clear_sky}
 

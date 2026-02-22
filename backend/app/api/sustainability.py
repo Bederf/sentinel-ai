@@ -311,7 +311,9 @@ async def get_emissions_summary(building_id: str):
         if not emissions or emissions["total_kg_co2e"] == 0:
             return {
                 "status": "no_data",
-                "message": "No emissions data available yet. Please start by uploading energy, generator, and water data.",
+                "message": (
+                    "No emissions data available yet. Please start by uploading energy, generator, and water data."
+                ),
                 "timestamp": date.today().isoformat(),
             }
 

@@ -43,7 +43,7 @@ class StorageService:
 
         try:
             # Upload file to Supabase Storage
-            response = self.client.storage.from_(STORAGE_BUCKET_NAME).upload(
+            self.client.storage.from_(STORAGE_BUCKET_NAME).upload(
                 path=storage_path,
                 file=content,
                 file_options={"content-type": file.content_type or "application/octet-stream"},

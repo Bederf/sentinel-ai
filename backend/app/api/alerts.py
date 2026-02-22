@@ -570,7 +570,7 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
         equipment_with_building = client.table("equipment").select("building_id").eq("id", equipment_id).execute()
         if equipment_with_building.data:
             building_id = equipment_with_building.data[0].get("building_id")
-    except:
+    except Exception:
         pass  # building_id might not exist in this table
 
     # Get building name from buildings table if building_id exists
@@ -580,7 +580,7 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
             building = client.table("buildings").select("name").eq("id", building_id).execute()
             if building.data:
                 building_name = building.data[0].get("name", "Unknown")
-        except:
+        except Exception:
             building_name = "Unknown"  # Default if query fails
 
     # Create alert using building_id from equipment foreign key
@@ -779,7 +779,7 @@ async def dispatch_work_order(alert_id: str, request: DispatchWorkOrderRequest):
 
     # Create work order
     work_order_id = str(uuid.uuid4())
-    work_order = {
+    _work_order = {
         "id": work_order_id,
         "alert_id": alert_id,
         "building_id": alert["building_id"],

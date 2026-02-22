@@ -7,8 +7,8 @@ import sys
 
 sys.path.insert(0, "/opt/bms-intelligence/backend")
 
-from app.database.supabase_client import get_supabase_client
-import json
+from app.database.supabase_client import get_supabase_client  # noqa: E402
+import json  # noqa: E402
 
 client = get_supabase_client()
 
@@ -66,7 +66,8 @@ try:
             if equip.data and count > 0:
                 for eq in equip.data[:3]:  # Show first 3
                     print(
-                        f"       - {eq.get('code', 'N/A')}: {eq.get('name', 'N/A')} (type: {eq.get('equipment_type', 'N/A')})"
+                        f"       - {eq.get('code', 'N/A')}: {eq.get('name', 'N/A')} "
+                        f"(type: {eq.get('equipment_type', 'N/A')})"
                     )
                 if count > 3:
                     print(f"       ... and {count - 3} more")
@@ -94,7 +95,7 @@ except Exception as e:
 # 5. Check JSON fallback data
 print("\n5. JSON FALLBACK DATA")
 print("-" * 70)
-from pathlib import Path
+from pathlib import Path  # noqa: E402
 
 json_equipment_file = Path("/opt/bms-intelligence/backend/app/data/equipment.json")
 if json_equipment_file.exists():
@@ -114,7 +115,7 @@ else:
 # 6. Repository test
 print("\n6. EQUIPMENT REPOSITORY TEST")
 print("-" * 70)
-from app.database.repositories.equipment_repository import EquipmentRepository
+from app.database.repositories.equipment_repository import EquipmentRepository  # noqa: E402
 
 repo = EquipmentRepository()
 

@@ -219,7 +219,7 @@ def _detect_protocol(equipment_code: str, equipment_type: Optional[str]) -> str:
         Protocol string: dali, bacnet, or modbus
     """
     code_upper = equipment_code.upper()
-    type_upper = (equipment_type or "").upper()
+    _type_upper = (equipment_type or "").upper()
 
     # DALI - lighting equipment
     if any(x in code_upper for x in ["DALI", "LUM", "LIGHT"]):

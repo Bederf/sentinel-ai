@@ -60,7 +60,10 @@ class WOConversationHandler:
             if response.status_code == 200:
                 result = response.json()
                 if result.get("success") and result.get("next_prompt"):
-                    return f"✅ Service completed!\n\nFor ML training data, please provide items one by one:\n\n{result['next_prompt']}"
+                    return (
+                        f"✅ Service completed!\n\nFor ML training data, "
+                        f"please provide items one by one:\n\n{result['next_prompt']}"
+                    )
                 else:
                     print(f"❌ Unexpected response: {result}")
                     return None

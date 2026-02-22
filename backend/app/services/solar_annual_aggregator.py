@@ -288,7 +288,9 @@ class SolarAnnualAggregator:
         )
 
         logger.info(
-            f"Annual aggregation complete: {total_solar:.0f} kWh solar, {total_cost_standard:.0f}→{total_cost_sentinel:.0f} ZAR ({summary.annual_savings_pct:.1f}% savings)"
+            f"Annual aggregation complete: {total_solar:.0f} kWh solar, "
+            f"{total_cost_standard:.0f}→{total_cost_sentinel:.0f} ZAR "
+            f"({summary.annual_savings_pct:.1f}% savings)"
         )
 
         return summary

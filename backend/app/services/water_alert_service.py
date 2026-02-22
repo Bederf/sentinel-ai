@@ -167,7 +167,8 @@ class WaterAlertService:
                 description=(
                     f"Continuous flow detected during off-hours ({self.continuous_flow_off_hours_start}:00-"
                     f"{self.continuous_flow_off_hours_end}:00). Flow rate {current_flow_rate:.1f} LPM exceeds "
-                    f"threshold {self.continuous_flow_threshold_lpm} LPM for {self.continuous_flow_duration_minutes:.0f} minutes. "
+                    f"threshold {self.continuous_flow_threshold_lpm} LPM for "
+                    f"{self.continuous_flow_duration_minutes:.0f} minutes. "
                     "Possible leak in irrigation system or restroom fixture."
                 ),
             )

@@ -222,7 +222,7 @@ class ComplianceService:
             Dictionary with light_code and battery_health
         """
         try:
-            result = await self.repository.record_emergency_light_test(light_code, battery_health_percent, test_result)
+            await self.repository.record_emergency_light_test(light_code, battery_health_percent, test_result)
 
             # Check if battery health degraded below threshold
             if battery_health_percent < 75:
@@ -408,7 +408,7 @@ class ComplianceService:
             Dictionary with lift_code and compliant status
         """
         try:
-            result = await self.repository.record_lift_test_results(lift_code, test_results)
+            await self.repository.record_lift_test_results(lift_code, test_results)
 
             # Check compliance
             is_compliant = True

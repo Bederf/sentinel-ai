@@ -204,7 +204,8 @@ class AIRecommendationEngine:
             "messaging": {
                 "short": f"Save R{annual_savings_r / 12:,.0f}/month with smart lighting",
                 "long": (
-                    f"Install DALI controls to reduce lighting energy by {(1 - current_kwh / baseline_kwh) * 100:.0f}%. "
+                    f"Install DALI controls to reduce lighting energy by "
+                    f"{(1 - current_kwh / baseline_kwh) * 100:.0f}%. "
                     f"Pays back in {payback_months:.1f} months."
                 ),
                 "urgency": "medium",
@@ -237,7 +238,8 @@ class AIRecommendationEngine:
             "title": "Water Efficiency Retrofit (Low-Flow Fixtures)",
             "description": (
                 f"Install low-flow toilets, faucets, and fixtures. "
-                f"Current consumption {current_liters / 1000:.1f} kL/day can be reduced by {(1 - current_liters / baseline_liters) * 100:.0f}%."
+                f"Current consumption {current_liters / 1000:.1f} kL/day can be reduced "
+                f"by {(1 - current_liters / baseline_liters) * 100:.0f}%."
             ),
             "current_state": {
                 "daily_liters": round(current_liters, 0),
@@ -275,7 +277,8 @@ class AIRecommendationEngine:
             "messaging": {
                 "short": f"Save R{annual_savings_r / 12:,.0f}/month with water efficiency",
                 "long": (
-                    f"Install low-flow fixtures to reduce water consumption by {(1 - current_liters / baseline_liters) * 100:.0f}%. "
+                    f"Install low-flow fixtures to reduce water consumption "
+                    f"by {(1 - current_liters / baseline_liters) * 100:.0f}%. "
                     f"Pays back in {payback_months:.1f} months."
                 ),
                 "urgency": "medium",

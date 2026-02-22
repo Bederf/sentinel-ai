@@ -79,7 +79,7 @@ class ZoneDiagnostics:
         ahu_code = equipment_codes["ahu"]
 
         fcu = equipment_status.get(fcu_code, {})
-        vav = equipment_status.get(vav_code, {})
+        _vav = equipment_status.get(vav_code, {})
         ahu = equipment_status.get(ahu_code, {})
 
         fcu_meta = fcu.get("metadata", {})

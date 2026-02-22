@@ -33,7 +33,7 @@ class FloorPlanSanitizer:
     def _check_ocr(self) -> bool:
         """Check if pytesseract and tesseract-ocr are available."""
         try:
-            import pytesseract
+            import pytesseract  # noqa: F401
 
             return True
         except ImportError:
@@ -72,7 +72,6 @@ class FloorPlanSanitizer:
         """
         # Load image
         image = self._load_image(image_path_or_bytes)
-        original_shape = image.shape
 
         # Convert to grayscale
         if len(image.shape) == 3:
@@ -121,8 +120,9 @@ class FloorPlanSanitizer:
 
         sanitized_bytes = buffer.tobytes()
 
+        input_desc = len(image_path_or_bytes) if isinstance(image_path_or_bytes, bytes) else image_path_or_bytes
         logger.info(
-            f"✓ Sanitized floor plan: {len(image_path_or_bytes) if isinstance(image_path_or_bytes, bytes) else image_path_or_bytes} "
+            f"✓ Sanitized floor plan: {input_desc} "
             f"→ {len(sanitized_bytes)} bytes, found {len(lookup_table)} text regions"
         )
 

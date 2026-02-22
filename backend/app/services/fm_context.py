@@ -58,7 +58,6 @@ class FMContextService:
         """
         equipment = load_json("equipment.json")
         sites = load_json("sites.json")
-        alerts = load_json("alerts.json")
 
         if site_id:
             equipment = [e for e in equipment if e.get("site_id") == site_id]
@@ -221,12 +220,12 @@ class FMContextService:
             # Evidence summary
             evidence = pred.get("evidence", {})
             lines.append("**Evidence:**")
-            lines.append(
-                f"- Repeat work orders: {evidence.get('repeat_work_orders', 0)} in {evidence.get('repeat_period_months', 0)} months"
-            )
-            lines.append(
-                f"- Asset age: {evidence.get('asset_age_years', 0)} years (expected life: {evidence.get('expected_life_years', 0)} years)"
-            )
+            repeat_wo = evidence.get("repeat_work_orders", 0)
+            repeat_months = evidence.get("repeat_period_months", 0)
+            lines.append(f"- Repeat work orders: {repeat_wo} in {repeat_months} months")
+            asset_age = evidence.get("asset_age_years", 0)
+            exp_life = evidence.get("expected_life_years", 0)
+            lines.append(f"- Asset age: {asset_age} years (expected life: {exp_life} years)")
 
             # Top contributing factors
             lines.append("**Top Contributing Factors:**")
@@ -240,9 +239,8 @@ class FMContextService:
             lines.append("**Financial Impact:**")
             lines.append(f"- Repair cost: R{financial.get('repair_cost_zar', 0):,.0f}")
             lines.append(f"- Potential loss: R{financial.get('potential_loss_zar', 0):,.0f}")
-            lines.append(
-                f"- Potential savings: R{financial.get('potential_loss_zar', 0) - financial.get('repair_cost_zar', 0):,.0f}"
-            )
+            potential_savings = financial.get("potential_loss_zar", 0) - financial.get("repair_cost_zar", 0)
+            lines.append(f"- Potential savings: R{potential_savings:,.0f}")
 
             # Cost impact breakdown
             cost_impact = pred.get("costImpact")

@@ -8,10 +8,11 @@ Handles:
 - GET /api/parasite/stats - Aggregated decision statistics
 - GET /api/parasite/routing-config - Current routing configuration
 - GET /api/parasite/health - PARASITE system health
+- GET /api/parasite/aegis/dashboard - AEGIS ops dashboard (24h activity + KPIs)
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Path
@@ -169,7 +170,7 @@ async def get_routing_config(auth: AuthContext = Depends(require_operator)) -> D
         Dict with parasite enabled status, tier thresholds, rate limits, COV timeouts
     """
     try:
-        routing_engine = get_tier_routing_engine()
+        _routing_engine = get_tier_routing_engine()
 
         return {
             "parasite_enabled": settings.parasite_enabled,
@@ -231,3 +232,134 @@ async def get_health(auth: AuthContext = Depends(require_auth)) -> Dict[str, Any
     except Exception as e:
         logger.error(f"Error retrieving health status: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving health status: {str(e)}")
+
+
+# ---------------------------------------------------------------------------
+# AEGIS Dashboard helpers
+# ---------------------------------------------------------------------------
+
+
+def _is_aegis_decision(d: Dict[str, Any]) -> bool:
+    """Check if a decision was created by the AEGIS subsystem."""
+    cf = d.get("contributing_factors") or {}
+    return cf.get("proposal_source") == "aegis" or cf.get("created_by") == "aegis"
+
+
+def _compute_aegis_kpis(decisions: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Compute 24h KPI counters from a list of AEGIS decisions."""
+    proposals = len(decisions)
+    approved = 0
+    rejected = 0
+    blocked = 0
+    response_times: List[float] = []
+
+    for d in decisions:
+        cf = d.get("contributing_factors") or {}
+        outcome = cf.get("approval_outcome", d.get("approval_outcome", "pending"))
+        if outcome == "approved":
+            approved += 1
+        elif outcome == "rejected":
+            rejected += 1
+
+        ws = d.get("write_status")
+        if ws == "blocked":
+            blocked += 1
+
+        # Response time: time between created_at and approval timestamp
+        approved_at = cf.get("approved_at") or d.get("approved_at")
+        created_at = d.get("created_at")
+        if approved_at and created_at:
+            try:
+                t_created = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                t_approved = datetime.fromisoformat(approved_at.replace("Z", "+00:00"))
+                response_times.append((t_approved - t_created).total_seconds())
+            except (ValueError, TypeError):
+                pass
+
+    avg_response = round(sum(response_times) / len(response_times), 1) if response_times else None
+
+    return {
+        "proposals_24h": proposals,
+        "approved_24h": approved,
+        "rejected_24h": rejected,
+        "blocked_24h": blocked,
+        "avg_response_time_s": avg_response,
+    }
+
+
+@router.get(
+    "/aegis/dashboard",
+    response_model=Dict[str, Any],
+    summary="AEGIS operations dashboard",
+)
+async def aegis_dashboard(
+    site_id: str = Query(..., description="Site ID (required)"),
+    execution_mode: Optional[str] = Query(None, description="Filter: blocked/shadow/live"),
+    approval_outcome: Optional[str] = Query(None, description="Filter: pending/approved/rejected"),
+    dispatch_action_type: Optional[str] = Query(None, description="Filter: charge/discharge/idle"),
+    write_status: Optional[str] = Query(None, description="Filter: blocked/success/skipped"),
+    auth: AuthContext = Depends(require_auth),
+) -> Dict[str, Any]:
+    """AEGIS operations dashboard — 24h activity, KPIs, and pending proposals.
+
+    KPIs are computed from the full unfiltered AEGIS set for the last 24 hours.
+    The activity list respects the optional query filters.
+    """
+    try:
+        parasite_repo = ParasiteDecisionRepository()
+
+        twenty_four_h_ago = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+        all_decisions = await parasite_repo.get_decisions_by_site(site_id=site_id, since=twenty_four_h_ago)
+
+        # Filter to AEGIS-only
+        aegis_decisions = [d for d in all_decisions if _is_aegis_decision(d)]
+
+        # KPIs from unfiltered AEGIS set
+        kpis = _compute_aegis_kpis(aegis_decisions)
+
+        # Apply optional query filters for activity list
+        filtered = aegis_decisions
+        if execution_mode:
+            filtered = [
+                d for d in filtered if (d.get("contributing_factors") or {}).get("execution_mode") == execution_mode
+            ]
+        if approval_outcome:
+            filtered = [
+                d
+                for d in filtered
+                if (d.get("contributing_factors") or {}).get("approval_outcome", d.get("approval_outcome"))
+                == approval_outcome
+            ]
+        if dispatch_action_type:
+            filtered = [
+                d
+                for d in filtered
+                if (d.get("contributing_factors") or {}).get("dispatch_action_type") == dispatch_action_type
+            ]
+        if write_status:
+            filtered = [d for d in filtered if d.get("write_status") == write_status]
+
+        # Separate pending proposals
+        pending = [
+            d
+            for d in aegis_decisions
+            if (d.get("contributing_factors") or {}).get("approval_outcome", d.get("approval_outcome")) == "pending"
+        ]
+
+        return {
+            "site_id": site_id,
+            "period": "last_24h",
+            "kpis": kpis,
+            "pending_proposals": pending,
+            "activity": filtered,
+            "filters_applied": {
+                "execution_mode": execution_mode,
+                "approval_outcome": approval_outcome,
+                "dispatch_action_type": dispatch_action_type,
+                "write_status": write_status,
+            },
+        }
+
+    except Exception as e:
+        logger.error(f"Error building AEGIS dashboard for {site_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error building AEGIS dashboard: {str(e)}")

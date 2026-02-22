@@ -18,9 +18,9 @@ from typing import List
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.database.supabase_client import get_supabase_client
-from app.services.embedding_service import get_embedding_service
-from app.services.vector_db import get_vector_db_service
+from app.database.supabase_client import get_supabase_client  # noqa: E402
+from app.services.embedding_service import get_embedding_service  # noqa: E402
+from app.services.vector_db import get_vector_db_service  # noqa: E402
 
 # Project root
 PROJECT_ROOT = Path(__file__).parent.parent.parent

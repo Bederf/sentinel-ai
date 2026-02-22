@@ -35,7 +35,7 @@ def calculate_thermal_runway(
 
     outside_temp = weather_forecast.get("outside_temp", 32.0)
     solar_load = weather_forecast.get("solar_load", 0.7)
-    humidity = weather_forecast.get("humidity", 65)
+    _humidity = weather_forecast.get("humidity", 65)
 
     # Calculate heat transfer coefficient based on insulation and solar load
     base_transfer = 0.05  # Base heat transfer coefficient (°C/min per °C difference)
@@ -144,7 +144,7 @@ def generate_thermal_curve(
 
     # Calculate temperature at each time point
     points = []
-    current_temp = start_temp
+    _current_temp = start_temp
 
     # Time points: every 15 minutes for first hour, then every 30 minutes
     time_points = []
@@ -271,7 +271,7 @@ if __name__ == "__main__":
 
     # Test thermal curve generation
     curve = generate_thermal_curve(22.4, 26.0, 180, building_params)
-    print(f"Thermal curve points: {len(points)}")
+    print(f"Thermal curve points: {len(curve)}")
     for time, temp in curve[:5]:  # Show first 5 points
         print(f"  {time}min: {temp}°C")
 

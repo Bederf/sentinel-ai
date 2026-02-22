@@ -187,7 +187,7 @@ async def record_emergency_light_test(
         if not 0 <= battery_health_percent <= 100:
             raise ValueError("Battery health must be 0-100%")
 
-        result = await repo.record_emergency_light_test(light_code, battery_health_percent, test_result)
+        await repo.record_emergency_light_test(light_code, battery_health_percent, test_result)
 
         return {"light_code": light_code, "battery_health": battery_health_percent}
 

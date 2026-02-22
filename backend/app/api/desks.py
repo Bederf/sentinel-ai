@@ -128,7 +128,8 @@ async def get_desks(
             desks = [d for d in desks if d.get("floor") == floor]
 
         logger.info(
-            f"Retrieved {len(desks)} desks for building {building_id} (UUID: {actual_building_id}) floor {floor or 'any'}"
+            f"Retrieved {len(desks)} desks for building {building_id} "
+            f"(UUID: {actual_building_id}) floor {floor or 'any'}"
         )
         return desks
     except Exception as e:

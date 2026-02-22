@@ -389,7 +389,6 @@ class FireHVACCoordinator:
                     )
         else:
             # Simulation: determine what WOULD be shut down
-            floor_suffix = floor.replace("L", "")
             simulated_devices = [
                 f"S002-AHU-{floor}-001",
                 f"S002-FCU-{floor}-A",
@@ -485,7 +484,9 @@ class FireHVACCoordinator:
             {
                 "action_type": "smoke_damper_close",
                 "zone_id": zone_id,
-                "description": f"Closed {sum(1 for r in results if r['success'])} of {len(results)} dampers for zone {zone_id}",
+                "description": (
+                    f"Closed {sum(1 for r in results if r['success'])} of {len(results)} dampers for zone {zone_id}"
+                ),
                 "mode": self._mode,
             }
         )

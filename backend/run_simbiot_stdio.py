@@ -14,7 +14,7 @@ backend_dir = Path(__file__).parent
 sys.path.insert(0, str(backend_dir))
 
 # Import only what we need
-from app.mcp.simbiot_stdio import main
+from app.mcp.simbiot_stdio import main  # noqa: E402
 
 if __name__ == "__main__":
     asyncio.run(main())

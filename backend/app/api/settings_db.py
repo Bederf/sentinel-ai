@@ -123,20 +123,26 @@ async def update_health_thresholds(thresholds: HealthThresholdsUpdate) -> Dict[s
     if thresholds.healthy <= thresholds.warning:
         raise HTTPException(
             status_code=400,
-            detail=f"healthy threshold ({thresholds.healthy}) must be greater than warning threshold ({thresholds.warning})",
+            detail=(
+                f"healthy threshold ({thresholds.healthy}) must be greater "
+                f"than warning threshold ({thresholds.warning})"
+            ),
         )
 
     if thresholds.warning <= thresholds.critical:
         raise HTTPException(
             status_code=400,
-            detail=f"warning threshold ({thresholds.warning}) must be greater than critical threshold ({thresholds.critical})",
+            detail=(
+                f"warning threshold ({thresholds.warning}) must be greater "
+                f"than critical threshold ({thresholds.critical})"
+            ),
         )
 
     try:
         supabase = get_supabase_client()
 
         # Update in database
-        result = (
+        (
             supabase.table("system_settings")
             .upsert(
                 {
@@ -208,7 +214,7 @@ async def update_alert_intervals(intervals: Dict[str, int]) -> Dict[str, int]:
     try:
         supabase = get_supabase_client()
 
-        result = (
+        (
             supabase.table("system_settings")
             .upsert(
                 {
@@ -282,7 +288,7 @@ async def update_setting(key: str, update: SettingUpdate) -> Dict[str, Any]:
         supabase = get_supabase_client()
 
         # Check if setting exists and is editable
-        existing = repo.supabase.table("system_settings").select("is_editable").eq("key", key).execute()
+        existing = supabase.table("system_settings").select("is_editable").eq("key", key).execute()
 
         if existing.data:
             if not existing.data[0].get("is_editable", True):
@@ -301,7 +307,7 @@ async def update_setting(key: str, update: SettingUpdate) -> Dict[str, Any]:
             update_data["description"] = update.description
 
         # Update in database
-        result = supabase.table("system_settings").upsert(update_data, on_conflict="key").execute()
+        supabase.table("system_settings").upsert(update_data, on_conflict="key").execute()
 
         logger.info(f"Updated setting '{key}': {update.value}")
 

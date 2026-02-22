@@ -242,7 +242,10 @@ async def rollback_approval(
         if recommendation.status != RecommendationStatus.EXECUTED:
             raise HTTPException(
                 status_code=400,
-                detail=f"Cannot rollback {recommendation.status.value} recommendation. Only executed recommendations can be rolled back.",
+                detail=(
+                    f"Cannot rollback {recommendation.status.value} recommendation. "
+                    "Only executed recommendations can be rolled back."
+                ),
             )
 
         # Execute rollback

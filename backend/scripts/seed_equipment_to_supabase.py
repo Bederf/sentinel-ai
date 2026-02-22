@@ -24,7 +24,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 sys.path.insert(0, "/opt/bms-intelligence/backend")
 
-from app.database.supabase_client import get_supabase_client
+from app.database.supabase_client import get_supabase_client  # noqa: E402
 
 DATA_PATH = Path("/opt/bms-intelligence/backend/app/data")
 BUILDINGS_PATH = DATA_PATH / "buildings"

@@ -206,7 +206,6 @@ class AutoencoderDataPrep:
         # Inject anomalies at random positions
         anomaly_starts = np.random.choice(range(100, n_hours - 100), size=n_anomalies, replace=False)
 
-        anomaly_windows = []
         for start in anomaly_starts:
             # Inject anomaly: sudden shift or spike
             duration = np.random.randint(3, 12)

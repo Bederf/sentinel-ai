@@ -58,7 +58,7 @@ async def get_correlation_data(
         occ_percent = _get_occupancy_for_hour(hour, current_hour.weekday())
 
         # Baseline energy (setback + minimal lighting)
-        baseline_kwh = (HVAC_SETBACK_POWER + 2.0) / 60  # 30 min worth
+        _baseline_kwh = (HVAC_SETBACK_POWER + 2.0) / 60  # 30 min worth
 
         # Actual energy (if HVAC runs at constant power, lights scale with occupancy)
         hvac_actual = (HVAC_BASELINE_POWER * 0.8) / 60  # 80% of peak

@@ -684,7 +684,7 @@ async def submit_weekly_inspection(submission: InspectionSubmission, current_use
     completion_status = checklist_service.calculate_completion_status(template, submission.checklist_responses)
 
     # Generate task number
-    task_number = f"INS-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
+    _task_number = f"INS-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
 
     # Determine overall status from completion
     if completion_status["critical_count"] > 0:
@@ -747,7 +747,7 @@ async def submit_weekly_inspection(submission: InspectionSubmission, current_use
     summary="Get inspection schedule",
     description="Get upcoming inspections for user or equipment",
 )
-async def get_inspection_schedule(
+async def get_inspection_schedule_list(
     equipment_id: Optional[str] = Query(None, description="Filter by equipment ID"),
     days_ahead: int = Query(30, ge=1, le=365, description="Days ahead to include"),
     current_user: User = Depends(get_current_user),

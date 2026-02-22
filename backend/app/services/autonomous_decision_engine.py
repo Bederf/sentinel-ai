@@ -90,7 +90,10 @@ class AutonomousDecisionEngine:
                 "point_name": "cooling_setpoint",
                 "current_value": 22.0,
                 "target_value": 23.5,
-                "decision_rationale": "Outdoor temperature rising to 29°C, increasing setpoint 1.5°C for energy savings while maintaining comfort",
+                "decision_rationale": (
+                    "Outdoor temperature rising to 29°C, increasing setpoint "
+                    "1.5°C for energy savings while maintaining comfort"
+                ),
                 "rule_triggered": "temp_optimization_rule",
                 "safety_validation": {
                     "allowed": True,
@@ -122,7 +125,9 @@ class AutonomousDecisionEngine:
                 "point_name": "brightness",
                 "current_value": 85.0,
                 "target_value": 75.0,
-                "decision_rationale": "Occupancy sensors indicate low activity, reducing brightness 10% for energy conservation",
+                "decision_rationale": (
+                    "Occupancy sensors indicate low activity, reducing brightness 10% for energy conservation"
+                ),
                 "rule_triggered": "occupancy_based_optimization",
                 "safety_validation": {
                     "allowed": True,
@@ -154,7 +159,9 @@ class AutonomousDecisionEngine:
                 "point_name": "supply_temp_setpoint",
                 "current_value": 7.0,
                 "target_value": 8.5,
-                "decision_rationale": "Increasing CHW temperature for chiller efficiency optimization based on load conditions",
+                "decision_rationale": (
+                    "Increasing CHW temperature for chiller efficiency optimization based on load conditions"
+                ),
                 "rule_triggered": "chiller_efficiency_rule",
                 "safety_validation": {
                     "allowed": True,
@@ -186,7 +193,9 @@ class AutonomousDecisionEngine:
                 "point_name": "cooling_setpoint",
                 "current_value": 22.0,
                 "target_value": 25.0,
-                "decision_rationale": "Peak demand period detected, implementing load shedding by increasing setpoint 3°C",
+                "decision_rationale": (
+                    "Peak demand period detected, implementing load shedding by increasing setpoint 3°C"
+                ),
                 "rule_triggered": "peak_demand_shedding",
                 "safety_validation": {
                     "allowed": False,

@@ -504,6 +504,6 @@ async def override_auto_response(
 
 
 # Logging imports at the end
-import logging
+import logging  # noqa: E402
 
 logger = logging.getLogger(__name__)

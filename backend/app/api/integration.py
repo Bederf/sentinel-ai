@@ -129,13 +129,13 @@ class BuildingStatusResponse(BaseModel):
     notes: Optional[str] = None
 
 
-from app.database.repositories.integration_repository import IntegrationRepository
-from app.database.repositories.building_repository import BuildingRepository
-from app.database.repositories.equipment_repository import EquipmentRepository
-from app.services.log_parser import LogParserService
-from app.services.point_matcher import PointMatcherService
-from app.services.commissioning_service import CommissioningService
-from app.models.commissioning import TruthCheckSubmission
+from app.database.repositories.integration_repository import IntegrationRepository  # noqa: E402
+from app.database.repositories.building_repository import BuildingRepository  # noqa: E402
+from app.database.repositories.equipment_repository import EquipmentRepository  # noqa: E402
+from app.services.log_parser import LogParserService  # noqa: E402
+from app.services.point_matcher import PointMatcherService  # noqa: E402
+from app.services.commissioning_service import CommissioningService  # noqa: E402
+from app.models.commissioning import TruthCheckSubmission  # noqa: E402
 
 
 router = APIRouter(prefix="/api/integration", tags=["Integration"])
@@ -628,7 +628,10 @@ async def get_integration_health(
                         id=str(uuid.uuid4()),
                         type="stale_data",
                         severity="warning" if hours_since_sync < 48 else "critical",
-                        message=f"Data is {int(hours_since_sync)} hours old. Last sync was {last_sync.strftime('%Y-%m-%d %H:%M')}.",
+                        message=(
+                            f"Data is {int(hours_since_sync)} hours old. "
+                            f"Last sync was {last_sync.strftime('%Y-%m-%d %H:%M')}."
+                        ),
                         timestamp=datetime.utcnow().isoformat(),
                         value=round(hours_since_sync, 1),
                         threshold=24,
@@ -663,7 +666,10 @@ async def get_integration_health(
                     id=str(uuid.uuid4()),
                     type="low_match_coverage",
                     severity="warning" if match_rate > 25 else "critical",
-                    message=f"Only {match_rate:.0f}% of points are matched to assets. {health['unmatched_points']} points unmatched.",
+                    message=(
+                        f"Only {match_rate:.0f}% of points are matched to assets. "
+                        f"{health['unmatched_points']} points unmatched."
+                    ),
                     timestamp=datetime.utcnow().isoformat(),
                     value=round(match_rate, 1),
                     threshold=50,
@@ -1044,7 +1050,7 @@ async def seed_integration_data():
     for eq in equipment_list[:50]:  # Limit to 50 equipment items
         eq_id = eq.get("code") or eq.get("equipment_id") or eq.get("id")
         eq_type = (eq.get("type") or "sensor").lower()
-        eq_name = eq.get("name") or eq_id
+        _eq_name = eq.get("name") or eq_id
 
         # Get parameter templates for this equipment type
         params = parameter_templates.get(eq_type, [("Value", "Value", "analog")])

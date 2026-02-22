@@ -281,8 +281,8 @@ def validate_anomaly_sensor_alignment() -> tuple[bool, list[str]]:
         last_value = readings_list[-1]["value"]
 
         # Verify trend direction
-        current = anomaly.get("current_value")
-        baseline = anomaly.get("baseline_value")
+        _current = anomaly.get("current_value")
+        _baseline = anomaly.get("baseline_value")
         trend = anomaly.get("trend")
 
         if trend == "increasing" and last_value < first_value * 0.9:

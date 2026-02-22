@@ -37,7 +37,7 @@ from dotenv import load_dotenv
 env_path = Path(__file__).parent.parent / ".env"
 load_dotenv(env_path)
 
-import os
+import os  # noqa: E402
 
 # Configuration
 API_URL = os.getenv("API_URL", "http://localhost:9095")
@@ -447,7 +447,8 @@ def _format_text_output(results: Dict[str, Any]) -> str:
                 f"Site: {site['code']} - {site['name']}",
                 f"  Equipment: {site['equipment']} | Generators: {site['generators']}",
                 f"  Alerts: {site['alerts']['critical']} critical, {site['alerts']['warning']} warning",
-                f"  Safety: {site['safety_status']['in_alarm']} in alarm, {site['safety_status']['in_warning']} in warning",
+                f"  Safety: {site['safety_status']['in_alarm']} in alarm, "
+                f"{site['safety_status']['in_warning']} in warning",
             ]
         )
 

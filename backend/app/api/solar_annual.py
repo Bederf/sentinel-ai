@@ -264,7 +264,8 @@ async def _run_annual_simulation(
         task["days_completed"] = 365
 
         logger.info(
-            f"🎉 Annual simulation complete: {annual_summary.annual_savings_pct:.1f}% savings, R{annual_summary.annual_savings_zar:,.0f}"
+            f"Annual simulation complete: {annual_summary.annual_savings_pct:.1f}% savings, "
+            f"R{annual_summary.annual_savings_zar:,.0f}"
         )
 
     except Exception as e:

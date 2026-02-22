@@ -163,7 +163,7 @@ class TrendDataGenerator:
         Returns:
             Array of point values
         """
-        n = len(timestamps)
+        _n = len(timestamps)
 
         # Get value range
         default_value = point_def.get("default_value", 0)
@@ -312,7 +312,7 @@ class TrendDataGenerator:
         all_data = []
 
         for device in devices:
-            device_id = device.get("id", "")
+            _device_id = device.get("id", "")
             df = self.generate_device_trends(device, timestamps)
             all_data.append(df)
 

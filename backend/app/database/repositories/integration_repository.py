@@ -814,7 +814,9 @@ class IntegrationRepository:
                 "status": "pass" if high_confidence_pct >= 25 else "warning",
                 "value": round(high_confidence_pct, 1),
                 "threshold": 25,
-                "details": f"{round(high_confidence_pct, 1)}% high confidence matches ({high_confidence} of {total_points})",
+                "details": (
+                    f"{round(high_confidence_pct, 1)}% high confidence matches ({high_confidence} of {total_points})"
+                ),
             }
         )
 

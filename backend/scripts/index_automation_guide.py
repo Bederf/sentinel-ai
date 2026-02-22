@@ -18,8 +18,8 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.database.supabase_client import get_supabase_client
-from app.services.vector_db import get_vector_db_service
+from app.database.supabase_client import get_supabase_client  # noqa: E402
+from app.services.vector_db import get_vector_db_service  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,7 +54,11 @@ async def index_guide():
         equipment_type="all",  # Applies to all equipment types
         full_text=full_text,
         source="internal_documentation",
-        summary="Comprehensive guide for automation specialists integrating external systems with SENTINEL BMS. Covers device control APIs, safety interlocks, real-time streaming, work order automation, and common integration scenarios.",
+        summary=(
+            "Comprehensive guide for automation specialists integrating external systems with "
+            "SENTINEL BMS. Covers device control APIs, safety interlocks, real-time streaming, "
+            "work order automation, and common integration scenarios."
+        ),
         keywords=[
             "integration",
             "automation",

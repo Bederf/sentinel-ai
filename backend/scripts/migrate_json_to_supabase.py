@@ -17,9 +17,9 @@ import uuid
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from supabase import create_client, Client
-from dotenv import load_dotenv
-import os
+from supabase import create_client, Client  # noqa: E402
+from dotenv import load_dotenv  # noqa: E402
+import os  # noqa: E402
 
 # Load environment
 load_dotenv()
@@ -378,7 +378,7 @@ def main():
     # Migrate in order of dependencies
     building_map = migrate_buildings(supabase)
     equipment_map = migrate_equipment(supabase, building_map)
-    sensor_map = migrate_sensors(supabase, equipment_map)
+    _sensor_map = migrate_sensors(supabase, equipment_map)
     migrate_alerts(supabase, building_map, equipment_map)
     migrate_predictions(supabase, building_map, equipment_map)
     migrate_anomalies(supabase, building_map, equipment_map)

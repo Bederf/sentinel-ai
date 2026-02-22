@@ -187,7 +187,6 @@ class MunicipalReconciliationService:
             period_start=period_start,
             period_end=period_end,
             meter_id=meter_id,
-            power_sensor_type=sensor_type,
         )
 
         return {

@@ -360,10 +360,26 @@ class StringAnalyzer:
     def _generate_recommendation(self, failure_type: Optional[str], health_score: float) -> str:
         """Generate actionable recommendation based on failure type."""
         recommendations = {
-            "dead": "String open circuit detected. Check for: loose connections, broken modules, damaged bypass diodes. Estimated loss: -20% capacity. Action: Schedule immediate inspection.",
-            "shorted": "String short circuit detected. Check for: moisture ingress, module damage, faulty combiner box. Risk: Fire hazard. Action: Isolate string immediately and investigate.",
-            "degraded": "String power output 20%+ below baseline. Likely causes: partial shading, module soiling, degradation. Action: Clean modules and retest.",
-            "bypass_diode": "Bypass diode failure suspected (voltage ripple pattern). Causes: thermal stress, manufacturing defect. Action: Schedule module replacement.",
+            "dead": (
+                "String open circuit detected. Check for: loose connections, "
+                "broken modules, damaged bypass diodes. Estimated loss: -20% capacity. "
+                "Action: Schedule immediate inspection."
+            ),
+            "shorted": (
+                "String short circuit detected. Check for: moisture ingress, "
+                "module damage, faulty combiner box. Risk: Fire hazard. "
+                "Action: Isolate string immediately and investigate."
+            ),
+            "degraded": (
+                "String power output 20%+ below baseline. Likely causes: "
+                "partial shading, module soiling, degradation. "
+                "Action: Clean modules and retest."
+            ),
+            "bypass_diode": (
+                "Bypass diode failure suspected (voltage ripple pattern). "
+                "Causes: thermal stress, manufacturing defect. "
+                "Action: Schedule module replacement."
+            ),
             "healthy": "String performing within normal parameters.",
         }
 

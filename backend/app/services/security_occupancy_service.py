@@ -164,7 +164,10 @@ class SecurityOccupancyService:
                 "zone_name": zone_name,
                 "occupancy": count,
                 "recommendation": "relax_setpoint",
-                "detail": f"Zone {zone_name} is empty. Recommend relaxing cooling setpoint by +{hvac_setback}°C to save energy.",
+                "detail": (
+                    f"Zone {zone_name} is empty. Recommend relaxing cooling "
+                    f"setpoint by +{hvac_setback}°C to save energy."
+                ),
                 "setpoint_offset": hvac_setback,
                 "reason": "Zone unoccupied based on badge data",
                 "module": "hvac",
@@ -176,7 +179,10 @@ class SecurityOccupancyService:
                 "zone_name": zone_name,
                 "occupancy": count,
                 "recommendation": "partial_relax",
-                "detail": f"Zone {zone_name} has low occupancy ({count} people). Recommend relaxing cooling setpoint by +{offset}°C.",
+                "detail": (
+                    f"Zone {zone_name} has low occupancy ({count} people). "
+                    f"Recommend relaxing cooling setpoint by +{offset}°C."
+                ),
                 "setpoint_offset": offset,
                 "reason": f"Low occupancy ({count} people)",
                 "module": "hvac",
@@ -224,7 +230,9 @@ class SecurityOccupancyService:
                 "zone_name": zone_name,
                 "occupancy": count,
                 "recommendation": "dim_partial",
-                "detail": f"Zone {zone_name} has low occupancy ({count} people). Recommend dimming lights to {lighting_low}%.",
+                "detail": (
+                    f"Zone {zone_name} has low occupancy ({count} people). Recommend dimming lights to {lighting_low}%."
+                ),
                 "brightness_level": lighting_low,
                 "reason": f"Low occupancy ({count} people)",
                 "module": "lighting",

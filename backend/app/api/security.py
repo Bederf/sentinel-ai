@@ -104,7 +104,7 @@ async def get_security_overview(request: Request, site: str = Query(..., descrip
 
         # Get events from today
         today = datetime.now().date()
-        today_start = datetime.combine(today, datetime.min.time())
+        _today_start = datetime.combine(today, datetime.min.time())
 
         events = repo.list_events(site, limit=1000)
         today_events = [e for e in events if datetime.fromisoformat(e["timestamp"]).date() == today]
@@ -279,7 +279,7 @@ async def get_access_anomalies(
         for event in all_events:
             timestamp_str = event.get("timestamp", "")
             try:
-                event_time = datetime.fromisoformat(timestamp_str)
+                _event_time = datetime.fromisoformat(timestamp_str)
                 if repo._is_after_hours(timestamp_str):
                     anomalies.append(
                         {
@@ -407,7 +407,7 @@ async def register_visitor(request: Request, data: RegisterVisitorRequest, site:
         )
 
         repo = SecurityRepository()
-        result = repo.create_event(visitor)  # Store visitor using event system
+        repo.create_event(visitor)  # Store visitor using event system
 
         return {"visitor_id": visitor.visitor_id, "status": "registered", "name": visitor.name}
     except Exception as e:
@@ -458,7 +458,7 @@ async def checkout_visitor(request: Request, visitor_id: str):
 async def revoke_visitor(request: Request, visitor_id: str):
     """Immediately revoke visitor access."""
     try:
-        repo = SecurityRepository()
+        _repo = SecurityRepository()
         # In real system, would immediately invalidate card/code
         return {"visitor_id": visitor_id, "status": "revoked"}
     except Exception as e:

@@ -98,7 +98,7 @@ async def format_sensor_with_zone_and_desks(sensor_data: Dict[str, Any]) -> Dict
     # Strategy: Match by sensor name or sensor_id
     # Common patterns: "site-002-DALI-L2-A", "S002-DALI-L2-A"
     sensor_id = sensor_data.get("sensor_id", "")
-    sensor_name = sensor_data.get("name", "")
+    _sensor_name = sensor_data.get("name", "")
 
     equipment_record = None
 

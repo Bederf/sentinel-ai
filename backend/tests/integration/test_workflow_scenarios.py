@@ -145,7 +145,9 @@ class TestMLAnomalyScenario:
             anomaly_type="vibration",
             probability=0.85,
             timeframe="7 days",
-            ml_explanation="Bearing vibration up 111% from baseline (1.8 → 4.2 mm/s). Frequency analysis confirms bearing defect.",
+            ml_explanation=(
+                "Bearing vibration up 111% from baseline (1.8 → 4.2 mm/s). Frequency analysis confirms bearing defect."
+            ),
             priority="high",
         )
 
@@ -310,7 +312,9 @@ class TestFailedRepairScenario:
                 anomaly_type="repair_followup",
                 probability=1.0,
                 timeframe="immediate",
-                ml_explanation=f"Repair validation failed: only {validation_response.effectiveness['score']:.1f}% improvement",
+                ml_explanation=(
+                    f"Repair validation failed: only {validation_response.effectiveness['score']:.1f}% improvement"
+                ),
                 priority="critical",
             )
 

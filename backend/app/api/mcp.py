@@ -114,7 +114,10 @@ async def server_info() -> MCPServerInfo:
     return MCPServerInfo(
         name="simbiot-mcp",
         version="1.0.0",
-        description="SIMBIOT Building Intelligence MCP Server - Provides building data, asset management, and BMS device control tools for AI integration.",
+        description=(
+            "SIMBIOT Building Intelligence MCP Server - Provides building data, "
+            "asset management, and BMS device control tools for AI integration."
+        ),
         tool_count=len(server.list_tools()),
         capabilities={
             "tools": True,

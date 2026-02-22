@@ -68,7 +68,8 @@ class PromptInjectionDetector:
         ),
         (r"(?i)(no|not)(\s+)?(concern|worry)(\s+)?for(\s+)?(safety|security)", "Attempt to disable safety checks"),
         (
-            r"(?i)(pretend|act|behave|roleplay)(\s+as)?(\s+)?(you\'?re|you are)?(\s+)?(a|an)?(\s+)?(unrestricted|unlimited|unfiltered)(\s+)?(AI|assistant|model)",
+            r"(?i)(pretend|act|behave|roleplay)(\s+as)?(\s+)?(you\'?re|you are)?"
+            r"(\s+)?(a|an)?(\s+)?(unrestricted|unlimited|unfiltered)(\s+)?(AI|assistant|model)",
             "Attempt to assume unrestricted persona",
         ),
         (
@@ -116,7 +117,8 @@ class PromptInjectionDetector:
     # BMS-specific patterns - attempts to manipulate building control
     BMS_PATTERNS = [
         (
-            r"(?i)(disable|turn off|bypass)(\s+)?(all)?(\s+)?(fire|life|life safety)?(\s+)?(safety|security|interlock|limit)(\s+)?(checks?|rules?|systems?)?",
+            r"(?i)(disable|turn off|bypass)(\s+)?(all)?(\s+)?(fire|life|life safety)?"
+            r"(\s+)?(safety|security|interlock|limit)(\s+)?(checks?|rules?|systems?)?",
             "Attempt to disable safety systems",
         ),
         (
@@ -132,7 +134,8 @@ class PromptInjectionDetector:
             "Attempt to force unsafe equipment states",
         ),
         (
-            r"(?i)(shut down|stop|kill|terminate)(\s+)?(all)?(\s+)?(fire|safety|security)(\s+)?(systems?|alarms?|panels?)",
+            r"(?i)(shut down|stop|kill|terminate)(\s+)?(all)?(\s+)?"
+            r"(fire|safety|security)(\s+)?(systems?|alarms?|panels?)",
             "Attempt to disable fire/safety systems",
         ),
         (
@@ -354,9 +357,16 @@ def check_query_safety(query: str) -> Tuple[bool, str, List[PromptInjection]]:
         high = [i for i in injections if i.severity == "high"]
 
         if critical:
-            reason = "Security concern: Query contains content that appears to be attempting to manipulate the AI system or bypass safety controls. This type of request cannot be processed for security reasons."
+            reason = (
+                "Security concern: Query contains content that appears to be "
+                "attempting to manipulate the AI system or bypass safety controls. "
+                "This type of request cannot be processed for security reasons."
+            )
         elif high:
-            reason = "Security concern: Query contains suspicious patterns that may indicate an attempt to bypass safety systems."
+            reason = (
+                "Security concern: Query contains suspicious patterns that may "
+                "indicate an attempt to bypass safety systems."
+            )
         else:
             reason = "Security concern: Query contains patterns that triggered security filters."
 

@@ -390,7 +390,7 @@ class SolarPerformanceService:
                 continue
 
             group_mean = statistics.mean(yield_values)
-            group_stdev = statistics.stdev(yield_values) if len(yield_values) > 1 else 0
+            _group_stdev = statistics.stdev(yield_values) if len(yield_values) > 1 else 0
 
             # Rank by specific yield (highest first)
             yields.sort(key=lambda x: x[1], reverse=True)

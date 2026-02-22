@@ -31,6 +31,10 @@ from app.services.solar_arbitrage_engine import (
     DispatchActionType,
     get_solar_arbitrage_engine,
 )
+from app.services.decision_event_logger import emit_decision_event
+from app.database.repositories.parasite_decision_repository import (
+    get_parasite_decision_repository,
+)
 from app.services.tier_routing_engine import TierRoutingEngine
 
 logger = logging.getLogger(__name__)
@@ -275,6 +279,89 @@ def _build_contributing_factors(
 
 
 # ---------------------------------------------------------------------------
+# Tripwire alerts
+# ---------------------------------------------------------------------------
+
+
+def _check_tripwire_gate_fail(
+    rec_dict: Dict[str, Any],
+    routing_result,
+    site_id: str,
+) -> None:
+    """Emit an event if the quality gate evaluated to 'fail'.
+
+    Silent on pass/unknown/pending — only fires on explicit failure.
+    """
+    cf = rec_dict.get("contributing_factors") or {}
+    gate_status = str(cf.get("quality_gate_status", "")).lower()
+    if gate_status == "fail":
+        logger.warning(
+            "AEGIS tripwire: quality gate FAIL for %s (decision %s)",
+            site_id,
+            routing_result.decision_id if routing_result else "unknown",
+        )
+        emit_decision_event(
+            "aegis.tripwire.gate_fail",
+            correlation_id=rec_dict.get("correlation_id", ""),
+            decision_id=getattr(routing_result, "decision_id", ""),
+            site_id=site_id,
+            status="triggered",
+            details={
+                "quality_gate_status": gate_status,
+                "command_hash": cf.get("command_hash"),
+            },
+        )
+
+
+async def _check_tripwire_repeated_hash(
+    rec_dict: Dict[str, Any],
+    routing_result,
+    site_id: str,
+) -> None:
+    """Emit an event if the same command_hash appears >= 3 times in 1h unapproved.
+
+    Detects the optimizer proposing the same blocked dispatch repeatedly,
+    which may indicate a stuck arbitrage loop.
+    """
+    cf = rec_dict.get("contributing_factors") or {}
+    command_hash = cf.get("command_hash")
+    if not command_hash:
+        return
+
+    repo = get_parasite_decision_repository()
+    one_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    recent = await repo.get_decisions_since(one_hour_ago)
+
+    # Count decisions with the same command_hash that were NOT approved
+    same_hash_unapproved = sum(
+        1
+        for d in recent
+        if (d.get("contributing_factors") or {}).get("command_hash") == command_hash
+        and (d.get("contributing_factors") or {}).get("approval_outcome", d.get("approval_outcome")) != "approved"
+    )
+
+    if same_hash_unapproved >= 3:
+        logger.warning(
+            "AEGIS tripwire: repeated hash %s (%d unapproved in 1h) for %s",
+            command_hash,
+            same_hash_unapproved,
+            site_id,
+        )
+        emit_decision_event(
+            "aegis.tripwire.repeated_hash",
+            correlation_id=rec_dict.get("correlation_id", ""),
+            decision_id=getattr(routing_result, "decision_id", ""),
+            site_id=site_id,
+            status="triggered",
+            details={
+                "command_hash": command_hash,
+                "unapproved_count": same_hash_unapproved,
+                "window": "1h",
+            },
+        )
+
+
+# ---------------------------------------------------------------------------
 # Main cycle
 # ---------------------------------------------------------------------------
 
@@ -386,6 +473,11 @@ async def run_aegis_cycle(
         }
         # Stable join key: links JSONL dispatch events to parasite_decisions
         result["aegis_proposal_id"] = rec.correlation_id
+
+        # 9. Tripwire checks
+        _check_tripwire_gate_fail(rec_dict, routing_result, site_id)
+        await _check_tripwire_repeated_hash(rec_dict, routing_result, site_id)
+
         return result
 
     except Exception as e:

@@ -147,7 +147,8 @@ def test_concurrent_batch_requests_no_429(client):
     assert error_429_count == 0, f"Got {error_429_count} rate limit (429) errors - rate limiting not working"
 
     assert success_count >= (CONCURRENT_REQUESTS * 0.95), (
-        f"Only {success_count}/{CONCURRENT_REQUESTS} requests succeeded ({success_count / CONCURRENT_REQUESTS * 100:.1f}%)"
+        f"Only {success_count}/{CONCURRENT_REQUESTS} requests succeeded "
+        f"({success_count / CONCURRENT_REQUESTS * 100:.1f}%)"
     )
 
     assert avg_time_ms < TARGET_RESPONSE_TIME_MS, (

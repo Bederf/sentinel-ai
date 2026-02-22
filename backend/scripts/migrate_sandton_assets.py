@@ -26,9 +26,9 @@ import uuid
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from supabase import create_client, Client
-from dotenv import load_dotenv
-import os
+from supabase import create_client, Client  # noqa: E402
+from dotenv import load_dotenv  # noqa: E402
+import os  # noqa: E402
 
 # Load environment
 load_dotenv()
@@ -743,8 +743,8 @@ def main():
     # Migrate in dependency order
     zone_map = migrate_hvac_zones(supabase, building_id)
     migrate_desks(supabase, building_id, zone_map)
-    gen_counts = migrate_generators_all(supabase, building_id)
-    ec_counts = migrate_energy_centre(supabase, building_id)
+    _gen_counts = migrate_generators_all(supabase, building_id)
+    _ec_counts = migrate_energy_centre(supabase, building_id)
 
     # Verify
     verify_asset_summary(supabase, building_id)

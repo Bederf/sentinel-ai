@@ -341,7 +341,10 @@ async def get_hvac_overview(site_id: str):
                     "type": "temp_deviation",
                     "priority": "medium" if deviation < 4 else "high",
                     "title": f"Temperature Deviation: {zone.get('zone_name')}",
-                    "description": f"Current {zone.get('current_temp')}°C vs setpoint {zone.get('setpoint')}°C ({deviation:.1f}°C off)",
+                    "description": (
+                        f"Current {zone.get('current_temp')}°C vs setpoint "
+                        f"{zone.get('setpoint')}°C ({deviation:.1f}°C off)"
+                    ),
                     "zone_id": zone.get("zone_id"),
                 }
             )
@@ -698,7 +701,7 @@ async def get_thermal_runway(site_id: str):
     # Thermal model parameters (simplified)
     thermal_mass_hours = 2.5  # Building thermal mass in hours to rise 1°C
     comfort_limit = 26.0
-    outage_duration_hours = 2.5
+    _outage_duration_hours = 2.5
 
     # Generate time points (30-minute intervals)
     time_points = []

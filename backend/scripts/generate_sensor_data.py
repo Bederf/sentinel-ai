@@ -448,7 +448,7 @@ def generate_readings(
                 base_power = float(capacity_str.replace("kVA", "")) * 0.8
             else:
                 base_power = 10
-        except:
+        except Exception:
             base_power = 10
 
         current = START_DATE

@@ -8,7 +8,7 @@ import pytest
 
 try:
     # Try to import from pytest-benchmark
-    from pytest_benchmark.fixture import BenchmarkFixture
+    from pytest_benchmark.fixture import BenchmarkFixture  # noqa: F401
 
     HAS_BENCHMARK = True
 except ImportError:

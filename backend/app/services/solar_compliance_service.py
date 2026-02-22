@@ -548,7 +548,7 @@ class SolarComplianceService:
 
         ingestion = get_solar_ingestion_service()
         meters = await ingestion.get_meter_readings(site_id)
-        inverters = await ingestion.get_inverters(site_id)
+        _inverters = await ingestion.get_inverters(site_id)
 
         # Aggregate THD from meters
         thd_values = [m.thd_pct for m in meters if m.thd_pct > 0]

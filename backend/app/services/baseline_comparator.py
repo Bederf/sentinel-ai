@@ -311,7 +311,10 @@ class BaselineComparator:
                 "last_reading": last_date,
                 "first_rms": first_rms,
                 "last_rms": last_rms,
-                "message": f"Vibration {'rising' if change_pct > 0 else 'falling'} {abs(change_pct):.0f}% over {len(recordings)} readings",
+                "message": (
+                    f"Vibration {'rising' if change_pct > 0 else 'falling'} "
+                    f"{abs(change_pct):.0f}% over {len(recordings)} readings"
+                ),
                 "action_required": trend in ("rapid_increase", "increasing"),
             }
 

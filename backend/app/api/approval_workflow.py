@@ -85,7 +85,9 @@ class NotificationService:
         # HTML email body
         items_html = "".join(
             [
-                f"<li>{item.get('part_name', 'Unknown')} - {item.get('part_number', '')} - R{item.get('unit_price', '0')}</li>"
+                f"<li>{item.get('part_name', 'Unknown')} - "
+                f"{item.get('part_number', '')} - "
+                f"R{item.get('unit_price', '0')}</li>"
                 for item in approval.items
             ]
         )
@@ -109,12 +111,16 @@ class NotificationService:
             <h3>Action Required:</h3>
             <p>
               <a href="{self.frontend_url}/orders/{approval.order_id}/approve"
-                 style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px;">
+                 style="background-color: #4CAF50; color: white;
+                 padding: 10px 20px; text-decoration: none;
+                 border-radius: 4px;">
                 Approve Order
               </a>
               &nbsp;&nbsp;
               <a href="{self.frontend_url}/orders/{approval.order_id}/reject"
-                 style="background-color: #f44336; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px;">
+                 style="background-color: #f44336; color: white;
+                 padding: 10px 20px; text-decoration: none;
+                 border-radius: 4px;">
                 Reject Order
               </a>
             </p>

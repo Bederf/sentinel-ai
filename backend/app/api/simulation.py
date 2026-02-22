@@ -408,7 +408,7 @@ async def force_equipment_degradation(
 # and triggers Sentry health alerts
 # =============================================================================
 
-from app.services.health_simulation_service import health_simulation_service
+from app.services.health_simulation_service import health_simulation_service  # noqa: E402
 
 
 @router.get("/health-sim/status")
@@ -498,13 +498,13 @@ async def trigger_equipment_maintenance(equipment_id: str):
 # Trigger warnings and reset to healthy for demo presentations
 # =============================================================================
 
-from app.services.equipment_alert_service import get_equipment_alert_service
-from app.services.prediction_generator import get_prediction_generator
-from app.database.repositories.prediction_repository import PredictionRepository
-from app.services.maintenance_recommender import get_maintenance_recommender
-from app.services.module_registry_service import ModuleRegistryService
-from app.models.module_registry import AIRecommendation, ModuleType, RecommendationType, RecommendationPriority
-import uuid
+from app.services.equipment_alert_service import get_equipment_alert_service  # noqa: E402
+from app.services.prediction_generator import get_prediction_generator  # noqa: E402
+from app.database.repositories.prediction_repository import PredictionRepository  # noqa: E402
+from app.services.maintenance_recommender import get_maintenance_recommender  # noqa: E402
+from app.services.module_registry_service import ModuleRegistryService  # noqa: E402
+from app.models.module_registry import AIRecommendation, ModuleType, RecommendationType, RecommendationPriority  # noqa: E402
+import uuid  # noqa: E402
 
 
 @router.post("/demo/trigger-warnings")
@@ -658,7 +658,10 @@ async def trigger_demo_warnings(
                 recommendation_type=RecommendationType.MAINTENANCE,
                 priority=RecommendationPriority.HIGH,
                 title=f"Maintenance Required: {eq['name']}",
-                description=f"Health score dropped to {eq_info['new_health']}%. {'; '.join(recommendation.immediate_actions[:2])}",
+                description=(
+                    f"Health score dropped to {eq_info['new_health']}%. "
+                    f"{'; '.join(recommendation.immediate_actions[:2])}"
+                ),
                 confidence=0.85,
                 related_modules=[ModuleType.ENERGY] if "chiller" in eq.get("type", "").lower() else [],
                 telemetry_context={
@@ -820,7 +823,7 @@ async def reset_demo_to_healthy(
 # Pause/resume prediction generation and other background jobs
 # =============================================================================
 
-from app.services.background_scheduler import scheduler_service
+from app.services.background_scheduler import scheduler_service  # noqa: E402
 
 
 @router.get("/scheduler/status")

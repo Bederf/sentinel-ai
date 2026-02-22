@@ -235,7 +235,7 @@ class DeviceStatusInitializer:
         """
         try:
             # Store in device_status cache/view
-            device_status = {
+            _device_status = {
                 "site_id": site_id,
                 "device_code": device_code,
                 "device_type": device_type,

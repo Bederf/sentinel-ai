@@ -542,7 +542,8 @@ class VectorDBService:
     ) -> List[Dict[str, Any]]:
         """List documents with optional filters."""
         query = self.client.table("documents").select(
-            "id, code, title, equipment_type, document_type, manufacturer, model, indexing_status, chunk_count, created_at"
+            "id, code, title, equipment_type, document_type, manufacturer, "
+            "model, indexing_status, chunk_count, created_at"
         )
 
         if equipment_type:

@@ -7,7 +7,9 @@ into actionable maintenance recommendations.
 from typing import Optional
 
 # Base template for prediction explanation
-PREDICTION_EXPLANATION_TEMPLATE = """You are a BMS (Building Management System) expert explaining equipment predictions to maintenance technicians.
+PREDICTION_EXPLANATION_TEMPLATE = (
+    """You are a BMS (Building Management System) expert explaining """
+    """equipment predictions to maintenance technicians.
 
 ## Equipment Information
 - **Type:** {equipment_type}
@@ -52,6 +54,7 @@ Generate a structured explanation using EXACTLY this format:
 ### ADDITIONAL_NOTES
 [Any other relevant information for the technician]
 """
+)
 
 # Template for generating maintenance recommendations
 MAINTENANCE_RECOMMENDATION_TEMPLATE = """You are a maintenance planning expert for building management systems.

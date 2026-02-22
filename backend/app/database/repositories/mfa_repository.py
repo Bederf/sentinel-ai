@@ -166,7 +166,7 @@ class MFARepository:
             return False
 
         try:
-            result = self.client.table("mfa_secrets").delete().eq("user_email", user_email.lower().strip()).execute()
+            self.client.table("mfa_secrets").delete().eq("user_email", user_email.lower().strip()).execute()
 
             return True  # Delete succeeds even if no record existed
 

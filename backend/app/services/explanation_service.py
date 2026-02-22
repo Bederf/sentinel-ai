@@ -201,7 +201,9 @@ class ExplanationService:
         risk_factors = overall_risk.get("risk_factors", [])
 
         explanation = f"""### SUMMARY
-This {template_data.get("equipment_type", "equipment")} ({template_data.get("equipment_id", "")}) has a {risk_level} risk level with {failure_prob:.1f}% failure probability in the next 30 days. The predicted failure type is {predicted_failure}.
+This {template_data.get("equipment_type", "equipment")} ({template_data.get("equipment_id", "")}) has a \
+{risk_level} risk level with {failure_prob:.1f}% failure probability in the next 30 days. \
+The predicted failure type is {predicted_failure}.
 
 ### KEY_FACTORS
 {chr(10).join("- " + f for f in risk_factors) if risk_factors else "- No specific factors identified"}
@@ -219,7 +221,8 @@ This {template_data.get("equipment_type", "equipment")} ({template_data.get("equ
 1-2 hours for initial inspection
 
 ### ADDITIONAL_NOTES
-[Ollama LLM not available] This is an automated fallback explanation. For detailed analysis, ensure Ollama service is running.
+[Ollama LLM not available] This is an automated fallback explanation. \
+For detailed analysis, ensure Ollama service is running.
 """
         return explanation
 

@@ -555,28 +555,20 @@ class RULCalculator:
         # Classify element type and generate appropriate action
         if any(kw in element_lower for kw in ("vibration", "bearing", "vib")):
             action = "Inspect bearings, check alignment, measure detailed vibration spectrum"
-            element_type = "vibration"
         elif any(kw in element_lower for kw in ("temp", "temperature", "thermal")):
             action = "Check refrigerant levels, clean heat exchangers, verify airflow"
-            element_type = "temperature"
         elif any(kw in element_lower for kw in ("pressure", "bar", "kpa", "psi")):
             action = "Check for leaks, inspect valves, verify pump operation"
-            element_type = "pressure"
         elif any(kw in element_lower for kw in ("filter", "dp")):
             action = "Replace filters, check housing seals"
-            element_type = "filter"
         elif any(kw in element_lower for kw in ("current", "voltage", "motor", "electrical")):
             action = "Check connections, measure insulation resistance"
-            element_type = "electrical"
         elif any(kw in element_lower for kw in ("fuel",)):
             action = "Check fuel supply, inspect fuel lines and filters"
-            element_type = "fuel"
         elif any(kw in element_lower for kw in ("airflow", "damper")):
             action = "Inspect damper actuator, calibrate airflow sensor"
-            element_type = "airflow"
         else:
             action = "Inspect element, compare with baseline measurements"
-            element_type = "general"
 
         # Build reason
         if days_remaining <= 0:

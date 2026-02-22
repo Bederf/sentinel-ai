@@ -1232,7 +1232,7 @@ async def escalate_water_alert(
         Escalation confirmation
     """
     try:
-        alert_svc = get_water_alert_service()
+        _alert_svc = get_water_alert_service()
 
         escalated_at = datetime.now().isoformat()
 

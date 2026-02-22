@@ -763,7 +763,7 @@ class SolarHealthService:
         # Strategy: When SoH > warranty threshold AND < 5 years history,
         # project using warranty-implied rate.  As the system ages and we
         # accumulate data, weight shifts to the observed rate.
-        warranty_end_year = 2039  # commissioning 2024 + 15 years warranty
+        _warranty_end_year = 2039  # commissioning 2024 + 15 years warranty
 
         # Observed rate (noisy when young)
         observed_rate = (100.0 - soh) / calendar_age if calendar_age > 0 else 1.33
@@ -823,7 +823,7 @@ class SolarHealthService:
             return []
 
         demo = self._bess_demo_data.get(site_id, {})
-        total_cycles = demo.get("cycles_completed", bess.cycles_count)
+        _total_cycles = demo.get("cycles_completed", bess.cycles_count)
 
         rng = random.Random(hash(f"{site_id}-bess-cycles"))
         now = datetime.now()
@@ -1075,9 +1075,16 @@ class SolarHealthService:
             conclusion={
                 "warranty_claim_recommended": exceeds_spec,
                 "reason": (
-                    f"BESS SoH at {soh:.1f}% after {cycles} cycles ({years:.1f} years). "
-                    f"{'SoH is below expected level — investigate rack-level data.' if exceeds_spec else 'SoH within expected parameters.'} "
-                    f"Rack 4 cell imbalance ({max(r['cell_imbalance_mv'] for r in demo.get('racks', [{'cell_imbalance_mv': 20}])):.0f}mV) requires monitoring."
+                    f"BESS SoH at {soh:.1f}% after {cycles} cycles "
+                    f"({years:.1f} years). "
+                    + (
+                        "SoH is below expected level — investigate rack-level data. "
+                        if exceeds_spec
+                        else "SoH within expected parameters. "
+                    )
+                    + f"Rack 4 cell imbalance "
+                    f"({max(r['cell_imbalance_mv'] for r in demo.get('racks', [{'cell_imbalance_mv': 20}])):.0f}"
+                    f"mV) requires monitoring."
                 ),
                 "estimated_replacement_year": (await self.predict_bess_replacement(site_id)).replacement_year
                 if await self.predict_bess_replacement(site_id)

@@ -37,7 +37,7 @@ def count_json_equipment(site_code: str) -> dict:
             with open(zones_file) as f:
                 zones = json.load(f)
                 counts["hvac_zones"] = len(zones) if isinstance(zones, list) else 0
-        except:
+        except Exception:
             pass
 
     # Count generators
@@ -51,7 +51,7 @@ def count_json_equipment(site_code: str) -> dict:
                     + len(gen_data.get("groups", []))
                     + len(gen_data.get("diesel_tanks", []))
                 )
-        except:
+        except Exception:
             pass
 
     # Count energy centre
@@ -71,7 +71,7 @@ def count_json_equipment(site_code: str) -> dict:
                     + len(ec_data.get("ups_systems", []))
                     + len(ec_data.get("feeders", []))
                 )
-        except:
+        except Exception:
             pass
 
     return counts

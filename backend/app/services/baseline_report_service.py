@@ -325,7 +325,9 @@ class BaselineReportService:
 
             <div class="section">
                 <h2>Baseline Status</h2>
-                <p><strong>Active Baseline:</strong> {"Yes" if json_report["baseline_status"]["has_active_baseline"] else "No"}</p>
+                <p><strong>Active Baseline:</strong> {
+            "Yes" if json_report["baseline_status"]["has_active_baseline"] else "No"
+        }</p>
         """
 
         if json_report["baseline_status"]["has_active_baseline"]:
@@ -343,10 +345,18 @@ class BaselineReportService:
                 <h2>Deviation Statistics</h2>
                 <table>
                     <tr><th>Metric</th><th>Value</th></tr>
-                    <tr><td>Total Comparisons</td><td>{json_report["deviation_statistics"]["total_comparisons"]}</td></tr>
-                    <tr><td class="status-normal">Normal</td><td>{json_report["deviation_statistics"]["normal_count"]}</td></tr>
-                    <tr><td class="status-warning">Warning</td><td>{json_report["deviation_statistics"]["warning_count"]}</td></tr>
-                    <tr><td class="status-critical">Critical</td><td>{json_report["deviation_statistics"]["critical_count"]}</td></tr>
+                    <tr><td>Total Comparisons</td><td>{
+            json_report["deviation_statistics"]["total_comparisons"]
+        }</td></tr>
+                    <tr><td class="status-normal">Normal</td><td>{
+            json_report["deviation_statistics"]["normal_count"]
+        }</td></tr>
+                    <tr><td class="status-warning">Warning</td><td>{
+            json_report["deviation_statistics"]["warning_count"]
+        }</td></tr>
+                    <tr><td class="status-critical">Critical</td><td>{
+            json_report["deviation_statistics"]["critical_count"]
+        }</td></tr>
                     <tr><td>Max Deviation</td><td>{json_report["deviation_statistics"]["max_deviation"]}%</td></tr>
                     <tr><td>Trend</td><td>{json_report["deviation_statistics"]["trend"]}</td></tr>
                 </table>

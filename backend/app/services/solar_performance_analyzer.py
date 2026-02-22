@@ -432,7 +432,10 @@ class SolarPerformanceAnalyzer:
         # Build recommendation
         recommendation = "System performing within expected range."
         if efficiency_deviation > 10:
-            recommendation = f"CRITICAL: Efficiency {efficiency_deviation:.1f}% below peers. Investigate immediately. Potential fault in inverter or strings."
+            recommendation = (
+                f"CRITICAL: Efficiency {efficiency_deviation:.1f}% below peers. "
+                f"Investigate immediately. Potential fault in inverter or strings."
+            )
         elif efficiency_deviation > 5:
             recommendation = (
                 f"WARNING: Efficiency {efficiency_deviation:.1f}% below peers. Schedule diagnostics within 24h."

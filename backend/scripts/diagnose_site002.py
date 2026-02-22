@@ -11,7 +11,7 @@ from datetime import datetime
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.database.supabase_client import get_supabase_client
+from app.database.supabase_client import get_supabase_client  # noqa: E402
 
 
 def check_building(client):
@@ -104,7 +104,8 @@ def check_zones(client, building_id):
             print("\n✅ Zones:")
             for zone in result.data:
                 print(
-                    f"   - {zone.get('zone_id')} ({zone.get('floor')}) {zone.get('zone_type')} - {zone.get('area_sqm')} sqm"
+                    f"   - {zone.get('zone_id')} ({zone.get('floor')}) "
+                    f"{zone.get('zone_type')} - {zone.get('area_sqm')} sqm"
                 )
         else:
             print("❌ NO zones found for site-002")

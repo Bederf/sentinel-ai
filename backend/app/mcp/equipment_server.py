@@ -289,7 +289,11 @@ async def search_equipment_issue_tool(
 MCP_TOOLS = [
     {
         "name": "lookup_fault_code",
-        "description": "Look up a fault code for specific equipment and get diagnosis, fix, and parts. Returns comprehensive fault information including probable causes, recommended fixes, suggested parts with SA suppliers, and forum solutions.",
+        "description": (
+            "Look up a fault code for specific equipment and get diagnosis, fix, and parts. "
+            "Returns comprehensive fault information including probable causes, recommended "
+            "fixes, suggested parts with SA suppliers, and forum solutions."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -306,7 +310,10 @@ MCP_TOOLS = [
     },
     {
         "name": "lookup_parts",
-        "description": "Search for parts across South African suppliers. Returns parts with pricing, lead times, and generic alternatives.",
+        "description": (
+            "Search for parts across South African suppliers. "
+            "Returns parts with pricing, lead times, and generic alternatives."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -323,7 +330,11 @@ MCP_TOOLS = [
     },
     {
         "name": "search_equipment_issue",
-        "description": "Natural language search for equipment issues. Supports queries like 'chiller making loud noise' or 'VSD showing fault 29'. Auto-detects fault codes and manufacturers from the query.",
+        "description": (
+            "Natural language search for equipment issues. Supports queries like "
+            "'chiller making loud noise' or 'VSD showing fault 29'. Auto-detects "
+            "fault codes and manufacturers from the query."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {

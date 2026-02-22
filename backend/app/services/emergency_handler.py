@@ -6,11 +6,12 @@ restoration, and emergency notification distribution.
 
 import logging
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from app.models.autonomous_decision import EscalationEvent, EscalationLevel
 from app.services.autonomous_decision_engine import autonomous_decision_engine
 from app.services.device_abstraction import device_manager
+from app.models.audit_log import AuditResultType
 from app.services.audit_logger import audit_logger
 
 logger = logging.getLogger(__name__)
@@ -317,7 +318,7 @@ class EmergencyHandler:
         )
 
         # Create corresponding boundary status
-        test_boundary = BoundaryStatus(
+        _test_boundary = BoundaryStatus(
             device_id="test_device",
             point_name="temperature",
             current_value=30.0,

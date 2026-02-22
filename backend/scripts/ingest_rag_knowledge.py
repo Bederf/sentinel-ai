@@ -18,9 +18,9 @@ import os
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.database.supabase_client import get_supabase_client
-from app.services.embedding_service import get_embedding_service
-from app.services.vector_db import get_vector_db_service
+from app.database.supabase_client import get_supabase_client  # noqa: E402
+from app.services.embedding_service import get_embedding_service  # noqa: E402
+from app.services.vector_db import get_vector_db_service  # noqa: E402
 
 
 # Equipment knowledge entries to ingest
@@ -48,7 +48,9 @@ EQUIPMENT_KNOWLEDGE = [
             "Check evaporator condition",
             "Verify expansion valve operation",
         ],
-        "solution": "Check for refrigerant leaks, clean evaporator if dirty. May need to add refrigerant if system is low.",
+        "solution": (
+            "Check for refrigerant leaks, clean evaporator if dirty. May need to add refrigerant if system is low."
+        ),
         "parts_required": {
             "items": [{"part_number": "026-35389-000", "description": "Low pressure switch", "quantity": 1}]
         },
@@ -67,7 +69,11 @@ EQUIPMENT_KNOWLEDGE = [
         "symptoms": [],
         "possible_causes": [],
         "diagnostic_steps": [],
-        "solution": "1. De-energize unit. 2. Apply coil cleaner to condenser fins. 3. Allow 15 minutes to soak. 4. Rinse with low-pressure water. 5. Verify fin condition.",
+        "solution": (
+            "1. De-energize unit. 2. Apply coil cleaner to condenser fins. "
+            "3. Allow 15 minutes to soak. 4. Rinse with low-pressure water. "
+            "5. Verify fin condition."
+        ),
         "parts_required": {
             "items": [{"part_number": "CON-CLN-01", "description": "Coil cleaner solution", "quantity": 1}]
         },
@@ -121,7 +127,10 @@ EQUIPMENT_KNOWLEDGE = [
             "Inspect belt condition",
             "Measure motor current",
         ],
-        "solution": "Check VFD for fault codes, reset if transient. Replace belt if broken. Check motor bearings if overheating.",
+        "solution": (
+            "Check VFD for fault codes, reset if transient. "
+            "Replace belt if broken. Check motor bearings if overheating."
+        ),
         "parts_required": {"items": [{"part_number": "V-BELT-A68", "description": "V-Belt A68", "quantity": 2}]},
         "estimated_labor_hours": 1.5,
         "priority": "critical",
@@ -138,7 +147,11 @@ EQUIPMENT_KNOWLEDGE = [
         "symptoms": [],
         "possible_causes": [],
         "diagnostic_steps": [],
-        "solution": "1. Isolate unit. 2. Remove access panel. 3. Remove dirty filters. 4. Install new filters (arrow direction matches airflow). 5. Record filter change.",
+        "solution": (
+            "1. Isolate unit. 2. Remove access panel. 3. Remove dirty filters. "
+            "4. Install new filters (arrow direction matches airflow). "
+            "5. Record filter change."
+        ),
         "parts_required": {
             "items": [{"part_number": "MERV13-24x24x2", "description": "MERV 13 Filter 24x24x2", "quantity": 8}]
         },
@@ -162,7 +175,9 @@ EQUIPMENT_KNOWLEDGE = [
             "Measure delta-T across coil",
             "Inspect coil surface",
         ],
-        "solution": "Verify CHW system operation, bleed air from coil if needed, clean coil if dirty, check valve actuator.",
+        "solution": (
+            "Verify CHW system operation, bleed air from coil if needed, clean coil if dirty, check valve actuator."
+        ),
         "parts_required": {},
         "estimated_labor_hours": 2.0,
         "priority": "medium",
@@ -185,7 +200,10 @@ EQUIPMENT_KNOWLEDGE = [
             "Verify igniter spark",
             "Check flame signal strength",
         ],
-        "solution": "Clean flame sensor with emery cloth. Verify gas pressure. Check igniter gap. Reset lockout after addressing cause.",
+        "solution": (
+            "Clean flame sensor with emery cloth. Verify gas pressure. "
+            "Check igniter gap. Reset lockout after addressing cause."
+        ),
         "parts_required": {"items": [{"part_number": "FS-UV-01", "description": "UV Flame sensor", "quantity": 1}]},
         "estimated_labor_hours": 1.5,
         "priority": "critical",
@@ -202,7 +220,11 @@ EQUIPMENT_KNOWLEDGE = [
         "symptoms": [],
         "possible_causes": [],
         "diagnostic_steps": [],
-        "solution": "1. Slowly drain water using blowdown valve. 2. Verify burner shuts off before water drops below safe level. 3. Refill and verify normal operation. 4. Document test.",
+        "solution": (
+            "1. Slowly drain water using blowdown valve. "
+            "2. Verify burner shuts off before water drops below safe level. "
+            "3. Refill and verify normal operation. 4. Document test."
+        ),
         "parts_required": {},
         "estimated_labor_hours": 0.25,
         "priority": "critical",
@@ -225,7 +247,10 @@ EQUIPMENT_KNOWLEDGE = [
             "Measure vibration levels",
             "Inspect bearings",
         ],
-        "solution": "Balance fan blades, replace damaged blades, check and replace bearings if worn. Verify blade pitch settings.",
+        "solution": (
+            "Balance fan blades, replace damaged blades, check and replace "
+            "bearings if worn. Verify blade pitch settings."
+        ),
         "parts_required": {
             "items": [{"part_number": "BLADE-36-FRP", "description": "FRP Fan blade 36 inch", "quantity": 1}]
         },
@@ -244,7 +269,11 @@ EQUIPMENT_KNOWLEDGE = [
         "symptoms": [],
         "possible_causes": [],
         "diagnostic_steps": [],
-        "solution": "1. Test conductivity. 2. Adjust blowdown to maintain cycles. 3. Check chemical feed rates. 4. Inspect basin for debris. 5. Document readings.",
+        "solution": (
+            "1. Test conductivity. 2. Adjust blowdown to maintain cycles. "
+            "3. Check chemical feed rates. 4. Inspect basin for debris. "
+            "5. Document readings."
+        ),
         "parts_required": {},
         "estimated_labor_hours": 0.5,
         "priority": "medium",
@@ -262,7 +291,10 @@ EQUIPMENT_KNOWLEDGE = [
         "symptoms": ["Water dripping from pump", "Wet pump base", "Low system pressure"],
         "possible_causes": ["Seal wear", "Dry running damage", "Misalignment", "Cavitation damage"],
         "diagnostic_steps": ["Verify leak location", "Check pump alignment", "Measure vibration", "Inspect coupling"],
-        "solution": "Replace mechanical seal. Check alignment and correct if needed. Verify proper venting to prevent dry running.",
+        "solution": (
+            "Replace mechanical seal. Check alignment and correct if needed. "
+            "Verify proper venting to prevent dry running."
+        ),
         "parts_required": {
             "items": [{"part_number": "SEAL-4300-1.5", "description": "Mechanical seal kit 1.5 inch", "quantity": 1}]
         },
@@ -286,7 +318,9 @@ EQUIPMENT_KNOWLEDGE = [
             "Test motor resistance",
             "Check control signals",
         ],
-        "solution": "Verify power supply and control signals. Reset overload if tripped. Replace starter contacts if pitted.",
+        "solution": (
+            "Verify power supply and control signals. Reset overload if tripped. Replace starter contacts if pitted."
+        ),
         "parts_required": {},
         "estimated_labor_hours": 1.0,
         "priority": "high",
@@ -314,7 +348,9 @@ EQUIPMENT_KNOWLEDGE = [
             "Review acceleration ramp",
             "Check load conditions",
         ],
-        "solution": "Check motor and cables for faults. Increase acceleration time if load is high inertia. Reset and monitor.",
+        "solution": (
+            "Check motor and cables for faults. Increase acceleration time if load is high inertia. Reset and monitor."
+        ),
         "parts_required": {},
         "estimated_labor_hours": 1.5,
         "priority": "high",
@@ -341,7 +377,9 @@ EQUIPMENT_KNOWLEDGE = [
             "Verify brake resistor",
             "Check load type",
         ],
-        "solution": "Increase deceleration time. Install or verify brake resistor for regenerative loads. Check supply voltage.",
+        "solution": (
+            "Increase deceleration time. Install or verify brake resistor for regenerative loads. Check supply voltage."
+        ),
         "parts_required": {
             "items": [{"part_number": "NBRA-658C", "description": "Brake resistor 3.3 ohm", "quantity": 1}]
         },
@@ -366,7 +404,10 @@ EQUIPMENT_KNOWLEDGE = [
             "Verify thermostat operation",
             "Bleed air from coil",
         ],
-        "solution": "Verify CHW available at unit. Check valve actuator operation. Bleed air from coil if pipes are cold but unit is warm.",
+        "solution": (
+            "Verify CHW available at unit. Check valve actuator operation. "
+            "Bleed air from coil if pipes are cold but unit is warm."
+        ),
         "parts_required": {},
         "estimated_labor_hours": 1.0,
         "priority": "medium",
@@ -389,7 +430,10 @@ EQUIPMENT_KNOWLEDGE = [
             "Verify power LED",
             "Check for IP conflicts",
         ],
-        "solution": "Verify network connectivity. Check power supply. Reboot controller if network is OK. Check for duplicate IP addresses.",
+        "solution": (
+            "Verify network connectivity. Check power supply. "
+            "Reboot controller if network is OK. Check for duplicate IP addresses."
+        ),
         "parts_required": {},
         "estimated_labor_hours": 1.0,
         "priority": "critical",
@@ -411,7 +455,9 @@ EQUIPMENT_KNOWLEDGE = [
             "Compare to another sensor",
             "Check terminal connections",
         ],
-        "solution": "Check wiring first. Measure sensor resistance (10K NTC typical). Replace sensor if out of specification.",
+        "solution": (
+            "Check wiring first. Measure sensor resistance (10K NTC typical). Replace sensor if out of specification."
+        ),
         "parts_required": {
             "items": [{"part_number": "C7041D2001", "description": "10K NTC temperature sensor", "quantity": 1}]
         },

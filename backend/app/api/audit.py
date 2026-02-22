@@ -102,7 +102,7 @@ async def get_audit_logs(
     """
     try:
         # Calculate offset for pagination
-        offset = (page - 1) * page_size
+        _offset = (page - 1) * page_size
         limit = page_size + 1  # Get one extra to check if there are more
 
         # Get filtered logs

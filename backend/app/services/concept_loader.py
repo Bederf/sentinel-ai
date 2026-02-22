@@ -422,7 +422,8 @@ class ConceptDataLoader:
 
         if len(repeat_calls) >= 3:
             recommendations.append(
-                f"{len(repeat_calls)} repeat calls in 12 months indicates systemic issue. Root cause analysis recommended."
+                f"{len(repeat_calls)} repeat calls in 12 months indicates "
+                f"systemic issue. Root cause analysis recommended."
             )
 
         if warnings:

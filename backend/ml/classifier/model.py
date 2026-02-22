@@ -156,7 +156,7 @@ class FailureClassifier:
         contributions = []
         for i, (name, value) in enumerate(feature_values.items()):
             if name in self.feature_names:
-                idx = self.feature_names.index(name)
+                _idx = self.feature_names.index(name)
                 importance = self.model.feature_importances_[i]
 
                 # Normalize value to 0-1 scale (simplified)

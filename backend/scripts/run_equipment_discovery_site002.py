@@ -17,17 +17,17 @@ import asyncio
 # Add backend to path
 sys.path.insert(0, "/opt/bms-intelligence/backend")
 
-from app.database.repositories.building_repository import BuildingRepository
-from app.services.dali_discovery_service import SimulatedDALIDiscovery
-from app.services.bacnet_discovery_service import SimulatedBACnetDiscovery
-from app.services.modbus_discovery_service import SimulatedModbusDiscovery
-from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
+from app.database.repositories.building_repository import BuildingRepository  # noqa: E402
+from app.services.dali_discovery_service import SimulatedDALIDiscovery  # noqa: E402
+from app.services.bacnet_discovery_service import SimulatedBACnetDiscovery  # noqa: E402
+from app.services.modbus_discovery_service import SimulatedModbusDiscovery  # noqa: E402
+from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository  # noqa: E402
 
 
 def detect_protocol(equipment_code: str, equipment_type: str) -> str:
     """Detect protocol from equipment code or type."""
     code_upper = equipment_code.upper()
-    type_upper = (equipment_type or "").upper()
+    _type_upper = (equipment_type or "").upper()
 
     # DALI - lighting equipment
     if any(x in code_upper for x in ["DALI", "LUM", "LIGHT"]):
@@ -88,7 +88,7 @@ async def discover_equipment_for_site(site_code: str):
         print(f"❌ Site {site_code} not found")
         return
 
-    building_uuid = building["id"]
+    _building_uuid = building["id"]
     print(f"✅ Found site: {building['name']}")
 
     # Get all equipment
@@ -107,7 +107,7 @@ async def discover_equipment_for_site(site_code: str):
     for idx, equipment in enumerate(equipment_list, 1):
         eq_code = equipment.get("code")
         eq_type = equipment.get("type")
-        eq_name = equipment.get("name")
+        _eq_name = equipment.get("name")
         eq_id = equipment.get("id")
 
         try:

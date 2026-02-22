@@ -244,7 +244,6 @@ def draw_equipment(draw, name, eq_type, x, y, scale=2):
         )
 
     # Draw label (small text)
-    label = f"{name}\n({eq_type})"
     draw.text((sx + size + 5, sy - 10), name.split("-")[0], fill="black", font=None)
 
 

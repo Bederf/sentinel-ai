@@ -285,7 +285,10 @@ class EnergyRulesEngine:
             if not conditions_met["sufficient_daylight"]:
                 reason += f"daylight {state.daylight_lux} lux below {DAYLIGHT_HARVESTING_THRESHOLD} lux; "
             if not conditions_met["daytime"]:
-                reason += f"outside daytime hours ({DAYLIGHT_HARVESTING_HOURS[0]:02d}:00-{DAYLIGHT_HARVESTING_HOURS[1]:02d}:00); "
+                reason += (
+                    f"outside daytime hours "
+                    f"({DAYLIGHT_HARVESTING_HOURS[0]:02d}:00-{DAYLIGHT_HARVESTING_HOURS[1]:02d}:00); "
+                )
 
             return RuleResult(
                 rule_id="daylight_harvesting",

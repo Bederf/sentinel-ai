@@ -14,9 +14,9 @@ import logging
 import random
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
-
 from app.models.generator import Generator, GeneratorGroup, DieselTank, GeneratorHealth, PredictiveIndicator
+
+logger = logging.getLogger(__name__)
 
 
 class GeneratorService:

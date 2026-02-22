@@ -24,7 +24,7 @@ from app.models.baseline import EquipmentBaseline, BaselineType, BaselineSource,
 
 # Import existing services
 try:
-    from app.services.device_abstraction import DeviceManager, DeviceInterface
+    from app.services.device_abstraction import DeviceManager
     from app.services.baseline_comparator import get_baseline_comparator
     from app.services.baseline_service import BaselineService
     from app.services.safety_interlocks import safety_engine
@@ -89,9 +89,6 @@ class BaselineElement(BaseModel):
 
     class Config:
         json_schema_extra = {"example": {"value": 7.2, "unit": "°C", "tolerance": 2.0, "tolerance_type": "absolute"}}
-
-
-from pydantic import BaseModel, Field
 
 
 # ============================================================================
@@ -445,11 +442,11 @@ class BaselineCaptureService:
                         logger.debug(f"No mapping for point {point_name}, using raw name")
                         element_name = point_name
                         unit = point_info.unit if hasattr(point_info, "unit") else ""
-                        metric_type = "generic"
+                        _metric_type = "generic"
                     else:
                         element_name = mapping["element"]
                         unit = mapping["unit"]
-                        metric_type = mapping["type"]
+                        _metric_type = mapping["type"]
 
                     # Create element (tolerance will be applied later)
                     elements[element_name] = BaselineElement(

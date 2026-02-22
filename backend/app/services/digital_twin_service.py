@@ -321,7 +321,7 @@ class DigitalTwinService:
         logger.info(f"Generating demo config for {building_code}")
 
         # Generate realistic South African commercial building
-        equipment_types = ["chiller", "ahu", "fcu", "vav", "gen", "ups"]
+        _equipment_types = ["chiller", "ahu", "fcu", "vav", "gen", "ups"]
         floors = ["B1", "G", "L1", "L2", "L3"][:floors_count]
 
         equipment = []

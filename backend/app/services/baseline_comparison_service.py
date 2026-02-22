@@ -132,12 +132,12 @@ class BaselineComparisonService:
                 baseline_value = baseline_el.get("value")
                 tolerance = baseline_el.get("tolerance", 10)
                 tolerance_type = baseline_el.get("tolerance_type", "absolute")
-                unit = baseline_el.get("unit", "")
+                _unit = baseline_el.get("unit", "")
             else:
                 baseline_value = baseline_el
                 tolerance = 10  # Default tolerance
                 tolerance_type = "absolute"
-                unit = ""
+                _unit = ""
 
             # Calculate deviation
             deviation = self._calculate_deviation(
@@ -194,10 +194,10 @@ class BaselineComparisonService:
         # Calculate tolerance threshold
         if tolerance_type == "percentage":
             # Tolerance is a percentage of baseline
-            tolerance_threshold = (tolerance / 100) * abs(baseline_value)
+            _tolerance_threshold = (tolerance / 100) * abs(baseline_value)
         else:
             # Absolute tolerance
-            tolerance_threshold = tolerance
+            _tolerance_threshold = tolerance
 
         # Calculate deviation as percentage for severity check
         if baseline_value != 0:
@@ -256,9 +256,16 @@ class BaselineComparisonService:
     def _generate_recommended_action(self, element_name: str, severity: str, deviation_percent: float) -> str:
         """Generate recommended action based on severity and element."""
         if severity == "critical":
-            return f"Critical deviation detected for {element_name} ({deviation_percent:.1f}%). Immediate inspection required."
+            return (
+                f"Critical deviation detected for {element_name} "
+                f"({deviation_percent:.1f}%). Immediate inspection required."
+            )
         elif severity == "warning":
-            return f"Warning: {element_name} deviation {deviation_percent:.1f}% from baseline. Monitor trend and schedule inspection if continues."
+            return (
+                f"Warning: {element_name} deviation {deviation_percent:.1f}% "
+                f"from baseline. Monitor trend and schedule inspection "
+                f"if continues."
+            )
         else:
             return f"Monitor {element_name} - within acceptable range."
 
@@ -338,7 +345,7 @@ class BaselineComparisonService:
             from reportlab.lib.units import inch
             from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
             from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-            from reportlab.lib.enums import TA_CENTER, TA_LEFT
+            from reportlab.lib.enums import TA_CENTER, TA_LEFT  # noqa: F401
             from io import BytesIO
 
             buffer = BytesIO()

@@ -80,7 +80,8 @@ try:
     print("\n[5] Sample Equipment:")
     for eq in (equipment_result.data or [])[:10]:
         print(
-            f"  {eq['code']}: {eq['name']} ({eq['type']}) - Health: {eq.get('health_score', 'N/A')}%, Status: {eq.get('status')}"
+            f"  {eq['code']}: {eq['name']} ({eq['type']}) - "
+            f"Health: {eq.get('health_score', 'N/A')}%, Status: {eq.get('status')}"
         )
 
     print("\n" + "=" * 70)

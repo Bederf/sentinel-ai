@@ -8,6 +8,7 @@ import json
 import random
 import math
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 import logging
@@ -883,15 +884,15 @@ class BMSimulationService:
             return
 
         # Get temperature readings
-        supply_temp = equipment.sensor_readings.get("supply_temp", 22)
-        return_temp = equipment.sensor_readings.get("return_temp", 24)
+        _supply_temp = equipment.sensor_readings.get("supply_temp", 22)
+        _return_temp = equipment.sensor_readings.get("return_temp", 24)
         zone_temp = equipment.temperature
 
         # Comfort thresholds
         COMFORT_MIN = 20.0  # Too cold below this
         COMFORT_MAX = 26.0  # Too hot above this
-        IDEAL_MIN = 21.0
-        IDEAL_MAX = 24.0
+        _IDEAL_MIN = 21.0
+        _IDEAL_MAX = 24.0
 
         # Check for too hot (actionable: lower setpoint)
         if zone_temp > COMFORT_MAX and equipment.status != "down":

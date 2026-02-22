@@ -175,7 +175,7 @@ class OCRCorrectionHandler:
             }
 
         # Clean up pending state
-        completed_state = self.pending_corrections.pop(service_record_id)
+        self.pending_corrections.pop(service_record_id)
 
         logger.info(f"Applied {len(state['corrections'])} corrections to {service_record_id}")
 

@@ -268,6 +268,124 @@ class ParasiteDecisionRepository:
             logger.error(f"Error updating COV status for decision {decision_id}: {e}")
             raise
 
+    async def get_decision_by_id(self, decision_id: str) -> Optional[Dict]:
+        """Get a single decision by its ID.
+
+        Args:
+            decision_id: Decision UUID
+
+        Returns:
+            Decision dict or None if not found.
+        """
+        try:
+            if not self._use_json and self.client:
+                result = self.client.table("parasite_decisions").select("*").eq("id", decision_id).limit(1).execute()
+                return result.data[0] if result.data else None
+
+            # JSON fallback
+            self._load_all()
+            return self._decisions.get(decision_id)
+
+        except Exception as e:
+            logger.error(f"Error getting decision {decision_id}: {e}")
+            return None
+
+    async def count_pending_measurements(self) -> int:
+        """Count decisions awaiting outcome measurement.
+
+        Returns decisions where write_status is 'success' or 'blocked'
+        but outcome_measured_at is still null.
+        """
+        try:
+            if not self._use_json and self.client:
+                result = (
+                    self.client.table("parasite_decisions")
+                    .select("id", count="exact")
+                    .in_("write_status", ["success", "blocked"])
+                    .is_("outcome_measured_at", "null")
+                    .execute()
+                )
+                return result.count if result.count is not None else 0
+
+            # JSON fallback
+            self._load_all()
+            return sum(
+                1
+                for d in self._decisions.values()
+                if d.get("write_status") in ("success", "blocked") and d.get("outcome_measured_at") is None
+            )
+
+        except Exception as e:
+            logger.error(f"Error counting pending measurements: {e}")
+            return 0
+
+    async def get_decisions_since(self, since_iso: str, limit: int = 500) -> List[Dict]:
+        """Get decisions created after a given ISO timestamp.
+
+        Args:
+            since_iso: ISO 8601 timestamp lower bound (exclusive)
+            limit: Maximum number to return
+
+        Returns:
+            List of decisions newer than since_iso, newest first.
+        """
+        try:
+            if not self._use_json and self.client:
+                result = (
+                    self.client.table("parasite_decisions")
+                    .select("*")
+                    .gt("created_at", since_iso)
+                    .order("created_at", desc=True)
+                    .limit(limit)
+                    .execute()
+                )
+                return result.data if result.data else []
+
+            # JSON fallback
+            self._load_all()
+            matching = [d for d in self._decisions.values() if d.get("created_at", "") > since_iso]
+            matching.sort(key=lambda d: d.get("created_at", ""), reverse=True)
+            return matching[:limit]
+
+        except Exception as e:
+            logger.error(f"Error getting decisions since {since_iso}: {e}")
+            return []
+
+    async def get_decisions_by_site(self, site_id: str, since: Optional[str] = None, limit: int = 1000) -> List[Dict]:
+        """Query decisions by site with optional time filter.
+
+        Like get_decisions_for_site but accepts an optional `since` kwarg
+        to restrict to decisions created after a given ISO timestamp.
+
+        Args:
+            site_id: Site identifier
+            since: Optional ISO 8601 lower bound (exclusive)
+            limit: Maximum number to return
+
+        Returns:
+            List of decisions for site, newest first.
+        """
+        try:
+            if not self._use_json and self.client:
+                query = self.client.table("parasite_decisions").select("*").eq("site_id", site_id)
+                if since:
+                    query = query.gt("created_at", since)
+                query = query.order("created_at", desc=True).limit(limit)
+                result = query.execute()
+                return result.data if result.data else []
+
+            # JSON fallback
+            self._load_all()
+            matching = [d for d in self._decisions.values() if d.get("site_id") == site_id]
+            if since:
+                matching = [d for d in matching if d.get("created_at", "") > since]
+            matching.sort(key=lambda d: d.get("created_at", ""), reverse=True)
+            return matching[:limit]
+
+        except Exception as e:
+            logger.error(f"Error querying decisions by site {site_id}: {e}")
+            return []
+
     async def get_decisions_for_equipment(self, equipment_code: str, limit: int = 50) -> List[Dict]:
         """Query decisions by equipment.
 

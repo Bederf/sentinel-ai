@@ -10,6 +10,7 @@ from app.database.repositories.prediction_repository import PredictionRepository
 from app.services.prediction_generator import get_prediction_generator
 from app.services.prediction_taxonomy import (
     normalize_prediction_confidence,
+    normalize_prediction_severity,
     normalize_prediction_urgency,
 )
 
@@ -150,7 +151,7 @@ async def list_predictions(
             }
 
     if severity:
-        normalized_severity = _normalize_prediction_severity(severity)
+        normalized_severity = normalize_prediction_severity(severity)
         if not normalized_severity:
             raise HTTPException(status_code=400, detail="Invalid severity. Use critical, warning, or healthy.")
         query = query.eq("severity", normalized_severity)

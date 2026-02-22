@@ -20,9 +20,11 @@ class RAGService:
 
 User question: {query}
 
-Please provide a helpful, accurate answer based on the documentation above. If the documentation doesn't contain relevant information, say so clearly."""
+Please provide a helpful, accurate answer based on the documentation above. \
+If the documentation doesn't contain relevant information, say so clearly."""
 
-    EQUIPMENT_EXPLANATION_TEMPLATE = """You are a BMS (Building Management System) expert explaining equipment predictions to maintenance technicians.
+    EQUIPMENT_EXPLANATION_TEMPLATE = """You are a BMS (Building Management System) expert \
+explaining equipment predictions to maintenance technicians.
 
 **Equipment:** {equipment_type} - {equipment_id}
 **Manufacturer:** {manufacturer}
@@ -135,7 +137,8 @@ Keep the language practical and technical but accessible to field technicians.""
         if factors:
             factors_text = "\n".join(
                 [
-                    f"- {f.get('factor', f.get('name', 'Unknown'))}: {f.get('importance', f.get('weight', 0)):.1%} importance"
+                    f"- {f.get('factor', f.get('name', 'Unknown'))}: "
+                    f"{f.get('importance', f.get('weight', 0)):.1%} importance"
                     for f in factors[:5]
                 ]
             )
@@ -163,7 +166,16 @@ Keep the language practical and technical but accessible to field technicians.""
             # Generate explanation with lower temperature for more consistent output
             explanation = await self.ollama.generate(prompt, temperature=0.3)
         else:
-            explanation = f"[Ollama not available]\n\nBased on the prediction data:\n- Failure probability: {prediction.get('failure_probability_30d', 0) * 100:.1f}%\n- Predicted failure: {prediction.get('predicted_failure', 'Unknown')}\n- Risk level: {prediction.get('risk_level', 'Unknown')}\n\nPlease review the technical documentation for detailed guidance."
+            fail_prob = prediction.get("failure_probability_30d", 0) * 100
+            pred_failure = prediction.get("predicted_failure", "Unknown")
+            risk_lvl = prediction.get("risk_level", "Unknown")
+            explanation = (
+                f"[Ollama not available]\n\nBased on the prediction data:\n"
+                f"- Failure probability: {fail_prob:.1f}%\n"
+                f"- Predicted failure: {pred_failure}\n"
+                f"- Risk level: {risk_lvl}\n\n"
+                f"Please review the technical documentation for detailed guidance."
+            )
 
         return {
             "equipment_id": equipment_id,

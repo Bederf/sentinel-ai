@@ -151,7 +151,7 @@ class PredictionGeneratorService:
         """
         health_score = equipment.get("health_score", 50)
         equipment_type = equipment.get("type", "unknown")
-        building = equipment.get("building", {})
+        _building = equipment.get("building", {})
 
         # Calculate probability based on health (inverse relationship)
         probability = min(95, max(60, 100 - health_score + 10))

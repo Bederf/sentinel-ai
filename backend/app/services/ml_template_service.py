@@ -287,12 +287,15 @@ class MLTemplateService:
         faulty_equipment = diagnostic_context.get("faulty_equipment", "")
         original_reading = diagnostic_context.get("original_reading")
         setpoint = diagnostic_context.get("setpoint")
-        zone_id = diagnostic_context.get("zone_id", "")
+        _zone_id = diagnostic_context.get("zone_id", "")
 
         # Step 0: Photo BEFORE repair
         if current_step == "photo_before":
             return {
-                "prompt": f"Please take a photo of the issue BEFORE you start the repair.\n\nDetected issue: {fault_description}",
+                "prompt": (
+                    f"Please take a photo of the issue BEFORE you start the repair."
+                    f"\n\nDetected issue: {fault_description}"
+                ),
                 "type": "photo",
                 "options": None,
             }
@@ -300,7 +303,11 @@ class MLTemplateService:
         # Step 1: Confirm the detected fault
         if current_step == "fault_confirmation":
             return {
-                "prompt": f"{faulty_equipment} repair complete - thanks!\n\nWe detected: {fault_description}\n\nDid you confirm this was the issue?",
+                "prompt": (
+                    f"{faulty_equipment} repair complete - thanks!\n\n"
+                    f"We detected: {fault_description}\n\n"
+                    f"Did you confirm this was the issue?"
+                ),
                 "type": "choice",
                 "options": ["Yes, confirmed", "No, different issue", "Partially - multiple issues"],
             }

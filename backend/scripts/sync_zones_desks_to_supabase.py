@@ -17,7 +17,7 @@ from typing import List, Dict, Any
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.database.supabase_client import get_supabase_client
+from app.database.supabase_client import get_supabase_client  # noqa: E402
 
 
 # Floor mapping: legacy → correct
@@ -103,7 +103,7 @@ def transform_desks(desks: List[Dict], building_id: str) -> List[Dict]:
     # Generate coordinates
     for zone_id, desks_in_zone in desk_by_zone.items():
         # Get zone base center (default to origin if not found)
-        zone_letter = zone_id.split("-")[-1]  # e.g., "A", "B", "001"
+        _zone_letter = zone_id.split("-")[-1]  # e.g., "A", "B", "001"
         base_x, base_z = ZONE_CENTERS.get(zone_id.replace("Zone-", ""), (0.0, 0.0))
 
         for idx, (desk, floor, corrected_zone) in enumerate(desks_in_zone):

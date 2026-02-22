@@ -205,7 +205,9 @@ class ModelRegistryDB:
                 self._thresholds_cache_time = datetime.now()
 
             logger.debug(
-                f"Loaded thresholds for {equipment_type}: tier2={thresholds.tier2_confidence_min}, tier3={thresholds.tier3_confidence_min}"
+                f"Loaded thresholds for {equipment_type}: "
+                f"tier2={thresholds.tier2_confidence_min}, "
+                f"tier3={thresholds.tier3_confidence_min}"
             )
             return thresholds
 

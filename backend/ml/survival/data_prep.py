@@ -13,6 +13,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import pandas as pd
+
 logger = logging.getLogger(__name__)
 
 
@@ -186,7 +188,7 @@ class SurvivalDataPrep:
             try:
                 last_service = datetime.fromisoformat(last_service_str)
                 days_since_service = (datetime.utcnow() - last_service).days
-            except:
+            except Exception:
                 days_since_service = 365
         else:
             days_since_service = 365
@@ -242,7 +244,7 @@ class SurvivalDataPrep:
                     alert_date = datetime.fromisoformat(alert.get("timestamp", ""))
                     if alert_date >= cutoff:
                         count += 1
-                except:
+                except Exception:
                     pass
         return count
 
@@ -258,7 +260,7 @@ class SurvivalDataPrep:
                     alert_date = datetime.fromisoformat(alert.get("timestamp", ""))
                     if alert_date >= cutoff:
                         count += 1
-                except:
+                except Exception:
                     pass
         return count
 

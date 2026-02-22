@@ -162,8 +162,8 @@ High pressure observed. Might be overcharge.
 
         # Test too long
         long = (
-            "This is a very long explanation that goes on and on with many unnecessary words and redundant information that makes it difficult to read and understand quickly. "
-            * 10
+            "This is a very long explanation that goes on and on with many unnecessary words "
+            "and redundant information that makes it difficult to read and understand quickly. " * 10
         )
         score_long = evaluator._calculate_conciseness(long)
         assert score_long < 0.6

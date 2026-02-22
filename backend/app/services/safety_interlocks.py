@@ -273,7 +273,8 @@ class SafetyEngine:
         # First pass: collect all matching rules and identify specific rules
         for rule in self.rules.values():
             logger.debug(
-                f"Checking rule {rule.id}: enabled={rule.enabled}, rule_device_type={rule.device_type}, rule_point={rule.point_name}"
+                f"Checking rule {rule.id}: enabled={rule.enabled}, "
+                f"rule_device_type={rule.device_type}, rule_point={rule.point_name}"
             )
 
             if not rule.enabled:

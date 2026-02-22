@@ -97,7 +97,7 @@ class OutcomeRepository:
     async def _create_supabase(self, outcome: Outcome) -> Outcome:
         """Store outcome in Supabase."""
         try:
-            result = self.client.table("outcomes").insert(outcome.to_dict()).execute()
+            self.client.table("outcomes").insert(outcome.to_dict()).execute()
             logger.debug(f"Stored outcome in Supabase for {outcome.recommendation_id}")
             return outcome
         except Exception as e:
@@ -169,8 +169,8 @@ class OutcomeRepository:
     def _get_accuracy_json(self, action_type: str, site_id: str, days: int = 30) -> float:
         """Get average accuracy from JSON data."""
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
-            accuracies = []
+            _cutoff_date = datetime.utcnow() - timedelta(days=days)
+            _accuracies = []
 
             # Note: JSON outcomes don't have action_type/site_id directly
             # In real implementation, would need to join with recommendations table

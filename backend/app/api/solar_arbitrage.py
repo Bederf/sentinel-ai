@@ -651,6 +651,6 @@ async def get_dispatch_history(
 
 # === Logging ===
 
-import logging
+import logging  # noqa: E402
 
 logger = logging.getLogger(__name__)

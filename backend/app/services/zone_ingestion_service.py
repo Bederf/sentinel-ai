@@ -193,7 +193,7 @@ class ZoneIngestionService:
 
             try:
                 x = float(coords["x"])
-                y = float(coords.get("y", 0))
+                _y = float(coords.get("y", 0))
                 z = float(coords["z"])
 
                 # Basic bounds check (X: 0-50m, Z: 0-50m)

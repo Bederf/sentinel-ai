@@ -186,7 +186,7 @@ class FireSafetyRepository:
         """Update a smoke damper (dual-write)."""
         if not self._use_json and self.client:
             try:
-                response = self.client.table("fire_dampers").update(data).eq("damper_id", damper_id).execute()
+                self.client.table("fire_dampers").update(data).eq("damper_id", damper_id).execute()
             except Exception as e:
                 logger.warning(f"Supabase fire_dampers update failed: {e}")
 
@@ -223,9 +223,7 @@ class FireSafetyRepository:
         """Update stairwell pressurization (dual-write)."""
         if not self._use_json and self.client:
             try:
-                response = (
-                    self.client.table("fire_pressurization").update(data).eq("stairwell_id", stairwell_id).execute()
-                )
+                (self.client.table("fire_pressurization").update(data).eq("stairwell_id", stairwell_id).execute())
             except Exception as e:
                 logger.warning(f"Supabase fire_pressurization update failed: {e}")
 

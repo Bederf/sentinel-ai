@@ -73,7 +73,6 @@ SMA_STATUS_MAP = {
     303: "off",
     307: "standby",
     455: "warning",
-    307: "standby",
     308: "starting",
     309: "online",  # "MPP" tracking
     310: "online",  # "Throttled" due to temperature

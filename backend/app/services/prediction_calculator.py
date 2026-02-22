@@ -95,7 +95,7 @@ class PredictionCalculator:
 
         # Create lookups
         site_lookup = {s["id"]: s for s in sites}
-        asset_lookup = {a["asset_id"]: a for a in assets}
+        _asset_lookup = {a["asset_id"]: a for a in assets}
 
         # Group work orders by asset_id (from work orders) and equipment_id
         wo_by_asset: Dict[str, List[Dict]] = defaultdict(list)
@@ -336,7 +336,10 @@ class PredictionCalculator:
                 {
                     "factor": "Repeat fault calls",
                     "weight": 0.25,
-                    "description": f"{repeat_wo_count} work orders in 6 months{' for same fault code' if most_common_fault else ''}",
+                    "description": (
+                        f"{repeat_wo_count} work orders in 6 months"
+                        f"{' for same fault code' if most_common_fault else ''}"
+                    ),
                 }
             )
         if risk_notes:
@@ -385,7 +388,10 @@ class PredictionCalculator:
                 {
                     "factor": "Asset age",
                     "weight": 0.15,
-                    "description": f"{age_years} years old, {int((age_factor * 100))}% through expected life ({expected_life} years)",
+                    "description": (
+                        f"{age_years} years old, {int((age_factor * 100))}% "
+                        f"through expected life ({expected_life} years)"
+                    ),
                 }
             )
 
@@ -683,7 +689,8 @@ class PredictionCalculator:
         # Health-based observations (using configured thresholds)
         if health_score < thresholds["critical"]:
             notes.append(
-                f"Equipment showing significant degradation. Health score at {health_score}% - recommend urgent attention."
+                f"Equipment showing significant degradation. Health score at "
+                f"{health_score}% - recommend urgent attention."
             )
             notes.append(
                 "Multiple performance indicators below acceptable thresholds. Schedule comprehensive inspection."
@@ -699,7 +706,8 @@ class PredictionCalculator:
         # Age-based observations
         if age_factor > 1.0:
             notes.append(
-                f"Unit is {age_years - expected_life} years beyond expected service life. Replacement planning recommended."
+                f"Unit is {age_years - expected_life} years beyond expected "
+                f"service life. Replacement planning recommended."
             )
         elif age_factor > 0.8:
             notes.append(

@@ -10,8 +10,6 @@ import json
 import logging
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
-
 from app.models.energy_centre import (
     EnergyCentre,
     ATSUnit,
@@ -23,6 +21,8 @@ from app.models.energy_centre import (
     UPSSystem,
 )
 from app.services.generator_service import get_generator_service
+
+logger = logging.getLogger(__name__)
 
 
 class EnergyCentreService:
@@ -331,7 +331,7 @@ class EnergyCentreService:
         ats_units = self.get_ats_units(site_id=site_id)
         meters = self.get_meters(site_id=site_id)
         pfc_banks = self.get_pfc_banks(site_id=site_id)
-        ups_systems = self.get_ups_systems(site_id=site_id)
+        _ups_systems = self.get_ups_systems(site_id=site_id)
         feeders = self.get_feeders(site_id=site_id)
 
         # Determine overall status

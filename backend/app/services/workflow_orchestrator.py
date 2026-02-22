@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 # Data Models
 # ============================================================================
 
-from enum import Enum
+from enum import Enum  # noqa: E402
 
 
 class WorkflowState(str, Enum):

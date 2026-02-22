@@ -160,7 +160,7 @@ class TechnicianRepository:
                 return None
 
             equipment = eq_result.data[0]
-            equipment_id = equipment["id"]
+            _equipment_id = equipment["id"]
             building_id = equipment["building_id"]
 
             # Parse code to determine specialty (supports both site-002 and site-005 formats)
@@ -178,14 +178,16 @@ class TechnicianRepository:
             )
 
             logger.debug(
-                f"Site_technicians query for specialty={specialty}: found {len(result.data) if result.data else 0} results"
+                "Site_technicians query for specialty="
+                f"{specialty}: found {len(result.data) if result.data else 0} results"
             )
 
             if result.data and len(result.data) > 0:
                 assignment = result.data[0]
                 tech = assignment.get("technicians", {})
                 logger.debug(
-                    f"Found technician {tech.get('name')} for {equipment_code} (specialty={assignment.get('specialty')})"
+                    f"Found technician {tech.get('name')} for "
+                    f"{equipment_code} (specialty={assignment.get('specialty')})"
                 )
                 return {
                     "id": tech.get("id"),

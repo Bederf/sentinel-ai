@@ -52,16 +52,16 @@ try:
 except Exception:
     pass
 
-import pytest
-import json
-import asyncio
-from pathlib import Path
-from typing import AsyncGenerator, Generator
-from unittest.mock import Mock, patch
+import pytest  # noqa: E402
+import json  # noqa: E402
+import asyncio  # noqa: E402
+from pathlib import Path  # noqa: E402
+from typing import AsyncGenerator, Generator  # noqa: E402
+from unittest.mock import Mock, patch  # noqa: E402
 
-from fastapi.testclient import TestClient
-from httpx import AsyncClient, ASGITransport
-from fastapi import FastAPI
+from fastapi.testclient import TestClient  # noqa: E402
+from httpx import AsyncClient, ASGITransport  # noqa: E402
+from fastapi import FastAPI  # noqa: E402
 
 if os.getenv("LIGHTWEIGHT_APP", "").lower() == "true":
     from app.api import devices as devices_api
@@ -100,9 +100,9 @@ else:
 if os.getenv("TESTING", "").lower() == "true":
     app.router.on_startup.clear()
     app.router.on_shutdown.clear()
-from app.services.device_abstraction import DeviceManager
-from app.services.safety_interlocks import SafetyEngine
-from app.services.audit_logger import AuditLogger
+from app.services.device_abstraction import DeviceManager  # noqa: E402
+from app.services.safety_interlocks import SafetyEngine  # noqa: E402
+from app.services.audit_logger import AuditLogger  # noqa: E402
 
 # Test data directory
 TEST_DATA_DIR = Path(__file__).parent.parent / "app" / "data"

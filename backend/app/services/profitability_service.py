@@ -576,12 +576,26 @@ class ProfitabilityService:
     def _generate_recommendation(self, root_causes: List[str]) -> str:
         """Generate actionable recommendation based on root causes."""
         recommendations = {
-            "high_labor_costs": "Review technician allocation efficiency. Consider scheduling optimization or training to improve first-time fix rates.",
-            "excessive_parts_costs": "Implement preventive maintenance program to reduce emergency parts purchases. Negotiate bulk discounts with suppliers.",
-            "subcontractor_over_reliance": "Evaluate bringing specialized work in-house. Review subcontractor margins and performance.",
-            "underpriced_contract": "Initiate contract renegotiation. Document cost overruns to support rate adjustment request.",
-            "severe_underpricing": "URGENT: Immediate contract review required. Consider exit strategy if client refuses rate adjustment.",
-            "general_inefficiency": "Conduct operational audit. Review work order patterns and technician utilization.",
+            "high_labor_costs": (
+                "Review technician allocation efficiency. Consider scheduling "
+                "optimization or training to improve first-time fix rates."
+            ),
+            "excessive_parts_costs": (
+                "Implement preventive maintenance program to reduce emergency "
+                "parts purchases. Negotiate bulk discounts with suppliers."
+            ),
+            "subcontractor_over_reliance": (
+                "Evaluate bringing specialized work in-house. Review subcontractor margins and performance."
+            ),
+            "underpriced_contract": (
+                "Initiate contract renegotiation. Document cost overruns to support rate adjustment request."
+            ),
+            "severe_underpricing": (
+                "URGENT: Immediate contract review required. Consider exit strategy if client refuses rate adjustment."
+            ),
+            "general_inefficiency": (
+                "Conduct operational audit. Review work order patterns and technician utilization."
+            ),
         }
 
         # Generate combined recommendation

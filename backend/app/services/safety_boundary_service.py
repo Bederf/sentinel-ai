@@ -95,7 +95,8 @@ class SafetyBoundaryService:
                             if approach_percentage >= 95:
                                 escalation_level = EscalationLevel.EMERGENCY
                                 warnings.append(
-                                    f"EMERGENCY: Value {check_value} is {approach_percentage:.1f}% of the way to minimum limit"
+                                    f"EMERGENCY: Value {check_value} is "
+                                    f"{approach_percentage:.1f}% of the way to minimum limit"
                                 )
                             elif approach_percentage >= 85:
                                 escalation_level = EscalationLevel.CRITICAL
@@ -124,7 +125,8 @@ class SafetyBoundaryService:
                             if approach_percentage >= 95:
                                 escalation_level = EscalationLevel.EMERGENCY
                                 warnings.append(
-                                    f"EMERGENCY: Value {check_value} is {approach_percentage:.1f}% of the way to maximum limit"
+                                    f"EMERGENCY: Value {check_value} is "
+                                    f"{approach_percentage:.1f}% of the way to maximum limit"
                                 )
                             elif approach_percentage >= 85:
                                 escalation_level = EscalationLevel.CRITICAL

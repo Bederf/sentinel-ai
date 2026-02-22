@@ -389,7 +389,7 @@ class SystemHealthService:
                         "error_message": str(e),
                     }
                 ).eq("diagnostic_id", diagnostic_id).execute()
-            except:
+            except Exception:
                 pass
 
     async def _call_simbiot_tool(

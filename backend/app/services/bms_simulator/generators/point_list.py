@@ -142,13 +142,13 @@ class PointListExporter:
         vavs = [d for d in devices if d.get("hvac_type") == "vav"]
 
         diffusers = []
-        rickard_adapter = RickardAdapter()
+        _rickard_adapter = RickardAdapter()
 
         for vav in vavs:
             vav_id = vav.get("id", "")
             location = vav.get("device_location", {})
             floor = location.get("floor", "L1")
-            zone = location.get("zone", "Zone-A")
+            _zone = location.get("zone", "Zone-A")
 
             # Parse zone letter from VAV ID (e.g., S002-VAV-L2-A -> A)
             parts = vav_id.split("-")

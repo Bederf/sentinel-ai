@@ -311,7 +311,10 @@ class CommandExecutor:
                 command_type="temperature",
                 target=site["name"],
                 action=f"set to {temp}°C",
-                message=f"Temperature {temp}°C is outside the safe range (16-28°C). Please specify a temperature within range.",
+                message=(
+                    f"Temperature {temp}°C is outside the safe range "
+                    f"(16-28°C). Please specify a temperature within range."
+                ),
             )
 
         return CommandResult(
@@ -381,7 +384,11 @@ class CommandExecutor:
             command_type="emergency",
             target=target,
             action="isolate",
-            message=f"Could not find equipment or site matching '{target}'. Please specify a valid equipment ID, equipment name, or site name.",
+            message=(
+                f"Could not find equipment or site matching '{target}'. "
+                f"Please specify a valid equipment ID, equipment name, "
+                f"or site name."
+            ),
         )
 
 

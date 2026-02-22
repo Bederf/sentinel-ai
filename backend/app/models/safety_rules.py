@@ -93,7 +93,7 @@ class SafetyRule(ABC):
     def from_dict(cls, data: Dict[str, Any]) -> "SafetyRule":
         """Create rule instance from dictionary."""
         rule_type = RuleType(data["rule_type"])
-        severity = RuleSeverity(data["severity"])
+        _severity = RuleSeverity(data["severity"])
 
         # Create appropriate rule subclass
         if rule_type == RuleType.TEMPERATURE_RANGE:
@@ -126,7 +126,10 @@ class TemperatureRangeRule(SafetyRule):
                 return {
                     "allowed": self.severity != RuleSeverity.BLOCK,
                     "severity": self.severity.value,
-                    "message": f"Temperature {temp}{self.unit} is outside safe range ({self.min_temp}-{self.max_temp}{self.unit})",
+                    "message": (
+                        f"Temperature {temp}{self.unit} is outside safe range "
+                        f"({self.min_temp}-{self.max_temp}{self.unit})"
+                    ),
                     "rule_id": self.id,
                     "rule_name": self.name,
                     "actual_value": temp,

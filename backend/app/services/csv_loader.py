@@ -969,7 +969,9 @@ def get_ai_context_summary() -> str:
         lines.append("\n### Approaching End of Life:")
         for asset in eol_assets:
             lines.append(
-                f"- **{asset['asset_tag']}** ({asset['make']} {asset['model']}): {asset['age_years']} years old, {asset['remaining_life_years']} years remaining"
+                f"- **{asset['asset_tag']}** ({asset['make']} "
+                f"{asset['model']}): {asset['age_years']} years old, "
+                f"{asset['remaining_life_years']} years remaining"
             )
 
     # Key failure stories
@@ -1060,7 +1062,8 @@ def get_ai_context_summary() -> str:
             "## BCC Alarm History",
             f"- **Total Alarms**: {len(alarms)}",
             f"- **Critical Alarms**: {len(critical_alarms)}",
-            f"- **False Alarms**: {len(false_alarms)} ({len(false_alarms) / len(alarms) * 100:.0f}% false positive rate)"
+            f"- **False Alarms**: {len(false_alarms)} "
+            f"({len(false_alarms) / len(alarms) * 100:.0f}% false positive rate)"
             if alarms
             else "",
         ]
@@ -1199,7 +1202,8 @@ def get_ai_context_summary() -> str:
                 lines.extend(
                     [
                         "",
-                        f"**Motor Current Trend**: {first_current:.1f}A → {last_current:.1f}A ({pct_increase:.0f}% increase)",
+                        f"**Motor Current Trend**: {first_current:.1f}A "
+                        f"→ {last_current:.1f}A ({pct_increase:.0f}% increase)",
                         "- Rated motor current: 38A",
                         "- Final reading before failure: 72A (89% overload)",
                         "- **AI Detection**: Current >10% above baseline = bearing degradation",
@@ -1350,7 +1354,7 @@ def get_ai_context_summary() -> str:
                 oil = reading["oil_analysis_result"] or "Not tested"
                 alarm = reading["alarm_code"] or "-"
                 current = reading["compressor_current_a"]
-                oil_press = reading["oil_pressure_kpa"]
+                _oil_press = reading["oil_pressure_kpa"]
                 notes = reading["notes"] or ""
                 lines.append(f"- {date_str}: Vib {vib:.1f}mm/s | Oil: {oil} | {alarm}")
                 if "CRITICAL" in notes or "metal" in notes.lower() or "failure" in notes.lower():
@@ -1442,7 +1446,9 @@ def get_ai_context_summary() -> str:
                 alarm = reading["alarm_code"] or "-"
                 notes = reading["notes"] or ""
                 lines.append(
-                    f"- {date_str}: DE {vib_de:.1f}mm/s | NDE {vib_nde:.1f}mm/s | Bearing {bearing_de:.0f}°C | Seal: {seal} | {alarm}"
+                    f"- {date_str}: DE {vib_de:.1f}mm/s | "
+                    f"NDE {vib_nde:.1f}mm/s | Bearing {bearing_de:.0f}°C "
+                    f"| Seal: {seal} | {alarm}"
                 )
                 if "similar to" in notes.lower() or "monitor" in notes.lower() or "trace" in notes.lower():
                     lines.append(f"  *{notes}*")
@@ -1522,7 +1528,9 @@ def get_work_order_detail(work_order_id: str) -> str:
         f"**Technician Notes**: {wo['technician_notes']}",
         f"**Technician**: {wo['technician_name']}",
         "",
-        f"**Costs**: Labour R{wo['labour_cost']:,.0f} | Parts R{wo['parts_cost']:,.0f} | Total R{wo['total_cost']:,.0f}",
+        f"**Costs**: Labour R{wo['labour_cost']:,.0f} | "
+        f"Parts R{wo['parts_cost']:,.0f} | "
+        f"Total R{wo['total_cost']:,.0f}",
         f"**SLA Met**: {'Yes' if wo['sla_met'] else 'No'} (Target: {wo['sla_target_hours']}h)",
         f"**Repeat Call**: {'Yes' if wo['repeat_call'] else 'No'}",
     ]

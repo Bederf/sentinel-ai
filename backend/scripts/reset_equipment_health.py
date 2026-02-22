@@ -18,7 +18,7 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.database.supabase_client import get_supabase_client
+from app.database.supabase_client import get_supabase_client  # noqa: E402
 
 
 def reset_health_scores():
@@ -34,7 +34,7 @@ def reset_health_scores():
 
     if eq_ids:
         # Update all equipment to health_score = 90, status = normal
-        result = client.table("equipment").update({"health_score": 90, "status": "normal"}).in_("id", eq_ids).execute()
+        client.table("equipment").update({"health_score": 90, "status": "normal"}).in_("id", eq_ids).execute()
 
         print(f"✓ Reset {len(eq_ids)} equipment items to health_score=90, status=normal")
     else:
@@ -50,7 +50,7 @@ def reset_health_scores():
         pred_ids = [p["id"] for p in predictions.data]
 
         # Update all to resolved
-        resolved = client.table("predictions").update({"status": "resolved"}).in_("id", pred_ids).execute()
+        client.table("predictions").update({"status": "resolved"}).in_("id", pred_ids).execute()
 
         print(f"✓ Resolved {len(pred_ids)} active predictions")
     else:

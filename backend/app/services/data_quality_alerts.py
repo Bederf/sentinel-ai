@@ -173,7 +173,9 @@ class DataQualityAlertService:
                     severity="warning" if minutes_since < 60 else "critical",
                     equipment_id=equipment_id,
                     sensor_type=sensor_type,
-                    message=f"Stale data: {sensor_type} on {equipment_id} - no readings for {int(minutes_since)} minutes",
+                    message=(
+                        f"Stale data: {sensor_type} on {equipment_id} - no readings for {int(minutes_since)} minutes"
+                    ),
                     detected_at=datetime.utcnow(),
                     details={"minutes_since_last": round(minutes_since, 2)},
                 )
@@ -215,7 +217,11 @@ class DataQualityAlertService:
                         severity=severity,
                         equipment_id=equipment_id,
                         sensor_type=sensor_health.sensor_type,
-                        message=f"Data gap: {sensor_health.sensor_type} on {equipment_id} - {int(gap.duration_minutes)} minute gap",
+                        message=(
+                            f"Data gap: {sensor_health.sensor_type} on "
+                            f"{equipment_id} - {int(gap.duration_minutes)} "
+                            f"minute gap"
+                        ),
                         detected_at=gap.start,
                         resolved_at=gap.end,  # Gap is already resolved (we have data after it)
                         details={

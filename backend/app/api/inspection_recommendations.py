@@ -165,7 +165,11 @@ async def create_repair_work_order_from_inspection(
         "work_order_type": "maintenance",
         "service_type": "repair",
         "title": f"Repair: {eq['name']} (from inspection)",
-        "notes": f"Inspection Findings: {body.recommendation_reason}\n\nParts Needed: {parts_description}\n\nOriginal Inspection WO: {work_order_id}",
+        "notes": (
+            f"Inspection Findings: {body.recommendation_reason}\n\n"
+            f"Parts Needed: {parts_description}\n\n"
+            f"Original Inspection WO: {work_order_id}"
+        ),
         "assigned_to": assigned_to,
         "created_by": "inspection_analyzer",
         "created_at": datetime.utcnow().isoformat(),

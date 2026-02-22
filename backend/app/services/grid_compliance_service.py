@@ -359,7 +359,7 @@ class MonitoringEngine:
 
             # Insert into compliance_log table
             # Note: Supabase client in synchronous mode, call it directly
-            response = (
+            (
                 supabase.table("compliance_log")
                 .insert(
                     {
@@ -471,8 +471,6 @@ class LoadShedScheduler:
         Returns:
             Tuple of (action_name, affected_system_ids)
         """
-        affected_systems: List[str] = []
-
         if current_stage > previous_stage:
             # Shedding is worsening
             if current_stage <= 3:
@@ -498,7 +496,7 @@ class LoadShedScheduler:
 
             # Insert into load_shed_events table
             # Note: Supabase client in synchronous mode, call it directly
-            response = (
+            (
                 supabase.table("load_shed_events")
                 .insert(
                     {

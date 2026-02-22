@@ -24,8 +24,8 @@ from typing import Dict, List
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.models.baseline import BaselineStatus, BaselineSource
-from app.models.inspection import (
+from app.models.baseline import BaselineStatus, BaselineSource  # noqa: E402
+from app.models.inspection import (  # noqa: E402
     InspectionScheduleFrequency,
     InspectionOverallStatus,
     DeficiencySeverity,
@@ -282,7 +282,9 @@ CHILLER_001_INSPECTIONS = [
                 "title": "Critical Compressor Bearing Wear",
                 "severity": DeficiencySeverity.CRITICAL,
                 "category": DeficiencyCategory.MECHANICAL,
-                "description": "Vibration at 3.8 mm/s is 111% above baseline. Frequency analysis confirms bearing defect.",
+                "description": (
+                    "Vibration at 3.8 mm/s is 111% above baseline. Frequency analysis confirms bearing defect."
+                ),
                 "recommended_action": "Replace compressor bearing before catastrophic failure",
                 "estimated_repair_cost_min": 5000,
                 "estimated_repair_cost_max": 8000,
@@ -317,7 +319,11 @@ ML_PREDICTIONS = {
             {"factor": "Asset age", "weight": 0.10, "value": "21 years (exceeds 20-year life)"},
             {"factor": "Repeat calls", "weight": 0.05, "value": "3 vibration complaints in 6 months"},
         ],
-        "explanation": "The chiller shows declining efficiency indicating refrigerant leak and bearing wear. Vibration levels are 111% above baseline with bearing temperature at critical 85°C. Asset age exceeds recommended 20-year lifespan.",
+        "explanation": (
+            "The chiller shows declining efficiency indicating refrigerant leak and bearing wear. "
+            "Vibration levels are 111% above baseline with bearing temperature at critical 85\u00b0C. "
+            "Asset age exceeds recommended 20-year lifespan."
+        ),
         "actions": [
             {
                 "description": "Replace compressor bearing",
@@ -333,7 +339,10 @@ ML_PREDICTIONS = {
         "timeframe": "90 days",
         "confidence": "high",
         "contributing_factors": [],
-        "explanation": "All parameters within normal range. No anomalies detected. Asset is 7 years old with no significant wear indicators.",
+        "explanation": (
+            "All parameters within normal range. No anomalies detected. "
+            "Asset is 7 years old with no significant wear indicators."
+        ),
         "actions": [],
     },
     "ahu-003": {
@@ -347,7 +356,11 @@ ML_PREDICTIONS = {
             {"factor": "Filter pressure drop", "weight": 0.15, "value": "+140% (clogged)"},
             {"factor": "Age-related wear", "weight": 0.10, "value": "7 years moderate usage"},
         ],
-        "explanation": "Fan motor showing early signs of bearing degradation. Vibration up 73% with elevated current draw. Filter severely clogged - replace immediately.",
+        "explanation": (
+            "Fan motor showing early signs of bearing degradation. "
+            "Vibration up 73% with elevated current draw. "
+            "Filter severely clogged - replace immediately."
+        ),
         "actions": [
             {
                 "description": "Replace fan motor bearings",

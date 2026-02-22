@@ -45,7 +45,7 @@ def get_stats_from_supabase() -> Optional[dict]:
 
         # Get equipment counts by status
         equipment_result = client.table("equipment").select("status", count="exact").execute()
-        equipment_data = equipment_result.data or []
+        _equipment_data = equipment_result.data or []
 
         # Get total equipment count
         total_equipment = 0

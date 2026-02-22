@@ -190,13 +190,19 @@ class ChecklistGeneratorService:
             for key, value in additional_specs.items():
                 specs_text += f"\n{key}: {value}"
 
-        return f"""You are a building maintenance expert specializing in commercial HVAC, electrical, and mechanical systems. Generate inspection checklists for the following equipment:
-
-Equipment Type: {equipment_type}
-Manufacturer: {manufacturer}
-Model: {model}{specs_text}
-
-Generate exactly 3 inspection template variants as a JSON array. Each template should be tailored to {manufacturer} {model} specifications with OEM-specific tolerances where applicable.
+        return (
+            f"You are a building maintenance expert specializing in "
+            f"commercial HVAC, electrical, and mechanical systems. "
+            f"Generate inspection checklists for the following "
+            f"equipment:\n\n"
+            f"Equipment Type: {equipment_type}\n"
+            f"Manufacturer: {manufacturer}\n"
+            f"Model: {model}{specs_text}\n\n"
+            f"Generate exactly 3 inspection template variants as a "
+            f"JSON array. Each template should be tailored to "
+            f"{manufacturer} {model} specifications with OEM-specific "
+            f"tolerances where applicable.\n"
+            f"""
 
 **Template variants required:**
 1. **routine_inspection** - Weekly/monthly routine checks (15-45 min)
@@ -243,6 +249,7 @@ Generate exactly 3 inspection template variants as a JSON array. Each template s
 - Each `item_id` must be unique within the template (use snake_case).
 
 Respond with ONLY the JSON array of 3 templates. No markdown, no explanation, just valid JSON."""
+        )
 
     def _parse_response(
         self,
@@ -353,7 +360,9 @@ Respond with ONLY the JSON array of 3 templates. No markdown, no explanation, ju
                     {
                         "category": "General",
                         "item_id": "visual_check",
-                        "question": f"Visual inspection of {manufacturer} {model} - check for leaks, damage, unusual noise",
+                        "question": (
+                            f"Visual inspection of {manufacturer} {model} - check for leaks, damage, unusual noise"
+                        ),
                         "item_type": "checklist",
                         "options": [
                             {"label": "No issues", "value": "ok"},

@@ -14,7 +14,7 @@ from datetime import datetime
 
 # Optional imports for advanced metrics
 try:
-    from bert_score import score as bert_score
+    from bert_score import score as bert_score  # noqa: F401
 
     BERT_SCORE_AVAILABLE = True
 except ImportError:
@@ -28,7 +28,7 @@ except ImportError:
     ROUGE_AVAILABLE = False
 
 try:
-    import nltk
+    import nltk  # noqa: F401
     from nltk.translate.bleu_score import sentence_bleu
 
     NLTK_AVAILABLE = True

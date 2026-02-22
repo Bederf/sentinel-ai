@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.database.supabase_client import get_supabase_client
+from app.database.supabase_client import get_supabase_client  # noqa: E402
 
 
 def load_building_json(site_id: str) -> Dict[str, Any]:

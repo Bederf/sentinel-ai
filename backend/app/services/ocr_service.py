@@ -237,7 +237,6 @@ For confidence scores: 1.0 = clearly legible, 0.5 = partially readable, 0.0 = gu
         validation_rules = template.get("validation_rules", {})
 
         # Validate readings from extracted data
-        readings = extracted_data.get("readings", {})
         for rule_name, rule in validation_rules.items():
             value = self._find_extracted_value(extracted_data, rule_name)
             confidence = self._find_confidence(extracted_data, rule_name)

@@ -218,7 +218,7 @@ class EscalationEngine:
         try:
             # Note: This would need async context, so we'll use fallback for now
             return device_id  # Placeholder
-        except:
+        except Exception:
             return device_id
 
     async def add_escalation_callback(self, callback: Callable[[EscalationEvent], None]) -> None:

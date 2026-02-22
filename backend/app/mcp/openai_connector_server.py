@@ -376,7 +376,9 @@ def _build_prediction_document(prediction: Dict, source: str = "supabase") -> Di
 
     return {
         "id": f"prediction-{pred_id}",
-        "title": f"Prediction: {prediction.get('prediction_type', 'Unknown')} - {equipment_name or 'Unknown Equipment'}",
+        "title": (
+            f"Prediction: {prediction.get('prediction_type', 'Unknown')} - {equipment_name or 'Unknown Equipment'}"
+        ),
         "text": "\n".join(text_parts),
         "url": f"{BASE_URL}/predictions/{pred_id}",
         "doc_type": "prediction",
@@ -639,13 +641,21 @@ class OpenAIConnectorMCPServer:
         return [
             {
                 "name": "search",
-                "description": "Search SENTINEL BMS data including buildings, equipment, alerts, predictions, work orders, and technical documentation. Returns matching document references.",
+                "description": (
+                    "Search SENTINEL BMS data including buildings, equipment, alerts, "
+                    "predictions, work orders, and technical documentation. "
+                    "Returns matching document references."
+                ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "Search query to find relevant documents (e.g., 'chiller maintenance', 'Sandton building alerts', 'high risk predictions')",
+                            "description": (
+                                "Search query to find relevant documents "
+                                "(e.g., 'chiller maintenance', 'Sandton building alerts', "
+                                "'high risk predictions')"
+                            ),
                         }
                     },
                     "required": ["query"],
@@ -653,7 +663,10 @@ class OpenAIConnectorMCPServer:
             },
             {
                 "name": "fetch",
-                "description": "Retrieve full content of a document by its ID. Use IDs from search results to get detailed information.",
+                "description": (
+                    "Retrieve full content of a document by its ID. "
+                    "Use IDs from search results to get detailed information."
+                ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {

@@ -162,7 +162,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     body = request._json
                     if isinstance(body, dict) and "user_id" in body:
                         return body["user_id"]
-            except:
+            except Exception:
                 pass
 
         return "system"  # Default for automated/system actions
@@ -260,7 +260,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
                     error_data = json.loads(body.decode())
                     error_message = error_data.get("detail", error_message)
-            except:
+            except Exception:
                 pass
 
             self.audit_logger.log_system_event(

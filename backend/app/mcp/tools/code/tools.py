@@ -26,18 +26,26 @@ logger = logging.getLogger(__name__)
 TOOLS = [
     {
         "name": "code_search",
-        "description": "Search for files and code in the codebase. Supports glob patterns, content search, and symbol search.",
+        "description": (
+            "Search for files and code in the codebase. Supports glob patterns, content search, and symbol search."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "Search query: file pattern (e.g., '*.tsx', 'components/**/*.py'), keyword, or symbol name",
+                    "description": (
+                        "Search query: file pattern (e.g., '*.tsx', 'components/**/*.py'), keyword, or symbol name"
+                    ),
                 },
                 "search_type": {
                     "type": "string",
                     "enum": ["file", "content", "symbol"],
-                    "description": "Type of search: 'file' for glob patterns, 'content' for keyword/regex, 'symbol' for function/class names",
+                    "description": (
+                        "Type of search: 'file' for glob patterns, "
+                        "'content' for keyword/regex, "
+                        "'symbol' for function/class names"
+                    ),
                 },
                 "base_path": {
                     "type": "string",
@@ -63,7 +71,9 @@ TOOLS = [
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Relative path to file from codebase root (e.g., 'frontend/src/components/Dashboard.tsx')",
+                    "description": (
+                        "Relative path to file from codebase root (e.g., 'frontend/src/components/Dashboard.tsx')"
+                    ),
                 }
             },
             "required": ["path"],
