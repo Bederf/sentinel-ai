@@ -33,6 +33,8 @@ import type {
 } from '../../lib/sustainabilityApi';
 import type { Site } from '../../lib/api';
 import { api } from '../../lib/api';
+import { sustainabilityApi as sustainabilityV2Api } from '../../lib/api/sustainability';
+import type { ESGMetrics } from '../../lib/api/sustainability';
 
 interface SustainabilityDashboardProps {
   siteId?: string;
@@ -63,6 +65,7 @@ export function SustainabilityDashboard({
   const [history, setHistory] = useState<EmissionsHistory | null>(null);
   const [efficiency, setEfficiency] = useState<EfficiencyMetrics | null>(null);
   const [greenStar, setGreenStar] = useState<GreenStarAssessment | null>(null);
+  const [esgMetrics, setEsgMetrics] = useState<ESGMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [sitesLoading, setSitesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +122,15 @@ export function SustainabilityDashboard({
     const interval = setInterval(loadData, 60000);
     return () => clearInterval(interval);
   }, [loadData]);
+
+  // Fetch ESG metrics from v2 API (graceful fallback — may not be available)
+  useEffect(() => {
+    if (selectedSiteId) {
+      sustainabilityV2Api.getESGMetrics(selectedSiteId)
+        .then(setEsgMetrics)
+        .catch(() => setEsgMetrics(null));
+    }
+  }, [selectedSiteId]);
 
   if (sitesLoading || !selectedSiteId) {
     return <PageLoading message="Loading sustainability data..." />;
@@ -246,7 +258,7 @@ export function SustainabilityDashboard({
       </div>
 
       {/* KPI Row */}
-      <Grid className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <Grid className={`grid grid-cols-2 ${esgMetrics ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}>
         <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
           <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
             {isSimulationRunning ? 'CO2 in Simulation' : 'Total CO2 YTD'}
@@ -301,6 +313,27 @@ export function SustainabilityDashboard({
             {summary?.green_star.estimated_rating ?? '—'}
           </Badge>
         </Card>
+
+        {/* ESG Score from v2 API — hidden if unavailable */}
+        {esgMetrics && (
+          <Card
+            className="glass-panel"
+            decoration="top"
+            decorationColor={
+              esgMetrics.overall_esg_score >= 80 ? 'green' :
+              esgMetrics.overall_esg_score >= 60 ? 'amber' : 'red'
+            }
+            style={{ border: "1px solid var(--glass-border)" }}
+          >
+            <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>ESG Score</Text>
+            <Metric>{esgMetrics.overall_esg_score}/100</Metric>
+            <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Carbon: {esgMetrics.carbon_intensity_score}% |
+              Energy: {esgMetrics.energy_efficiency_score}% |
+              Waste: {esgMetrics.waste_diversion_score}%
+            </Text>
+          </Card>
+        )}
       </Grid>
 
       {/* Emissions Chart */}
