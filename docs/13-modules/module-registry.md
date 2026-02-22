@@ -2,9 +2,9 @@
 title: "Bolt-on Module Registry"
 type: "architecture"
 status: "approved"
-version: "1.1.0"
+version: "1.2.0"
 created: "2026-01-31"
-updated: "2026-02-20"
+updated: "2026-02-22"
 author: "Sentinel Development Team"
 tags: ["modules", "architecture", "integration", "ai"]
 domain: "general"
@@ -64,7 +64,7 @@ graph TB
 |--------|-----|-------------|------------------|
 | **HVAC** | `hvac` | Heating, ventilation, air conditioning | Zone control, AHU monitoring, chiller control, comfort analysis |
 | **Energy** | `energy` | Energy centre & power distribution | Generator SCADA, ATS monitoring, power metering, UPS monitoring, SLD visualization |
-| **Security** | `security` | Access control & CCTV | Door access, CCTV integration, occupancy tracking, intrusion detection |
+| **Security** | `security` | Access control, CCTV & occupancy | Door access, CCTV with stream URLs, zone-level occupancy, access rules, occupancy trends, cross-module HVAC/Lighting triggers. **Sellable: $500/month** |
 | **Lighting** | `lighting` | DALI lighting control | Luminaire control, scene management, daylight harvesting, emergency lighting |
 | **Fire** | `fire` | Fire & life safety (read-only) | Alarm monitoring, damper positions, HVAC shutdown |
 | **Access** | `access` | Access control standalone | Door status, badge events, after-hours scheduling |
@@ -83,6 +83,24 @@ When multiple modules are active, integrations are automatically created:
 | `energy_lighting_loadshed` | Energy → Lighting | ATS on generator | Reduce lighting 50% |
 | `security_hvac_occupancy` | Security → HVAC | Zone occupancy change | Adjust zone setpoint |
 | `security_lighting_occupancy` | Security → Lighting | Zone occupancy change | Adjust lighting level |
+
+## Sellable Modules
+
+Modules marked as sellable include pricing metadata in `site_modules.json`:
+
+| Module | Price | Billing | Key Includes |
+|--------|-------|---------|--------------|
+| **Security** | $500/month | Monthly | Access control monitoring, real-time occupancy, CCTV integration, breach alerts, occupancy-based automation triggers |
+
+Sellable module config fields in `site_modules.json`:
+- `sellable` (boolean): Whether module appears in pricing/checkout
+- `display_name` (string): Customer-facing name
+- `price_usd` (integer): Monthly price in USD
+- `billing_frequency` (string): `monthly` or `annual`
+- `includes` (array): Feature list for the pricing card
+- `integrations` (array): Cross-module integration definitions with `requires`, `provides`, and `feature` fields
+- `dashboard_route` (string): Frontend route path
+- `api_prefix` (string): Backend API prefix
 
 ## Architecture
 

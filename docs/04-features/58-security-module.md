@@ -1,11 +1,92 @@
-# Phase 58: Security Module — Access Control Integration & Anomaly Detection
+---
+title: "Security Module - Access Control, Occupancy & Dashboard"
+type: "spec"
+status: "approved"
+version: "2.0.0"
+created: "2026-02-09"
+updated: "2026-02-22"
+author: "Sentinel Development Team"
+tags: ["security", "access-control", "occupancy", "dashboard", "cameras", "module"]
+domain: "security"
+audience: "developers"
+complexity: "intermediate"
+estimated_read_time: 15
+---
+
+# Security Module — Access Control, Occupancy & Dashboard
 
 ## Overview
 
 The SENTINEL Security Module provides intelligent integration with access control systems (C•CURE 9000, Lenel, Gallagher, and others) as an **intelligence overlay** rather than a control system. SENTINEL reads security events and correlates them with HVAC, lighting, and infrastructure health to detect anomalies, predict maintenance, and optimize building operations.
 
-**Version:** Phase 58.2 (Demo mode ready; Live integration in Phase 58.3)
-**Status:** Production-ready for demonstration; requires Software House Partner Program license for C•CURE live integration
+Phase 69 added zone-level occupancy tracking, a 5-tab SecurityDashboard, CCTV camera integration with stream URLs, and registered the module as a sellable add-on ($500/month).
+
+**Version:** Phase 69 (Dashboard + Occupancy + Sellable Module)
+**Status:** Production-ready; sellable at $500/month with HVAC/Lighting cross-module integrations
+
+---
+
+## Phase 69: Security Dashboard & Zone Occupancy
+
+### SecurityDashboard (5-Tab UI)
+
+Location: `frontend/src/components/security/SecurityDashboard.tsx`
+
+| Tab | Content |
+|-----|---------|
+| **Overview** | 4 KPI cards (doors, cameras, alarm zones, occupancy) + zone occupancy cards with progress bars |
+| **Access Control** | AccessEventsPanel with badge event history, filtering |
+| **Cameras** | CCTV status list with stream URLs, camera models, analytics badges |
+| **Occupancy Analysis** | 24h AreaChart trend, peak hours summary, BarChart floor breakdown |
+| **Integrations** | HVAC/Lighting automation status and cross-module integration health |
+
+### SecurityOccupancyService (Phase 69 additions)
+
+| Method | Purpose |
+|--------|---------|
+| `process_access_event(event_data)` | Handle badge events, update zone occupancy, trigger HVAC/Lighting cross-module recommendations |
+| `get_occupancy_trend(zone_id, hours)` | Hourly entry/exit/net occupancy snapshots for trending and AI analysis |
+| `get_floor_occupancy(floor)` | Aggregate occupancy across all zones on a floor |
+
+### Phase 69 API Endpoints
+
+Six zone-level endpoints added under `/api/security`:
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/occupancy/zone/{zone_id}` | Per-zone occupancy count, max capacity, percent full |
+| GET | `/occupancy/floor/{floor}` | Aggregate floor occupancy across zones |
+| POST | `/access-event` | Receive badge events, trigger HVAC/Lighting automations |
+| GET | `/access-log/{zone_id}` | Recent badge events by zone and time range |
+| GET | `/cameras/{zone_id}` | Zone cameras with stream URLs (Supabase + demo fallback) |
+| GET | `/occupancy-trend/{zone_id}` | Hourly trend data for graphing (default 24h) |
+
+See [Security API Reference](../03-api-reference/security-api.md) for full endpoint details.
+
+### Module Registry (Sellable)
+
+The Security module is registered as a sellable add-on in `site_modules.json`:
+
+- **Price:** $500/month
+- **Includes:** Access control monitoring, real-time occupancy tracking, CCTV integration, breach alerts, occupancy-based automation triggers
+- **Cross-module integrations:**
+  - Security + HVAC: Occupancy-based HVAC optimization
+  - Security + Lighting: Occupancy-based lighting control
+
+### Database Schema (Phase 69)
+
+Migration: `supabase/migrations/security_module.sql`
+
+**New table: `access_rules`** -- Configurable access restrictions per zone:
+- `rule_type`: `time_based` | `occupancy_based` | `emergency`
+- `rule_config`: JSONB (time windows, occupancy thresholds, emergency actions)
+- Indexes on `zone_id` and `(active, rule_type)`
+
+**Extended columns:**
+- `security_occupancy.max_capacity` (INTEGER) -- fire code capacity per zone
+- `security_occupancy.percent_full` (DECIMAL) -- computed fullness percentage
+- `security_cameras.stream_url` (TEXT) -- RTSP stream URL
+- `security_cameras.camera_model` (TEXT) -- hardware model string
 
 ---
 
@@ -240,35 +321,23 @@ Added C•CURE-specific fields:
 
 ---
 
-## Demo Dashboard
+## Dashboard
 
-The Security Dashboard includes:
+Two dashboard layouts are available:
 
-**Section 1: KPI Cards** (4 cards)
-- Doors (count + secured status)
-- Cameras (count + online status)
-- Alarm Zones (count + armed status)
-- Occupancy (total building occupancy)
+### Original Dashboard (`components/SecurityDashboard.tsx`)
 
-**Section 2: C•CURE 9000 Status Card**
-- Integration mode (Demo/Live)
-- Protocol (victor Web Service API)
-- License status
-- Client onboarding instructions
+Flat layout with KPI cards, C•CURE status, anomalies panel, access events, camera/alarm status.
 
-**Section 3: Security Anomalies Panel**
-- After-hours access (with energy impact)
-- Controller offline (with network correlation)
-- Other anomalies (forced door, anti-passback, tamper)
-- Severity badges and recommendations
+### Phase 69 Tabbed Dashboard (`components/security/SecurityDashboard.tsx`)
 
-**Section 4: Access Events Table**
-- Real-time badge events
-- Filtering by zone, badge holder, access level
+5-tab Tremor TabGroup dashboard:
 
-**Section 5: Camera & Alarm Status**
-- CCTV camera status (online/offline)
-- Alarm zone status (armed/disarmed)
+1. **Overview** -- 4 KPI cards (doors, cameras, alarm zones, occupancy) + zone occupancy cards with progress bars showing percent_full against max_capacity
+2. **Access Control** -- AccessEventsPanel with badge event history, person name, location, status badges, time
+3. **Cameras** -- CCTV camera list with stream URLs, camera model, resolution, analytics capability badges
+4. **Occupancy Analysis** -- 24h AreaChart (hourly entries/exits/net occupancy), peak hours summary, BarChart floor breakdown
+5. **Integrations** -- HVAC/Lighting automation status showing cross-module integration health and triggered recommendations
 
 ---
 
@@ -419,13 +488,16 @@ All security integrations (C•CURE badge events, Camera/LPR, Facial recognition
 | File | Purpose |
 |------|---------|
 | `backend/app/services/ccure/ccure_adapter.py` | C•CURE API integration adapter |
-| `backend/app/services/security_occupancy_service.py` | Occupancy + anomaly detection |
-| `backend/app/api/security.py` | REST endpoints (/api/security/*) |
-| `backend/app/models/security.py` | Security data models (CCureEventType, etc.) |
+| `backend/app/services/security_occupancy_service.py` | Occupancy tracking, cross-module coordination, anomaly detection |
+| `backend/app/api/security.py` | REST endpoints (/api/security/*) including Phase 69 zone-level endpoints |
+| `backend/app/models/security.py` | Security data models (CCureEventType, SecurityOccupancy, etc.) |
 | `backend/app/data/ccure_demo_data.json` | Demo badge events, controllers, zones |
-| `frontend/src/components/SecurityDashboard.tsx` | Main security dashboard |
+| `backend/app/data/modules/site_modules.json` | Module registry with sellable metadata |
+| `frontend/src/components/SecurityDashboard.tsx` | Original security dashboard (flat layout) |
+| `frontend/src/components/security/SecurityDashboard.tsx` | Phase 69 tabbed security dashboard (5 tabs) |
 | `frontend/src/components/SecurityAnomaliesPanel.tsx` | Anomalies display component |
-| `supabase/migrations/060_ccure_integration.sql` | Database schema |
+| `supabase/migrations/060_ccure_integration.sql` | Original C•CURE database schema |
+| `supabase/migrations/security_module.sql` | Phase 69 schema: access_rules, occupancy extensions |
 
 ---
 

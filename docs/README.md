@@ -50,12 +50,14 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [MLOps API](03-api-reference/mlops-api.md) - Drift detection, ML alerts, retraining triggers, success metrics (Phase 45-03)
 - [Solar & BESS API](03-api-reference/solar-api.md) - Solar PV, BESS dispatch, grid compliance, financial reporting, maintenance (Phase 34)
 - **[Peak Demand Management API](03-api-reference/peak-demand-api.md)** - Real-time NMD monitoring, multi-module peak shaving coordination, demand forecasting with municipal bill integration (Phase 081)
+- **[Sustainability & ESG API](03-api-reference/sustainability-api.md)** - Carbon emissions (v1+v2), per-system breakdown, solar offset, ESG scoring, CSV/HTML report export (Phase 111)
 - [Water Meter API](03-api-reference/water-api.md) - Water consumption monitoring, leak detection, trending, alert management (Phase 35)
 - [Contract Management API](03-api-reference/contracts-api.md) - Organizations, contracts, SLA terms, equipment assignments, budgets, condition assessments (Phase 48)
 - [Risk-Based Pricing API](03-api-reference/pricing-api.md) - Quote calculations, SLA tier pricing, risk buffers (Phase 52)
 - [Recommendations API](03-api-reference/recommendations-api.md) - Profile-based recommendations, approval workflow, outcome tracking, rejection learning (Phase 72)
 - **[Asset Health API](03-api-reference/asset-health-api.md)** - Combined equipment health scores + baseline status + deviation tracking per site/equipment (Phase 109A)
 - [System Health API](03-api-reference/system-health-api.md) - Unified health snapshots, diagnostics, and system error logs
+- **[Security API](03-api-reference/security-api.md)** - Access control events, visitor management, zone occupancy, cameras, occupancy trends, cross-module recommendations (Phases 27, 58, 69)
 
 ### ✨ Features
 
@@ -105,7 +107,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Water Meter Integration & Leak Detection](04-features/35-water-meter-integration.md)** - Modbus pulse counter integration, 3-algorithm leak detection, consumption trending, alert management, water dashboard (Phase 35)
 
 #### Sustainability & ESG
-- **[Sustainability & ESG Module](04-features/29-sentinel-sustainability.md)** - Carbon emissions (Scope 1/2/3), energy efficiency benchmarks, Green Star SA self-assessment (Phase 29)
+- **[Sustainability & ESG Module](04-features/29-sentinel-sustainability.md)** - Carbon emissions (Scope 1/2/3), energy efficiency benchmarks, Green Star SA self-assessment, per-system breakdown, solar offset, ESG scoring, report export (Phase 29 + Phase 111)
 
 #### Contract Management
 - **[Contract Management Module](04-features/48-contract-management.md)** - Portfolio KPIs, SLA compliance tracking, budget variance analysis, profitability dashboard (Phase 48)
@@ -156,6 +158,11 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 ### 📦 Modules
 - [Module Registry](13-modules/module-registry.md) - Bolt-on module system architecture
+
+### 🗄️ Database
+- [Service Records Schema](07-database/SERVICE_RECORDS_SCHEMA.md) - Service records table structure
+- **[Daily Sustainability Metrics](07-database/daily-sustainability-metrics.md)** - Energy/water/diesel/solar daily snapshots with computed emissions (Phase 111)
+- **[Security Module Schema](07-database/69-security-module-schema.md)** - access_rules table, occupancy capacity, camera stream URLs (Phase 69)
 
 ### 🤖 AI & ML
 - **[AI Recommendation System](08-ai-ml/ai-recommendation-system.md)** - Zone-aware HVAC optimization with Claude AI
