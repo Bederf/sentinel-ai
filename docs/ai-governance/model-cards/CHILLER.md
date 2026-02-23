@@ -155,7 +155,26 @@ complexity: "intermediate"
 - Safety boundary violation detected (any single occurrence triggers immediate review)
 - Anomaly detector sensitivity drops below 75%
 
-## 8. Ethical Considerations
+## 8. Fairness & Bias
+
+**Bias risk: LOW-MEDIUM** (see full assessment: [`fairness-bias-baseline.md`](../fairness-bias-baseline.md))
+
+**Identified biases:**
+- **Single-site training bias:** All training data from Site 002. Chiller types, sizes, and loading patterns at other sites may differ, leading to reduced accuracy for out-of-distribution equipment.
+- **Equipment subtype bias:** Trained on scroll and centrifugal compressors only. Absorption chillers (different thermodynamic cycle) are explicitly out of scope.
+- **Simulation bias:** 365-day simulation data may not fully capture real-world sensor drift, noise, and calibration issues.
+
+**Mitigations:**
+- Confidence scoring penalizes out-of-distribution (OOD) inputs
+- New sites enter simulation mode first, allowing performance validation before live control
+- Quality gates (QualityGateEvaluator) enforce mode discipline and fail-closed in live_control
+- Safety bounds (CHW supply 5-12 degrees C, zone 16-28 degrees C) prevent harmful outcomes regardless of model bias
+
+**Fairness assessment:** Optimization recommendations apply identical safety bounds and confidence thresholds across all zones. Zone equity is maintained by the lifecycle orchestrator processing all zones together with building physics accounting for inter-zone heat transfer.
+
+**Review cadence:** Quarterly fairness metrics review per NIST AI RMF MS 2.7.
+
+## 9. Ethical Considerations
 
 - No personal data used in training or inference
 - Model cannot discriminate against individuals

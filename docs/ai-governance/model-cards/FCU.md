@@ -154,7 +154,27 @@ complexity: "intermediate"
 - Safety boundary violation detected
 - Consistent misclassification of healthy actuators as degraded
 
-## 8. Ethical Considerations
+## 8. Fairness & Bias
+
+**Bias risk: MEDIUM** (see full assessment: [`fairness-bias-baseline.md`](../fairness-bias-baseline.md))
+
+**Identified biases:**
+- **Occupancy pattern bias:** Training data reflects a specific building schedule. Buildings with different usage patterns (hospitals, retail, co-working) will have different zone dynamics, reducing model accuracy.
+- **Zone location bias:** Perimeter zones (solar gain) behave differently from core zones (internal loads). Model treats both equally, which may create accuracy disparity across zone types.
+- **Sensor noise bias:** Valve position feedback jitter (2-5%) varies by manufacturer, potentially biasing stiction detection toward noisier sensors.
+- **Cross-zone interference:** Adjacent zone interactions through shared plenums are not fully modeled.
+
+**Mitigations:**
+- **Confidence capped at 0.45** -- all FCU recommendations are advisory-only, requiring human review. This is the primary mitigation against bias impact.
+- Mode discipline: FCU recommendations are excluded from automatic execution in all modes
+- Zone-average imputation for missing data reduces individual sensor bias
+- Safety bounds (zone 16-28 degrees C) maintained regardless of model output
+
+**Fairness assessment:** The advisory-only status of the FCU model means that even if occupancy pattern bias causes inaccurate zone-level predictions, no automated action is taken. Human operators validate all FCU recommendations before implementation, providing a human-in-the-loop check against biased outputs.
+
+**Review cadence:** Quarterly fairness metrics review per NIST AI RMF MS 2.7.
+
+## 9. Ethical Considerations
 
 - No personal data used in training or inference
 - Occupancy data is binary (occupied/unoccupied), not identity-linked

@@ -153,7 +153,28 @@ complexity: "intermediate"
 - Safety boundary violation detected
 - Filter replacement prediction error exceeds 7 days consistently
 
-## 8. Ethical Considerations
+## 8. Fairness & Bias
+
+**Bias risk: MEDIUM** (see full assessment: [`fairness-bias-baseline.md`](../fairness-bias-baseline.md))
+
+**Identified biases:**
+- **Seasonal/climate bias:** JHB wet season (Oct-Mar) and dry season create distinct loading patterns. Northern hemisphere or coastal deployments would experience different humidity profiles. 10-15% accuracy variation between seasons is documented.
+- **Equipment subtype bias:** Trained primarily on belt-driven fans. Direct-drive units may show different motor bearing degradation patterns.
+- **Economizer mode bias:** Accuracy drops during free-cooling transitions when outdoor air damper position changes rapidly.
+- **Altitude bias:** JHB altitude (1,750m) affects fan performance curves. Lower-altitude deployments may need recalibration.
+
+**Mitigations:**
+- Climate-aware feature engineering accounts for seasonal variation
+- Humidity guard rule adjusts thresholds for wet season (Oct-Mar: lower to 40%, cap at 55%)
+- Filter replacement alerts use differential pressure (physics-based, not model-dependent)
+- Safety bounds (supply air 12-35 degrees C, minimum outdoor airflow per ASHRAE 62.1)
+- Quality gate WARN enforcement in shadow mode addresses seasonal false alarm risk
+
+**Fairness assessment:** AHU recommendations apply the same safety bounds and confidence thresholds regardless of unit location or zone served. Ventilation rates are maintained per ASHRAE 62.1, ensuring indoor air quality is not compromised by optimization for any zone.
+
+**Review cadence:** Quarterly fairness metrics review per NIST AI RMF MS 2.7.
+
+## 9. Ethical Considerations
 
 - No personal data used in training or inference
 - Model cannot discriminate against individuals
