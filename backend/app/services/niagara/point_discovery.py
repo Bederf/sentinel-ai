@@ -596,7 +596,7 @@ class PointDiscoveryService:
                             "instance": instance_counter,
                             "units": reading.get("unit", ""),
                             "present_value": reading.get("value"),
-                            "writable": sensor_type in ("setpoint", "command", "mode"),
+                            "writable": _infer_point_type(sensor_type) in ("setpoint", "command"),
                             "_equipment_id": eq_code,
                             "_equipment_type": eq_type,
                             "_point_type": _infer_point_type(sensor_type),
