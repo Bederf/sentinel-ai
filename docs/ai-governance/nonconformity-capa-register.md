@@ -2,7 +2,7 @@
 title: "Nonconformity and Corrective Action (CAPA) Register"
 type: "register"
 status: "active"
-version: "1.0.0"
+version: "1.2.0"
 created: "2026-02-23"
 updated: "2026-02-23"
 author: "SENTINEL Governance Team"
@@ -41,18 +41,18 @@ Track nonconformities identified in the AI Management System (AIMS), their root 
 
 | NC-ID | Date Raised | Severity | Description | Root Cause | Corrective Action | Owner | Due Date | Status | Closure Evidence |
 |-------|-------------|----------|-------------|------------|-------------------|-------|----------|--------|------------------|
-| NC-001 | 2026-02-23 | Major | Model cards not yet completed for active models. Six models (AHU, CHILLER, FCU, UPS, GENERATOR, DALI) are in the ML model registry without completed model cards as required by AI Management Policy section 3.2. | Model card template and process established but not yet executed for existing models that pre-date the governance framework. | Complete model cards for all 6 active models using the template in `05-model-and-data-governance.md`. Populate from existing model metadata in `ml_models` table and `model_thresholds`. | AI Engineering Lead | 2026-04-15 | Open | |
+| NC-001 | 2026-02-23 | Major | Model cards not yet completed for active models. Six models (AHU, CHILLER, FCU, UPS, GENERATOR, DALI) are in the ML model registry without completed model cards as required by AI Management Policy section 3.2. | Model card template and process established but not yet executed for existing models that pre-date the governance framework. | Complete model cards for all 6 active models using the template in `05-model-and-data-governance.md`. Populate from existing model metadata in `ml_models` table and `model_thresholds`. | AI Engineering Lead | 2026-04-15 | CLOSED | `docs/ai-governance/model-cards/` -- All 6 model cards completed 2026-02-23 (AHU, CHILLER, FCU, UPS, GENERATOR, DALI). Fairness sections added to CHILLER, AHU, FCU cards. Verified by: AI Engineering Lead (pending signature). |
 | NC-002 | 2026-02-23 | Major | Fairness/bias baseline analysis not performed. No formal bias assessment exists for any AI use case, as required for potential-high-risk classifications (RISK-004) and EU AI Act readiness. | Fairness analysis was not part of the original development process. Framework for bias assessment not yet defined. | Define fairness metrics relevant to BMS domain (e.g., equitable comfort optimization across zones, unbiased equipment prioritization). Perform baseline assessment for RISK-004 (Tier 3 execution) first. | Compliance Lead | 2026-05-06 | CLOSED | `docs/ai-governance/fairness-bias-baseline.md` -- Fairness/bias baseline assessment completed 2026-02-23. Covers all 6 models, 4 equity dimensions, data bias assessment, baseline metrics. Model cards (CHILLER, AHU, FCU) updated with fairness sections. Verified by: ML Lead (pending signature). |
-| NC-003 | 2026-02-23 | Minor | Residual risk disclosure not published for operators. Operators using AI features do not receive a formal disclosure of known AI limitations, residual risks, and appropriate reliance levels. | Risk classification register documents gaps internally but no operator-facing disclosure artifact has been created. | Create operator-facing residual risk disclosure document covering each AI use case. Integrate disclosure into onboarding and feature documentation. Publish at `docs/ai-governance/evidence/risk-disclosures/`. | Operations Lead | 2026-05-13 | Open | |
+| NC-003 | 2026-02-23 | Minor | Residual risk disclosure not published for operators. Operators using AI features do not receive a formal disclosure of known AI limitations, residual risks, and appropriate reliance levels. | Risk classification register documents gaps internally but no operator-facing disclosure artifact has been created. | Create operator-facing residual risk disclosure document covering each AI use case. Integrate disclosure into onboarding and feature documentation. Publish at `docs/ai-governance/evidence/risk-disclosures/`. | Operations Lead | 2026-05-13 | CLOSED | `docs/ai-governance/residual-risk-disclosure.md` -- Residual risk disclosure completed 2026-02-23. Covers all 10 AI use cases (RISK-001 through RISK-010), residual risk levels, operator guidance, and appropriate reliance levels. Verified by: Operations Lead (pending signature). |
 
 ## Summary Statistics
 
 | Metric | Value |
 |--------|-------|
 | Total nonconformities raised | 3 |
-| Open | 2 |
+| Open | 0 |
 | In Progress | 0 |
-| Closed | 1 |
+| Closed | 3 |
 | Overdue | 0 |
 | Critical | 0 |
 | Major | 2 |
@@ -78,3 +78,4 @@ These initial nonconformities were identified from the gap analysis documented i
 |---------|------|--------|--------|
 | 1.0.0 | 2026-02-23 | SENTINEL Governance Team | Initial register with 3 pre-populated nonconformities from gap analysis |
 | 1.1.0 | 2026-02-23 | SENTINEL Governance Team | NC-002 closed: fairness/bias baseline assessment completed |
+| 1.2.0 | 2026-02-23 | SENTINEL Governance Team | NC-001 closed: all 6 model cards completed. NC-003 closed: residual risk disclosure published. All 3 Phase 1 CAPAs now closed. |

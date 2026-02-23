@@ -42,6 +42,17 @@ Operational governance pack for:
 - `nonconformity-capa-register.md` -- AI nonconformity and CAPA workflow register
 - `control-applicability-matrix.md` -- Control applicability matrix with owners/evidence links
 
+### Phase 2: Training, Risk & Compliance
+
+- `ai-literacy-training-package.md` -- AI literacy training curriculum (EU AI Act Article 4)
+- `competence-training-register.md` -- Role-based competence register with annual refresh tracking
+- `live-control-entry-criteria.md` -- Entry criteria evidence pack for live control mode
+- `residual-risk-disclosure.md` -- Operator-facing residual risk disclosure per AI use case
+- `retraining-policy.md` -- Model retraining cadence, trigger policy, and run log requirements
+- `third-party-ai-risk-register.md` -- Third-party AI vendor risk register
+- `fairness-bias-baseline.md` -- Fairness/bias baseline analysis across 6 models and 4 equity dimensions
+- `stress-test-scenarios.md` -- 3 quarterly stress test scenario templates with pass criteria
+
 ### Model and Data Governance
 
 - `model-cards/` -- Model cards for 6 active ML models (AHU, CHILLER, FCU, UPS, GENERATOR, DALI)
@@ -49,5 +60,9 @@ Operational governance pack for:
 
 ### Evidence
 
-- `evidence/README.md` -- Evidence collection index
+- `evidence/README.md` -- Evidence collection index and process documentation
 - `evidence/drift-reports/` -- Model drift evidence snapshots
+- `evidence/audit-logs-samples/` -- Representative traceability samples
+- `evidence/rca-postmortems/` -- Stress test results and incident RCA reports
+- `evidence/training/` -- AI literacy and competence training records
+- `evidence/model-cards/` -- Versioned model card snapshots for reviews
