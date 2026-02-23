@@ -2,7 +2,7 @@
 title: "AI Governance Pack"
 type: "reference"
 status: "active"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-02-23"
 updated: "2026-02-23"
 author: "SENTINEL Governance Team"
@@ -14,6 +14,8 @@ estimated_read_time: 5
 ---
 
 # AI Governance Pack
+
+**Compliance Programme Status:** Phase 3 Complete -- Pending Board Approval
 
 Operational governance pack for:
 
@@ -58,11 +60,25 @@ Operational governance pack for:
 - `model-cards/` -- Model cards for 6 active ML models (AHU, CHILLER, FCU, UPS, GENERATOR, DALI)
 - `evidence/data-sheets/` -- Data sheets for governed datasets and corpora
 
+### Phase 3: Assurance and Closure
+
+- `internal-audit-plan.md` -- Internal audit plan (ISO/NIST/EU scope, sampling methodology, audit schedule)
+- `incident-tabletop-report.md` -- Incident tabletop exercise report (Scenario 1: Bad Model Update)
+- `nist-control-effectiveness-review.md` -- NIST AI RMF control-effectiveness review (11 controls, 87% effective)
+- `eu-ai-act-assurance-review.md` -- EU AI Act assurance review (Articles 4/5/50/52-53, 75% compliant)
+- `independent-audit-readiness-pack.md` -- Independent audit readiness pack (48 artifacts, 7 sections)
+- `compliance-closure-report.md` -- Unified compliance closure report (Phases 1-3, executive summary, recommendations)
+- `phase3-board-review-memo.md` -- Architecture Board review memo (4 decision items, resolution template)
+- `evidence/iso42001-evidence-bundle.md` -- ISO 42001 evidence bundle (13 controls mapped with evidence paths)
+- `evidence/togaf-governance-evidence.md` -- TOGAF governance evidence bundle
+- `evidence/rca-postmortems/tabletop-001-bad-model.md` -- RCA postmortem for TABLETOP-001 scenario
+
 ### Evidence
 
-- `evidence/README.md` -- Evidence collection index and process documentation
+- `evidence/README.md` -- Evidence collection index and process documentation (v1.1.0, quarterly cadence)
 - `evidence/drift-reports/` -- Model drift evidence snapshots
 - `evidence/audit-logs-samples/` -- Representative traceability samples
 - `evidence/rca-postmortems/` -- Stress test results and incident RCA reports
 - `evidence/training/` -- AI literacy and competence training records
 - `evidence/model-cards/` -- Versioned model card snapshots for reviews
+- `evidence/data-sheets/` -- Training data provenance sheets

@@ -1,7 +1,7 @@
 # SENTINEL Unified Compliance Programme
 
 Last updated: 2026-02-23
-Phase 1 status: 12 items complete | Phase 2 status: 7 items complete | Phase 3 status: 4 of 5 gate items complete
+Phase 1 status: 12 items complete | Phase 2 status: 7 items complete | Phase 3 status: 5 gate items complete (3 passed, 2 pending board decision)
 Scope: `/opt/bms-intelligence` (SENTINEL only)
 
 ## 1) Framework Scope
@@ -63,6 +63,8 @@ Phase 3 artifacts:
 - NIST control-effectiveness review: `docs/ai-governance/nist-control-effectiveness-review.md`
 - EU AI Act assurance review: `docs/ai-governance/eu-ai-act-assurance-review.md`
 - Independent audit readiness pack: `docs/ai-governance/independent-audit-readiness-pack.md`
+- Compliance closure report: `docs/ai-governance/compliance-closure-report.md`
+- Board review memo: `docs/ai-governance/phase3-board-review-memo.md`
 
 ## 3) Consolidated Gap Backlog
 
@@ -255,6 +257,6 @@ Must deliver:
 
 - [x] Internal audit completed across ISO/NIST/EU control mappings -- `docs/ai-governance/internal-audit-plan.md`, `docs/ai-governance/evidence/iso42001-evidence-bundle.md`, `docs/ai-governance/nist-control-effectiveness-review.md`, `docs/ai-governance/eu-ai-act-assurance-review.md`
 - [x] Incident tabletop actions closed or accepted with owner/date -- `docs/ai-governance/incident-tabletop-report.md` (5 actions with owners and due dates tracked in CAPA register NC-004)
-- [x] Independent audit scope, budget, and timeline approved -- `docs/ai-governance/independent-audit-readiness-pack.md` (scope and logistics defined; budget and timeline pending executive approval)
+- [ ] Independent audit scope approved (pending board decision DECISION-003) -- `docs/ai-governance/independent-audit-readiness-pack.md` (scope defined, budget ZAR R170k-R290k, requires board authorization via `docs/ai-governance/phase3-board-review-memo.md`)
 - [x] All high/critical CAPA actions closed -- Zero critical CAPAs. NC-004 (Major) has assigned owners and tracked due dates. NC-005, NC-006 (Minor) are time-dependent observations. See `docs/ai-governance/nonconformity-capa-register.md` v1.3.0.
-- [ ] Final compliance closure report approved by Architecture Board
+- [ ] Final compliance closure report approved by Architecture Board -- `docs/ai-governance/compliance-closure-report.md` (submitted for review via `docs/ai-governance/phase3-board-review-memo.md` DECISION-001)
