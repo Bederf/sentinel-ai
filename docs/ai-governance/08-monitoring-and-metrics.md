@@ -1,0 +1,203 @@
+---
+title: "AI Monitoring and Metrics Governance"
+type: "guide"
+status: "active"
+version: "1.0.0"
+created: "2026-02-23"
+updated: "2026-02-23"
+author: "SENTINEL Governance Team"
+tags: ["ai-governance", "monitoring", "metrics", "prometheus", "alerts"]
+domain: "compliance"
+audience: "all"
+complexity: "advanced"
+estimated_read_time: 15
+---
+
+# AI Monitoring and Metrics Governance
+
+## Current State
+
+- AI health and drift are exposed via JSON APIs under `backend/app/api/mlops.py`.
+- Audit/decision telemetry is strong in log-based observability (Loki/Promtail/Grafana).
+- Prometheus runs from `/opt/aimthelaw` (`docker-compose.monitoring.yml`), not from this repository stack.
+- **NEW:** Prometheus-format `/metrics` endpoint available at `backend/app/api/metrics.py` (Phase 114-05).
+
+## Observability Gaps
+
+| Gap | Current Evidence | Status |
+|---|---|---|
+| Prometheus backend scraping for AI controls is incomplete | `/opt/aimthelaw/config/prometheus.yml` has backend scrape disabled | Endpoint ready, scrape wiring pending (Phase 2) |
+| No canonical Prometheus exposition for AI controls | `/api/mlops/metrics` returns JSON (not Prometheus text format) | **RESOLVED** -- `/metrics` endpoint ships Prometheus text format |
+| Alerting focuses on log events | `infrastructure/grafana/provisioning/alerting/security-alerts.yaml` | Alert rules defined below, wiring pending (Phase 2) |
+| Cost/approval metrics are not standardized | Mixed APIs and logs | 8 stable metric names defined below |
+
+## Prometheus Metrics
+
+The `/metrics` endpoint (`backend/app/api/metrics.py`) exposes the following AI governance metrics in Prometheus text exposition format.
+
+| # | Metric Name | Type | Labels | Description |
+|---|---|---|---|---|
+| 1 | `sentinel_quality_gate_evaluations_total` | Counter | `site_id`, `status` (pass/warn/fail) | Total quality-gate evaluations by site and outcome |
+| 2 | `sentinel_quality_gate_enforcement` | Gauge | `site_id`, `enforcement` (normal/cap_confidence/suppress_tier3/block_writes) | Current enforcement level per site (1 = active) |
+| 3 | `sentinel_recommendations_total` | Counter | `site_id`, `tier` (tier1/tier2/tier3), `action` (advisory/pending_approval/auto_execute/blocked) | Total recommendations by site, tier, and action disposition |
+| 4 | `sentinel_approval_decisions_total` | Counter | `site_id`, `decision` (approved/rejected/expired) | Total approval workflow decisions by site and outcome |
+| 5 | `sentinel_safety_violations_total` | Counter | `site_id`, `severity` (warning/block/alarm) | Total safety boundary violations by site and severity |
+| 6 | `sentinel_model_drift_alerts` | Gauge | `site_id`, `model_type` | Active model drift alerts by site and model type |
+| 7 | `sentinel_rollback_total` | Counter | `site_id`, `equipment_type` | Total automated rollback events by site and equipment type |
+| 8 | `sentinel_info` | Info | `version`, `mode`, `build_date` | SENTINEL build and configuration metadata |
+
+### Scrape Configuration
+
+Add the following job to `/opt/aimthelaw/config/prometheus.yml`:
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: "sentinel-backend"
+    scrape_interval: 30s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["bms-intelligence_backend:9095"]
+        labels:
+          instance: "sentinel"
+          environment: "production"
+```
+
+### Access Control
+
+The `/metrics` endpoint uses an IP allowlist (no authentication required for Prometheus scrape compatibility):
+
+- `127.0.0.0/8` (localhost)
+- `10.0.0.0/8` (Docker default bridge / overlay)
+- `172.16.0.0/12` (Docker bridge range)
+- `192.168.0.0/16` (private LAN)
+- `::1/128` (IPv6 loopback)
+
+Additional CIDRs can be added via the `METRICS_ALLOWED_CIDRS` environment variable (comma-separated).
+
+## Grafana Dashboard
+
+Recommended panels for the SENTINEL AI Governance dashboard:
+
+### Quality Gate Pass Rate (Time Series)
+
+- **Query:** `rate(sentinel_quality_gate_evaluations_total{status="pass"}[5m]) / rate(sentinel_quality_gate_evaluations_total[5m])`
+- **Thresholds:** Green >= 0.95, Yellow >= 0.80, Red < 0.80
+- **Description:** Percentage of quality gate evaluations passing over time. Drops below 95% indicate degrading control effectiveness.
+
+### Recommendation Tier Distribution (Pie Chart)
+
+- **Query:** `sum by (tier) (sentinel_recommendations_total)`
+- **Description:** Distribution of recommendations across tiers. A healthy system should have tier1 > tier2 > tier3. High tier3 volume may indicate over-cautious gating.
+
+### Safety Violation Count (Stat Panel)
+
+- **Query:** `sum(sentinel_safety_violations_total)`
+- **Target:** 0 (any non-zero value triggers investigation)
+- **Thresholds:** Green = 0, Red > 0
+- **Description:** Total safety boundary violations. This should always be zero in a healthy system.
+
+### Model Drift Alerts (Time Series)
+
+- **Query:** `sentinel_model_drift_alerts`
+- **Threshold line:** 0 (any positive value = active drift)
+- **Description:** Active model drift alerts by model type. Persistent drift (> 7 days) triggers retraining review.
+
+### Approval Latency P95 (Gauge)
+
+- **Query:** `histogram_quantile(0.95, rate(sentinel_approval_decisions_total[1h]))`
+- **Thresholds:** Green < 4h, Yellow < 24h, Red >= 24h
+- **Description:** 95th percentile time from recommendation to approval decision. Long latency indicates approval workflow bottlenecks.
+- **Note:** Full latency histogram will be added in Phase 2 when real service hooks are wired.
+
+## Alert Rules
+
+Alert rules mapping metrics to runbooks for operational response:
+
+### 1. Safety Violation Alert
+
+```yaml
+- alert: SentinelSafetyViolation
+  expr: rate(sentinel_safety_violations_total[5m]) > 0
+  for: 0m  # immediate
+  labels:
+    severity: critical
+  annotations:
+    summary: "Safety boundary violation detected at {{ $labels.site_id }}"
+    runbook: "docs/06-safety-compliance/safety-interlocks-engine.md"
+    action: "Page on-call engineer immediately. Check equipment logs and disable automatic control if needed."
+```
+
+### 2. Model Drift Persistent Alert
+
+```yaml
+- alert: SentinelModelDriftPersistent
+  expr: sentinel_model_drift_alerts > 0
+  for: 7d
+  labels:
+    severity: warning
+  annotations:
+    summary: "Model drift active for 7+ days: {{ $labels.model_type }} at {{ $labels.site_id }}"
+    runbook: "docs/08-ai-ml/write-policy-and-rollout.md"
+    action: "Notify ML lead. Review model performance and schedule retraining if accuracy below threshold."
+```
+
+### 3. Quality Gate Block Writes Alert
+
+```yaml
+- alert: SentinelQualityGateBlockWrites
+  expr: sentinel_quality_gate_enforcement{enforcement="block_writes"} == 1
+  for: 0m  # immediate
+  labels:
+    severity: critical
+  annotations:
+    summary: "Quality gate enforcing BLOCK_WRITES at {{ $labels.site_id }}"
+    runbook: "docs/ai-governance/06-human-oversight-and-approval.md"
+    action: "Page ops team. All AI writes are blocked. Investigate quality gate failure and activate kill switch if needed."
+```
+
+### 4. Rollback Rate Alert
+
+```yaml
+- alert: SentinelHighRollbackRate
+  expr: rate(sentinel_rollback_total[1h]) > 2
+  for: 15m
+  labels:
+    severity: warning
+  annotations:
+    summary: "High rollback rate (>2/hr) for {{ $labels.equipment_type }} at {{ $labels.site_id }}"
+    runbook: "docs/ai-governance/07-incident-and-rollback.md"
+    action: "Notify operations. Investigate equipment behavior and consider disabling automatic optimization."
+```
+
+### Alert Routing Summary
+
+| Metric | Condition | Severity | Action | Runbook |
+|---|---|---|---|---|
+| `sentinel_safety_violations_total` | rate > 0 | Critical | Page on-call | `docs/06-safety-compliance/safety-interlocks-engine.md` |
+| `sentinel_model_drift_alerts` | > 0 for 7d | Warning | Notify ML lead | `docs/08-ai-ml/write-policy-and-rollout.md` |
+| `sentinel_quality_gate_enforcement{enforcement="block_writes"}` | == 1 | Critical | Page ops | Kill switch playbook |
+| `sentinel_rollback_total` | rate > 2/hr | Warning | Notify ops | `docs/ai-governance/07-incident-and-rollback.md` |
+
+## Evidence and Ownership
+
+- **Metrics endpoint:** `backend/app/api/metrics.py`
+- **Dashboards:** `infrastructure/grafana/provisioning/dashboards/`
+- **Alerting rules:** `infrastructure/grafana/provisioning/alerting/`
+- **Evidence snapshots:** `docs/ai-governance/evidence/drift-reports/`
+- **Owner:** AI Engineering + Operations
+
+## Cross-Repo Note
+
+In `/opt/aimthelaw/config/prometheus.yml`, backend scraping is currently commented out with a note that a true Prometheus `/metrics` endpoint is required. Now that the endpoint exists (`backend/app/api/metrics.py`), the scrape job can be enabled using the configuration in the "Scrape Configuration" section above. Treat this as shared platform work between `bms-intelligence` (metric exposition) and `aimthelaw` (scrape/alerts).
+
+## Phase 2 Roadmap
+
+The following enhancements are planned for Phase 2 (Control Implementation, 2026-04-01 to 2026-05-31):
+
+- Wire real metric collection hooks into existing services (quality gate evaluator, approval workflow, safety engine)
+- Add histogram metrics for approval latency and recommendation processing time
+- Enable Prometheus scrape in `/opt/aimthelaw/config/prometheus.yml`
+- Deploy Grafana dashboard JSON provisioning
+- Configure alert rules in Grafana alerting pipeline
+- Validate end-to-end signal quality
