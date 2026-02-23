@@ -2,9 +2,9 @@
 title: "SENTINEL Security Documentation"
 type: "reference"
 status: "approved"
-version: "1.2.0"
+version: "1.5.0"
 created: "2026-02-04"
-updated: "2026-02-20"
+updated: "2026-02-23"
 author: "SENTINEL Security Office"
 tags: ["security", "governance", "index", "FSR"]
 domain: "security"
@@ -42,6 +42,7 @@ This directory contains the SENTINEL Information Security Policy Suite -- the go
 | Document | Description | Status |
 |---|---|---|
 | [Vulnerability Management Process](vulnerability-management-process.md) | Scanning schedules, remediation SLAs, dependency monitoring | Complete |
+| [Vulnerability Disclosure Policy](vulnerability-disclosure-policy.md) | Coordinated vulnerability reporting, safe-harbor, triage, and disclosure timelines | Complete |
 | [Incident Response Policy](incident-response-policy.md) | Detection, containment, eradication, recovery, notification procedures | Complete |
 | [Incident Response Process](incident-response-process.md) | Operational runbooks for incident handling | Complete |
 
@@ -50,6 +51,7 @@ This directory contains the SENTINEL Information Security Policy Suite -- the go
 | Document | Description | Status |
 |---|---|---|
 | [Business Continuity Policy](business-continuity-policy.md) | BIA, RTO/RPO, DR procedures, annual testing | Complete |
+| [BCP/DR Exercise Report 2026 Q1](dr-exercise-report-2026Q1.md) | Consolidated tabletop + restore test evidence capture for FSR 4.15 closure | Draft |
 | [Third-Party Security Register](third-party-security-register.md) | Supplier register, compliance framework, review cadence | Complete |
 
 ### Risk & Privacy (Phase 64-05)
@@ -70,7 +72,7 @@ This directory contains the SENTINEL Information Security Policy Suite -- the go
 |---|---|---|
 | [HR Security Policy](hr-security-policy.md) | Vetting, training, joiners/leavers, disciplinary process | Complete |
 | [Cryptography & Key Management Policy](cryptography-key-management-policy.md) | Algorithms, key rotation, secrets management, Fernet encryption at rest | Complete |
-| Asset Register | Infrastructure components, ownership, disposal procedures | Planned |
+| [Asset Lifecycle Policy](asset-lifecycle-policy.md) | Asset lifecycle controls from planning through disposal with ownership and evidence requirements | Complete |
 | Security Awareness Training Programme | Training content, completion tracking, annual cadence | Planned |
 | [Security Audit Programme](security-audit-programme.md) | Audit cadence, findings tracking, remediation monitoring | Complete |
 
@@ -104,32 +106,48 @@ These documents record the technical security controls deployed as part of Phase
 | [Application Security Pipeline](application-security-pipeline.md) | SAST/DAST integration, Bandit, Safety, container scanning | Complete |
 | [Vulnerability Management](vulnerability-management.md) | Scanning tools, schedules, remediation workflow | Complete |
 | [BCP/DR Procedures](bcp-dr-procedures.md) | Backup, recovery, failover, test runbooks | Complete |
-| [Consent and Privacy](consent-and-privacy.md) | Consent capture for messaging platforms, privacy notices | Complete |
+| [Consent and Privacy](consent-and-privacy.md) | Consent capture and enforcement, cross-border routing controls, DSR + retention references | Complete |
+
+### AI Governance & Regulatory Compliance
+
+EU AI Act readiness artifacts are tracked in the compliance directory and linked here for security/compliance coordination.
+
+| Document | Description | Status |
+|---|---|---|
+| [AI Governance Pack](../ai-governance/README.md) | Operational governance pack: scope, risk classification, ISO 42001 mapping, NIST AI RMF mapping, monitoring controls | Draft |
+| [EU AI Act Compliance Register](../compliance/eu-ai-act-compliance-register.md) | AI feature inventory, provisional classification, obligations, owners, evidence | Draft |
+| [EU AI Act Policy](../compliance/eu-ai-act-policy.md) | Mandatory governance controls for AI literacy, prohibited-practices checks, transparency, incident handling | Draft |
+| [EU AI Act Internal Audit 2026 Q2](../compliance/eu-ai-act-internal-audit-2026Q2.md) | Internal audit checklist, sample plan, findings tracker, sign-off | Draft |
+| [POPIA Compliance Register](../compliance/popia-compliance-register.md) | POPIA pass/fail status, technical evidence, and remediation backlog | Draft |
+| [POPIA Data Subject Rights Workflow](../compliance/popia-data-subject-rights-workflow.md) | Request lifecycle, SLA rules, and evidence outputs | Draft |
+| [POPIA Retention Enforcement](../compliance/popia-retention-enforcement.md) | Automated retention/deletion controls and run evidence | Draft |
+| [Privacy & Consent API Reference](../03-api-reference/privacy-api.md) | Operational API endpoints for consent, DSR workflow, SLA metrics, and retention enforcement | Approved |
 
 ## FSR Domain Coverage
 
 The following table maps each FSR security domain to the SENTINEL governance document(s) that address it.
+Scores reflect the consolidated re-rating completed on `2026-02-23`.
 
 | # | FSR Domain | Primary Document | Current | Target | Gap |
 |---|---|---|---|---|---|
-| 4.1 | Information Security Governance | Framework, Strategy, Policy, AUP | 3.7 | 4.0 | LOW |
-| 4.2 | Asset Management | Asset Register | 4.0 | 4.5 | LOW |
-| 4.3 | Information Classification | Data Privacy & Classification Policy | 3.5 | 4.0 | LOW |
-| 4.4 | Human Resource Security | HR Security Policy, Training Programme | 3.0 | 3.8 | MEDIUM |
-| 4.5 | Physical Access Security | (Provider attestations) | 4.0 | 4.0 | NONE |
-| 4.6 | Network Security | Information Security Policy s3.6 | 4.0 | 4.5 | LOW |
-| 4.7 | Logical Access Control | Access Control Policy | 3.8 | 4.0 | LOW |
-| 4.8 | System Security | Information Security Policy s3.8 | 3.5 | 4.0 | LOW |
-| 4.9 | Application Security | Application Security Policy, Secure Coding Standards | 3.8 | 4.0 | LOW |
-| 4.10 | Vulnerability Management | Vulnerability Management Policy | 4.3 | 4.5 | LOW |
-| 4.11 | Communication Management | Information Security Policy s3.11 | 4.0 | 4.0 | NONE |
-| 4.12 | Cryptography & Key Management | Cryptography & Key Management Policy | 4.0 | 4.5 | LOW |
-| 4.13 | Incident Detection | Incident Response Policy, Logging Architecture | 3.8 | 4.0 | LOW |
-| 4.14 | Incident Management | Incident Response Policy | 3.2 | 4.0 | MEDIUM |
-| 4.15 | Business Continuity | BCP/DR Policy, BCP/DR Procedures | 3.0 | 4.0 | MEDIUM |
-| 4.16 | Third Party Management | Third-Party Security Policy | 3.7 | 4.0 | LOW |
-| 4.17 | Risk & Compliance | Risk Management Policy | 3.5 | 4.0 | LOW |
-| 4.18 | Information Security Audit | Security Audit Procedure | 3.0 | 3.5 | MEDIUM |
+| 4.1 | Information Security Governance | Framework, Strategy, Policy, AUP | 4.0 | 4.0 | TARGET MET |
+| 4.2 | Asset Management | Asset Lifecycle Policy | 4.5 | 4.5 | TARGET MET |
+| 4.3 | Information Classification | Data Privacy & Information Classification Policy | 4.0 | 4.0 | TARGET MET |
+| 4.4 | Human Resource Security | HR Security Policy, AI literacy package, competence register | 3.8 | 3.8 | TARGET MET |
+| 4.5 | Physical Access Security | Provider attestations | 4.0 | 4.0 | TARGET MET |
+| 4.6 | Network Security | Information Security Policy s3.6, network hardening controls | 4.3 | 4.5 | LOW GAP |
+| 4.7 | Logical Access Control | Logical Access Control Policy + RBAC/MFA evidence | 4.0 | 4.0 | TARGET MET |
+| 4.8 | System Security | Information Security Policy s3.8 + technical hardening evidence | 4.0 | 4.0 | TARGET MET |
+| 4.9 | Application Security | Application Security Policy, secure coding standards, CI controls | 4.0 | 4.0 | TARGET MET |
+| 4.10 | Vulnerability Management | Vulnerability Management Process + Vulnerability Disclosure Policy | 4.5 | 4.5 | TARGET MET |
+| 4.11 | Communication Management | Information Security Policy s3.11 | 4.0 | 4.0 | TARGET MET |
+| 4.12 | Cryptography & Key Management | Cryptography & Key Management Policy | 4.3 | 4.5 | LOW GAP |
+| 4.13 | Incident Detection | Incident Response Policy, Logging Architecture, IDS/SIEM evidence | 4.0 | 4.0 | TARGET MET |
+| 4.14 | Incident Management | Incident Response Policy + tabletop/RCA evidence | 4.0 | 4.0 | TARGET MET |
+| 4.15 | Business Continuity | Business Continuity Policy, BCP/DR Procedures, DR exercise report | 3.6 | 4.0 | MEDIUM GAP |
+| 4.16 | Third Party Management | Third-Party Security Register + PIAs + cross-border register | 4.0 | 4.0 | TARGET MET |
+| 4.17 | Risk & Compliance | Risk register, control matrix, compliance programme artifacts | 4.0 | 4.0 | TARGET MET |
+| 4.18 | Information Security Audit | Security Audit Programme + internal audit evidence pack | 3.5 | 3.5 | TARGET MET |
 
 ## Gap Analysis Reference
 
