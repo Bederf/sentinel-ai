@@ -2,7 +2,7 @@
 title: "AI Governance Evidence Index"
 type: "reference"
 status: "active"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-02-23"
 updated: "2026-02-23"
 author: "SENTINEL Governance Team"
@@ -95,6 +95,21 @@ This directory stores audit-ready artifacts for the SENTINEL AI Management Syste
 **Collection trigger**: On dataset creation or major update
 **Owner**: Data Governance Lead
 
+## Phase 3 Assurance Artifacts (Phase 116)
+
+The following artifacts were created during the Phase 3 assurance cycle and form the evidence base for independent audit readiness:
+
+| # | Artifact | Path | Created | Owner |
+|---|----------|------|---------|-------|
+| 1 | Internal Audit Plan | `docs/ai-governance/internal-audit-plan.md` | 2026-02-23 | Compliance Lead |
+| 2 | ISO 42001 Evidence Bundle | `docs/ai-governance/evidence/iso42001-evidence-bundle.md` | 2026-02-23 | Compliance Lead |
+| 3 | TOGAF Governance Evidence Bundle | `docs/ai-governance/evidence/togaf-governance-evidence.md` | 2026-02-23 | Architecture Lead |
+| 4 | Incident Tabletop Exercise Report | `docs/ai-governance/incident-tabletop-report.md` | 2026-02-23 | Security Lead |
+| 5 | RCA Postmortem (Tabletop-001) | `docs/ai-governance/evidence/rca-postmortems/tabletop-001-bad-model.md` | 2026-02-23 | Security Lead |
+| 6 | NIST Control-Effectiveness Review | `docs/ai-governance/nist-control-effectiveness-review.md` | 2026-02-23 | ML Lead |
+| 7 | EU AI Act Assurance Review | `docs/ai-governance/eu-ai-act-assurance-review.md` | 2026-02-23 | Compliance Lead |
+| 8 | Independent Audit Readiness Pack | `docs/ai-governance/independent-audit-readiness-pack.md` | 2026-02-23 | Compliance Lead |
+
 ## Collection Schedule
 
 | Category | Frequency | Trigger | Owner | Review Forum |
@@ -105,6 +120,9 @@ This directory stores audit-ready artifacts for the SENTINEL AI Management Syste
 | RCA/Postmortems | On event | Stress test or incident | Security Lead | Next management review |
 | Model Cards | On change / quarterly | Model update or review | AI Engineering Lead | Quarterly management review |
 | Data Sheets | On change | Dataset update | Data Governance Lead | Annual review |
+| Assurance Reviews | Quarterly | Phase 3+ review cycle | Compliance Lead | Quarterly management review |
+| Tabletop Exercises | Quarterly | Stress test schedule | Security Lead | Quarterly management review |
+| CAPA Register Snapshot | Quarterly | Management review prep | Compliance Lead | Quarterly management review |
 
 ## Retention Policy
 

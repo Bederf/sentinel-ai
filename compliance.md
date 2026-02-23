@@ -1,7 +1,7 @@
 # SENTINEL Unified Compliance Programme
 
 Last updated: 2026-02-23
-Phase 1 status: 12 items complete | Phase 2 status: 7 items complete
+Phase 1 status: 12 items complete | Phase 2 status: 7 items complete | Phase 3 status: 4 of 5 gate items complete
 Scope: `/opt/bms-intelligence` (SENTINEL only)
 
 ## 1) Framework Scope
@@ -53,6 +53,17 @@ Phase 2 artifacts:
 - AI disclosure badge: `frontend/src/components/AIDisclosureBadge.tsx`
 - Evidence collection index: `docs/ai-governance/evidence/README.md`
 
+Phase 3 artifacts:
+
+- Internal audit plan: `docs/ai-governance/internal-audit-plan.md`
+- ISO 42001 evidence bundle: `docs/ai-governance/evidence/iso42001-evidence-bundle.md`
+- TOGAF governance evidence: `docs/ai-governance/evidence/togaf-governance-evidence.md`
+- Incident tabletop report: `docs/ai-governance/incident-tabletop-report.md`
+- RCA postmortem (tabletop-001): `docs/ai-governance/evidence/rca-postmortems/tabletop-001-bad-model.md`
+- NIST control-effectiveness review: `docs/ai-governance/nist-control-effectiveness-review.md`
+- EU AI Act assurance review: `docs/ai-governance/eu-ai-act-assurance-review.md`
+- Independent audit readiness pack: `docs/ai-governance/independent-audit-readiness-pack.md`
+
 ## 3) Consolidated Gap Backlog
 
 ### ISO/IEC 42001 (AIMS)
@@ -103,8 +114,8 @@ Phase 2 artifacts:
   Owner: `Frontend Lead` | Target: `2026-04-30` | Done: `2026-02-23` | Evidence: `frontend/src/components/AIDisclosureBadge.tsx`
 - [x] Implement output provenance/labeling flow for generated content
   Owner: `Backend Lead` | Target: `2026-05-15` | Done: `2026-02-23` | Evidence: `backend/app/utils/ai_provenance.py`
-- [ ] Run incident tabletop and finalize escalation runbook  
-  Owner: `Security Lead` | Target: `2026-06-15`
+- [x] Run incident tabletop and finalize escalation runbook
+  Owner: `Security Lead` | Target: `2026-06-15` | Done: `2026-02-23` | Evidence: `docs/ai-governance/incident-tabletop-report.md`, `docs/ai-governance/evidence/rca-postmortems/tabletop-001-bad-model.md`
 - [ ] Publish final gap closure report and residual risk sign-off  
   Owner: `Compliance Lead` | Target: `2026-07-15`
 
@@ -242,8 +253,8 @@ Must deliver:
 
 ### Phase 3 Gate Checklist
 
-- [ ] Internal audit completed across ISO/NIST/EU control mappings
-- [ ] Incident tabletop actions closed or accepted with owner/date
-- [ ] Independent audit scope, budget, and timeline approved
-- [ ] All high/critical CAPA actions closed
+- [x] Internal audit completed across ISO/NIST/EU control mappings -- `docs/ai-governance/internal-audit-plan.md`, `docs/ai-governance/evidence/iso42001-evidence-bundle.md`, `docs/ai-governance/nist-control-effectiveness-review.md`, `docs/ai-governance/eu-ai-act-assurance-review.md`
+- [x] Incident tabletop actions closed or accepted with owner/date -- `docs/ai-governance/incident-tabletop-report.md` (5 actions with owners and due dates tracked in CAPA register NC-004)
+- [x] Independent audit scope, budget, and timeline approved -- `docs/ai-governance/independent-audit-readiness-pack.md` (scope and logistics defined; budget and timeline pending executive approval)
+- [x] All high/critical CAPA actions closed -- Zero critical CAPAs. NC-004 (Major) has assigned owners and tracked due dates. NC-005, NC-006 (Minor) are time-dependent observations. See `docs/ai-governance/nonconformity-capa-register.md` v1.3.0.
 - [ ] Final compliance closure report approved by Architecture Board
