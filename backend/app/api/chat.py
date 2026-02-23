@@ -18,6 +18,7 @@ from app.services.feature_request_logger import log_chat_query
 from app.services.prompt_injection_guard import check_query_safety
 from app.config.settings import settings
 from app.middleware.auth_middleware import get_current_auth
+from app.utils.ai_provenance import get_claude_provenance, provenance_headers
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -272,6 +273,7 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
                 "X-Accel-Buffering": "no",
                 "X-Response-Type": "ai_response",
                 "X-Search-Docs": "true",
+                **provenance_headers(get_claude_provenance()),
             },
         )
 
@@ -300,6 +302,8 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
                 "X-Accel-Buffering": "no",
                 "X-Response-Type": "work_order_created",
                 "X-Work-Order-Id": work_order.id,
+                "X-AI-Assisted": "true",
+                **provenance_headers(get_claude_provenance()),
             },
         )
 
@@ -325,6 +329,7 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
                     "X-Accel-Buffering": "no",
                     "X-Response-Type": "ai_response",
                     "X-Demo-Cached": "true",
+                    **provenance_headers(get_claude_provenance()),
                 },
             )
 
@@ -349,6 +354,7 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
             "X-Response-Type": "ai_response",
+            **provenance_headers(get_claude_provenance()),
         },
     )
 

@@ -9,6 +9,7 @@ from app.services.rag_service import get_rag_service
 from app.services.vector_db import get_vector_db_service
 from app.services.ollama_client import get_ollama_client
 from app.database.supabase_client import get_supabase_client
+from app.utils.ai_provenance import get_claude_provenance
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/rag", tags=["rag"])
@@ -67,7 +68,7 @@ class KnowledgeRequest(BaseModel):
 # Endpoints
 
 
-@router.post("/query", response_model=QueryResponse)
+@router.post("/query")
 async def query_rag(request: QueryRequest):
     """Query the RAG system with natural language."""
     client = get_supabase_client()
@@ -80,7 +81,10 @@ async def query_rag(request: QueryRequest):
         use_local_llm=request.use_local_llm,
     )
 
-    return QueryResponse(**result)
+    response = QueryResponse(**result)
+    response_dict = response.model_dump()
+    response_dict["ai_provenance"] = get_claude_provenance().model_dump()
+    return response_dict
 
 
 @router.get("/search")
@@ -199,6 +203,7 @@ async def explain_equipment_risk(
     if not include_context:
         explanation.pop("context_sources", None)
 
+    explanation["ai_provenance"] = get_claude_provenance().model_dump()
     return explanation
 
 
