@@ -18,7 +18,6 @@ import type {
   NiagaraMappingSummary,
   DiscoverClassifyResponse,
   BMSVendor,
-  DemoBuilding,
 } from '@/lib/api';
 import { sitesApi } from '@/lib/api/sites';
 import { niagaraApi } from '@/lib/api';
@@ -79,8 +78,7 @@ interface WizardState {
   username: string;
   password: string;
   useHttps: boolean;
-  useDemoData: boolean;
-  demoBuildingId: string;  // Selected demo building for data source
+  useSimulation: boolean;  // Discover equipment from simulation database instead of live BMS
   siteId: string;  // Auto-generated on site creation
   connectionStatus: ConnectionStatus;
   connectionMessage: string;
@@ -296,8 +294,7 @@ export function BMSConnectionWizard({
     username: "",
     password: "",
     useHttps: false,
-    useDemoData: true,  // Default to demo mode for wizard
-    demoBuildingId: "",
+    useSimulation: true,  // Default to simulation mode for wizard
     siteId: initialSiteId || "",
     connectionStatus: "idle",
     connectionMessage: "",
@@ -315,29 +312,6 @@ export function BMSConnectionWizard({
     discoveryPhase: 0,
     showZoneIngestionWizard: false,
   });
-
-  // Fetch demo buildings on mount
-  const [demoBuildings, setDemoBuildings] = useState<DemoBuilding[]>([]);
-  const [demoBuildingsLoading, setDemoBuildingsLoading] = useState(false);
-
-  useEffect(() => {
-    const fetchDemoBuildings = async () => {
-      setDemoBuildingsLoading(true);
-      try {
-        const buildings = await sitesApi.getDemoBuildings();
-        setDemoBuildings(buildings);
-        // Auto-select first demo building if available
-        if (buildings.length > 0 && !state.demoBuildingId) {
-          dispatch({ type: "SET_FIELD", field: "demoBuildingId", value: buildings[0].id });
-        }
-      } catch (err) {
-        console.error("Failed to fetch demo buildings:", err);
-      } finally {
-        setDemoBuildingsLoading(false);
-      }
-    };
-    fetchDemoBuildings();
-  }, []);
 
   const isNiagara = state.bmsVendor === "niagara";
   const vendorLabel = BMS_VENDORS.find((v) => v.value === state.bmsVendor)?.label ?? state.bmsVendor;
@@ -357,18 +331,8 @@ export function BMSConnectionWizard({
       return;
     }
 
-    if (state.useDemoData) {
-      // Validate demo building is selected
-      if (!state.demoBuildingId) {
-        dispatch({
-          type: "SET_CONNECTION_STATUS",
-          status: "failed",
-          message: "Please select a demo building to use as data source",
-        });
-        return;
-      }
-
-      // Create the new site first
+    if (state.useSimulation) {
+      // Simulation mode: create the site, discovery will pull from Supabase
       try {
         // @ts-ignore - Type mismatch in CreateSiteRequest, but API accepts number
         const siteResult = await sitesApi.create({
@@ -383,11 +347,10 @@ export function BMSConnectionWizard({
         // Store the created site ID
         dispatch({ type: "SET_FIELD", field: "siteId", value: siteResult.id });
 
-        const demoBuilding = demoBuildings.find((b) => b.id === state.demoBuildingId);
         dispatch({
           type: "SET_CONNECTION_STATUS",
           status: "connected",
-          message: `Site "${state.siteName}" created (${siteResult.id}). Demo data from "${demoBuilding?.name || state.demoBuildingId}" ready.`,
+          message: `Site "${state.siteName}" created (${siteResult.id}). Equipment will be discovered from the simulation database.`,
         });
       } catch (err) {
         dispatch({
@@ -443,7 +406,7 @@ export function BMSConnectionWizard({
         message: err instanceof Error ? err.message : "Connection failed",
       });
     }
-  }, [state.bmsVendor, state.host, state.port, state.username, state.password, state.useHttps, state.useDemoData, state.siteName, state.siteAddress, state.siteRegion, state.siteType, state.siteFloors, state.siteSqm, state.demoBuildingId, demoBuildings]);
+  }, [state.bmsVendor, state.host, state.port, state.username, state.password, state.useHttps, state.useSimulation, state.siteName, state.siteAddress, state.siteRegion, state.siteType, state.siteFloors, state.siteSqm]);
 
   // ---------- Step 2: Discover & Classify ----------
   const handleDiscover = useCallback(async () => {
@@ -460,10 +423,8 @@ export function BMSConnectionWizard({
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 3 }); // Classifying equipment...
 
       const res = await niagaraApi.discoverAndClassify({
-        device_ip: state.useDemoData ? "demo" : state.host,
+        device_ip: state.useSimulation ? "simulation" : state.host,
         site_id: state.siteId,
-        use_demo: state.useDemoData,
-        demo_building_id: state.useDemoData ? state.demoBuildingId : undefined,
         bms_vendor: state.bmsVendor,
       });
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 4 }); // Grouping into zones...
@@ -478,7 +439,7 @@ export function BMSConnectionWizard({
       });
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 0 });
     }
-  }, [state.host, state.siteId, state.useDemoData, state.demoBuildingId, state.bmsVendor]);
+  }, [state.host, state.siteId, state.useSimulation, state.bmsVendor]);
 
   // ---------- Step 3: Load Mappings ----------
   const handleLoadMappings = useCallback(async () => {
@@ -822,24 +783,24 @@ export function BMSConnectionWizard({
           )}
         </div>\n\n        {/* Connection Mode Toggle */}
         <div className="space-y-2">
-          {/* Real BMS option */}
+          {/* Connect to BMS option */}
           <label
             className="flex items-center gap-3 p-3 rounded cursor-pointer"
             style={{
-              background: !state.useDemoData
+              background: !state.useSimulation
                 ? "var(--color-sentinel-blue)11"
                 : "transparent",
-              border: `1px solid ${!state.useDemoData ? "var(--color-sentinel-blue)" : "var(--color-sentinel-border)"}`,
+              border: `1px solid ${!state.useSimulation ? "var(--color-sentinel-blue)" : "var(--color-sentinel-border)"}`,
             }}
           >
             <input
               type="radio"
               name="connectionMode"
-              checked={!state.useDemoData}
+              checked={!state.useSimulation}
               onChange={() =>
                 dispatch({
                   type: "SET_FIELD",
-                  field: "useDemoData",
+                  field: "useSimulation",
                   value: false,
                 })
               }
@@ -850,35 +811,35 @@ export function BMSConnectionWizard({
                 className="text-sm font-medium"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                Real BMS Connection
+                Connect to BMS
               </span>
               <p
                 className="text-xs mt-0.5"
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
-                Connect to a live BMS system
+                Connect to a live BMS system via BACnet/oBIX
               </p>
             </div>
           </label>
 
-          {/* Demo Data option */}
+          {/* Discover from Simulation option */}
           <label
             className="flex items-center gap-3 p-3 rounded cursor-pointer"
             style={{
-              background: state.useDemoData
+              background: state.useSimulation
                 ? "var(--color-sentinel-blue)11"
                 : "transparent",
-              border: `1px solid ${state.useDemoData ? "var(--color-sentinel-blue)" : "var(--color-sentinel-border)"}`,
+              border: `1px solid ${state.useSimulation ? "var(--color-sentinel-blue)" : "var(--color-sentinel-border)"}`,
             }}
           >
             <input
               type="radio"
               name="connectionMode"
-              checked={state.useDemoData}
+              checked={state.useSimulation}
               onChange={() =>
                 dispatch({
                   type: "SET_FIELD",
-                  field: "useDemoData",
+                  field: "useSimulation",
                   value: true,
                 })
               }
@@ -889,66 +850,20 @@ export function BMSConnectionWizard({
                 className="text-sm font-medium"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                Use Demo Data
+                Discover from Simulation
               </span>
               <p
                 className="text-xs mt-0.5"
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
-                Select a demo building to simulate discovery
+                Equipment will be discovered from the simulation database
               </p>
             </div>
           </label>
         </div>
 
-        {/* Demo Building Picker - shown when Demo Data is selected */}
-        {state.useDemoData && (
-          <div className="mt-4">
-            <label className="block text-sm font-medium mb-1" style={labelStyle}>
-              Demo Data Source
-            </label>
-            {demoBuildingsLoading ? (
-              <div className="flex items-center gap-2 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Loading demo buildings...
-              </div>
-            ) : demoBuildings.length === 0 ? (
-              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                No demo buildings available
-              </p>
-            ) : (
-              <select
-                value={state.demoBuildingId}
-                onChange={(e) =>
-                  dispatch({
-                    type: "SET_FIELD",
-                    field: "demoBuildingId",
-                    value: e.target.value,
-                  })
-                }
-                className="w-full rounded px-3 py-2 text-sm"
-                style={inputStyle}
-              >
-                {demoBuildings.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name} — {b.equipment_count} equipment, {b.type.replace("_", " ")}
-                  </option>
-                ))}
-              </select>
-            )}
-            {state.demoBuildingId && demoBuildings.length > 0 && (
-              <p
-                className="text-xs mt-1"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
-              >
-                Equipment from <strong>{demoBuildings.find(b => b.id === state.demoBuildingId)?.name}</strong> will be imported into your new site.
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Real BMS Connection fields — shown when Real BMS is selected */}
-        {!state.useDemoData && isNiagara && (
+        {/* BMS Connection fields — shown when Connect to BMS is selected */}
+        {!state.useSimulation && isNiagara && (
           <div className="grid grid-cols-2 gap-4 mt-4">
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
@@ -1058,8 +973,8 @@ export function BMSConnectionWizard({
           </div>
         )}
 
-        {/* BACnet-only info for non-Niagara vendors (not in demo mode) */}
-        {!state.useDemoData && !isNiagara && (
+        {/* BACnet-only info for non-Niagara vendors (not in simulation mode) */}
+        {!state.useSimulation && !isNiagara && (
           <div
             className="p-3 rounded text-sm mt-4"
             style={{
@@ -1079,8 +994,7 @@ export function BMSConnectionWizard({
         disabled={
           state.connectionStatus === "testing" ||
           !state.siteName.trim() ||
-          (state.useDemoData && !state.demoBuildingId) ||
-          (!state.useDemoData && isNiagara && !state.host)
+          (!state.useSimulation && isNiagara && !state.host)
         }
         className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-opacity disabled:opacity-50"
         style={{
@@ -1090,12 +1004,12 @@ export function BMSConnectionWizard({
       >
         {state.connectionStatus === "testing" ? (
           <Loader2 className="w-4 h-4 animate-spin" />
-        ) : state.useDemoData ? (
+        ) : state.useSimulation ? (
           <Building2 className="w-4 h-4" />
         ) : (
           <Wifi className="w-4 h-4" />
         )}
-        {state.useDemoData ? "Create Site & Enable Demo" : "Test Connection"}
+        {state.useSimulation ? "Create Site & Discover" : "Test Connection"}
       </button>
 
       {/* Connection result */}
