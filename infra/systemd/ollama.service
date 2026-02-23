@@ -1,0 +1,29 @@
+# Ollama inference server — pairs with rlm-runner.service
+# The RLM runner declares Wants=ollama.service and After=ollama.service
+# so this unit must be installed for the runner to start correctly.
+#
+# Install: sudo cp ollama.service /etc/systemd/system/
+#          sudo systemctl daemon-reload
+#          sudo systemctl enable --now ollama.service
+
+[Unit]
+Description=Ollama Local LLM Inference Server
+After=network.target
+
+[Service]
+Type=simple
+User=ollama
+Group=ollama
+ExecStart=/usr/local/bin/ollama serve
+Environment=OLLAMA_HOST=127.0.0.1:11434
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ollama
+
+# Security hardening
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
