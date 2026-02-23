@@ -99,7 +99,7 @@ class ApprovalService:
         evaluator = QualityGateEvaluator()
         mode = settings.resolved_ingestion_mode.value
         metrics = await evaluator.collect_metrics(site_id)
-        return evaluator.evaluate(mode, metrics)
+        return evaluator.evaluate(mode, metrics, site_id=site_id)
 
     def _audit_gate_block(self, recommendation_id: str, error_code: str, gate_result) -> None:
         """Log a quality gate block to the audit trail."""
@@ -407,6 +407,16 @@ class ApprovalService:
                 },
             )
 
+            # Prometheus metrics instrumentation (best-effort)
+            try:
+                from app.api.metrics import sentinel_approval_decisions_total
+
+                sentinel_approval_decisions_total.labels(
+                    site_id=recommendation.site_id or "unknown", decision="approved"
+                ).inc()
+            except Exception:
+                pass  # Metrics are best-effort, never block business logic
+
             logger.info(f"Approval executed successfully for {recommendation_id}")
 
             return ApprovalResult(
@@ -525,6 +535,16 @@ class ApprovalService:
                     "correlation_id": correlation_id,
                 },
             )
+
+            # Prometheus metrics instrumentation (best-effort)
+            try:
+                from app.api.metrics import sentinel_approval_decisions_total
+
+                sentinel_approval_decisions_total.labels(
+                    site_id=recommendation.site_id or "unknown", decision="rejected"
+                ).inc()
+            except Exception:
+                pass  # Metrics are best-effort, never block business logic
 
             logger.info(f"Recommendation {recommendation_id} rejected by {rejected_by}")
 
@@ -653,6 +673,19 @@ class ApprovalService:
                     "initiated_by": initiated_by or "system",
                 },
             )
+
+            # Prometheus metrics instrumentation (best-effort)
+            try:
+                from app.api.metrics import sentinel_rollback_total
+
+                # Extract equipment type from equipment code (e.g., S002-CHILLER-B1-001 -> CHILLER)
+                eq_parts = equipment_id.split("-") if equipment_id else []
+                eq_type = eq_parts[1].upper() if len(eq_parts) >= 2 else "unknown"
+                sentinel_rollback_total.labels(
+                    site_id=recommendation.site_id or "unknown", equipment_type=eq_type
+                ).inc()
+            except Exception:
+                pass  # Metrics are best-effort, never block business logic
 
             logger.info(f"Rollback completed successfully for {recommendation_id}")
 
@@ -1323,6 +1356,18 @@ class ApprovalService:
                     "rollback_cov_verified": rollback_cov_result.verified,
                 },
             )
+
+            # Prometheus metrics instrumentation (best-effort)
+            try:
+                from app.api.metrics import sentinel_rollback_total
+
+                eq_parts = equipment_id.split("-") if equipment_id else []
+                eq_type = eq_parts[1].upper() if len(eq_parts) >= 2 else "unknown"
+                sentinel_rollback_total.labels(
+                    site_id=recommendation.site_id or "unknown", equipment_type=eq_type
+                ).inc()
+            except Exception:
+                pass  # Metrics are best-effort, never block business logic
 
             logger.info(f"Auto-rollback: Successfully completed for {recommendation.id}")
             return True

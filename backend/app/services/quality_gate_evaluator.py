@@ -95,7 +95,7 @@ class QualityGateEvaluator:
     def __init__(self) -> None:
         self._policy = QualityGatePolicy()
 
-    def evaluate(self, mode: str, metrics: Dict[str, float]) -> QualityGateResult:
+    def evaluate(self, mode: str, metrics: Dict[str, float], site_id: str = "unknown") -> QualityGateResult:
         """Evaluate metrics against quality gate thresholds for a mode.
 
         Pure function — no IO. Takes pre-collected metrics and returns
@@ -104,6 +104,7 @@ class QualityGateEvaluator:
         Args:
             mode: Ingestion mode ('simulation', 'shadow_live', 'live_control')
             metrics: Dict of metric_name -> float value
+            site_id: Site identifier for Prometheus metric labels
 
         Returns:
             QualityGateResult with overall status, per-metric results, and enforcement
@@ -160,6 +161,23 @@ class QualityGateEvaluator:
 
         # Audit log
         self._audit_log(result)
+
+        # Prometheus metrics instrumentation (best-effort, never blocks business logic)
+        try:
+            from app.api.metrics import (
+                sentinel_quality_gate_evaluations_total,
+                sentinel_quality_gate_enforcement,
+            )
+
+            sentinel_quality_gate_evaluations_total.labels(site_id=site_id, status=result.overall.value).inc()
+
+            # Set active enforcement level to 1, others to 0
+            for level in ("normal", "cap_confidence", "suppress_tier3", "block_writes"):
+                sentinel_quality_gate_enforcement.labels(site_id=site_id, enforcement=level).set(
+                    1 if result.enforcement.value == level else 0
+                )
+        except Exception:
+            pass  # Metrics are best-effort, never block business logic
 
         return result
 

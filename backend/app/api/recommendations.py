@@ -239,7 +239,7 @@ async def approve_recommendation(
                     site_id = "unknown"
 
                 metrics = await evaluator.collect_metrics(site_id)
-                gate_result = evaluator.evaluate(mode, metrics)
+                gate_result = evaluator.evaluate(mode, metrics, site_id=site_id)
 
                 if gate_result.overall == GateStatus.FAIL:
                     raise HTTPException(

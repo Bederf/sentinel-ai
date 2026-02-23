@@ -187,6 +187,15 @@ class TierRoutingEngine:
             f"Routed {equipment_type} to {tier} (confidence={confidence_score:.2f}, risk={risk_level}): {reason}"
         )
 
+        # Prometheus metrics instrumentation (best-effort)
+        try:
+            from app.api.metrics import sentinel_recommendations_total
+
+            rec_site_id = recommendation.get("site_id", "unknown")
+            sentinel_recommendations_total.labels(site_id=rec_site_id, tier=tier, action=action).inc()
+        except Exception:
+            pass  # Metrics are best-effort, never block business logic
+
         # 8. Log decision to parasite_decisions
         equipment_code = recommendation.get("target_equipment", "unknown")
         site_id = recommendation.get("site_id", "unknown")

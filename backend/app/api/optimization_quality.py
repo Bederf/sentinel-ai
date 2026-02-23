@@ -56,7 +56,7 @@ async def get_quality_gate(site_id: str):
         metrics = await evaluator.collect_metrics(site_id)
 
         # Evaluate against thresholds for current mode
-        result = evaluator.evaluate(mode, metrics)
+        result = evaluator.evaluate(mode, metrics, site_id=site_id)
 
         # Build per-metric detail list
         rule_details = []
