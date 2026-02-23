@@ -58,9 +58,16 @@ async def submit_run(request: RunRequest) -> RunResponse:
     # Lazy import to avoid circular dependency at module level
     from app.services.run_manager import run_manager
 
-    # Validate model against allowlist
-    model = request.model or settings.model_name
-    if model not in settings.model_allowlist:
+    # Resolve model — provider-aware default
+    if request.model:
+        model = request.model
+    elif settings.inference_provider == "anthropic":
+        model = settings.anthropic_model
+    else:
+        model = settings.model_name
+
+    # Validate model against allowlist (skip for Anthropic — cloud models not enumerable)
+    if settings.inference_provider != "anthropic" and model not in settings.model_allowlist:
         raise HTTPException(
             status_code=400,
             detail=f"Model '{model}' is not in the allowlist. Allowed: {settings.model_allowlist}",
@@ -126,23 +133,31 @@ async def get_trace(run_id: str) -> list[TraceEntry]:
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
-    """Return service health including Ollama availability.
+    """Return service health including inference backend availability.
 
-    Checks Ollama via the OpenAI-compatible /v1 endpoint (not native /api/generate).
+    Checks the configured provider: Ollama (HTTP /v1/models) or Anthropic (API key present).
     """
+    from app.services.inference_client import get_inference_client
+
+    client = get_inference_client()
+    inference_ready = await client.is_available()
+
+    # Legacy field: check Ollama separately if it's not the primary provider
     ollama_available = False
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(f"{settings.model_base_url}/models")
-            ollama_available = resp.status_code == 200
-    except (httpx.ConnectError, httpx.TimeoutException):
-        ollama_available = False
-    except Exception:
-        logger.warning("Unexpected error checking Ollama health", exc_info=True)
-        ollama_available = False
+    if settings.inference_provider == "ollama":
+        ollama_available = inference_ready
+    else:
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as hc:
+                resp = await hc.get(f"{settings.model_base_url}/models")
+                ollama_available = resp.status_code == 200
+        except Exception:
+            ollama_available = False
 
     return HealthResponse(
         status="ok",
         version="1.0.0",
         ollama_available=ollama_available,
+        inference_provider=settings.inference_provider,
+        inference_ready=inference_ready,
     )

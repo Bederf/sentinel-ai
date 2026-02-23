@@ -390,9 +390,18 @@ class RecursiveAnalyzer:
 
     def _normalize_parsed(self, data: dict[str, Any]) -> dict[str, Any]:
         """Normalize parsed LLM response to expected schema fields."""
+        # Ensure summary is a string (some models return it as a dict)
+        raw_summary = data.get("summary", "")
+        if not isinstance(raw_summary, str):
+            raw_summary = json.dumps(raw_summary, indent=2) if raw_summary else ""
+
+        # Ensure findings are strings
+        raw_findings = data.get("findings", [])
+        findings = [str(f) if not isinstance(f, str) else f for f in raw_findings] if isinstance(raw_findings, list) else []
+
         return {
-            "summary": data.get("summary", ""),
-            "findings": data.get("findings", []),
+            "summary": raw_summary,
+            "findings": findings,
             "anomalies": data.get("anomalies", []),
             "timeline": data.get("timeline", []),
             "recommended_actions": data.get("recommended_actions", []),

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +56,31 @@ class ResultSchema(BaseModel):
     confidence: float = 0.0
     needs_deeper_run: bool = False
     trajectory: TrajectoryData = Field(default_factory=TrajectoryData)
+    scoring_version: int = Field(default_factory=lambda: _get_scoring_version())
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def confidence_label(self) -> Literal["low", "medium", "high"]:
+        """Human-readable confidence label derived from the float score.
+
+        Thresholds are configurable via CONFIDENCE_THRESHOLD_HIGH and
+        CONFIDENCE_THRESHOLD_MEDIUM env vars (see config.py).
+        Use this for UI display and policy rules. The float stays stable for ML.
+        """
+        from app.config import settings
+
+        if self.confidence >= settings.confidence_threshold_high:
+            return "high"
+        if self.confidence >= settings.confidence_threshold_medium:
+            return "medium"
+        return "low"
+
+
+def _get_scoring_version() -> int:
+    """Read scoring_version from config at construction time."""
+    from app.config import settings
+
+    return settings.scoring_version
 
 
 # ---------------------------------------------------------------------------
@@ -93,3 +118,5 @@ class HealthResponse(BaseModel):
     status: str = "ok"
     version: str = "1.0.0"
     ollama_available: bool = False
+    inference_provider: str = "ollama"
+    inference_ready: bool = False
