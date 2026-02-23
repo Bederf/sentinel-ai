@@ -16,6 +16,7 @@ from app.services.classification_service import get_classification_service
 from app.services.ml_inference import get_lstm_service, get_anomaly_service
 from app.services.survival_service import SurvivalService
 from pydantic import BaseModel, Field
+from app.utils.ai_provenance import get_ml_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ class ModelInfo(BaseModel):
 
 
 # Endpoints
-@router.get("/failure-type/{equipment_id}", response_model=FailurePredictionResponse)
+@router.get("/failure-type/{equipment_id}")
 async def get_failure_type_prediction(equipment_id: str):
     """Get predicted failure type for equipment.
 
@@ -72,7 +73,13 @@ async def get_failure_type_prediction(equipment_id: str):
     """
     try:
         service = get_classification_service()
-        return service.predict_failure_type(equipment_id)
+        result = service.predict_failure_type(equipment_id)
+        if isinstance(result, dict):
+            result["ai_provenance"] = get_ml_provenance("failure-classifier-v1").model_dump()
+            return result
+        response_dict = result.model_dump() if hasattr(result, "model_dump") else result
+        response_dict["ai_provenance"] = get_ml_provenance("failure-classifier-v1").model_dump()
+        return response_dict
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -183,7 +190,7 @@ class ComprehensivePredictionResponse(BaseModel):
     overall_risk: Dict
 
 
-@router.get("/comprehensive/{equipment_id}", response_model=ComprehensivePredictionResponse)
+@router.get("/comprehensive/{equipment_id}")
 async def get_comprehensive_prediction(equipment_id: str):
     """Get all ML predictions for equipment (LSTM, Autoencoder, Survival, Classifier).
 
@@ -259,6 +266,7 @@ async def get_comprehensive_prediction(equipment_id: str):
 
     # Calculate overall risk
     results["overall_risk"] = calculate_overall_risk(results["predictions"])
+    results["ai_provenance"] = get_ml_provenance("comprehensive-ml-ensemble-v1").model_dump()
 
     return results
 

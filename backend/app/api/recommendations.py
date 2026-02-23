@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from app.middleware.rate_limiter import limiter
 from app.services.recommendation_service import get_recommendation_service
+from app.utils.ai_provenance import get_ml_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +149,7 @@ async def create_recommendation(req: Request, request: CreateRecommendationReque
             "recommendation": rec.to_dict(),
             "status": rec.status.value,
             "requires_approval": rec.requires_approval,
+            "ai_provenance": get_ml_provenance("recommendation-engine-v1").model_dump(),
         }
 
     except ValueError as e:
@@ -381,6 +383,7 @@ async def trigger_recommendation_processing(
             "recommendation_id": result.get("recommendation_id"),
             "needs_input": result.get("needs_input", False),
             "processing_complete": result.get("processing_complete", False),
+            "ai_provenance": get_ml_provenance("recommendation-agent-v1").model_dump(),
         }
 
     except ImportError:

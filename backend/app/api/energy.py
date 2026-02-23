@@ -13,6 +13,7 @@ from app.database.repositories.energy_consumption_repository import get_energy_c
 from app.services.building_loader import BuildingDataLoader
 from app.services.energy_rules_engine import get_energy_rules_engine
 from app.models.energy_rules import BuildingState
+from app.utils.ai_provenance import get_ml_provenance
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -1335,17 +1336,22 @@ async def get_simulated_energy_costs(
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=days - 1)
 
-        response = (
-            supabase.table("energy_cost_summary")
-            .select("*")
-            .gte("date", start_date.isoformat())
-            .lte("date", end_date.isoformat())
-            .eq("building_id", site_id)
-            .order("date", desc=False)
-            .execute()
-        )
+        try:
+            response = (
+                supabase.table("energy_cost_summary")
+                .select("*")
+                .gte("date", start_date.isoformat())
+                .lte("date", end_date.isoformat())
+                .eq("building_id", site_id)
+                .order("date", desc=False)
+                .execute()
+            )
+            cost_data = response.data
+        except Exception as table_err:
+            logger.warning(f"[COST] energy_cost_summary table unavailable: {table_err}")
+            cost_data = []
 
-        if not response.data:
+        if not cost_data:
             logger.info(f"[COST] No cost data for {site_id} in last {days} days")
             return {
                 "site_id": site_id,
@@ -1361,7 +1367,7 @@ async def get_simulated_energy_costs(
         total_kwh = 0.0
         total_cost = 0.0
 
-        for record in response.data:
+        for record in cost_data:
             daily_costs.append(
                 {
                     "date": record.get("date"),
@@ -2180,6 +2186,7 @@ async def get_ai_recommendations(
             cost_variance_pct=cost_variance_pct,
         )
 
+        result["ai_provenance"] = get_ml_provenance("ai-recommendation-engine-v1").model_dump()
         return result
 
     except Exception as e:
@@ -2258,6 +2265,7 @@ async def get_recommendations_dashboard(
                 f"Implement {len(top_3)} recommendations to save"
                 f" R{full_recs.get('total_annual_savings_r', 0):,.0f}/year"
             ),
+            "ai_provenance": get_ml_provenance("ai-recommendation-engine-v1").model_dump(),
         }
 
     except Exception as e:

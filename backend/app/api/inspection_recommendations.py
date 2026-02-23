@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from app.services.inspection_analyzer import get_inspection_analyzer
 from app.database.supabase_client import get_supabase_client
+from app.utils.ai_provenance import get_ml_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +96,7 @@ async def get_inspection_recommendation(request: Request, work_order_id: str) ->
         "equipment_name": eq.get("name"),
         "current_health": eq.get("health_score"),
         "recommendation": analysis.to_dict(),
+        "ai_provenance": get_ml_provenance("inspection-analyzer-v1").model_dump(),
     }
 
 

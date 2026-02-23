@@ -18,6 +18,8 @@ from pydantic import BaseModel
 from datetime import datetime
 from dataclasses import asdict
 
+from app.utils.ai_provenance import get_ml_provenance
+
 router = APIRouter(prefix="/api/ml", tags=["ml"])
 
 
@@ -86,7 +88,7 @@ class ModelInfo(BaseModel):
 # === LSTM Prediction Endpoints ===
 
 
-@router.get("/predictions/lstm/{equipment_id}", response_model=PredictionResponse)
+@router.get("/predictions/lstm/{equipment_id}")
 async def get_lstm_prediction(
     equipment_id: str,
     equipment_type: str = Query(..., description="Equipment type (chiller, ahu, generator, etc.)"),
@@ -135,6 +137,7 @@ async def get_lstm_prediction(
             result["explanation"] = {"error": f"Failed to generate explanation: {str(e)}"}
             result["maintenance_recommendations"] = []
 
+    result["ai_provenance"] = get_ml_provenance(f"lstm-{equipment_type}-v1").model_dump()
     return result
 
 
@@ -198,7 +201,7 @@ async def get_batch_predictions(equipment_list: List[dict]):
 # === Anomaly Detection Endpoints ===
 
 
-@router.get("/anomalies/equipment/{equipment_id}", response_model=AnomalyResponse)
+@router.get("/anomalies/equipment/{equipment_id}")
 async def check_equipment_anomaly(
     equipment_id: str,
     equipment_type: str = Query(..., description="Equipment type"),
@@ -257,6 +260,7 @@ async def check_equipment_anomaly(
             result["related_faults"] = []
             result["recommended_actions"] = []
 
+    result["ai_provenance"] = get_ml_provenance(f"autoencoder-{equipment_type}-v1").model_dump()
     return result
 
 
@@ -507,7 +511,7 @@ class MaintenanceRecommendationResponse(BaseModel):
     timestamp: str
 
 
-@router.post("/maintenance/recommendations", response_model=MaintenanceRecommendationResponse)
+@router.post("/maintenance/recommendations")
 async def generate_maintenance_recommendations(request: MaintenanceRecommendationRequest):
     """
     Generate maintenance recommendations for equipment.
@@ -527,7 +531,7 @@ async def generate_maintenance_recommendations(request: MaintenanceRecommendatio
             urgency_filter=request.urgency_filter,
         )
 
-        return MaintenanceRecommendationResponse(
+        response = MaintenanceRecommendationResponse(
             equipment_id=request.equipment_id,
             equipment_type=request.equipment_type,
             recommendations=result.get("recommendations", []),
@@ -536,6 +540,11 @@ async def generate_maintenance_recommendations(request: MaintenanceRecommendatio
             priority_breakdown=result.get("priority_breakdown", {}),
             timestamp=datetime.utcnow().isoformat(),
         )
+        response_dict = response.model_dump()
+        response_dict["ai_provenance"] = get_ml_provenance(
+            f"maintenance-recommender-{request.equipment_type}-v1"
+        ).model_dump()
+        return response_dict
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(e)}")
 

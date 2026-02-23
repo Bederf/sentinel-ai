@@ -27,6 +27,7 @@ from app.config.settings import settings
 from app.services.optimization_tier_router import get_tier_router
 from app.services.module_registry_service import module_registry
 from app.services.profile_service import get_profile_service
+from app.utils.ai_provenance import get_ml_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -806,6 +807,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
                 "cross_system_recommendations": cross_system_count,
                 "total_recommendations": hvac_count + lighting_count,
             },
+            "ai_provenance": get_ml_provenance("ai-optimizer-v1").model_dump(),
         }
 
     except ValueError as e:
