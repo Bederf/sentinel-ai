@@ -1,7 +1,7 @@
 # SENTINEL Incident Response Process
 
 **Document ID:** SENTINEL-IRP-002
-**Version:** 1.0
+**Version:** 1.1
 **Effective Date:** 2026-02-04
 **Review Cadence:** Annual, or after any P1 incident
 **Classification:** Internal — FSR Supplier Confidential
@@ -904,6 +904,127 @@ If SIEM rule SIEM-004 (BMS Write Anomaly) triggers:
 4. **Assess:** Determine if writes caused operational impact
 5. **Update:** Adjust SIEM thresholds if false positive, or escalate if genuine
 
+### 10.4 AI Model Incident Playbook
+
+**Scope:** Incidents involving AI/ML model failures, corrupted predictions, quality gate violations, or training data integrity issues. This supplements general incident response with AI-specific procedures.
+
+**Severity classification for AI incidents:**
+
+| Scenario | Severity | Rationale |
+|----------|----------|-----------|
+| Quality gate enters BLOCK_WRITES enforcement | P2 | AI writes suspended, no equipment impact (safety interlocks active) |
+| Safety interlock triggers on AI recommendation | P2 | Defence-in-depth caught unsafe recommendation |
+| Model produces sustained anomalous predictions (>5 min) | P2 | Potential for incorrect advisory output |
+| Training data corruption discovered post-deployment | P3 | Model integrity questionable, investigation needed |
+| AI provenance headers missing from responses | P4 | Transparency gap, no safety impact |
+
+#### 10.4.1 Detection
+
+AI model incidents are detected via:
+
+| Source | Metric/Signal | Alert Threshold |
+|--------|--------------|-----------------|
+| Quality Gate Evaluator | `sentinel_quality_gate_evaluations_total{result="FAIL"}` | Any FAIL in live_control mode |
+| Safety Interlocks | `sentinel_safety_violations_total` | Any violation |
+| Tier Routing Engine | `sentinel_tier_routing_decisions_total{tier="blocked"}` | >10 blocks in 5 minutes |
+| Model Registry | Model version mismatch or rollback event | Any rollback |
+| Confidence Scores | `sentinel_prediction_confidence` | Mean confidence <0.4 sustained 5 min |
+
+**Detection services:**
+- `backend/app/services/quality_gate_evaluator.py` — evaluate() checks 14 metrics
+- `backend/app/services/safety_interlocks.py` — enforces physical safety boundaries
+- `backend/app/services/tier_routing_engine.py` — routes by confidence score
+
+#### 10.4.2 Containment — Model Rollback Procedure
+
+**Step 1: Verify quality gate enforcement is active**
+
+```bash
+# Check current enforcement level
+curl -s http://localhost:9095/api/optimization/quality-gate/site-002 | \
+  jq '.enforcement'
+# Expected: "BLOCK_WRITES" or "SUPPRESS_TIER3" if incident detected
+```
+
+**Step 2: Identify the affected model**
+
+```bash
+# Check model registry for active models
+curl -s http://localhost:9095/api/ml/models | \
+  jq '.[] | select(.status == "active") | {model_type, version, updated_at}'
+
+# Check recent quality gate failures
+curl -s http://localhost:9095/api/optimization/quality-gate/site-002 | \
+  jq '.metrics[] | select(.state == "FAIL")'
+```
+
+**Step 3: Rollback to previous model version**
+
+```bash
+# Via API (preferred — triggers quality gate re-evaluation)
+curl -X POST http://localhost:9095/api/ml/models/{model_type}/rollback \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "INC-YYYY-NNN: quality gate violation", "operator": "incident_commander"}'
+
+# Via database (fallback — if API unavailable)
+# 1. Find previous version
+# SELECT version, status FROM ml_models WHERE model_type = '{type}' ORDER BY created_at DESC LIMIT 5;
+# 2. Deactivate current, activate previous
+# UPDATE ml_models SET status = 'deactivated' WHERE model_type = '{type}' AND status = 'active';
+# UPDATE ml_models SET status = 'active' WHERE model_type = '{type}' AND version = '{prev_version}';
+```
+
+**Step 4: Verify rollback success**
+
+```bash
+# Confirm model version reverted
+curl -s http://localhost:9095/api/ml/models | \
+  jq '.[] | select(.model_type == "{type}") | {version, status}'
+
+# Confirm quality gate passes with rolled-back model
+curl -s http://localhost:9095/api/optimization/quality-gate/site-002 | \
+  jq '{enforcement, pass_rate: (.metrics | map(select(.state == "PASS")) | length)}'
+
+# Target: rollback complete within 5 minutes of detection
+```
+
+#### 10.4.3 Training Data Quarantine
+
+If the incident involves corrupted training data:
+
+1. **Identify affected dataset:** Check retraining logs for data source and date range
+2. **Quarantine:** Mark affected data records with `quarantined=true` flag
+3. **Assess blast radius:** Which models were trained on the affected data?
+4. **Retrain:** Schedule retraining with clean dataset (exclude quarantined records)
+5. **Validate:** Run quality gate evaluation on retrained model before promotion
+
+#### 10.4.4 Recovery and Verification
+
+After containment:
+
+1. **Monitor for 1 hour:** Watch quality gate metrics for stability
+2. **Verify predictions:** Spot-check 10 predictions against known-good baselines
+3. **Check mode alignment:** Confirm SENTINEL operating mode matches expected (shadow/supervised/automatic)
+4. **Clear enforcement:** If quality gate returns to NORMAL, document in incident register
+5. **CAPA entry:** Raise nonconformity in `docs/ai-governance/nonconformity-capa-register.md`
+
+#### 10.4.5 Post-Incident AI Review
+
+In addition to standard Phase 6 review:
+
+1. **Model forensics:** Compare corrupted model weights/parameters against previous version
+2. **Prediction audit:** Review all predictions made by the affected model during the incident window
+3. **Quality gate review:** Were the 14 quality gate metrics sufficient to detect this failure mode?
+4. **Safety interlock review:** Did safety boundaries hold? Any near-misses?
+5. **Update stress test scenarios:** Add the incident as a new tabletop scenario in `docs/ai-governance/stress-test-scenarios.md`
+
+**Cross-references:**
+- Quality gate policy: `backend/app/services/quality_gate_policy.py` (14 metrics, 42 threshold entries)
+- Safety interlocks: `backend/app/services/safety_interlocks.py`
+- Stress test scenarios: `docs/ai-governance/stress-test-scenarios.md`
+- Tabletop exercise report: `docs/ai-governance/incident-tabletop-report.md`
+- CAPA register: `docs/ai-governance/nonconformity-capa-register.md`
+
 ---
 
 ## 11. Document Governance
@@ -923,6 +1044,7 @@ If SIEM rule SIEM-004 (BMS Write Anomaly) triggers:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-02-04 | SENTINEL Security | Initial process creation |
+| 1.1 | 2026-02-23 | SENTINEL Governance Team | Added Section 10.4 AI Model Incident Playbook (model rollback, training data quarantine, quality gate procedures). Ref: TABLETOP-001 Action 3. |
 
 ---
 

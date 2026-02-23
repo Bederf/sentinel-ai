@@ -126,7 +126,7 @@ The following artifacts were created during the Phase 3 assurance cycle and form
 
 ## Retention Policy
 
-Evidence is retained per the data privacy policy (`docs/ai-governance/data-privacy-policy.md`):
+Evidence is retained per the data privacy policy (`docs/09-security/data-privacy-policy.md`):
 
 - **Minimum retention**: 3 years for all compliance evidence
 - **Regulatory evidence**: Retained for the duration required by applicable regulation (EU AI Act: 10 years for high-risk system documentation)
