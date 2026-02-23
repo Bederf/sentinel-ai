@@ -40,6 +40,31 @@ def get_claude_provenance(correlation_id: Optional[str] = None) -> AIProvenance:
     )
 
 
+def get_local_llm_provenance(
+    model: str = "phi3:mini",
+    correlation_id: Optional[str] = None,
+) -> AIProvenance:
+    """Return provenance for local LLM-generated content (Ollama/local runtime)."""
+    return AIProvenance(
+        model=model,
+        provider="sentinel-local",
+        correlation_id=correlation_id,
+    )
+
+
+def get_cloud_llm_provenance(
+    provider: str,
+    model: str,
+    correlation_id: Optional[str] = None,
+) -> AIProvenance:
+    """Return provenance for cloud LLM-generated content."""
+    return AIProvenance(
+        model=model,
+        provider=provider,
+        correlation_id=correlation_id,
+    )
+
+
 def get_ml_provenance(
     model_type: str,
     correlation_id: Optional[str] = None,

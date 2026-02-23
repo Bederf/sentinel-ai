@@ -50,6 +50,10 @@ _PATTERNS: dict[str, re.Pattern[str]] = {
 _METADATA_FIELDS: frozenset[str] = frozenset({
     "status",
     "confidence",
+    "confidence_label",
+    "scoring",
+    "model_name",
+    "model_provider",
     "trajectory",
     "needs_deeper_run",
     "steps",

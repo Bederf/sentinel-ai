@@ -99,6 +99,7 @@ class OperationMode(str, Enum):
     HVAC_DALI_SENTINEL = "hvac_dali_sentinel"
     SOLAR_BESS_BASELINE = "solar_bess_baseline"
     SOLAR_BESS_SENTINEL = "solar_bess_sentinel"
+    FULL_SENTINEL = "full_sentinel"  # HVAC + DALI + Solar + BESS combined
 
 
 @dataclass
@@ -134,8 +135,31 @@ class ScenarioConfig:
     demo_mode: bool = False
 
 
-# Predefined scenarios
+# Active scenarios — only sentinel_annual is exposed in /api/lifecycle/scenarios
 SCENARIOS = {
+    "sentinel_annual": ScenarioConfig(
+        name="SENTINEL Full Building Simulation (365 days)",
+        description=(
+            "Full-year simulation: HVAC + DALI + Solar 3.9 MWp + BESS 5 MWh + "
+            "City Power TOU arbitrage, South African seasonal variations, "
+            "temperature cycles, rainfall patterns, occupancy variations, "
+            "and seasonal fault probabilities"
+        ),
+        operation_mode=OperationMode.FULL_SENTINEL,
+        fault_probability=0.05,
+        auto_repair=True,
+        repair_delay_hours=4,
+        optimization_enabled=True,
+        demo_mode=True,
+    ),
+}
+
+# Backward-compatible aliases — old scenario keys resolve to the unified scenario
+SCENARIOS["grant_hvac_dali_ai_annual"] = SCENARIOS["sentinel_annual"]
+SCENARIOS["grant_solar_bess_ai_annual"] = SCENARIOS["sentinel_annual"]
+
+# Archived scenarios — kept for reference and backward-compatible API calls, not listed in /scenarios
+ARCHIVED_SCENARIOS = {
     "normal_day": ScenarioConfig(
         name="Normal Day",
         description="Typical building operations with no major issues",
@@ -209,35 +233,10 @@ SCENARIOS = {
         fault_probability=0.0,
         optimization_enabled=True,
     ),
-    "grant_hvac_dali_ai_annual": ScenarioConfig(
-        name="Grant Demo: HVAC + DALI + Sentinel AI (365 days)",
-        description=(
-            "Full-year simulation with South African seasonal variations - "
-            "temperature cycles, rainfall patterns, occupancy variations, "
-            "and seasonal fault probabilities"
-        ),
-        operation_mode=OperationMode.HVAC_DALI_SENTINEL,
-        fault_probability=0.05,
-        auto_repair=True,
-        repair_delay_hours=4,
-        optimization_enabled=True,
-        demo_mode=True,  # Enable continuous AI recommendations for demo (lower thresholds, BESS arbitrage)
-    ),
-    "grant_solar_bess_ai_annual": ScenarioConfig(
-        name="Grant Demo: Solar + BESS + Sentinel AI (365 days)",
-        description=(
-            "Full-year simulation with 3.9 MWp solar + 5 MWh BESS, "
-            "City Power TOU arbitrage, demand management, "
-            "and South African seasonal variations"
-        ),
-        operation_mode=OperationMode.SOLAR_BESS_SENTINEL,
-        fault_probability=0.03,
-        auto_repair=True,
-        repair_delay_hours=6,
-        optimization_enabled=True,
-        demo_mode=True,  # Enable continuous AI recommendations for demo
-    ),
 }
+
+# Combined lookup — used internally for start() and crash recovery
+ALL_SCENARIOS = {**ARCHIVED_SCENARIOS, **SCENARIOS}
 
 
 class LifecycleOrchestrator:
@@ -275,6 +274,7 @@ class LifecycleOrchestrator:
         # Cycle tracking for completion
         self.max_cycles: int = 1  # How many full cycles before completing
         self.completed_cycles: int = 0
+        self._site_prefix: str = self.site_id.replace("site-", "S").upper()  # site-005 -> S005
 
         # Energy tracking
         self.total_energy_kwh: float = 0.0  # Cumulative energy consumption
@@ -325,12 +325,40 @@ class LifecycleOrchestrator:
         # Supabase persistence for dashboard visibility (104-02)
         self.persistence = get_simulation_persistence(site_id=site_id)
 
+        # BESS state of charge tracking across hours
+        self.bess_soc: float = 50.0  # Start at 50% SoC
+
+        # Current ambient temp and solar efficiency (set each hour in _process_hour)
+        self.current_ambient_temp: float = 22.0
+        self.current_solar_efficiency: float = 0.0
+
         # Sustainability metrics accumulators (111-01)
         self._daily_hvac_kwh: float = 0.0
         self._daily_lighting_kwh: float = 0.0
         self._daily_other_kwh: float = 0.0
         self._daily_occupancy_samples: list[float] = []
         self._sustainability_collector = SustainabilityMetricsCollector(self.site_id)
+
+        # DALI→HVAC occupancy bridge state
+        self.current_occupancy_data: dict[str, float] = {}
+        self._prev_zone_occupancy_state: dict[str, bool] = {}  # zone -> was_occupied
+
+    @property
+    def site_prefix(self) -> str:
+        """Derive equipment code prefix from site_id: 'site-005' -> 'S005'."""
+        return self._site_prefix
+
+    # Normalize DB type names (e.g. GEN, MTR, INV) to internal names
+    TYPE_ALIASES: dict[str, str] = {
+        "gen": "generator",
+        "mtr": "meter",
+        "inv": "inverter",
+        "ct": "cooling_tower",
+        "dali": "dali_zone",
+        "dali_luminaire": "luminaire",
+        "zone": "zone_controller",
+        "controller": "zone_controller",
+    }
 
     # Equipment type -> technician specialty mapping (106-01)
     EQUIPMENT_SPECIALTY_MAP = {
@@ -343,8 +371,12 @@ class LifecycleOrchestrator:
         "ups": "Electrical",
         "generator": "Electrical",
         "meter": "Electrical",
+        "inverter": "Electrical",
+        "bess": "Electrical",
         "dali_zone": "Controls",
         "dali_controller": "Controls",
+        "luminaire": "Controls",
+        "zone_controller": "Controls",
         "fire": "Fire Safety",
     }
 
@@ -359,6 +391,10 @@ class LifecycleOrchestrator:
         "ups": 0.001,  # ~8.7% per year (always on, battery aging)
         "generator": 0.0001,  # ~0.9% per year (standby)
         "meter": 0.0,  # Meters don't degrade
+        "inverter": 0.0002,  # Solar inverter, moderate wear
+        "bess": 0.0008,  # Battery cycling ages cells
+        "luminaire": 0.0001,  # LED lamp, very slow degradation
+        "zone_controller": 0.0,  # Electronic controller, no mechanical wear
         "dali_zone": 0.0001,
         "dali_controller": 0.0001,
         "zone_sensor": 0.0001,
@@ -481,7 +517,7 @@ class LifecycleOrchestrator:
         """
         # FIRST: Check for existing checkpoint to recover from
         checkpoint = None
-        if task_id and scenario == "grant_hvac_dali_ai_annual":
+        if task_id and "annual" in scenario:
             try:
                 from app.database.supabase_client import get_supabase_client
 
@@ -503,8 +539,8 @@ class LifecycleOrchestrator:
         if self.running and not checkpoint:
             return {"success": False, "error": "Simulation already running"}
 
-        # Get scenario config
-        self.current_scenario = SCENARIOS.get(scenario, SCENARIOS["fault_day"])
+        # Get scenario config (check ALL_SCENARIOS for archived scenarios)
+        self.current_scenario = ALL_SCENARIOS.get(scenario, SCENARIOS["sentinel_annual"])
 
         # Initialize seeded random for reproducible occupancy variation
         # Hash scenario name to get consistent seed for same demo
@@ -983,6 +1019,7 @@ class LifecycleOrchestrator:
         occupancy_data = {}
         try:
             occupancy_data = self._generate_occupancy_for_hour(hour)
+            self.current_occupancy_data = occupancy_data
 
             # Get ambient temperature from JHB climate engine (preferred)
             # or fall back to seasonal modeler for backward compatibility
@@ -1020,6 +1057,23 @@ class LifecycleOrchestrator:
             logger.warning(f"[THERMAL] Failed to update temperatures at hour {hour}: {e}")
             occupancy_data = {}
 
+        # === STORE ENVIRONMENT FOR SENSOR GENERATION ===
+        self.current_ambient_temp = ambient_temp
+        # Calculate solar efficiency for this hour
+        if self.seasonal_modeler:
+            current_date = self.simulated_time.date()
+            is_raining_now = self.seasonal_modeler.should_rain_today(current_date)
+            cloud_cover = self.seasonal_modeler.get_cloud_cover_percent(current_date)
+            if 6 <= hour < 18:
+                base_eff = 100 - (cloud_cover * 0.8)
+                if is_raining_now:
+                    base_eff *= 0.3
+                self.current_solar_efficiency = max(10, base_eff)
+            else:
+                self.current_solar_efficiency = 0
+        else:
+            self.current_solar_efficiency = 100.0 if 6 <= hour < 18 else 0.0
+
         # === CHILLED WATER MODEL UPDATE (105-01) ===
         # Advance CHW supply/return temps based on chiller staging and ambient
         self.chw_model.update(schedule_state.chiller_staging, ambient_temp)
@@ -1052,9 +1106,27 @@ class LifecycleOrchestrator:
         # All 15 office zones: L0 (001-005), L1 (101-105), L2 (201-205)
         default_zones = [f"Zone-{z:03d}" for z in list(range(1, 6)) + list(range(101, 106)) + list(range(201, 206))]
         for zone_id in set(list(self.zone_temperatures.keys()) + default_zones):
-            # Small per-zone variation (orientation, occupancy, solar gain)
-            variation = self._scenario_rng.uniform(-0.5, 0.5)
-            self.zone_temperatures[zone_id] = round(zone_base + variation, 1)
+            # Per-zone occupancy drives body heat contribution
+            zone_occ = self._get_zone_occupancy(zone_id) / 100.0  # 0.0-1.0
+
+            if zone_occ >= 0.30:
+                # Occupied: body heat adds +0.3 to +0.8°C proportional to occupancy
+                body_heat = 0.3 + (zone_occ - 0.30) * (0.5 / 0.70)  # linear 0.3→0.8 over 30-100%
+                variation = self._scenario_rng.uniform(-0.3, 0.3)
+                self.zone_temperatures[zone_id] = round(zone_base + body_heat + variation, 1)
+            elif zone_occ < 0.10:
+                # Unoccupied: drifts 0.5°C closer to ambient (no internal heat gain)
+                drift = 0.5 if ambient_temp > zone_base else -0.5
+                variation = self._scenario_rng.uniform(-0.2, 0.2)
+                self.zone_temperatures[zone_id] = round(zone_base + drift + variation, 1)
+            else:
+                # Low occupancy (10-30%): minimal heat gain +0.1 to +0.3°C
+                body_heat = 0.1 + (zone_occ - 0.10) * (0.2 / 0.20)  # linear 0.1→0.3 over 10-30%
+                variation = self._scenario_rng.uniform(-0.3, 0.3)
+                self.zone_temperatures[zone_id] = round(zone_base + body_heat + variation, 1)
+
+        # === DALI→HVAC OCCUPANCY BRIDGE EVENTS ===
+        self._emit_occupancy_bridge_events(hour)
 
         # === ENERGY CONSUMPTION TRACKING (schedule-driven) ===
         # Power consumption based on equipment staging, not flat 20-35kW
@@ -1073,9 +1145,9 @@ class LifecycleOrchestrator:
 
         # === POWER METER VALIDATION (A.3) ===
         try:
-            power_engine = get_power_meter_validation_engine("S002")
+            power_engine = get_power_meter_validation_engine(self.site_prefix)
             result = await power_engine.validate_hourly_power(
-                meter_id="S002-MTR-B1-HVAC",
+                meter_id=f"{self.site_prefix}-MTR-B1-HVAC",
                 reading_kwh=base_power,
                 simulated_hour=hour,
                 simulated_date=self.simulated_time,
@@ -1088,7 +1160,7 @@ class LifecycleOrchestrator:
         # === COST VALIDATION (A.4) ===
         if hour == 23:
             try:
-                cost_engine = get_cost_validation_engine("S002")
+                cost_engine = get_cost_validation_engine(self.site_prefix)
                 result = await cost_engine.validate_monthly_cost(
                     invoice_period_start=self.simulated_time.replace(day=1),
                     invoice_period_end=self.simulated_time,
@@ -1316,6 +1388,94 @@ class LifecycleOrchestrator:
 
         return occupancy_data
 
+    def _get_zone_occupancy(self, zone_id: str) -> float:
+        """Map a temperature zone (Zone-001..Zone-205) to DALI occupancy %.
+
+        Temperature zones use numeric IDs while DALI occupancy zones use
+        floor-letter IDs.  Mapping:
+          Zone-001..005 (B1/L0)  → Zone-B1-001 (utility, typically low)
+          Zone-101,102,103 (L1)  → Zone-L1-A
+          Zone-104,105     (L1)  → Zone-L1-B
+          Zone-201,202,203 (L2)  → Zone-L2-A
+          Zone-204,205     (L2)  → Zone-L2-B
+        """
+        if not self.current_occupancy_data:
+            return 50.0  # Fallback: assume moderate occupancy
+
+        # Parse numeric zone number from "Zone-NNN"
+        parts = zone_id.split("-")
+        if len(parts) < 2 or not parts[-1].isdigit():
+            return 50.0
+        zone_num = int(parts[-1])
+
+        if zone_num <= 99:
+            # Basement / L0 → Zone-B1-001
+            return self.current_occupancy_data.get("Zone-B1-001", 10.0)
+        elif zone_num <= 199:
+            # L1: 101-103 → L1-A, 104-105 → L1-B
+            if zone_num <= 103:
+                return self.current_occupancy_data.get("Zone-L1-A", 50.0)
+            else:
+                return self.current_occupancy_data.get("Zone-L1-B", 50.0)
+        elif zone_num <= 299:
+            # L2: 201-203 → L2-A, 204-205 → L2-B
+            if zone_num <= 203:
+                return self.current_occupancy_data.get("Zone-L2-A", 50.0)
+            else:
+                return self.current_occupancy_data.get("Zone-L2-B", 50.0)
+        return 50.0
+
+    def _emit_occupancy_bridge_events(self, hour: int):
+        """Emit cross-module bridge events when zones transition occupied↔unoccupied."""
+        # Map temperature zones to their occupancy
+        default_zones = [f"Zone-{z:03d}" for z in list(range(1, 6)) + list(range(101, 106)) + list(range(201, 206))]
+        for zone_id in default_zones:
+            occ_pct = self._get_zone_occupancy(zone_id)
+            is_occupied = occ_pct >= 10.0
+            was_occupied = self._prev_zone_occupancy_state.get(zone_id, True)
+
+            if was_occupied and not is_occupied:
+                # Transition: occupied → unoccupied
+                self._emit_event(
+                    LifecycleEvent(
+                        timestamp=datetime.now(),
+                        simulated_hour=hour,
+                        event_type=EventType.AI_OPTIMIZATION,
+                        description=(
+                            f"DALI\u2192HVAC bridge: {zone_id} unoccupied ({occ_pct:.0f}%) "
+                            f"\u2192 VAV damper 15%, setpoint +2\u00b0C"
+                        ),
+                        details={
+                            "bridge": "dali_hvac_occupancy",
+                            "zone": zone_id,
+                            "occupancy_pct": round(occ_pct, 1),
+                            "action": "reduce_cooling",
+                            "damper_min_pct": 15,
+                            "setpoint_offset_c": 2.0,
+                        },
+                    )
+                )
+            elif not was_occupied and is_occupied:
+                # Transition: unoccupied → occupied
+                self._emit_event(
+                    LifecycleEvent(
+                        timestamp=datetime.now(),
+                        simulated_hour=hour,
+                        event_type=EventType.AI_OPTIMIZATION,
+                        description=(
+                            f"DALI\u2192HVAC bridge: {zone_id} occupied ({occ_pct:.0f}%) \u2192 restore full cooling"
+                        ),
+                        details={
+                            "bridge": "dali_hvac_occupancy",
+                            "zone": zone_id,
+                            "occupancy_pct": round(occ_pct, 1),
+                            "action": "restore_cooling",
+                        },
+                    )
+                )
+
+            self._prev_zone_occupancy_state[zone_id] = is_occupied
+
     async def _building_wake(self):
         """Simulate building morning startup."""
         self._emit_event(
@@ -1435,9 +1595,8 @@ class LifecycleOrchestrator:
                 return
 
             # Filter to target site if available — process ALL equipment (no cap)
-            # Derive equipment code prefix from site_id: "site-002" -> "S002-"
-            site_prefix = "S" + self.site_id.replace("site-", "").upper() + "-"
-            site_equipment = [eq for eq in equipment_list if eq.get("code", "").startswith(site_prefix)]
+            equip_prefix = f"{self.site_prefix}-"
+            site_equipment = [eq for eq in equipment_list if eq.get("code", "").startswith(equip_prefix)]
             if not site_equipment:
                 site_equipment = equipment_list
 
@@ -1488,7 +1647,7 @@ class LifecycleOrchestrator:
                     # Create control recommendation
                     try:
                         rec = Recommendation(
-                            site_id="S002",
+                            site_id=self.site_prefix,
                             timestamp=datetime.utcnow(),
                             action_type="ai_optimization",
                             risk_level=ActionRiskLevel.LOW,
@@ -1528,7 +1687,7 @@ class LifecycleOrchestrator:
                 # BESS TOU arbitrage: charge during off-peak, discharge during peak
                 if current_hour in [7, 8, 9, 18, 19]:  # Peak hours (R 3.45/kWh)
                     bess_rec = {
-                        "equipment": "S002-BESS-001",
+                        "equipment": f"{self.site_prefix}-BESS-001",
                         "control_point": "discharge_power",
                         "target_value": 500,  # kW
                         "reason": "Peak tariff arbitrage - discharge BESS to grid",
@@ -1538,7 +1697,7 @@ class LifecycleOrchestrator:
                     recommendations_created.append(bess_rec)
                 elif current_hour in [0, 1, 2, 3, 4, 5]:  # Off-peak (R 1.05/kWh)
                     bess_rec = {
-                        "equipment": "S002-BESS-001",
+                        "equipment": f"{self.site_prefix}-BESS-001",
                         "control_point": "charge_power",
                         "target_value": 300,  # kW
                         "reason": "Off-peak charging - cheap grid power",
@@ -1551,7 +1710,7 @@ class LifecycleOrchestrator:
                 # 5% chance per hour to simulate load shedding event
                 if random.random() < 0.05:
                     gen_rec = {
-                        "equipment": "S002-GEN-B1-001",
+                        "equipment": f"{self.site_prefix}-GEN-B1-001",
                         "control_point": "start",
                         "target_value": 1,
                         "reason": "Simulated load shedding event from grid operator",
@@ -1586,8 +1745,11 @@ class LifecycleOrchestrator:
             logger.warning(f"AI optimization error: {e}")
 
     def _calculate_occupancy(self, hour: int) -> int:
-        """Calculate occupancy percent based on hour of day, with demo mode drift."""
-        # Base occupancy from time of day
+        """Calculate occupancy percent based on hour and day of week.
+
+        Applies weekend/holiday factors: Sat 30%, Sun 20% of weekday base.
+        """
+        # Base occupancy from time of day (weekday profile)
         if hour < 6 or hour >= 22:
             base = 0  # Night: 0%
         elif hour < 8:
@@ -1607,12 +1769,19 @@ class LifecycleOrchestrator:
         else:
             base = 5  # Late evening: security/cleaning only
 
+        # Apply day-of-week factor (Mon=0 .. Sun=6)
+        # Weekend occupancy is skeleton staff only
+        if self.simulated_time:
+            day_of_week = self.simulated_time.weekday()
+            day_factors = [1.0, 0.95, 0.90, 0.88, 0.80, 0.3, 0.2]  # Mon-Sun
+            base = int(base * day_factors[day_of_week])
+
         # Demo mode: add occupancy drift (±15%) to keep rules triggering
         if self.current_scenario and self.current_scenario.demo_mode:
             drift = self._scenario_rng.uniform(0.85, 1.15)
             base = int(max(0, min(100, base * drift)))
 
-        return base  # Late evening: security/cleaning only
+        return base
 
     def _calculate_daylight(self, hour: int) -> int:
         """Calculate available natural daylight as percentage (0-100%)."""
@@ -1940,10 +2109,14 @@ class LifecycleOrchestrator:
             return schedule_state.hvac_mode.value not in ("off", "night_setback")
         elif equip_type == "pump":
             return schedule_state.chiller_staging.value != "off"
-        elif equip_type in ("ups", "generator"):
+        elif equip_type in ("ups", "generator", "bess", "meter"):
             return True  # Always on
-        elif equip_type in ("dali_zone", "dali_controller"):
+        elif equip_type == "inverter":
+            return self.current_solar_efficiency > 0  # Daytime only
+        elif equip_type in ("dali_zone", "dali_controller", "luminaire"):
             return schedule_state.lighting_mode.value != "off"
+        elif equip_type == "zone_controller":
+            return schedule_state.target_occupancy_pct > 0  # Active during occupied hours
         return False
 
     def _apply_cascade_effects(self, equipment_states: dict[str, dict]) -> dict[str, dict]:
@@ -2010,14 +2183,15 @@ class LifecycleOrchestrator:
                 pass
 
             equipment_list = self.equipment_repo.get_all(building_id=building_uuid)
-            site_prefix = self.site_id.replace("site-", "S").upper()  # site-002 -> S002
 
             for equip in equipment_list:
                 code = equip.get("code", "")
-                if not code.startswith(site_prefix):
+                if not code.startswith(self.site_prefix):
                     continue
 
                 equip_type = equip.get("type", "unknown").lower()
+                # Normalize DB type names to internal names
+                equip_type = self.TYPE_ALIASES.get(equip_type, equip_type)
                 health = equip.get("health_score", 75)
 
                 # Baseline wear: slow degradation during normal operation (105-02)
@@ -2046,6 +2220,7 @@ class LifecycleOrchestrator:
                     "status": "online" if health >= 70 else ("degraded" if health >= 40 else "offline"),
                     "sensor_readings": sensor_readings,
                     "type": equip_type,
+                    "is_running": is_running,
                     "runtime_hours": self.runtime_hours.get(code, 0),
                 }
         except Exception as e:
@@ -2166,15 +2341,24 @@ class LifecycleOrchestrator:
         except Exception as e:
             logger.warning(f"Could not create alert via service: {e}")
 
+        description = f"Health alert ({severity}): {code} at {health:.1f}%"
         self._emit_event(
             LifecycleEvent(
                 timestamp=datetime.now(),
                 simulated_hour=simulated_hour,
                 event_type=EventType.ALERT_CREATED if severity == "critical" else EventType.HEALTH_DEGRADED,
                 equipment_id=code,
-                description=f"Health alert ({severity}): {code} at {health:.1f}%",
+                description=description,
                 details={"equipment_code": code, "health": health, "severity": severity},
             )
+        )
+        # Push to dashboard Recent Alerts
+        self._push_alert_to_dashboard(
+            equipment_code=code,
+            severity=severity,
+            alert_type="health_degradation",
+            message=description,
+            details={"health": health},
         )
 
     async def _auto_create_work_order(self, code: str, equip_type: str, health: float, simulated_hour: int):
@@ -2265,10 +2449,15 @@ class LifecycleOrchestrator:
         hour: int,
         schedule_state: ScheduleState,
     ) -> dict[str, float]:
-        """Generate realistic sensor readings for an equipment item."""
-        readings: dict[str, float] = {}
+        """Generate realistic sensor readings for an equipment item.
 
-        if equip_type in ("chiller", "cooling_tower"):
+        equip_type is already normalized via TYPE_ALIASES in _collect_equipment_states.
+        """
+        readings: dict[str, float] = {}
+        ambient = self.current_ambient_temp
+        solar_eff = self.current_solar_efficiency
+
+        if equip_type == "chiller":
             # Use CHW model for supply/return temps (105-01)
             readings["supply_temp"] = round(self.chw_model.supply_temp, 1)
             readings["return_temp"] = round(self.chw_model.return_temp, 1)
@@ -2285,6 +2474,27 @@ class LifecycleOrchestrator:
                 readings["compressor_status"] = 0
                 readings["cop"] = 0
 
+        elif equip_type == "cooling_tower":
+            # CT responds to ambient temp, humidity, and chiller staging
+            chillers_on = schedule_state.chiller_staging.value != "off"
+            readings["status"] = 1.0 if chillers_on else 0.0
+            if chillers_on:
+                readings["fan_speed_pct"] = {"stage_1": 50, "stage_2": 75, "full_load": 95}.get(
+                    schedule_state.chiller_staging.value, 0
+                )
+                # Water inlet = CHW return (warm water from building)
+                readings["water_inlet_temp_c"] = round(self.chw_model.return_temp + 2.0, 1)
+                # Outlet approaches wet-bulb (ambient - 3C), limited by fan speed
+                wet_bulb_approx = ambient - 3.0
+                fan_factor = readings["fan_speed_pct"] / 100.0
+                inlet = readings["water_inlet_temp_c"]
+                outlet = inlet - (inlet - wet_bulb_approx) * fan_factor * 0.7
+                readings["water_outlet_temp_c"] = round(max(wet_bulb_approx, outlet), 1)
+            else:
+                readings["fan_speed_pct"] = 0.0
+                readings["water_inlet_temp_c"] = round(ambient, 1)
+                readings["water_outlet_temp_c"] = round(ambient, 1)
+
         elif equip_type == "ahu":
             readings["fan_speed_pct"] = schedule_state.ahu_fan_pct
             readings["supply_air_temp"] = 14.0 + (100 - health) * 0.05
@@ -2299,13 +2509,28 @@ class LifecycleOrchestrator:
             sensor_noise = self._scenario_rng.uniform(-0.3, 0.3)
             readings["zone_temp"] = round(actual_temp + sensor_noise, 1)
 
+            # DALI→HVAC occupancy bridge: per-zone PIR occupancy drives damper
+            zone_occ_pct = self._get_zone_occupancy(zone_id)
+
             if schedule_state.hvac_mode.value not in ("off", "night_setback"):
-                # Damper responds to temp error (demand-responsive)
-                temp_error = actual_temp - self.building_schedule.COMFORT_SETPOINT
-                base_damper = schedule_state.target_occupancy_pct + 10
-                demand_adjustment = max(0, temp_error * 10)  # 10% more damper per deg C above setpoint
-                readings["damper_position"] = min(100, base_damper + demand_adjustment)
-                readings["airflow_lps"] = readings["damper_position"] * 0.8  # Rough L/s from damper %
+                if zone_occ_pct < 10.0:
+                    # Unoccupied: DALI PIR says empty → minimum damper
+                    readings["damper_position"] = 15.0
+                elif zone_occ_pct < 30.0:
+                    # Low occupancy: scale proportionally between 15% and normal
+                    temp_error = actual_temp - self.building_schedule.COMFORT_SETPOINT
+                    base_damper = schedule_state.target_occupancy_pct + 10
+                    demand_adjustment = max(0, temp_error * 10)
+                    full_damper = min(100, base_damper + demand_adjustment)
+                    scale = (zone_occ_pct - 10.0) / 20.0  # 0.0 at 10%, 1.0 at 30%
+                    readings["damper_position"] = round(15.0 + (full_damper - 15.0) * scale, 1)
+                else:
+                    # Occupied: demand-responsive as before
+                    temp_error = actual_temp - self.building_schedule.COMFORT_SETPOINT
+                    base_damper = schedule_state.target_occupancy_pct + 10
+                    demand_adjustment = max(0, temp_error * 10)
+                    readings["damper_position"] = min(100, base_damper + demand_adjustment)
+                readings["airflow_lps"] = round(readings["damper_position"] * 0.8, 1)
             else:
                 readings["damper_position"] = 0
                 readings["airflow_lps"] = 0
@@ -2319,13 +2544,30 @@ class LifecycleOrchestrator:
             sensor_noise = self._scenario_rng.uniform(-0.3, 0.3)
             readings["room_temp"] = round(actual_temp + sensor_noise, 1)
 
+            # DALI→HVAC occupancy bridge: per-zone PIR occupancy drives valve/fan
+            zone_occ_pct = self._get_zone_occupancy(zone_id)
+
             if schedule_state.hvac_mode.value not in ("off", "night_setback"):
-                # Valve responds to temp error (demand-responsive)
-                temp_error = actual_temp - self.building_schedule.COMFORT_SETPOINT
-                base_valve = schedule_state.target_occupancy_pct + 15
-                demand_adjustment = max(0, temp_error * 8)  # 8% more valve per deg C above setpoint
-                readings["valve_position"] = min(100, base_valve + demand_adjustment)
-                readings["fan_speed"] = 2  # medium
+                if zone_occ_pct < 10.0:
+                    # Unoccupied: close valve further, low fan
+                    readings["valve_position"] = 10.0
+                    readings["fan_speed"] = 1  # low
+                elif zone_occ_pct < 30.0:
+                    # Low occupancy: proportional scaling
+                    temp_error = actual_temp - self.building_schedule.COMFORT_SETPOINT
+                    base_valve = schedule_state.target_occupancy_pct + 15
+                    demand_adjustment = max(0, temp_error * 8)
+                    full_valve = min(100, base_valve + demand_adjustment)
+                    scale = (zone_occ_pct - 10.0) / 20.0
+                    readings["valve_position"] = round(10.0 + (full_valve - 10.0) * scale, 1)
+                    readings["fan_speed"] = 1  # low
+                else:
+                    # Occupied: demand-responsive as before
+                    temp_error = actual_temp - self.building_schedule.COMFORT_SETPOINT
+                    base_valve = schedule_state.target_occupancy_pct + 15
+                    demand_adjustment = max(0, temp_error * 8)
+                    readings["valve_position"] = min(100, base_valve + demand_adjustment)
+                    readings["fan_speed"] = 2  # medium
             else:
                 readings["valve_position"] = 0
                 readings["fan_speed"] = 0
@@ -2356,6 +2598,128 @@ class LifecycleOrchestrator:
         elif equip_type == "meter":
             readings["power_kw"] = self.current_hour_power_kw
             readings["power_factor"] = 0.92 + self._scenario_rng.uniform(-0.02, 0.02)
+
+        elif equip_type == "bess":
+            # Battery Energy Storage System — responds to TOU schedule and solar
+            # Charge off-peak (22:00-06:00) and when solar excess, discharge peak (07:00-10:00, 17:00-21:00)
+            bess_capacity_kwh = 200.0  # 200 kWh system
+            max_charge_kw = 50.0
+            max_discharge_kw = 50.0
+
+            charge_kw = 0.0
+            discharge_kw = 0.0
+
+            if hour < 6 or hour >= 22:
+                # Off-peak: charge from grid
+                charge_kw = max_charge_kw * 0.8
+                soc_delta = (charge_kw / bess_capacity_kwh) * 100.0
+                self.bess_soc = min(100.0, self.bess_soc + soc_delta)
+            elif 7 <= hour <= 10 or 17 <= hour <= 21:
+                # Peak: discharge to offset grid
+                if self.bess_soc > 10:
+                    discharge_kw = max_discharge_kw * min(1.0, (self.bess_soc - 10) / 30.0)
+                    soc_delta = (discharge_kw / bess_capacity_kwh) * 100.0
+                    self.bess_soc = max(10.0, self.bess_soc - soc_delta)
+            elif solar_eff > 50 and self.bess_soc < 90:
+                # Midday solar excess: charge from solar
+                charge_kw = max_charge_kw * 0.5 * (solar_eff / 100.0)
+                soc_delta = (charge_kw / bess_capacity_kwh) * 100.0
+                self.bess_soc = min(100.0, self.bess_soc + soc_delta)
+
+            readings["state_of_charge_pct"] = round(self.bess_soc, 1)
+            readings["charge_power_kw"] = round(charge_kw, 1)
+            readings["discharge_power_kw"] = round(discharge_kw, 1)
+            readings["grid_import_kw"] = round(max(0, self.current_hour_power_kw - discharge_kw), 1)
+            # Battery temp: ambient + self-heating during charge/discharge
+            self_heat = (charge_kw + discharge_kw) * 0.1  # 0.1°C per kW
+            readings["battery_temp_c"] = round(ambient + self_heat, 1)
+            readings["status"] = 1.0
+
+        elif equip_type == "inverter":
+            # Solar inverter — responds to solar_efficiency, time of day, health
+            panel_capacity_kw = 100.0  # 100 kWp array per inverter
+            if solar_eff > 0:
+                # Time-of-day bell curve: peak at noon
+                hour_mod = hour % 24
+                if 6 <= hour_mod < 18:
+                    time_factor = max(0, 1.0 - abs(hour_mod - 12) / 6.0)
+                else:
+                    time_factor = 0.0
+
+                dc_power = panel_capacity_kw * (solar_eff / 100.0) * time_factor * (health / 100.0)
+                inv_efficiency = 0.96 * (health / 100.0)  # Degrades slightly with health
+                ac_power = dc_power * inv_efficiency
+
+                readings["dc_power_kw"] = round(dc_power, 1)
+                readings["ac_power_kw"] = round(ac_power, 1)
+                readings["efficiency_pct"] = round(inv_efficiency * 100, 1)
+                readings["dc_voltage"] = round(600 + (solar_eff / 100.0 - 0.5) * 100, 0)  # ~550-650V
+                readings["temperature_c"] = round(ambient + 15 * time_factor, 1)
+                readings["status"] = 1.0
+            else:
+                readings["dc_power_kw"] = 0.0
+                readings["ac_power_kw"] = 0.0
+                readings["efficiency_pct"] = 0.0
+                readings["dc_voltage"] = 0.0
+                readings["temperature_c"] = round(ambient, 1)
+                readings["status"] = 0.0
+
+        elif equip_type == "luminaire":
+            # Luminaire — responds to lighting_mode, daylight (solar as proxy), occupancy
+            lighting_mode = schedule_state.lighting_mode.value
+
+            # DALI→Lighting occupancy bridge: use per-zone DALI PIR occupancy
+            zone_id = self._equipment_to_zone(code)
+            zone_occ_pct = self._get_zone_occupancy(zone_id)
+            occupancy = zone_occ_pct / 100.0  # 0.0-1.0
+
+            base_brightness = {
+                "off": 0,
+                "security_only": 10,
+                "dimmed": 30,
+                "full": 100,
+                "daylight_harvest": 65,
+            }.get(lighting_mode, 0)
+
+            if lighting_mode == "daylight_harvest" and solar_eff > 0:
+                # Tridonic DALI daylight harvesting: reduce brightness when daylight strong
+                daylight_reduction = (solar_eff / 100.0) * 40  # Up to 40% reduction
+                base_brightness = max(20, base_brightness - daylight_reduction)
+
+            # Tridonic native occupancy dimming: unoccupied zones dim to 20%
+            if occupancy < 0.1 and lighting_mode not in ("off", "security_only"):
+                base_brightness = min(base_brightness, 20)
+            elif occupancy < 0.3 and lighting_mode not in ("off", "security_only"):
+                # Low occupancy: scale brightness down proportionally
+                scale = occupancy / 0.3  # 0.0 at 0%, 1.0 at 30%
+                base_brightness = max(20, base_brightness * scale)
+
+            power_w = base_brightness / 100.0 * 40.0  # 40W at full brightness
+            readings["brightness_pct"] = round(base_brightness, 1)
+            readings["power_w"] = round(power_w, 1)
+            readings["dimming_level"] = round(base_brightness, 1)
+            readings["status"] = 1.0 if base_brightness > 0 else 0.0
+
+        elif equip_type == "zone_controller":
+            # Zone controller — reports zone environment and control state
+            zone_id = self._equipment_to_zone(code)
+            zone_temp = self.zone_temperatures.get(
+                zone_id, self.building_schedule.COMFORT_SETPOINT + schedule_state.setpoint_offset
+            )
+            setpoint = self.building_schedule.COMFORT_SETPOINT + schedule_state.setpoint_offset
+            occupancy = schedule_state.target_occupancy_pct
+
+            readings["zone_temp_c"] = round(zone_temp + self._scenario_rng.uniform(-0.2, 0.2), 1)
+            readings["occupancy_pct"] = round(occupancy + self._scenario_rng.uniform(-2, 2), 1)
+            readings["setpoint_c"] = round(setpoint, 1)
+            # Mode: heating if below setpoint-1, cooling if above setpoint+1, else off
+            if zone_temp < setpoint - 1.0:
+                readings["mode"] = 1.0  # heating
+            elif zone_temp > setpoint + 1.0:
+                readings["mode"] = 2.0  # cooling
+            else:
+                readings["mode"] = 0.0  # satisfied / off
+            readings["status"] = 1.0 if occupancy > 0 else 0.0
 
         elif equip_type in ("dali_zone", "dali_controller"):
             lighting_pct = {
@@ -2671,14 +3035,14 @@ class LifecycleOrchestrator:
                 supabase.table("equipment").update(
                     {
                         "health_score": 85,
-                        "status": "online",
+                        "status": "normal",
                     }
                 ).eq("code", eq_code).execute()
                 logger.info(f"Health restored to 85% for {eq_code}")
             except Exception:
                 # Fallback: update via equipment repo
                 try:
-                    self.equipment_repo.update(eq_code, {"health_score": 85, "status": "online"})
+                    self.equipment_repo.update(eq_code, {"health_score": 85, "status": "normal"})
                 except Exception:
                     pass  # JSON fallback handled by persistence service
 
@@ -3152,6 +3516,9 @@ class LifecycleOrchestrator:
         is within 10% of a boundary, emits a warning. If it exceeds the boundary,
         emits a critical event. Limits to 3 violations per scan to prevent spam.
 
+        Skips equipment that is not running — zero readings during off-hours
+        are expected, not safety concerns.
+
         Args:
             equipment_states: Dict mapping equipment code to state dict with sensor_readings
             simulated_hour: Current simulated hour (0-23)
@@ -3159,6 +3526,10 @@ class LifecycleOrchestrator:
         violations = []
 
         for code, state in equipment_states.items():
+            # Skip equipment that is off — zero values are expected, not violations
+            if not state.get("is_running", False):
+                continue
+
             readings = state.get("sensor_readings", {})
             for point_name, value in readings.items():
                 if point_name not in self.SAFETY_LIMITS:
@@ -3198,18 +3569,70 @@ class LifecycleOrchestrator:
         # Emit events for violations (limit to top 3 to avoid event spam)
         for v in violations[:3]:
             severity = "critical" if v["approach_pct"] >= 100 else "warning"
+            description = f"Safety boundary {severity}: {v['code']} {v['point']}={v['value']} (limits: {v['limits']})"
             self._emit_event(
                 LifecycleEvent(
                     timestamp=datetime.now(),
                     simulated_hour=simulated_hour,
                     event_type=EventType.SAFETY_VIOLATION if severity == "critical" else EventType.ALERT_CREATED,
                     equipment_id=v["code"],
-                    description=(
-                        f"Safety boundary {severity}: {v['code']} {v['point']}={v['value']} (limits: {v['limits']})"
-                    ),
+                    description=description,
                     details=v,
                 )
             )
+            # Push to dashboard Recent Alerts
+            self._push_alert_to_dashboard(
+                equipment_code=v["code"],
+                severity=severity,
+                alert_type="safety_boundary",
+                message=description,
+                details=v,
+            )
+
+    def _push_alert_to_dashboard(
+        self, equipment_code: str, severity: str, alert_type: str, message: str, details: dict | None = None
+    ):
+        """Push a SENTINEL alert into the simulation service so it appears in Recent Alerts.
+
+        The lifecycle orchestrator tracks events internally. This bridges them to
+        the bms_simulation_service alert queue, which the /api/alerts endpoint reads.
+        """
+        try:
+            from app.api.simulation import simulation_service
+
+            simulation_service._alert_id_counter += 1
+            equip_type = (equipment_code.split("-")[1] or "unknown").lower() if "-" in equipment_code else "unknown"
+
+            alert = {
+                "id": f"SIM-ALERT-{simulation_service._alert_id_counter}",
+                "equipment_id": equipment_code,
+                "equipment_name": equipment_code,
+                "site_id": self.site_id,
+                "site_name": self.site_id,
+                "type": alert_type,
+                "severity": severity,
+                "priority": 1 if severity == "critical" else 2 if severity == "warning" else 3,
+                "status": "active",
+                "title": f"{severity.upper()}: {equipment_code} - {alert_type.replace('_', ' ').title()}",
+                "message": message,
+                "health_score": details.get("health") if details else None,
+                "fault_codes": [],
+                "created_at": datetime.now().isoformat(),
+                "acknowledged": False,
+                "acknowledged_by": None,
+                "category": "hvac" if equip_type in ("chiller", "ahu", "fcu", "vav", "pump", "ct") else "electrical",
+                "suggested_action": None,
+                "actionable_remotely": False,
+            }
+
+            simulation_service.alert_queue.append(alert)
+            simulation_service.alert_history.append(alert)
+
+            # Keep history manageable
+            if len(simulation_service.alert_history) > 500:
+                simulation_service.alert_history = simulation_service.alert_history[-500:]
+        except Exception as e:
+            logger.debug(f"Could not push alert to dashboard: {e}")
 
     def _get_sentinel_status(self) -> dict[str, Any]:
         """Get current SENTINEL response loop status for API.

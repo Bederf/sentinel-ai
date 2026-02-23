@@ -235,7 +235,7 @@ Runner rolls back independently without affecting Sentinel.
 
 ## Test Coverage
 
-53 tests across 6 test files:
+53 unit tests across 7 test files, plus a 6-case eval harness:
 
 | File | Tests | Scope |
 |------|-------|-------|
@@ -247,7 +247,37 @@ Runner rolls back independently without affecting Sentinel.
 | `runner/tests/test_recursive_analyzer.py` | 7 | Single/recursive passes, budget, error handling, redaction |
 | `backend/tests/services/test_rlm_runner_client.py` | 6 | Submit, unavailable, result, poll, disabled |
 
+### Eval Harness
+
+The eval harness (`runner/tests/run_evals.py`) runs 6 golden-case fixtures against a live runner, validating keyword presence, structural completeness, confidence thresholds, POPIA redaction compliance via regex pattern matching, and budget exhaustion behaviour. See [Runner Eval Harness](../11-testing/runner-eval-harness.md) for full documentation.
+
+| Case | Scenario |
+|------|----------|
+| CASE001 | Chiller condenser fouling |
+| CASE002 | UPS battery degradation |
+| CASE003 | VAV damper stuck open |
+| CASE004 | Fire panel RS-485 comm failure |
+| CASE005 | Generator crank failure + POPIA redaction |
+| CASE006 | Multi-system cascading failure + budget exhaustion (3MB, 10 files) |
+
+## Confidence Label
+
+The `ResultSchema` includes both a float `confidence` score (0.0-1.0) and a computed `confidence_label` field:
+
+| Label | Range | Use |
+|-------|-------|-----|
+| `low` | < 0.4 | UI badge, policy: may trigger `needs_deeper_run` |
+| `medium` | 0.4 - 0.7 | UI badge, policy: acceptable for most cases |
+| `high` | >= 0.7 | UI badge, policy: high assurance |
+
+The float stays stable for ML consumers. The label is derived at serialization time via Pydantic `@computed_field` and is intended for UI display and policy rules. Thresholds are configurable via `CONFIDENCE_THRESHOLD_HIGH` and `CONFIDENCE_THRESHOLD_MEDIUM` env vars (see `runner/app/config.py`).
+
+Every result includes a `scoring` object that snapshots the thresholds used at result-creation time (`version`, `threshold_medium`, `threshold_high`). When thresholds are tuned, bump `SCORING_VERSION` — old runs stay interpretable.
+
+Every result also stamps `model_name` and `model_provider`, preventing "same score means same quality" assumptions if the model changes.
+
 ## Related
 
 - [RLM API Reference](../03-api-reference/rlm-api.md) -- endpoint details and schemas
+- [Runner Eval Harness](../11-testing/runner-eval-harness.md) -- eval fixture documentation
 - [Architecture Specification](../02-architecture/SENTINEL-RLM-ARCHITECTURE-SPEC-v1.0.md) -- full system design

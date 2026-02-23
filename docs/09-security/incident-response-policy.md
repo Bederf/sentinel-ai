@@ -362,11 +362,64 @@ Lessons learned feed into:
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
+| 1.1 | 2026-02-23 | SENTINEL Security | Added EU AI Act incident handling addendum (classification trigger, evidence pack, escalation path, compliance register linkage) |
 | 1.0 | 2026-02-04 | SENTINEL Security | Initial policy creation |
 
 ### 14.3 Approval
 
 This policy is approved by the SENTINEL Information Security Officer and is effective from the date listed above. All personnel with access to SENTINEL systems are required to acknowledge and comply with this policy.
+
+## 15. EU AI Act Incident Handling Addendum
+
+### 15.1 Purpose
+
+This addendum defines minimum AI-incident handling requirements for EU AI Act alignment. It applies when SENTINEL AI outputs are used in EU contexts or when a feature is tagged `potential-high-risk` in the EU AI Act register.
+
+### 15.2 AI Incident Trigger Conditions
+
+An incident must be marked as `AI-regulatory` when any of the following occur:
+
+- AI output materially contributes to unsafe or non-compliant operational action
+- Mandatory AI transparency control fails in a production user channel
+- Prohibited-practices gate is bypassed or not executed for a released feature
+- Traceability evidence for a material AI decision is missing or corrupted
+- A legal/compliance reviewer flags a potential EU AI Act serious-incident condition
+
+### 15.3 Mandatory Escalation Path
+
+| Time from detection | Required action | Owner |
+|---|---|---|
+| **0-4 hours** | Classify incident severity and set `AI-regulatory` flag | Incident Manager |
+| **<24 hours** | Notify Compliance Owner + Legal Reviewer with initial facts and scope | Incident Manager |
+| **<48 hours** | Produce initial AI evidence pack and provisional corrective action plan | Technical Lead + Compliance Owner |
+| **Ongoing** | Follow applicable legal notification timelines and preserve evidence chain | Compliance Owner + Legal Reviewer |
+
+### 15.4 AI Evidence Pack (Required)
+
+For all `AI-regulatory` incidents, collect and preserve:
+
+- Correlation IDs, decision IDs, request/response metadata
+- Model/service path used (e.g., local/cloud routing)
+- Quality gate, safety validation, approval and rollback events
+- User-facing transparency state at time of incident
+- Root cause summary and corrective actions with owners and due dates
+
+### 15.5 Registers and Record Linkage
+
+Every `AI-regulatory` incident must be linked to:
+
+- `docs/compliance/eu-ai-act-compliance-register.md` (feature entry)
+- `docs/compliance/eu-ai-act-internal-audit-2026Q2.md` (finding, if control failed)
+- Incident register entry (this policy, Section 10)
+
+### 15.6 Post-Incident Review Requirement
+
+For any P1/P2 `AI-regulatory` incident:
+
+- Conduct formal review within 5 business days of closure
+- Validate corrective action effectiveness within 30 days
+- Update AI controls, tests, and training where gaps were found
+- Record residual risk decision by Compliance Owner and Legal Reviewer
 
 ---
 
@@ -376,6 +429,8 @@ This policy is approved by the SENTINEL Information Security Officer and is effe
 - [Intrusion Detection](./intrusion-detection.md) — IDS/WAF/Fail2Ban architecture
 - [BCP/DR Procedures](./bcp-dr-procedures.md) — Business continuity and disaster recovery
 - [Access Control Implementation](./access-control-implementation.md) — Logical access controls
+- [EU AI Act Compliance Register](../compliance/eu-ai-act-compliance-register.md) — AI feature classification and obligations
+- [EU AI Act Policy](../compliance/eu-ai-act-policy.md) — EU AI Act governance requirements
 
-*SENTINEL BMS Intelligence Platform — Incident Response Policy v1.0*
+*SENTINEL BMS Intelligence Platform — Incident Response Policy v1.1*
 *Effective: 2026-02-04*

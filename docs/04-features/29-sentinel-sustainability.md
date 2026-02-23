@@ -2,9 +2,9 @@
 title: "Sustainability & ESG Module"
 type: "guide"
 status: "approved"
-version: "1.0.0"
+version: "2.0.0"
 created: "2026-02-06"
-updated: "2026-02-06"
+updated: "2026-02-22"
 author: "Sentinel Development Team"
 tags: ["sustainability", "esg", "carbon", "emissions", "green-star", "energy-efficiency"]
 domain: "general"
@@ -193,6 +193,120 @@ Accessed via the ModularDashboard tabbed view when the sustainability module is 
 | `frontend/src/lib/sustainabilityApi.ts` | TypeScript API client |
 | `frontend/src/components/sustainability/SustainabilityDashboard.tsx` | React dashboard component |
 | `frontend/src/components/sustainability/index.ts` | Module export |
+
+## Phase 111: Real-Data Pipeline & ESG Integration (2026-02-22)
+
+Phase 111 upgraded the sustainability module from hardcoded estimates to a **real-data-driven pipeline** with per-system carbon breakdown, solar offset tracking, ESG scoring, and report export.
+
+### Daily Sustainability Metrics Pipeline
+
+The `SustainabilityMetricsCollector` gathers real data from existing simulation services at the end of each simulated day:
+
+```
+LifecycleOrchestrator (hourly power breakdown)
+       |
+       v
+SustainabilityMetricsCollector
+  ├── Energy: HVAC/lighting/other kWh (from orchestrator accumulators)
+  ├── Water: liters (from energy_consumption_history DB records)
+  ├── Diesel: liters (from generator_service runtime × fuel_rate_lph)
+  ├── Solar: generation kWh (from irradiance model / solar service)
+  └── Occupancy: avg %, peak count (from orchestrator samples)
+       |
+       v
+daily_sustainability_metrics table (Supabase, JSON fallback)
+       |
+       v
+SustainabilityService / CarbonCalculator (reads real data first)
+```
+
+**Data source tracking:** Every `EmissionsSnapshot` now carries a `data_source` field:
+- `"simulation"` — All data from simulation pipeline
+- `"measured"` — All data from live metered sources
+- `"estimated"` — Fallback to config-based estimates (conservative default)
+
+### Per-System Carbon Breakdown
+
+Emissions are now broken down by building system:
+
+| Field | Calculation |
+|-------|-------------|
+| `hvac_kg_co2` | HVAC kWh × 1.06 |
+| `lighting_kg_co2` | Lighting kWh × 1.06 |
+| `other_kg_co2` | Other electrical kWh × 1.06 |
+| `solar_offset_kg_co2` | Solar generation kWh × 1.06 |
+| `net_scope2_kg_co2` | Scope 2 after solar offset (≥ 0) |
+
+Displayed as a DonutChart on the dashboard alongside the existing monthly stacked bar chart.
+
+### Solar Offset (Scope 2)
+
+When solar generation data is available, Scope 2 is calculated as:
+
+```
+net_grid_kwh = max(0, gross_grid_kwh - solar_generation_kwh)
+scope2 = net_grid_kwh × 1.06
+solar_offset = solar_generation_kwh × 1.06
+```
+
+The dashboard shows a green indicator: "Solar offset: -{X}t CO2" when `solar_offset_kg_co2 > 0`.
+
+### ESG Score Card
+
+The dashboard fetches ESG metrics from the v2 API (`/api/v2/sustainability/buildings/{id}/esg-metrics`) and displays:
+- Overall score (0-100) with color-coded decoration (green ≥80, amber ≥60, red <60)
+- Breakdown: Carbon intensity %, Energy efficiency %, Waste diversion %
+- Graceful fallback: card hidden if v2 API unavailable
+
+### Report Export
+
+Two export formats available via the dashboard:
+
+| Format | Endpoint | Content |
+|--------|----------|---------|
+| CSV | `GET /{site_id}/report/export?format=csv&months=12` | Monthly rows with Scope 1/2/3, per-system CO2, solar offset, data source |
+| HTML | `GET /{site_id}/report/export?format=html&months=12` | Styled report with KPIs, Green Star progress, SA benchmarks |
+
+Export buttons appear in the dashboard header. HTML reports can be printed to PDF via browser.
+
+### New API Endpoints (Phase 111)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/{site_id}/report/export` | Export CSV or HTML report (query: `format`, `months`) |
+
+v2 endpoints now fall back to `daily_sustainability_metrics` when `emissions_sources` table is empty.
+
+### New EmissionsSnapshot Fields
+
+All fields have defaults for backward compatibility:
+
+```python
+hvac_kg_co2: float = 0.0
+lighting_kg_co2: float = 0.0
+other_kg_co2: float = 0.0
+solar_offset_kg_co2: float = 0.0
+net_scope2_kg_co2: float = 0.0
+actual_diesel_liters: Optional[float] = None
+actual_water_kl: Optional[float] = None
+solar_generation_kwh: Optional[float] = None
+data_source: str = "estimated"  # "estimated" | "measured" | "simulation"
+```
+
+### Additional Data Files (Phase 111)
+
+| File | Purpose |
+|------|---------|
+| `backend/app/data/sustainability/daily_metrics/site-002.json` | Demo daily metrics (JSON fallback) |
+| `backend/supabase/migrations/20260222_002_daily_sustainability_metrics.sql` | Daily metrics table migration |
+
+### Additional Key Files (Phase 111)
+
+| File | Purpose |
+|------|---------|
+| `backend/app/services/sustainability_metrics_collector.py` | Gathers real data from existing services, computes emissions, persists |
+| `backend/app/services/carbon_calculator.py` | CarbonCalculator with solar offset in Scope 2 |
+| `backend/app/models/sustainability.py` | Extended with DailySustainabilityWrite, DailySustainabilityMetrics |
 
 ## Configuration
 

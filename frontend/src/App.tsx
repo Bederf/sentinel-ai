@@ -103,7 +103,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState<View>("dashboard");
   const [viewRefreshKey, setViewRefreshKey] = useState(0);
-  const [showCardLibrary, setShowCardLibrary] = useState(false);
+  // Card library removed — dashboard now shows only portfolio-level sections
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showAlertsPanel, setShowAlertsPanel] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -462,13 +462,6 @@ function App() {
         currentView={currentView}
         onViewChange={handleViewChange}
         version={health?.version || "13.0"}
-        onCustomizeDashboard={() => {
-          setShowCardLibrary(true);
-          // Navigate to dashboard if not already there (CardLibrary only works on dashboard)
-          if (currentView !== "dashboard") {
-            setCurrentView("dashboard");
-          }
-        }}
         userRole={currentUser?.role}
         userEmail={currentUser?.email}
       />
@@ -768,9 +761,6 @@ function App() {
             <Dashboard
               key={viewRefreshKey}
               onViewChange={handleViewChange}
-              openCardLibrary={showCardLibrary}
-              onCardLibraryClose={() => setShowCardLibrary(false)}
-              userEmail={currentUser?.email}
             />
           ) : currentView === "digital-twin" ? (
             <div className="h-full overflow-hidden">

@@ -396,6 +396,22 @@ def get_sites_from_supabase(
         if not buildings:
             return [], False
 
+        # Filter to only onboarded sites (those with at least one active module)
+        # Sites without modules haven't been ingested via SIMBIOT yet
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            modules_result = client.table("site_modules").select("site_id").execute()
+            onboarded_sites = {row["site_id"] for row in (modules_result.data or [])}
+            if onboarded_sites:
+                buildings = [b for b in buildings if b.get("code") in onboarded_sites]
+        except Exception as e:
+            logger.warning(f"Could not filter by onboarded sites: {e}")
+
+        if not buildings:
+            return [], False
+
         sites = []
         for b in buildings:
             # Get equipment and alert counts

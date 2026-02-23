@@ -221,13 +221,21 @@ Returned by `GET /runs/{run_id}` (both layers).
   ],
   "recommended_actions": ["Review access logs for anomalous entries"],
   "confidence": 0.72,
+  "confidence_label": "high",
   "needs_deeper_run": false,
   "trajectory": {
     "steps": 3,
     "files_read": 12,
     "bytes_read": 524288,
     "elapsed_s": 45.2
-  }
+  },
+  "scoring": {
+    "version": 1,
+    "threshold_medium": 0.4,
+    "threshold_high": 0.7
+  },
+  "model_name": "phi3:mini",
+  "model_provider": "ollama"
 }
 ```
 
@@ -239,9 +247,13 @@ Returned by `GET /runs/{run_id}` (both layers).
 | `anomalies` | object[] | Detected anomalies with timestamp, source, severity |
 | `timeline` | object[] | Chronological event timeline |
 | `recommended_actions` | string[] | Suggested next steps |
-| `confidence` | float | Analysis confidence score (0.0 - 1.0) |
+| `confidence` | float | Analysis confidence score (0.0 - 1.0). Stable for ML consumers. |
+| `confidence_label` | enum | Computed from `confidence` using `scoring` thresholds. `"low"` / `"medium"` / `"high"`. For UI display and policy rules. |
 | `needs_deeper_run` | bool | `true` if budget was exhausted before analysis completed |
 | `trajectory` | object | Execution metrics (steps, files, bytes, time) |
+| `scoring` | object | Snapshot of scoring config at result time: `version` (int), `threshold_medium` (float), `threshold_high` (float). Enables audit of old runs when thresholds change. Configurable via `SCORING_VERSION`, `CONFIDENCE_THRESHOLD_HIGH`, `CONFIDENCE_THRESHOLD_MEDIUM` env vars. |
+| `model_name` | string | Model used for inference (e.g., `"phi3:mini"`) |
+| `model_provider` | string | Inference backend (always `"ollama"` — local only) |
 
 ### Trace Entry
 

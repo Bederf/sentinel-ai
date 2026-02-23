@@ -826,6 +826,15 @@
     min-width: 0;
   }
 
+  /* Hide scrollbar utility — used for horizontal scrollable tab bars */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Ensure white text on dark backgrounds */
   .dark-text {
     color: var(--color-grafana-text-primary);

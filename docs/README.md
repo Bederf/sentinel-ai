@@ -26,6 +26,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 ### 🏗️ Architecture
 - [System Overview](02-architecture/system-overview.md) - High-level architecture
+- **[Frontend Navigation Architecture](02-architecture/frontend-navigation.md)** - Two-level navigation: minimal global sidebar (4 items) + scrollable module-gated building detail tabs (23 views)
 - [Architecture Repository (TOGAF)](architecture-repository/README.md) - TOGAF-aligned architecture principles, governance, landscapes, and roadmaps
 - [Module System](02-architecture/module-system.md) - Bolt-on module architecture, activation, cross-module integrations
 - [Module Connectivity & Cross-System Integration](02-architecture/module-connectivity.md) - How modules interconnect, integration patterns, multi-module behaviors, upsell value
@@ -59,6 +60,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Asset Health API](03-api-reference/asset-health-api.md)** - Combined equipment health scores + baseline status + deviation tracking per site/equipment (Phase 109A)
 - [System Health API](03-api-reference/system-health-api.md) - Unified health snapshots, diagnostics, and system error logs
 - **[Security API](03-api-reference/security-api.md)** - Access control events, visitor management, zone occupancy, cameras, occupancy trends, cross-module recommendations (Phases 27, 58, 69)
+- **[Privacy & Consent API](03-api-reference/privacy-api.md)** - POPIA consent, cross-border gating, data subject requests (DSR), and retention automation endpoints
 - **[RLM Runner & Orchestration API](03-api-reference/rlm-api.md)** - Evidence analysis submission, result polling, audit trace, health check — runner direct and backend orchestration (Phase 113)
 
 ### ✨ Features
@@ -134,21 +136,27 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Safety Interlocks Engine](06-safety-compliance/safety-interlocks-engine.md) - Safety validation
 - [Audit Logging](06-safety-compliance/audit-logging.md) - Device control, login, and decision pipeline audit trail
 - [AEGIS Phase 1 Entry Gate](06-safety-compliance/aegis-phase1-entry-gate.md) - Mandatory readiness and sign-off checklist before enabling BESS writes
-- **[Data Privacy & Security Architecture](SECURITY-PRIVACY.md)** - Data sovereignty, local AI, air-gapped deployment, POPIA compliance
+- **[Data Privacy & Security Architecture](09-security/SECURITY-PRIVACY.md)** - Data sovereignty, local AI, air-gapped deployment, POPIA compliance
 
 ### 🔒 Security & Governance
-- **[Security Documentation Suite](08-security/README.md)** - Complete security policy suite for FSR supplier onboarding
+- **[Security Documentation Suite](09-security/README.md)** - Complete security policy suite for FSR supplier onboarding
 - **[AI Governance Pack](ai-governance/README.md)** - ISO 42001, NIST AI RMF, and EU AI Act operational mapping with evidence structure
 - **[EU AI Act Compliance Register](compliance/eu-ai-act-compliance-register.md)** - AI feature inventory, risk class, obligations, owners, and evidence tracker
 - **[EU AI Act Policy](compliance/eu-ai-act-policy.md)** - Mandatory AI governance controls for EU AI Act alignment
 - **[EU AI Act Internal Audit 2026 Q2](compliance/eu-ai-act-internal-audit-2026Q2.md)** - Internal assurance checklist and findings tracker
+- **[POPIA Compliance Register](compliance/popia-compliance-register.md)** - POPIA pass/fail controls, evidence, and remediation tracking
+- **[POPIA Data Subject Rights Workflow](compliance/popia-data-subject-rights-workflow.md)** - Request lifecycle, SLA tracking, and workflow states
+- **[POPIA Retention Enforcement](compliance/popia-retention-enforcement.md)** - Automated retention enforcement and run evidence
+- **[Asset Lifecycle Policy](09-security/asset-lifecycle-policy.md)** - Formal lifecycle controls for infrastructure, application, and data assets
+- **[Vulnerability Disclosure Policy](09-security/vulnerability-disclosure-policy.md)** - Coordinated disclosure process and reporter safe-harbor
+- **[BCP/DR Exercise Report 2026 Q1](09-security/dr-exercise-report-2026Q1.md)** - Tabletop + restore test evidence capture template
 - **[FSR Gap Analysis - Updated](FSR_GAP_ANALYSIS_UPDATE.md)** - Current assessment against FSR V8 questionnaire
 - **Encryption at Rest** - Fernet AES-128-CBC for audit logs (Phase 81, v14.0)
-- **[Logging Architecture](08-security/logging-architecture.md)** - Promtail → Loki pipeline, security events, decision pipeline observability, Grafana dashboards
-- [Information Security Framework](08-security/information-security-framework.md) - Governance structure, ISO role, policy hierarchy
-- [Information Security Strategy](08-security/information-security-strategy.md) - Maturity targets, remediation roadmap
-- [Information Security Policy](08-security/information-security-policy.md) - Overarching policy covering all 18 FSR domains
-- [Acceptable Usage Policy](08-security/acceptable-usage-policy.md) - Infrastructure, communication, and data handling rules
+- **[Logging Architecture](09-security/logging-architecture.md)** - Promtail → Loki pipeline, security events, decision pipeline observability, Grafana dashboards
+- [Information Security Framework](09-security/information-security-framework.md) - Governance structure, ISO role, policy hierarchy
+- [Information Security Strategy](09-security/information-security-strategy.md) - Maturity targets, remediation roadmap
+- [Information Security Policy](09-security/information-security-policy.md) - Overarching policy covering all 18 FSR domains
+- [Acceptable Usage Policy](09-security/acceptable-usage-policy.md) - Infrastructure, communication, and data handling rules
 - [Audit Logging](06-safety-compliance/audit-logging.md) - Device control and login audit trail
 
 ### 🔗 Integrations
@@ -174,7 +182,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 ### 🤖 AI & ML
 - **[AI Recommendation System](08-ai-ml/ai-recommendation-system.md)** - Zone-aware HVAC optimization with Claude AI
 - [Claude Integration](08-ai-ml/claude-integration.md) - Claude API usage
-- [Hybrid AI Router](08-ai-ml/hybrid-ai-router.md) - Ollama/Claude routing
+- [Hybrid AI Router](08-ai-ml/hybrid-ai-routing.md) - Ollama/cloud routing with POPIA consent gating
 - **[RAG Integration Overview](08-ai-ml/rag-integration-overview.md)** - Vector database and semantic search (Phase 44-01)
 - **[Explainable AI](08-ai-ml/explainable-ai.md)** - XAI for ML predictions and maintenance recommendations (Phase 44-02)
 
@@ -193,6 +201,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Testing Strategy](11-testing/testing-strategy.md) - Test architecture
 - [E2E Testing](11-testing/e2e-testing.md) - End-to-end tests
 - [Test Data](11-testing/test-data.md) - Test data management
+- **[Runner Eval Harness](11-testing/runner-eval-harness.md)** - 5 golden-case fixtures for RLM runner quality validation, POPIA redaction compliance, and regression testing (Phase 113)
 
 ### 🌍 South Africa Context
 - [Load Shedding Optimization](14-south-africa-context/load-shedding-optimization.md) - Eskom load shedding
@@ -212,8 +221,8 @@ docs/
 ├── 06-safety-compliance/    # Safety interlocks, audit trails
 ├── 07-integrations/         # BACnet, Modbus, CAFM, BMS, DALI
 ├── 08-ai-ml/                # Claude, Ollama, predictions
-├── 09-operations/           # Deployment, monitoring
-├── 10-security/             # Auth, audit, API keys
+├── 09-security/             # Security policies, privacy, audit, governance
+├── 10-operations/           # Deployment, monitoring
 ├── 11-testing/              # Unit tests, integration tests
 ├── 12-development/          # Workflow, tooling, best practices
 ├── 13-modules/              # Bolt-on module system (Energy, HVAC, Security, Lighting, Sustainability)

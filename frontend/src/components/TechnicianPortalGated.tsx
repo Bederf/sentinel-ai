@@ -29,6 +29,7 @@ export function TechnicianPortalGated({ gated = true }: TechnicianPortalGatedPro
       module="maintenance"
       featureName="Technician Portal"
       customMessage="Enable Maintenance module to let SENTINEL automatically create, assign, and track work orders for equipment issues — reduce mean time to repair (MTTR) by 40% and improve first-time fix rates."
+      renderPreviewWhenLocked={false}
     >
       <TechnicianPortal />
     </LockedFeatureOverlay>

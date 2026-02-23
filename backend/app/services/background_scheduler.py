@@ -1418,8 +1418,9 @@ class BackgroundSchedulerService:
             logger.warning(f">>> ✅ Starting lifecycle simulation task {task_id}")
 
             # Create orchestrator and register
-            logger.warning(f">>> Creating orchestrator for task {task_id}...")
-            orchestrator = create_orchestrator(task_id)
+            site_id = task.get("site_id", "site-002")
+            logger.warning(f">>> Creating orchestrator for task {task_id} (site: {site_id})...")
+            orchestrator = create_orchestrator(task_id, site_id=site_id)
             register_simulation(task_id, orchestrator)
             logger.warning(">>> Orchestrator registered")
 
@@ -1449,7 +1450,7 @@ class BackgroundSchedulerService:
         """
         from app.database.supabase_client import Supabase
         from app.services.simulation_orchestrator import unregister_simulation
-        from app.services.lifecycle_orchestrator import SCENARIOS
+        from app.services.lifecycle_orchestrator import ALL_SCENARIOS
         from datetime import datetime
 
         supabase = Supabase.instance()
@@ -1470,7 +1471,7 @@ class BackgroundSchedulerService:
             if is_recovery and state_snapshot:
                 # CRASH RECOVERY PATH: Restore full orchestrator state from checkpoint
                 # Get scenario config
-                orchestrator.current_scenario = SCENARIOS.get(scenario, SCENARIOS["fault_day"])
+                orchestrator.current_scenario = ALL_SCENARIOS.get(scenario, ALL_SCENARIOS["sentinel_annual"])
 
                 # Restore all state from checkpoint
                 restored = orchestrator.deserialize_state(state_snapshot)
@@ -1635,6 +1636,54 @@ class BackgroundSchedulerService:
 
         except Exception as e:
             logger.error(f"Failed to run integration sync: {e}")
+
+    def add_popia_retention_job(self, interval_seconds: int = 86400):
+        """Add periodic POPIA retention enforcement job."""
+        job_id = "popia_retention_enforcement"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing POPIA retention enforcement job")
+
+        self.scheduler.add_job(
+            func=self._run_popia_retention_enforcement,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="POPIA Retention Enforcement",
+            replace_existing=True,
+        )
+        logger.info("Added POPIA retention enforcement job with %ss interval", interval_seconds)
+
+    def _run_popia_retention_enforcement(self):
+        """Execute POPIA retention enforcement and log summary."""
+        try:
+            from app.services.popia_retention_service import get_popia_retention_service
+
+            service = get_popia_retention_service()
+            summary = service.enforce_policies(dry_run=False)
+            logger.info(
+                "POPIA retention enforcement completed: deleted=%s reviewed=%s errors=%s",
+                summary.get("total_deleted", 0),
+                summary.get("total_reviewed", 0),
+                len(summary.get("errors", [])),
+            )
+
+            try:
+                from app.services.audit_logger import AuditLogger
+
+                audit_logger = AuditLogger()
+                audit_logger.log_system_event(
+                    event_type="popia_retention_enforcement",
+                    metadata={
+                        "total_deleted": summary.get("total_deleted", 0),
+                        "total_reviewed": summary.get("total_reviewed", 0),
+                        "error_count": len(summary.get("errors", [])),
+                        "dry_run": False,
+                    },
+                )
+            except Exception as exc:
+                logger.warning("Failed to write retention enforcement audit event: %s", exc)
+        except Exception as e:
+            logger.error(f"Failed to run POPIA retention enforcement: {e}", exc_info=True)
 
     def add_site_mode_policy_dry_run_job(self, interval_seconds: int = 300, site_id: str = "site-002"):
         """Add periodic dry-run evaluation for deterministic site onboarding policy."""

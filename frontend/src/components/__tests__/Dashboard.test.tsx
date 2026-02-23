@@ -5,10 +5,10 @@
  * - KPI card rendering and calculations
  * - Site protection grid with site cards
  * - Energy analytics with period and site filters
- * - Risk predictions section with hero card
- * - Modal interactions (prediction detail, risk detail)
- * - Drag-and-drop reordering
- * - Preference saving and loading
+ * - Navigation to site detail
+ *
+ * Site-specific panels (risk predictions, solar, comfort, occupancy,
+ * energy comparison, validation) are now tested in SiteDetail tests.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -36,16 +36,38 @@ vi.mock('@/lib/api', () => ({
     getStats: vi.fn(),
     getPredictions: vi.fn(),
     getEnergy: vi.fn(),
-    getDashboardPreferences: vi.fn(),
-    updateDashboardPreferences: vi.fn(),
-    resetDashboardPreferences: vi.fn(),
   },
-  createWorkOrder: vi.fn(),
 }));
 
 // Mock custom hook
 vi.mock('@/hooks/useBuildingsList', () => ({
   useBuildingsList: vi.fn(() => ({ data: [] })),
+}));
+
+// Mock useModules hook
+vi.mock('@/contexts/ModuleHooks', () => ({
+  useModules: vi.fn(() => ({
+    isModuleActive: vi.fn(() => true),
+    activeModules: [{ module_type: 'energy' }],
+    recommendations: [],
+  })),
+}));
+
+// Mock useSimulation hook
+vi.mock('@/contexts/SimulationContext', () => ({
+  useSimulation: vi.fn(() => ({
+    running: false,
+    occupancyPercent: 0,
+    hvacLoadPercent: 0,
+    ambientTemp: 25,
+    totalEnergyKwh: 0,
+    currentHourPowerKw: 0,
+  })),
+}));
+
+// Mock useServerEvents hook
+vi.mock('@/hooks/useServerEvents', () => ({
+  useServerEvents: vi.fn(),
 }));
 
 // Mock components
@@ -79,83 +101,10 @@ vi.mock('../EnergyChart', () => ({
   ),
 }));
 
-vi.mock('../PredictionCard', () => ({
-  PredictionCard: ({ prediction, onClick }: any) => (
-    <button onClick={() => onClick(prediction)} data-testid={`prediction-card-${prediction.id}`}>
-      {prediction.equipment_name}
-    </button>
-  ),
-}));
-
-vi.mock('../PredictionDetail', () => ({
-  PredictionDetail: ({ isOpen, onClose }: any) => (
-    isOpen ? (
-      <div data-testid="prediction-detail-modal">
-        <button onClick={onClose}>Close Modal</button>
-      </div>
-    ) : null
-  ),
-}));
-
-vi.mock('../RiskDetailModal', () => ({
-  RiskDetailModal: ({ isOpen, onClose }: any) => (
-    isOpen ? (
-      <div data-testid="risk-detail-modal">
-        <button onClick={onClose}>Close Risk Modal</button>
-      </div>
-    ) : null
-  ),
-}));
-
-vi.mock('../CardLibrary', () => ({
-  default: ({ isOpen, onClose }: any) => (
-    isOpen ? (
-      <div data-testid="card-library">
-        <button onClick={onClose}>Close Card Library</button>
-      </div>
-    ) : null
-  ),
-}));
-
-vi.mock('../solar/SolarOverviewPanel', () => ({
-  SolarOverviewPanel: () => <div data-testid="solar-overview">Solar Overview</div>,
-}));
-
-vi.mock('../solar/BESSStatusPanel', () => ({
-  BESSStatusPanel: () => <div data-testid="bess-status">BESS Status</div>,
-}));
-
-vi.mock('../solar/InverterStatusMatrix', () => ({
-  InverterStatusMatrix: () => <div data-testid="inverter-status">Inverter Matrix</div>,
-}));
-
-vi.mock('../solar/EnergyFlowDiagram', () => ({
-  EnergyFlowDiagram: () => <div data-testid="energy-flow">Energy Flow</div>,
-}));
-
-vi.mock('../OccupancyPanel', () => ({
-  OccupancyPanel: () => <div data-testid="occupancy-panel">Occupancy</div>,
-}));
-
-vi.mock('../ComfortComplaintPanel', () => ({
-  default: () => <div data-testid="comfort-panel">Comfort</div>,
-}));
-
 vi.mock('../SiteDetail', () => ({
   SiteDetail: ({ onBack }: any) => (
     <button onClick={onBack}>Back</button>
   ),
-}));
-
-vi.mock('../PageLoading', () => ({
-  PageLoading: ({ message }: any) => <div>{message}</div>,
-}));
-
-vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
 }));
 
 import api from '@/lib/api';
@@ -183,7 +132,6 @@ describe('Dashboard', () => {
     it('should display loading state initially', async () => {
       vi.mocked(api.getStats).mockImplementation(() => new Promise(() => {})); // Never resolves
       vi.mocked(api.getPredictions).mockImplementation(() => new Promise(() => {}));
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
       vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
@@ -211,13 +159,13 @@ describe('Dashboard', () => {
       const stats = createMockDashboardStats();
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
-        expect(screen.getByText('Customize')).toBeInTheDocument();
+        expect(screen.getByText('Site Protection Status')).toBeInTheDocument();
       });
     });
   });
@@ -227,7 +175,7 @@ describe('Dashboard', () => {
       const stats = createMockDashboardStats();
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
@@ -251,7 +199,7 @@ describe('Dashboard', () => {
 
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: sites } as any);
 
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
@@ -266,7 +214,7 @@ describe('Dashboard', () => {
       const stats = createMockDashboardStats({ total_equipment: 156 });
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
@@ -281,7 +229,7 @@ describe('Dashboard', () => {
       const stats = createMockDashboardStats({ active_alerts: 12 });
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
@@ -307,7 +255,7 @@ describe('Dashboard', () => {
 
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
@@ -329,7 +277,6 @@ describe('Dashboard', () => {
 
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
       vi.mocked(api.getEnergy).mockResolvedValue({ data: [] } as any);
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
@@ -337,8 +284,8 @@ describe('Dashboard', () => {
 
       await waitFor(() => {
         const card = screen.getByTestId('kpi-card-Risk Predictions');
-        // Should show count of all predictions (including healthy ones)
-        expect(card.textContent).toContain('3');
+        // Only critical + warning predictions are stored (filtered on load)
+        expect(card.textContent).toContain('2');
       });
     });
   });
@@ -350,7 +297,7 @@ describe('Dashboard', () => {
 
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: sites } as any);
 
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
@@ -364,7 +311,7 @@ describe('Dashboard', () => {
       const stats = createMockDashboardStats();
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
@@ -383,7 +330,7 @@ describe('Dashboard', () => {
 
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: sites } as any);
 
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
@@ -401,7 +348,7 @@ describe('Dashboard', () => {
 
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: sites } as any);
 
       render(<Dashboard onViewChange={onViewChange} />, { wrapper: createTestWrapper() });
@@ -427,7 +374,7 @@ describe('Dashboard', () => {
 
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: sites } as any);
 
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
@@ -443,7 +390,6 @@ describe('Dashboard', () => {
       const stats = createMockDashboardStats();
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
       vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
@@ -458,7 +404,6 @@ describe('Dashboard', () => {
       const stats = createMockDashboardStats();
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
       vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
@@ -475,7 +420,6 @@ describe('Dashboard', () => {
       const stats = createMockDashboardStats();
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
       vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
@@ -490,7 +434,6 @@ describe('Dashboard', () => {
       const stats = createMockDashboardStats();
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
       vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
@@ -515,7 +458,6 @@ describe('Dashboard', () => {
 
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
       vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: sites } as any);
 
@@ -535,7 +477,6 @@ describe('Dashboard', () => {
 
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
       vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: sites } as any);
 
@@ -560,7 +501,6 @@ describe('Dashboard', () => {
 
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
       vi.mocked(api.getEnergy).mockResolvedValue({ data: energyData });
       vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
 
@@ -568,272 +508,6 @@ describe('Dashboard', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Chart: 2 points')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Risk Predictions', () => {
-    it('should display Risk Intelligence panel header', async () => {
-      const stats = createMockDashboardStats();
-      vi.mocked(api.getStats).mockResolvedValue(stats);
-      vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
-      vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
-
-      render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
-
-      await waitFor(() => {
-        expect(screen.getByText('Risk Intelligence')).toBeInTheDocument();
-      });
-    });
-
-    it('should filter predictions to show only critical and warning severity', async () => {
-      const stats = createMockDashboardStats();
-      const predictions = [
-        createMockPrediction({ id: 'pred-1', severity: 'critical' }),
-        createMockPrediction({ id: 'pred-2', severity: 'warning' }),
-        createMockPrediction({ id: 'pred-3', severity: 'healthy' }),
-      ];
-
-      vi.mocked(api.getStats).mockResolvedValue(stats);
-      vi.mocked(api.getPredictions).mockResolvedValue({ predictions });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
-      vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
-
-      render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
-
-      await waitFor(() => {
-        // Should display only critical and warning predictions
-        expect(screen.getByTestId('prediction-card-pred-1')).toBeInTheDocument();
-        expect(screen.getByTestId('prediction-card-pred-2')).toBeInTheDocument();
-        expect(screen.queryByTestId('prediction-card-pred-3')).not.toBeInTheDocument();
-      });
-    });
-
-    it('should display empty state when no predictions', async () => {
-      const stats = createMockDashboardStats();
-      vi.mocked(api.getStats).mockResolvedValue(stats);
-      vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
-      vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
-
-      render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
-
-      await waitFor(() => {
-        expect(screen.getByText('No risk predictions detected')).toBeInTheDocument();
-      });
-    });
-
-    it('should display highest risk prediction as hero card', async () => {
-      const stats = createMockDashboardStats();
-      const predictions = [
-        createMockPrediction({
-          id: 'pred-1',
-          severity: 'warning',
-          equipment_name: 'Chiller Unit A',
-          probability_percent: 45,
-        }),
-        createMockPrediction({
-          id: 'pred-2',
-          severity: 'critical',
-          equipment_name: 'Generator B',
-          probability_percent: 85,
-        }),
-      ];
-
-      vi.mocked(api.getStats).mockResolvedValue(stats);
-      vi.mocked(api.getPredictions).mockResolvedValue({ predictions });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
-      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] } as any);
-      vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
-
-      render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
-
-      await waitFor(() => {
-        // Highest risk should be critical first, then by probability
-        expect(screen.getByText('Generator B')).toBeInTheDocument();
-      });
-    });
-
-    it('should calculate total potential savings from critical predictions', async () => {
-      const stats = createMockDashboardStats();
-      const predictions = [
-        createMockPrediction({
-          severity: 'critical',
-          financial_impact: { potential_loss_zar: 5000 },
-        }),
-        createMockPrediction({
-          severity: 'warning',
-          financial_impact: { potential_loss_zar: 3000 },
-        }),
-      ];
-
-      vi.mocked(api.getStats).mockResolvedValue(stats);
-      vi.mocked(api.getPredictions).mockResolvedValue({ predictions });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
-      vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
-
-      render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
-
-      await waitFor(() => {
-        // Should show savings total (8000 ZAR)
-        expect(screen.getByText(/saveable/)).toBeInTheDocument();
-      });
-    });
-
-    it('should open prediction detail modal when prediction card clicked', async () => {
-      const stats = createMockDashboardStats();
-      const predictions = [
-        createMockPrediction({ id: 'pred-1', severity: 'critical' }),
-      ];
-
-      vi.mocked(api.getStats).mockResolvedValue(stats);
-      vi.mocked(api.getPredictions).mockResolvedValue({ predictions });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
-      vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
-
-      render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
-
-      await waitFor(() => {
-        const card = screen.getByTestId('prediction-card-pred-1');
-        fireEvent.click(card);
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('prediction-detail-modal')).toBeInTheDocument();
-      });
-    });
-
-    it('should close prediction detail modal when close button clicked', async () => {
-      const stats = createMockDashboardStats();
-      const predictions = [
-        createMockPrediction({ id: 'pred-1', severity: 'critical' }),
-      ];
-
-      vi.mocked(api.getStats).mockResolvedValue(stats);
-      vi.mocked(api.getPredictions).mockResolvedValue({ predictions });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
-      vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
-
-      render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
-
-      await waitFor(() => {
-        const card = screen.getByTestId('prediction-card-pred-1');
-        fireEvent.click(card);
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('prediction-detail-modal')).toBeInTheDocument();
-      });
-
-      const closeButton = screen.getAllByText('Close Modal')[0];
-      fireEvent.click(closeButton);
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('prediction-detail-modal')).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Customization and Preferences', () => {
-    it('should display Customize button', async () => {
-      const stats = createMockDashboardStats();
-      vi.mocked(api.getStats).mockResolvedValue(stats);
-      vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
-      vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
-
-      render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
-
-      await waitFor(() => {
-        expect(screen.getByText('Customize')).toBeInTheDocument();
-      });
-    });
-
-    it('should open Card Library when Customize clicked', async () => {
-      const stats = createMockDashboardStats();
-      vi.mocked(api.getStats).mockResolvedValue(stats);
-      vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
-      vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
-
-      render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
-
-      await waitFor(() => {
-        const customizeButton = screen.getByText('Customize');
-        fireEvent.click(customizeButton);
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('card-library')).toBeInTheDocument();
-      });
-    });
-
-    it('should close Card Library', async () => {
-      const stats = createMockDashboardStats();
-      vi.mocked(api.getStats).mockResolvedValue(stats);
-      vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
-      vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
-
-      render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
-
-      await waitFor(() => {
-        const customizeButton = screen.getByText('Customize');
-        fireEvent.click(customizeButton);
-      });
-
-      await waitFor(() => {
-        const closeButton = screen.getByText('Close Card Library');
-        fireEvent.click(closeButton);
-      });
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('card-library')).not.toBeInTheDocument();
-      });
-    });
-
-    it('should load dashboard preferences on mount', async () => {
-      const stats = createMockDashboardStats();
-      const preferences = {
-        preferences: {
-          visible_kpi_cards: ['kpi-protected-sites'],
-          visible_sections: ['kpi-row', 'site-protection'],
-          kpi_card_order: ['kpi-protected-sites'],
-          section_order: ['kpi-row', 'site-protection'],
-          default_energy_period: 7,
-          default_energy_site_id: 'site-002',
-        },
-      };
-
-      vi.mocked(api.getStats).mockResolvedValue(stats);
-      vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockResolvedValue(preferences);
-      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
-      vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
-
-      render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
-
-      await waitFor(() => {
-        // Should load and apply preferences
-        expect(vi.mocked(api.getDashboardPreferences)).toHaveBeenCalled();
-      });
-    });
-
-    it('should save dashboard preferences when card visibility changes', async () => {
-      const stats = createMockDashboardStats();
-      vi.mocked(api.getStats).mockResolvedValue(stats);
-      vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
-      vi.mocked(api.updateDashboardPreferences).mockResolvedValue({});
-      vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
-
-      render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
-
-      // Note: This test assumes Card Library is properly mocked to emit visibility changes
-      // In integration, this would be tested through the CardLibrary component interaction
-      await waitFor(() => {
-        expect(screen.getByText('Customize')).toBeInTheDocument();
       });
     });
   });
@@ -846,7 +520,7 @@ describe('Dashboard', () => {
 
       vi.mocked(api.getStats).mockResolvedValue(stats);
       vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
+      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] });
       vi.mocked(useBuildingsList).mockReturnValue({ data: sites } as any);
 
       render(<Dashboard onViewChange={onViewChange} />, { wrapper: createTestWrapper() });
@@ -858,43 +532,6 @@ describe('Dashboard', () => {
 
       // The navigation happens internally through state management
       expect(screen.getByText('Back')).toBeInTheDocument();
-    });
-  });
-
-  describe('Solar & BESS Section', () => {
-    it('should display Solar & BESS section when visible', async () => {
-      const stats = createMockDashboardStats();
-      vi.mocked(api.getStats).mockResolvedValue(stats);
-      vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
-      vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
-
-      render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('solar-overview')).toBeInTheDocument();
-        expect(screen.getByTestId('energy-flow')).toBeInTheDocument();
-        expect(screen.getByTestId('bess-status')).toBeInTheDocument();
-        expect(screen.getByTestId('inverter-status')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Additional Sections', () => {
-    it('should display Comfort and Occupancy panels when visible', async () => {
-      const stats = createMockDashboardStats();
-      vi.mocked(api.getStats).mockResolvedValue(stats);
-      vi.mocked(api.getPredictions).mockResolvedValue({ predictions: [] });
-      vi.mocked(api.getDashboardPreferences).mockRejectedValue(new Error('Not found'));
-      vi.mocked(api.getEnergy).mockResolvedValue({ data: [] } as any);
-      vi.mocked(useBuildingsList).mockReturnValue({ data: [] } as any);
-
-      render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('comfort-panel')).toBeInTheDocument();
-        expect(screen.getByTestId('occupancy-panel')).toBeInTheDocument();
-      });
     });
   });
 });

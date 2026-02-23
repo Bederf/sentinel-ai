@@ -247,6 +247,14 @@ async def startup_event(app: FastAPI) -> None:
     except Exception as e:
         _logger.warning(f"⚠️ Feedback retraining job initialization failed: {e}")
 
+    # POPIA retention enforcement (daily by default)
+    if settings.popia_retention_enabled:
+        try:
+            scheduler_service.add_popia_retention_job(interval_seconds=settings.popia_retention_job_interval_seconds)
+            _logger.info("✅ POPIA retention enforcement job initialized")
+        except Exception as e:
+            _logger.warning(f"⚠️ POPIA retention job initialization failed: {e}")
+
     # Phase 083: Recover crashed simulations from database
     # Queries for any tasks marked as 'running' and resumes from checkpoint
     async def recover_crashed_simulations():
@@ -410,6 +418,54 @@ async def startup_event(app: FastAPI) -> None:
     except Exception as e:
         _logger.error(f"❌ Simulation queue processor initialization failed: {e}", exc_info=True)
         _logger.warning("⚠️ Simulations will not be auto-processed. Manual intervention required.")
+
+    # Auto-start sentinel_annual simulation for site-002 if none is active
+    async def auto_start_sentinel_simulation():
+        """Auto-queue sentinel_annual for site-002 if no active simulation exists."""
+        try:
+            import uuid
+
+            from app.database.supabase_client import Supabase
+
+            client = Supabase.instance()
+
+            # Check for any active simulation (running or queued)
+            active = (
+                client.table("lifecycle_simulation_tasks")
+                .select("task_id")
+                .in_("status", ["running", "queued"])
+                .eq("simulation_type", "lifecycle")
+                .limit(1)
+                .execute()
+            )
+
+            if active.data:
+                _logger.info("✅ Active simulation already exists, skipping auto-start")
+                return
+
+            # Queue sentinel_annual for site-002
+            task_id = str(uuid.uuid4())
+            client.table("lifecycle_simulation_tasks").insert(
+                {
+                    "task_id": task_id,
+                    "site_id": "site-002",
+                    "scenario": "sentinel_annual",
+                    "simulation_type": "lifecycle",
+                    "status": "queued",
+                    "progress_pct": 0,
+                    "days_completed": 0,
+                    "duration_minutes": 3650.0,
+                }
+            ).execute()
+
+            _logger.info(f"🚀 Auto-queued sentinel_annual simulation: {task_id}")
+        except Exception as e:
+            _logger.error(f"⚠️ Failed to auto-start sentinel_annual simulation: {e}")
+
+    try:
+        await auto_start_sentinel_simulation()
+    except Exception as e:
+        _logger.error(f"Error during sentinel auto-start: {e}")
 
     # Start system health snapshot job (runs every 5 minutes)
     # Stores point-in-time health snapshots for trend analysis and historical reporting

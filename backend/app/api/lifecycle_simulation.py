@@ -10,7 +10,7 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.services.lifecycle_orchestrator import SCENARIOS
+from app.services.lifecycle_orchestrator import ALL_SCENARIOS, SCENARIOS
 from app.services.simulation_orchestrator import (
     get_simulation_by_task_id,
 )
@@ -60,6 +60,10 @@ class StartSimulationRequest(BaseModel):
         ge=0.1,
         le=10000.0,
         description="Speed factor: 1x=real-time, 10x=10x faster, 100x=100x faster",
+    )
+    site_id: str = Field(
+        default="site-002",
+        description="Target site identifier (e.g. 'site-002', 'site-005')",
     )
     start_date: Optional[str] = Field(
         default=None,
@@ -173,7 +177,7 @@ async def start_simulation(request: StartSimulationRequest):
     - `speed_multiplier=100`: 100x speed (1 hour = 0.6 seconds)
     - `speed_multiplier=1000`: 1000x speed (1 hour = 0.06 seconds)
     """
-    if request.scenario not in SCENARIOS:
+    if request.scenario not in ALL_SCENARIOS:
         raise HTTPException(
             status_code=400, detail=f"Unknown scenario: {request.scenario}. Available: {list(SCENARIOS.keys())}"
         )
@@ -188,7 +192,7 @@ async def start_simulation(request: StartSimulationRequest):
             .insert(
                 {
                     "task_id": task_id,
-                    "site_id": "site-002",  # Default to site-002 (can be parameterized later)
+                    "site_id": request.site_id,
                     "scenario": request.scenario,
                     "simulation_type": "lifecycle",
                     "status": "queued",
@@ -336,7 +340,9 @@ async def change_simulation_speed(task_id: str, request: SpeedChangeRequest):
 @router.post("/speed")
 async def change_default_speed(request: SpeedChangeRequest):
     """
-    Change the speed of the default/singleton simulation.
+    Change the speed of the currently running simulation.
+
+    Finds any active simulation from the task queue and changes its speed.
 
     Args:
         request: SpeedChangeRequest with new speed_multiplier
@@ -345,11 +351,23 @@ async def change_default_speed(request: SpeedChangeRequest):
         New speed settings
     """
     try:
-        from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
+        from app.services.simulation_orchestrator import get_all_active_simulations
 
-        orchestrator = get_lifecycle_orchestrator()
+        # Find any running simulation from the task-based queue
+        active = get_all_active_simulations()
+        orchestrator = None
+        for _tid, orch in active.items():
+            if orch.running:
+                orchestrator = orch
+                break
 
-        if not orchestrator.running:
+        # Fallback to singleton
+        if not orchestrator:
+            from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
+
+            orchestrator = get_lifecycle_orchestrator()
+
+        if not orchestrator or not orchestrator.running:
             raise HTTPException(status_code=400, detail="No simulation running")
 
         result = orchestrator.set_speed(request.speed_multiplier)

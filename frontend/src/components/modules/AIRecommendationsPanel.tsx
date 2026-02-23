@@ -209,7 +209,7 @@ function RecommendationCard({ recommendation, onAcknowledge, onResolve }: Recomm
 
           {/* Confidence */}
           <Text className="text-xs text-gray-400 mt-1">
-            Confidence: {(recommendation.confidence * 100).toFixed(0)}%
+            Confidence: {((recommendation.confidence ?? 0) * 100).toFixed(0)}%
           </Text>
         </div>
 

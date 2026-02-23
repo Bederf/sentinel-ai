@@ -359,14 +359,12 @@ async def login_with_email(request: Request, email: str):
             "session_id": session_id,
         }
 
-        # Auto-start demo for Grant (grant@grantdemo.co.za) - 365-day annual simulation
-        # When Grant logs in, his demo scenario auto-starts with data from ZERO
-        # The simulation runs 365 days compressed into 30 minutes real time
-        if email == "grant@grantdemo.co.za":
+        # Auto-start 365-day SENTINEL simulation for demo users (Grant & Bederf)
+        # Single unified simulation: HVAC + DALI + Solar + BESS + Sentinel AI
+        if email in ("grant@grantdemo.co.za", "bederf@protonmail.com"):
             try:
                 from app.database.supabase_client import Supabase
 
-                # Create simulation task in database (queued status)
                 task_id = str(uuid.uuid4())
                 client = Supabase.instance()
 
@@ -376,7 +374,7 @@ async def login_with_email(request: Request, email: str):
                         {
                             "task_id": task_id,
                             "site_id": "site-002",
-                            "scenario": "grant_hvac_dali_ai_annual",
+                            "scenario": "sentinel_annual",
                             "simulation_type": "lifecycle",
                             "status": "queued",
                             "progress_pct": 0,
@@ -388,16 +386,16 @@ async def login_with_email(request: Request, email: str):
                 )
 
                 logger.info(
-                    f"Auto-started Grant demo: task_id={task_id}, scenario=grant_hvac_dali_ai_annual (365d → 480min/8h)"
+                    f"Auto-started SENTINEL demo for {email}: task_id={task_id}, "
+                    f"scenario=sentinel_annual (365d → 480min/8h)"
                 )
 
-                # Add simulation task info to response
                 response["demo_auto_start"] = True
-                response["demo_type"] = "annual-demonstration"
+                response["demo_type"] = "sentinel-full-annual"
                 response["demo_description"] = (
-                    "365-day HVAC + DALI + Sentinel AI simulation with live data accumulation from zero"
+                    "365-day HVAC + DALI + Solar + BESS + Sentinel AI simulation with live data accumulation from zero"
                 )
-                response["demo_scenario"] = "grant_hvac_dali_ai_annual"
+                response["demo_scenario"] = "sentinel_annual"
                 response["demo_status"] = "queued"
                 response["demo_task_id"] = task_id
                 response["demo_duration_minutes"] = 480.0
@@ -407,60 +405,7 @@ async def login_with_email(request: Request, email: str):
                 )
 
             except Exception as e:
-                logger.error(f"Error auto-starting Grant demo: {e}", exc_info=True)
-                response["demo_auto_start"] = False
-                response["demo_error"] = str(e)
-
-        # Auto-start demo for Bederf (bederf@protonmail.com) - 365-day solar+BESS simulation
-        # When Bederf logs in, solar optimization demo auto-starts with data from ZERO
-        # The simulation runs 365 days compressed into 30 minutes real time
-        if email == "bederf@protonmail.com":
-            try:
-                from app.database.supabase_client import Supabase
-
-                # Create simulation task in database (queued status)
-                task_id = str(uuid.uuid4())
-                client = Supabase.instance()
-
-                (
-                    client.table("lifecycle_simulation_tasks")
-                    .insert(
-                        {
-                            "task_id": task_id,
-                            "site_id": "site-002",
-                            "scenario": "grant_solar_bess_ai_annual",
-                            "simulation_type": "lifecycle",
-                            "status": "queued",
-                            "progress_pct": 0,
-                            "days_completed": 0,
-                            "duration_minutes": 480.0,  # 365 days in 480 minutes (8h)
-                        }
-                    )
-                    .execute()
-                )
-
-                logger.info(
-                    f"Auto-started Bederf solar demo: task_id={task_id}, "
-                    f"scenario=grant_solar_bess_ai_annual (365d → 480min/8h)"
-                )
-
-                # Add simulation task info to response
-                response["demo_auto_start"] = True
-                response["demo_type"] = "solar-bess-annual"
-                response["demo_description"] = (
-                    "Solar+BESS with Sentinel AI (365-day full-year with City Power TOU arbitrage)"
-                )
-                response["demo_scenario"] = "grant_solar_bess_ai_annual"
-                response["demo_status"] = "queued"
-                response["demo_task_id"] = task_id
-                response["demo_duration_minutes"] = 480.0
-                response["demo_note"] = (
-                    "Solar simulation runs in background (8 hours). "
-                    "Dashboard will update live as simulation progresses through 365 days."
-                )
-
-            except Exception as e:
-                logger.error(f"Error auto-starting Bederf demo: {e}", exc_info=True)
+                logger.error(f"Error auto-starting SENTINEL demo for {email}: {e}", exc_info=True)
                 response["demo_auto_start"] = False
                 response["demo_error"] = str(e)
 

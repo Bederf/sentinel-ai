@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import uuid
 
+from app.config.settings import settings
 from app.models.module_registry import (
     ModuleType,
     ModuleStatus,
@@ -69,11 +70,97 @@ class ModuleRegistryService:
         self._site_configs: Dict[str, SiteModuleConfig] = {}
         self._recommendations: Dict[str, List[AIRecommendation]] = {}  # By site
         self._demo_presets: Dict[str, Dict[str, Any]] = {}
+        self._supabase_client = None
+        self._use_json = settings.use_json_storage
         self._load_configs()
         self._load_presets()
 
+    @property
+    def _supabase(self):
+        """Lazy-load Supabase client."""
+        if self._supabase_client is None and not self._use_json:
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                self._supabase_client = get_supabase_client()
+            except Exception as e:
+                logger.warning(f"Supabase unavailable, using JSON fallback: {e}")
+                self._use_json = True
+        return self._supabase_client
+
     def _load_configs(self) -> None:
-        """Load site module configurations from disk."""
+        """Load site module configurations.
+
+        Source of truth: Supabase (site_module_configs + site_modules + cross_module_links).
+        Fallback: JSON file (site_modules.json) when Supabase is unavailable.
+        """
+        if not self._use_json:
+            try:
+                self._load_configs_from_supabase()
+                if self._site_configs:
+                    logger.info(f"Loaded module configs for {len(self._site_configs)} sites from Supabase")
+                    return
+            except Exception as e:
+                logger.warning(f"Supabase load failed, falling back to JSON: {e}")
+
+        # JSON fallback
+        self._load_configs_from_json()
+
+    def _load_configs_from_supabase(self) -> None:
+        """Load site module configs from Supabase tables."""
+        client = self._supabase
+        if client is None:
+            return
+
+        # 1. Load site-level configs
+        site_configs_resp = client.table("site_module_configs").select("*").execute()
+        site_rows = site_configs_resp.data or []
+
+        for site_row in site_rows:
+            site_id = site_row["site_id"]
+
+            # 2. Load modules for this site
+            modules_resp = client.table("site_modules").select("*").eq("site_id", site_id).execute()
+            module_rows = modules_resp.data or []
+
+            # 3. Load cross-module links for this site
+            links_resp = client.table("cross_module_links").select("*").eq("site_id", site_id).execute()
+            link_rows = links_resp.data or []
+
+            self._site_configs[site_id] = SiteModuleConfig(
+                site_id=site_id,
+                site_name=site_row["site_name"],
+                active_modules=[
+                    ModuleInstance(
+                        instance_id=m["instance_id"],
+                        site_id=m["site_id"],
+                        module_type=ModuleType(m["module_type"]),
+                        status=ModuleStatus(m["status"]),
+                        activated_at=m["activated_at"],
+                        config=m.get("config") or {},
+                        health_score=m.get("health_score", 100.0),
+                        last_telemetry=m.get("last_telemetry"),
+                        error_message=m.get("error_message"),
+                    )
+                    for m in module_rows
+                ],
+                cross_module_links=[
+                    CrossModuleLink(
+                        link_id=lnk["link_id"],
+                        source_module=ModuleType(lnk["source_module"]),
+                        target_module=ModuleType(lnk["target_module"]),
+                        integration_type=lnk["integration_type"],
+                        enabled=lnk.get("enabled", False),
+                        config=lnk.get("config") or {},
+                    )
+                    for lnk in link_rows
+                ],
+                ai_enabled=site_row.get("ai_enabled", True),
+                auto_integration=site_row.get("auto_integration", True),
+            )
+
+    def _load_configs_from_json(self) -> None:
+        """Load site module configurations from JSON file (fallback)."""
         config_file = self.data_dir / "site_modules.json"
         if config_file.exists():
             try:
@@ -81,12 +168,80 @@ class ModuleRegistryService:
                     data = json.load(f)
                 for site_id, config in data.items():
                     self._site_configs[site_id] = self._parse_site_config(config)
-                logger.info(f"Loaded module configs for {len(self._site_configs)} sites")
+                logger.info(f"Loaded module configs for {len(self._site_configs)} sites from JSON")
             except Exception as e:
-                logger.error(f"Error loading module configs: {e}")
+                logger.error(f"Error loading module configs from JSON: {e}")
 
     def _save_configs(self) -> None:
-        """Save site module configurations to disk."""
+        """Save site module configurations.
+
+        Writes to Supabase (source of truth) and JSON (backup/fallback).
+        """
+        # Always write JSON as backup
+        self._save_configs_to_json()
+
+        # Write to Supabase if available
+        if not self._use_json:
+            try:
+                self._save_configs_to_supabase()
+            except Exception as e:
+                logger.warning(f"Failed to save to Supabase (JSON backup saved): {e}")
+
+    def _save_configs_to_supabase(self) -> None:
+        """Persist site module configs to Supabase tables."""
+        client = self._supabase
+        if client is None:
+            return
+
+        for site_id, config in self._site_configs.items():
+            # Upsert site-level config
+            client.table("site_module_configs").upsert(
+                {
+                    "site_id": config.site_id,
+                    "site_name": config.site_name,
+                    "ai_enabled": config.ai_enabled,
+                    "auto_integration": config.auto_integration,
+                    "updated_at": datetime.utcnow().isoformat(),
+                },
+                on_conflict="site_id",
+            ).execute()
+
+            # Upsert modules
+            for m in config.active_modules:
+                client.table("site_modules").upsert(
+                    {
+                        "instance_id": m.instance_id,
+                        "site_id": m.site_id,
+                        "module_type": m.module_type.value,
+                        "status": m.status.value,
+                        "activated_at": m.activated_at,
+                        "config": m.config,
+                        "health_score": m.health_score,
+                        "last_telemetry": m.last_telemetry,
+                        "error_message": m.error_message,
+                        "updated_at": datetime.utcnow().isoformat(),
+                    },
+                    on_conflict="instance_id",
+                ).execute()
+
+            # Upsert cross-module links
+            for lnk in config.cross_module_links:
+                client.table("cross_module_links").upsert(
+                    {
+                        "link_id": lnk.link_id,
+                        "site_id": site_id,
+                        "source_module": lnk.source_module.value,
+                        "target_module": lnk.target_module.value,
+                        "integration_type": lnk.integration_type,
+                        "enabled": lnk.enabled,
+                        "config": lnk.config,
+                        "updated_at": datetime.utcnow().isoformat(),
+                    },
+                    on_conflict="link_id",
+                ).execute()
+
+    def _save_configs_to_json(self) -> None:
+        """Save site module configurations to JSON file (backup/fallback)."""
         config_file = self.data_dir / "site_modules.json"
         try:
             data = {}
@@ -95,7 +250,7 @@ class ModuleRegistryService:
             with open(config_file, "w") as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
-            logger.error(f"Error saving module configs: {e}")
+            logger.error(f"Error saving module configs to JSON: {e}")
 
     def _load_presets(self) -> None:
         """Load demo presets from disk."""

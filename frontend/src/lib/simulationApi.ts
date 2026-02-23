@@ -154,6 +154,15 @@ export async function resumeSimulation(): Promise<{ success: boolean }> {
   return fetchJson("/api/lifecycle/resume", { method: "POST" });
 }
 
+export async function changeSimulationSpeed(
+  speedMultiplier: number
+): Promise<{ success: boolean; speed: number; seconds_per_hour: number }> {
+  return fetchJson("/api/lifecycle/speed", {
+    method: "POST",
+    body: JSON.stringify({ speed_multiplier: speedMultiplier }),
+  });
+}
+
 export async function getSimulationStatus(): Promise<SimulationStatus> {
   return fetchJson("/api/lifecycle/status");
 }

@@ -28,6 +28,12 @@ interface LockedFeatureOverlayProps {
   /** Child component(s) to render (shown normally if module active, greyed if inactive) */
   children: ReactNode
 
+  /**
+   * Whether to render children behind the locked overlay.
+   * Set false for children with side effects (API calls, sockets) to avoid unnecessary requests.
+   */
+  renderPreviewWhenLocked?: boolean
+
   /** Optional custom message to show in upgrade prompt */
   customMessage?: string
 
@@ -44,6 +50,7 @@ export function LockedFeatureOverlay({
   children,
   customMessage,
   onRequestActivation,
+  renderPreviewWhenLocked = true,
 }: LockedFeatureOverlayProps) {
   const { isActive, loading, savingsData } = useModuleAccess(module)
 
@@ -56,9 +63,13 @@ export function LockedFeatureOverlay({
   return (
     <div className="relative">
       {/* Greyed-out child component */}
-      <div className="opacity-40 pointer-events-none select-none">
-        {children}
-      </div>
+      {renderPreviewWhenLocked ? (
+        <div className="opacity-40 pointer-events-none select-none">
+          {children}
+        </div>
+      ) : (
+        <div className="opacity-40 pointer-events-none select-none h-full min-h-[320px]" />
+      )}
 
       {/* Upgrade prompt overlay */}
       <div className="absolute inset-0 flex items-center justify-center">

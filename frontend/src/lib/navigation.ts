@@ -1,11 +1,8 @@
 /**
- * Navigation Configuration - Module-Gated Sidebar
+ * Navigation Configuration - Sidebar + Building Detail Tabs
  *
- * Defines all navigation items with module gating metadata.
- * Items are categorised as:
- * - base: always visible to all users
- * - addon: visible only when the required module is active (paid add-ons)
- * - internal: visible only to users with the required role
+ * Sidebar items: Dashboard, AI Chat, SIMBIOT, Settings (+ About/Info)
+ * Building tabs: All site-specific views, module-gated, shown inside SiteDetail
  */
 
 import type { LucideIcon } from "lucide-react";
@@ -13,7 +10,6 @@ import {
   MessageSquare,
   LayoutDashboard,
   Shield,
-  ClipboardList,
   Settings as SettingsIcon,
   Zap,
   Wrench,
@@ -116,62 +112,28 @@ export const VIEW_TITLES: Record<View, string> = {
 };
 
 /**
- * Base navigation items - always visible, cannot be disabled.
- * FREE BASIC PACKAGE PAGES:
- * - Dashboard: view equipment and AI recommendations
- * - System Health: real-time building monitoring
- * - AI Chat: SENTINEL AI assistant
- * - Digital Twin: 3D/2D building visualization
- * - Audit Logs: system-wide audit trail for compliance and debugging
+ * Base sidebar items — always visible.
+ * Dashboard, AI Chat, SIMBIOT (moved from addon), Settings (moved from internal).
+ * Settings requires admin or demo user (checked in Sidebar component).
  */
 export const BASE_NAV_ITEMS: NavItem[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Overview and AI recommendation", category: "base" },
-  { id: "integrations", label: "System Health", icon: Activity, description: "Real-time Health Monitoring", category: "base" },
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Overview and AI recommendations", category: "base" },
   { id: "ai-chat", label: "AI Chat", icon: MessageSquare, description: "SENTINEL AI Assistant", category: "base" },
-  { id: "digital-twin", label: "Digital Twin", icon: Box, description: "3D/2D Building Visualization", category: "base" },
-  { id: "control-audit", label: "Audit Logs", icon: History, description: "System Audit Trail", category: "base" },
+  { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard", category: "base" },
+  { id: "settings", label: "Settings", icon: SettingsIcon, description: "Admin settings", category: "base", requiredRole: "admin" },
 ];
 
 /**
- * Module-gated navigation items - visible only when the required module is active.
- * All modules ship with every deployment; clients activate/deactivate per site.
- *
- * Core modules (control, assets, simbiot, integrations) are typically always active
- * but CAN be disabled if a client doesn't need them.
+ * Addon items — EMPTY. All moved to building detail tabs.
+ * Kept for backward compatibility with ViewGuard and access-control.
  */
-export const ADDON_NAV_ITEMS: NavItem[] = [
-  // Core operations modules
-  { id: "control", label: "Control", icon: Shield, description: "Building Controls", category: "addon", requiredModule: "control", defaultOrder: 0 },
-  { id: "workflow", label: "Asset Workflow", icon: GitBranch, description: "Lifecycle Management", category: "addon", requiredModule: "assets", defaultOrder: 2 },
-  { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard", category: "addon", requiredModule: "simbiot", defaultOrder: 3 },
-  // Building system modules
-  { id: "technician", label: "Tech Chat", icon: Wrench, description: "Fault Diagnosis", category: "addon", requiredModule: "maintenance", defaultOrder: 10 },
-  { id: "optimization", label: "Loadshedding", icon: Zap, description: "Load Shedding AI", category: "addon", requiredModule: "energy", defaultOrder: 11 },
-  { id: "occupancy", label: "Occupancy", icon: Users, description: "Occupancy Monitoring", category: "addon", requiredModule: "lighting", defaultOrder: 12 },
-  { id: "occupancy-analytics", label: "Occupancy Analytics", icon: BarChart3, description: "Occupancy Trends & Insights", category: "addon", requiredModule: "lighting", defaultOrder: 12.2 },
-  { id: "occupancy-energy-correlation", label: "Energy Correlation", icon: TrendingDown, description: "Occupancy vs Energy Savings", category: "addon", requiredModule: "lighting", defaultOrder: 12.3 },
-  { id: "lighting", label: "Lighting", icon: Lightbulb, description: "Lighting Control", category: "addon", requiredModule: "lighting", defaultOrder: 12.5 },
-  { id: "security", label: "Security", icon: ShieldCheck, description: "Access & CCTV", category: "addon", requiredModule: "security", defaultOrder: 13 },
-  { id: "solar", label: "Solar & BESS", icon: Sun, description: "PV & Battery Storage", category: "addon", requiredModule: "solar", defaultOrder: 14 },
-  { id: "aegis", label: "AEGIS Ops", icon: Brain, description: "BESS Dispatch Governance", category: "addon", requiredModule: "solar", defaultOrder: 14.1 },
-  { id: "water", label: "Water", icon: Droplets, description: "Water Consumption", category: "addon", requiredModule: "water", defaultOrder: 15 },
-  { id: "sustainability", label: "ESG", icon: Leaf, description: "Sustainability & Carbon", category: "addon", requiredModule: "sustainability", defaultOrder: 16 },
-  { id: "contracts", label: "Contracts", icon: FileText, description: "Contract & SLA", category: "addon", requiredModule: "contracts", defaultOrder: 17 },
-  { id: "profitability", label: "Profitability", icon: TrendingUp, description: "Profitability Analytics", category: "addon", requiredModule: "contracts", defaultOrder: 18 },
-  { id: "budget-report", label: "Budget Reports", icon: DollarSign, description: "Budget Reporting", category: "addon", requiredModule: "contracts", defaultOrder: 19 },
-  // Intelligence modules
-  { id: "fleet", label: "Fleet ML", icon: BarChart3, description: "Cross-Site Insights", category: "addon", requiredModule: "ml", defaultOrder: 20 },
-  { id: "mlops", label: "ML Metrics", icon: Brain, description: "MLOps Monitoring", category: "addon", requiredModule: "ml", defaultOrder: 21 },
-];
+export const ADDON_NAV_ITEMS: NavItem[] = [];
 
 /**
- * Internal navigation items - visible only to users with matching role.
- * Settings is password-protected and visible to both admin and demo users.
+ * Internal items — EMPTY. Settings moved to base.
+ * Kept for backward compatibility with ViewGuard and access-control.
  */
-export const INTERNAL_NAV_ITEMS: NavItem[] = [
-  { id: "simulation", label: "Simulation", icon: FlaskConical, description: "Lifecycle & Analytics", category: "internal", requiredRole: "admin", requiredModule: "ml" },
-  { id: "settings", label: "Settings", icon: SettingsIcon, description: "Admin settings", category: "internal", requiredRole: "admin" },
-];
+export const INTERNAL_NAV_ITEMS: NavItem[] = [];
 
 /** All nav items combined (for lookup) */
 export const ALL_NAV_ITEMS: NavItem[] = [
@@ -180,43 +142,108 @@ export const ALL_NAV_ITEMS: NavItem[] = [
   ...INTERNAL_NAV_ITEMS,
 ];
 
-/** localStorage key for persisted addon ordering */
+// ─── Building Detail Tabs ────────────────────────────────────────────
+
+export type BuildingTabId =
+  | "overview"
+  | "system-health"
+  | "control"
+  | "digital-twin"
+  | "audit-logs"
+  | "tech-chat"
+  | "loadshedding"
+  | "lighting"
+  | "occupancy"
+  | "occupancy-analytics"
+  | "energy-correlation"
+  | "solar"
+  | "aegis"
+  | "security"
+  | "water"
+  | "esg"
+  | "asset-workflow"
+  | "contracts"
+  | "profitability"
+  | "budget"
+  | "fleet-ml"
+  | "ml-metrics"
+  | "simulation";
+
+export interface BuildingTabItem {
+  id: BuildingTabId;
+  label: string;
+  icon: LucideIcon;
+  requiredModule?: ModuleType;
+  requiredRole?: "admin";
+}
+
+/**
+ * Building detail tab definitions.
+ * Rendered as a scrollable tab bar inside SiteDetail.
+ * Module-gated: tabs only appear when the required module is active.
+ */
+export const BUILDING_TAB_ITEMS: BuildingTabItem[] = [
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "system-health", label: "System Health", icon: Activity },
+  { id: "control", label: "Control", icon: Shield, requiredModule: "control" },
+  { id: "digital-twin", label: "Digital Twin", icon: Box },
+  { id: "audit-logs", label: "Audit Logs", icon: History },
+  { id: "tech-chat", label: "Tech Chat", icon: Wrench, requiredModule: "maintenance" },
+  { id: "loadshedding", label: "Loadshedding", icon: Zap, requiredModule: "energy" },
+  { id: "lighting", label: "Lighting", icon: Lightbulb, requiredModule: "lighting" },
+  { id: "occupancy", label: "Occupancy", icon: Users, requiredModule: "lighting" },
+  { id: "occupancy-analytics", label: "Occ. Analytics", icon: BarChart3, requiredModule: "lighting" },
+  { id: "energy-correlation", label: "Energy Correlation", icon: TrendingDown, requiredModule: "lighting" },
+  { id: "solar", label: "Solar & BESS", icon: Sun, requiredModule: "solar" },
+  { id: "aegis", label: "AEGIS", icon: Brain, requiredModule: "solar" },
+  { id: "security", label: "Security", icon: ShieldCheck, requiredModule: "security" },
+  { id: "water", label: "Water", icon: Droplets, requiredModule: "water" },
+  { id: "esg", label: "ESG", icon: Leaf, requiredModule: "sustainability" },
+  { id: "asset-workflow", label: "Asset Workflow", icon: GitBranch, requiredModule: "assets" },
+  { id: "contracts", label: "Contracts", icon: FileText, requiredModule: "contracts" },
+  { id: "profitability", label: "Profitability", icon: TrendingUp, requiredModule: "contracts" },
+  { id: "budget", label: "Budget", icon: DollarSign, requiredModule: "contracts" },
+  { id: "fleet-ml", label: "Fleet ML", icon: BarChart3, requiredModule: "ml" },
+  { id: "ml-metrics", label: "ML Metrics", icon: Brain, requiredModule: "ml" },
+  { id: "simulation", label: "Simulation", icon: FlaskConical, requiredModule: "ml", requiredRole: "admin" },
+];
+
+// ─── Legacy helpers (kept for ViewGuard / access-control compatibility) ──
+
+/** localStorage key for persisted addon ordering (no longer used, kept for cleanup) */
 export const SIDEBAR_ORDER_KEY = "sentinel_sidebar_order";
-
-/**
- * Get the persisted addon order from localStorage.
- * Returns an array of View ids representing the user's preferred order.
- */
-export function getPersistedAddonOrder(): View[] {
-  try {
-    const stored = localStorage.getItem(SIDEBAR_ORDER_KEY);
-    if (stored) {
-      return JSON.parse(stored) as View[];
-    }
-  } catch {
-    // ignore parse errors
-  }
-  return [];
-}
-
-/**
- * Persist addon order to localStorage.
- */
-export function persistAddonOrder(order: View[]): void {
-  localStorage.setItem(SIDEBAR_ORDER_KEY, JSON.stringify(order));
-}
 
 /**
  * Check if a view requires an active module to be accessible.
  */
 export function isModuleGatedView(view: View): boolean {
-  return ADDON_NAV_ITEMS.some((item) => item.id === view);
+  // Check both old addon items (empty) and building tabs
+  const tabItem = BUILDING_TAB_ITEMS.find((t) => t.id === view || mapTabToView(t.id) === view);
+  return !!tabItem?.requiredModule;
 }
 
 /**
  * Get the required module for a gated view, if any.
  */
 export function getRequiredModule(view: View): ModuleType | undefined {
-  const item = ADDON_NAV_ITEMS.find((i) => i.id === view);
-  return item?.requiredModule;
+  const tabItem = BUILDING_TAB_ITEMS.find((t) => t.id === view || mapTabToView(t.id) === view);
+  return tabItem?.requiredModule;
+}
+
+/** Map a BuildingTabId to the legacy View id where they differ */
+function mapTabToView(tabId: BuildingTabId): View | undefined {
+  const map: Partial<Record<BuildingTabId, View>> = {
+    "system-health": "integrations",
+    "tech-chat": "technician",
+    "loadshedding": "optimization",
+    "occupancy-analytics": "occupancy-analytics",
+    "energy-correlation": "occupancy-energy-correlation",
+    "aegis": "aegis",
+    "esg": "sustainability",
+    "asset-workflow": "workflow",
+    "budget": "budget-report",
+    "fleet-ml": "fleet",
+    "ml-metrics": "mlops",
+  };
+  return map[tabId];
 }

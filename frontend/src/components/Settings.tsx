@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Settings as SettingsIcon, Bell, Monitor, Shield, Lock, Unlock, Zap } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Settings as SettingsIcon, Bell, Monitor, Shield, Lock, Unlock, Zap, Gauge, Play, Pause } from "lucide-react";
 import { useHealthThresholds } from "../hooks/useHealthThresholds";
 import { useGlassTheme } from "../hooks/useGlassTheme";
 import { GLASS_PRESETS } from "../lib/settings";
@@ -10,8 +10,10 @@ import { NotificationSettings } from "./NotificationSettings";
 import { NotificationChannelsSettings } from "./NotificationChannelsSettings";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { useModules } from "../contexts/ModuleHooks";
+import { useSimulation } from "../contexts/SimulationContext";
 import type { ModuleType } from "../lib/moduleRegistry";
 import { MANDATORY_MODULES } from "../lib/mandatoryModules";
+import { changeSimulationSpeed, pauseSimulation, resumeSimulation } from "../lib/simulationApi";
 
 interface SettingsProps {
   onError?: (error: string) => void;
@@ -505,6 +507,12 @@ export function Settings({ onError }: SettingsProps) {
             <GlassThemeControls />
           </div>
         </div>
+
+        {/* Simulation Controls */}
+        <SimulationControlsPanel
+          readOnly={!!(isDemoUser && !settingsPageUnlocked)}
+          onError={onError}
+        />
       </div>
 
       {/* Password Modal */}
@@ -517,6 +525,273 @@ export function Settings({ onError }: SettingsProps) {
         title="Unlock Settings Page"
         description="This page requires a password to modify settings. Enter the admin password to make changes to safety rules, feature access, and other configurations."
       />
+    </div>
+  );
+}
+
+// ========== Simulation Controls Panel ==========
+
+const SPEED_PRESETS = [1, 5, 10, 50, 100] as const;
+
+function SimulationControlsPanel({
+  readOnly,
+  onError,
+}: {
+  readOnly: boolean;
+  onError?: (msg: string) => void;
+}) {
+  const sim = useSimulation();
+  const [changingSpeed, setChangingSpeed] = useState(false);
+
+  const handleSpeedChange = useCallback(
+    async (speed: number) => {
+      if (readOnly || changingSpeed) return;
+      setChangingSpeed(true);
+      try {
+        await changeSimulationSpeed(speed);
+        await sim.refresh();
+      } catch (err) {
+        onError?.(err instanceof Error ? err.message : "Failed to change speed");
+      } finally {
+        setChangingSpeed(false);
+      }
+    },
+    [readOnly, changingSpeed, sim, onError]
+  );
+
+  const handlePauseResume = useCallback(async () => {
+    if (readOnly) return;
+    try {
+      if (sim.paused) {
+        await resumeSimulation();
+      } else {
+        await pauseSimulation();
+      }
+      await sim.refresh();
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : "Failed to pause/resume");
+    }
+  }, [readOnly, sim, onError]);
+
+  // Convert linear slider (0-100) to log scale (0.1 - 1000)
+  const speedToSlider = (speed: number) =>
+    Math.round((Math.log10(Math.max(0.1, speed)) + 1) * 25);
+  const sliderToSpeed = (val: number) =>
+    Math.round(10 ** (val / 25 - 1) * 10) / 10;
+
+  return (
+    <div className="glass-panel overflow-hidden">
+      <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+        <div className="flex items-center gap-3">
+          <div
+            className="p-2 rounded"
+            style={{
+              background: "rgba(59, 130, 246, 0.15)",
+              color: "var(--color-sentinel-blue)",
+            }}
+          >
+            <Gauge className="h-5 w-5" />
+          </div>
+          <div>
+            <h2
+              className="text-lg font-semibold"
+              style={{ color: "var(--color-sentinel-text-primary)" }}
+            >
+              Simulation Controls
+            </h2>
+            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Adjust simulation speed and view progress
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-6">
+        {!sim.running ? (
+          <div
+            className="rounded-lg p-4 text-center"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--glass-border)",
+            }}
+          >
+            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              No simulation running
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {/* Current Speed + Day Progress */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div
+                className="flex-1 rounded-lg p-3"
+                style={{
+                  background: "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--glass-border)",
+                }}
+              >
+                <p className="text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Current Speed
+                </p>
+                <p className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {sim.speedMultiplier}x
+                  <span
+                    className="text-sm font-normal ml-2"
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                  >
+                    {sim.secondsPerHour.toFixed(1)}s per simulated hour
+                  </span>
+                </p>
+              </div>
+              <div
+                className="flex-1 rounded-lg p-3"
+                style={{
+                  background: "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--glass-border)",
+                }}
+              >
+                <p className="text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Progress
+                </p>
+                <p className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  Day {sim.daysSimulated} of 365
+                  <span
+                    className="text-sm font-normal ml-2"
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                  >
+                    {sim.progressPct}%
+                  </span>
+                </p>
+                {/* Progress bar */}
+                <div
+                  className="mt-2 h-1.5 rounded-full overflow-hidden"
+                  style={{ background: "var(--color-sentinel-bg-hover)" }}
+                >
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${sim.progressPct}%`,
+                      background: "var(--color-sentinel-blue)",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Pause/Resume */}
+            <div>
+              <button
+                onClick={() => void handlePauseResume()}
+                disabled={readOnly}
+                className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-colors hover:brightness-110"
+                style={{
+                  background: sim.paused
+                    ? "rgba(16, 185, 129, 0.15)"
+                    : "rgba(245, 158, 11, 0.15)",
+                  color: sim.paused
+                    ? "var(--color-sentinel-green)"
+                    : "var(--color-sentinel-amber)",
+                  border: `1px solid ${sim.paused ? "rgba(16, 185, 129, 0.3)" : "rgba(245, 158, 11, 0.3)"}`,
+                  cursor: readOnly ? "not-allowed" : "pointer",
+                  opacity: readOnly ? 0.6 : 1,
+                }}
+                type="button"
+              >
+                {sim.paused ? (
+                  <>
+                    <Play className="h-4 w-4" />
+                    Resume Simulation
+                  </>
+                ) : (
+                  <>
+                    <Pause className="h-4 w-4" />
+                    Pause Simulation
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Speed Presets */}
+            <div>
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Speed Presets
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {SPEED_PRESETS.map((speed) => {
+                  const isActive = sim.speedMultiplier === speed;
+                  return (
+                    <button
+                      key={speed}
+                      onClick={() => void handleSpeedChange(speed)}
+                      disabled={readOnly || changingSpeed}
+                      className="px-4 py-2 text-sm rounded font-medium transition-colors"
+                      style={{
+                        background: isActive
+                          ? "rgba(59, 130, 246, 0.25)"
+                          : "var(--color-sentinel-bg-secondary)",
+                        color: isActive
+                          ? "var(--color-sentinel-blue)"
+                          : "var(--color-sentinel-text-primary)",
+                        border: `1px solid ${isActive ? "rgba(59, 130, 246, 0.4)" : "var(--glass-border)"}`,
+                        cursor: readOnly || changingSpeed ? "not-allowed" : "pointer",
+                        opacity: readOnly ? 0.6 : 1,
+                      }}
+                      type="button"
+                    >
+                      {speed}x
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Fine-Grained Slider (log scale) */}
+            <div>
+              <div className="flex justify-between mb-2">
+                <label
+                  className="text-sm font-medium"
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
+                >
+                  Fine Control
+                </label>
+                <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  {sim.speedMultiplier}x
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={speedToSlider(sim.speedMultiplier)}
+                onChange={(e) => {
+                  const speed = sliderToSpeed(Number.parseInt(e.target.value, 10));
+                  void handleSpeedChange(speed);
+                }}
+                disabled={readOnly || changingSpeed}
+                className="w-full h-3"
+                style={{ cursor: readOnly ? "not-allowed" : "pointer" }}
+                aria-label="Simulation speed"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={speedToSlider(sim.speedMultiplier)}
+              />
+              <div
+                className="flex justify-between text-xs mt-1"
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
+              >
+                <span>0.1x</span>
+                <span>1x</span>
+                <span>10x</span>
+                <span>100x</span>
+                <span>1000x</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

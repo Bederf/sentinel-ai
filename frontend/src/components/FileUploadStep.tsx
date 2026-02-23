@@ -131,7 +131,7 @@ export function FileUploadStep({
             <p><strong>Format:</strong> {result.file_format.toUpperCase()}</p>
             <p><strong>Delimiter:</strong> "{result.delimiter}"</p>
             <p><strong>Vendor:</strong> {result.vendor}</p>
-            <p><strong>Confidence:</strong> {(result.confidence * 100).toFixed(0)}%</p>
+            <p><strong>Confidence:</strong> {((result.confidence ?? 0) * 100).toFixed(0)}%</p>
             <p><strong>Rows:</strong> {result.row_count.toLocaleString()}</p>
           </div>
         </Callout>

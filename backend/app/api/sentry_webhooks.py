@@ -30,6 +30,10 @@ from app.services.ocr_service import get_ocr_service
 from app.services.sentry_integration.ocr_correction_handler import get_ocr_correction_handler
 from app.database.repositories.service_record_repository import ServiceRecordRepository
 from app.services.sentry_auth_service import get_sentry_jwt_headers
+from app.services.popia_consent_guard import (
+    evaluate_ingress_processing_consent,
+    enforce_active_processing_consent,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sentry", tags=["sentry"])
@@ -64,6 +68,18 @@ def _require_sentry_secret(
 
     if not provided_secret or not hmac.compare_digest(provided_secret, configured_secret):
         raise HTTPException(status_code=403, detail="Unauthorized")
+
+
+def _extract_reply_text(content: Any) -> str:
+    """Best-effort extraction of technician reply text from webhook payload."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, dict):
+        for key in ("text", "body", "caption", "message"):
+            value = content.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+    return ""
 
 
 class EquipmentResetRequest(BaseModel):
@@ -101,6 +117,22 @@ async def handle_work_order_response(
     for field in required_fields:
         if field not in data:
             raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
+
+    reply_text = _extract_reply_text(data.get("content"))
+    consent_decision = evaluate_ingress_processing_consent(
+        data_subject_id=data["telegram_user_id"],
+        platform="telegram",
+        message_text=reply_text,
+    )
+    if not consent_decision.allow_processing:
+        return {
+            "success": False,
+            "requires_consent": True,
+            "consent_status": consent_decision.status,
+            "next_prompt": consent_decision.response_message,
+            "collected_items": [],
+            "is_complete": False,
+        }
 
     # Handle the response
     result = await work_order_notifier.handle_technician_reply(
@@ -379,6 +411,11 @@ async def process_service_sheet_ocr(
         - correction_prompt: First correction prompt (if needs_review)
     """
     _require_sentry_secret(x_sentry_secret, endpoint_name="ocr_process_service_sheet")
+    if not enforce_active_processing_consent(data_subject_id=data.telegram_user_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Active POPIA consent is required for Telegram OCR processing",
+        )
 
     # Decode image
     try:

@@ -1,0 +1,7 @@
+{"timestamp": "2025-11-05T14:22:00Z", "alarm_code": "COND-WARN-001", "severity": "WARNING", "source": "S002-CHILLER-B1-001", "message": "Condenser approach temperature 4.8 degC (normal < 3.0 degC)"}
+{"timestamp": "2025-11-19T10:15:00Z", "alarm_code": "COND-WARN-002", "severity": "WARNING", "source": "S002-CHILLER-B1-001", "message": "Condenser approach temperature 5.5 degC — fouling suspected"}
+{"timestamp": "2025-12-03T08:40:00Z", "alarm_code": "COP-WARN-001", "severity": "WARNING", "source": "S002-CHILLER-B1-001", "message": "COP dropped to 3.8 (rated 5.2) — 27% efficiency loss"}
+{"timestamp": "2025-12-10T15:30:00Z", "alarm_code": "COND-CRIT-001", "severity": "CRITICAL", "source": "S002-CHILLER-B1-001", "message": "Condenser leaving water temp 38.2 degC (setpoint 30 degC) — high head pressure"}
+{"timestamp": "2025-12-17T09:00:00Z", "alarm_code": "HP-CRIT-001", "severity": "CRITICAL", "source": "S002-CHILLER-B1-001", "message": "Head pressure 1650 kPa — approaching safety cutout at 1750 kPa"}
+{"timestamp": "2026-01-07T11:20:00Z", "alarm_code": "COP-CRIT-001", "severity": "CRITICAL", "source": "S002-CHILLER-B1-001", "message": "COP 2.9 — 44% below rated efficiency. Condenser tube cleaning required immediately."}
+{"timestamp": "2026-01-14T07:05:00Z", "alarm_code": "HP-TRIP-001", "severity": "CRITICAL", "source": "S002-CHILLER-B1-001", "message": "High pressure safety cutout activated at 1760 kPa. Chiller-001 OFFLINE."}

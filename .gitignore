@@ -41,3 +41,4 @@ frontend/dist/
 
 # Docker
 *.log
+power_meters.csv

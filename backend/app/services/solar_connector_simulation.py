@@ -27,6 +27,7 @@ from app.models.solar import (
 )
 from app.services.solar_connector_base import SolarConnector
 from app.services.seasonal_modeler import SeasonalModeler
+from app.services.simulation_orchestrator import get_all_active_simulations
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -268,18 +269,26 @@ class SimulatedSolarConnector(SolarConnector):
             logger.error(f"Failed to get simulation data: {e}")
             return None
 
+    def _get_simulation_time(self) -> datetime:
+        """Get current time from active simulation, falling back to real time."""
+        active_sims = get_all_active_simulations()
+        for orchestrator in active_sims.values():
+            if hasattr(orchestrator, "simulated_time") and orchestrator.simulated_time:
+                return orchestrator.simulated_time
+        return datetime.now()
+
     def _get_current_hour_data(self, sim_data: Dict) -> Optional[Dict]:
         """Extract current hour's data from simulation results.
 
         Uses SeasonalModeler (same as simulation engine) to generate realistic
-        solar generation based on current date/time. Scales based on actual
-        plant capacity to match weather patterns.
+        solar generation based on simulation time (not real time). Scales based
+        on actual plant capacity to match weather patterns.
         """
         if not sim_data:
             return None
 
         try:
-            now = datetime.now()
+            now = self._get_simulation_time()
             current_date = now.date()
             current_hour = now.hour
 

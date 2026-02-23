@@ -10,7 +10,7 @@
  * - AI predictions for this site
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import {
   ArrowLeft,
   Building2,
@@ -34,6 +34,11 @@ import {
   Info,
   Wifi,
   Server,
+  Sun,
+  DollarSign,
+  Shield,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import api from '@/lib/api';
 import type {
@@ -53,6 +58,60 @@ import { PredictionDetail } from "./PredictionDetail";
 import { OptimizationInfoCard } from "./OptimizationInfoCard";
 import { ControlPanel } from "./ControlPanel";
 import { useHealthThresholds } from "../hooks/useHealthThresholds";
+import { useModules } from "@/contexts/ModuleHooks";
+import { ROISummaryCard } from "./ROISummaryCard";
+import { LightingIntelligencePanel } from "./LightingIntelligencePanel";
+import { SolarOverviewPanel } from "./solar/SolarOverviewPanel";
+import { BESSStatusPanel } from "./solar/BESSStatusPanel";
+import { InverterStatusMatrix } from "./solar/InverterStatusMatrix";
+import { EnergyFlowDiagram } from "./solar/EnergyFlowDiagram";
+import { SolarAnnualCard } from "./solar/SolarAnnualCard";
+import { EnergyComparisonPanel } from "./EnergyComparisonPanel";
+import { ActualVsSentinelEnergyCard } from "./ActualVsSentinelEnergyCard";
+import { PowerMeterValidationCard, CostValidationCard } from "./validation";
+import ComfortComplaintPanel from "./ComfortComplaintPanel";
+import { OccupancyPanel } from "./OccupancyPanel";
+import { BUILDING_TAB_ITEMS } from "../lib/navigation";
+import type { BuildingTabId } from "../lib/navigation";
+
+// ─── Lazy-loaded tab components ─────────────────────────────────────
+const SystemHealthPage = lazy(() => import("./SystemHealthPage"));
+const ControlDashboard = lazy(() => import("./ControlDashboard").then(m => ({ default: m.ControlDashboard })));
+const DigitalTwin = lazy(() => import("./digital-twin").then(m => ({ default: m.DigitalTwin })));
+const ControlAuditTrail = lazy(() => import("./ControlAuditTrail").then(m => ({ default: m.ControlAuditTrail })));
+const TechnicianPortalGated = lazy(() => import("./TechnicianPortalGated").then(m => ({ default: m.TechnicianPortalGated })));
+const OptimizationPage = lazy(() => import("../pages/OptimizationPage").then(m => ({ default: m.OptimizationPage })));
+const LightingPage = lazy(() => import("./lighting/LightingPage").then(m => ({ default: m.LightingPage })));
+const OccupancyFullPanel = lazy(() => import("./OccupancyPanel").then(m => ({ default: m.OccupancyPanel })));
+const OccupancyAnalyticsPage = lazy(() => import("../pages/OccupancyAnalyticsPage").then(m => ({ default: m.OccupancyAnalyticsPage })));
+const OccupancyEnergyCorrelationPage = lazy(() => import("../pages/OccupancyEnergyCorrelationPage").then(m => ({ default: m.OccupancyEnergyCorrelationPage })));
+const SolarDashboard = lazy(() => import("./solar/SolarDashboard").then(m => ({ default: m.SolarDashboard })));
+const AegisConsolePage = lazy(() => import("../pages/AegisConsolePage").then(m => ({ default: m.AegisConsolePage })));
+const SecurityDashboard = lazy(() => import("./SecurityDashboard").then(m => ({ default: m.SecurityDashboard })));
+const WaterPanel = lazy(() => import("./water").then(m => ({ default: m.WaterPanel })));
+const ESGPage = lazy(() => import("./sustainability/ESGPage").then(m => ({ default: m.ESGPage })));
+const AssetWorkflowDashboard = lazy(() => import("./AssetWorkflowDashboard").then(m => ({ default: m.AssetWorkflowDashboard })));
+const ContractManagementPage = lazy(() => import("../pages/ContractManagementPage").then(m => ({ default: m.ContractManagementPage })));
+const ProfitabilityDashboardPage = lazy(() => import("../pages/ProfitabilityDashboardPage").then(m => ({ default: m.ProfitabilityDashboardPage })));
+const BudgetReportPage = lazy(() => import("../pages/BudgetReportPage").then(m => ({ default: m.BudgetReportPage })));
+const FleetInsights = lazy(() => import("./FleetInsights").then(m => ({ default: m.FleetInsights })));
+const MLMetrics = lazy(() => import("./MLMetrics").then(m => ({ default: m.MLMetrics })));
+const SimulationDashboard = lazy(() => import("./SimulationDashboard").then(m => ({ default: m.SimulationDashboard })));
+
+/** Loading spinner shown while lazy tabs load */
+function TabLoading() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <div
+        className="animate-spin h-8 w-8 border-4 rounded-full"
+        style={{
+          borderColor: "var(--color-sentinel-blue)",
+          borderTopColor: "transparent",
+        }}
+      />
+    </div>
+  );
+}
 
 interface SiteDetailProps {
   siteId: string;
@@ -100,6 +159,8 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("equipment");
+  const [activeMainTab, setActiveMainTab] = useState<BuildingTabId>("overview");
+  const [equipmentExpanded, setEquipmentExpanded] = useState(false);
 
   // Equipment control
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
@@ -122,6 +183,9 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
 
   // Health thresholds
   const { thresholds } = useHealthThresholds();
+
+  // Module gating for site-specific intelligence panels
+  const { isModuleActive, activeModules } = useModules();
 
   useEffect(() => {
     const loadSiteData = async () => {
@@ -727,7 +791,75 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* ═══════════════════════════════════════════════════════════
+          Scrollable Main Tab Bar — Overview + module-gated building tabs
+          ═══════════════════════════════════════════════════════════ */}
+      <div
+        className="mb-6 rounded-md overflow-hidden"
+        style={{
+          background: "var(--color-sentinel-bg-panel)",
+          border: "1px solid var(--color-sentinel-border)",
+        }}
+      >
+        <div
+          className="flex overflow-x-auto border-b scrollbar-hide"
+          style={{
+            borderColor: "var(--color-sentinel-border)",
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
+        >
+          {BUILDING_TAB_ITEMS
+            .filter((tab) => {
+              // Module gating
+              if (tab.requiredModule && !isModuleActive(tab.requiredModule)) return false;
+              // Role gating (simulation = admin only)
+              if (tab.requiredRole === "admin") {
+                const storedUser = localStorage.getItem("sentinel_user");
+                if (storedUser) {
+                  try {
+                    const user = JSON.parse(storedUser);
+                    if (user.role !== "admin") return false;
+                  } catch { return false; }
+                } else { return false; }
+              }
+              return true;
+            })
+            .map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeMainTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveMainTab(tab.id)}
+                  className="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0"
+                  style={{
+                    color: isActive
+                      ? "var(--color-sentinel-amber)"
+                      : "var(--color-sentinel-text-secondary)",
+                    borderBottom: isActive
+                      ? "2px solid var(--color-sentinel-amber)"
+                      : "2px solid transparent",
+                    background: isActive
+                      ? "rgba(245, 158, 11, 0.08)"
+                      : "transparent",
+                  }}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          Tab Content
+          ═══════════════════════════════════════════════════════════ */}
+
+      {activeMainTab === "overview" ? (
+      <>
+      {/* Overview Tab — original Equipment/Alerts/Energy/Predictions tabs + summary panels */}
       <div
         className="rounded-md overflow-hidden mb-6"
         style={{
@@ -735,7 +867,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           border: "1px solid var(--color-sentinel-border)",
         }}
       >
-        {/* Tab Navigation */}
+        {/* Sub-Tab Navigation (Equipment/Alerts/Energy/Predictions) */}
         <div
           className="flex border-b"
           style={{ borderColor: "var(--color-sentinel-border)" }}
@@ -777,12 +909,23 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <h3
-                    className="text-lg font-semibold"
-                    style={{ color: "var(--color-sentinel-text-primary)" }}
+                  <button
+                    onClick={() => setEquipmentExpanded(!equipmentExpanded)}
+                    className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
                   >
-                    Equipment
-                  </h3>
+                    {equipmentExpanded ? (
+                      <ChevronDown className="h-5 w-5" style={{ color: "var(--color-sentinel-text-secondary)" }} />
+                    ) : (
+                      <ChevronRight className="h-5 w-5" style={{ color: "var(--color-sentinel-text-secondary)" }} />
+                    )}
+                    <h3
+                      className="text-lg font-semibold"
+                      style={{ color: "var(--color-sentinel-text-primary)" }}
+                    >
+                      Equipment
+                    </h3>
+                  </button>
                   <div
                     className="px-2 py-1 rounded text-xs font-medium"
                     style={{
@@ -874,8 +1017,8 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                 </div>
               </div>
 
-              {/* Category Filter Chips */}
-              {Object.keys(equipmentCategories).length > 0 && (
+              {/* Category Filter Chips + Equipment Table (collapsible) */}
+              {equipmentExpanded && Object.keys(equipmentCategories).length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-4">
                   <button
                     onClick={() => setSelectedCategory(null)}
@@ -939,7 +1082,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                 </div>
               )}
 
-              {(() => {
+              {equipmentExpanded && (() => {
                 // Filter by category, then sort: warnings/critical first, then by health (lowest first)
                 const filteredEquipment = (selectedCategory
                   ? equipment.filter((eq) => eq.category === selectedCategory)
@@ -1233,6 +1376,247 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           )}
         </div>
       </div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          Site Intelligence Panels (moved from main dashboard)
+          These are site-specific and belong in the building detail view.
+          ═══════════════════════════════════════════════════════════ */}
+
+      {/* Lighting Intelligence */}
+      {(activeModules.length === 0 || isModuleActive('lighting')) && (
+        <div className="mb-6">
+          <LightingIntelligencePanel siteId={siteId} />
+        </div>
+      )}
+
+      {/* Solar & BESS */}
+      {(activeModules.length === 0 || isModuleActive('solar')) && (
+        <div className="mb-6 space-y-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div
+              className="p-2 rounded"
+              style={{ background: "rgba(250, 204, 21, 0.15)" }}
+            >
+              <Sun
+                className="h-5 w-5"
+                style={{ color: "#FACC15" }}
+              />
+            </div>
+            <div>
+              <h3
+                className="font-medium text-sm"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Solar &amp; BESS
+              </h3>
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                Solar generation &amp; battery storage
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <SolarOverviewPanel siteId={siteId} />
+            <div className="min-w-0">
+              <EnergyFlowDiagram siteId={siteId} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <BESSStatusPanel siteId={siteId} />
+            <InverterStatusMatrix siteId={siteId} />
+          </div>
+        </div>
+      )}
+
+      {/* Solar Annual Summary */}
+      {(activeModules.length === 0 || isModuleActive('solar')) && (
+        <div className="mb-6 space-y-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div
+              className="p-2 rounded"
+              style={{ background: "rgba(250, 204, 21, 0.15)" }}
+            >
+              <Sun
+                className="h-5 w-5"
+                style={{ color: "#FACC15" }}
+              />
+            </div>
+            <div>
+              <h3
+                className="font-medium text-sm"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Solar Annual Summary
+              </h3>
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                365-day simulation with AI savings progression
+              </span>
+            </div>
+          </div>
+          <SolarAnnualCard siteId={siteId} />
+        </div>
+      )}
+
+      {/* Energy Comparison */}
+      <div className="mb-6">
+        <EnergyComparisonPanel siteId={siteId} />
+      </div>
+
+      {/* Actual vs SENTINEL Energy */}
+      <div className="mb-6">
+        <div className="glass-panel rounded-md overflow-hidden">
+          <ActualVsSentinelEnergyCard siteId={siteId} />
+        </div>
+      </div>
+
+      {/* Power Meter Validation */}
+      <div className="mb-6 space-y-4">
+        <div className="flex items-center gap-3 mb-2">
+          <div
+            className="p-2 rounded"
+            style={{ background: "rgba(59, 130, 246, 0.15)" }}
+          >
+            <Cpu
+              className="h-5 w-5"
+              style={{ color: "#3B82F6" }}
+            />
+          </div>
+          <div>
+            <h3
+              className="font-medium text-sm"
+              style={{ color: "var(--color-sentinel-text-primary)" }}
+            >
+              Power Meter Validation
+            </h3>
+            <span
+              className="text-xs"
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
+            >
+              Real-time HVAC anomaly detection and COP tracking
+            </span>
+          </div>
+        </div>
+        <PowerMeterValidationCard buildingId={siteId} />
+      </div>
+
+      {/* Cost Validation */}
+      <div className="mb-6 space-y-4">
+        <div className="flex items-center gap-3 mb-2">
+          <div
+            className="p-2 rounded"
+            style={{ background: "rgba(34, 197, 94, 0.15)" }}
+          >
+            <DollarSign
+              className="h-5 w-5"
+              style={{ color: "#22C55E" }}
+            />
+          </div>
+          <div>
+            <h3
+              className="font-medium text-sm"
+              style={{ color: "var(--color-sentinel-text-primary)" }}
+            >
+              Cost Validation
+            </h3>
+            <span
+              className="text-xs"
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
+            >
+              Monthly cost reconciliation and tariff optimization
+            </span>
+          </div>
+        </div>
+        <CostValidationCard buildingId={siteId} />
+      </div>
+
+      {/* ROI Summary */}
+      {predictions.length > 0 && (
+        <div className="mb-6 space-y-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div
+              className="p-2 rounded"
+              style={{ background: "rgba(245, 158, 11, 0.15)" }}
+            >
+              <Shield
+                className="h-5 w-5"
+                style={{ color: "var(--color-sentinel-amber)" }}
+              />
+            </div>
+            <div>
+              <h3
+                className="font-medium text-sm"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Risk Intelligence Summary
+              </h3>
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                AI-powered ROI from predictive maintenance
+              </span>
+            </div>
+          </div>
+          <ROISummaryCard predictions={predictions} />
+        </div>
+      )}
+
+      {/* Comfort Assistant */}
+      {(activeModules.length === 0 || isModuleActive('hvac')) && (
+        <div className="mb-6">
+          <ComfortComplaintPanel compact={true} />
+        </div>
+      )}
+
+      {/* Occupancy */}
+      {(activeModules.length === 0 || isModuleActive('lighting')) && (
+        <div className="mb-6">
+          <OccupancyPanel compact={true} />
+        </div>
+      )}
+      </>
+      ) : (
+      /* ═══════════════════════════════════════════════════════════
+         Non-overview tabs — lazy-loaded full-page components
+         ═══════════════════════════════════════════════════════════ */
+      <Suspense fallback={<TabLoading />}>
+        <div className="min-h-[400px]">
+          {activeMainTab === "system-health" && <SystemHealthPage />}
+          {activeMainTab === "control" && <ControlDashboard onError={() => {}} />}
+          {activeMainTab === "digital-twin" && (
+            <div className="h-[calc(100vh-300px)]"><DigitalTwin /></div>
+          )}
+          {activeMainTab === "audit-logs" && <ControlAuditTrail onError={() => {}} onViewDevice={() => {}} />}
+          {activeMainTab === "tech-chat" && <TechnicianPortalGated />}
+          {activeMainTab === "loadshedding" && <OptimizationPage onError={() => {}} />}
+          {activeMainTab === "lighting" && <LightingPage />}
+          {activeMainTab === "occupancy" && (
+            <div className="p-4 md:p-6"><OccupancyFullPanel compact={false} /></div>
+          )}
+          {activeMainTab === "occupancy-analytics" && <OccupancyAnalyticsPage />}
+          {activeMainTab === "energy-correlation" && <OccupancyEnergyCorrelationPage />}
+          {activeMainTab === "solar" && <SolarDashboard />}
+          {activeMainTab === "aegis" && <AegisConsolePage />}
+          {activeMainTab === "security" && <SecurityDashboard />}
+          {activeMainTab === "water" && <WaterPanel />}
+          {activeMainTab === "esg" && <ESGPage selectedBuilding={undefined} />}
+          {activeMainTab === "asset-workflow" && <AssetWorkflowDashboard />}
+          {activeMainTab === "contracts" && <ContractManagementPage />}
+          {activeMainTab === "profitability" && <ProfitabilityDashboardPage />}
+          {activeMainTab === "budget" && <BudgetReportPage />}
+          {activeMainTab === "fleet-ml" && <FleetInsights />}
+          {activeMainTab === "ml-metrics" && <MLMetrics />}
+          {activeMainTab === "simulation" && <SimulationDashboard />}
+        </div>
+      </Suspense>
+      )}
 
       {/* Prediction Detail Modal */}
       {selectedPrediction && (

@@ -1,36 +1,27 @@
 /**
  * Sidebar Navigation Component - SENTINEL Branding
  *
- * Module-gated sidebar with three sections:
- * - Base: always visible (Dashboard, Chat, Control, etc.)
- * - Modules: visible when required module is active (paid add-ons)
- * - Internal: visible to admin users only (Simulation)
- *
- * Add-on items can be reordered with up/down arrows (persisted in localStorage).
+ * Simplified sidebar with 4 items + About section:
+ * - Dashboard, AI Chat, SIMBIOT, Settings
+ * All site-specific views are now in the building detail tab bar.
  */
 
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Menu,
   X,
   ChevronDown,
   ChevronRight,
   ChevronLeft,
-  ChevronUp,
   Info,
-  SlidersHorizontal,
 } from "lucide-react";
 import { useModules } from "../contexts/ModuleHooks";
 import {
   type View,
-  type NavItem,
   BASE_NAV_ITEMS,
-  ADDON_NAV_ITEMS,
-  INTERNAL_NAV_ITEMS,
-  getPersistedAddonOrder,
-  persistAddonOrder,
 } from "../lib/navigation";
-import { getAllowedViews, canAccessView, isRestrictedDemoUser } from "../lib/access-control";
+import type { NavItem } from "../lib/navigation";
+import { getAllowedViews, isRestrictedDemoUser } from "../lib/access-control";
 
 export type { View } from "../lib/navigation";
 
@@ -38,19 +29,17 @@ interface SidebarProps {
   currentView: View;
   onViewChange: (view: View) => void;
   version?: string;
-  onCustomizeDashboard?: () => void;
   userRole?: string;
   userEmail?: string;
 }
 
-export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomizeDashboard, userRole, userEmail }: SidebarProps) {
+export function Sidebar({ currentView, onViewChange, version = "13.0", userRole, userEmail }: SidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true); // Start minimized
-  const [addonOrder, setAddonOrder] = useState<View[]>(() => getPersistedAddonOrder());
   const [isMobile, setIsMobile] = useState(false);
 
-  const { isModuleActive, activeModules } = useModules();
+  const { activeModules } = useModules();
   const aboutBtnRef = useRef<HTMLDivElement>(null);
 
   // Detect mobile screen size
@@ -61,110 +50,33 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Compute visible addon items, filtered by active modules and sorted by user order
-  const visibleAddons = useMemo(() => {
-    const active = ADDON_NAV_ITEMS.filter(
-      (item) => !item.requiredModule || isModuleActive(item.requiredModule)
-    );
-
-    // Sort by persisted order, falling back to defaultOrder
-    if (addonOrder.length > 0) {
-      return [...active].sort((a, b) => {
-        const aIdx = addonOrder.indexOf(a.id);
-        const bIdx = addonOrder.indexOf(b.id);
-        const aOrder = aIdx >= 0 ? aIdx : (a.defaultOrder ?? 999);
-        const bOrder = bIdx >= 0 ? bIdx : (b.defaultOrder ?? 999);
-        return aOrder - bOrder;
-      });
-    }
-
-    return [...active].sort((a, b) => (a.defaultOrder ?? 0) - (b.defaultOrder ?? 0));
-  }, [isModuleActive, addonOrder]);
-
-  // Compute visible internal items, filtered by role
-  // Settings is password-protected and visible to admin + demo users
-  const visibleInternal = useMemo(() => {
+  // Filter base items by role and access control
+  const allowedBaseItems = useMemo(() => {
     const isDemoUser = userEmail && isRestrictedDemoUser(userEmail);
 
-    return INTERNAL_NAV_ITEMS.filter(
-      (item) => {
-        const passesModuleCheck = !item.requiredModule || isModuleActive(item.requiredModule);
-
-        // Settings is visible to admin OR demo users
-        if (item.id === 'settings') {
-          return passesModuleCheck && (userRole === 'admin' || isDemoUser);
-        }
-
-        // Other internal items require matching role
-        return passesModuleCheck && (!item.requiredRole || userRole === item.requiredRole);
+    // Settings requires admin or demo user
+    const roleFiltered = BASE_NAV_ITEMS.filter((item) => {
+      if (item.id === 'settings') {
+        return userRole === 'admin' || isDemoUser;
       }
-    );
-  }, [userRole, userEmail, isModuleActive]);
+      return true;
+    });
 
-  // Apply access control based on user email (company demo restrictions)
-  const allowedBaseItems = useMemo(() => {
-    if (!userEmail) return BASE_NAV_ITEMS;
-    const allItems = [...BASE_NAV_ITEMS, ...visibleAddons, ...visibleInternal];
-    const allowed = getAllowedViews(userEmail, allItems.map(i => i.id));
-    return BASE_NAV_ITEMS.filter(item => allowed.includes(item.id));
-  }, [userEmail, visibleAddons, visibleInternal]);
-
-  const allowedAddonItems = useMemo(() => {
-    if (!userEmail) return visibleAddons;
-    const allItems = [...BASE_NAV_ITEMS, ...visibleAddons, ...visibleInternal];
-    const allowed = getAllowedViews(userEmail, allItems.map(i => i.id));
-    return visibleAddons.filter(item => allowed.includes(item.id));
-  }, [userEmail, visibleAddons, visibleInternal]);
-
-  const allowedInternalItems = useMemo(() => {
-    if (!userEmail) return visibleInternal;
-    const allItems = [...BASE_NAV_ITEMS, ...visibleAddons, ...visibleInternal];
-    const allowed = getAllowedViews(userEmail, allItems.map(i => i.id));
-    return visibleInternal.filter(item => allowed.includes(item.id));
-  }, [userEmail, visibleAddons, visibleInternal]);
+    if (!userEmail) return roleFiltered;
+    const allowed = getAllowedViews(userEmail, roleFiltered.map(i => i.id));
+    return roleFiltered.filter(item => allowed.includes(item.id));
+  }, [userEmail, userRole]);
 
   const handleNavClick = (view: View) => {
     onViewChange(view);
     setIsMobileOpen(false);
   };
 
-  // Reorder addon items
-  const moveAddon = useCallback((itemId: View, direction: "up" | "down") => {
-    setAddonOrder((prev) => {
-      // Build current order from visible addons
-      const currentIds = allowedAddonItems.map((i) => i.id);
-      const ordered = prev.length > 0
-        ? [...currentIds].sort((a, b) => {
-            const aIdx = prev.indexOf(a);
-            const bIdx = prev.indexOf(b);
-            return (aIdx >= 0 ? aIdx : 999) - (bIdx >= 0 ? bIdx : 999);
-          })
-        : currentIds;
-
-      const idx = ordered.indexOf(itemId);
-      if (idx < 0) return prev;
-
-      const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-      if (swapIdx < 0 || swapIdx >= ordered.length) return prev;
-
-      const newOrder = [...ordered];
-      [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
-
-      persistAddonOrder(newOrder);
-      return newOrder;
-    });
-  }, [allowedAddonItems]);
-
-  // Items to hide on mobile by default (less frequently used)
-  const MOBILE_HIDDEN_ITEMS = ['simbiot', 'fleet', 'mlops'];
-  const [showMobileMore, setShowMobileMore] = useState(false);
-
-  const renderNavItem = (item: NavItem, isActive: boolean, showReorder?: { index: number; total: number }) => {
+  const renderNavItem = (item: NavItem, isActive: boolean) => {
     const Icon = item.icon;
-    const isHiddenOnMobile = isMobile && MOBILE_HIDDEN_ITEMS.includes(item.id);
 
     return (
-      <div key={item.id} className={`relative group ${isHiddenOnMobile && !showMobileMore ? 'hidden' : ''}`}>
+      <div key={item.id} className="relative group">
         <button
           onClick={() => handleNavClick(item.id)}
           className={`
@@ -210,9 +122,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
             <span
               className={`font-medium ${isMobile ? 'text-base' : 'text-sm'}`}
               style={{
-                color: isActive
-                  ? "var(--color-sentinel-text-primary)"
-                  : "var(--color-sentinel-text-primary)",
+                color: "var(--color-sentinel-text-primary)",
                 fontWeight: isActive ? '600' : '500',
               }}
             >
@@ -231,43 +141,19 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
             )}
           </div>
         </button>
-
-        {/* Reorder arrows for addon items (expanded sidebar only) */}
-        {showReorder && !isCollapsed && (
-          <div className={`absolute right-2 top-1/2 -translate-y-1/2 hidden lg:flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity`}>
-            {showReorder.index > 0 && (
-              <button
-                onClick={(e) => { e.stopPropagation(); moveAddon(item.id, "up"); }}
-                className="p-0.5 rounded hover:bg-[var(--color-sentinel-bg-panel)] transition-colors"
-                aria-label={`Move ${item.label} up`}
-              >
-                <ChevronUp className="h-3 w-3" style={{ color: "var(--color-sentinel-text-secondary)" }} />
-              </button>
-            )}
-            {showReorder.index < showReorder.total - 1 && (
-              <button
-                onClick={(e) => { e.stopPropagation(); moveAddon(item.id, "down"); }}
-                className="p-0.5 rounded hover:bg-[var(--color-sentinel-bg-panel)] transition-colors"
-                aria-label={`Move ${item.label} down`}
-              >
-                <ChevronDown className="h-3 w-3" style={{ color: "var(--color-sentinel-text-secondary)" }} />
-              </button>
-            )}
-          </div>
-        )}
       </div>
     );
   };
 
   // Module emoji mapping for About section
   const moduleEmojis: Record<string, string> = {
-    control: "\uD83D\uDEE1\uFE0F", // shield
-    assets: "\uD83D\uDD27", // wrench
-    simbiot: "\uD83D\uDD0C", // plug
-    integrations: "\uD83D\uDCE1", // satellite
-    notifications: "\uD83D\uDD14", // bell
-    contracts: "\uD83D\uDCC4", // document
-    hvac: "\u2744", // snowflake
+    control: "\uD83D\uDEE1\uFE0F",
+    assets: "\uD83D\uDD27",
+    simbiot: "\uD83D\uDD0C",
+    integrations: "\uD83D\uDCE1",
+    notifications: "\uD83D\uDD14",
+    contracts: "\uD83D\uDCC4",
+    hvac: "\u2744",
     energy: "\u26A1",
     security: "\uD83D\uDD12",
     lighting: "\uD83D\uDCA1",
@@ -293,7 +179,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
         )}
       </button>
 
-      {/* Mobile overlay - darker for better contrast */}
+      {/* Mobile overlay */}
       {isMobileOpen && (
         <div
           className="md:hidden fixed inset-0 z-30 animate-in fade-in duration-200"
@@ -371,7 +257,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
 
         {/* Navigation items */}
         <nav className="flex-1 py-4 overflow-y-auto" role="navigation">
-          {/* Base section */}
+          {/* Menu label */}
           <div className="px-3 mb-2">
             <span
               className={`text-xs font-medium uppercase tracking-wider md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}
@@ -384,112 +270,6 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", onCustomi
           {allowedBaseItems.map((item) =>
             renderNavItem(item, currentView === item.id)
           )}
-
-          {/* Customize Dashboard Button - base section */}
-          {onCustomizeDashboard && (
-            <div className="mt-2 mx-3">
-              <button
-                type="button"
-                onClick={() => {
-                  onCustomizeDashboard();
-                  setIsMobileOpen(false);
-                }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 hover:brightness-125 hover:scale-[1.02] ${
-                  isCollapsed ? 'md:justify-center lg:justify-center' : 'md:justify-center lg:justify-start'
-                }`}
-                style={{
-                  background: "rgba(245, 158, 11, 0.1)",
-                  border: "1px solid rgba(245, 158, 11, 0.3)",
-                  color: "var(--color-sentinel-amber)",
-                }}
-              >
-                <SlidersHorizontal className="h-5 w-5 flex-shrink-0" />
-                <div className={`flex flex-col items-start md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:flex'}`}>
-                  <span className="font-medium text-sm">Customize</span>
-                  <span
-                    className="text-xs"
-                    style={{ color: "var(--color-grafana-text-disabled)" }}
-                  >
-                    Dashboard Cards
-                  </span>
-                </div>
-              </button>
-            </div>
-          )}
-
-          {/* Addon section - only shown if there are active add-on modules */}
-          {allowedAddonItems.length > 0 && (
-            <>
-              <div
-                className="mx-3 mt-3 mb-2 pt-3"
-                style={{ borderTop: "1px solid var(--color-grafana-border)" }}
-              >
-                <span
-                  className={`text-xs font-medium uppercase tracking-wider md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}
-                  style={{ color: "var(--color-grafana-text-disabled)" }}
-                >
-                  Modules
-                </span>
-              </div>
-
-              {allowedAddonItems.map((item, index) =>
-                renderNavItem(item, currentView === item.id, {
-                  index,
-                  total: allowedAddonItems.length,
-                })
-              )}
-            </>
-          )}
-
-          {/* Internal section - only shown if there are visible internal items */}
-          {allowedInternalItems.length > 0 && (
-            <>
-              <div
-                className="mx-3 mt-3 mb-2 pt-3"
-                style={{ borderTop: "1px solid var(--color-grafana-border)" }}
-              >
-                <span
-                  className={`text-xs font-medium uppercase tracking-wider md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}
-                  style={{ color: "var(--color-grafana-text-disabled)" }}
-                >
-                  Internal
-                </span>
-              </div>
-
-              {allowedInternalItems.map((item) =>
-                renderNavItem(item, currentView === item.id)
-              )}
-            </>
-          )}
-
-          {/* Mobile "More" button */}
-          <div className="md:hidden mt-4 mx-3">
-            <button
-              onClick={() => setShowMobileMore(!showMobileMore)}
-              className="w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-150"
-              style={{
-                background: showMobileMore
-                  ? "rgba(255, 255, 255, 0.08)"
-                  : "rgba(255, 255, 255, 0.05)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                color: "var(--color-sentinel-text-primary)",
-              }}
-            >
-              {showMobileMore ? (
-                <ChevronUp className="h-5 w-5 flex-shrink-0" style={{ color: "var(--color-sentinel-amber)" }} />
-              ) : (
-                <ChevronDown className="h-5 w-5 flex-shrink-0" style={{ color: "var(--color-sentinel-text-secondary)" }} />
-              )}
-              <div className="flex flex-col items-start flex-1">
-                <span className="font-medium text-base">
-                  {showMobileMore ? "Show Less" : "More Options"}
-                </span>
-                <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)", opacity: 0.8 }}>
-                  {showMobileMore ? "Hide secondary items" : "Control audit, integrations, SIMBIOT"}
-                </span>
-              </div>
-            </button>
-          </div>
 
           {/* About Section */}
           <div

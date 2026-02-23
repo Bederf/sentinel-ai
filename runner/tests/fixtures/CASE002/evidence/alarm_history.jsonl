@@ -1,0 +1,8 @@
+{"timestamp": "2025-08-15T03:00:00Z", "alarm_code": "UPS-BAT-WARN-001", "severity": "WARNING", "source": "S002-UPS-B1-001", "message": "Battery string 1 voltage 380V on load test (rated 384V) — marginal"}
+{"timestamp": "2025-09-15T03:00:00Z", "alarm_code": "UPS-BAT-WARN-002", "severity": "WARNING", "source": "S002-UPS-B1-001", "message": "Battery string 1 voltage 376V on load — below 98% threshold"}
+{"timestamp": "2025-10-01T14:30:00Z", "alarm_code": "UPS-CELL-WARN-001", "severity": "WARNING", "source": "S002-UPS-B1-001", "message": "Cell 14 temperature 38 degC (ambient 24 degC) — 14 degC above ambient"}
+{"timestamp": "2025-10-15T03:00:00Z", "alarm_code": "UPS-BAT-WARN-003", "severity": "WARNING", "source": "S002-UPS-B1-001", "message": "Battery runtime reduced to 8.2 minutes (rated 15 min at full load)"}
+{"timestamp": "2025-11-15T03:00:00Z", "alarm_code": "UPS-BAT-CRIT-001", "severity": "CRITICAL", "source": "S002-UPS-B1-001", "message": "Battery string 1 voltage 362V on load — 5.7% below rated. Replace battery string."}
+{"timestamp": "2025-11-15T03:01:00Z", "alarm_code": "UPS-CELL-CRIT-001", "severity": "CRITICAL", "source": "S002-UPS-B1-001", "message": "Cell 14 internal resistance 18 mohm (new: 4 mohm) — cell failure imminent"}
+{"timestamp": "2025-12-02T22:15:00Z", "alarm_code": "UPS-MAINS-FAIL-001", "severity": "CRITICAL", "source": "S002-UPS-B1-001", "message": "Mains power failure — UPS on battery. Estimated runtime 5.8 minutes (generator start timeout 45s)."}
+{"timestamp": "2025-12-02T22:16:00Z", "alarm_code": "UPS-BAT-CRIT-002", "severity": "CRITICAL", "source": "S002-UPS-B1-001", "message": "Battery voltage dropping rapidly: 350V after 60 seconds on load. Cell 14 shorted."}

@@ -372,3 +372,85 @@ class BaselineRepository:
             "elements_with_baselines": elements_with_baselines,
             "last_baseline_date": active_baseline.baseline_date if active_baseline else None,
         }
+
+    # ============================================================================
+    # Bulk Query Operations (used by AssetHealthService)
+    # ============================================================================
+
+    async def get_bulk_baseline_status(self, equipment_ids: List[str]) -> Dict[str, Dict]:
+        """Get baseline status for multiple equipment items in a single query.
+
+        Returns dict keyed by equipment_id with baseline status info.
+        """
+        if not equipment_ids:
+            return {}
+
+        try:
+            result = (
+                get_supabase_client()
+                .table("equipment_baselines")
+                .select("equipment_id, status, baseline_date, source_type, baseline_type")
+                .in_("equipment_id", equipment_ids)
+                .eq("status", "active")
+                .order("baseline_date", desc=True)
+                .execute()
+            )
+
+            status_map: Dict[str, Dict] = {}
+            for row in result.data:
+                eq_id = row["equipment_id"]
+                if eq_id not in status_map:
+                    status_map[eq_id] = {
+                        "has_active_baseline": True,
+                        "last_baseline_at": row.get("baseline_date"),
+                        "total_baselines": 1,
+                        "baseline_source": row.get("source_type", "unknown"),
+                    }
+                else:
+                    status_map[eq_id]["total_baselines"] += 1
+
+            return status_map
+
+        except Exception:
+            return {}
+
+    async def get_bulk_max_deviation_24h(self, equipment_ids: List[str]) -> Dict[str, Dict]:
+        """Get maximum baseline deviation in the last 24 hours for multiple equipment.
+
+        Returns dict keyed by equipment_id with deviation info.
+        """
+        if not equipment_ids:
+            return {}
+
+        try:
+            since = (datetime.now() - timedelta(hours=24)).isoformat()
+
+            result = (
+                get_supabase_client()
+                .table("baseline_comparisons")
+                .select("equipment_id, deviation_percent")
+                .in_("equipment_id", equipment_ids)
+                .gte("comparison_date", since)
+                .execute()
+            )
+
+            deviation_map: Dict[str, Dict] = {}
+            for row in result.data:
+                eq_id = row["equipment_id"]
+                dev_pct = abs(row.get("deviation_percent") or 0)
+                if eq_id not in deviation_map or dev_pct > deviation_map[eq_id]["max_deviation_percent"]:
+                    if dev_pct > 20:
+                        status = "critical"
+                    elif dev_pct > 10:
+                        status = "warning"
+                    else:
+                        status = "normal"
+                    deviation_map[eq_id] = {
+                        "max_deviation_percent": round(dev_pct, 2),
+                        "deviation_status": status,
+                    }
+
+            return deviation_map
+
+        except Exception:
+            return {}

@@ -1795,6 +1795,44 @@
           "energy_savings_percent": 3.5
         }
       }
+    },
+    {
+      "id": "mlf-mod-20260223154224-0086",
+      "equipment_id": "S002-CHILLER-B1-001",
+      "work_order_id": "4f784b96-186d-4e6e-860d-b83593425716",
+      "feedback_type": "module_outcome",
+      "repair_successful": true,
+      "effectiveness_score": 100.0,
+      "prediction_id": "4f784b96-186d-4e6e-860d-b83593425716",
+      "predicted_failure_type": null,
+      "actual_failure_type": null,
+      "prediction_was_correct": true,
+      "time_to_failure_predicted": null,
+      "time_to_failure_actual": null,
+      "recorded_at": "2026-02-23T15:42:24.974396",
+      "metadata": {
+        "site_id": "S002",
+        "module_type": "hvac",
+        "action_type": "ai_optimization",
+        "outcome_status": "executed",
+        "predicted_impact": {
+          "description": "Set chiller to 100% capacity for peak cooling demand",
+          "energy_savings_percent": 0
+        },
+        "actual_impact": {
+          "cov_verified": false,
+          "device_write": {
+            "success": true,
+            "message": "Demo mode - device write simulated"
+          },
+          "target_value": 100
+        },
+        "confidence_score": 0.9,
+        "source_path": "approval_service",
+        "source": "approval_service.execute_approval",
+        "approved_by": "dashboard",
+        "correlation_id": "366d4159-3fa4-4799-a85f-b26dbadef67e"
+      }
     }
   ],
   "training_data": [
@@ -2928,6 +2966,20 @@
       "days_to_failure": null,
       "repair_effectiveness": 100.0,
       "source": "module_outcome"
+    },
+    {
+      "equipment_id": "S002-CHILLER-B1-001",
+      "equipment_type": "hvac",
+      "features": {
+        "effectiveness_score": 100.0,
+        "success_flag": 1.0,
+        "confidence_score": 0.9
+      },
+      "label": "successful",
+      "failure_type": null,
+      "days_to_failure": null,
+      "repair_effectiveness": 100.0,
+      "source": "module_outcome"
     }
   ],
   "prediction_accuracy": {},
@@ -2942,8 +2994,8 @@
         "hvac": 100.0,
         "control": 100.0
       },
-      "records": 10,
-      "refreshed_at": "2026-02-22T19:33:58.081889"
+      "records": 11,
+      "refreshed_at": "2026-02-23T15:44:03.715443"
     },
     "site-002": {
       "site_id": "site-002",
@@ -2954,9 +3006,9 @@
         "hvac": 50.0
       },
       "records": 16,
-      "refreshed_at": "2026-02-22T19:33:58.081820"
+      "refreshed_at": "2026-02-23T15:44:03.715383"
     }
   },
-  "record_counter": 85,
-  "updated_at": "2026-02-22T19:33:58.083794"
+  "record_counter": 86,
+  "updated_at": "2026-02-23T15:44:03.808824"
 }

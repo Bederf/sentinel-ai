@@ -1,0 +1,57 @@
+{
+  "case_id": "CASE006",
+  "created_at": "2026-02-23T16:00:00Z",
+  "description": "Multi-system cascading failure at Site S003 — chiller plant, AHU, fire suppression, and electrical switchgear faults over 72 hours. Large evidence pack designed to exceed single-pass analysis budget.",
+  "evidence_files": [
+    {
+      "filename": "chiller_alarms.jsonl",
+      "type": "log",
+      "description": "480 chiller plant alarms over 72 hours across 3 chillers"
+    },
+    {
+      "filename": "ahu_alarms.jsonl",
+      "type": "log",
+      "description": "320 AHU alarms across 8 air handling units"
+    },
+    {
+      "filename": "electrical_alarms.jsonl",
+      "type": "log",
+      "description": "150 electrical fault alarms including switchgear and UPS"
+    },
+    {
+      "filename": "fire_panel_events.jsonl",
+      "type": "log",
+      "description": "85 fire panel events including suppression triggers"
+    },
+    {
+      "filename": "chiller_sensors.csv",
+      "type": "structured",
+      "description": "5-minute interval sensor readings for 3 chillers over 72 hours (2592 rows)"
+    },
+    {
+      "filename": "ahu_sensors.csv",
+      "type": "structured",
+      "description": "5-minute interval readings for 8 AHUs over 72 hours (6912 rows)"
+    },
+    {
+      "filename": "power_meters.csv",
+      "type": "structured",
+      "description": "1-minute interval power readings from 6 meters over 72 hours (25920 rows)"
+    },
+    {
+      "filename": "comfort_complaints.json",
+      "type": "structured",
+      "description": "47 occupant comfort complaints with zone and timestamp"
+    },
+    {
+      "filename": "maintenance_history.json",
+      "type": "structured",
+      "description": "18 months of maintenance records for all affected systems"
+    },
+    {
+      "filename": "contractor_report.md",
+      "type": "document",
+      "description": "15-page contractor investigation report with root cause analysis"
+    }
+  ]
+}

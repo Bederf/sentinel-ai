@@ -3,8 +3,6 @@ import { Briefcase, Clock, CheckCircle, AlertCircle, Package } from 'lucide-reac
 import type { ReactElement } from 'react'
 import { authorizedFetch } from '../lib/api/client'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || ''
-
 interface Order {
   id: string
   items: Array<{ part_name: string; quantity: number }>
@@ -40,7 +38,21 @@ export default function TechnicianPortal(): ReactElement {
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
-      const response = await authorizedFetch(`${API_BASE_URL}/api/technician/dashboard`)
+      const token = localStorage.getItem('sentinel_token')
+      if (!token) {
+        setError('Session expired. Please sign in again.')
+        return
+      }
+
+      const response = await authorizedFetch('/api/technician/dashboard')
+      if (response.status === 401) {
+        setError('Session expired. Please sign in again.')
+        return
+      }
+      if (response.status === 403) {
+        setError('Maintenance module is not active for this site.')
+        return
+      }
       if (!response.ok) {
         throw new Error('Failed to load dashboard')
       }

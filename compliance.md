@@ -11,6 +11,7 @@ This programme unifies:
 - ISO/IEC 42001 (AI Management System)
 - NIST AI RMF 1.0
 - EU AI Act readiness
+- POPIA (South Africa data protection compliance)
 - TOGAF 10 Foundation enablement (architecture governance structure)
 - FSR security/compliance alignment (as linked control baseline)
 
@@ -38,6 +39,15 @@ Completed baseline artifacts:
 - Prohibited practices checklist: `docs/compliance/eu-ai-act-prohibited-practices-checklist.md`
 - Prometheus /metrics endpoint: `backend/app/api/metrics.py`
 - Monitoring & metrics guide: `docs/ai-governance/08-monitoring-and-metrics.md`
+- POPIA privacy policy baseline: `docs/09-security/data-privacy-policy.md`
+- POPIA consent controls: `docs/09-security/consent-and-privacy.md`
+- POPIA Section 72 register: `docs/09-security/popia-cross-border-register.md`
+- POPIA compliance register: `docs/compliance/popia-compliance-register.md`
+- POPIA data subject rights workflow: `docs/compliance/popia-data-subject-rights-workflow.md`
+- POPIA retention enforcement procedure: `docs/compliance/popia-retention-enforcement.md`
+- Asset lifecycle policy: `docs/09-security/asset-lifecycle-policy.md`
+- Vulnerability disclosure policy: `docs/09-security/vulnerability-disclosure-policy.md`
+- DR exercise report template (tabletop + restore): `docs/09-security/dr-exercise-report-2026Q1.md`
 
 Phase 2 artifacts:
 
@@ -121,6 +131,23 @@ Phase 3 artifacts:
 - [ ] Publish final gap closure report and residual risk sign-off  
   Owner: `Compliance Lead` | Target: `2026-07-15`
 
+### POPIA (South Africa)
+
+- [x] Publish POPIA control baseline and pass/fail register
+  Owner: `Compliance Lead` | Target: `2026-02-23` | Done: `2026-02-23` | Evidence: `docs/compliance/popia-compliance-register.md`
+- [x] Activate consent API routes in production router registration
+  Owner: `Backend Lead` | Target: `2026-02-23` | Done: `2026-02-23` | Evidence: `backend/app/api/registrars/operations.py`
+- [x] Enforce `pi_processing` consent at WhatsApp/Telegram ingress paths
+  Owner: `Backend Lead` | Target: `2026-03-15` | Done: `2026-02-23` | Evidence: `backend/app/api/whatsapp_webhooks.py`, `backend/app/api/sentry_webhooks.py`
+- [x] Enforce `cross_border_transfer` consent in cloud model routing with local fallback
+  Owner: `AI Engineering Lead` | Target: `2026-03-22` | Done: `2026-02-23` | Evidence: `backend/app/api/chat.py`, `backend/app/api/hybrid_chat.py`, `backend/app/services/hybrid_ai_service.py`
+- [x] Implement data-subject rights request workflow (access/correction/deletion) with SLA tracking
+  Owner: `Compliance Lead` | Target: `2026-04-05` | Done: `2026-02-23` | Evidence: `backend/app/api/privacy.py`, `backend/app/services/privacy_request_service.py`
+- [x] Implement automated POPIA retention/deletion enforcement and audit log evidence
+  Owner: `Platform/SRE Lead` | Target: `2026-04-19` | Done: `2026-02-23` | Evidence: `backend/app/services/popia_retention_service.py`, `backend/app/services/background_scheduler.py`, `backend/app/startup/events.py`
+- [ ] Publish monthly POPIA control-effectiveness evidence pack
+  Owner: `Compliance Lead` | Target: `2026-03-31`
+
 ### TOGAF 10 Enablement
 
 - [ ] Complete TOGAF Foundation study plan  
@@ -150,6 +177,19 @@ Phase 3 artifacts:
 - [ ] Add alert rules mapped to runbooks  
   Owner: `Operations Lead` | Target: `2026-05-31`
 
+### FSR v3.0 Security Closeout
+
+- [ ] Execute Q1 DR tabletop + technical restore test and finalize signed evidence report  
+  Owner: `Platform/SRE Lead` | Target: `2026-03-31` | Evidence: `docs/09-security/dr-exercise-report-2026Q1.md`
+- [x] Publish formal asset lifecycle policy for FSR Domain 4.2  
+  Owner: `Information Security Officer` | Target: `2026-02-23` | Done: `2026-02-23` | Evidence: `docs/09-security/asset-lifecycle-policy.md`
+- [x] Publish coordinated vulnerability disclosure policy for FSR Domain 4.10  
+  Owner: `Information Security Officer` | Target: `2026-02-23` | Done: `2026-02-23` | Evidence: `docs/09-security/vulnerability-disclosure-policy.md`
+- [ ] Commission independent external security audit  
+  Owner: `Compliance Lead` | Target: `2026-04-15`
+- [ ] Commission penetration test (external + internal scope)  
+  Owner: `Compliance Lead` | Target: `2026-04-15`
+
 ## 4) Delivery Roadmap
 
 ### Phase 1: Foundations (2026-02-23 to 2026-03-31)
@@ -164,6 +204,7 @@ Must deliver:
 
 - Final AIMS scope and AI management policy
 - Ownership/approval matrix for unified controls
+- POPIA pass/fail register with owned remediation actions
 - TOGAF study completion and exam booking
 
 ### Phase 2: Control Implementation (2026-04-01 to 2026-05-31)
@@ -178,6 +219,7 @@ Must deliver:
 - Prometheus metrics endpoint and scrape wiring
 - AI literacy register, prohibited-practices checklist, transparency rollout
 - Model cards, data sheets, retraining policy baseline
+- POPIA consent enforcement gates, DSR workflow, and retention automation baseline
 
 ### Phase 3: Assurance and Closure (2026-06-01 to 2026-07-31)
 
@@ -204,6 +246,8 @@ Must deliver:
 - No placeholder safety path in production approval logic
 - Cross-framework control matrix kept current in `docs/ai-governance/`
 - Measurable control-effectiveness telemetry active
+- POPIA runtime consent gating active for cloud and messaging channels
+- POPIA data-subject rights and retention controls produce auditable evidence
 - Internal audit completed with no unresolved critical findings
 
 ## 7) Phase 2 Execution Board (2026-04-01 to 2026-05-31)

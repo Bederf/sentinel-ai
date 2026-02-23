@@ -35,6 +35,10 @@ export interface SimulationState {
     equipment: string
   }>
 
+  // Speed control
+  speedMultiplier: number         // Current speed factor (1x, 10x, etc.)
+  secondsPerHour: number          // Real seconds per simulated hour
+
   // Status flags
   lastUpdated: number             // Timestamp (ms) of last successful poll
   isLoading: boolean
@@ -60,6 +64,8 @@ const initialState: SimulationState = {
   currentHourPowerKw: 0,
   scenario: null,
   recentEvents: [],
+  speedMultiplier: 10,
+  secondsPerHour: 6,
   lastUpdated: 0,
   isLoading: false,
   error: null,
@@ -114,6 +120,10 @@ export function SimulationProvider({ children, siteId = 'site-002' }: Simulation
         // Energy consumption data
         totalEnergyKwh: data.total_energy_kwh ?? prev.totalEnergyKwh,
         currentHourPowerKw: data.current_hour_power_kw ?? prev.currentHourPowerKw,
+
+        // Speed control
+        speedMultiplier: data.speed_multiplier ?? prev.speedMultiplier,
+        secondsPerHour: data.seconds_per_hour ?? prev.secondsPerHour,
 
         lastUpdated: Date.now(),
         isLoading: false,

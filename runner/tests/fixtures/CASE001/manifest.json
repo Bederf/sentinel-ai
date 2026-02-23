@@ -1,0 +1,22 @@
+{
+  "case_id": "CASE001",
+  "created_at": "2026-02-23T14:00:00Z",
+  "description": "Chiller-001 condenser fouling — progressive overtemperature with COP degradation over 3 months. Site S002 Sandton City Office Tower.",
+  "evidence_files": [
+    {
+      "filename": "alarm_history.jsonl",
+      "type": "log",
+      "description": "BMS alarm log showing condenser temperature escalation"
+    },
+    {
+      "filename": "sensor_readings.csv",
+      "type": "structured",
+      "description": "Weekly condenser temp, COP, and power readings over 12 weeks"
+    },
+    {
+      "filename": "maintenance_log.json",
+      "type": "structured",
+      "description": "3 work orders: inspection, chemical wash attempt, tube cleaning"
+    }
+  ]
+}

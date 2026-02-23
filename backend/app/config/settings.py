@@ -55,6 +55,18 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     claude_model: str = "claude-sonnet-4-20250514"
     claude_max_tokens: int = 4096
+    ai_cloud_provider: str = "anthropic"  # anthropic|zai
+    zai_api_key: str = ""
+    zai_model: str = "glm-4.5-flash"
+    zai_base_url: str = "https://api.z.ai/api/paas/v4"
+    local_ai_only: bool = False  # Force local-only AI mode (no Anthropic/Claude calls)
+    popia_require_cross_border_consent: bool = True  # Block cloud LLM without explicit cross-border consent
+    popia_dsr_sla_days: int = 30  # POPIA response SLA for data subject requests
+    popia_retention_enabled: bool = True  # Enable scheduled retention enforcement
+    popia_retention_consent_days: int = 1825  # 5 years
+    popia_retention_request_days: int = 1825  # 5 years
+    popia_retention_audit_days: int = 1825  # 5 years
+    popia_retention_job_interval_seconds: int = 86400  # Daily
 
     # ElevenLabs TTS (Voice Chat)
     elevenlabs_api_key: str = ""
@@ -228,6 +240,14 @@ class Settings(BaseSettings):
     @classmethod
     def _validate_list_fields(cls, value):
         return _parse_csv_list(value)
+
+    @field_validator("ai_cloud_provider", mode="before")
+    @classmethod
+    def _validate_ai_cloud_provider(cls, value):
+        provider = (value or "anthropic").strip().lower()
+        if provider not in {"anthropic", "zai"}:
+            return "anthropic"
+        return provider
 
 
 settings = Settings()

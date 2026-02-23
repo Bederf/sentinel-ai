@@ -166,6 +166,7 @@ async def test_budget_timeout(evidence_case, run_env):
         mock_settings.max_tokens_per_call = 1200
         mock_settings.temperature = 0.1
         mock_settings.model_name = "phi3:mini"
+        mock_settings.inference_provider = "ollama"
 
         analyzer = RecursiveAnalyzer(
             inference_client=mock_client,
@@ -199,6 +200,7 @@ async def test_budget_depth_limit(evidence_case, run_env):
         mock_settings.max_tokens_per_call = 1200
         mock_settings.temperature = 0.1
         mock_settings.model_name = "phi3:mini"
+        mock_settings.inference_provider = "ollama"
 
         analyzer = RecursiveAnalyzer(
             inference_client=mock_client,

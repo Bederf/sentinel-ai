@@ -3,11 +3,12 @@
 import logging
 from typing import AsyncGenerator
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.services.hybrid_ai_service import hybrid_ai_service
+from app.middleware.auth_middleware import get_current_auth
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,11 @@ class ChatMetadata(BaseModel):
     routing_reason: str
 
 
-async def generate_hybrid_sse_stream(user_message: str, use_tools: bool = False) -> AsyncGenerator[str, None]:
+async def generate_hybrid_sse_stream(
+    user_message: str,
+    use_tools: bool = False,
+    data_subject_id: str | None = None,
+) -> AsyncGenerator[str, None]:
     """
     Generate SSE-formatted stream from Hybrid AI (Ollama or Claude).
 
@@ -45,7 +50,11 @@ async def generate_hybrid_sse_stream(user_message: str, use_tools: bool = False)
     """
     try:
         # Route and stream from appropriate model
-        async for chunk in hybrid_ai_service.stream_response(user_message, use_tools):
+        async for chunk in hybrid_ai_service.stream_response(
+            user_message,
+            use_tools,
+            data_subject_id=data_subject_id,
+        ):
             # Format as SSE data
             yield f"data: {chunk}\n\n"
 
@@ -55,7 +64,7 @@ async def generate_hybrid_sse_stream(user_message: str, use_tools: bool = False)
 
 
 @router.post("/api/hybrid-chat")
-async def hybrid_chat(request: HybridChatRequest):
+async def hybrid_chat(request: HybridChatRequest, http_request: Request):
     """
     Hybrid chat endpoint that routes between Ollama (local) and Claude (cloud).
 
@@ -70,7 +79,13 @@ async def hybrid_chat(request: HybridChatRequest):
     """
 
     async def stream():
-        async for chunk in generate_hybrid_sse_stream(request.message, request.use_tools):
+        auth_ctx = get_current_auth(http_request)
+        data_subject_id = getattr(auth_ctx, "email", None) or getattr(auth_ctx, "user_id", None)
+        async for chunk in generate_hybrid_sse_stream(
+            request.message,
+            request.use_tools,
+            data_subject_id=data_subject_id,
+        ):
             yield chunk
 
     return StreamingResponse(

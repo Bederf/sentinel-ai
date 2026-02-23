@@ -12,11 +12,11 @@ Endpoints:
 - POST /api/ml/train/{model_type}/{equipment_type} - Train new model
 """
 
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
-from typing import List, Optional
-from pydantic import BaseModel
-from datetime import datetime
 from dataclasses import asdict
+from datetime import datetime
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from pydantic import BaseModel
 
 from app.utils.ai_provenance import get_ml_provenance
 
@@ -34,28 +34,28 @@ class PredictionResponse(BaseModel):
     predictions: dict  # {"24h": float, "48h": float, "72h": float}
     confidence: float
     timestamp: str
-    model_info: Optional[dict] = None
-    explanation: Optional[dict] = None  # Natural language explanation
-    maintenance_recommendations: Optional[List[dict]] = None  # Actionable recommendations
-    error: Optional[str] = None
+    model_info: dict | None = None
+    explanation: dict | None = None  # Natural language explanation
+    maintenance_recommendations: list[dict] | None = None  # Actionable recommendations
+    error: str | None = None
 
 
 class AnomalyResponse(BaseModel):
     """Anomaly detection response."""
 
     equipment_id: str
-    equipment_type: Optional[str] = None
-    is_anomaly: Optional[bool] = None
-    anomaly_score: Optional[float] = None
-    threshold: Optional[float] = None
-    score_pct: Optional[float] = None
-    severity: Optional[str] = None
-    timestamp: Optional[str] = None
-    model_info: Optional[dict] = None
-    explanation: Optional[dict] = None  # Natural language explanation
-    recommended_actions: Optional[List[dict]] = None  # Immediate actions
-    related_faults: Optional[List[str]] = None  # Matching fault patterns
-    error: Optional[str] = None
+    equipment_type: str | None = None
+    is_anomaly: bool | None = None
+    anomaly_score: float | None = None
+    threshold: float | None = None
+    score_pct: float | None = None
+    severity: str | None = None
+    timestamp: str | None = None
+    model_info: dict | None = None
+    explanation: dict | None = None  # Natural language explanation
+    recommended_actions: list[dict] | None = None  # Immediate actions
+    related_faults: list[str] | None = None  # Matching fault patterns
+    error: str | None = None
 
 
 class TrainRequest(BaseModel):
@@ -70,8 +70,8 @@ class TrainResponse(BaseModel):
 
     status: str
     message: str
-    model_id: Optional[str] = None
-    metrics: Optional[dict] = None
+    model_id: str | None = None
+    metrics: dict | None = None
 
 
 class ModelInfo(BaseModel):
@@ -99,9 +99,9 @@ async def get_lstm_prediction(
 
     Uses LSTM model trained for the specific equipment type.
     """
-    from app.services.ml_inference import get_lstm_service
     from app.services.explanation_service import ExplanationService
     from app.services.maintenance_recommender import MaintenanceRecommender
+    from app.services.ml_inference import get_lstm_service
 
     service = get_lstm_service()
     result = service.predict(equipment_id, equipment_type)
@@ -134,7 +134,7 @@ async def get_lstm_prediction(
 
         except Exception as e:
             # Don't fail the prediction if explanation fails
-            result["explanation"] = {"error": f"Failed to generate explanation: {str(e)}"}
+            result["explanation"] = {"error": f"Failed to generate explanation: {e!s}"}
             result["maintenance_recommendations"] = []
 
     result["ai_provenance"] = get_ml_provenance(f"lstm-{equipment_type}-v1").model_dump()
@@ -153,8 +153,8 @@ async def get_prediction_trend(
 
     Returns data formatted for chart display.
     """
-    from app.services.ml_inference import get_lstm_service
     from app.services.explanation_service import ExplanationService
+    from app.services.ml_inference import get_lstm_service
 
     service = get_lstm_service()
     result = service.get_trend(equipment_id, equipment_type, hours_history)
@@ -174,13 +174,13 @@ async def get_prediction_trend(
             )
             result["explanation"] = asdict(explanation) if hasattr(explanation, "__dict__") else explanation
         except Exception as e:
-            result["explanation"] = {"error": f"Failed to generate trend explanation: {str(e)}"}
+            result["explanation"] = {"error": f"Failed to generate trend explanation: {e!s}"}
 
     return result
 
 
 @router.post("/predictions/batch")
-async def get_batch_predictions(equipment_list: List[dict]):
+async def get_batch_predictions(equipment_list: list[dict]):
     """
     Get predictions for multiple equipment.
 
@@ -213,8 +213,8 @@ async def check_equipment_anomaly(
     Uses autoencoder trained on normal operation data.
     High reconstruction error indicates anomaly.
     """
-    from app.services.ml_inference import get_anomaly_service
     from app.services.explanation_service import ExplanationService
+    from app.services.ml_inference import get_anomaly_service
     from app.services.rag_service import RAGService
 
     service = get_anomaly_service()
@@ -256,7 +256,7 @@ async def check_equipment_anomaly(
                 result["recommended_actions"] = recommended_actions
 
         except Exception as e:
-            result["explanation"] = {"error": f"Failed to generate anomaly explanation: {str(e)}"}
+            result["explanation"] = {"error": f"Failed to generate anomaly explanation: {e!s}"}
             result["related_faults"] = []
             result["recommended_actions"] = []
 
@@ -312,11 +312,11 @@ async def get_anomaly_history(
 # === Model Management Endpoints ===
 
 
-@router.get("/models", response_model=List[ModelInfo])
+@router.get("/models", response_model=list[ModelInfo])
 async def list_models(
-    model_type: Optional[str] = Query(None, description="Filter by model type (lstm, autoencoder)"),
-    equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
-    status: Optional[str] = Query(None, description="Filter by status (active, inactive)"),
+    model_type: str | None = Query(None, description="Filter by model type (lstm, autoencoder)"),
+    equipment_type: str | None = Query(None, description="Filter by equipment type"),
+    status: str | None = Query(None, description="Filter by status (active, inactive)"),
 ):
     """
     List all registered ML models.
@@ -496,7 +496,7 @@ class MaintenanceRecommendationRequest(BaseModel):
     equipment_id: str
     equipment_type: str
     include_historical: bool = True
-    urgency_filter: Optional[str] = None  # 'critical', 'high', 'medium', 'low'
+    urgency_filter: str | None = None  # 'critical', 'high', 'medium', 'low'
 
 
 class MaintenanceRecommendationResponse(BaseModel):
@@ -504,7 +504,7 @@ class MaintenanceRecommendationResponse(BaseModel):
 
     equipment_id: str
     equipment_type: str
-    recommendations: List[dict]
+    recommendations: list[dict]
     total_estimated_time: float
     total_estimated_cost: float
     priority_breakdown: dict
@@ -546,7 +546,7 @@ async def generate_maintenance_recommendations(request: MaintenanceRecommendatio
         ).model_dump()
         return response_dict
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {e!s}")
 
 
 @router.get("/maintenance/priorities/{equipment_type}")
@@ -606,9 +606,9 @@ async def submit_maintenance_feedback(
     recommendation_id: str,
     action_taken: str,
     outcome: str,
-    actual_time_hours: Optional[float] = None,
-    actual_cost: Optional[float] = None,
-    notes: Optional[str] = None,
+    actual_time_hours: float | None = None,
+    actual_cost: float | None = None,
+    notes: str | None = None,
 ):
     """
     Submit feedback on maintenance recommendations.

@@ -19,6 +19,7 @@ from app.database.repositories.work_order_repository import get_work_order_repos
 from app.services.ml_template_service import MLTemplateService
 from app.models.service_record import ServiceStatus
 from app.services.health_simulation_service import health_simulation_service
+from app.services.popia_consent_guard import evaluate_ingress_processing_consent
 
 logger = logging.getLogger(__name__)
 
@@ -1074,6 +1075,14 @@ async def handle_telegram_comfort_complaint(
     Returns the response text, or None if the message isn't a comfort complaint
     and there's no active complaint session.
     """
+    consent_decision = evaluate_ingress_processing_consent(
+        data_subject_id=telegram_user_id,
+        platform="telegram",
+        message_text=message_text,
+    )
+    if not consent_decision.allow_processing:
+        return consent_decision.response_message
+
     try:
         from langchain_core.messages import HumanMessage
 
@@ -1127,6 +1136,14 @@ async def handle_telegram_recommendation_approval(telegram_user_id: str, message
     Returns:
         Response string if handled, None if not a recommendation approval
     """
+    consent_decision = evaluate_ingress_processing_consent(
+        data_subject_id=telegram_user_id,
+        platform="telegram",
+        message_text=message_text,
+    )
+    if not consent_decision.allow_processing:
+        return consent_decision.response_message
+
     try:
         text_upper = message_text.strip().upper()
 

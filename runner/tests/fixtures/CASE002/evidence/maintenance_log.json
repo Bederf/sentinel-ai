@@ -1,0 +1,52 @@
+{
+  "equipment_code": "S002-UPS-B1-001",
+  "site_id": "site-002",
+  "work_orders": [
+    {
+      "wo_id": "WO-S002-2025-0075",
+      "created_at": "2025-08-16T08:00:00Z",
+      "closed_at": "2025-08-16T12:00:00Z",
+      "priority": "medium",
+      "category": "preventive",
+      "title": "UPS battery string load test — quarterly",
+      "description": "Standard quarterly battery load test. String 1 showing marginal voltage. Individual cell impedance test recommended.",
+      "technician": "David Chen",
+      "resolution": "Load test completed. String voltage 380V (marginal). Recommended impedance test at next PM window.",
+      "parts_used": [],
+      "cost_rands": 0,
+      "labour_hours": 2.0
+    },
+    {
+      "wo_id": "WO-S002-2025-0095",
+      "created_at": "2025-10-02T08:00:00Z",
+      "closed_at": "2025-10-02T15:00:00Z",
+      "priority": "high",
+      "category": "corrective",
+      "title": "UPS cell 14 high temperature investigation",
+      "description": "Cell 14 running 14 degC above ambient. Impedance test shows 12.5 mohm (new spec 4 mohm). Cell degraded.",
+      "technician": "David Chen",
+      "resolution": "Cell 14 confirmed degraded. Ordered replacement string. Interim: increased monitoring to weekly. Battery room ventilation verified OK.",
+      "parts_used": [],
+      "cost_rands": 0,
+      "labour_hours": 4.0
+    },
+    {
+      "wo_id": "WO-S002-2025-0120",
+      "created_at": "2025-12-03T06:00:00Z",
+      "closed_at": "2025-12-05T18:00:00Z",
+      "priority": "critical",
+      "category": "corrective",
+      "title": "Emergency UPS battery string replacement",
+      "description": "Mains failure on 2 Dec exposed battery weakness. Cell 14 shorted under load. Emergency string replacement.",
+      "technician": "External — PowerGuard SA",
+      "resolution": "Full 32-cell VRLA string replaced. Post-install: 384V on load, 15.2 min runtime, all cells < 5 mohm. Old string disposed per SANS 10229.",
+      "parts_used": [
+        {"part": "VRLA 12V 100Ah battery", "qty": 32, "cost_rands": 96000},
+        {"part": "Battery interconnect cables", "qty": 1, "cost_rands": 2400},
+        {"part": "Old battery disposal", "qty": 1, "cost_rands": 1800}
+      ],
+      "cost_rands": 100200,
+      "labour_hours": 16.0
+    }
+  ]
+}

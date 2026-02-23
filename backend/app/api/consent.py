@@ -5,11 +5,6 @@ Supports WhatsApp/Telegram/web consent recording, checking, withdrawal,
 history, statistics, and audit export.
 
 Phase 63-06: FSR privacy controls — consent API endpoints.
-
-NOTE: This router is NOT registered in main.py yet.
-To integrate, add to main.py:
-    from app.api import consent
-    app.include_router(consent.router, prefix="/api", tags=["consent"])
 """
 
 import logging

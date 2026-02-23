@@ -19,6 +19,32 @@ Sentry is a Telegram AI bot located at `$SENTRY_HOME` that integrates with SENTI
 | **Alert Mode** | SENTINEL → Sentry → User | BMS sends alerts to FM team |
 | **Work Order Mode** | Bidirectional | Alert → Dispatch → Data Collection |
 
+## POPIA Runtime Controls
+
+Sentry/Telegram ingress is now consent-gated before personal information is processed.
+
+### Consent gate behavior
+
+Applied at:
+
+- `POST /api/sentry/work-order/response`
+- `POST /api/sentry/ocr/process-service-sheet`
+- Telegram complaint/approval flows in `work_order_notifier.py`
+
+Runtime outcomes:
+
+- No active `pi_processing` consent: request is blocked and consent prompt is returned.
+- Consent withdrawn (`STOP` patterns): processing is halted immediately.
+- Consent granted (`YES` patterns): consent is recorded and user is asked to resend the request.
+
+### Cloud routing rule (cross-border)
+
+For Telegram-driven AI chat and hybrid routing:
+
+- If `cross_border_transfer` consent is absent, cloud LLM routing is blocked.
+- Local Ollama fallback is used.
+- Tool/control flows are disabled in forced-local mode.
+
 ## Architecture
 
 ```
@@ -49,7 +75,7 @@ Sentry is a Telegram AI bot located at `$SENTRY_HOME` that integrates with SENTI
               │                               │
               ▼                               ▼
 ┌──────────────────────────┐    ┌──────────────────────────┐
-│   SENTINEL API           │    │   Ollama / Claude        │
+│   SENTINEL API           │    │   Ollama / Cloud LLM     │
 │   localhost:9095         │    │   (Hybrid AI routing)    │
 └──────────────────────────┘    └──────────────────────────┘
 ```
@@ -64,7 +90,7 @@ Located in `$SENTRY_HOME/tools/`:
 | `bms_control.py` | Device control | `/api/devices/*` |
 | `bms_monitor.py` | Health monitoring alerts | `/api/alerts`, `/api/equipment` |
 | `sentry_ai_bridge.py` | AI routing with BMS detection | Routes to appropriate tool |
-| `tiered_ai_router.py` | Claude/Ollama fallback | N/A (AI routing) |
+| `tiered_ai_router.py` | Cloud/Ollama fallback | N/A (AI routing) |
 
 ## Desk Comfort Diagnosis
 
@@ -271,9 +297,9 @@ When a query isn't a desk complaint, `tiered_ai_router.py` routes:
 | Tier | Model | Use Cases | Cost |
 |------|-------|-----------|------|
 | 1 | Ollama (llama3.2:1b) | Simple lookups, status | FREE |
-| 2 | Claude | Complex reasoning, control | PAID |
+| 2 | Configured cloud provider (Anthropic or Z.ai) | Complex reasoning, control | PAID |
 
-Safety-critical operations always route to Claude.
+Safety-critical operations use cloud tool path only. If POPIA cross-border consent is missing, the request remains local/advisory and tool/control actions are not executed.
 
 ## Audit Trail
 

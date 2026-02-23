@@ -461,18 +461,37 @@ async def get_notification_preferences(
     Get notification preferences for a technician.
 
     Args:
-        technician_id: UUID of the technician
+        technician_id: UUID or email of the technician
 
     Returns:
-        Notification preferences or 404 if not configured
+        Notification preferences or sensible defaults if not yet configured
     """
+    now = datetime.utcnow().isoformat()
+    _defaults = NotificationPreferencesResponse(
+        id="",
+        technician_id=technician_id,
+        preferred_channel="telegram",
+        enabled_channels=["telegram"],
+        alert_level_min="warning",
+        quiet_hours_enabled=True,
+        quiet_hours_start="22:00:00",
+        quiet_hours_end="06:00:00",
+        emergency_override_enabled=True,
+        batch_low_priority=False,
+        batch_interval_minutes=60,
+        created_at=now,
+        updated_at=now,
+    )
+
     try:
         repo = NotificationRepository()
         tech_uuid = await _resolve_technician_id(technician_id)
 
         preferences = await repo.get_notification_preferences(tech_uuid)
         if not preferences:
-            raise HTTPException(status_code=404, detail="Preferences not configured")
+            # No preferences row yet — return defaults so settings page loads
+            _defaults.technician_id = str(tech_uuid)
+            return _defaults
 
         return NotificationPreferencesResponse(
             id=str(preferences.id),
@@ -490,10 +509,9 @@ async def get_notification_preferences(
             updated_at=preferences.updated_at.isoformat(),
         )
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid technician ID: {str(e)}")
     except HTTPException:
-        raise
+        # Technician not found in DB — return defaults for admin/non-technician users
+        return _defaults
     except Exception as e:
         logger.error(f"Error getting notification preferences: {e}")
         raise HTTPException(status_code=500, detail="Failed to get preferences")

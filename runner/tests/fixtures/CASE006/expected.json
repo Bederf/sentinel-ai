@@ -1,0 +1,21 @@
+{
+  "must_include_any": ["chiller", "condenser", "fouling", "cascade", "multi-system", "cooling"],
+  "must_include_all": ["findings", "recommended_actions"],
+  "must_not_include": [],
+  "redaction_patterns": [
+    {
+      "label": "Email address (truncation leak check)",
+      "regex": "\\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}\\b"
+    },
+    {
+      "label": "SA phone number (truncation leak check)",
+      "regex": "(?<!\\d)0[1-8]\\d[- ]?\\d{3}[- ]?\\d{4}(?!\\d)"
+    }
+  ],
+  "min_actions": 3,
+  "min_confidence": 0.3,
+  "max_anomalies": 80,
+  "expect_needs_deeper_run": true,
+  "expect_status": "complete",
+  "summary_must_include_any": ["budget", "depth", "pass", "limit", "exhausted", "truncat"]
+}

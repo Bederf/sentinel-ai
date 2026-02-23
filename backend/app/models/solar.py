@@ -163,7 +163,11 @@ class SolarInverter:
     alarms: List[str] = field(default_factory=list)
     last_poll: Optional[str] = None
 
+    # Map backend status values to frontend-expected values
+    _STATUS_MAP = {"online": "normal", "standby": "offline"}
+
     def to_dict(self) -> Dict[str, Any]:
+        frontend_status = self._STATUS_MAP.get(self.status, self.status)
         return {
             "inverter_id": self.inverter_id,
             "plant_id": self.plant_id,
@@ -173,7 +177,9 @@ class SolarInverter:
             "model": self.model,
             "serial": self.serial,
             "rated_power_kva": self.rated_power_kva,
+            "rated_power_kw": self.rated_power_kva,  # Alias for frontend
             "mppt_count": self.mppt_count,
+            "string_count": self.mppt_count,  # Frontend expects string_count
             "firmware_version": self.firmware_version,
             "protocol": self.protocol,
             "ip_address": self.ip_address,
@@ -181,9 +187,12 @@ class SolarInverter:
             "unit_id": self.unit_id,
             "dc_power_kw": self.dc_power_kw,
             "ac_power_kw": self.ac_power_kw,
+            "current_power_kw": self.ac_power_kw,  # Alias for frontend
             "efficiency_pct": self.efficiency_pct,
+            "efficiency_percent": self.efficiency_pct,  # Alias for frontend
             "temp_c": self.temp_c,
-            "status": self.status,
+            "temperature_c": self.temp_c,  # Alias for frontend
+            "status": frontend_status,
             "frequency_hz": self.frequency_hz,
             "power_factor": self.power_factor,
             "daily_yield_kwh": self.daily_yield_kwh,

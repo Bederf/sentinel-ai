@@ -1,0 +1,7 @@
+{"timestamp": "2026-01-20T02:15:00Z", "alarm_code": "FIRE-COMM-WARN-001", "severity": "WARNING", "source": "S002-FIRE-B1-001", "message": "RS-485 loop 3 communication error — 12 retries before recovery"}
+{"timestamp": "2026-01-22T14:30:00Z", "alarm_code": "FIRE-ZONE-WARN-001", "severity": "WARNING", "source": "S002-FIRE-B1-001", "message": "Zone L3-A detectors offline for 45 seconds — loop 3 fault"}
+{"timestamp": "2026-01-25T03:00:00Z", "alarm_code": "FIRE-COMM-WARN-002", "severity": "WARNING", "source": "S002-FIRE-B1-001", "message": "RS-485 loop 3 intermittent — 47 comm errors in 24 hours (threshold 10)"}
+{"timestamp": "2026-01-28T11:20:00Z", "alarm_code": "FIRE-ZONE-CRIT-001", "severity": "CRITICAL", "source": "S002-FIRE-B1-001", "message": "Zone L3-A OFFLINE — 14 detectors unmonitored for 8 minutes. SAFETY RISK."}
+{"timestamp": "2026-01-28T11:28:00Z", "alarm_code": "FIRE-ZONE-INFO-001", "severity": "INFO", "source": "S002-FIRE-B1-001", "message": "Zone L3-A recovered — all 14 detectors reporting normally"}
+{"timestamp": "2026-02-01T22:45:00Z", "alarm_code": "FIRE-COMM-CRIT-001", "severity": "CRITICAL", "source": "S002-FIRE-B1-001", "message": "RS-485 loop 3 failed — zones L3-A, L3-B, L3-C all OFFLINE (42 detectors). Fire watch required."}
+{"timestamp": "2026-02-02T06:30:00Z", "alarm_code": "FIRE-COMM-CRIT-002", "severity": "CRITICAL", "source": "S002-FIRE-B1-001", "message": "Loop 3 still down after 8 hours. Emergency repair scheduled. Manual fire watch in progress."}

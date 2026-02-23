@@ -6,6 +6,7 @@ Integrates with FastAPI for webhook verification and message handling.
 from fastapi import APIRouter, Request, HTTPException, Query
 from app.handlers.whatsapp_handler import get_whatsapp_handler
 from app.integrations.whatsapp_service import get_whatsapp_service
+from app.services.popia_consent_guard import evaluate_ingress_processing_consent
 import logging
 from typing import Any, Dict
 import json
@@ -119,6 +120,10 @@ async def handle_whatsapp_message(request: Request) -> Dict[str, str]:
         message_id = message.get("id")
         message_type = message.get("type", "text")
 
+        if not from_number:
+            logger.warning("WhatsApp message missing sender identifier")
+            return {"status": "ok"}
+
         # Extract message content based on type
         content = None
         if message_type == "text":
@@ -136,6 +141,22 @@ async def handle_whatsapp_message(request: Request) -> Dict[str, str]:
 
         if not content:
             logger.debug("Message received but no extractable content")
+            return {"status": "ok"}
+
+        consent_decision = evaluate_ingress_processing_consent(
+            data_subject_id=from_number,
+            platform="whatsapp",
+            message_text=content,
+            ip_address=(request.client.host if request.client else None),
+        )
+        if not consent_decision.allow_processing:
+            if consent_decision.response_message:
+                await whatsapp_service.send_text_message(from_number, consent_decision.response_message)
+            logger.info(
+                "[WhatsApp] POPIA consent gate blocked processing: from=%s status=%s",
+                from_number,
+                consent_decision.status,
+            )
             return {"status": "ok"}
 
         # Route message to appropriate handler

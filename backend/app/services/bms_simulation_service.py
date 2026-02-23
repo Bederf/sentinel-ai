@@ -1117,6 +1117,15 @@ class BMSimulationService:
 
     def get_equipment_summary(self) -> Dict[str, Any]:
         """Get summary of all equipment"""
+        if not self.equipment:
+            return {
+                "total_equipment": 0,
+                "by_type": {},
+                "health_stats": {"avg_health": 0, "min_health": 0, "max_health": 0},
+                "fault_summary": {"total_faults": 0, "equipment_with_faults": 0},
+                "timestamp": datetime.now(),
+            }
+
         summary = {
             "total_equipment": len(self.equipment),
             "by_type": {},

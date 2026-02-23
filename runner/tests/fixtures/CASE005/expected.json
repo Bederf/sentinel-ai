@@ -1,0 +1,35 @@
+{
+  "must_include_any": ["generator", "battery", "crank", "start", "loadshedding"],
+  "must_include_all": ["recommended_actions", "findings"],
+  "must_not_include": [
+    "8501015800089",
+    "9203125800045",
+    "072-555-1234",
+    "083-444-5678",
+    "sipho.ndlovu@personal-email.co.za",
+    "nosipho.d@insuranceco.co.za",
+    "@personal-email.co.za",
+    "@insuranceco.co.za"
+  ],
+  "redaction_patterns": [
+    {
+      "label": "SA ID number (13 digits)",
+      "regex": "\\b\\d{13}\\b"
+    },
+    {
+      "label": "Email address",
+      "regex": "\\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}\\b"
+    },
+    {
+      "label": "SA phone number (0xx format)",
+      "regex": "(?<!\\d)0[1-8]\\d[- ]?\\d{3}[- ]?\\d{4}(?!\\d)"
+    },
+    {
+      "label": "SA phone number (+27 format)",
+      "regex": "\\+27[\\s-]?\\d{2}[\\s-]?\\d{3}[\\s-]?\\d{4}"
+    }
+  ],
+  "min_actions": 1,
+  "min_confidence": 0.4,
+  "max_anomalies": 30
+}

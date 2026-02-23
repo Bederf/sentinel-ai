@@ -1,0 +1,38 @@
+{
+  "equipment_code": "S002-FIRE-B1-001",
+  "site_id": "site-002",
+  "work_orders": [
+    {
+      "wo_id": "WO-S002-2026-0015",
+      "created_at": "2026-01-25T09:00:00Z",
+      "closed_at": "2026-01-25T14:00:00Z",
+      "priority": "high",
+      "category": "corrective",
+      "title": "Fire panel loop 3 comm fault investigation",
+      "description": "Intermittent RS-485 errors on loop 3. 47 errors in 24 hours. Inspected terminations at fire panel and first 3 junction boxes.",
+      "technician": "James Wilson",
+      "resolution": "Tightened loose terminations at JB-L3-02. Comm errors reduced but not eliminated. Suspected cable damage in riser between L2 and L3. Megger test needed.",
+      "parts_used": [],
+      "cost_rands": 0,
+      "labour_hours": 4.0
+    },
+    {
+      "wo_id": "WO-S002-2026-0022",
+      "created_at": "2026-02-02T07:00:00Z",
+      "closed_at": "2026-02-03T18:00:00Z",
+      "priority": "critical",
+      "category": "corrective",
+      "title": "Emergency fire loop 3 cable replacement",
+      "description": "Loop 3 total failure — 42 detectors offline. Megger test confirmed insulation breakdown in riser cable (0.2 Mohm, spec > 20 Mohm). Water ingress from roof leak damaged cable.",
+      "technician": "External — Chubb Fire SA",
+      "resolution": "Riser cable replaced L2-L3 (30m FP200 Gold). All terminations remade. Post-repair: 0 comm errors, bus voltage 12.2V, all 42 detectors reporting. Fire watch stood down.",
+      "parts_used": [
+        {"part": "FP200 Gold 2c+e 1.5mm 30m", "qty": 1, "cost_rands": 2800},
+        {"part": "Junction box IP66", "qty": 2, "cost_rands": 450},
+        {"part": "Emergency callout surcharge", "qty": 1, "cost_rands": 3500}
+      ],
+      "cost_rands": 6750,
+      "labour_hours": 12.0
+    }
+  ]
+}

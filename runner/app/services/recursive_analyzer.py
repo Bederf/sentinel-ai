@@ -125,6 +125,8 @@ class RecursiveAnalyzer:
                 status="complete",
                 summary="No readable evidence files found in case.",
                 confidence=0.0,
+                model_name=model,
+                model_provider=settings.inference_provider,
                 trajectory=TrajectoryData(
                     steps=0,
                     files_read=budget.files_read,
@@ -183,6 +185,8 @@ class RecursiveAnalyzer:
                     timeline=all_timeline,
                     recommended_actions=all_actions,
                     confidence=confidence,
+                    model_name=model,
+                    model_provider=settings.inference_provider,
                     trajectory=TrajectoryData(
                         steps=budget.current_depth,
                         files_read=budget.files_read,
@@ -266,6 +270,8 @@ class RecursiveAnalyzer:
             recommended_actions=all_actions,
             confidence=confidence,
             needs_deeper_run=needs_deeper,
+            model_name=model,
+            model_provider=settings.inference_provider,
             trajectory=TrajectoryData(
                 steps=budget.current_depth,
                 files_read=budget.files_read,

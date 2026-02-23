@@ -1,0 +1,8 @@
+{
+  "must_include_any": ["damper", "stuck", "vav", "actuator", "overcool"],
+  "must_include_all": ["recommended_actions", "findings"],
+  "must_not_include": ["@gmail.com", "id number", "password"],
+  "min_actions": 1,
+  "min_confidence": 0.4,
+  "max_anomalies": 30
+}

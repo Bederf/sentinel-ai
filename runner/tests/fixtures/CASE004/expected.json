@@ -1,0 +1,8 @@
+{
+  "must_include_any": ["fire", "communication", "loop", "detector", "rs-485", "cable", "safety"],
+  "must_include_all": ["recommended_actions", "findings"],
+  "must_not_include": ["@gmail.com", "id number", "password"],
+  "min_actions": 1,
+  "min_confidence": 0.4,
+  "max_anomalies": 30
+}

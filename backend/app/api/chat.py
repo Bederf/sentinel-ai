@@ -16,9 +16,11 @@ from app.services.work_order_service import work_order_service
 from app.services.doc_rag_service import search_documentation, get_doc_rag_system_prompt
 from app.services.feature_request_logger import log_chat_query
 from app.services.prompt_injection_guard import check_query_safety
-from app.config.settings import settings
+from app.services.hybrid_ai_service import hybrid_ai_service
+from app.services.zai_service import zai_service
 from app.middleware.auth_middleware import get_current_auth
-from app.utils.ai_provenance import get_claude_provenance, provenance_headers
+from app.utils.ai_provenance import get_cloud_llm_provenance, get_local_llm_provenance, provenance_headers
+from app.services.popia_consent_guard import should_allow_cloud_processing
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -70,12 +72,53 @@ def format_sse_chunk(chunk: str) -> str:
     return "\n".join(sse_lines) + "\n\n"
 
 
+def get_chat_provenance_headers(data_subject_id: str | None = None) -> dict[str, str]:
+    """Return provenance headers for current chat execution mode."""
+    if hybrid_ai_service.is_local_ai_only_mode() or not should_allow_cloud_processing(data_subject_id):
+        return provenance_headers(get_local_llm_provenance(model="phi3:mini"))
+    return provenance_headers(
+        get_cloud_llm_provenance(
+            provider=hybrid_ai_service.get_active_cloud_provider(),
+            model=hybrid_ai_service.get_active_cloud_model(),
+        )
+    )
+
+
+def build_local_docs_prompt(user_message: str, doc_results: list[dict], site_id: str | None) -> str:
+    """Build a compact local-LLM prompt using retrieved documentation snippets."""
+    snippets: list[str] = []
+    for idx, doc in enumerate(doc_results[:5], 1):
+        title = doc.get("document_title", doc.get("title", "Documentation"))
+        section = doc.get("section_title", "")
+        content = (doc.get("content") or "").strip()
+        if not content:
+            continue
+        if len(content) > 1200:
+            content = content[:1200] + "..."
+        header = f"{title}" + (f" > {section}" if section else "")
+        snippets.append(f"[{idx}] {header}\n{content}")
+
+    docs_block = "\n\n---\n\n".join(snippets) if snippets else "No documentation snippets were found for this question."
+    site_context = f"site '{site_id}'" if site_id else "no specific site selected"
+
+    return (
+        "You are SENTINEL running in local-only AI mode. "
+        "Answer using the documentation snippets below. "
+        "If evidence is missing, say so clearly.\n\n"
+        f"Context: User is asking about {site_context}.\n\n"
+        f"Documentation snippets:\n{docs_block}\n\n"
+        f"User question: {user_message}\n\n"
+        "Respond clearly and concisely. Do not invent capabilities."
+    )
+
+
 async def generate_sse_stream(
     user_message: str,
     use_tools: bool = True,
     site_id: str | None = None,
     user_email: str | None = None,
     user_role: str | None = None,
+    data_subject_id: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """
     Generate SSE-formatted stream from Claude response.
@@ -98,6 +141,18 @@ async def generate_sse_stream(
     messages = [{"role": "user", "content": message_with_context}]
 
     try:
+        cloud_allowed = should_allow_cloud_processing(data_subject_id)
+        if hybrid_ai_service.is_local_ai_only_mode() or not cloud_allowed:
+            # Local-only mode: route all non-doc chat through hybrid local path.
+            async for chunk in hybrid_ai_service.stream_response(
+                message_with_context,
+                use_tools=False if not cloud_allowed else use_tools,
+                data_subject_id=data_subject_id,
+            ):
+                yield format_sse_chunk(chunk)
+            yield "data: [DONE]\n\n"
+            return
+
         if use_tools:
             # Use tool-enabled streaming for device control capabilities
             async for chunk in claude_service.stream_response_with_tools(
@@ -110,9 +165,14 @@ async def generate_sse_stream(
                 yield format_sse_chunk(chunk)
         else:
             # Use regular streaming without tools
-            async for chunk in claude_service.stream_response(messages):
-                # Format as SSE data with proper newline handling
-                yield format_sse_chunk(chunk)
+            provider = hybrid_ai_service.get_active_cloud_provider()
+            if provider == "zai":
+                async for chunk in zai_service.stream_response(messages):
+                    yield format_sse_chunk(chunk)
+            else:
+                async for chunk in claude_service.stream_response(messages):
+                    # Format as SSE data with proper newline handling
+                    yield format_sse_chunk(chunk)
 
         # Send completion sentinel
         yield "data: [DONE]\n\n"
@@ -145,7 +205,11 @@ async def generate_static_sse(message: str) -> AsyncGenerator[str, None]:
     yield "data: [DONE]\n\n"
 
 
-async def generate_docs_sse_stream(user_message: str, site_id: str | None = None) -> AsyncGenerator[str, None]:
+async def generate_docs_sse_stream(
+    user_message: str,
+    site_id: str | None = None,
+    data_subject_id: str | None = None,
+) -> AsyncGenerator[str, None]:
     """
     Generate SSE-formatted stream for documentation search mode.
 
@@ -176,6 +240,17 @@ async def generate_docs_sse_stream(user_message: str, site_id: str | None = None
         # Search documentation RAG for relevant content (with optional building scope)
         doc_results = await search_documentation(user_message, building_id=building_id)
 
+        if hybrid_ai_service.is_local_ai_only_mode() or not should_allow_cloud_processing(data_subject_id):
+            local_prompt = build_local_docs_prompt(user_message, doc_results, site_id)
+            async for chunk in hybrid_ai_service.stream_response(
+                local_prompt,
+                use_tools=False,
+                data_subject_id=data_subject_id,
+            ):
+                yield format_sse_chunk(chunk)
+            yield "data: [DONE]\n\n"
+            return
+
         # Build system prompt with documentation context
         system_prompt = get_doc_rag_system_prompt(doc_results)
 
@@ -189,12 +264,21 @@ async def generate_docs_sse_stream(user_message: str, site_id: str | None = None
         messages = [{"role": "user", "content": message_with_context}]
 
         # Stream response with documentation context (no device control tools)
-        async for chunk in claude_service.stream_response(
-            messages,
-            system_prompt=system_prompt,
-            include_building_context=True,  # Still include building data
-        ):
-            yield format_sse_chunk(chunk)
+        provider = hybrid_ai_service.get_active_cloud_provider()
+        if provider == "zai":
+            async for chunk in zai_service.stream_response(
+                messages,
+                system_prompt=system_prompt,
+                include_building_context=True,
+            ):
+                yield format_sse_chunk(chunk)
+        else:
+            async for chunk in claude_service.stream_response(
+                messages,
+                system_prompt=system_prompt,
+                include_building_context=True,  # Still include building data
+            ):
+                yield format_sse_chunk(chunk)
 
         # Send completion sentinel
         yield "data: [DONE]\n\n"
@@ -252,20 +336,17 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
         f"search_docs={chat_request.search_docs}, site_id={chat_request.site_id}, "
         f"message={user_message[:50]}..."
     )
+    auth_ctx = get_current_auth(request)
+    data_subject_id = getattr(auth_ctx, "email", None) or getattr(auth_ctx, "user_id", None)
 
     # 1. Documentation search mode takes priority - this is Q&A, not device control
     #    No work order detection or demo cache in docs mode
     if chat_request.search_docs:
-        if not claude_service.is_configured():
-            raise HTTPException(
-                status_code=503,
-                detail="Claude AI is not configured. Set ANTHROPIC_API_KEY in environment.",
-            )
         logger.info(f"Documentation search mode enabled, site_id={chat_request.site_id}")
         # Log query for feature request tracking
         log_chat_query(user_message)
         return StreamingResponse(
-            generate_docs_sse_stream(user_message, chat_request.site_id),
+            generate_docs_sse_stream(user_message, chat_request.site_id, data_subject_id=data_subject_id),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -273,7 +354,7 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
                 "X-Accel-Buffering": "no",
                 "X-Response-Type": "ai_response",
                 "X-Search-Docs": "true",
-                **provenance_headers(get_claude_provenance()),
+                **get_chat_provenance_headers(data_subject_id),
             },
         )
 
@@ -303,7 +384,7 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
                 "X-Response-Type": "work_order_created",
                 "X-Work-Order-Id": work_order.id,
                 "X-AI-Assisted": "true",
-                **provenance_headers(get_claude_provenance()),
+                **get_chat_provenance_headers(data_subject_id),
             },
         )
 
@@ -329,24 +410,21 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
                     "X-Accel-Buffering": "no",
                     "X-Response-Type": "ai_response",
                     "X-Demo-Cached": "true",
-                    **provenance_headers(get_claude_provenance()),
+                    **get_chat_provenance_headers(data_subject_id),
                 },
             )
 
-    if not claude_service.is_configured():
-        raise HTTPException(
-            status_code=503,
-            detail="Claude AI is not configured. Set ANTHROPIC_API_KEY in environment.",
-        )
-
-    auth_ctx = get_current_auth(request)
+    tools_enabled = (
+        not hybrid_ai_service.is_local_ai_only_mode() and hybrid_ai_service.get_active_cloud_provider() == "anthropic"
+    )
     return StreamingResponse(
         generate_sse_stream(
             user_message,
-            use_tools=True,
+            use_tools=tools_enabled,
             site_id=chat_request.site_id,
             user_email=getattr(auth_ctx, "email", None),
             user_role=getattr(auth_ctx, "role", None),
+            data_subject_id=data_subject_id,
         ),
         media_type="text/event-stream",
         headers={
@@ -354,7 +432,7 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
             "X-Response-Type": "ai_response",
-            **provenance_headers(get_claude_provenance()),
+            **get_chat_provenance_headers(data_subject_id),
         },
     )
 
@@ -366,16 +444,24 @@ async def chat_status():
 
     demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
     tts = get_tts_service()
+    local_mode = hybrid_ai_service.is_local_ai_only_mode()
+    cloud_provider = hybrid_ai_service.get_active_cloud_provider()
+    configured = local_mode or hybrid_ai_service.is_cloud_configured()
+    active_model = "phi3:mini (local-only)" if local_mode else hybrid_ai_service.get_active_cloud_model()
+    tools_enabled = (not local_mode) and cloud_provider == "anthropic"
+
     return {
-        "configured": claude_service.is_configured(),
+        "configured": configured,
         "demo_mode": demo_mode,
-        "model": settings.claude_model,
+        "model": active_model,
+        "local_ai_only": local_mode,
+        "cloud_provider": "sentinel-local" if local_mode else cloud_provider,
         "features": {
-            "device_control": True,  # AI can control devices via tool calling
+            "device_control": tools_enabled,  # Tool-based control is Claude-only
             "work_orders": True,
             "building_context": True,
             "demo_cache": demo_mode,
-            "tool_calling": True,  # Claude tool use enabled
+            "tool_calling": tools_enabled,
             "documentation_search": True,  # RAG-based documentation search
             "tts": tts.is_configured(),  # Voice chat TTS
         },

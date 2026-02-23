@@ -51,16 +51,28 @@ export function ExpandableRiskList({
           const buildingId = siteId === "site-002" ? "sandton" : siteId;
           const response = await api.getBuildingEquipment(buildingId);
 
-          // Filter for warning and critical status only
-          const riskEquipment = response.equipment.filter(
-            (e) => e.status === "warning" || e.status === "critical"
-          );
+          // Filter for at-risk equipment: explicit status OR health-based degradation
+          // Aligns with SafetySummary logic in sites_aggregation.py
+          const riskEquipment = response.equipment.filter((e) => {
+            if (e.status === "warning" || e.status === "critical") return true;
+            if (e.status === "offline" || e.status === "maintenance") return true;
+            // Health-based: normal status but degraded health
+            // Backend returns health_score, not health
+            const health = (e as any).health_score ?? (e as any).health ?? 100;
+            if (health < 80) return true;
+            return false;
+          });
 
-          // Sort: critical first, then by lowest health
+          // Sort: critical first, then warning, then by lowest health
           riskEquipment.sort((a, b) => {
-            if (a.status === "critical" && b.status !== "critical") return -1;
-            if (b.status === "critical" && a.status !== "critical") return 1;
-            return (a as any).health - (b as any).health;
+            const priority = (s: string) =>
+              s === "critical" ? 0 : s === "warning" ? 1 : s === "offline" ? 2 : 3;
+            const pa = priority(a.status);
+            const pb = priority(b.status);
+            if (pa !== pb) return pa - pb;
+            const ha = (a as any).health_score ?? (a as any).health ?? 100;
+            const hb = (b as any).health_score ?? (b as any).health ?? 100;
+            return ha - hb;
           });
 
           setEquipment(riskEquipment as any);
@@ -160,9 +172,13 @@ export function ExpandableRiskList({
                     background:
                       eq.status === "critical"
                         ? "rgba(220, 38, 38, 0.1)"
+                        : ((eq as any).health_score ?? (eq as any).health ?? 100) < 57
+                        ? "rgba(220, 38, 38, 0.1)"
                         : "rgba(245, 158, 11, 0.1)",
                     border: `1px solid ${
                       eq.status === "critical"
+                        ? "rgba(220, 38, 38, 0.2)"
+                        : ((eq as any).health_score ?? (eq as any).health ?? 100) < 57
                         ? "rgba(220, 38, 38, 0.2)"
                         : "rgba(245, 158, 11, 0.2)"
                     }`,
@@ -177,7 +193,7 @@ export function ExpandableRiskList({
                       className="flex-shrink-0 p-1 rounded hover:bg-white/10 transition-colors"
                       title="View risk details"
                     >
-                      {eq.status === "critical" ? (
+                      {eq.status === "critical" || ((eq as any).health_score ?? (eq as any).health ?? 100) < 57 ? (
                         <AlertCircle
                           className="h-4 w-4"
                           style={{ color: "var(--color-sentinel-red)" }}
@@ -213,12 +229,12 @@ export function ExpandableRiskList({
                       className="text-xs font-semibold"
                       style={{
                         color:
-                          eq.status === "critical"
+                          eq.status === "critical" || ((eq as any).health_score ?? (eq as any).health ?? 100) < 57
                             ? "var(--color-sentinel-red)"
                             : "var(--color-sentinel-amber)",
                       }}
                     >
-                      {eq.health}%
+                      {(eq as any).health_score ?? eq.health ?? '—'}%
                     </div>
                     <ChevronRight
                       className="h-4 w-4"

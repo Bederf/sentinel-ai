@@ -15,7 +15,8 @@ from app.api import integration, concept
 from app.api import modules, health_config, service_records, preferences
 from app.api import solar, water, sustainability, contracts, pricing, municipal_billing
 from app.api import parts_orders, approval_workflow, delivery_tracking, approvals, parasite_decisions
-from app.api import security, compliance, notifications
+from app.api import security, compliance, notifications, consent
+from app.api import privacy
 from app.api import asset_health
 from app.api import health_rating
 from app.api import cafm_integration
@@ -68,6 +69,10 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Multi-channel notifications (Phase 102)
     app.include_router(notifications.router, prefix="/api", tags=["notifications"])
+
+    # POPIA consent management
+    app.include_router(consent.router, prefix="/api", tags=["consent"])
+    app.include_router(privacy.router, tags=["privacy"])
 
     # Parts ordering and approval workflow (Phase 20)
     app.include_router(approval_workflow.router, tags=["approval-workflow"])

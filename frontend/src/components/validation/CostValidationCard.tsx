@@ -10,7 +10,7 @@
  * Used for validating energy + water cost calculations against actual bills.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Card,
   Title,
@@ -20,7 +20,7 @@ import {
   ProgressBar,
   Button,
 } from "@tremor/react";
-import { DollarSign, AlertTriangle, TrendingUp } from "lucide-react";
+import { DollarSign, AlertTriangle, TrendingUp, Upload, FileText, Loader2, CheckCircle } from "lucide-react";
 
 interface CostValidationRaw {
   // API field names
@@ -90,6 +90,92 @@ export function CostValidationCard({
   const [validation, setValidation] = useState<CostValidation | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Invoice upload state
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<{
+    success: boolean;
+    total_zar?: number;
+    invoice_number?: string;
+    message?: string;
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleInvoiceUpload = async (file: File) => {
+    if (file.type !== "application/pdf") {
+      setUploadResult({ success: false, message: "Only PDF files are supported" });
+      return;
+    }
+
+    setUploading(true);
+    setUploadResult(null);
+
+    try {
+      const token = localStorage.getItem("sentinel_token");
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("site_id", buildingId);
+      formData.append("municipality", "city_power");
+      formData.append("utility_type", "electricity");
+      formData.append("account_number", `${buildingId}-MAIN`);
+
+      const response = await fetch("/api/municipal-billing/invoices/upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token || ""}` },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || "Upload failed");
+      }
+
+      const data = await response.json();
+      const invoice = data.invoice || {};
+      const totalZar = invoice.total_amount_zar;
+      const invoiceNumber = invoice.invoice_number || "Uploaded";
+
+      setUploadResult({
+        success: true,
+        total_zar: totalZar,
+        invoice_number: invoiceNumber,
+      });
+
+      // If we got a total from the PDF, run reconciliation
+      if (totalZar && totalZar > 0) {
+        const now = new Date();
+        const reconResponse = await fetch(
+          `/api/validation/cost?site_id=${buildingId}&month=${now.getMonth() + 1}&year=${now.getFullYear()}&real_invoice_cost_r=${totalZar}`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token || ""}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (reconResponse.ok) {
+          const reconData = await reconResponse.json();
+          setValidation((prev) => prev ? {
+            ...prev,
+            real_cost_r: totalZar,
+            variance_pct: reconData.variance_pct,
+            recommendation: reconData.recommendation,
+            tariff_adjustment_factor: reconData.tariff_adjustment_factor,
+            confidence: reconData.confidence,
+          } : prev);
+        }
+      }
+    } catch (err) {
+      setUploadResult({
+        success: false,
+        message: err instanceof Error ? err.message : "Upload failed",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchValidation = async () => {
@@ -300,12 +386,12 @@ export function CostValidationCard({
             {validation.confidence !== undefined && (
               <>
                 <ProgressBar
-                  value={validation.confidence * 100}
+                  value={(validation.confidence ?? 0) * 100}
                   color="blue"
                   className="mt-2"
                 />
                 <Text className="text-xs text-gray-500 mt-1">
-                  Confidence: {(validation.confidence * 100).toFixed(0)}%
+                  Confidence: {((validation.confidence ?? 0) * 100).toFixed(0)}%
                 </Text>
               </>
             )}

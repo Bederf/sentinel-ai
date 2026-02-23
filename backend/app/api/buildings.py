@@ -819,6 +819,14 @@ async def get_building_equipment(building_id: str) -> dict:
                         status = "warning"
                         health = min(health, 60)
 
+                # Derive status from health score to align with SafetySummary thresholds
+                # (sites_aggregation.py: <57 = alarm, 57-80 = warning, >=80 = safe)
+                if status == "normal" and isinstance(health, (int, float)):
+                    if health < 57:
+                        status = "critical"
+                    elif health < 80:
+                        status = "warning"
+
                 equipment_list.append(
                     {
                         "id": eq.get("code", eq.get("id")),

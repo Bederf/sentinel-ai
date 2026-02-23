@@ -180,7 +180,7 @@ export function PointMatchingStep({ buildingId, columnMappings: _columnMappings,
                     <SelectItem value="">-- Unmatched --</SelectItem>
                     {match.alternatives?.map(alt => (
                       <SelectItem key={alt.asset_id} value={alt.asset_id}>
-                        {alt.asset_tag} ({(alt.confidence * 100).toFixed(0)}%)
+                        {alt.asset_tag} ({((alt.confidence ?? 0) * 100).toFixed(0)}%)
                       </SelectItem>
                     ))}
                   </Select>

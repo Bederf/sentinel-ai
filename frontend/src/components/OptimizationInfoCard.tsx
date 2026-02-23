@@ -48,9 +48,10 @@ export function OptimizationInfoCard({
   const [monthlySavings, setMonthlySavings] = useState<MonthlySavingsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
+  const [mode, setMode] = useState<"supervised" | "automatic">("supervised");
 
-  // Derive mode from toggle: ON = automatic, OFF = supervised
-  const isAutomatic = optimizationEnabled;
+  // Use actual mode from API, not just the enabled toggle
+  const isAutomatic = mode === "automatic";
 
   // Always fetch optimization status (both modes run optimization)
   useEffect(() => {
@@ -65,6 +66,9 @@ export function OptimizationInfoCard({
         setLastOptimization(status.last_optimization);
         setCurrentRecommendation(status.last_recommendation);
         setMonthlySavings(status.monthly_savings || null);
+        if (status.optimization_settings?.mode) {
+          setMode(status.optimization_settings.mode);
+        }
       } catch (error) {
         console.error("[OptimizationInfoCard] Failed to fetch optimization status:", error);
         setOptimizationStatus("error");

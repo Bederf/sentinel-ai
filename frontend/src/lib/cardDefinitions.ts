@@ -50,20 +50,12 @@ export const DEFAULT_KPI_CARDS = [
 ];
 
 // Default visible dashboard sections on load
+// Site-specific panels (lighting, solar, BESS, energy comparison, risk predictions,
+// comfort, occupancy, validation) now live in SiteDetail.tsx.
 export const DEFAULT_SECTIONS = [
   'kpi-row',
   'site-protection',
-  'lighting-intelligence',
-  'solar-bess',
-  'solar-annual',
   'energy-analytics',
-  'energy-comparison',
-  'energy-comparison-actual-vs-sentinel',
-  'power-meter-validation',
-  'cost-validation',
-  'risk-predictions',
-  'comfort-assistant',
-  'occupancy-dashboard',
 ];
 
 /**

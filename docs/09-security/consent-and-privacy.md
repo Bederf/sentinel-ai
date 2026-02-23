@@ -1,7 +1,7 @@
 # SENTINEL Consent and Privacy Controls
 
 **Document Owner:** SENTINEL Platform Team
-**Version:** 1.0
+**Version:** 1.1
 **Created:** 2026-02-04
 **FSR Reference:** Privacy Controls Sections 1, 3, 4, and 7
 **POPIA Reference:** Protection of Personal Information Act, 2013
@@ -75,7 +75,7 @@ Three types of consent are captured for each data subject:
 |-------------|-------------|---------------------|-------------------|
 | **PI processing** | Basic consent to process personal information (phone number, name, location, facilities requests) for building management purposes | Yes | Service discontinued |
 | **Data retention** | Agreement to 90-day raw data / 2-year aggregate data retention periods | Yes | Data deleted per POPIA |
-| **Cross-border transfer** | Acknowledgment that AI processing may use international services (Anthropic Claude API, US-based) | No (service degrades to local AI) | AI chat uses Ollama only |
+| **Cross-border transfer** | Acknowledgment that AI processing may use an international cloud AI provider (for example Anthropic or Z.ai) | No (service degrades to local AI) | AI chat uses Ollama only |
 
 ### 4.3 Consent Storage
 
@@ -103,6 +103,24 @@ Data subjects can withdraw consent at any time:
 4. Data processing ceases immediately
 5. Data deletion scheduled per retention policy
 6. Confirmation sent to data subject
+
+---
+
+### 4.5 Runtime Enforcement (Implemented)
+
+POPIA consent is now enforced directly in ingress and routing paths:
+
+- WhatsApp ingress gate: `backend/app/api/whatsapp_webhooks.py`
+- Telegram/Sentry ingress gate: `backend/app/api/sentry_webhooks.py`
+- Consent evaluation logic: `backend/app/services/popia_consent_guard.py`
+- Hybrid cloud routing gate (cross-border consent required): `backend/app/services/hybrid_ai_service.py`
+
+Current runtime behavior:
+
+1. Inbound WhatsApp/Telegram messages are blocked until `pi_processing` consent is active.
+2. `YES` records consent and asks the user to resend the request.
+3. `STOP` withdraws consent and halts processing.
+4. Cloud LLM usage is blocked without active `cross_border_transfer` consent; local model fallback is used.
 
 ---
 
@@ -158,6 +176,7 @@ Building occupants have the following rights:
 **How to exercise rights:**
 - WhatsApp/Telegram: Message "RIGHTS" or "PRIVACY"
 - Email: privacy@[company-domain]
+- API workflow: `POST /api/privacy/requests` and `GET /api/privacy/requests-metrics`
 - Response time: Within 30 days per POPIA
 
 ### 5.5 Cross-Border Transfer Disclosure
@@ -166,7 +185,7 @@ SENTINEL uses the following international services for AI-assisted processing:
 
 | Service | Provider | Location | Data Transferred | Legal Basis |
 |---------|----------|----------|-----------------|-------------|
-| **Claude API** | Anthropic | United States | Chat messages (processed, not stored) | POPIA s72: adequate protection + consent |
+| **Cloud AI API (if enabled)** | Configured provider (Anthropic or Z.ai) | International (provider-hosted regions) | Chat messages (processed per provider policy) | POPIA s72: adequate protection + consent |
 | **WhatsApp** | Meta | International (various) | Messages (Meta terms of service) | Existing relationship + consent |
 | **Telegram** | Telegram FZ-LLC | International (various) | Messages (Telegram terms of service) | Existing relationship + consent |
 
@@ -177,8 +196,7 @@ SENTINEL uses the following international services for AI-assisted processing:
 4. Transfer is for benefit of data subject
 
 **Mitigation measures:**
-- Claude API processes messages ephemerally (not retained by Anthropic for training when using API)
-- No raw PI is sent to Claude API — messages are contextualised with building data only
+- No raw PI is sent to cloud AI services by design — prompts are contextualized to building operations
 - Ollama (local AI) available as fallback for all AI processing without cross-border transfer
 - Data subjects who decline cross-border consent still receive service via Ollama
 
@@ -206,7 +224,18 @@ Day 731:     Aggregated data deleted
 
 **Consent records exception:** Retained for duration of relationship + 5 years for compliance audit purposes.
 
-### 6.2 Deletion Process at Contract Termination
+### 6.2 Automated Retention Controls
+
+POPIA retention enforcement is automated and schedulable:
+
+- Service: `backend/app/services/popia_retention_service.py`
+- Scheduler wiring: `backend/app/services/background_scheduler.py`, `backend/app/startup/events.py`
+- Operational API:
+  - `GET /api/privacy/retention/status`
+  - `POST /api/privacy/retention/enforce` (`dry_run` true/false)
+- Run evidence: `backend/app/data/popia_retention_runs.json`
+
+### 6.3 Deletion Process at Contract Termination
 
 When the FM company terminates their SENTINEL contract:
 
@@ -223,7 +252,7 @@ When the FM company terminates their SENTINEL contract:
 6. **Consent records:** Retained separately for compliance (5 years post-termination)
 7. **Audit logs:** Retained separately for compliance (1 year summary)
 
-### 6.3 Automated Deletion
+### 6.4 Automated Deletion
 
 SENTINEL implements automated data lifecycle management:
 
@@ -279,12 +308,15 @@ SENTINEL implements automated data lifecycle management:
 |----------|----------|
 | Consent Service (implementation) | `backend/app/services/consent_service.py` |
 | Consent API (endpoints) | `backend/app/api/consent.py` |
+| Privacy API (DSR + retention) | `backend/app/api/privacy.py` |
+| POPIA DSR workflow doc | `docs/compliance/popia-data-subject-rights-workflow.md` |
+| POPIA retention enforcement doc | `docs/compliance/popia-retention-enforcement.md` |
 | Security Awareness Training | `infrastructure/training/security-awareness-plan.md` |
-| BCP/DR Procedures | `docs/08-security/bcp-dr-procedures.md` |
-| Logging Architecture | `docs/08-security/logging-architecture.md` |
-| Access Control Implementation | `docs/08-security/access-control-implementation.md` |
-| Vulnerability Management | `docs/08-security/vulnerability-management.md` |
-| Sentry Telegram Integration | `docs/SENTRY_INTEGRATION.md` |
+| BCP/DR Procedures | `docs/09-security/bcp-dr-procedures.md` |
+| Logging Architecture | `docs/09-security/logging-architecture.md` |
+| Access Control Implementation | `docs/09-security/access-control-implementation.md` |
+| Vulnerability Management | `docs/09-security/vulnerability-management.md` |
+| Sentry Telegram Integration | `docs/05-integrations/SENTRY_INTEGRATION.md` |
 
 ---
 
@@ -293,6 +325,7 @@ SENTINEL implements automated data lifecycle management:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-02-04 | SENTINEL Platform Team | Initial creation |
+| 1.1 | 2026-02-23 | SENTINEL Platform Team | Added runtime ingress consent gates, cross-border cloud routing control, DSR workflow API, and retention automation references |
 
 ---
 
