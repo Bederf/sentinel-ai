@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 
@@ -23,6 +24,27 @@ router = APIRouter()
 
 
 # ---------------------------------------------------------------------------
+# Background analysis task
+# ---------------------------------------------------------------------------
+
+async def _execute_run(run_id: str, case_id: str, question: str, model: str) -> None:
+    """Execute analysis in background — launched by POST /run via asyncio.create_task()."""
+    from app.services.recursive_analyzer import RecursiveAnalyzer
+    from app.services.run_manager import run_manager
+
+    run_manager.update_status(run_id, "running")
+    try:
+        analyzer = RecursiveAnalyzer()
+        result = await analyzer.analyze(case_id, question, model, run_id)
+        run_manager.update_status(run_id, result.status, result.model_dump())
+    except Exception as exc:
+        logger.error("Run %s failed: %s", run_id, exc, exc_info=True)
+        run_manager.update_status(run_id, "error", {"summary": str(exc)})
+    finally:
+        run_manager.unregister_task(run_id)
+
+
+# ---------------------------------------------------------------------------
 # POST /run — submit analysis job
 # ---------------------------------------------------------------------------
 
@@ -31,7 +53,7 @@ async def submit_run(request: RunRequest) -> RunResponse:
     """Submit a new analysis run.
 
     Validates model against allowlist, checks case folder exists, creates run
-    via RunManager, and returns the run_id with status='queued'.
+    via RunManager, launches analysis as background task, returns immediately.
     """
     # Lazy import to avoid circular dependency at module level
     from app.services.run_manager import run_manager
@@ -58,6 +80,10 @@ async def submit_run(request: RunRequest) -> RunResponse:
         question=request.question,
         model=model,
     )
+
+    # Launch analysis as background task (POST /run returns immediately)
+    task = asyncio.create_task(_execute_run(run_id, request.case_id, request.question, model))
+    run_manager.register_task(run_id, task)
 
     return RunResponse(run_id=run_id, status="queued")
 

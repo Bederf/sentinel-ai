@@ -12,14 +12,31 @@ import hashlib
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from app.services.run_manager import run_manager
+if TYPE_CHECKING:
+    from app.services.run_manager import RunManager
 
 logger = logging.getLogger(__name__)
 
 
 class TraceBuilder:
-    """Builds typed trace entries and appends them via RunManager."""
+    """Builds typed trace entries and appends them via RunManager.
+
+    Accepts an optional RunManager instance. If not provided, uses the
+    module-level singleton (lazy import to avoid circular deps).
+    """
+
+    def __init__(self, run_manager: RunManager | None = None) -> None:
+        self._run_manager = run_manager
+
+    @property
+    def _rm(self) -> RunManager:
+        """Resolve the RunManager — injected or module singleton."""
+        if self._run_manager is not None:
+            return self._run_manager
+        from app.services.run_manager import run_manager
+        return run_manager
 
     def capture_file_access(
         self,
@@ -37,7 +54,7 @@ class TraceBuilder:
                 "size_bytes": size_bytes,
             },
         )
-        run_manager.append_trace(run_id, entry)
+        self._rm.append_trace(run_id, entry)
 
     def capture_model_call(
         self,
@@ -64,7 +81,7 @@ class TraceBuilder:
                 "elapsed_ms": round(elapsed_ms, 2),
             },
         )
-        run_manager.append_trace(run_id, entry)
+        self._rm.append_trace(run_id, entry)
 
     def capture_state_change(
         self,
@@ -80,7 +97,7 @@ class TraceBuilder:
                 "to_state": to_state,
             },
         )
-        run_manager.append_trace(run_id, entry)
+        self._rm.append_trace(run_id, entry)
 
     def capture_step(
         self,
@@ -98,7 +115,7 @@ class TraceBuilder:
                 "result_summary": result_summary,
             },
         )
-        run_manager.append_trace(run_id, entry)
+        self._rm.append_trace(run_id, entry)
 
     @staticmethod
     def compute_sha256(file_path: Path) -> str:
