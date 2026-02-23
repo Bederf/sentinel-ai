@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from app.database.supabase_client import get_supabase_client
 from app.services.niagara.bacnet_client import (
     BACnetException,
     NiagaraBACnetClient,
@@ -43,6 +44,44 @@ DISCOVERY_OBJECT_TYPES = [
 
 # Maximum points to read details for in a single batch
 BATCH_SIZE = 50
+
+
+def _infer_object_type(sensor_type: str) -> str:
+    """Infer BACnet object type from sensor type string.
+
+    Args:
+        sensor_type: Sensor type name (e.g., 'temperature', 'setpoint', 'command')
+
+    Returns:
+        BACnet object type string (analogInput, analogValue, binaryOutput, binaryInput)
+    """
+    st = sensor_type.lower()
+    if "setpoint" in st or "target" in st:
+        return "analogValue"
+    if "command" in st or "enable" in st or "mode" in st:
+        return "binaryOutput"
+    if "status" in st or "alarm" in st or "fault" in st:
+        return "binaryInput"
+    return "analogInput"
+
+
+def _infer_point_type(sensor_type: str) -> str:
+    """Infer point type category from sensor type string.
+
+    Args:
+        sensor_type: Sensor type name (e.g., 'temperature', 'setpoint', 'command')
+
+    Returns:
+        Point type string (sensor, setpoint, command, status)
+    """
+    st = sensor_type.lower()
+    if "setpoint" in st or "target" in st:
+        return "setpoint"
+    if "command" in st or "enable" in st:
+        return "command"
+    if "status" in st or "alarm" in st or "fault" in st:
+        return "status"
+    return "sensor"
 
 
 class DiscoveryResult:
@@ -460,6 +499,121 @@ class PointDiscoveryService:
             return demo_points
         except (FileNotFoundError, json.JSONDecodeError) as e:
             logger.error("Failed to load demo points from haystack_tags.json: %s", e)
+            return []
+
+    def _load_simulation_points(self, site_id: str) -> List[Dict[str, Any]]:
+        """Load points from Supabase equipment + sensor readings (simulation data).
+
+        Queries the equipment table for equipment belonging to the site, then
+        fetches latest sensor readings from equipment_sensor_readings. Formats
+        results as point dicts matching the classifier's expected input format.
+
+        Args:
+            site_id: SENTINEL site ID (e.g., 'site-002')
+
+        Returns:
+            List of point dicts, or empty list if Supabase unavailable or no data.
+        """
+        try:
+            client = get_supabase_client()
+        except Exception as e:
+            logger.warning("Supabase client unavailable for simulation points: %s", e)
+            return []
+
+        try:
+            # Try to find equipment via buildings table first
+            equipment_rows = []
+            try:
+                buildings_resp = (
+                    client.table("buildings").select("id").or_(f"code.eq.{site_id},site_id.eq.{site_id}").execute()
+                )
+                building_ids = [b["id"] for b in (buildings_resp.data or [])]
+
+                if building_ids:
+                    equip_resp = (
+                        client.table("equipment")
+                        .select("code,name,type,status,health_score")
+                        .in_("building_id", building_ids)
+                        .execute()
+                    )
+                    equipment_rows = equip_resp.data or []
+            except Exception as e:
+                logger.debug("Buildings-based equipment lookup failed: %s", e)
+
+            # Fallback: match by equipment code prefix (e.g., S002-)
+            if not equipment_rows:
+                prefix = site_id.upper().replace("SITE-", "S")
+                try:
+                    equip_resp = (
+                        client.table("equipment")
+                        .select("code,name,type,status,health_score")
+                        .like("code", f"{prefix}-%")
+                        .execute()
+                    )
+                    equipment_rows = equip_resp.data or []
+                except Exception as e:
+                    logger.debug("Prefix-based equipment lookup failed: %s", e)
+
+            if not equipment_rows:
+                logger.info("No simulation equipment found for site %s", site_id)
+                return []
+
+            # Fetch sensor readings for each equipment and build point dicts
+            points: List[Dict[str, Any]] = []
+            instance_counter = 2000  # Offset from JSON fallback range (1000+)
+
+            for equip in equipment_rows:
+                eq_code = equip.get("code", "")
+                eq_name = equip.get("name", eq_code)
+                eq_type = equip.get("type", "unknown")
+
+                try:
+                    readings_resp = (
+                        client.table("equipment_sensor_readings")
+                        .select("sensor_type,value,unit")
+                        .eq("equipment_id", eq_code)
+                        .order("recorded_at", desc=True)
+                        .limit(50)
+                    ).execute()
+                    readings = readings_resp.data or []
+                except Exception as e:
+                    logger.debug("Sensor readings query failed for %s: %s", eq_code, e)
+                    readings = []
+
+                # Deduplicate by sensor_type (keep first = most recent)
+                seen_types: set = set()
+                for reading in readings:
+                    sensor_type = reading.get("sensor_type", "")
+                    if not sensor_type or sensor_type in seen_types:
+                        continue
+                    seen_types.add(sensor_type)
+
+                    points.append(
+                        {
+                            "name": f"{eq_code}.{sensor_type}",
+                            "description": f"{eq_name} - {sensor_type.replace('_', ' ').title()}",
+                            "object_type": _infer_object_type(sensor_type),
+                            "instance": instance_counter,
+                            "units": reading.get("unit", ""),
+                            "present_value": reading.get("value"),
+                            "writable": sensor_type in ("setpoint", "command", "mode"),
+                            "_equipment_id": eq_code,
+                            "_equipment_type": eq_type,
+                            "_point_type": _infer_point_type(sensor_type),
+                        }
+                    )
+                    instance_counter += 1
+
+            logger.info(
+                "Loaded %d simulation points from %d equipment for site %s",
+                len(points),
+                len(equipment_rows),
+                site_id,
+            )
+            return points
+
+        except Exception as e:
+            logger.warning("Failed to load simulation points for %s: %s", site_id, e)
             return []
 
     def _classify_discovered_points(self, points: List[Dict[str, Any]]) -> List[ClassifiedPoint]:
