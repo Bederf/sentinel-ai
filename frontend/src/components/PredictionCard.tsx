@@ -530,17 +530,24 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
           </div>
         </div>
 
-        {/* Footer: Confidence and Action */}
+        {/* Footer: Confidence, AI disclosure, and Action */}
         <div className="flex items-center justify-between">
-          <span
-            className="text-xs font-medium px-2 py-0.5 rounded"
-            style={{
-              background: `${confidenceConfig.color}20`,
-              color: confidenceConfig.color,
-            }}
-          >
-            {confidenceConfig.label}
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className="text-xs font-medium px-1.5 py-0.5 rounded bg-sky-900/30 text-sky-300 border border-sky-800/40"
+            >
+              AI
+            </span>
+            <span
+              className="text-xs font-medium px-2 py-0.5 rounded"
+              style={{
+                background: `${confidenceConfig.color}20`,
+                color: confidenceConfig.color,
+              }}
+            >
+              {confidenceConfig.label}
+            </span>
+          </div>
           {onClick && (
             <div
               className="flex items-center gap-1 text-xs"

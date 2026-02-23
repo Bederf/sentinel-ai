@@ -197,9 +197,9 @@ export function RecommendationCard({
           </div>
         )}
 
-        {/* Timestamp */}
+        {/* Timestamp + AI disclosure */}
         <div className="text-[10px]" style={{ color: 'var(--color-sentinel-text-disabled, #666)' }}>
-          Detected at {new Date(recommendation.timestamp).toLocaleTimeString()} — Profile: {recommendation.profile}
+          <span className="text-sky-400/70">AI-generated</span> &middot; Detected at {new Date(recommendation.timestamp).toLocaleTimeString()} — Profile: {recommendation.profile}
         </div>
       </div>
 

@@ -287,6 +287,9 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
                 >
                   AI Analysis
                 </span>
+                <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-sky-900/30 text-sky-300 border border-sky-800/40 ml-auto">
+                  AI
+                </span>
               </div>
               <p
                 className="text-sm leading-relaxed line-clamp-3"

@@ -467,6 +467,13 @@ export function OptimizationRecommendationModal({
           </div>
         </div>
 
+        {/* AI Disclosure — EU AI Act Article 50 */}
+        <div className="flex-shrink-0 px-6 pt-2 text-center">
+          <span className="text-xs italic" style={{ color: "var(--color-sentinel-text-secondary)", opacity: 0.7 }}>
+            AI-generated recommendation &middot; Review before approving
+          </span>
+        </div>
+
         {/* Action Buttons */}
         <div className="flex-shrink-0 px-6 py-4 border-t flex gap-3"
           style={{ borderColor: "var(--glass-border)" }}

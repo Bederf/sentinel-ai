@@ -84,7 +84,12 @@ export const RecommendationsDashboard: React.FC<
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold">Pending Recommendations</h2>
+      <div>
+        <h2 className="text-2xl font-bold">Pending Recommendations</h2>
+        <p className="text-xs text-gray-400 italic mt-0.5">
+          AI-generated recommendations &middot; Review before acting
+        </p>
+      </div>
 
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded">

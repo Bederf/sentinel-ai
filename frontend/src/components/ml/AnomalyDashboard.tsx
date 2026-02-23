@@ -145,7 +145,13 @@ export function AnomalyDashboard({ refreshInterval = 30000 }: AnomalyDashboardPr
       {/* Active Alerts */}
       {alerts.length > 0 && (
         <Card>
-          <Title>Active Anomaly Alerts</Title>
+          <div className="flex items-center gap-2">
+            <Title>Active Anomaly Alerts</Title>
+            <Badge color="sky" size="xs">AI</Badge>
+          </div>
+          <Text className="text-xs text-gray-400 italic -mt-2 mb-2">
+            AI-generated anomaly detection &middot; Review before acting
+          </Text>
           <Table className="mt-4">
             <TableHead>
               <TableRow>
