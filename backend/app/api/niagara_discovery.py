@@ -34,14 +34,9 @@ router = APIRouter(prefix="/api/niagara", tags=["niagara-discovery"])
 class DiscoverRequest(BaseModel):
     """Request to trigger point discovery and classification."""
 
-    device_ip: str = Field(..., description="IP address of the BACnet device (JACE/Supervisor)")
+    device_ip: str = Field(..., description="IP address of the BACnet device, or 'simulation' for simulation data")
     site_id: str = Field(..., description="SENTINEL site ID for mapping (e.g., 'site-002')")
     device_bacnet_id: Optional[int] = Field(None, description="Optional BACnet device instance ID")
-    use_demo: bool = Field(True, description="Use demo data when BACnet device unavailable")
-    demo_building_id: Optional[str] = Field(
-        None,
-        description="Demo building ID to load data from (e.g., 'site-004'). Only used when use_demo=True.",
-    )
     bms_vendor: Optional[str] = Field(
         None,
         description="BMS vendor identifier (niagara, desigo, metasys, honeywell, schneider, trend, generic)",
@@ -123,9 +118,10 @@ async def discover_and_classify(request: DiscoverRequest):
     """
     Trigger point discovery and AI classification.
 
-    Scans a BACnet device for all points, classifies them using
-    Haystack/Brick ontology, groups into equipment, and stores
-    results for review.
+    Routes through 3-tier data source: BACnet (live device) -> Simulation
+    (Supabase equipment_sensor_readings) -> JSON fallback (static files).
+    Classifies points using Haystack/Brick ontology, groups into equipment,
+    and stores results for review.
 
     Returns a discovery_id for tracking the workflow.
     """
@@ -133,13 +129,11 @@ async def discover_and_classify(request: DiscoverRequest):
         discovery_service = get_point_discovery_service()
         mapping_service = get_mapping_service()
 
-        # Run discovery and classification
+        # Run discovery and classification (routes: BACnet -> Simulation -> JSON fallback)
         result = await discovery_service.discover_and_classify(
             device_ip=request.device_ip,
             site_id=request.site_id,
             device_bacnet_id=request.device_bacnet_id,
-            use_demo=request.use_demo,
-            demo_building_id=request.demo_building_id,
             bms_vendor=request.bms_vendor,
         )
 
