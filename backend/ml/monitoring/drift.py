@@ -242,6 +242,19 @@ class DriftDetector:
         total_feature_drift = sum(1 for r in feature_results if r["drift_detected"])
         total_model_drift = sum(1 for r in model_results if r["drift_detected"])
 
+        # Prometheus metrics instrumentation (best-effort)
+        try:
+            from app.api.metrics import sentinel_model_drift_alerts
+
+            # Set gauge per equipment type: 1 if drift detected, 0 if clean
+            for result in feature_results:
+                sentinel_model_drift_alerts.labels(
+                    site_id="site-002",
+                    model_type=result["equipment_type"].upper(),
+                ).set(1 if result["drift_detected"] else 0)
+        except Exception:
+            pass  # Metrics are best-effort, never block business logic
+
         return {
             "detected_at": datetime.now().isoformat(),
             "summary": {

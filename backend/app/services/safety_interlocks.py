@@ -440,6 +440,23 @@ class SafetyEngine:
         # Determine overall result
         allowed = len(block_violations) == 0
 
+        # Prometheus metrics instrumentation (best-effort)
+        try:
+            from app.api.metrics import sentinel_safety_violations_total
+
+            # Extract site_id from device context; fall back to "unknown"
+            site_id = getattr(device, "building_id", None) or getattr(device, "site_id", None) or "unknown"
+            if block_violations:
+                sentinel_safety_violations_total.labels(site_id=site_id, severity="block").inc(len(block_violations))
+            if warning_violations:
+                sentinel_safety_violations_total.labels(site_id=site_id, severity="warning").inc(
+                    len(warning_violations)
+                )
+            if alarm_violations:
+                sentinel_safety_violations_total.labels(site_id=site_id, severity="alarm").inc(len(alarm_violations))
+        except Exception:
+            pass  # Metrics are best-effort, never block business logic
+
         return {
             "allowed": allowed,
             "reasons": block_violations,

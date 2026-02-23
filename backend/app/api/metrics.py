@@ -105,8 +105,9 @@ sentinel_info = Info(
 # Static info set once at import time
 # ---------------------------------------------------------------------------
 _MODE = os.getenv("SENTINEL_MODE", "simulation")
-_VERSION = os.getenv("APP_VERSION", "13.2")
+_VERSION = os.getenv("APP_VERSION", "14.9")
 _BUILD_DATE = os.getenv("BUILD_DATE", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+_DEMO_MODE = os.getenv("DEMO_MODE", "").lower() in ("true", "1", "yes")
 
 sentinel_info.info(
     {
@@ -117,8 +118,9 @@ sentinel_info.info(
 )
 
 # ---------------------------------------------------------------------------
-# Seed demo values so the endpoint is non-empty before real hooks are wired.
-# These will be superseded once service-level instrumentation lands (Phase 2).
+# Seed demo values (only when DEMO_MODE=true).
+# In production, metrics start at 0 and increment from real service events.
+# Phase 115-01: Real instrumentation wired into services.
 # ---------------------------------------------------------------------------
 _DEMO_SEEDED = False
 
@@ -221,8 +223,9 @@ async def prometheus_metrics(request: Request) -> PlainTextResponse:
             media_type="text/plain",
         )
 
-    # Seed demo values on first request
-    _seed_demo_values()
+    # Seed demo values on first request (only in DEMO_MODE)
+    if _DEMO_MODE:
+        _seed_demo_values()
 
     # Generate Prometheus text exposition
     output = generate_latest(REGISTRY)
