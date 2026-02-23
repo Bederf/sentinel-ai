@@ -146,7 +146,6 @@ class PointDiscoveryService:
         self._bacnet_client = bacnet_client
         self._classifier = classifier or get_point_classifier()
         self._discovery_cache: Dict[str, DiscoveryResult] = {}
-        self._demo_mode = True  # Use demo data when BACnet not available
 
     def _get_bacnet_client(self) -> NiagaraBACnetClient:
         """Get the BACnet client, creating if needed."""
@@ -159,18 +158,17 @@ class PointDiscoveryService:
         device_ip: str,
         site_id: str,
         device_bacnet_id: Optional[int] = None,
-        use_demo: bool = True,
-        demo_building_id: Optional[str] = None,
         bms_vendor: Optional[str] = None,
     ) -> DiscoveryResult:
         """Run full point discovery and classification workflow.
 
+        Routes: BACnet (live device) -> Simulation (Supabase) -> JSON fallback.
+
         Args:
-            device_ip: IP address of the BACnet device (JACE/Supervisor)
+            device_ip: IP address of the BACnet device, or 'simulation' for simulation data
             site_id: SENTINEL site ID for mapping (the NEW site being created)
             device_bacnet_id: Optional BACnet device instance ID
-            use_demo: If True, use demo points when BACnet unavailable
-            demo_building_id: Demo building ID to load data from (e.g., 'site-004')
+            bms_vendor: Optional BMS vendor identifier
 
         Returns:
             DiscoveryResult with classified points and summary
@@ -184,17 +182,16 @@ class PointDiscoveryService:
         )
 
         logger.info(
-            "Starting point discovery %s for device %s (site %s, demo_building=%s)",
+            "Starting point discovery %s for device %s (site %s)",
             discovery_id,
             device_ip,
             site_id,
-            demo_building_id,
         )
 
         try:
-            # Phase 1: Discover points
+            # Phase 1: Discover points (BACnet -> Simulation -> JSON fallback)
             result.status = "discovering"
-            raw_points = await self._discover_points(device_ip, device_bacnet_id, use_demo, demo_building_id)
+            raw_points = await self._discover_points(device_ip, site_id, device_bacnet_id)
             result.raw_points = [p if isinstance(p, dict) else p.to_dict() for p in raw_points]
 
             logger.info(
@@ -235,60 +232,63 @@ class PointDiscoveryService:
     async def _discover_points(
         self,
         device_ip: str,
-        device_bacnet_id: Optional[int],
-        use_demo: bool,
-        demo_building_id: Optional[str] = None,
+        site_id: str,
+        device_bacnet_id: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        """Discover points from BACnet device or demo data.
-
-        Auto-starts the BACnet client if BAC0 is installed and a real
-        device_bacnet_id is provided.
+        """Discover points using 3-tier routing: BACnet -> Simulation -> JSON fallback.
 
         Args:
-            device_ip: Device IP address
-            device_bacnet_id: BACnet device ID
-            use_demo: Fall back to demo data if BACnet unavailable
-            demo_building_id: Demo building ID to load data from (e.g., 'site-004')
+            device_ip: Device IP address (or 'simulation' for simulation-only)
+            site_id: SENTINEL site ID for simulation/fallback lookup
+            device_bacnet_id: BACnet device ID (if provided, tries BACnet first)
 
         Returns:
             List of point dicts with name, description, object_type, etc.
         """
-        # Try BACnet discovery first
-        client = self._get_bacnet_client()
-
+        # Tier 1: Try BACnet discovery first (if device_bacnet_id provided)
         if device_bacnet_id is not None:
-            # Auto-start if not running and BAC0 is available
+            client = self._get_bacnet_client()
             if not client.is_running:
                 try:
                     logger.info("Auto-starting BACnet client for discovery...")
                     await client.start()
                 except BACnetException as e:
                     logger.warning(
-                        "BACnet auto-start failed: %s. %s",
+                        "BACnet auto-start failed: %s. Falling back to simulation data.",
                         e,
-                        "Falling back to demo data." if use_demo else "No fallback.",
                     )
-                    if not use_demo:
-                        raise
 
             if client.is_running:
                 try:
                     return await self._discover_from_bacnet(client, device_bacnet_id)
                 except BACnetException as e:
                     logger.warning(
-                        "BACnet discovery failed for device %d: %s. %s",
+                        "BACnet discovery failed for device %d: %s. Falling back to simulation data.",
                         device_bacnet_id,
                         e,
-                        "Falling back to demo data." if use_demo else "No fallback.",
                     )
-                    if not use_demo:
-                        raise
 
-        # Fall back to demo data
-        if use_demo or self._demo_mode:
-            return self._load_demo_points(demo_building_id)
+        # Tier 2: Try simulation data from Supabase
+        sim_points = self._load_simulation_points(site_id)
+        if sim_points:
+            logger.info(
+                "Loaded %d points from simulation data for site %s",
+                len(sim_points),
+                site_id,
+            )
+            return sim_points
 
-        raise BACnetException(f"BACnet client not running and demo mode disabled for {device_ip}")
+        # Tier 3: Fall back to static JSON files
+        json_points = self._load_demo_points(site_id)
+        if json_points:
+            logger.info(
+                "Loaded %d points from JSON fallback for site %s",
+                len(json_points),
+                site_id,
+            )
+            return json_points
+
+        raise BACnetException(f"No points found for {device_ip} (site {site_id}): all tiers exhausted")
 
     async def _discover_from_bacnet(
         self,
@@ -400,38 +400,38 @@ class PointDiscoveryService:
 
         return detailed_points
 
-    def _load_demo_points(self, demo_building_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Load demo points from a demo building's equipment files.
+    def _load_demo_points(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Load points from static JSON equipment files (Tier 3 fallback).
 
         Args:
-            demo_building_id: ID of demo building to load data from (e.g., 'site-004').
-                            If None, falls back to haystack_tags.json demo points.
+            site_id: Site ID to load equipment files from (e.g., 'site-002').
+                     If None, falls back to haystack_tags.json demo points.
 
         Returns:
             List of point dicts with name, description, object_type, etc.
         """
-        # If demo_building_id is provided, load from that building's equipment files
-        if demo_building_id:
-            equipment_dir = DATA_DIR.parent / "buildings" / demo_building_id / "equipment"
+        # If site_id is provided, load from that building's equipment files
+        if site_id:
+            equipment_dir = DATA_DIR.parent / "buildings" / site_id / "equipment"
 
             if equipment_dir.exists():
-                points = self._load_points_from_equipment_dir(equipment_dir, demo_building_id)
+                points = self._load_points_from_equipment_dir(equipment_dir, site_id)
                 if points:
                     logger.info(
-                        "Loaded %d demo points from %s equipment files",
+                        "Loaded %d JSON fallback points from %s equipment files",
                         len(points),
-                        demo_building_id,
+                        site_id,
                     )
                     return points
                 else:
                     logger.warning(
-                        "Demo building %s has no equipment files, falling back to haystack_tags.json",
-                        demo_building_id,
+                        "Site %s has no equipment files, falling back to haystack_tags.json",
+                        site_id,
                     )
             else:
                 logger.warning(
-                    "Demo building %s equipment directory not found: %s, falling back to haystack_tags.json",
-                    demo_building_id,
+                    "Site %s equipment directory not found: %s, falling back to haystack_tags.json",
+                    site_id,
                     equipment_dir,
                 )
 
