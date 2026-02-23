@@ -187,6 +187,11 @@ class Settings(BaseSettings):
     mcp_mutate_rate_limit: int = 10  # Mutate tool calls per minute per identity
     mcp_tool_timeout_seconds: int = 30  # Default tool execution timeout
 
+    # RLM Runner Integration (Phase 113 — see SENTINEL-RLM-ARCHITECTURE-SPEC-v1.0.md)
+    rlm_runner_url: str = "http://127.0.0.1:8010"  # Runner binds localhost only
+    rlm_runner_enabled: bool = False  # Disabled until runner is deployed
+    rlm_timeout_seconds: int = 120  # Max time per HTTP request to runner
+
     # JWT Token Claims (MCP SSE B1 - Issuer/Audience validation)
     jwt_issuer: str = "sentinel.bms"  # JWT iss claim
     jwt_audience: str = "sentinel.bms"  # JWT aud claim

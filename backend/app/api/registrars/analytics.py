@@ -6,6 +6,7 @@ Registers routers for AI/ML, predictions, diagnostics, and analytics.
 
 from fastapi import FastAPI
 
+from app.config.settings import settings
 from app.api import chat, hybrid_chat, local_chat
 from app.api import predictions, optimization, energy, ml_predictions
 from app.api import equipment_lookup, diagnosis, vision, ocr
@@ -77,3 +78,9 @@ def register_analytics_routers(app: FastAPI) -> None:
     app.include_router(mcp_sse.router, tags=["mcp-sse"])
     app.include_router(mcp_openai.router, tags=["mcp-openai"])
     app.include_router(mcp_openai.wellknown_router, tags=["mcp-discovery"])
+
+    # RLM Runner orchestration (Phase 113 — feature-gated)
+    if settings.rlm_runner_enabled:
+        from app.api import rlm_orchestration
+
+        app.include_router(rlm_orchestration.router, tags=["rlm"])
