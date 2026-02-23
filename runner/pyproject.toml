@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+pythonpath = ["."]
 testpaths = ["tests"]
 timeout = 30
 addopts = "-v --tb=short"
