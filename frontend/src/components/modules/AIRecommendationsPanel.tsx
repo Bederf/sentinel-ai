@@ -59,6 +59,7 @@ export function AIRecommendationsPanel({
           <div>
             <Text className="text-sm font-medium">AI Recommendations</Text>
             <Text className="text-2xl font-bold">{filteredRecs.length}</Text>
+            <Text className="text-xs text-gray-400 italic">AI-generated</Text>
           </div>
           {criticalRecs.length > 0 && (
             <Badge color="red" size="lg">{criticalRecs.length} Critical</Badge>
@@ -94,6 +95,9 @@ export function AIRecommendationsPanel({
           <Title>AI Recommendations</Title>
           <Text className="text-xs text-gray-500">
             {activeModules.length} module(s) active
+          </Text>
+          <Text className="text-xs text-gray-400 mt-0.5 italic">
+            AI-generated recommendations &middot; Review before acting
           </Text>
         </div>
         <div className="flex gap-2">
@@ -174,6 +178,7 @@ function RecommendationCard({ recommendation, onAcknowledge, onResolve }: Recomm
       <Flex justifyContent="between" alignItems="start">
         <div className="flex-1">
           <Flex alignItems="center" className="gap-2 mb-1">
+            <Badge color="sky" size="xs">AI</Badge>
             <Badge color={MODULE_COLORS[recommendation.source_module] || 'gray'} size="xs">
               {recommendation.source_module.toUpperCase()}
             </Badge>

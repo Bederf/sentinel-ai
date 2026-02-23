@@ -269,6 +269,12 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                 aria-label="typing"
               />
             )}
+            {/* EU AI Act Article 50 — AI-generated content disclosure */}
+            {!isStreaming && (
+              <p className="mt-2 text-xs" style={{ color: "var(--color-grafana-text-secondary)", opacity: 0.7 }}>
+                AI-generated &middot; Review before acting
+              </p>
+            )}
             {/* Speaker button for TTS (non-streaming assistant messages only) */}
             {onSpeak && !isStreaming && messageId && (
               <button

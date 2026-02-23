@@ -110,10 +110,13 @@ export const RecommendationsList: React.FC<RecommendationsListProps> = ({
           >
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
-                {/* Equipment */}
-                <h3 className="font-semibold text-white truncate">
-                  {rec.target_equipment}
-                </h3>
+                {/* Equipment + AI disclosure badge */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-sky-900/30 text-sky-300 border border-sky-800/40">AI</span>
+                  <h3 className="font-semibold text-white truncate">
+                    {rec.target_equipment}
+                  </h3>
+                </div>
 
                 {/* Action */}
                 {rec.action && (
