@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rlm-runner"
+version = "1.0.0"
+description = "RLM Runner — Recursive Language Model analysis service for SENTINEL"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+timeout = 30
+addopts = "-v --tb=short"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+indent-width = 4
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "RUF",  # Ruff-specific rules
+]
+
+ignore = [
+    "E501",  # Line too long (formatter handles this)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "ARG001",
+    "F841",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
