@@ -1,0 +1,29 @@
+[Unit]
+Description=SENTINEL RLM Runner Service
+After=network.target ollama.service
+Wants=ollama.service
+
+[Service]
+Type=simple
+User=sentinel-runner
+Group=sentinel-runner
+WorkingDirectory=/opt/rlm-runner
+ExecStart=/opt/rlm-runner/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8010
+Environment=PYTHONUNBUFFERED=1
+Environment=PATH=/opt/rlm-runner/venv/bin:/usr/local/bin:/usr/bin
+EnvironmentFile=-/etc/sentinel/rlm-runner.env
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rlm-runner
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/sentinel/rlm_out /var/log/rlm-runner
+ReadOnlyPaths=/var/lib/sentinel/cases /opt/rlm-runner
+
+[Install]
+WantedBy=multi-user.target
