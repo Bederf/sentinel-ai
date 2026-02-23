@@ -83,3 +83,6 @@ numpy>=1.24.0                  # Numeric calculations for geometry transformatio
 
 # Agent Framework (LangGraph)
 langgraph>=0.2.0               # StateGraph with checkpointing for multi-turn agents
+
+# Prometheus Metrics (Phase 114 - AI Governance Observability)
+prometheus_client>=0.20.0      # Prometheus text exposition format for /metrics endpoint

@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from app.api import health, sites, settings as settings_api, settings_db, system_health
 from app.api import auth, user_access, login_audit, mfa, cache, sites_aggregation, events, user_entitlements
+from app.api import metrics as prometheus_metrics
 
 
 def register_core_routers(app: FastAPI) -> None:
@@ -17,6 +18,9 @@ def register_core_routers(app: FastAPI) -> None:
     app.include_router(system_health.router, tags=["system-health"])
     app.include_router(cache.router, tags=["cache"])
     app.include_router(events.router, tags=["events"])
+
+    # Prometheus metrics (no prefix — mounted at root /metrics)
+    app.include_router(prometheus_metrics.router, tags=["monitoring"])
 
     # Sites (core entity) - IMPORTANT: sites_aggregation MUST be first for specific routes to match
     app.include_router(sites_aggregation.router, prefix="/api", tags=["sites-aggregation"])
