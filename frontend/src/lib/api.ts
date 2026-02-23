@@ -3816,8 +3816,6 @@ export interface DiscoverClassifyRequest {
   device_ip: string;
   site_id: string;
   device_bacnet_id?: number;
-  use_demo: boolean;
-  demo_building_id?: string;  // Demo building ID to load data from
   bms_vendor?: BMSVendor;
 }
 
@@ -3910,14 +3908,6 @@ export const niagaraApi = {
 export const bmsApi = niagaraApi;
 
 // ============= Sites API Interfaces (Onboarding Wizard) =============
-
-export interface DemoBuilding {
-  id: string;
-  name: string;
-  type: string;
-  equipment_count: number;
-  description: string;
-}
 
 export interface CreateSiteRequest {
   name: string;
