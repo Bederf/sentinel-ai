@@ -553,4 +553,5 @@ The RLM runner does not replace these. They continue to operate as-is.
 
 **End of document.**
 **Approved:** 2026-02-23
-**Next step:** Build the runner service and wire the first end-to-end pilot on Site 002.
+**Implemented:** Phase 113 (2026-02-23) -- runner foundation, LLM analysis engine, Sentinel integration, and deployment infrastructure. See [Phase 113 feature doc](../04-features/113-rlm-runner-service.md).
+**Next step:** Wire the first end-to-end pilot on Site 002.

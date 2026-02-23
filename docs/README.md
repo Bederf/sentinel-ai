@@ -2,9 +2,9 @@
 title: "SENTINEL Documentation"
 type: "guide"
 status: "approved"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-01-30"
-updated: "2026-02-22"
+updated: "2026-02-23"
 author: "Sentinel Development Team"
 tags: ["documentation", "overview"]
 domain: "general"
@@ -26,6 +26,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 ### 🏗️ Architecture
 - [System Overview](02-architecture/system-overview.md) - High-level architecture
+- [Architecture Repository (TOGAF)](architecture-repository/README.md) - TOGAF-aligned architecture principles, governance, landscapes, and roadmaps
 - [Module System](02-architecture/module-system.md) - Bolt-on module architecture, activation, cross-module integrations
 - [Module Connectivity & Cross-System Integration](02-architecture/module-connectivity.md) - How modules interconnect, integration patterns, multi-module behaviors, upsell value
 - [Profile-Based Optimization Architecture](02-architecture/profile-based-optimization.md) - Three optimization profiles (SWEAT ASSETS, COMFORT, COST) with multi-objective scoring and feedback loop (Phase 72)
@@ -58,6 +59,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Asset Health API](03-api-reference/asset-health-api.md)** - Combined equipment health scores + baseline status + deviation tracking per site/equipment (Phase 109A)
 - [System Health API](03-api-reference/system-health-api.md) - Unified health snapshots, diagnostics, and system error logs
 - **[Security API](03-api-reference/security-api.md)** - Access control events, visitor management, zone occupancy, cameras, occupancy trends, cross-module recommendations (Phases 27, 58, 69)
+- **[RLM Runner & Orchestration API](03-api-reference/rlm-api.md)** - Evidence analysis submission, result polling, audit trace, health check — runner direct and backend orchestration (Phase 113)
 
 ### ✨ Features
 
@@ -78,6 +80,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[45-01: Online Learning & Automated Retraining](04-features/45-01-online-learning.md)** - Model freshness monitoring, auto-retraining, A/B testing (Phase 45-01)
 - **[45-02: Fleet Learning & Cross-Site Insights](04-features/45-02-fleet-learning.md)** - Anonymized fleet patterns, global models, local fine-tuning (Phase 45-02)
 - **[45-03: MLOps Monitoring & Success Metrics](04-features/45-03-mlops-monitoring.md)** - Drift detection, ML alerting, retraining triggers, metrics dashboard (Phase 45-03)
+- **[113: RLM Runner Service](04-features/113-rlm-runner-service.md)** - Standalone long-context evidence analysis with recursive multi-pass LLM, POPIA redaction, audit trace, and feature-gated Sentinel integration (Phase 113)
 
 #### Asset Management Workflow
 - **[Asset Baseline Assessment](04-features/44-asset-baseline-assessment.md)** - Asset condition scoring and maintenance cost modeling (Phase 44)
@@ -135,6 +138,10 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 ### 🔒 Security & Governance
 - **[Security Documentation Suite](08-security/README.md)** - Complete security policy suite for FSR supplier onboarding
+- **[AI Governance Pack](ai-governance/README.md)** - ISO 42001, NIST AI RMF, and EU AI Act operational mapping with evidence structure
+- **[EU AI Act Compliance Register](compliance/eu-ai-act-compliance-register.md)** - AI feature inventory, risk class, obligations, owners, and evidence tracker
+- **[EU AI Act Policy](compliance/eu-ai-act-policy.md)** - Mandatory AI governance controls for EU AI Act alignment
+- **[EU AI Act Internal Audit 2026 Q2](compliance/eu-ai-act-internal-audit-2026Q2.md)** - Internal assurance checklist and findings tracker
 - **[FSR Gap Analysis - Updated](FSR_GAP_ANALYSIS_UPDATE.md)** - Current assessment against FSR V8 questionnaire
 - **Encryption at Rest** - Fernet AES-128-CBC for audit logs (Phase 81, v14.0)
 - **[Logging Architecture](08-security/logging-architecture.md)** - Promtail → Loki pipeline, security events, decision pipeline observability, Grafana dashboards
@@ -194,10 +201,13 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 ```
 docs/
+├── architecture-repository/ # TOGAF-aligned architecture repository (principles, governance, landscapes, roadmaps)
+├── ai-governance/          # AI governance pack (scope, risk mapping, controls, evidence)
 ├── 01-getting-started/      # Onboarding, setup, quick start
 ├── 02-architecture/         # System design, patterns, data flow
 ├── 03-api-reference/        # REST API, MCP tools, SSE streams
 ├── 04-features/             # Feature specifications
+├── compliance/              # Regulatory compliance (EU AI Act registers, policies, audits)
 ├── 05-bms-concepts/         # BMS/HVAC domain knowledge
 ├── 06-safety-compliance/    # Safety interlocks, audit trails
 ├── 07-integrations/         # BACnet, Modbus, CAFM, BMS, DALI
