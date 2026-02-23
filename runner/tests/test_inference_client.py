@@ -44,7 +44,7 @@ def _make_response(status_code: int = 200, json_data: dict | None = None) -> htt
         status_code=status_code,
         content=body,
         headers={"content-type": "application/json"},
-        request=httpx.Request("POST", "http://fake:11434/v1/chat/completions"),
+        request=httpx.Request("POST", "http://127.0.0.1:11434/v1/chat/completions"),
     )
     return resp
 
@@ -65,7 +65,7 @@ def _models_response(model_ids: list[str] | None = None) -> dict:
 @pytest.mark.asyncio
 async def test_chat_returns_text():
     """Mock httpx response with OpenAI-format JSON, verify text extracted."""
-    client = InferenceClient(base_url="http://fake:11434/v1")
+    client = InferenceClient(base_url="http://127.0.0.1:11434/v1")
 
     mock_resp = _make_response(200, _openai_response(content="Analysis complete"))
 
@@ -88,7 +88,7 @@ async def test_chat_returns_text():
 @pytest.mark.asyncio
 async def test_chat_retry_on_timeout():
     """First call raises TimeoutException, second succeeds."""
-    client = InferenceClient(base_url="http://fake:11434/v1")
+    client = InferenceClient(base_url="http://127.0.0.1:11434/v1")
 
     mock_resp = _make_response(200, _openai_response(content="Retry success"))
 
@@ -119,7 +119,7 @@ async def test_chat_retry_on_timeout():
 @pytest.mark.asyncio
 async def test_is_available_true():
     """Mock 200 from /models."""
-    client = InferenceClient(base_url="http://fake:11434/v1")
+    client = InferenceClient(base_url="http://127.0.0.1:11434/v1")
 
     mock_resp = _make_response(200, _models_response())
 
@@ -138,7 +138,7 @@ async def test_is_available_true():
 @pytest.mark.asyncio
 async def test_is_available_false():
     """Mock connection error -> returns False."""
-    client = InferenceClient(base_url="http://fake:11434/v1")
+    client = InferenceClient(base_url="http://127.0.0.1:11434/v1")
 
     with patch("app.services.inference_client.httpx.AsyncClient") as MockAsyncClient:
         instance = AsyncMock()
@@ -155,7 +155,7 @@ async def test_is_available_false():
 @pytest.mark.asyncio
 async def test_token_tracking():
     """Verify usage tokens captured from response."""
-    client = InferenceClient(base_url="http://fake:11434/v1")
+    client = InferenceClient(base_url="http://127.0.0.1:11434/v1")
 
     mock_resp = _make_response(
         200,
@@ -179,3 +179,24 @@ async def test_token_tracking():
 
     assert result.input_tokens == 42
     assert result.output_tokens == 99
+
+
+def test_cloud_url_blocked():
+    """Any non-local base_url must be rejected."""
+    with pytest.raises(ValueError, match="Cloud inference blocked"):
+        InferenceClient(base_url="https://api.anthropic.com/v1")
+
+    with pytest.raises(ValueError, match="Cloud inference blocked"):
+        InferenceClient(base_url="https://api.openai.com/v1")
+
+    with pytest.raises(ValueError, match="Cloud inference blocked"):
+        InferenceClient(base_url="http://some-cloud-host.com:8080/v1")
+
+
+def test_local_urls_allowed():
+    """127.0.0.1, localhost, and private IPs are accepted."""
+    # These should not raise
+    InferenceClient(base_url="http://127.0.0.1:11434/v1")
+    InferenceClient(base_url="http://localhost:11434/v1")
+    InferenceClient(base_url="http://192.168.1.100:11434/v1")
+    InferenceClient(base_url="http://10.0.0.5:11434/v1")

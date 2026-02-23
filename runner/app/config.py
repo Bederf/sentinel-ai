@@ -15,10 +15,8 @@ class Settings(BaseSettings):
     output_dir: str = "/var/lib/sentinel/rlm_out"
     log_dir: str = "/var/log/rlm-runner"
 
-    # Inference provider: "ollama" (local OpenAI-compatible) or "anthropic" (cloud)
+    # Inference — local only, no cloud
     inference_provider: str = "ollama"
-
-    # Ollama settings (used when inference_provider=ollama)
     model_base_url: str = "http://127.0.0.1:11434/v1"
     model_name: str = "phi3:mini"
     model_allowlist: list[str] = [
@@ -28,18 +26,14 @@ class Settings(BaseSettings):
         "nomic-embed-text",
     ]
 
-    # Anthropic settings (used when inference_provider=anthropic)
-    anthropic_api_key: str = ""
-    anthropic_model: str = "claude-haiku-4-5-20251001"
-
     # Budget limits
     max_runtime_seconds: int = 900
     max_recursion_depth: int = 6
-    max_tokens_per_call: int = 800
+    max_tokens_per_call: int = 4096
     temperature: float = 0.1
     inference_timeout_seconds: float = 600.0
 
-    # Confidence scoring — tune per model/site via env or runner.env
+    # Confidence scoring
     confidence_threshold_high: float = 0.7
     confidence_threshold_medium: float = 0.4
     scoring_version: int = 1

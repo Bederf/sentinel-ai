@@ -44,6 +44,14 @@ class TrajectoryData(BaseModel):
     elapsed_s: float = 0.0
 
 
+class ScoringMetadata(BaseModel):
+    """Snapshot of scoring config used for this result — enables audit of old runs."""
+
+    version: int = 1
+    threshold_medium: float = 0.4
+    threshold_high: float = 0.7
+
+
 class ResultSchema(BaseModel):
     """Full result schema matching spec Section 5.4."""
 
@@ -56,31 +64,35 @@ class ResultSchema(BaseModel):
     confidence: float = 0.0
     needs_deeper_run: bool = False
     trajectory: TrajectoryData = Field(default_factory=TrajectoryData)
-    scoring_version: int = Field(default_factory=lambda: _get_scoring_version())
+    scoring: ScoringMetadata = Field(default_factory=lambda: _build_scoring_metadata())
+    model_name: str = ""
+    model_provider: str = ""
 
     @computed_field  # type: ignore[prop-decorator]
     @property
     def confidence_label(self) -> Literal["low", "medium", "high"]:
         """Human-readable confidence label derived from the float score.
 
-        Thresholds are configurable via CONFIDENCE_THRESHOLD_HIGH and
-        CONFIDENCE_THRESHOLD_MEDIUM env vars (see config.py).
-        Use this for UI display and policy rules. The float stays stable for ML.
+        Thresholds come from the scoring metadata snapshot (which mirrors
+        config at result-creation time). Use for UI display and policy rules.
+        The float stays stable for ML.
         """
-        from app.config import settings
-
-        if self.confidence >= settings.confidence_threshold_high:
+        if self.confidence >= self.scoring.threshold_high:
             return "high"
-        if self.confidence >= settings.confidence_threshold_medium:
+        if self.confidence >= self.scoring.threshold_medium:
             return "medium"
         return "low"
 
 
-def _get_scoring_version() -> int:
-    """Read scoring_version from config at construction time."""
+def _build_scoring_metadata() -> ScoringMetadata:
+    """Snapshot scoring config at result-creation time."""
     from app.config import settings
 
-    return settings.scoring_version
+    return ScoringMetadata(
+        version=settings.scoring_version,
+        threshold_medium=settings.confidence_threshold_medium,
+        threshold_high=settings.confidence_threshold_high,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -118,5 +130,3 @@ class HealthResponse(BaseModel):
     status: str = "ok"
     version: str = "1.0.0"
     ollama_available: bool = False
-    inference_provider: str = "ollama"
-    inference_ready: bool = False
