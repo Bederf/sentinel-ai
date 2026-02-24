@@ -546,18 +546,28 @@ class MIPDispatchOptimizer:
         Falls back to synchronous optimize() with whatever data is available.
         """
         if ls_schedule is None:
-            try:
-                from app.services.eskomsepush_service import eskomsepush_service
+            # Check manual override first, then EskomSePush API
+            from app.config.settings import settings as _settings
 
-                if eskomsepush_service.is_configured:
-                    status = await eskomsepush_service.get_combined_status()
-                    sast_start = datetime.now(timezone.utc) + timedelta(hours=2)
-                    ls_schedule = _build_ls_schedule_from_eskom(
-                        status.area_events,
-                        sast_start,
-                    )
-            except Exception as e:
-                logger.debug("EskomSePush enrichment failed (non-fatal): %s", e)
+            override = _settings.load_shedding_stage_override
+            if override > 0:
+                # Manual override: build a synthetic 24h load-shedding schedule
+                ls_schedule = [True] * 96  # All intervals flagged
+                logger.info("MIP using manual load-shedding override (stage %d)", override)
+            elif override == -1:
+                # Use EskomSePush API if configured (paid, optional)
+                try:
+                    from app.services.eskomsepush_service import eskomsepush_service
+
+                    if eskomsepush_service.is_configured:
+                        status = await eskomsepush_service.get_combined_status()
+                        sast_start = datetime.now(timezone.utc) + timedelta(hours=2)
+                        ls_schedule = _build_ls_schedule_from_eskom(
+                            status.area_events,
+                            sast_start,
+                        )
+                except Exception as e:
+                    logger.debug("EskomSePush enrichment failed (non-fatal): %s", e)
 
         return self.optimize(site_id, initial_soc_kwh, load_forecast, solar_forecast, ls_schedule)
 

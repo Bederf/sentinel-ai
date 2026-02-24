@@ -2,7 +2,7 @@
 
 The "invisible optimiser" brain.  Runs a 5-minute dispatch cycle that:
   1. Reads current state (SOC, solar gen, building load, grid import/export)
-  2. Checks load shedding schedule via EskomSePush
+  2. Checks load shedding (manual override or EskomSePush API if configured)
   3. Gets dispatch action from arbitrage engine
   4. Applies compliance constraints (export limits from 34-03)
   5. Executes action (update simulated BESS state for demo)
@@ -20,6 +20,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
+from app.config.settings import settings
 from app.services.solar_arbitrage_engine import (
     get_solar_arbitrage_engine,
     DispatchActionType,
@@ -495,16 +496,23 @@ class SolarDispatchService:
         # Try to read current interval from cached MIP schedule
         action = self._get_mip_dispatch_action(site_id, current_soc, solar_kw, load_kw, sast)
 
-        # Check live load shedding status (non-fatal)
+        # Check load shedding status: manual override > EskomSePush API > off
         load_shedding_active = False
-        try:
-            from app.services.eskomsepush_service import eskomsepush_service
+        override = settings.load_shedding_stage_override
+        if override > 0:
+            # Manual override: operator has set a stage (1-8)
+            load_shedding_active = True
+            logger.info("Load shedding ACTIVE (manual override stage %d)", override)
+        elif override == -1:
+            # Use EskomSePush API if configured (paid API, optional)
+            try:
+                from app.services.eskomsepush_service import eskomsepush_service
 
-            if eskomsepush_service.is_configured:
-                eskom_status = await eskomsepush_service.get_combined_status()
-                load_shedding_active = eskom_status.eskom.stage > 0
-        except Exception:
-            pass  # Non-fatal — continue with False
+                if eskomsepush_service.is_configured:
+                    eskom_status = await eskomsepush_service.get_combined_status()
+                    load_shedding_active = eskom_status.eskom.stage > 0
+            except Exception:
+                pass  # Non-fatal — continue with False
 
         if action is None:
             # Fallback: get dispatch action from arbitrage engine

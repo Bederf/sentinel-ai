@@ -155,7 +155,14 @@ class Settings(BaseSettings):
     # AEGIS BESS Writer (Phase 0: disabled; Phase 1: enable after ops CONFIRM)
     aegis_bess_writer_enabled: bool = False
 
-    # EskomSePush API (load shedding data)
+    # Load shedding — manual override takes priority over any API
+    # Set to a stage number (1-8) to force load-shedding mode without an API.
+    # Set to 0 (default) for no load shedding, or -1 to use EskomSePush API if configured.
+    load_shedding_stage_override: int = 0
+
+    # EskomSePush API (optional paid upgrade — not required for Sprint 0)
+    # Free tier: 50 req/day. Business tier: R100+/month.
+    # System works without it — uses load_shedding_stage_override instead.
     eskomsepush_api_token: str = ""
     eskomsepush_area_id: str = ""  # Area ID from EskomSePush (use /areas_search to find)
     eskomsepush_cache_seconds: int = 300  # Cache API responses for 5 minutes
