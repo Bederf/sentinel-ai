@@ -124,15 +124,14 @@ export function getUserViewMode(email: string): 'auditor' | 'operator' | 'admin'
 
 /**
  * Get the default view to show when user logs in.
- * DEFAULT LANDING PAGE: 'dashboard' (not AI Chat)
+ * DEFAULT LANDING PAGE: 'ai-chat'
  *
  * Grant Demo (grantdemo.co.za) users override this and default to 'occupancy'.
- * Bederf protonmail users default to 'dashboard'.
- * All other users default to 'dashboard'.
+ * All other users default to 'ai-chat'.
  */
 export function getDefaultView(email: string): View {
   const config = getCompanyDemoConfig(email);
-  return config?.defaultView || 'dashboard';
+  return config?.defaultView || 'ai-chat';
 }
 
 /**

@@ -526,7 +526,7 @@ async def list_equipment(
             "install_date": eq.get("install_date", ""),
             "last_service": eq.get("last_service", ""),
             "status": eq.get("status", "normal"),
-            "health_score": int(eq.get("health_score", 100)),
+            "health_score": int(eq.get("health_score") or 100),
             "location": eq.get("location", ""),
             "serial_number": eq.get("serial_number", ""),
         }
@@ -597,7 +597,7 @@ async def get_equipment(equipment_id: str) -> EquipmentResponse:
         "install_date": raw_eq.get("install_date", ""),
         "last_service": raw_eq.get("last_service", ""),
         "status": raw_eq.get("status", "normal"),
-        "health_score": int(raw_eq.get("health_score", 100)),
+        "health_score": int(raw_eq.get("health_score") or 100),
         "location": raw_eq.get("location", ""),
         "serial_number": raw_eq.get("serial_number", ""),
     }

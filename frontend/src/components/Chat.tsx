@@ -38,6 +38,7 @@ export function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const hasLoadedSitesRef = useRef(false);
+  const hasAutoGreetedRef = useRef(false);
 
   // Voice chat hooks
   const stt = useSpeechRecognition({
@@ -106,6 +107,48 @@ export function Chat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingContent]);
+
+  // Auto-greet: send a welcome query on first load so the user sees live data immediately
+  useEffect(() => {
+    if (hasAutoGreetedRef.current || messages.length > 0 || isLoading) return;
+    if (!selectedSiteId) return;
+    hasAutoGreetedRef.current = true;
+
+    const autoGreet = async () => {
+      const greetMessage = "Good day. Give me a quick overview of how the building is doing.";
+      const greetMsg: Message = {
+        id: `msg-${Date.now()}-greet`,
+        role: "user",
+        content: greetMessage,
+      };
+      setMessages([greetMsg]);
+      setIsLoading(true);
+      setStreamingContent("");
+
+      try {
+        let fullResponse = "";
+        await streamChat(greetMessage, undefined, (chunk) => {
+          fullResponse += chunk;
+          setStreamingContent(fullResponse);
+        }, false, selectedSiteId);
+
+        setMessages((prev) => [
+          ...prev,
+          { id: `msg-${Date.now()}-greet-resp`, role: "assistant", content: fullResponse },
+        ]);
+      } catch (error) {
+        console.error("Auto-greet error:", error);
+        setMessages((prev) => [
+          ...prev,
+          { id: `msg-${Date.now()}-greet-err`, role: "assistant", content: "Welcome to SENTINEL. Ask me anything about your building." },
+        ]);
+      } finally {
+        setIsLoading(false);
+        setStreamingContent("");
+      }
+    };
+    autoGreet();
+  }, [selectedSiteId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Generate unique ID for messages
   const generateId = () => `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;

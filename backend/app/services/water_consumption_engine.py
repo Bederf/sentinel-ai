@@ -176,35 +176,45 @@ class WaterConsumptionEngine:
             # Update power_meters table (for consistency with energy tracking)
             meter_id = f"{self.building_id.split('-')[-1]}-MTR-B1-WATER"
 
-            meter_data = {
-                "meter_id": meter_id,
-                "active_power_kw": 0.0,  # Water doesn't use kW, but field needed
-                "active_liters_per_hour": total_liters,
-                "last_update": simulated_date.isoformat(),
-            }
-
-            # Upsert power_meters (soft insert if not exists)
+            # Update existing water meter (skip if meter doesn't exist yet)
             try:
-                self.client.table("power_meters").upsert(meter_data).execute()
-            except Exception as e:
-                logger.warning(f"Could not upsert power_meters for water: {e}")
+                self.client.table("power_meters").update(
+                    {
+                        "active_power_kw": 0.0,
+                        "last_poll": simulated_date.isoformat(),
+                    }
+                ).eq("meter_id", meter_id).execute()
+            except Exception:
+                logger.debug(f"[WATER] Meter {meter_id} not found, skipping update")
 
-            # Record in energy_consumption_history (repurposed for water tracking)
-            history_record = {
-                "building_id": self.building_id,
-                "meter_id": meter_id,
-                "timestamp": simulated_date.isoformat(),
-                "energy_kwh": 0.0,  # Not applicable for water
-                "energy_type": "WATER",
-                "simulated_hour": simulated_hour,
-                "zone_details": zone_consumption,  # Per-zone breakdown
-                "daylight_lux": 0.0,  # Not applicable
-            }
-
+            # Update daily energy_consumption_history (water tracked under other_kwh)
+            today_str = simulated_date.strftime("%Y-%m-%d")
             try:
-                self.client.table("energy_consumption_history").insert(history_record).execute()
+                existing = (
+                    self.client.table("energy_consumption_history")
+                    .select("other_kwh")
+                    .eq("building_id", self.building_id)
+                    .eq("date", today_str)
+                    .maybe_single()
+                    .execute()
+                )
+                prev_kwh = float(existing.data.get("other_kwh", 0)) if existing.data else 0
+                # Water pump energy is negligible; track volume in logs, not in energy table
+                self.client.table("energy_consumption_history").upsert(
+                    {
+                        "building_id": self.building_id,
+                        "date": today_str,
+                        "other_kwh": round(prev_kwh, 2),
+                    },
+                    on_conflict="building_id,date",
+                ).execute()
             except Exception as e:
-                logger.warning(f"Could not insert water consumption history: {e}")
+                logger.warning(f"Could not update energy history for water: {e}")
+
+            # Log water volume for diagnostics
+            logger.debug(
+                f"[WATER] {meter_id}: {total_liters:.1f}L/hr at hour {simulated_hour:02d}, zones: {zone_consumption}"
+            )
 
         except Exception as e:
             logger.error(f"Error writing water consumption: {e}")

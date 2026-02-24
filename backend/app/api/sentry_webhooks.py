@@ -676,3 +676,78 @@ async def get_inspection_checklist_for_telegram(equipment_type: str):
         "checklist_text": "\n".join(lines),
         "items": items,
     }
+
+
+# ---------------------------------------------------------------------------
+# Work Order Creation (Sentry-authenticated)
+# ---------------------------------------------------------------------------
+
+
+class SentryWorkOrderRequest(BaseModel):
+    """Work order creation request from Sentry bot."""
+
+    equipment_code: str = Field(..., description="Equipment code (e.g., S002-LUM-202-14)")
+    title: str = Field(..., description="Work order title")
+    description: str = Field(..., description="Full description")
+    priority: str = Field("medium", description="low, medium, high, urgent, critical")
+    created_by: str = Field("SENTINEL", description="Creator identifier")
+
+
+@router.post("/create-work-order", status_code=status.HTTP_200_OK)
+async def sentry_create_work_order(
+    req: SentryWorkOrderRequest,
+    x_sentry_secret: Optional[str] = Header(None),
+):
+    """Create a work order in Supabase, authenticated via Sentry webhook secret.
+
+    Returns the created WO with code, assigned technician, and equipment info.
+    Used by Sentry bot agents for inspection WOs, health-triggered WOs, etc.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="create_work_order")
+
+    from app.database.repositories.work_order_repository import get_work_order_repository
+    from app.database.repositories.technician_repository import get_technician_repository
+
+    try:
+        wo_repo = get_work_order_repository()
+        tech_repo = get_technician_repository()
+
+        # Get technician for this equipment
+        tech = await tech_repo.get_technician_for_equipment_code(req.equipment_code)
+
+        wo_data = {
+            "equipment_code": req.equipment_code,
+            "title": req.title,
+            "description": req.description,
+            "priority": req.priority if req.priority != "critical" else "urgent",
+            "status": "scheduled",
+            "created_by": req.created_by,
+        }
+
+        if tech:
+            wo_data["assigned_to"] = tech.get("name")
+            wo_data["assigned_team"] = tech.get("specialty")
+
+        created = await wo_repo.create_work_order(wo_data)
+
+        if not created:
+            raise HTTPException(status_code=500, detail="Failed to create work order")
+
+        return {
+            "success": True,
+            "code": created.get("code"),
+            "id": created.get("id"),
+            "equipment_code": req.equipment_code,
+            "equipment_name": created.get("equipment_name", req.title),
+            "assigned_to": wo_data.get("assigned_to"),
+            "technician_email": tech.get("email") if tech else None,
+            "technician_telegram_id": tech.get("telegram_id") if tech else None,
+            "priority": req.priority,
+            "status": "scheduled",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Sentry WO creation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

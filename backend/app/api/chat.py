@@ -360,33 +360,40 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
 
     # 2. System chat mode (search_docs=false) - work orders and device control
 
-    # Check for work order requests
-    wo_detection = work_order_service.detect_work_order_request(user_message)
-    if wo_detection and wo_detection.get("detected"):
-        logger.info(f"Detected work order request: {wo_detection}")
+    # When Claude tools are available, let Claude handle work orders
+    # (better UX: confirms details, looks up equipment, validates).
+    # Only fall back to direct detection when tools are not available.
+    tools_enabled = (
+        not hybrid_ai_service.is_local_ai_only_mode() and hybrid_ai_service.get_active_cloud_provider() == "anthropic"
+    )
 
-        work_order = work_order_service.create_work_order(
-            description=user_message,
-            equipment_ref=wo_detection.get("equipment_ref"),
-            category=wo_detection.get("category", "other"),
-            priority=wo_detection.get("priority", "medium"),
-        )
+    if not tools_enabled:
+        wo_detection = work_order_service.detect_work_order_request(user_message)
+        if wo_detection and wo_detection.get("detected"):
+            logger.info(f"Detected work order request (no-tools fallback): {wo_detection}")
 
-        response_message = work_order.format_confirmation()
+            work_order = work_order_service.create_work_order(
+                description=user_message,
+                equipment_ref=wo_detection.get("equipment_ref"),
+                category=wo_detection.get("category", "other"),
+                priority=wo_detection.get("priority", "medium"),
+            )
 
-        return StreamingResponse(
-            generate_static_sse(response_message),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-                "X-Response-Type": "work_order_created",
-                "X-Work-Order-Id": work_order.id,
-                "X-AI-Assisted": "true",
-                **get_chat_provenance_headers(data_subject_id),
-            },
-        )
+            response_message = work_order.format_confirmation()
+
+            return StreamingResponse(
+                generate_static_sse(response_message),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",
+                    "X-Response-Type": "work_order_created",
+                    "X-Work-Order-Id": work_order.id,
+                    "X-AI-Assisted": "true",
+                    **get_chat_provenance_headers(data_subject_id),
+                },
+            )
 
     # Check demo cache if DEMO_MODE is enabled
     demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"

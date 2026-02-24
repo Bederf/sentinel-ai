@@ -101,7 +101,7 @@ function App() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<View>("dashboard");
+  const [currentView, setCurrentView] = useState<View>("ai-chat");
   const [viewRefreshKey, setViewRefreshKey] = useState(0);
   // Card library removed — dashboard now shows only portfolio-level sections
   const [currentTime, setCurrentTime] = useState(new Date());

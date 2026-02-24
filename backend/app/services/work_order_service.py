@@ -106,7 +106,9 @@ MAINTENANCE_KEYWORDS = [
     "fix",
     "service",
     "maintenance needed",
-    "down",
+    "is down",
+    "went down",
+    "shut down",
     "offline",
     "stopped",
     "won't start",
@@ -247,8 +249,22 @@ class WorkOrderService:
                 "description": message,
             }
 
-        # If just a clear maintenance issue description
-        if has_maintenance_keyword and len(message) > 20:
+        # Without equipment reference, require explicit work order intent
+        wo_intent_phrases = [
+            "create work order",
+            "create wo",
+            "raise work order",
+            "raise wo",
+            "log a job",
+            "maintenance needed",
+            "needs repair",
+            "needs fixing",
+            "schedule maintenance",
+            "report fault",
+            "report issue",
+        ]
+        has_wo_intent = any(phrase in message_lower for phrase in wo_intent_phrases)
+        if has_maintenance_keyword and has_wo_intent and len(message) > 20:
             return {
                 "detected": True,
                 "equipment_ref": equipment_ref,

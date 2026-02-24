@@ -211,10 +211,21 @@ class LightingSimulationEngine:
     async def _load_zone_metadata(self) -> None:
         """Load zone configuration from database."""
         try:
+            # Resolve building code to UUID if needed (hvac_zones.building_id is UUID)
+            building_uuid = self.building_id
+            try:
+                bldg = (
+                    self.supabase.table("buildings").select("id").eq("code", self.building_id).maybe_single().execute()
+                )
+                if bldg and bldg.data:
+                    building_uuid = bldg.data["id"]
+            except Exception:
+                pass  # Fall through with original value
+
             response = (
                 self.supabase.table("hvac_zones")
                 .select("id, zone_id, zone_name, floor, typical_occupancy, area_sqm")
-                .eq("building_id", self.building_id)
+                .eq("building_id", building_uuid)
                 .execute()
             )
 
@@ -247,27 +258,39 @@ class LightingSimulationEngine:
             lighting_kwh = round(total_power, 2)
 
             # Update power_meters table for lighting feeder
-            hvac_meter_update = {
-                "meter_id": "S002-MTR-B1-LIGHT",  # Lighting Distribution feeder
-                "active_power_kw": round(total_power, 2),
-                "last_update": datetime.utcnow().isoformat() + "Z",
-            }
+            # Update existing power meter (skip if meter doesn't exist yet)
+            try:
+                self.supabase.table("power_meters").update(
+                    {
+                        "active_power_kw": round(total_power, 2),
+                        "last_poll": datetime.utcnow().isoformat() + "Z",
+                    }
+                ).eq("meter_id", "S002-MTR-B1-LIGHT").execute()
+            except Exception:
+                logger.debug("[LIGHTING] Meter S002-MTR-B1-LIGHT not found, skipping update")
 
-            self.supabase.table("power_meters").upsert(hvac_meter_update, on_conflict="meter_id").execute()
-
-            # Record hourly energy consumption
-            energy_record = {
-                "building_id": self.building_id,
-                "meter_id": "S002-MTR-B1-LIGHT",
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "energy_kwh": lighting_kwh,
-                "energy_type": "LIGHTING",
-                "simulated_hour": simulated_hour,
-                "zone_details": zone_power,
-                "daylight_lux": round(daylight_lux, 1),
-            }
-
-            self.supabase.table("energy_consumption_history").insert(energy_record).execute()
+            # Update daily energy_consumption_history (upsert lighting_kwh for today)
+            today_str = datetime.utcnow().strftime("%Y-%m-%d")
+            try:
+                existing = (
+                    self.supabase.table("energy_consumption_history")
+                    .select("lighting_kwh")
+                    .eq("building_id", self.building_id)
+                    .eq("date", today_str)
+                    .maybe_single()
+                    .execute()
+                )
+                prev_kwh = float(existing.data.get("lighting_kwh", 0)) if existing.data else 0
+                self.supabase.table("energy_consumption_history").upsert(
+                    {
+                        "building_id": self.building_id,
+                        "date": today_str,
+                        "lighting_kwh": round(prev_kwh + lighting_kwh, 2),
+                    },
+                    on_conflict="building_id,date",
+                ).execute()
+            except Exception as e:
+                logger.warning(f"[LIGHTING] Could not record energy history: {e}")
 
             logger.debug(
                 f"[LIGHTING] Updated meter S002-MTR-B1-LIGHT: "

@@ -6,6 +6,8 @@ This module implements the tool functions that Claude can call to:
 - Get optimization recommendations
 - Access alerts, anomalies, and maintenance status
 - Provide intelligent suggestions for building operations
+- Create work orders, approve/reject recommendations (operator+)
+- Adjust setpoints and reset equipment faults (operator+)
 """
 
 import json
@@ -15,7 +17,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from app.database.repositories.module_access_repository import get_module_access_repository
-from app.models.auth import SentinelRole
+from app.models.auth import ROLE_HIERARCHY, SentinelRole
 from app.services.device_abstraction import device_manager
 from app.models.device import DeviceStatus
 from app.models.module_registry import ModuleType
@@ -278,8 +280,12 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
         eq_resp = eq_query.execute()
         equipment = eq_resp.data if eq_resp.data else []
 
-        # Get alerts for site
-        alerts_query = client.table("alerts").select("id, type, severity, message, status, created_at, equipment_id")
+        # Get active alerts for site
+        alerts_query = (
+            client.table("alerts")
+            .select("id, type, severity, message, status, created_at, equipment_id")
+            .eq("status", "active")
+        )
         if building_uuid:
             alerts_query = alerts_query.eq("building_id", building_uuid)
         alerts_resp = alerts_query.execute()
@@ -464,7 +470,7 @@ async def get_equipment_health(
         # Build equipment query from Supabase
         query = client.table("equipment").select(
             "id, code, name, type, health_score, status, last_service, "
-            "install_date, manufacturer, model, location, metadata, building_id, buildings(code, name, floors, sqm)"
+            "install_date, manufacturer, model, location, device_info, building_id, buildings(code, name, floors, sqm)"
         )
 
         # Filter by site if provided
@@ -522,11 +528,11 @@ async def get_equipment_health(
             building_info = eq.get("buildings", {}) or {}
             eq_site_id = building_info.get("code", "unknown")
 
-            # Extract sensor reading from metadata if available
-            metadata = eq.get("metadata") or {}
-            current_reading = metadata.get("current_reading")
-            reading_unit = metadata.get("unit")
-            setpoint = metadata.get("setpoint")
+            # Extract sensor reading from device_info if available
+            device_info = eq.get("device_info") or {}
+            current_reading = device_info.get("current_reading")
+            reading_unit = device_info.get("unit")
+            setpoint = device_info.get("setpoint")
 
             item = {
                 "id": eq.get("code") or eq.get("id"),
@@ -543,8 +549,8 @@ async def get_equipment_health(
                 "maintenance_due": health_score < thresholds["warning"] or highest_risk > 60,
             }
 
-            # Add all metadata readings based on equipment type
-            if metadata:
+            # Add all device_info readings based on equipment type
+            if device_info:
                 # Common readings
                 if current_reading is not None:
                     item["current_reading"] = current_reading
@@ -557,106 +563,106 @@ async def get_equipment_health(
                     item["unit"] = "ppm"
 
                 # Occupancy sensors
-                if metadata.get("occupied") is not None:
-                    item["occupied"] = metadata.get("occupied")
-                    item["occupant_count"] = metadata.get("occupant_count", 0)
+                if device_info.get("occupied") is not None:
+                    item["occupied"] = device_info.get("occupied")
+                    item["occupant_count"] = device_info.get("occupant_count", 0)
 
                 # Lighting
-                if metadata.get("brightness_percent") is not None:
-                    item["brightness_percent"] = metadata.get("brightness_percent")
-                    item["is_on"] = metadata.get("is_on", False)
-                    item["power_watts"] = metadata.get("power_watts", 0)
+                if device_info.get("brightness_percent") is not None:
+                    item["brightness_percent"] = device_info.get("brightness_percent")
+                    item["is_on"] = device_info.get("is_on", False)
+                    item["power_watts"] = device_info.get("power_watts", 0)
 
                 # Daylight sensors
-                if metadata.get("current_lux") is not None:
-                    item["current_lux"] = metadata.get("current_lux")
-                    item["lux_setpoint"] = metadata.get("lux_setpoint")
+                if device_info.get("current_lux") is not None:
+                    item["current_lux"] = device_info.get("current_lux")
+                    item["lux_setpoint"] = device_info.get("lux_setpoint")
 
                 # HVAC (VAV, FCU, AHU)
-                if metadata.get("supply_temp") is not None:
-                    item["supply_temp"] = metadata.get("supply_temp")
-                    item["return_temp"] = metadata.get("return_temp")
-                if metadata.get("airflow_cfm") is not None:
-                    item["airflow_cfm"] = metadata.get("airflow_cfm")
-                    item["damper_position_percent"] = metadata.get("damper_position_percent")
-                if metadata.get("fan_speed") is not None:
-                    item["fan_speed"] = metadata.get("fan_speed")
+                if device_info.get("supply_temp") is not None:
+                    item["supply_temp"] = device_info.get("supply_temp")
+                    item["return_temp"] = device_info.get("return_temp")
+                if device_info.get("airflow_cfm") is not None:
+                    item["airflow_cfm"] = device_info.get("airflow_cfm")
+                    item["damper_position_percent"] = device_info.get("damper_position_percent")
+                if device_info.get("fan_speed") is not None:
+                    item["fan_speed"] = device_info.get("fan_speed")
 
                 # Chillers
-                if metadata.get("chw_supply_temp") is not None:
-                    item["chw_supply_temp"] = metadata.get("chw_supply_temp")
-                    item["chw_return_temp"] = metadata.get("chw_return_temp")
-                    item["load_percent"] = metadata.get("load_percent")
-                    item["power_kw"] = metadata.get("power_kw")
+                if device_info.get("chw_supply_temp") is not None:
+                    item["chw_supply_temp"] = device_info.get("chw_supply_temp")
+                    item["chw_return_temp"] = device_info.get("chw_return_temp")
+                    item["load_percent"] = device_info.get("load_percent")
+                    item["power_kw"] = device_info.get("power_kw")
 
                 # Generators (DSE8610 controller data)
-                if metadata.get("fuel_level_percent") is not None:
-                    item["generator_status"] = metadata.get("status")
-                    item["control_mode"] = metadata.get("control_mode")
-                    item["fuel_level_percent"] = metadata.get("fuel_level_percent")
-                    item["runtime_hours"] = metadata.get("runtime_hours")
-                    item["kwh_total"] = metadata.get("kwh_total")
+                if device_info.get("fuel_level_percent") is not None:
+                    item["generator_status"] = device_info.get("status")
+                    item["control_mode"] = device_info.get("control_mode")
+                    item["fuel_level_percent"] = device_info.get("fuel_level_percent")
+                    item["runtime_hours"] = device_info.get("runtime_hours")
+                    item["kwh_total"] = device_info.get("kwh_total")
                     # Engine
-                    item["engine_rpm"] = metadata.get("engine_rpm")
-                    item["engine_temp_c"] = metadata.get("engine_temp_c")
-                    item["coolant_temp_c"] = metadata.get("coolant_temp")
-                    item["oil_temp_c"] = metadata.get("oil_temp_c")
-                    item["oil_pressure_kpa"] = metadata.get("oil_pressure_kpa")
-                    item["battery_voltage"] = metadata.get("battery_voltage")
+                    item["engine_rpm"] = device_info.get("engine_rpm")
+                    item["engine_temp_c"] = device_info.get("engine_temp_c")
+                    item["coolant_temp_c"] = device_info.get("coolant_temp")
+                    item["oil_temp_c"] = device_info.get("oil_temp_c")
+                    item["oil_pressure_kpa"] = device_info.get("oil_pressure_kpa")
+                    item["battery_voltage"] = device_info.get("battery_voltage")
                     # Output (when running)
-                    item["output_kw"] = metadata.get("output_kw")
-                    item["output_kva"] = metadata.get("output_kva")
-                    item["frequency_hz"] = metadata.get("frequency_hz")
+                    item["output_kw"] = device_info.get("output_kw")
+                    item["output_kva"] = device_info.get("output_kva")
+                    item["frequency_hz"] = device_info.get("frequency_hz")
                     # Mains monitoring
-                    item["mains_healthy"] = metadata.get("mains_healthy")
-                    item["load_transfer_status"] = metadata.get("load_transfer_status")
+                    item["mains_healthy"] = device_info.get("mains_healthy")
+                    item["load_transfer_status"] = device_info.get("load_transfer_status")
                     # Alarms
-                    item["alarm_active"] = metadata.get("alarm_active")
-                    item["alarm_count"] = metadata.get("alarm_count")
-                    item["comms_status"] = metadata.get("comms_status")
+                    item["alarm_active"] = device_info.get("alarm_active")
+                    item["alarm_count"] = device_info.get("alarm_count")
+                    item["comms_status"] = device_info.get("comms_status")
 
                 # Power meters
-                if metadata.get("kw") is not None:
-                    item["kw"] = metadata.get("kw")
-                    item["kwh_today"] = metadata.get("kwh_today")
-                    item["power_factor"] = metadata.get("power_factor")
+                if device_info.get("kw") is not None:
+                    item["kw"] = device_info.get("kw")
+                    item["kwh_today"] = device_info.get("kwh_today")
+                    item["power_factor"] = device_info.get("power_factor")
 
                 # UPS
-                if metadata.get("battery_percent") is not None:
-                    item["battery_percent"] = metadata.get("battery_percent")
-                    item["load_percent"] = metadata.get("load_percent")
-                    item["runtime_minutes"] = metadata.get("runtime_minutes")
+                if device_info.get("battery_percent") is not None:
+                    item["battery_percent"] = device_info.get("battery_percent")
+                    item["load_percent"] = device_info.get("load_percent")
+                    item["runtime_minutes"] = device_info.get("runtime_minutes")
 
                 # BMS/SCADA (Desigo CC)
-                if metadata.get("total_data_points") is not None:
-                    item["total_data_points"] = metadata.get("total_data_points")
-                    item["online_devices"] = metadata.get("online_devices")
-                    item["offline_devices"] = metadata.get("offline_devices")
-                    item["active_alarms"] = metadata.get("active_alarms")
-                    item["unacknowledged_alarms"] = metadata.get("unacknowledged_alarms")
-                    item["alarms_today"] = metadata.get("alarms_today")
-                    item["subsystems"] = metadata.get("subsystems")
-                    item["protocols"] = metadata.get("protocols")
+                if device_info.get("total_data_points") is not None:
+                    item["total_data_points"] = device_info.get("total_data_points")
+                    item["online_devices"] = device_info.get("online_devices")
+                    item["offline_devices"] = device_info.get("offline_devices")
+                    item["active_alarms"] = device_info.get("active_alarms")
+                    item["unacknowledged_alarms"] = device_info.get("unacknowledged_alarms")
+                    item["alarms_today"] = device_info.get("alarms_today")
+                    item["subsystems"] = device_info.get("subsystems")
+                    item["protocols"] = device_info.get("protocols")
                     # Energy
-                    item["current_demand_kw"] = metadata.get("current_demand_kw")
-                    item["peak_demand_kw"] = metadata.get("peak_demand_kw")
-                    item["energy_today_kwh"] = metadata.get("energy_today_kwh")
-                    item["cost_today_zar"] = metadata.get("cost_today_zar")
-                    item["load_shedding_stage"] = metadata.get("load_shedding_stage")
+                    item["current_demand_kw"] = device_info.get("current_demand_kw")
+                    item["peak_demand_kw"] = device_info.get("peak_demand_kw")
+                    item["energy_today_kwh"] = device_info.get("energy_today_kwh")
+                    item["cost_today_zar"] = device_info.get("cost_today_zar")
+                    item["load_shedding_stage"] = device_info.get("load_shedding_stage")
                     # System
-                    item["active_users"] = metadata.get("active_users")
-                    item["historian_status"] = metadata.get("historian_status")
-                    item["trend_logs_active"] = metadata.get("trend_logs_active")
-                    item["active_schedules"] = metadata.get("active_schedules")
-                    item["uptime_days"] = metadata.get("uptime_days")
+                    item["active_users"] = device_info.get("active_users")
+                    item["historian_status"] = device_info.get("historian_status")
+                    item["trend_logs_active"] = device_info.get("trend_logs_active")
+                    item["active_schedules"] = device_info.get("active_schedules")
+                    item["uptime_days"] = device_info.get("uptime_days")
 
                 # BMS Controllers (Desigo PXC)
-                if metadata.get("points_configured") is not None:
-                    item["points_configured"] = metadata.get("points_configured")
-                    item["points_online"] = metadata.get("points_online")
-                    item["communication_status"] = metadata.get("communication_status")
-                    item["firmware"] = metadata.get("firmware")
-                    item["uptime_hours"] = metadata.get("uptime_hours")
+                if device_info.get("points_configured") is not None:
+                    item["points_configured"] = device_info.get("points_configured")
+                    item["points_online"] = device_info.get("points_online")
+                    item["communication_status"] = device_info.get("communication_status")
+                    item["firmware"] = device_info.get("firmware")
+                    item["uptime_hours"] = device_info.get("uptime_hours")
 
             # Add recommendation if needed
             if health_score < thresholds["critical"]:
@@ -887,7 +893,7 @@ async def get_alerts_and_anomalies(
 
         # Build alerts query
         alerts_query = client.table("alerts").select(
-            "id, type, severity, message, status, created_at, resolved_at, "
+            "id, type, severity, message, status, created_at, acknowledged_at, "
             "equipment_id, building_id, buildings(code, name), equipment(code, name)"
         )
 
@@ -898,7 +904,7 @@ async def get_alerts_and_anomalies(
         if severity:
             alerts_query = alerts_query.eq("severity", severity)
 
-        alerts_resp = alerts_query.order("created_at", desc=True).limit(20).execute()
+        alerts_resp = alerts_query.order("created_at", desc=True).limit(100).execute()
         alerts_data = alerts_resp.data if alerts_resp.data else []
 
         # Build predictions query (as anomalies)
@@ -3022,6 +3028,148 @@ CHAT_TOOLS = [
             "required": [],
         },
     },
+    # ================================================================
+    # Write/Action Tools — Operator+ only (role-gated)
+    # ================================================================
+    {
+        "name": "adjust_setpoint",
+        "description": (
+            "Adjust a temperature setpoint on HVAC equipment. "
+            "WRITE action — restricted to operators and admins. "
+            "Safety boundaries enforced: zone_temp 16-28°C, "
+            "supply_temp 4-25°C, supply_air_temp 12-22°C, "
+            "chw_supply_temp 5-12°C. "
+            "ALWAYS check the current reading with get_device_details "
+            "before adjusting. All changes are audit-logged."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "equipment_code": {
+                    "type": "string",
+                    "description": "Equipment code (e.g., 'S002-VAV-101', 'S002-AHU-L1-001')",
+                },
+                "setpoint_type": {
+                    "type": "string",
+                    "description": "Type of setpoint to adjust",
+                    "enum": ["zone_temp", "supply_temp", "supply_air_temp", "chw_supply_temp"],
+                },
+                "value": {
+                    "type": "number",
+                    "description": "New setpoint value in °C",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for adjustment (e.g., 'comfort complaint', 'energy optimization')",
+                },
+            },
+            "required": ["equipment_code", "setpoint_type", "value", "reason"],
+        },
+    },
+    {
+        "name": "create_work_order",
+        "description": (
+            "Create a maintenance work order for equipment issues. "
+            "WRITE action — restricted to operators and admins. "
+            "Provide a clear description, priority, and optionally "
+            "the equipment code. The work order will be logged and "
+            "assigned to the maintenance team."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "description": "Clear description of the issue or maintenance needed",
+                },
+                "equipment_code": {
+                    "type": "string",
+                    "description": "Equipment code if known (e.g., 'S002-AHU-L1-001')",
+                },
+                "priority": {
+                    "type": "string",
+                    "description": "Work order priority",
+                    "enum": ["critical", "high", "medium", "low"],
+                },
+                "category": {
+                    "type": "string",
+                    "description": "Work order category",
+                    "enum": ["hvac", "electrical", "plumbing", "maintenance", "other"],
+                },
+            },
+            "required": ["description"],
+        },
+    },
+    {
+        "name": "approve_recommendation",
+        "description": (
+            "Approve a pending AI recommendation for execution. "
+            "WRITE action — restricted to operators and admins. "
+            "The recommendation will be executed through the "
+            "safety-validated approval pipeline. Use get_system_status "
+            "or get_optimization_recommendations first to see pending items."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "recommendation_id": {
+                    "type": "string",
+                    "description": "The recommendation ID to approve (e.g., 'rec-...')",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional approval notes",
+                },
+            },
+            "required": ["recommendation_id"],
+        },
+    },
+    {
+        "name": "reject_recommendation",
+        "description": (
+            "Reject a pending AI recommendation. "
+            "WRITE action — restricted to operators and admins. "
+            "Provide a clear reason for rejection."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "recommendation_id": {
+                    "type": "string",
+                    "description": "The recommendation ID to reject",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for rejecting the recommendation",
+                },
+            },
+            "required": ["recommendation_id", "reason"],
+        },
+    },
+    {
+        "name": "reset_equipment_fault",
+        "description": (
+            "Reset a fault condition on equipment, restoring it to "
+            "operational status. WRITE action — restricted to operators "
+            "and admins. Safety-critical equipment (FIRE, GEN) cannot "
+            "be remotely reset — create a work order instead. Resets "
+            "health score, clears active predictions, and logs the action."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "equipment_code": {
+                    "type": "string",
+                    "description": "Equipment code to reset (e.g., 'S002-FCU-L1-A')",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for the fault reset",
+                },
+            },
+            "required": ["equipment_code"],
+        },
+    },
 ]
 
 
@@ -3045,7 +3193,54 @@ TOOL_MODULE_REQUIREMENTS: dict[str, ModuleType] = {
     "get_solar_savings": ModuleType.SOLAR,
     "get_solar_diagnostics": ModuleType.SOLAR,
     "get_solar_forecast": ModuleType.SOLAR,
+    # Write/action tools — module gating
+    "adjust_setpoint": ModuleType.CONTROL,
+    "approve_recommendation": ModuleType.CONTROL,
+    "reject_recommendation": ModuleType.CONTROL,
+    "reset_equipment_fault": ModuleType.CONTROL,
 }
+
+
+# Tool-level minimum role requirements.
+# Tools NOT listed here are available to any authenticated user.
+TOOL_ROLE_REQUIREMENTS: dict[str, SentinelRole] = {
+    # Existing write tools — now role-gated
+    "control_device": SentinelRole.OPERATOR,
+    "approve_point_mapping": SentinelRole.OPERATOR,
+    "correct_point_classification": SentinelRole.OPERATOR,
+    # New write/action tools
+    "adjust_setpoint": SentinelRole.OPERATOR,
+    "create_work_order": SentinelRole.OPERATOR,
+    "approve_recommendation": SentinelRole.OPERATOR,
+    "reject_recommendation": SentinelRole.OPERATOR,
+    "reset_equipment_fault": SentinelRole.OPERATOR,
+}
+
+
+def _has_required_role(user_role: Optional[SentinelRole], required_role: SentinelRole) -> bool:
+    """Check if user role meets the minimum required role."""
+    if user_role is None:
+        return False
+    # Handle string role values from auth middleware
+    if isinstance(user_role, str):
+        try:
+            user_role = SentinelRole(user_role)
+        except ValueError:
+            return False
+    user_level = ROLE_HIERARCHY.get(user_role, 0)
+    required_level = ROLE_HIERARCHY.get(required_role, 999)
+    return user_level >= required_level
+
+
+def _filter_tools_by_role(tools: list[dict], user_role: Optional[SentinelRole]) -> list[dict]:
+    """Filter tool list by role requirements (no module check)."""
+    result = []
+    for tool in tools:
+        required_role = TOOL_ROLE_REQUIREMENTS.get(tool.get("name"))
+        if required_role and not _has_required_role(user_role, required_role):
+            continue
+        result.append(tool)
+    return result
 
 
 def get_chat_tools(
@@ -3054,16 +3249,23 @@ def get_chat_tools(
     user_email: Optional[str] = None,
     user_role: Optional[SentinelRole] = None,
 ) -> list[dict[str, Any]]:
-    """Return chat tools filtered by active modules for a site.
+    """Return chat tools filtered by active modules and user role.
 
-    If no site is provided, return the full tool list.
+    If no site is provided, still filter by role requirements.
     """
     if not site_id:
-        return CHAT_TOOLS
+        return _filter_tools_by_role(CHAT_TOOLS, user_role)
 
     filtered: list[dict[str, Any]] = []
     for tool in CHAT_TOOLS:
         tool_name = tool.get("name")
+
+        # Role check — hide write tools from users below required role
+        required_role = TOOL_ROLE_REQUIREMENTS.get(tool_name)
+        if required_role and not _has_required_role(user_role, required_role):
+            continue
+
+        # Module check — existing behavior
         required_module = TOOL_MODULE_REQUIREMENTS.get(tool_name)
         if required_module is None:
             filtered.append(tool)
@@ -3171,6 +3373,516 @@ async def process_recommendation(
         return {"success": False, "error": str(e)}
 
 
+# ================================================================
+# Write/Action Tool Handlers — Operator+ only
+# ================================================================
+
+# Maps setpoint type to device point name
+SETPOINT_TYPE_TO_POINT = {
+    "zone_temp": "setpoint",
+    "supply_temp": "supply_temp_setpoint",
+    "supply_air_temp": "supply_air_temp_setpoint",
+    "chw_supply_temp": "chw_supply_temp_setpoint",
+    "humidity": "humidity_setpoint",
+}
+
+# Fallback limits only used if settings.json cannot be loaded
+_FALLBACK_LIMITS = {
+    "zone_temp": {"min": 18.0, "max": 26.0, "unit": "°C"},
+    "supply_temp": {"min": 4.0, "max": 26.0, "unit": "°C"},
+    "supply_air_temp": {"min": 12.0, "max": 26.0, "unit": "°C"},
+    "chw_supply_temp": {"min": 5.0, "max": 12.0, "unit": "°C"},
+    "humidity": {"min": 40.0, "max": 60.0, "unit": "%RH"},
+}
+
+
+def _get_setpoint_safety_limits() -> dict:
+    """Load setpoint safety limits from settings.json (Settings page)."""
+    try:
+        from app.api.settings import load_settings
+
+        settings = load_settings()
+        control_limits = settings.get("controlLimits", {})
+        temp = control_limits.get("temperature_setpoint", {})
+        chiller = control_limits.get("chiller_setpoint", {})
+        humidity = control_limits.get("humidity_setpoint", {})
+        return {
+            "zone_temp": {
+                "min": float(temp.get("min", 18)),
+                "max": float(temp.get("max", 26)),
+                "unit": temp.get("unit", "°C"),
+            },
+            "supply_temp": {
+                "min": 4.0,
+                "max": float(temp.get("max", 26)),
+                "unit": "°C",
+            },
+            "supply_air_temp": {
+                "min": 12.0,
+                "max": float(temp.get("max", 26)),
+                "unit": "°C",
+            },
+            "chw_supply_temp": {
+                "min": float(chiller.get("min", 5)),
+                "max": float(chiller.get("max", 12)),
+                "unit": chiller.get("unit", "°C"),
+            },
+            "humidity": {
+                "min": float(humidity.get("min", 40)),
+                "max": float(humidity.get("max", 60)),
+                "unit": humidity.get("unit", "%RH"),
+            },
+        }
+    except Exception:
+        return _FALLBACK_LIMITS.copy()
+
+
+async def adjust_setpoint(
+    equipment_code: str,
+    setpoint_type: str,
+    value: float,
+    reason: str = "Operator adjustment via chat",
+) -> dict[str, Any]:
+    """Adjust a setpoint within safety boundaries from settings."""
+    safety_limits = _get_setpoint_safety_limits()
+    limits = safety_limits.get(setpoint_type)
+    if not limits:
+        return {
+            "success": False,
+            "error": (f"Unknown setpoint type '{setpoint_type}'. Valid types: {list(safety_limits.keys())}"),
+        }
+
+    try:
+        value = float(value)
+    except (ValueError, TypeError):
+        return {"success": False, "error": f"Value must be a number, got: {value}"}
+
+    if value < limits["min"] or value > limits["max"]:
+        return {
+            "success": False,
+            "blocked": True,
+            "error": (
+                f"Value {value}{limits['unit']} is outside safe range "
+                f"({limits['min']}-{limits['max']}{limits['unit']}) for {setpoint_type}."
+            ),
+            "safety_limits": limits,
+        }
+
+    point_name = SETPOINT_TYPE_TO_POINT.get(setpoint_type, "setpoint")
+    return await control_device(
+        device_id=equipment_code,
+        point=point_name,
+        value=value,
+        reason=reason,
+    )
+
+
+def _get_template_requirements(equipment_type: str | None) -> dict[str, Any] | None:
+    """Get ML data collection template for an equipment type.
+
+    Returns the 'breakdown' template first (most common for WOs), falling
+    back to 'minor', then 'callout'.  Returns None if no template found.
+    """
+    if not equipment_type:
+        return None
+    try:
+        from app.services.ml_template_service import MLTemplateService
+
+        svc = MLTemplateService()
+        # Try breakdown first (most relevant for work orders), then minor
+        for service_type in ("breakdown", "callout", "minor"):
+            template = svc.get_template(equipment_type, service_type)
+            if template:
+                return template
+        return None
+    except Exception:
+        return None
+
+
+async def _build_wo_email_body(wo, description: str, reported_by: str, equipment_code: str | None) -> str:
+    """Build detailed WO email body with equipment diagnostics from Supabase.
+
+    Matches the format of WorkOrderNotifier._build_email_body():
+    WORK ORDER REFERENCES, EQUIPMENT & SITE, DIAGNOSTIC CONTEXT,
+    FIELD INSTRUCTIONS, NEXT STEPS.
+    """
+    wo_dict = wo.to_dict()
+    lines = [
+        f"Hi {reported_by},",
+        "",
+        "A new work order has been created via SENTINEL AI Chat.",
+        "",
+        "WORK ORDER REFERENCES",
+        f"- Work Order: {wo.id}",
+        f"- Priority: {wo.priority.upper()}",
+        f"- Category: {wo.category}",
+        f"- Created: {wo_dict.get('created_at', 'now')[:16].replace('T', ' ')}",
+        "- Status: OPEN",
+        "",
+        "EQUIPMENT & SITE",
+        f"- Site: {wo.site_name} [{wo.site_id}]",
+        f"- Equipment: {wo.equipment_name or 'Not specified'}",
+        f"- Equipment Code: {wo.equipment_id or 'N/A'}",
+        "",
+        "ISSUE DESCRIPTION",
+        description,
+    ]
+
+    # Pull equipment diagnostics from Supabase if equipment_code provided
+    if equipment_code:
+        try:
+            diag = await _fetch_equipment_diagnostics(equipment_code)
+            if diag:
+                lines.extend(["", "DIAGNOSTIC CONTEXT"])
+                lines.append(f"- Health Score: {diag['health_score']}%")
+                lines.append(f"- Equipment Status: {diag['status']}")
+                if diag.get("type"):
+                    lines.append(f"- Equipment Type: {diag['type']}")
+                if diag.get("manufacturer"):
+                    lines.append(f"- Manufacturer: {diag['manufacturer']}")
+                if diag.get("model"):
+                    lines.append(f"- Model: {diag['model']}")
+                if diag.get("last_service"):
+                    lines.append(f"- Last Service: {diag['last_service']}")
+
+                # Active alerts for this equipment
+                if diag.get("active_alerts"):
+                    lines.append("")
+                    lines.append(f"Active Alerts ({len(diag['active_alerts'])}):")
+                    for alert in diag["active_alerts"][:5]:
+                        sev = alert.get("severity", "info").upper()
+                        msg = alert.get("message", "No details")
+                        lines.append(f"  [{sev}] {msg}")
+
+                # Active predictions/anomalies
+                if diag.get("predictions"):
+                    lines.append("")
+                    lines.append(f"ML Predictions ({len(diag['predictions'])}):")
+                    for pred in diag["predictions"][:3]:
+                        ptype = pred.get("prediction_type", "unknown")
+                        prob = pred.get("probability_percent", 0)
+                        action = pred.get("recommended_action", "")
+                        lines.append(f"  - {ptype}: {prob}% probability")
+                        if action:
+                            lines.append(f"    Recommended: {action}")
+
+                # Current sensor readings
+                if diag.get("readings"):
+                    lines.append("")
+                    lines.append("Current Readings:")
+                    for key, val in diag["readings"].items():
+                        lines.append(f"  - {key}: {val}")
+        except Exception as diag_err:
+            logger.warning(f"Could not fetch equipment diagnostics for WO email: {diag_err}")
+
+    # Pull equipment-specific template for field instructions & required feedback
+    eq_type_for_template = None
+    if equipment_code:
+        # Extract type from equipment code: S002-AHU-L1-001 → ahu
+        parts = equipment_code.split("-")
+        if len(parts) >= 2:
+            eq_type_for_template = parts[1].lower()
+
+    template_items = _get_template_requirements(eq_type_for_template)
+
+    # Field instructions
+    lines.extend(
+        [
+            "",
+            "FIELD INSTRUCTIONS",
+            "1. Verify site safety controls before touching equipment.",
+        ]
+    )
+    if template_items:
+        # Equipment-specific prompts from ML template
+        step = 2
+        for item_name, prompt in template_items["prompts"].items():
+            lines.append(f"{step}. {prompt}")
+            step += 1
+        lines.append(f"{step}. Document all findings with photos, measurements, and notes.")
+    else:
+        lines.extend(
+            [
+                "2. Inspect the faulted subsystem and capture photos/readings.",
+                "3. Run diagnostics and record measured values.",
+                "4. Identify likely root cause and required corrective action.",
+                "5. Document all findings with photos, measurements, and notes.",
+            ]
+        )
+
+    # Next steps
+    lines.extend(
+        [
+            "",
+            "NEXT STEPS",
+            "1. Perform inspection and diagnostics per instructions above.",
+            "2. Capture required photos and meter readings for the service record.",
+            "3. Record root cause analysis and corrective action taken.",
+            "4. Update work order status when complete.",
+        ]
+    )
+
+    # Required feedback — equipment-specific or generic
+    lines.append("")
+    lines.append("REQUIRED FEEDBACK")
+    if template_items and template_items.get("required"):
+        for item in template_items["required"]:
+            label = item.replace("_", " ").title()
+            lines.append(f"- {label}")
+        if template_items.get("optional"):
+            lines.append("")
+            lines.append("Optional (if available):")
+            for item in template_items["optional"]:
+                label = item.replace("_", " ").title()
+                lines.append(f"- {label}")
+        if template_items.get("validation_rules"):
+            lines.append("")
+            lines.append("Expected Ranges:")
+            for field, rule in template_items["validation_rules"].items():
+                label = field.replace("_", " ").title()
+                unit = rule.get("unit", "")
+                lines.append(f"- {label}: {rule['min']}-{rule['max']} {unit}".rstrip())
+    else:
+        lines.extend(
+            [
+                "- Before/after photos of affected equipment",
+                "- Measured values (temperature, pressure, voltage as applicable)",
+                "- Root cause identified",
+                "- Corrective action taken or parts replaced",
+                "- Estimated time to next scheduled maintenance",
+            ]
+        )
+
+    lines.extend(
+        [
+            "",
+            "---",
+            "SENTINEL BMS Intelligence / Sentry",
+        ]
+    )
+
+    return "\n".join(lines)
+
+
+async def _fetch_equipment_diagnostics(equipment_code: str) -> dict[str, Any] | None:
+    """Fetch equipment health, alerts, and predictions from Supabase for WO context."""
+    try:
+        client = get_supabase_client()
+
+        # Get equipment details
+        eq_resp = (
+            client.table("equipment")
+            .select(
+                "id, code, name, type, health_score, status, last_service, "
+                "manufacturer, model, location, device_info, building_id"
+            )
+            .eq("code", equipment_code)
+            .execute()
+        )
+
+        if not eq_resp.data:
+            return None
+
+        eq = eq_resp.data[0]
+        eq_uuid = eq["id"]
+
+        # Get active alerts for this equipment
+        alerts_resp = (
+            client.table("alerts")
+            .select("severity, message, type, created_at")
+            .eq("equipment_id", eq_uuid)
+            .eq("status", "active")
+            .order("created_at", desc=True)
+            .limit(5)
+            .execute()
+        )
+
+        # Get active predictions for this equipment
+        pred_resp = (
+            client.table("predictions")
+            .select("prediction_type, probability_percent, recommended_action, contributing_factors")
+            .eq("equipment_id", eq_uuid)
+            .eq("status", "active")
+            .order("probability_percent", desc=True)
+            .limit(3)
+            .execute()
+        )
+
+        # Extract current readings from device_info
+        device_info = eq.get("device_info") or {}
+        readings = {}
+        if device_info.get("current_reading") is not None:
+            unit = device_info.get("unit", "")
+            readings["Current Reading"] = f"{device_info['current_reading']}{' ' + unit if unit else ''}"
+        if device_info.get("setpoint") is not None:
+            readings["Setpoint"] = f"{device_info['setpoint']}"
+        if device_info.get("supply_temp") is not None:
+            readings["Supply Temp"] = f"{device_info['supply_temp']}°C"
+        if device_info.get("return_temp") is not None:
+            readings["Return Temp"] = f"{device_info['return_temp']}°C"
+        if device_info.get("power_kw") is not None:
+            readings["Power"] = f"{device_info['power_kw']} kW"
+        if device_info.get("brightness_percent") is not None:
+            readings["Brightness"] = f"{device_info['brightness_percent']}%"
+
+        return {
+            "health_score": eq.get("health_score", 100) or 100,
+            "status": eq.get("status", "unknown"),
+            "type": eq.get("type"),
+            "manufacturer": eq.get("manufacturer"),
+            "model": eq.get("model"),
+            "last_service": eq.get("last_service"),
+            "active_alerts": alerts_resp.data or [],
+            "predictions": pred_resp.data or [],
+            "readings": readings if readings else None,
+        }
+    except Exception as e:
+        logger.warning(f"Failed to fetch equipment diagnostics for {equipment_code}: {e}")
+        return None
+
+
+async def create_work_order_chat(
+    description: str,
+    equipment_code: str | None = None,
+    priority: str = "medium",
+    category: str = "other",
+    site_id: str | None = None,
+    _user_email: str | None = None,
+) -> dict[str, Any]:
+    """Create a work order from chat and email confirmation to the logged-in user.
+
+    Sends a detailed email matching the WorkOrderNotifier format, including
+    equipment diagnostics (health, alerts, predictions) and field instructions.
+    """
+    try:
+        from app.services.work_order_service import work_order_service
+
+        reported_by = _user_email or "AI Chat (operator)"
+        wo = work_order_service.create_work_order(
+            description=description,
+            site_id=site_id or "site-002",
+            equipment_ref=equipment_code,
+            category=category,
+            priority=priority,
+            reported_by=reported_by,
+        )
+
+        # Send detailed email confirmation to the logged-in user via Sentry Gmail API
+        if _user_email and "@" in _user_email:
+            try:
+                from app.services.sentry_integration.work_order_notifier import WorkOrderNotifier
+
+                notifier = WorkOrderNotifier()
+                email_body = await _build_wo_email_body(wo, description, reported_by, equipment_code)
+                await notifier._send_email_via_local_gmail_helper(
+                    to_email=_user_email,
+                    subject=f"Work Order Created: {wo.id} — {wo.equipment_name or 'General'}",
+                    body=email_body,
+                )
+                logger.info(f"WO email confirmation sent to {_user_email} for {wo.id}")
+            except Exception as email_err:
+                logger.warning(f"Could not send WO email to {_user_email}: {email_err}")
+
+        return {
+            "success": True,
+            "work_order": wo.to_dict(),
+            "message": wo.format_confirmation(),
+            "email_sent_to": _user_email if _user_email and "@" in _user_email else None,
+        }
+    except Exception as e:
+        logger.error(f"Error creating work order: {e}")
+        return {"success": False, "error": str(e)}
+
+
+async def approve_recommendation_chat(
+    recommendation_id: str,
+    notes: str | None = None,
+) -> dict[str, Any]:
+    """Approve a Tier 2 recommendation from chat."""
+    try:
+        from app.agents.recommendation_tools import execute_approved_recommendation
+
+        result = await execute_approved_recommendation(
+            recommendation_id=recommendation_id,
+            approved_by="chat:operator",
+            notes=notes or "Approved via AI Chat",
+        )
+        return result
+    except ImportError:
+        return {"success": False, "error": "Recommendation agent not available"}
+    except Exception as e:
+        logger.error(f"Error approving recommendation: {e}")
+        return {"success": False, "error": str(e)}
+
+
+async def reject_recommendation_chat(
+    recommendation_id: str,
+    reason: str,
+) -> dict[str, Any]:
+    """Reject a Tier 2 recommendation from chat."""
+    try:
+        from app.agents.recommendation_tools import reject_recommendation
+
+        result = await reject_recommendation(
+            recommendation_id=recommendation_id,
+            rejected_by="chat:operator",
+            reason=reason,
+        )
+        return result
+    except ImportError:
+        return {"success": False, "error": "Recommendation agent not available"}
+    except Exception as e:
+        logger.error(f"Error rejecting recommendation: {e}")
+        return {"success": False, "error": str(e)}
+
+
+_RESET_BLOCKED_TYPES = {"FIRE", "GEN"}
+
+
+async def reset_equipment_fault_chat(
+    equipment_code: str,
+    reason: str = "Operator reset via chat",
+) -> dict[str, Any]:
+    """Reset equipment fault from chat."""
+    parts = equipment_code.split("-")
+    eq_type = parts[1].upper() if len(parts) >= 2 else ""
+
+    if eq_type in _RESET_BLOCKED_TYPES:
+        return {
+            "success": False,
+            "blocked": True,
+            "error": (
+                f"{eq_type} equipment cannot be remotely reset for safety reasons. Please create a work order instead."
+            ),
+            "equipment_code": equipment_code,
+        }
+
+    try:
+        from app.services.remote_command_service import RemoteCommandService
+
+        service = RemoteCommandService()
+        result = await service.execute_remote_command(
+            user_id="chat:operator",
+            user_role="operator",
+            device_id=equipment_code,
+            command_type="fault_reset",
+            reason=reason,
+        )
+        reset_data = result.get("data", {})
+        return {
+            "success": result.get("success", False),
+            "equipment_code": equipment_code,
+            "message": result.get("message", ""),
+            "previous_health": reset_data.get("previous_health"),
+            "new_health": reset_data.get("new_health"),
+            "predictions_resolved": reset_data.get("predictions_resolved", 0),
+            "error": result.get("error") if not result.get("success") else None,
+        }
+    except Exception as e:
+        logger.error(f"Error resetting equipment fault: {e}")
+        return {"success": False, "error": str(e)}
+
+
 # Tool handler dispatch
 TOOL_HANDLERS = {
     "list_devices": list_devices,
@@ -3199,6 +3911,12 @@ TOOL_HANDLERS = {
     "get_solar_forecast": get_solar_forecast,
     "get_floor_temperatures": get_floor_temperatures,
     "process_recommendation": process_recommendation,
+    # Write/action tools (role-gated to operator+)
+    "adjust_setpoint": adjust_setpoint,
+    "create_work_order": create_work_order_chat,
+    "approve_recommendation": approve_recommendation_chat,
+    "reject_recommendation": reject_recommendation_chat,
+    "reset_equipment_fault": reset_equipment_fault_chat,
 }
 
 
@@ -3219,6 +3937,15 @@ async def execute_tool(
     Returns:
         Tool execution result
     """
+    # Role enforcement (defence in depth — tools are also filtered in get_chat_tools)
+    required_role = TOOL_ROLE_REQUIREMENTS.get(tool_name)
+    if required_role and not _has_required_role(user_role, required_role):
+        return {
+            "error": (f"Insufficient permissions: '{tool_name}' requires '{required_role.value}' role or higher."),
+            "required_role": required_role.value,
+            "current_role": user_role.value if user_role else "none",
+        }
+
     effective_site_id = site_id or tool_input.get("site_id")
     if not _is_tool_allowed_for_site(
         tool_name,
@@ -3238,6 +3965,10 @@ async def execute_tool(
     handler = TOOL_HANDLERS.get(tool_name)
     if not handler:
         return {"error": f"Unknown tool: {tool_name}"}
+
+    # Inject user context into tools that accept it
+    if tool_name == "create_work_order" and user_email:
+        tool_input["_user_email"] = user_email
 
     try:
         return await handler(**tool_input)

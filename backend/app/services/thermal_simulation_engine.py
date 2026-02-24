@@ -213,7 +213,7 @@ class ThermalSimulationEngine:
 
         # === Heat Generation ===
         # Occupancy heat (people + equipment)
-        typical_occupancy = zone_config.get("typical_occupancy", 10)
+        typical_occupancy = zone_config.get("typical_occupancy") or 10
         people_count = max(1, int(typical_occupancy * (occupancy_pct / 100.0)))
         occupancy_heat = people_count * self.OCCUPANT_HEAT_GAIN  # Watts
 
@@ -338,6 +338,17 @@ class ThermalSimulationEngine:
     async def _load_zone_metadata(self) -> None:
         """Load zone configuration (setpoint, occupancy, fan speed) from database."""
         try:
+            # Resolve building code to UUID if needed (hvac_zones.building_id is UUID)
+            building_uuid = self.building_id
+            try:
+                bldg = (
+                    self.supabase.table("buildings").select("id").eq("code", self.building_id).maybe_single().execute()
+                )
+                if bldg and bldg.data:
+                    building_uuid = bldg.data["id"]
+            except Exception:
+                pass  # Fall through with original value
+
             response = (
                 self.supabase.table("hvac_zones")
                 .select(
@@ -345,22 +356,22 @@ class ThermalSimulationEngine:
                     "area_sqm, setpoint, heating_setpoint, cooling_setpoint, "
                     "fan_speed, status, fcu_id"
                 )
-                .eq("building_id", self.building_id)
+                .eq("building_id", building_uuid)
                 .execute()
             )
 
             for zone in response.data:
                 self._zone_cache[zone["zone_id"]] = {
                     "id": zone["id"],
-                    "zone_name": zone["zone_name"],
-                    "floor": zone["floor"],
-                    "typical_occupancy": zone.get("typical_occupancy", 10),
-                    "area_sqm": zone.get("area_sqm", 50),
-                    "setpoint": zone.get("setpoint", 22.0),
-                    "heating_setpoint": zone.get("heating_setpoint", 20.0),
-                    "cooling_setpoint": zone.get("cooling_setpoint", 24.0),
-                    "fan_speed": zone.get("fan_speed", "auto"),
-                    "status": zone.get("status", "idle"),
+                    "zone_name": zone.get("zone_name") or "Unknown",
+                    "floor": zone.get("floor") or 0,
+                    "typical_occupancy": zone.get("typical_occupancy") or 10,
+                    "area_sqm": zone.get("area_sqm") or 50,
+                    "setpoint": zone.get("setpoint") or 22.0,
+                    "heating_setpoint": zone.get("heating_setpoint") or 20.0,
+                    "cooling_setpoint": zone.get("cooling_setpoint") or 24.0,
+                    "fan_speed": zone.get("fan_speed") or "auto",
+                    "status": zone.get("status") or "idle",
                     "fcu_id": zone.get("fcu_id"),  # Link to FCU equipment for health checks
                 }
 
@@ -386,11 +397,22 @@ class ThermalSimulationEngine:
         - <50% = Significant performance loss
         """
         try:
+            # Resolve building code to UUID if needed (equipment.building_id is UUID)
+            building_uuid = self.building_id
+            try:
+                bldg = (
+                    self.supabase.table("buildings").select("id").eq("code", self.building_id).maybe_single().execute()
+                )
+                if bldg and bldg.data:
+                    building_uuid = bldg.data["id"]
+            except Exception:
+                pass
+
             # Get all HVAC equipment (FCU, AHU, CHILLER, VAV) for this building
             response = (
                 self.supabase.table("equipment")
                 .select("id, code, type, health_score")
-                .eq("building_id", self.building_id)
+                .eq("building_id", building_uuid)
                 .in_("type", ["FCU", "AHU", "CHILLER", "VAV", "fcu", "ahu", "chiller", "vav"])
                 .execute()
             )
@@ -613,35 +635,42 @@ class ThermalSimulationEngine:
 
             # Update HVAC feeder power meter
             # This meter tracks all HVAC consumption (zones + chiller)
-            hvac_feeder_update = {
-                "meter_id": "S002-MTR-B1-HVAC",  # HVAC Plant Room meter
-                "active_power_kw": round(total_hvac_power, 2),
-                "last_update": datetime.utcnow().isoformat() + "Z",
-            }
-
-            # Upsert into power_meters table
-            self.supabase.table("power_meters").upsert(hvac_feeder_update, on_conflict="meter_id").execute()
+            # Update existing power meter (skip if meter doesn't exist yet)
+            try:
+                self.supabase.table("power_meters").update(
+                    {
+                        "active_power_kw": round(total_hvac_power, 2),
+                        "last_poll": datetime.utcnow().isoformat() + "Z",
+                    }
+                ).eq("meter_id", "S002-MTR-B1-HVAC").execute()
+            except Exception:
+                logger.debug("[POWER] Meter S002-MTR-B1-HVAC not found, skipping update")
 
             # Also track hourly energy consumption
             # Convert kW * 1 hour to kWh
             kwh_consumed = round(total_hvac_power, 2)  # 1 hour = 1 * kW = kWh
 
-            # Create energy consumption history record
-            # This feeds the dashboard and AI recommendations
-            energy_record = {
-                "building_id": self.building_id,
-                "meter_id": "S002-MTR-B1-HVAC",
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "energy_kwh": kwh_consumed,
-                "energy_type": "HVAC",
-                "simulated_hour": simulated_hour,
-                "zone_details": zone_power,  # Store per-zone breakdown for analysis
-                "chiller_power_kw": chiller_power,
-            }
-
-            # Insert into energy_consumption_history
+            # Update daily energy_consumption_history (upsert hvac_kwh for today)
+            today_str = datetime.utcnow().strftime("%Y-%m-%d")
             try:
-                self.supabase.table("energy_consumption_history").insert(energy_record).execute()
+                # Fetch existing row for today
+                existing = (
+                    self.supabase.table("energy_consumption_history")
+                    .select("hvac_kwh")
+                    .eq("building_id", self.building_id)
+                    .eq("date", today_str)
+                    .maybe_single()
+                    .execute()
+                )
+                prev_kwh = float(existing.data.get("hvac_kwh", 0)) if existing.data else 0
+                self.supabase.table("energy_consumption_history").upsert(
+                    {
+                        "building_id": self.building_id,
+                        "date": today_str,
+                        "hvac_kwh": round(prev_kwh + kwh_consumed, 2),
+                    },
+                    on_conflict="building_id,date",
+                ).execute()
             except Exception as e:
                 logger.warning(f"[POWER] Could not record energy history: {e}")
 
