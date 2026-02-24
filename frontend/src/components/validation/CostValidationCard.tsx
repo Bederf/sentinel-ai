@@ -306,7 +306,7 @@ export function CostValidationCard({
                     maximumFractionDigits: 0,
                   })}
                 </div>
-                {savingsR && (
+                {savingsR !== null && (
                   <Text className="text-xs text-gray-500 mt-1">
                     Variance: R{savingsR.toLocaleString("en-ZA", {
                       maximumFractionDigits: 0,
@@ -315,9 +315,53 @@ export function CostValidationCard({
                 )}
               </>
             ) : (
-              <Text className="text-xs text-gray-400 mt-1">
-                Awaiting invoice upload
-              </Text>
+              <div className="mt-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleInvoiceUpload(file);
+                    e.target.value = "";
+                  }}
+                />
+                {uploading ? (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
+                    <Text className="text-xs text-amber-300">Analysing PDF...</Text>
+                  </div>
+                ) : uploadResult?.success ? (
+                  <div className="flex items-center gap-2 mt-2">
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                    <Text className="text-xs text-green-300">
+                      {uploadResult.total_zar
+                        ? `R${uploadResult.total_zar.toLocaleString("en-ZA", { maximumFractionDigits: 0 })} extracted`
+                        : "Uploaded — awaiting OCR"}
+                    </Text>
+                  </div>
+                ) : uploadResult && !uploadResult.success ? (
+                  <div>
+                    <Text className="text-xs text-red-400 mt-1">{uploadResult.message}</Text>
+                    <button
+                      onClick={() => { setUploadResult(null); fileInputRef.current?.click(); }}
+                      className="text-xs text-amber-400 hover:text-amber-300 underline mt-1"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 mt-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
+                      bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 hover:text-amber-200"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    Upload Invoice PDF
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>

@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Card, Title, Text, Badge, Flex, Grid, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@tremor/react";
-import { Fan, Thermometer, Activity, AlertTriangle, CheckCircle, Clock, Wrench } from "lucide-react";
+import { Fan, Thermometer, Activity, AlertTriangle, CheckCircle, Clock, Wrench, ClipboardList } from "lucide-react";
 import { hvacApi, type HVACEquipment } from "../../lib/hvacApi";
 
 interface EquipmentStatusPanelProps {
@@ -211,15 +211,15 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
         <div className="space-y-2 text-xs text-gray-400">
           <Flex justifyContent="between">
             <span>Manufacturer</span>
-            <span className="text-gray-300">{eq.manufacturer}</span>
+            <span className="text-gray-300">{eq.manufacturer || "N/A"}</span>
           </Flex>
           <Flex justifyContent="between">
             <span>Model</span>
-            <span className="text-gray-300">{eq.model}</span>
+            <span className="text-gray-300">{eq.model || "N/A"}</span>
           </Flex>
           <Flex justifyContent="between">
             <span>Capacity</span>
-            <span className="text-gray-300">{eq.capacity}</span>
+            <span className="text-gray-300">{eq.capacity || "N/A"}</span>
           </Flex>
           <Flex justifyContent="between" alignItems="center">
             <Flex alignItems="center" className="gap-1">
@@ -244,6 +244,33 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
             </span>
           </Flex>
         </div>
+      )}
+
+      {/* Create Work Order button for warning/critical equipment */}
+      {(eq.status === "warning" || eq.status === "fault") && (
+        <button
+          className="w-full mt-3 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+          style={{
+            background: eq.status === "fault"
+              ? "rgba(239, 68, 68, 0.15)"
+              : "rgba(245, 158, 11, 0.15)",
+            color: eq.status === "fault"
+              ? "rgb(239, 68, 68)"
+              : "rgb(245, 158, 11)",
+            border: `1px solid ${eq.status === "fault" ? "rgba(239, 68, 68, 0.3)" : "rgba(245, 158, 11, 0.3)"}`,
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            window.dispatchEvent(
+              new CustomEvent("create-work-order", {
+                detail: { equipmentCode: eq.name, equipmentId: eq.id, status: eq.status, healthScore: eq.health_score },
+              })
+            );
+          }}
+        >
+          <ClipboardList className="w-3.5 h-3.5" />
+          Create Work Order
+        </button>
       )}
     </Card>
   );

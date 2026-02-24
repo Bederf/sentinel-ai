@@ -156,16 +156,20 @@ class PointClassifier:
         units: str = "",
         present_value: Any = None,
         writable: bool = False,
+        metadata_equipment_id: str = "",
+        metadata_equipment_type: str = "",
+        metadata_point_type: str = "",
     ) -> ClassifiedPoint:
         """Classify a single BACnet point.
 
         Uses a multi-step approach:
-        1. Extract equipment ID from name prefix
-        2. Match equipment type using regex patterns
-        3. Match point category using keyword tags
-        4. Infer point type from object type and keywords
-        5. Generate standardized Brick name
-        6. Calculate confidence score
+        1. Use pre-populated metadata if available (vendor-agnostic, high confidence)
+        2. Otherwise, extract equipment ID from name prefix
+        3. Match equipment type using regex patterns
+        4. Match point category using keyword tags
+        5. Infer point type from object type and keywords
+        6. Generate standardized Brick name
+        7. Calculate confidence score
 
         Args:
             point_name: BACnet point name (e.g., "CH-1_CHW_Supply_Temp")
@@ -175,6 +179,9 @@ class PointClassifier:
             units: Engineering units string
             present_value: Current point value
             writable: Whether the point is writable
+            metadata_equipment_id: Pre-populated equipment ID from JSON files (any BMS vendor)
+            metadata_equipment_type: Pre-populated equipment type from JSON files (any BMS vendor)
+            metadata_point_type: Pre-populated point type from JSON files (any BMS vendor)
 
         Returns:
             ClassifiedPoint with equipment type, point type, and confidence
@@ -184,17 +191,45 @@ class PointClassifier:
         # Combine name and description for matching
         search_text = f"{point_name} {point_description}".lower()
 
-        # Step 1: Extract equipment ID from name prefix
-        equipment_id = self._extract_equipment_id(point_name)
+        # Step 1: Use pre-populated metadata when available (vendor-agnostic path)
+        # Equipment JSON files already contain equipment_id, equipment_type, point_type
+        # regardless of BMS vendor (Niagara, Desigo, Schneider, etc.)
+        if metadata_equipment_id:
+            equipment_id = metadata_equipment_id
+        else:
+            equipment_id = self._extract_equipment_id(point_name)
 
-        # Step 2: Match equipment type
-        equipment_type, equip_confidence = self._match_equipment_type(search_text)
+        # Step 2: Match equipment type - prefer metadata over regex
+        if metadata_equipment_type and metadata_equipment_type.lower() != "unknown":
+            equipment_type = metadata_equipment_type.lower()
+            equip_confidence = ConfidenceLevel.HIGH
+        elif metadata_equipment_id:
+            # Metadata type is "unknown" or missing but we have the equipment ID.
+            # Extract type from the ID itself (vendor-agnostic: type code is typically
+            # a segment like AHU, GEN, COLD, LIFT, JACE, etc.)
+            equipment_type, equip_confidence = self._extract_type_from_equipment_id(metadata_equipment_id)
+        else:
+            equipment_type, equip_confidence = self._match_equipment_type(search_text)
 
         # Step 3: Match point category (temperature, pressure, etc.)
         point_category, category_brick, category_unit, cat_confidence = self._match_point_category(search_text)
 
-        # Step 4: Infer point type
-        point_type = self._infer_point_type(search_text, object_type, writable, point_category)
+        # Step 4: Infer point type - prefer metadata over inference
+        if metadata_point_type:
+            try:
+                point_type = PointType(metadata_point_type.lower())
+            except ValueError:
+                # Map common metadata values to PointType enum
+                pt_map = {
+                    "sensor": PointType.SENSOR,
+                    "setpoint": PointType.SETPOINT,
+                    "command": PointType.COMMAND,
+                    "status": PointType.STATUS,
+                    "alarm": PointType.ALARM,
+                }
+                point_type = pt_map.get(metadata_point_type.lower(), PointType.UNKNOWN)
+        else:
+            point_type = self._infer_point_type(search_text, object_type, writable, point_category)
 
         # Step 5: Resolve units
         resolved_unit = self._resolve_unit(units, category_unit)
@@ -203,7 +238,11 @@ class PointClassifier:
         standardized_name = self._generate_standardized_name(equipment_id, equipment_type, point_category, point_type)
 
         # Step 7: Calculate overall confidence
-        confidence = self._calculate_confidence(equip_confidence, cat_confidence, equipment_type, point_category)
+        # Boost confidence when metadata was provided
+        if metadata_equipment_id and metadata_equipment_type:
+            confidence = ConfidenceLevel.HIGH
+        else:
+            confidence = self._calculate_confidence(equip_confidence, cat_confidence, equipment_type, point_category)
 
         # Build tags list
         tags = self._build_tags(equipment_type, point_category, point_type)
@@ -255,6 +294,9 @@ class PointClassifier:
                 units=p.get("units", ""),
                 present_value=p.get("present_value"),
                 writable=p.get("writable", False),
+                metadata_equipment_id=p.get("_equipment_id", ""),
+                metadata_equipment_type=p.get("_equipment_type", ""),
+                metadata_point_type=p.get("_point_type", ""),
             )
             results.append(result)
         return results
@@ -330,6 +372,62 @@ class PointClassifier:
             return parts[0]
 
         return ""
+
+    # Known equipment type codes found in BMS equipment IDs (vendor-agnostic).
+    # Maps uppercase segment → lowercase canonical type.
+    KNOWN_TYPE_CODES = {
+        "AHU": "ahu",
+        "FCU": "fcu",
+        "VAV": "vav",
+        "CHILLER": "chiller",
+        "CH": "chiller",
+        "CT": "ct",
+        "CRAC": "crac",
+        "SPLIT": "split",
+        "PUMP": "pump",
+        "BOILER": "boiler",
+        "COLD": "cold",
+        "KEF": "kef",
+        "GEN": "gen",
+        "UPS": "ups",
+        "ATS": "ats",
+        "MSB": "msb",
+        "DB": "db",
+        "MTR": "meter",
+        "PFC": "pfc",
+        "FDR": "fdr",
+        "MV": "mv",
+        "TX": "transformer",
+        "DALI": "dali",
+        "LUM": "lum",
+        "FIRE": "fire",
+        "ACC": "acc",
+        "CCTV": "cctv",
+        "LIFT": "lift",
+        "JACE": "jace",
+        "PXC": "pxc",
+        "BMS": "bms",
+        "MEDGAS": "medgas",
+    }
+
+    def _extract_type_from_equipment_id(self, equipment_id: str) -> Tuple[str, ConfidenceLevel]:
+        """Extract equipment type from the equipment ID string.
+
+        Splits the ID on hyphens and dots, then looks for a known type code
+        among the segments. Works for any BMS vendor naming convention.
+
+        Examples:
+            "site-005-UMH-COLD-B1-001.door" → ("cold", HIGH)
+            "site-005-UMH-LIFT-003.current"  → ("lift", HIGH)
+            "S002-AHU-L1-A"                  → ("ahu", HIGH)
+        """
+        segments = re.split(r"[-.]", equipment_id.upper())
+        for seg in segments:
+            if seg in self.KNOWN_TYPE_CODES:
+                return self.KNOWN_TYPE_CODES[seg], ConfidenceLevel.HIGH
+
+        # No known type found
+        return "unknown", ConfidenceLevel.UNKNOWN
 
     def _match_equipment_type(self, search_text: str) -> Tuple[str, ConfidenceLevel]:
         """Match equipment type using regex patterns.

@@ -59,21 +59,14 @@ class ClassifierDataPrep:
         if not failure_types:
             raise ValueError(f"No failure types defined for equipment type: {equipment_type}")
 
-        # Get equipment of this type
+        # Get equipment of this type (try both lowercase and uppercase)
         equipment_list = self.equipment_repo.get_by_type(equipment_type)
+        if not equipment_list:
+            equipment_list = self.equipment_repo.get_by_type(equipment_type.upper())
 
         if not equipment_list:
-            # Try JSON fallback
-            import json
-            from pathlib import Path
-
-            equipment_file = Path(__file__).parent.parent.parent / "data" / "equipment.json"
-            with open(equipment_file) as f:
-                all_equipment = json.load(f)
-                equipment_list = [eq for eq in all_equipment if eq.get("equipment_type") == equipment_type]
-
-        if not equipment_list:
-            raise ValueError(f"No equipment found for type: {equipment_type}")
+            # No real equipment found — will use synthetic data
+            logger.info(f"No equipment found for {equipment_type}, will use synthetic training data")
 
         logger.info(f"Found {len(equipment_list)} equipment of type {equipment_type}")
 
@@ -119,6 +112,7 @@ class ClassifierDataPrep:
         In production, this would query actual failure records from CAFM.
         """
         # Try to get from work orders
+        failures = []
         try:
             from app.database.repositories.work_order_repository import WorkOrderRepository
 
@@ -127,7 +121,6 @@ class ClassifierDataPrep:
             # Get work orders with failure codes
             work_orders = wo_repo.get_by_equipment(equipment_id)
 
-            failures = []
             for wo in work_orders:
                 if wo.get("failure_type"):
                     failures.append(

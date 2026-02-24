@@ -284,15 +284,13 @@ function App() {
     setUnreadAlertCount(0);
   };
 
-  // Handle alert click - navigate to equipment in control dashboard
+  // Handle alert click - navigate to equipment on dashboard
   const handleAlertClick = (alert: Alert) => {
-    // Store selection in sessionStorage for ControlDashboard to pick up
-    // Use device_id if available (maps to mock_devices.json), fallback to equipment_id
+    // Store alert context so the dashboard can highlight the relevant equipment
     const deviceId = alert.device_id || alert.equipment_id;
     if (deviceId && alert.site_id) {
       sessionStorage.setItem("sentinel_selected_equipment", deviceId);
       sessionStorage.setItem("sentinel_selected_site", alert.site_id);
-      // Store alert details for context display
       sessionStorage.setItem("sentinel_alert_context", JSON.stringify({
         message: alert.message,
         severity: alert.severity,
@@ -306,8 +304,8 @@ function App() {
     // Close alerts panel
     setShowAlertsPanel(false);
 
-    // Navigate to control dashboard
-    handleViewChange("control");
+    // Navigate to dashboard (site detail with building tabs)
+    handleViewChange("dashboard");
   };
 
   const formatDate = (date: Date) => {

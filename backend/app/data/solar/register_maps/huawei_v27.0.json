@@ -1,0 +1,64 @@
+{
+  "register_map_version": "v27.0",
+  "created": "2026-02-24",
+  "description": "Huawei SUN2000 + LUNA2000 Modbus TCP register map — single source of truth",
+  "notes": [
+    "All addresses are Modbus holding register addresses",
+    "Types: u16, i16, u32, i32, str",
+    "Scale factor: divide raw register value by this to get engineering units",
+    "String registers: each register holds 2 ASCII characters"
+  ],
+  "known_good_firmware": {
+    "SUN2000-100KTL-M2": "V200R001C00SPC136",
+    "LUNA2000-200KWH-2H1": "TBD (capture on site)"
+  },
+  "inverter": {
+    "model": "SUN2000-100KTL-M2",
+    "registers": {
+      "model":          { "address": 30000, "count": 15, "type": "str",  "scale": 1,    "unit": "",    "description": "Inverter model string" },
+      "serial":         { "address": 30015, "count": 10, "type": "str",  "scale": 1,    "unit": "",    "description": "Serial number" },
+      "firmware":       { "address": 30025, "count": 15, "type": "str",  "scale": 1,    "unit": "",    "description": "Firmware version string" },
+      "rated_power":    { "address": 30073, "count": 2,  "type": "u32",  "scale": 1000, "unit": "kW",  "description": "Rated power capacity" },
+      "dc_power":       { "address": 32064, "count": 2,  "type": "i32",  "scale": 1000, "unit": "kW",  "description": "DC input power" },
+      "ac_power":       { "address": 32080, "count": 2,  "type": "i32",  "scale": 1000, "unit": "kW",  "description": "AC output power" },
+      "efficiency":     { "address": 32086, "count": 1,  "type": "u16",  "scale": 100,  "unit": "%",   "description": "Conversion efficiency" },
+      "inverter_temp":  { "address": 32087, "count": 1,  "type": "i16",  "scale": 10,   "unit": "C",   "description": "Internal temperature" },
+      "status":         { "address": 32089, "count": 1,  "type": "u16",  "scale": 1,    "unit": "",    "description": "Operating status code" },
+      "fault_code":     { "address": 32090, "count": 1,  "type": "u16",  "scale": 1,    "unit": "",    "description": "Fault/alarm code" },
+      "grid_frequency": { "address": 32085, "count": 1,  "type": "u16",  "scale": 100,  "unit": "Hz",  "description": "Grid frequency" },
+      "power_factor":   { "address": 32084, "count": 1,  "type": "i16",  "scale": 1000, "unit": "",    "description": "Power factor" },
+      "daily_yield":    { "address": 32114, "count": 2,  "type": "u32",  "scale": 100,  "unit": "kWh", "description": "Energy generated today" },
+      "total_yield":    { "address": 32106, "count": 2,  "type": "u32",  "scale": 100,  "unit": "kWh", "description": "Lifetime energy generated" },
+      "pv1_voltage":    { "address": 32016, "count": 1,  "type": "i16",  "scale": 10,   "unit": "V",   "description": "MPPT 1 string voltage" },
+      "pv1_current":    { "address": 32017, "count": 1,  "type": "i16",  "scale": 100,  "unit": "A",   "description": "MPPT 1 string current" },
+      "pv2_voltage":    { "address": 32018, "count": 1,  "type": "i16",  "scale": 10,   "unit": "V",   "description": "MPPT 2 string voltage" },
+      "pv2_current":    { "address": 32019, "count": 1,  "type": "i16",  "scale": 100,  "unit": "A",   "description": "MPPT 2 string current" }
+    }
+  },
+  "bess": {
+    "model": "LUNA2000-200KWH-2H1",
+    "registers": {
+      "soc":              { "address": 37004, "count": 1, "type": "u16", "scale": 10,   "unit": "%",  "description": "State of charge" },
+      "soh":              { "address": 37760, "count": 1, "type": "u16", "scale": 10,   "unit": "%",  "description": "State of health" },
+      "charge_power":     { "address": 37001, "count": 2, "type": "i32", "scale": 1000, "unit": "kW", "description": "Charge power setpoint/readback" },
+      "discharge_power":  { "address": 37003, "count": 2, "type": "i32", "scale": 1000, "unit": "kW", "description": "Discharge power setpoint/readback" },
+      "bus_voltage":      { "address": 37006, "count": 1, "type": "u16", "scale": 10,   "unit": "V",  "description": "DC bus voltage" },
+      "bus_current":      { "address": 37007, "count": 1, "type": "i16", "scale": 10,   "unit": "A",  "description": "DC bus current" },
+      "batt_temp":        { "address": 37022, "count": 1, "type": "i16", "scale": 10,   "unit": "C",  "description": "Battery pack temperature" },
+      "status":           { "address": 37000, "count": 1, "type": "u16", "scale": 1,    "unit": "",   "description": "BESS operating status code" },
+      "fault_code":       { "address": 37014, "count": 1, "type": "u16", "scale": 1,    "unit": "",   "description": "BESS fault/alarm code" }
+    }
+  },
+  "status_codes": {
+    "0x0000": "standby",
+    "0x0001": "online",
+    "0x0002": "online (grid-connected)",
+    "0x0003": "fault",
+    "0x0100": "offline",
+    "0x0200": "warning"
+  },
+  "write_registers": {
+    "charge_power":    { "address": 37001, "count": 2, "type": "i32", "scale": 1000, "unit": "kW", "description": "Charge power setpoint (write)" },
+    "discharge_power": { "address": 37003, "count": 2, "type": "i32", "scale": 1000, "unit": "kW", "description": "Discharge power setpoint (write)" }
+  }
+}

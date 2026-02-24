@@ -2,9 +2,9 @@
 title: "Solar & BESS Optimisation Module"
 type: "feature"
 status: "implemented"
-version: "1.0.0"
+version: "2.0.0"
 created: "2026-02-06"
-updated: "2026-02-06"
+updated: "2026-02-24"
 author: "SENTINEL Development Team"
 tags: ["solar", "pv", "bess", "battery", "arbitrage", "dispatch", "nrs-097", "maintenance", "financial"]
 domain: "solar"
@@ -217,6 +217,115 @@ curl localhost:9095/api/solar/sites//maintenance/recommendations
 | Self-consumption target | >95% |
 | Forecast horizon | 72 hours |
 | Maintenance scheduling | 90-day rolling calendar |
+
+## Module 10: MIP Dispatch Optimizer (v26.0)
+
+Mathematical optimisation of BESS dispatch using Google OR-Tools CP-SAT integer programming solver. Replaces heuristic TOU rules with cost-minimising schedule.
+
+### 15-Minute Load Forecast
+
+GradientBoostingRegressor trained on 90 days of synthetic 15-min load profiles.
+
+- **Features (8):** hour_of_day, day_of_week, month, is_weekend, ambient_temp_c, solar_generation_kw, prev_interval_demand_kw, prev_day_same_interval_kw
+- **Output:** 96 intervals (24h) with confidence bands (widens with horizon)
+- **Retraining:** Automatic via scheduler (15-min refresh), manual via `POST /retrain`
+- **Service:** `load_forecast_service.py` (singleton, GBR, R² > 0.7)
+
+### CP-SAT Dispatch Optimizer
+
+96-slot optimal schedule minimising energy cost + demand charge + battery degradation.
+
+**Decision variables (per 15-min interval):**
+- `charge_kw[t]`, `discharge_kw[t]`, `soc_kwh[t]`, `grid_import_kw[t]`
+- `is_charging[t]`, `is_discharging[t]` (binary, mutually exclusive)
+
+**Objective:** MINIMIZE
+```
+sum(grid_import[t] × tariff[t] × 0.25)      # energy cost
++ peak_demand × R395.48/kVA/month ÷ 30       # demand charge
++ cycles × R15/cycle                          # battery degradation
+```
+
+**Constraints:**
+| # | Constraint | Description |
+|---|-----------|-------------|
+| 1 | Energy balance | load = solar + grid + discharge − charge |
+| 2 | SOC tracking | soc[t+1] = soc[t] + charge×eff×0.25 − discharge/eff×0.25 |
+| 3 | SOC bounds | 40 kWh ≤ SOC ≤ 190 kWh (20-95% of 200 kWh) |
+| 4 | Mutual exclusion | Cannot charge and discharge simultaneously |
+| 5 | Power limits | ≤ 100 kW rated (LUNA2000-200KWH-2H1) |
+| 6 | Export limit | ≤ 50 kW to grid (50% of rated) |
+| 7 | NMD constraint | Peak demand ≤ 1820 kVA |
+| 8 | Load shedding | Force ≥ 10 kW discharge during LS intervals |
+
+**Fallback:** If solver times out (10s) or returns INFEASIBLE, falls back to rules-based dispatch (charge off-peak, discharge peak, respect LS).
+
+**TOU Tariff Rates:**
+| Band | Rate (R/kWh) | Hours (SAST) |
+|------|-------------|--------------|
+| Off-peak | 0.649 | 22:00-05:59 |
+| Standard | 1.2457 | 06:00-06:59, 10:00-17:59, 20:00-21:59 |
+| Peak | 3.7641 | 07:00-09:59, 18:00-19:59 |
+
+### Modbus BESS Writer
+
+Async Modbus TCP writer for Huawei LUNA2000 charge/discharge setpoints.
+
+- **Registers:** 37001 (charge_power, i32, scale ×1000), 37003 (discharge_power, i32, scale ×1000)
+- **AEGIS gate:** `aegis_bess_writer_enabled=False` (Phase 0) blocks ALL Modbus writes
+- **Write protocol:** Validate constraints → AEGIS gate → Modbus TCP write → read-back verify → JSONL audit
+- **Watchdog:** 5-min timeout sends idle (0 kW) if no command received
+- **Demo mode:** When `modbus_bess_ip=""` or `DEMO_MODE=true`, logs commands without TCP
+- **Service:** `modbus_bess_writer.py` (singleton, async)
+
+### Integration Flow
+
+```
+Every 15 minutes (background scheduler):
+  LoadForecastService.get_forecast()     → 96 × 15-min demand predictions
+  SolarForecastService.get_forecast()    → 96 × 15-min solar predictions
+  MIPDispatchOptimizer.optimize()        → 96-slot optimal schedule (cached)
+
+Every 5 minutes (dispatch cycle):
+  SolarDispatchService reads current interval from cached MIP schedule
+  Falls back to arbitrage engine if MIP unavailable
+  BESSDispatchEngine validates constraints
+  ModbusBESSWriter executes (AEGIS gate decides: blocked or live)
+  JSONL audit trail persisted
+```
+
+### New API Endpoints (v26.0)
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/load-forecast/{site_id}` | 96-interval load forecast |
+| GET | `/api/load-forecast/{site_id}/accuracy` | RMSE, MAE, R² metrics |
+| POST | `/api/load-forecast/{site_id}/retrain` | Trigger model retraining |
+| GET | `/api/dispatch-optimizer/{site_id}/schedule` | Current optimal schedule |
+| GET | `/api/dispatch-optimizer/{site_id}/compare` | MIP vs rules side-by-side |
+| POST | `/api/dispatch-optimizer/{site_id}/solve` | Trigger fresh optimisation |
+
+### Backend Services (v26.0 additions)
+
+| Service | Purpose |
+|---------|---------|
+| `load_forecast_service.py` | GBR 15-min load forecast (8 features, 90-day training) |
+| `mip_dispatch_optimizer.py` | CP-SAT solver (96-slot schedule, 10s timeout, rules fallback) |
+| `modbus_bess_writer.py` | Async Modbus TCP writer (AEGIS-gated, watchdog, audit) |
+
+### Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `ortools` | ≥9.8.0 | Google OR-Tools CP-SAT solver |
+| `pymodbus` | ≥3.6.0 | Modbus TCP client for LUNA2000 |
+
+### Tests
+
+112 tests across 3 test files:
+- `test_load_forecast_service.py` — 40 tests (training, forecast, caching, edge cases)
+- `test_mip_dispatch_optimizer.py` — 36 tests (solver, constraints, fallback, comparison)
+- `test_modbus_bess_writer.py` — 36 tests (AEGIS gate, demo mode, registers, watchdog)
 
 ## Related Documentation
 

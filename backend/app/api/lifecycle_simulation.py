@@ -42,10 +42,10 @@ class StartSimulationRequest(BaseModel):
     """Request to start lifecycle simulation."""
 
     scenario: str = Field(
-        default="normal_day",
+        default="sentinel_annual",
         description=(
-            "Scenario name: normal_day, fault_day, chiller_failure, multi_fault, "
-            "maintenance_day, grant_hvac_dali_ai_annual, grant_solar_bess_ai_annual"
+            "Scenario name: sentinel_annual (365-day unified), normal_day, fault_day, "
+            "chiller_failure, multi_fault, maintenance_day"
         ),
     )
     duration_minutes: float = Field(
@@ -168,8 +168,7 @@ async def start_simulation(request: StartSimulationRequest):
     - `chiller_failure`: Chiller fault scenario
     - `multi_fault`: Multiple equipment issues
     - `maintenance_day`: Scheduled maintenance, no faults
-    - `grant_hvac_dali_ai_annual`: 365-day annual simulation (demo mode)
-    - `grant_solar_bess_ai_annual`: 365-day solar+BESS annual simulation
+    - `sentinel_annual`: 365-day unified annual simulation (HVAC + DALI + Solar + BESS)
 
     **Speed Control:**
     - `speed_multiplier=1`: Real-time (1 hour = 60 seconds)

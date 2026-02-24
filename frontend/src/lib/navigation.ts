@@ -11,26 +11,12 @@ import {
   LayoutDashboard,
   Shield,
   Settings as SettingsIcon,
-  Zap,
-  Wrench,
   Activity,
-  Users,
-  GitBranch,
-  ShieldCheck,
   Plug,
-  FlaskConical,
-  BarChart3,
   Leaf,
   Sun,
-  FileText,
-  TrendingUp,
-  TrendingDown,
   Droplets,
-  DollarSign,
-  Brain,
-  Box,
   Lightbulb,
-  History,
 } from "lucide-react";
 import type { ModuleType } from "./moduleRegistry";
 
@@ -142,70 +128,36 @@ export const ALL_NAV_ITEMS: NavItem[] = [
   ...INTERNAL_NAV_ITEMS,
 ];
 
-// ─── Building Detail Tabs ────────────────────────────────────────────
+// ─── Building Detail Tabs (Consolidated: 7 tabs) ────────────────────
 
 export type BuildingTabId =
   | "overview"
   | "system-health"
-  | "control"
-  | "digital-twin"
-  | "audit-logs"
-  | "tech-chat"
-  | "loadshedding"
-  | "lighting"
-  | "occupancy"
-  | "occupancy-analytics"
-  | "energy-correlation"
-  | "solar"
-  | "aegis"
-  | "security"
-  | "water"
-  | "esg"
-  | "asset-workflow"
-  | "contracts"
-  | "profitability"
-  | "budget"
-  | "fleet-ml"
-  | "ml-metrics"
-  | "simulation";
+  | "operations"
+  | "lighting-occupancy"
+  | "solar-bess"
+  | "energy"
+  | "water";
 
 export interface BuildingTabItem {
   id: BuildingTabId;
   label: string;
   icon: LucideIcon;
-  requiredModule?: ModuleType;
-  requiredRole?: "admin";
 }
 
 /**
- * Building detail tab definitions.
- * Rendered as a scrollable tab bar inside SiteDetail.
- * Module-gated: tabs only appear when the required module is active.
+ * Building detail tab definitions — 7 consolidated tabs.
+ * Rendered as a single-row tab bar inside SiteDetail (no scrolling needed).
+ * Merged tabs use internal sub-tab pills for their child views.
  */
 export const BUILDING_TAB_ITEMS: BuildingTabItem[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "system-health", label: "System Health", icon: Activity },
-  { id: "control", label: "Control", icon: Shield, requiredModule: "control" },
-  { id: "digital-twin", label: "Digital Twin", icon: Box },
-  { id: "audit-logs", label: "Audit Logs", icon: History },
-  { id: "tech-chat", label: "Tech Chat", icon: Wrench, requiredModule: "maintenance" },
-  { id: "loadshedding", label: "Loadshedding", icon: Zap, requiredModule: "energy" },
-  { id: "lighting", label: "Lighting", icon: Lightbulb, requiredModule: "lighting" },
-  { id: "occupancy", label: "Occupancy", icon: Users, requiredModule: "lighting" },
-  { id: "occupancy-analytics", label: "Occ. Analytics", icon: BarChart3, requiredModule: "lighting" },
-  { id: "energy-correlation", label: "Energy Correlation", icon: TrendingDown, requiredModule: "lighting" },
-  { id: "solar", label: "Solar & BESS", icon: Sun, requiredModule: "solar" },
-  { id: "aegis", label: "AEGIS", icon: Brain, requiredModule: "solar" },
-  { id: "security", label: "Security", icon: ShieldCheck, requiredModule: "security" },
-  { id: "water", label: "Water", icon: Droplets, requiredModule: "water" },
-  { id: "esg", label: "ESG", icon: Leaf, requiredModule: "sustainability" },
-  { id: "asset-workflow", label: "Asset Workflow", icon: GitBranch, requiredModule: "assets" },
-  { id: "contracts", label: "Contracts", icon: FileText, requiredModule: "contracts" },
-  { id: "profitability", label: "Profitability", icon: TrendingUp, requiredModule: "contracts" },
-  { id: "budget", label: "Budget", icon: DollarSign, requiredModule: "contracts" },
-  { id: "fleet-ml", label: "Fleet ML", icon: BarChart3, requiredModule: "ml" },
-  { id: "ml-metrics", label: "ML Metrics", icon: Brain, requiredModule: "ml" },
-  { id: "simulation", label: "Simulation", icon: FlaskConical, requiredModule: "ml", requiredRole: "admin" },
+  { id: "operations", label: "Operations", icon: Shield },
+  { id: "lighting-occupancy", label: "Lighting & Occupancy", icon: Lightbulb },
+  { id: "solar-bess", label: "Solar & BESS", icon: Sun },
+  { id: "energy", label: "Energy", icon: Leaf },
+  { id: "water", label: "Water", icon: Droplets },
 ];
 
 // ─── Legacy helpers (kept for ViewGuard / access-control compatibility) ──
@@ -215,35 +167,16 @@ export const SIDEBAR_ORDER_KEY = "sentinel_sidebar_order";
 
 /**
  * Check if a view requires an active module to be accessible.
+ * Consolidated tabs no longer have module gates — all 7 are always visible.
  */
-export function isModuleGatedView(view: View): boolean {
-  // Check both old addon items (empty) and building tabs
-  const tabItem = BUILDING_TAB_ITEMS.find((t) => t.id === view || mapTabToView(t.id) === view);
-  return !!tabItem?.requiredModule;
+export function isModuleGatedView(_view: View): boolean {
+  return false;
 }
 
 /**
  * Get the required module for a gated view, if any.
+ * Consolidated tabs have no module gates.
  */
-export function getRequiredModule(view: View): ModuleType | undefined {
-  const tabItem = BUILDING_TAB_ITEMS.find((t) => t.id === view || mapTabToView(t.id) === view);
-  return tabItem?.requiredModule;
-}
-
-/** Map a BuildingTabId to the legacy View id where they differ */
-function mapTabToView(tabId: BuildingTabId): View | undefined {
-  const map: Partial<Record<BuildingTabId, View>> = {
-    "system-health": "integrations",
-    "tech-chat": "technician",
-    "loadshedding": "optimization",
-    "occupancy-analytics": "occupancy-analytics",
-    "energy-correlation": "occupancy-energy-correlation",
-    "aegis": "aegis",
-    "esg": "sustainability",
-    "asset-workflow": "workflow",
-    "budget": "budget-report",
-    "fleet-ml": "fleet",
-    "ml-metrics": "mlops",
-  };
-  return map[tabId];
+export function getRequiredModule(_view: View): ModuleType | undefined {
+  return undefined;
 }

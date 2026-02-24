@@ -86,3 +86,7 @@ langgraph>=0.2.0               # StateGraph with checkpointing for multi-turn ag
 
 # Prometheus Metrics (Phase 114 - AI Governance Observability)
 prometheus_client>=0.20.0      # Prometheus text exposition format for /metrics endpoint
+
+# Solar+BESS Optimization (v26.0)
+ortools>=9.8.0                 # Google OR-Tools CP-SAT solver for MIP dispatch optimization
+pymodbus>=3.6.0                # Modbus TCP client for Huawei LUNA2000 BESS register writes

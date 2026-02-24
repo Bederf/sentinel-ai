@@ -52,6 +52,7 @@ class DispatchEvent:
     grid_import_kw: float = 0.0
     grid_export_kw: float = 0.0
     aegis_proposal_id: Optional[str] = None  # Join key to parasite_decisions
+    write_result: Optional[Dict[str, Any]] = None  # Modbus write result
 
     def to_dict(self) -> Dict[str, Any]:
         d = {
@@ -133,6 +134,7 @@ class SolarDispatchService:
     def __init__(self):
         self._dispatch_log: Dict[str, List[DispatchEvent]] = {}
         self._simulated_soc: Dict[str, float] = {}
+        self._last_real_soc: Dict[str, float] = {}  # Last known real SOC (for sync callers)
         self._started_at: Dict[str, str] = {}
         self._mode: Dict[str, str] = {}  # autonomous / manual / stopped
         try:
@@ -381,18 +383,102 @@ class SolarDispatchService:
 
         return profile
 
+    # === Real SOC ===
+
+    async def _get_current_soc(self, site_id: str) -> float:
+        """Get current BESS SOC, preferring real hardware reads when in live mode.
+
+        Falls back to simulated SOC on any failure or in demo/simulation mode.
+        """
+        from app.config.settings import settings
+
+        if settings.solar_connector_mode == "simulation" or settings.demo_mode:
+            return self._simulated_soc.get(site_id, 50.0)
+
+        try:
+            from app.services.solar_ingestion_service import get_solar_ingestion_service
+
+            svc = get_solar_ingestion_service()
+            bess = await svc.get_bess_status(site_id)
+            if bess and bess.soc_pct > 0:
+                self._last_real_soc[site_id] = bess.soc_pct
+                return bess.soc_pct
+        except Exception as e:
+            logger.warning("Real SOC read failed for %s: %s", site_id, e)
+
+        return self._simulated_soc.get(site_id, 50.0)
+
+    def get_current_soc_sync(self, site_id: str) -> float:
+        """Synchronous SOC accessor — returns last real SOC or simulated fallback.
+
+        For use by sync callers like aegis_bridge.py.
+        """
+        if site_id in self._last_real_soc:
+            return self._last_real_soc[site_id]
+        return self._simulated_soc.get(site_id, 50.0)
+
+    # === MIP schedule integration ===
+
+    def _get_mip_dispatch_action(self, site_id, current_soc, solar_kw, load_kw, sast):
+        """Read current interval from cached MIP schedule.
+
+        Returns a DispatchAction-like object if MIP schedule is available
+        and covers the current time, otherwise None.
+        """
+        try:
+            from app.services.mip_dispatch_optimizer import get_mip_dispatch_optimizer
+            from app.services.solar_arbitrage_engine import DispatchAction
+
+            optimizer = get_mip_dispatch_optimizer()
+            schedule = optimizer.get_cached_schedule(site_id)
+            if not schedule or not schedule.intervals:
+                return None
+
+            # Round to nearest 15-min boundary
+            minute = sast.minute
+            rounded_minute = (minute // 15) * 15
+            rounded_sast = sast.replace(minute=rounded_minute, second=0, microsecond=0)
+            target_ts = rounded_sast.strftime("%Y-%m-%dT%H:%M")
+
+            for interval in schedule.intervals:
+                if interval.timestamp == target_ts:
+                    # Convert MIP interval to DispatchAction
+                    if interval.discharge_kw > 0.1:
+                        action_type = "discharge"
+                        power = interval.discharge_kw
+                    elif interval.charge_kw > 0.1:
+                        action_type = "charge"
+                        power = interval.charge_kw
+                    else:
+                        action_type = "idle"
+                        power = 0.0
+
+                    return DispatchAction(
+                        action=action_type,
+                        power_kw=power,
+                        reason=f"MIP optimal: {action_type} {power:.0f} kW ({interval.tariff_band})",
+                        tariff_band=interval.tariff_band,
+                        rate_per_kwh=interval.tariff_rate,
+                        current_soc_pct=current_soc,
+                    )
+
+            return None
+        except Exception:
+            return None
+
     # === Dispatch execution ===
 
     async def execute_dispatch_cycle(self, site_id: str) -> Optional[DispatchEvent]:
         """Execute a single dispatch cycle.
 
         Called every 5 minutes by the autonomous scheduler.
-        For demo: reads simulated state and updates BESS SOC.
+        Reads the current interval from the cached MIP schedule if available,
+        otherwise falls back to the arbitrage engine's realtime dispatch.
         """
         engine = get_solar_arbitrage_engine()
 
-        # Get current state
-        current_soc = self._simulated_soc.get(site_id, 50.0)
+        # Get current state (real hardware SOC when in live mode)
+        current_soc = await self._get_current_soc(site_id)
         now = datetime.now(timezone.utc)
         sast = now + timedelta(hours=2)
 
@@ -406,15 +492,30 @@ class SolarDispatchService:
         solar_kw *= random.uniform(0.9, 1.1)
         load_kw *= random.uniform(0.95, 1.05)
 
-        # Get dispatch action from arbitrage engine
-        action = engine.get_realtime_dispatch_action(
-            site_id=site_id,
-            current_soc_pct=current_soc,
-            solar_gen_kw=solar_kw,
-            building_load_kw=load_kw,
-            load_shedding_active=False,
-            timestamp=now,
-        )
+        # Try to read current interval from cached MIP schedule
+        action = self._get_mip_dispatch_action(site_id, current_soc, solar_kw, load_kw, sast)
+
+        # Check live load shedding status (non-fatal)
+        load_shedding_active = False
+        try:
+            from app.services.eskomsepush_service import eskomsepush_service
+
+            if eskomsepush_service.is_configured:
+                eskom_status = await eskomsepush_service.get_combined_status()
+                load_shedding_active = eskom_status.eskom.stage > 0
+        except Exception:
+            pass  # Non-fatal — continue with False
+
+        if action is None:
+            # Fallback: get dispatch action from arbitrage engine
+            action = engine.get_realtime_dispatch_action(
+                site_id=site_id,
+                current_soc_pct=current_soc,
+                solar_gen_kw=solar_kw,
+                building_load_kw=load_kw,
+                load_shedding_active=load_shedding_active,
+                timestamp=now,
+            )
 
         # Update simulated SOC
         interval_hours = self.CYCLE_INTERVAL_MINUTES / 60.0
@@ -488,6 +589,30 @@ class SolarDispatchService:
                 )
         except Exception as e:
             logger.warning("AEGIS bridge failed (non-fatal): %s", e)
+
+        # Route dispatch command to Modbus BESS writer (gated by AEGIS)
+        try:
+            from app.services.modbus_bess_writer import execute_dispatch_with_write
+            from app.services.bess_dispatch_engine import BESSState
+
+            bess_state = BESSState(
+                soc_pct=soc_before,
+                temperature_c=25.0,
+                power_kw=0.0,
+                grid_frequency_hz=50.0,
+            )
+            write_result = await execute_dispatch_with_write(
+                site_id=site_id,
+                action=action.action,
+                requested_power_kw=action.power_kw,
+                bess_state=bess_state,
+                duration_minutes=self.CYCLE_INTERVAL_MINUTES,
+                reason=action.reason,
+                who="dispatch_scheduler",
+            )
+            event.write_result = write_result.get("write_result", {})
+        except Exception as e:
+            logger.debug("Modbus writer (non-fatal): %s", e)
 
         return event
 
@@ -572,6 +697,9 @@ class SolarDispatchService:
         current_soc = self._simulated_soc.get(site_id, 50.0)
         band = engine.get_current_tariff_band()
 
+        # Load-shedding status (best-effort from EskomSePush)
+        load_shedding_active = False
+
         # Find current action from recent events
         events_today = self.get_dispatch_log(site_id, hours=24)
         current_action = "idle"
@@ -625,7 +753,7 @@ class SolarDispatchService:
             cycles_today=max(1, cycles),
             dispatch_events_today=len(events_today),
             last_dispatch=last_dispatch,
-            load_shedding_active=False,
+            load_shedding_active=load_shedding_active,
             uptime_hours=uptime,
         )
 

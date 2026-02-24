@@ -110,9 +110,9 @@ Phase 3 artifacts:
 - [x] Formalize third-party AI risk register and link to security risk register
   Owner: `Security Lead` | Target: `2026-05-27` | Done: `2026-02-23` | Evidence: `docs/ai-governance/third-party-ai-risk-register.md`
 - [ ] Complete environmental impact assessment  
-  Owner: `Sustainability Lead` | Target: `2026-06-10`
+  Owner: `Sustainability Lead` | Target: `2026-06-10` | Evidence (draft): `docs/ai-governance/environmental-impact-assessment-2026Q2.md`
 - [ ] Scope and schedule independent AI audit  
-  Owner: `Compliance Lead` | Target: `2026-06-30`
+  Owner: `Compliance Lead` | Target: `2026-06-30` | Evidence: `docs/ai-governance/independent-audit-readiness-pack.md` (pending board `DECISION-003`)
 
 ### EU AI Act
 
@@ -163,10 +163,10 @@ Phase 3 artifacts:
 
 - [x] Add Prometheus-format `/metrics` endpoint in SENTINEL backend
   Owner: `Backend Lead` | Target: `2026-04-15` | Done: `2026-02-23` | Evidence: `backend/app/api/metrics.py`
-- [ ] Enable backend scrape in `/opt/aimthelaw/config/prometheus.yml`  
-  Owner: `Platform/SRE Lead` | Target: `2026-04-22`
-- [ ] Validate scrape health + Grafana signal quality  
-  Owner: `Platform/SRE Lead` | Target: `2026-04-29`
+- [x] Enable backend scrape in `/opt/aimthelaw/config/prometheus.yml`  
+  Owner: `Platform/SRE Lead` | Target: `2026-04-22` | Done: `2026-02-23` | Evidence: `/opt/aimthelaw/config/prometheus.yml`
+- [x] Validate scrape health + Grafana signal quality  
+  Owner: `Platform/SRE Lead` | Target: `2026-04-29` | Done: `2026-02-23` | Evidence: `docs/ai-governance/evidence/monitoring/2026-02-23-prometheus-grafana-validation.md`
 - [ ] Publish AI governance metrics  
   Owner: `MLOps Lead` | Target: `2026-05-20`
   - [ ] quality gate pass/fail by rule
@@ -174,8 +174,8 @@ Phase 3 artifacts:
   - [ ] tool-call error rate
   - [ ] approval latency/failure rate
   - [ ] token/cost by route and tenant
-- [ ] Add alert rules mapped to runbooks  
-  Owner: `Operations Lead` | Target: `2026-05-31`
+- [x] Add alert rules mapped to runbooks  
+  Owner: `Operations Lead` | Target: `2026-05-31` | Done: `2026-02-23` | Evidence: `/opt/aimthelaw/config/grafana/provisioning/alerting/sentinel-ai-governance-alert-rules.yml`
 
 ### FSR v3.0 Security Closeout
 

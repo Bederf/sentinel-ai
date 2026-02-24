@@ -113,7 +113,7 @@ export async function fetchAnnualSummary(
  */
 export async function startAnnualSimulation(
   siteId: string,
-  scenario: string = 'grant_solar_bess_ai_annual',
+  scenario: string = 'sentinel_annual',
   durationMinutes: number = 240.0
 ): Promise<{ task_id: string; site_id: string; scenario: string }> {
   const response = await authorizedFetch(

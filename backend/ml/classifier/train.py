@@ -86,14 +86,19 @@ class ClassifierTrainer:
                 model_type="classifier",
                 equipment_type=equipment_type,
                 model_path=str(model_path),
-                metadata={
-                    "accuracy": metrics["cv_accuracy"],
-                    "n_classes": metrics["n_classes"],
-                    "classes": metrics["classes"],
+                metrics={
+                    "cv_accuracy": metrics["cv_accuracy"],
+                    "cv_std": metrics["cv_std"],
                     "n_samples": metrics["n_samples"],
+                    "n_classes": metrics["n_classes"],
+                },
+                metadata={
+                    "classes": metrics["classes"],
+                    "feature_importance": metrics["feature_importance"][:5],
                     "n_estimators": n_estimators,
                     "max_depth": max_depth,
                     "trained_at": datetime.now().isoformat(),
+                    "use_demo_data": True,
                 },
             )
             logger.info("Model registered in registry")

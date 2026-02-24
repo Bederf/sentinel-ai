@@ -13,6 +13,7 @@ Time compression: 24 hours → configurable (default 24 minutes)
 
 import asyncio
 import logging
+import math
 import random
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -154,7 +155,7 @@ SCENARIOS = {
     ),
 }
 
-# Backward-compatible aliases — old scenario keys resolve to the unified scenario
+# Backward-compatible aliases — MUST stay: existing DB rows reference these old names
 SCENARIOS["grant_hvac_dali_ai_annual"] = SCENARIOS["sentinel_annual"]
 SCENARIOS["grant_solar_bess_ai_annual"] = SCENARIOS["sentinel_annual"]
 
@@ -296,6 +297,11 @@ class LifecycleOrchestrator:
         # Zone temperatures from thermal engine (105-01)
         self.zone_temperatures: dict[str, float] = {}
 
+        # In-memory equipment health tracking — seeded from DB once, updated each hour
+        # Avoids DB roundtrip precision loss on small wear increments (0.0006/hr)
+        self._equipment_health: dict[str, float] = {}
+        self._equipment_health_seeded: bool = False
+
         # JHB climate engine for realistic ambient temperature (104-01)
         # Lazy-import ClimatePattern to avoid bms_simulator/__init__.py which
         # triggers pandas import via the full simulator chain
@@ -322,6 +328,10 @@ class LifecycleOrchestrator:
         self.health_status_cache: dict[str, str] = {}  # code -> "healthy"/"warning"/"critical"
         self.last_alert_time: dict[str, int] = {}  # code -> simulated_hour of last alert
 
+        # Dashboard alert cooldown — prevents re-creating alerts after user clears them.
+        # Maps "equipment_code::alert_type" -> datetime of last dashboard push.
+        self._dashboard_alert_cooldown: dict[str, datetime] = {}
+
         # Supabase persistence for dashboard visibility (104-02)
         self.persistence = get_simulation_persistence(site_id=site_id)
 
@@ -338,6 +348,17 @@ class LifecycleOrchestrator:
         self._daily_other_kwh: float = 0.0
         self._daily_occupancy_samples: list[float] = []
         self._sustainability_collector = SustainabilityMetricsCollector(self.site_id)
+
+        # AI optimization savings tracking (includes rules engine + solar/BESS offset)
+        self._daily_baseline_kwh: float = 0.0
+        self._daily_sentinel_kwh: float = 0.0
+        self._daily_ai_savings_kwh: float = 0.0
+        self._daily_solar_gen_kwh: float = 0.0
+        self._daily_bess_discharge_kwh: float = 0.0
+        self._cumulative_baseline_kwh: float = 0.0
+        self._cumulative_sentinel_kwh: float = 0.0
+        self._cumulative_solar_gen_kwh: float = 0.0
+        self._cumulative_bess_discharge_kwh: float = 0.0
 
         # DALI→HVAC occupancy bridge state
         self.current_occupancy_data: dict[str, float] = {}
@@ -405,12 +426,155 @@ class LifecycleOrchestrator:
     SAFETY_LIMITS = {
         "zone_temp": {"min": 16.0, "max": 28.0, "unit": "°C"},
         "room_temp": {"min": 16.0, "max": 28.0, "unit": "°C"},
-        "supply_temp": {"min": 4.0, "max": 15.0, "unit": "°C"},
+        "supply_temp": {"min": 4.0, "max": 25.0, "unit": "°C"},
         "supply_air_temp": {"min": 12.0, "max": 22.0, "unit": "°C"},
         "battery_pct": {"min": 30.0, "max": 100.0, "unit": "%"},
         "load_pct": {"min": 0.0, "max": 95.0, "unit": "%"},
         "differential_pressure_kpa": {"min": 0.0, "max": 200.0, "unit": "kPa"},
     }
+
+    # Normal operating bands — values within these ranges are expected and should
+    # NOT trigger alerts, even if they fall within 10% of a safety limit.
+    # Structure: point_name → equip_type (or "_default") → time_period → (min, max)
+    NORMAL_BANDS = {
+        "supply_temp": {
+            "chiller": {"default": (5.0, 8.5)},  # Design supply 6-7°C
+            "ahu": {"default": (12.5, 18.0)},
+        },
+        "supply_air_temp": {
+            "_default": {"default": (13.0, 20.0)},
+        },
+        "zone_temp": {
+            "_default": {
+                "peak": (20.0, 24.0),
+                "off_peak": (18.0, 26.0),
+            },
+        },
+        "room_temp": {
+            "_default": {
+                "peak": (20.0, 24.0),
+                "off_peak": (18.0, 26.0),
+            },
+        },
+        "load_pct": {
+            "chiller": {"peak": (0.0, 92.0), "off_peak": (0.0, 70.0)},
+            "ups": {"default": (0.0, 80.0)},
+            "_default": {"default": (0.0, 85.0)},
+        },
+        "battery_pct": {
+            "_default": {"default": (50.0, 100.0)},
+        },
+        "differential_pressure_kpa": {
+            "_default": {"default": (20.0, 150.0)},
+        },
+    }
+
+    # Recommended actions for safety boundary alerts — tells operators WHAT TO DO.
+    # Structure: point_name → equip_type (or "_default") → severity → action_text
+    SAFETY_ACTIONS = {
+        "supply_temp": {
+            "chiller": {
+                "warning": "Check chiller staging and condenser water temps. Consider staging up if load demands it.",
+                "critical": (
+                    "IMMEDIATE: Verify chiller refrigerant charge and compressor operation."
+                    " Risk of coil freeze below 4\u00b0C."
+                ),
+            },
+            "ahu": {
+                "warning": "Check AHU coil valve position and mixed air dampers.",
+                "critical": "IMMEDIATE: Check AHU heating/cooling coil for failure. Verify supply fan operation.",
+            },
+            "_default": {
+                "warning": "Check equipment supply temperature trending and control setpoints.",
+                "critical": "IMMEDIATE: Investigate supply temperature deviation. Check control loop and actuators.",
+            },
+        },
+        "supply_air_temp": {
+            "_default": {
+                "warning": "Check AHU mixed air damper position and cooling coil valve.",
+                "critical": (
+                    "IMMEDIATE: Supply air temperature out of range. Check AHU cooling/heating coils and control loop."
+                ),
+            },
+        },
+        "zone_temp": {
+            "_default": {
+                "warning": "Check zone FCU/VAV operation and thermostat setpoint. Verify occupancy schedule.",
+                "critical": "IMMEDIATE: Zone temperature out of comfort range. Check FCU/VAV and AHU supply.",
+            },
+        },
+        "room_temp": {
+            "_default": {
+                "warning": "Check room FCU operation and thermostat setpoint.",
+                "critical": "IMMEDIATE: Room temperature out of comfort range. Check HVAC supply to this zone.",
+            },
+        },
+        "load_pct": {
+            "chiller": {
+                "warning": "Monitor chiller load trend. Consider staging another chiller online if available.",
+                "critical": "Stage additional chiller ASAP. Current unit at risk of trip on high pressure.",
+            },
+            "ups": {
+                "warning": "Review connected loads on this UPS. Plan load shedding if trend continues.",
+                "critical": "IMMEDIATE: Shed non-critical loads. UPS at risk of overload trip.",
+            },
+            "_default": {
+                "warning": "Monitor equipment load trend. Consider load redistribution.",
+                "critical": "IMMEDIATE: Equipment overloaded. Reduce load or bring standby online.",
+            },
+        },
+        "battery_pct": {
+            "_default": {
+                "warning": "Check charger operation and battery voltage. Schedule battery test.",
+                "critical": (
+                    "IMMEDIATE: Check charger operation. Prepare for mains transfer if battery continues to discharge."
+                ),
+            },
+        },
+        "differential_pressure_kpa": {
+            "_default": {
+                "warning": "Check filter condition and fan speed. Schedule filter inspection.",
+                "critical": "IMMEDIATE: Differential pressure critical. Check for blocked filters or duct obstruction.",
+            },
+        },
+    }
+
+    def _get_normal_band(self, point_name: str, equip_type: str, is_peak: bool) -> tuple | None:
+        """Look up normal operating band for a point/equipment/time combination.
+
+        Returns (min, max) tuple if a band exists, None otherwise.
+        Tries equipment-specific band first, then _default.
+        Tries peak/off_peak key first, then default.
+        """
+        point_bands = self.NORMAL_BANDS.get(point_name)
+        if not point_bands:
+            return None
+
+        # Try equipment-specific first, then _default
+        equip_bands = point_bands.get(equip_type) or point_bands.get("_default")
+        if not equip_bands:
+            return None
+
+        # Try peak/off_peak key first, then default
+        time_key = "peak" if is_peak else "off_peak"
+        band = equip_bands.get(time_key) or equip_bands.get("default")
+        return band
+
+    def _get_safety_action(self, point_name: str, equip_type: str, severity: str) -> str:
+        """Look up recommended action for a safety boundary alert.
+
+        Returns action text string. Falls back to generic message.
+        """
+        point_actions = self.SAFETY_ACTIONS.get(point_name)
+        if not point_actions:
+            return f"Investigate {point_name} on this equipment."
+
+        # Try equipment-specific first, then _default
+        equip_actions = point_actions.get(equip_type) or point_actions.get("_default")
+        if not equip_actions:
+            return f"Investigate {point_name} on this equipment."
+
+        return equip_actions.get(severity, f"Investigate {point_name} on this equipment.")
 
     def reset(self):
         """Reset orchestrator state for a fresh demo.
@@ -437,12 +601,23 @@ class LifecycleOrchestrator:
         self.runtime_hours = {}  # Reset runtime hours (105-02)
         self.chw_model = ChilledWaterModel()  # Reset CHW model (105-01)
         self.zone_temperatures = {}  # Reset zone temps (105-01)
+        self._equipment_health = {}  # Reset in-memory health tracking
+        self._equipment_health_seeded = False
         self.health_status_cache = {}  # Reset health monitoring (106-01)
         self.last_alert_time = {}  # Reset alert cooldowns (106-01)
         self._daily_hvac_kwh = 0.0  # Reset sustainability accumulators (111-01)
         self._daily_lighting_kwh = 0.0
         self._daily_other_kwh = 0.0
         self._daily_occupancy_samples = []
+        self._daily_baseline_kwh = 0.0
+        self._daily_sentinel_kwh = 0.0
+        self._daily_ai_savings_kwh = 0.0
+        self._daily_solar_gen_kwh = 0.0
+        self._daily_bess_discharge_kwh = 0.0
+        self._cumulative_baseline_kwh = 0.0
+        self._cumulative_sentinel_kwh = 0.0
+        self._cumulative_solar_gen_kwh = 0.0
+        self._cumulative_bess_discharge_kwh = 0.0
         logger.info("Orchestrator reset: Ready for fresh demo")
 
     @property
@@ -788,7 +963,8 @@ class LifecycleOrchestrator:
                 f"{self.seconds_per_simulated_hour:.2f}s/hour"
             )
 
-            iteration = 0
+            # On recovery, skip iterations already completed so we don't re-simulate days
+            iteration = self.days_simulated * 24 if self.days_simulated > 0 else 0
             last_checkpoint_hour = -1  # Track checkpoint saves
 
             # Persistent loop: Run max_days, then restart (loops until manually stopped)
@@ -1037,14 +1213,21 @@ class LifecycleOrchestrator:
                 ambient_temp = 20.0
                 self.current_humidity = 50.0
 
-            # Use schedule state for equipment health consideration
-            consider_health = bool(self.active_faults) or (
-                self.current_scenario is not None and self.current_scenario.fault_probability >= 0.5
-            )
+            # Always consider equipment health — healthy equipment has factor=1.0 (no impact)
+            # Gradual wear degrades health over months; thermal engine needs to see it
+            consider_health = True
 
             is_night_mode = schedule_state.hvac_mode in (HVACMode.OFF, HVACMode.NIGHT_SETBACK)
 
-            await update_simulation_temperatures(
+            # Refresh the thermal engine's health cache with in-memory values
+            # so degradation accumulated over the simulation is reflected in HVAC response
+            if self._equipment_health:
+                from app.services.thermal_simulation_engine import get_thermal_engine
+
+                thermal_engine = get_thermal_engine(self.building_id, consider_equipment_health=consider_health)
+                thermal_engine.update_health_cache(self._equipment_health)
+
+            thermal_temps = await update_simulation_temperatures(
                 building_id=self.building_id,
                 simulated_hour=hour,
                 occupancy_data=occupancy_data,
@@ -1053,6 +1236,11 @@ class LifecycleOrchestrator:
                 consider_equipment_health=consider_health,
                 simulated_date=self.simulated_time,
             )
+
+            # Use thermal engine results as source of truth for zone temperatures
+            if thermal_temps:
+                for zone_id, temp in thermal_temps.items():
+                    self.zone_temperatures[zone_id] = round(temp, 1)
         except Exception as e:
             logger.warning(f"[THERMAL] Failed to update temperatures at hour {hour}: {e}")
             occupancy_data = {}
@@ -1076,54 +1264,8 @@ class LifecycleOrchestrator:
 
         # === CHILLED WATER MODEL UPDATE (105-01) ===
         # Advance CHW supply/return temps based on chiller staging and ambient
+        # (kept for CHW sensor generation; zone temps now come from thermal engine above)
         self.chw_model.update(schedule_state.chiller_staging, ambient_temp)
-
-        # === ZONE TEMPERATURE CAPTURE (105-01) ===
-        # Calculate zone temps from setpoint, ambient, and CHW cooling capacity
-        # When HVAC is active and CHW is cold, zones stay near setpoint.
-        # When HVAC is off or CHW is warm, zones drift toward ambient.
-        setpoint = self.building_schedule.COMFORT_SETPOINT + schedule_state.setpoint_offset
-        if schedule_state.hvac_mode not in (HVACMode.OFF, HVACMode.NIGHT_SETBACK):
-            # HVAC active: zone temp depends on CHW cooling capacity
-            # Warmer CHW supply = less cooling = zone drifts above setpoint
-            chw_deficit = max(0, self.chw_model.supply_temp - 7.0)  # 7C = design supply
-            zone_base = setpoint + chw_deficit * 0.3  # 0.3C zone rise per 1C CHW deficit
-        else:
-            # HVAC off: zone drifts toward ambient (slow due to building thermal mass)
-            current_avg = (
-                sum(self.zone_temperatures.values()) / max(1, len(self.zone_temperatures))
-                if self.zone_temperatures
-                else setpoint
-            )
-            drift_rate = 0.3  # degrees C per hour toward ambient
-            if ambient_temp > current_avg:
-                zone_base = current_avg + drift_rate
-            else:
-                zone_base = current_avg - drift_rate
-            zone_base = min(zone_base, ambient_temp) if ambient_temp > setpoint else max(zone_base, ambient_temp)
-
-        # Update all known zones (or seed with defaults for known zones)
-        # All 15 office zones: L0 (001-005), L1 (101-105), L2 (201-205)
-        default_zones = [f"Zone-{z:03d}" for z in list(range(1, 6)) + list(range(101, 106)) + list(range(201, 206))]
-        for zone_id in set(list(self.zone_temperatures.keys()) + default_zones):
-            # Per-zone occupancy drives body heat contribution
-            zone_occ = self._get_zone_occupancy(zone_id) / 100.0  # 0.0-1.0
-
-            if zone_occ >= 0.30:
-                # Occupied: body heat adds +0.3 to +0.8°C proportional to occupancy
-                body_heat = 0.3 + (zone_occ - 0.30) * (0.5 / 0.70)  # linear 0.3→0.8 over 30-100%
-                variation = self._scenario_rng.uniform(-0.3, 0.3)
-                self.zone_temperatures[zone_id] = round(zone_base + body_heat + variation, 1)
-            elif zone_occ < 0.10:
-                # Unoccupied: drifts 0.5°C closer to ambient (no internal heat gain)
-                drift = 0.5 if ambient_temp > zone_base else -0.5
-                variation = self._scenario_rng.uniform(-0.2, 0.2)
-                self.zone_temperatures[zone_id] = round(zone_base + drift + variation, 1)
-            else:
-                # Low occupancy (10-30%): minimal heat gain +0.1 to +0.3°C
-                body_heat = 0.1 + (zone_occ - 0.10) * (0.2 / 0.20)  # linear 0.1→0.3 over 10-30%
-                variation = self._scenario_rng.uniform(-0.3, 0.3)
-                self.zone_temperatures[zone_id] = round(zone_base + body_heat + variation, 1)
 
         # === DALI→HVAC OCCUPANCY BRIDGE EVENTS ===
         self._emit_occupancy_bridge_events(hour)
@@ -1131,14 +1273,91 @@ class LifecycleOrchestrator:
         # === ENERGY CONSUMPTION TRACKING (schedule-driven) ===
         # Power consumption based on equipment staging, not flat 20-35kW
         base_power = self._calculate_hourly_power(schedule_state, occupancy_data)
-        self.current_hour_power_kw = base_power
-        self.total_energy_kwh += base_power
+
+        # === AI OPTIMIZATION ENERGY SAVINGS ===
+        # Apply rules-engine savings to hourly power when HVAC is active
+        ai_savings_kwh = 0.0
+        if schedule_state.hvac_mode != HVACMode.OFF:
+            try:
+                from app.services.energy_rules_engine import get_energy_rules_engine
+                from app.models.energy_rules import BuildingState as RulesBuildingState
+
+                rules_engine = get_energy_rules_engine(self.site_prefix)
+
+                avg_occ = schedule_state.target_occupancy_pct
+                chiller_load = {"off": 0, "stage_1": 30, "stage_2": 60, "full_load": 90}.get(
+                    schedule_state.chiller_staging.value, 0
+                )
+                tariff = (
+                    "peak"
+                    if hour in range(7, 10) or hour in range(18, 20)
+                    else ("off_peak" if hour < 6 or hour >= 22 else "standard")
+                )
+                daylight = (
+                    max(0, min(1000, int(500 * math.sin(math.pi * max(0, hour - 6) / 12)))) if 6 <= hour < 18 else 0
+                )
+
+                rules_state = RulesBuildingState(
+                    current_hour=hour,
+                    occupancy_percent=int(avg_occ),
+                    daylight_lux=daylight,
+                    chiller_load_percent=chiller_load,
+                    peak_demand_kw=base_power,
+                    tariff_band=tariff,
+                    ambient_temp_c=ambient_temp,
+                    site_id=self.site_prefix,
+                    date=self.simulated_time.date().isoformat(),
+                )
+
+                rules_output = rules_engine.evaluate_rules(
+                    building_state=rules_state,
+                    active_modules=["hvac", "dali", "solar"],
+                    baseline_kwh=base_power,
+                )
+                ai_savings_kwh = rules_output.delta_kwh
+            except Exception as e:
+                logger.debug(f"[ENERGY RULES] Skipped: {e}")
+
+        # === SOLAR GENERATION + BESS DISCHARGE OFFSET ===
+        # Calculate grid import reduction from solar + battery (same logic as equipment readings)
+        solar_offset_kwh = 0.0
+        bess_offset_kwh = 0.0
+        solar_eff = self.current_solar_efficiency
+        if solar_eff > 0 and 6 <= hour < 18:
+            # Solar inverter output: 100 kWp array * efficiency * time-of-day bell curve
+            time_factor = max(0, 1.0 - abs(hour - 12) / 6.0)
+            solar_offset_kwh = 100.0 * (solar_eff / 100.0) * time_factor * 0.96  # 96% inverter eff
+        # BESS discharge during peak hours offsets grid demand
+        max_discharge_kw = 50.0
+        if (7 <= hour <= 10 or 17 <= hour <= 21) and self.bess_soc > 10:
+            bess_offset_kwh = max_discharge_kw * min(1.0, (self.bess_soc - 10) / 30.0)
+
+        self._daily_solar_gen_kwh += solar_offset_kwh
+        self._daily_bess_discharge_kwh += bess_offset_kwh
+
+        # Track baseline (before AI) and optimized (after AI + solar/BESS)
+        self._daily_baseline_kwh += base_power
+        total_offset = ai_savings_kwh + solar_offset_kwh + bess_offset_kwh
+        optimized_power = max(0, base_power - total_offset)
+        self.current_hour_power_kw = optimized_power
+        self.total_energy_kwh += optimized_power
+        self._daily_sentinel_kwh += optimized_power
+        self._daily_ai_savings_kwh += ai_savings_kwh
 
         # === SUSTAINABILITY ACCUMULATORS (111-01) ===
         breakdown = getattr(self, "_last_hour_power_breakdown", {})
-        self._daily_hvac_kwh += breakdown.get("hvac_kw", 0)
-        self._daily_lighting_kwh += breakdown.get("lighting_kw", 0)
-        self._daily_other_kwh += breakdown.get("other_kw", 0)
+        if total_offset > 0 and base_power > 0:
+            savings_ratio = min(total_offset / base_power, 1.0)
+            hvac_savings = breakdown.get("hvac_kw", 0) * savings_ratio * 0.6
+            lighting_savings = breakdown.get("lighting_kw", 0) * savings_ratio * 0.25
+            other_savings = total_offset - hvac_savings - lighting_savings
+            self._daily_hvac_kwh += max(0, breakdown.get("hvac_kw", 0) - hvac_savings)
+            self._daily_lighting_kwh += max(0, breakdown.get("lighting_kw", 0) - lighting_savings)
+            self._daily_other_kwh += max(0, breakdown.get("other_kw", 0) - other_savings)
+        else:
+            self._daily_hvac_kwh += breakdown.get("hvac_kw", 0)
+            self._daily_lighting_kwh += breakdown.get("lighting_kw", 0)
+            self._daily_other_kwh += breakdown.get("other_kw", 0)
         if occupancy_data:
             avg_occ = sum(occupancy_data.values()) / max(len(occupancy_data), 1)
             self._daily_occupancy_samples.append(avg_occ)
@@ -1202,7 +1421,7 @@ class LifecycleOrchestrator:
         # Scan equipment readings against safety limits, escalate on approach
         try:
             if equipment_states:
-                self._scan_safety_boundaries(equipment_states, hour)
+                self._scan_safety_boundaries(equipment_states, hour, schedule_state)
         except Exception as e:
             logger.warning(f"[SAFETY SCAN] Failed safety boundary scan at hour {hour}: {e}")
 
@@ -1228,11 +1447,20 @@ class LifecycleOrchestrator:
             )
             await self._sustainability_collector.persist(metrics)
 
+            # Track cumulative AI optimization totals
+            self._cumulative_baseline_kwh += self._daily_baseline_kwh
+            self._cumulative_sentinel_kwh += self._daily_sentinel_kwh
+            self._cumulative_solar_gen_kwh += self._daily_solar_gen_kwh
+            self._cumulative_bess_discharge_kwh += self._daily_bess_discharge_kwh
+
             logger.info(
                 f"[SUSTAINABILITY] Day {self.days_simulated}: "
                 f"grid={energy_breakdown['total_kwh']:.1f} kWh, "
                 f"hvac={energy_breakdown['hvac_kwh']:.1f} kWh, "
-                f"scope2={metrics.scope2_kg_co2:.1f} kg CO2"
+                f"scope2={metrics.scope2_kg_co2:.1f} kg CO2, "
+                f"ai_savings={self._daily_ai_savings_kwh:.1f} kWh, "
+                f"solar={self._daily_solar_gen_kwh:.1f} kWh, "
+                f"bess={self._daily_bess_discharge_kwh:.1f} kWh"
             )
         except Exception as e:
             logger.warning(f"[SUSTAINABILITY] Failed to write daily metrics: {e}")
@@ -1242,6 +1470,35 @@ class LifecycleOrchestrator:
             self._daily_lighting_kwh = 0.0
             self._daily_other_kwh = 0.0
             self._daily_occupancy_samples = []
+            self._daily_baseline_kwh = 0.0
+            self._daily_sentinel_kwh = 0.0
+            self._daily_ai_savings_kwh = 0.0
+            self._daily_solar_gen_kwh = 0.0
+            self._daily_bess_discharge_kwh = 0.0
+
+    def get_energy_comparison_data(self) -> dict:
+        """Return baseline vs optimized energy for comparison API.
+
+        SENTINEL savings include: AI rules engine + solar generation offset + BESS discharge.
+        """
+        baseline = self._cumulative_baseline_kwh + self._daily_baseline_kwh
+        sentinel = self._cumulative_sentinel_kwh + self._daily_sentinel_kwh
+        solar_gen = self._cumulative_solar_gen_kwh + self._daily_solar_gen_kwh
+        bess_discharge = self._cumulative_bess_discharge_kwh + self._daily_bess_discharge_kwh
+        if baseline <= 0:
+            baseline = self.total_energy_kwh
+            sentinel = self.total_energy_kwh
+        savings_pct = ((baseline - sentinel) / baseline * 100) if baseline > 0 else 0
+        return {
+            "baseline_kwh": round(baseline, 2),
+            "dali_kwh": round(baseline * 0.80, 2),  # DALI provides ~20% lighting savings (industry benchmark)
+            "sentinel_kwh": round(sentinel, 2),
+            "savings_kwh": round(baseline - sentinel, 2),
+            "savings_percent": round(savings_pct, 1),
+            "solar_gen_kwh": round(solar_gen, 2),
+            "bess_discharge_kwh": round(bess_discharge, 2),
+            "days_simulated": self.days_simulated,
+        }
 
     async def _emit_schedule_event(self, hour: int, schedule_state: ScheduleState):
         """Emit events on meaningful schedule transitions."""
@@ -2192,7 +2449,13 @@ class LifecycleOrchestrator:
                 equip_type = equip.get("type", "unknown").lower()
                 # Normalize DB type names to internal names
                 equip_type = self.TYPE_ALIASES.get(equip_type, equip_type)
-                health = equip.get("health_score", 75)
+
+                # Use in-memory health if seeded, otherwise seed from DB
+                if code in self._equipment_health:
+                    health = self._equipment_health[code]
+                else:
+                    health = float(equip.get("health_score", 75) or 75)
+                    self._equipment_health[code] = health
 
                 # Baseline wear: slow degradation during normal operation (105-02)
                 is_running = self._is_equipment_running(equip_type, schedule_state)
@@ -2207,6 +2470,9 @@ class LifecycleOrchestrator:
                     hours_faulted = fault.get("hours_faulted", 0) + 1
                     fault["hours_faulted"] = hours_faulted
                     health = max(10, health - (hours_faulted * 2))  # 2% per hour while faulted
+
+                # Persist in-memory health (accumulates tiny wear without DB precision loss)
+                self._equipment_health[code] = health
 
                 # Generate sensor readings based on equipment type and schedule
                 sensor_readings = self._generate_sensor_readings(code, equip_type, health, hour, schedule_state)
@@ -3194,6 +3460,10 @@ class LifecycleOrchestrator:
             "occupancy_seed": self._occupancy_seed,
             "total_energy_kwh": round(self.total_energy_kwh, 1),
             "current_hour_power_kw": round(self.current_hour_power_kw, 2),
+            "cumulative_baseline_kwh": round(self._cumulative_baseline_kwh, 2),
+            "cumulative_sentinel_kwh": round(self._cumulative_sentinel_kwh, 2),
+            "cumulative_solar_gen_kwh": round(self._cumulative_solar_gen_kwh, 2),
+            "cumulative_bess_discharge_kwh": round(self._cumulative_bess_discharge_kwh, 2),
         }
 
     @staticmethod
@@ -3223,6 +3493,10 @@ class LifecycleOrchestrator:
         # Restore energy consumption tracking
         orchestrator.total_energy_kwh = state_dict.get("total_energy_kwh", 0.0)
         orchestrator.current_hour_power_kw = state_dict.get("current_hour_power_kw", 0.0)
+        orchestrator._cumulative_baseline_kwh = state_dict.get("cumulative_baseline_kwh", 0.0)
+        orchestrator._cumulative_sentinel_kwh = state_dict.get("cumulative_sentinel_kwh", 0.0)
+        orchestrator._cumulative_solar_gen_kwh = state_dict.get("cumulative_solar_gen_kwh", 0.0)
+        orchestrator._cumulative_bess_discharge_kwh = state_dict.get("cumulative_bess_discharge_kwh", 0.0)
 
         # Restore occupancy randomness (deterministic for same seed)
         if orchestrator._occupancy_seed is not None:
@@ -3509,12 +3783,15 @@ class LifecycleOrchestrator:
                 )
             )
 
-    def _scan_safety_boundaries(self, equipment_states: dict[str, dict], simulated_hour: int):
+    def _scan_safety_boundaries(self, equipment_states: dict[str, dict], simulated_hour: int, schedule_state=None):
         """Scan equipment readings against safety boundaries. Escalate on approach.
 
         Checks all equipment sensor readings against SAFETY_LIMITS. If a reading
         is within 10% of a boundary, emits a warning. If it exceeds the boundary,
         emits a critical event. Limits to 3 violations per scan to prevent spam.
+
+        Suppresses alerts when values fall within NORMAL_BANDS for the equipment
+        type and time period — e.g. chiller supply_temp=6°C during peak is normal.
 
         Skips equipment that is not running — zero readings during off-hours
         are expected, not safety concerns.
@@ -3522,7 +3799,17 @@ class LifecycleOrchestrator:
         Args:
             equipment_states: Dict mapping equipment code to state dict with sensor_readings
             simulated_hour: Current simulated hour (0-23)
+            schedule_state: Current BuildingScheduleState (for peak/off-peak context)
         """
+        # Determine peak status from schedule state
+        is_peak = False
+        if schedule_state:
+            is_peak = schedule_state.state in (
+                BuildingState.PEAK_OCCUPIED,
+                BuildingState.OCCUPIED_RAMPUP,
+                BuildingState.MORNING_STARTUP,
+            )
+
         violations = []
 
         for code, state in equipment_states.items():
@@ -3531,6 +3818,8 @@ class LifecycleOrchestrator:
                 continue
 
             readings = state.get("sensor_readings", {})
+            equip_type = state.get("type", "unknown").lower()
+
             for point_name, value in readings.items():
                 if point_name not in self.SAFETY_LIMITS:
                     continue
@@ -3555,21 +3844,56 @@ class LifecycleOrchestrator:
                 else:
                     approach_pct = 0  # Safe
 
-                if approach_pct >= 90:
-                    violations.append(
-                        {
-                            "code": code,
-                            "point": point_name,
-                            "value": value,
-                            "limits": f"{safe_min}-{safe_max} {limits['unit']}",
-                            "approach_pct": approach_pct,
-                        }
-                    )
+                if approach_pct < 90:
+                    continue
+
+                # Suppress alerts for values within normal operating bands
+                normal_band = self._get_normal_band(point_name, equip_type, is_peak)
+                if normal_band and normal_band[0] <= value <= normal_band[1]:
+                    continue  # Value within normal operating range — suppress
+
+                severity = "critical" if approach_pct >= 100 else "warning"
+                recommended_action = self._get_safety_action(point_name, equip_type, severity)
+
+                # Build operational context
+                operational_context = {
+                    "building_state": schedule_state.state.value if schedule_state else "unknown",
+                    "is_peak_hours": is_peak,
+                    "occupancy_pct": schedule_state.target_occupancy_pct if schedule_state else 0,
+                    "hvac_mode": schedule_state.hvac_mode.value if schedule_state else "unknown",
+                    "hour": simulated_hour,
+                }
+
+                # Determine which limit is being approached
+                if value <= safe_min or value < safe_min + safe_range * 0.1:
+                    limit_desc = f"limit: {safe_min}{limits['unit']}"
+                else:
+                    limit_desc = f"limit: {safe_max}{limits['unit']}"
+
+                violations.append(
+                    {
+                        "code": code,
+                        "point": point_name,
+                        "value": value,
+                        "limits": f"{safe_min}-{safe_max} {limits['unit']}",
+                        "approach_pct": approach_pct,
+                        "severity": severity,
+                        "recommended_action": recommended_action,
+                        "operational_context": operational_context,
+                        "limit_desc": limit_desc,
+                    }
+                )
 
         # Emit events for violations (limit to top 3 to avoid event spam)
         for v in violations[:3]:
-            severity = "critical" if v["approach_pct"] >= 100 else "warning"
-            description = f"Safety boundary {severity}: {v['code']} {v['point']}={v['value']} (limits: {v['limits']})"
+            severity = v["severity"]
+            action_preview = (
+                v["recommended_action"][:80] if len(v["recommended_action"]) > 80 else v["recommended_action"]
+            )
+            description = (
+                f"{v['code']} {v['point']} at {v['value']}{self.SAFETY_LIMITS[v['point']]['unit']} "
+                f"({v['limit_desc']}). Action: {action_preview}"
+            )
             self._emit_event(
                 LifecycleEvent(
                     timestamp=datetime.now(),
@@ -3588,6 +3912,22 @@ class LifecycleOrchestrator:
                 message=description,
                 details=v,
             )
+            # Notify Sentry bot (Telegram) for critical safety violations
+            if severity == "critical":
+                try:
+                    from app.services.equipment_alert_service import get_equipment_alert_service
+
+                    alert_svc = get_equipment_alert_service()
+                    alert_svc.create_alert_for_equipment(
+                        equipment_id=v["code"],
+                        alert_type="safety_boundary",
+                        severity="critical",
+                        message=description,
+                        building_id=self.building_id,
+                        notify_telegram=True,
+                    )
+                except Exception as e:
+                    logger.debug(f"Could not send Sentry notification for safety violation: {e}")
 
     def _push_alert_to_dashboard(
         self, equipment_code: str, severity: str, alert_type: str, message: str, details: dict | None = None
@@ -3596,9 +3936,47 @@ class LifecycleOrchestrator:
 
         The lifecycle orchestrator tracks events internally. This bridges them to
         the bms_simulation_service alert queue, which the /api/alerts endpoint reads.
+
+        Deduplication (two layers):
+        1. Active alert check — skip if an active alert already exists for this
+           equipment + alert_type (prevents duplicate rows).
+        2. Cooldown — skip if an alert was pushed for this equipment + alert_type
+           within the last 30 minutes (prevents cleared alerts from reappearing
+           immediately when the underlying condition persists).
+
+        Sentry bot notifications are handled separately by the caller and are NOT
+        affected by this dedup — they fire every time the condition is detected.
         """
         try:
             from app.api.simulation import simulation_service
+
+            cooldown_key = f"{equipment_code}::{alert_type}"
+
+            # Dedup layer 1: skip if an active alert already exists for this equipment + type
+            for existing in simulation_service.alert_queue:
+                if (
+                    existing["equipment_id"] == equipment_code
+                    and existing["type"] == alert_type
+                    and existing["status"] == "active"
+                ):
+                    logger.debug(
+                        f"Dedup: skipping duplicate dashboard alert for {equipment_code} "
+                        f"({alert_type}) — active alert {existing['id']} already exists"
+                    )
+                    return
+
+            # Dedup layer 2: cooldown — skip if we pushed an alert recently
+            # (prevents cleared/acknowledged alerts from reappearing immediately)
+            COOLDOWN_SECONDS = 1800  # 30 minutes
+            last_push = self._dashboard_alert_cooldown.get(cooldown_key)
+            if last_push:
+                elapsed = (datetime.now() - last_push).total_seconds()
+                if elapsed < COOLDOWN_SECONDS:
+                    logger.debug(
+                        f"Cooldown: skipping dashboard alert for {equipment_code} "
+                        f"({alert_type}) — last pushed {elapsed:.0f}s ago (cooldown {COOLDOWN_SECONDS}s)"
+                    )
+                    return
 
             simulation_service._alert_id_counter += 1
             equip_type = (equipment_code.split("-")[1] or "unknown").lower() if "-" in equipment_code else "unknown"
@@ -3621,12 +3999,17 @@ class LifecycleOrchestrator:
                 "acknowledged": False,
                 "acknowledged_by": None,
                 "category": "hvac" if equip_type in ("chiller", "ahu", "fcu", "vav", "pump", "ct") else "electrical",
-                "suggested_action": None,
+                "suggested_action": details.get("recommended_action") if details else None,
+                "recommended_action": details.get("recommended_action") if details else None,
+                "operational_context": details.get("operational_context") if details else None,
                 "actionable_remotely": False,
             }
 
             simulation_service.alert_queue.append(alert)
             simulation_service.alert_history.append(alert)
+
+            # Record cooldown timestamp
+            self._dashboard_alert_cooldown[cooldown_key] = datetime.now()
 
             # Keep history manageable
             if len(simulation_service.alert_history) > 500:

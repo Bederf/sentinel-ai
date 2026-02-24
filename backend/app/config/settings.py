@@ -39,6 +39,11 @@ class Settings(BaseSettings):
         "https://localhost:9096",
         "http://127.0.0.1:9096",
         "https://127.0.0.1:9096",
+        "http://localhost:9097",
+        "http://localhost:9098",
+        "http://localhost:9099",
+        "http://localhost:9100",
+        "http://localhost:9101",
         "http://localhost:3000",
         "https://localhost:3000",
         "http://localhost:5173",
@@ -203,6 +208,23 @@ class Settings(BaseSettings):
     rlm_runner_url: str = "http://127.0.0.1:8010"  # Runner binds localhost only
     rlm_runner_enabled: bool = False  # Disabled until runner is deployed
     rlm_timeout_seconds: int = 120  # Max time per HTTP request to runner
+
+    # Solar connector mode (v27.0 — simulation | live)
+    solar_connector_mode: str = "simulation"  # simulation = demo data, live = real Modbus TCP
+
+    # Sprint 0 write test gating — requires BOTH this AND aegis_bess_writer_enabled
+    allow_write_tests: bool = False  # Second gate: explicitly allow hardware write tests
+
+    # Sprint 0 hard safety limits (enforced in code, not just config)
+    sprint0_max_power_kw: float = 5.0  # Max power per command during Sprint 0
+    sprint0_max_duration_min: int = 10  # Max duration per command during Sprint 0
+
+    # Modbus BESS Writer (v26.0 — Huawei LUNA2000 register writes)
+    modbus_bess_ip: str = ""  # LUNA2000 Modbus TCP IP (empty = DEMO_MODE, no TCP)
+    modbus_bess_port: int = 502  # Standard Modbus TCP port
+    modbus_bess_unit_id: int = 1  # Modbus slave ID
+    modbus_bess_timeout_s: int = 5  # TCP connection/response timeout
+    modbus_write_verify: bool = True  # Read-back verification after write
 
     # JWT Token Claims (MCP SSE B1 - Issuer/Audience validation)
     jwt_issuer: str = "sentinel.bms"  # JWT iss claim

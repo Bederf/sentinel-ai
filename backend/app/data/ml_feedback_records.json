@@ -1811,27 +1811,27 @@
       "time_to_failure_actual": null,
       "recorded_at": "2026-02-23T15:42:24.974396",
       "metadata": {
+        "source": "approval_service.execute_approval",
         "site_id": "S002",
-        "module_type": "hvac",
         "action_type": "ai_optimization",
-        "outcome_status": "executed",
-        "predicted_impact": {
-          "description": "Set chiller to 100% capacity for peak cooling demand",
-          "energy_savings_percent": 0
-        },
+        "approved_by": "dashboard",
+        "module_type": "hvac",
+        "source_path": "approval_service",
         "actual_impact": {
           "cov_verified": false,
           "device_write": {
-            "success": true,
-            "message": "Demo mode - device write simulated"
+            "message": "Demo mode - device write simulated",
+            "success": true
           },
           "target_value": 100
         },
+        "correlation_id": "366d4159-3fa4-4799-a85f-b26dbadef67e",
+        "outcome_status": "executed",
         "confidence_score": 0.9,
-        "source_path": "approval_service",
-        "source": "approval_service.execute_approval",
-        "approved_by": "dashboard",
-        "correlation_id": "366d4159-3fa4-4799-a85f-b26dbadef67e"
+        "predicted_impact": {
+          "description": "Set chiller to 100% capacity for peak cooling demand",
+          "energy_savings_percent": 0
+        }
       }
     }
   ],
@@ -2971,9 +2971,9 @@
       "equipment_id": "S002-CHILLER-B1-001",
       "equipment_type": "hvac",
       "features": {
-        "effectiveness_score": 100.0,
         "success_flag": 1.0,
-        "confidence_score": 0.9
+        "confidence_score": 0.9,
+        "effectiveness_score": 100.0
       },
       "label": "successful",
       "failure_type": null,
@@ -2995,7 +2995,7 @@
         "control": 100.0
       },
       "records": 11,
-      "refreshed_at": "2026-02-23T15:44:03.715443"
+      "refreshed_at": "2026-02-24T08:39:08.727263"
     },
     "site-002": {
       "site_id": "site-002",
@@ -3006,9 +3006,9 @@
         "hvac": 50.0
       },
       "records": 16,
-      "refreshed_at": "2026-02-23T15:44:03.715383"
+      "refreshed_at": "2026-02-24T08:39:08.727329"
     }
   },
   "record_counter": 86,
-  "updated_at": "2026-02-23T15:44:03.808824"
+  "updated_at": "2026-02-24T08:39:08.730076"
 }

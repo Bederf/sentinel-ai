@@ -4,7 +4,7 @@ type: "technical-reference"
 status: "active"
 version: "1.0.0"
 created: "2026-02-12"
-updated: "2026-02-12"
+updated: "2026-02-23"
 author: "SENTINEL Development Team"
 tags: ["ml", "registry", "database", "async", "architecture", "phase-68-03"]
 domain: "ai-ml"
@@ -151,7 +151,7 @@ Stores trained model metadata and paths.
 CREATE TABLE ml_models (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   model_id TEXT UNIQUE NOT NULL,           -- e.g., "lstm_chiller_20260209_212308"
-  model_type TEXT NOT NULL,                 -- "lstm", "autoencoder"
+  model_type TEXT NOT NULL,                 -- "lstm", "autoencoder", "classifier"
   equipment_type TEXT NOT NULL,             -- "chiller", "ahu", "vav"
   model_path TEXT NOT NULL,                 -- Full path to .h5 file
   scaler_path TEXT,                         -- Optional feature scaler
@@ -174,6 +174,18 @@ CREATE TABLE ml_models (
 | ups | lstm_ups_20260209_215037 | 0.4144 | active |
 | generator | lstm_generator_20260209_213751 | 0.3710 | active |
 | vav | lstm_vav_20260209_215713 | 0.3171 | disabled |
+
+**Classifier Models (v25.0):**
+
+Registered in `registry.json` (file-based, not Supabase). Random Forest classifiers for fault type prediction:
+
+| equipment_type | model_id | cv_accuracy | n_classes | status |
+|---|---|---|---|---|
+| chiller | classifier_chiller_20260223_* | 0.608 | 6 | active |
+| ahu | classifier_ahu_20260223_* | 0.667 | 6 | active |
+| generator | classifier_generator_20260223_* | 0.542 | 6 | active |
+| fcu | classifier_fcu_20260223_* | 0.717 | 5 | active |
+| ups | classifier_ups_20260223_* | 0.508 | 5 | active |
 
 #### model_thresholds
 
@@ -399,9 +411,11 @@ Later when model trained:
 - [x] Cache TTL configured (1 hour default)
 - [x] Supabase indexes created for performance
 - [x] Graceful degradation verified (threshold=1.0 blocks recommendations)
-- [ ] ML model training pipeline updates (auto-register new models)
+- [x] 5 Random Forest classifiers trained and registered (v25.0)
+- [x] Fault classification wired into anomaly detection pipeline (v25.0)
+- [x] Classifier included in /train/all and retraining scheduler (v25.0)
+- [x] Documentation updated (v25.0)
 - [ ] Monitoring & alerting setup (model performance metrics)
-- [ ] Documentation updated (this file)
 
 ---
 

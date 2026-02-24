@@ -26,9 +26,9 @@ estimated_read_time: 15
 
 | Gap | Current Evidence | Status |
 |---|---|---|
-| Prometheus backend scraping for AI controls is incomplete | `/opt/aimthelaw/config/prometheus.yml` has backend scrape disabled | Endpoint ready, scrape wiring pending (Phase 2) |
+| Prometheus backend scraping for AI controls is incomplete | `/opt/aimthelaw/config/prometheus.yml` now includes `sentinel-backend` scrape job | **RESOLVED** -- scrape target validated `UP` (`2026-02-23`) |
 | No canonical Prometheus exposition for AI controls | `/api/mlops/metrics` returns JSON (not Prometheus text format) | **RESOLVED** -- `/metrics` endpoint ships Prometheus text format |
-| Alerting focuses on log events | `infrastructure/grafana/provisioning/alerting/security-alerts.yaml` | Alert rules defined below, wiring pending (Phase 2) |
+| Alerting focuses on log events | `/opt/aimthelaw/config/grafana/provisioning/alerting/sentinel-ai-governance-alert-rules.yml` | **RESOLVED** -- 4 AI governance alert rules provisioned (`2026-02-23`) |
 | Cost/approval metrics are not standardized | Mixed APIs and logs | 8 stable metric names defined below |
 
 ## Prometheus Metrics
@@ -182,22 +182,21 @@ Alert rules mapping metrics to runbooks for operational response:
 ## Evidence and Ownership
 
 - **Metrics endpoint:** `backend/app/api/metrics.py`
-- **Dashboards:** `infrastructure/grafana/provisioning/dashboards/`
-- **Alerting rules:** `infrastructure/grafana/provisioning/alerting/`
+- **Dashboards:** `/opt/aimthelaw/config/grafana/provisioning/dashboards/sentinel-ai-governance.json`
+- **Alerting rules:** `/opt/aimthelaw/config/grafana/provisioning/alerting/sentinel-ai-governance-alert-rules.yml`
 - **Evidence snapshots:** `docs/ai-governance/evidence/drift-reports/`
+- **Validation evidence:** `docs/ai-governance/evidence/monitoring/2026-02-23-prometheus-grafana-validation.md`
 - **Owner:** AI Engineering + Operations
 
 ## Cross-Repo Note
 
-In `/opt/aimthelaw/config/prometheus.yml`, backend scraping is currently commented out with a note that a true Prometheus `/metrics` endpoint is required. Now that the endpoint exists (`backend/app/api/metrics.py`), the scrape job can be enabled using the configuration in the "Scrape Configuration" section above. Treat this as shared platform work between `bms-intelligence` (metric exposition) and `aimthelaw` (scrape/alerts).
+In `/opt/aimthelaw/config/prometheus.yml`, the `sentinel-backend` scrape job is enabled and validated. Treat this as shared platform work between `bms-intelligence` (metric exposition) and `aimthelaw` (scrape/alerts).
 
 ## Phase 2 Roadmap
 
-The following enhancements are planned for Phase 2 (Control Implementation, 2026-04-01 to 2026-05-31):
+The following enhancements remain for Phase 2 (Control Implementation, 2026-04-01 to 2026-05-31):
 
 - Wire real metric collection hooks into existing services (quality gate evaluator, approval workflow, safety engine)
 - Add histogram metrics for approval latency and recommendation processing time
-- Enable Prometheus scrape in `/opt/aimthelaw/config/prometheus.yml`
-- Deploy Grafana dashboard JSON provisioning
-- Configure alert rules in Grafana alerting pipeline
-- Validate end-to-end signal quality
+- Gather 14 consecutive days of scrape stability evidence for gate closure
+- Tune alert thresholds against production baseline

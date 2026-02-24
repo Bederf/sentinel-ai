@@ -206,7 +206,9 @@ import { Tooltip } from "./Tooltip";
 ### Connected to Phase 1-3 Work:
 
 1. **Equipment ID Converter** (Phase 1)
-   - Backend converts BMS IDs to v2.0 standard
+   - Backend converts BMS IDs to v2.0 standard (`S###-TYPE-FLOOR-ZONE`)
+   - Supports 30+ equipment types including hospital (LIFT, COLD, MEDGAS, JACE, KEF)
+   - Vendor-agnostic floor extraction from any hyphen/dot-separated ID
    - Wizard shows confirmation in Step 4 checklist
 
 2. **Zone Mapping Service** (Phase 2)
@@ -214,7 +216,10 @@ import { Tooltip } from "./Tooltip";
    - Wizard displays zone badges in Step 3
 
 3. **Discovery Pipeline** (Phase 3)
-   - Backend runs full discovery with naming conversion
+   - 3-tier vendor-agnostic classifier: metadata → ID extraction → regex fallback
+   - Metadata-first approach: uses `_equipment_id`, `_equipment_type`, `_point_type` from equipment JSON when available (100% high confidence)
+   - Type code extraction from equipment IDs for unknown metadata (KNOWN_TYPE_CODES lookup)
+   - No code changes needed per BMS vendor — new types are a one-line addition
    - Wizard shows progress in Step 2
 
 4. **Equipment Verification Wizard** (Part of Phase 4)

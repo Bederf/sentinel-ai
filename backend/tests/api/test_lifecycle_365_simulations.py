@@ -1,9 +1,8 @@
 """
-365-Day Lifecycle Simulation Tests for Grant and Bederf Scenarios
+365-Day Lifecycle Simulation Tests — Unified sentinel_annual Scenario
 
-This test suite validates the lightweight 365-day annual simulations for demo scenarios:
-- grant_hvac_dali_ai_annual: HVAC + DALI + AI optimization over 365 days
-- grant_solar_bess_ai_annual: Solar + BESS + AI dispatch over 365 days
+This test suite validates the unified 365-day annual simulation (sentinel_annual)
+which covers HVAC + DALI + Solar + BESS + AI optimization in a single scenario.
 
 These tests ensure:
 1. Hourly event processing produces correct daily patterns
@@ -124,7 +123,7 @@ def mock_supabase_for_lifecycle():
     mock_select_response.data = [
         {
             "task_id": "test-task-123",
-            "scenario": "grant_hvac_dali_ai_annual",
+            "scenario": "sentinel_annual",
             "status": "running",
             "progress_pct": 95,
             "days_elapsed": 365,
@@ -204,7 +203,7 @@ def mock_supabase_for_lifecycle():
 
     # Mock the scenario
     mock_scenario = Mock()
-    mock_scenario.name = "grant_hvac_dali_ai_annual"
+    mock_scenario.name = "sentinel_annual"
     mock_orchestrator.current_scenario = mock_scenario
 
     # Make get_status return paused state that changes dynamically
@@ -248,25 +247,10 @@ def bederf_site_id() -> str:
 
 
 @pytest.fixture
-def hvac_dali_ai_scenario() -> Dict[str, Any]:
-    """Grant's HVAC + DALI + AI scenario configuration."""
+def sentinel_annual_scenario() -> Dict[str, Any]:
+    """Unified 365-day sentinel_annual scenario configuration."""
     return {
-        "scenario": "grant_hvac_dali_ai_annual",
-        "duration_minutes": 30.0,
-        "start_hour": 6,
-        "expected_events_per_day": 8,
-        "expected_recommendations_per_day": 3,  # Hours 6, 10, 14
-        "total_days": 365,
-        "expected_total_events": 2920,  # 365 × 8
-        "expected_total_recommendations": 1095,  # 365 × 3
-    }
-
-
-@pytest.fixture
-def solar_bess_ai_scenario() -> Dict[str, Any]:
-    """Grant's Solar + BESS + AI scenario configuration."""
-    return {
-        "scenario": "grant_solar_bess_ai_annual",
+        "scenario": "sentinel_annual",
         "duration_minutes": 30.0,
         "start_hour": 6,
         "expected_events_per_day": 8,
@@ -293,7 +277,7 @@ class TestHourlyEventProcessing:
         self,
         async_client: AsyncClient,
         grant_site_id: str,
-        hvac_dali_ai_scenario: Dict[str, Any],
+        sentinel_annual_scenario: Dict[str, Any],
         mock_supabase_for_lifecycle,
     ):
         """Verify hourly events occur at expected hours (0, 6, 8, 10, 11, 14, 18, 22)."""
@@ -301,9 +285,9 @@ class TestHourlyEventProcessing:
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -342,15 +326,15 @@ class TestHourlyEventProcessing:
             assert hour in expected_hours, f"Unexpected event hour: {hour}"
 
     @pytest.mark.asyncio
-    async def test_daily_event_count(self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]):
+    async def test_daily_event_count(self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]):
         """Verify daily event count is approximately 8 events per day."""
         # Start simulation
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -377,14 +361,14 @@ class TestHourlyEventProcessing:
             assert 7 <= avg_events_per_day <= 10, f"Expected ~8 events/day, got {avg_events_per_day:.1f}"
 
     @pytest.mark.asyncio
-    async def test_event_type_variety(self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]):
+    async def test_event_type_variety(self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]):
         """Verify event types include occupancy, setpoint, and optimization events."""
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -424,14 +408,14 @@ class TestSeasonalVariations:
     """
 
     @pytest.mark.asyncio
-    async def test_temperature_cycle(self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]):
+    async def test_temperature_cycle(self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]):
         """Verify temperature cycles between ~14°C (winter) and ~28°C (summer)."""
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -452,14 +436,14 @@ class TestSeasonalVariations:
             assert 10 <= ambient_temp <= 35, f"Temperature {ambient_temp}°C outside expected seasonal range"
 
     @pytest.mark.asyncio
-    async def test_seasonal_name_changes(self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]):
+    async def test_seasonal_name_changes(self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]):
         """Verify daily summaries include seasonal name (Summer, Winter, Spring, Autumn)."""
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -491,14 +475,14 @@ class TestSeasonalVariations:
         assert len(found_seasons) >= 2, f"Expected multiple seasons in simulation, found: {found_seasons}"
 
     @pytest.mark.asyncio
-    async def test_rainfall_pattern(self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]):
+    async def test_rainfall_pattern(self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]):
         """Verify rainfall patterns appear (Oct-Mar should be wetter)."""
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -536,15 +520,15 @@ class TestAIRecommendations:
 
     @pytest.mark.asyncio
     async def test_ai_optimization_event_generation(
-        self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
     ):
         """Verify ai_optimization events are generated at hours 6, 10, 14."""
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -576,15 +560,15 @@ class TestAIRecommendations:
 
     @pytest.mark.asyncio
     async def test_recommendation_payload_validity(
-        self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
     ):
         """Verify ai_optimization events have valid recommendation payloads."""
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -614,14 +598,16 @@ class TestAIRecommendations:
         )
 
     @pytest.mark.asyncio
-    async def test_daily_recommendation_count(self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]):
+    async def test_daily_recommendation_count(
+        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+    ):
         """Verify ~3 recommendations per day over 365 days."""
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -661,14 +647,16 @@ class TestCheckpointRecovery:
     """
 
     @pytest.mark.asyncio
-    async def test_checkpoint_save_on_interval(self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]):
+    async def test_checkpoint_save_on_interval(
+        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+    ):
         """Verify checkpoints are saved every 6 simulated hours."""
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -694,15 +682,17 @@ class TestCheckpointRecovery:
             )
 
     @pytest.mark.asyncio
-    async def test_pause_resume_preserves_state(self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]):
+    async def test_pause_resume_preserves_state(
+        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+    ):
         """Verify pause/resume preserves simulation state correctly."""
         # Start simulation
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -747,14 +737,16 @@ class TestProgressTracking:
     """
 
     @pytest.mark.asyncio
-    async def test_progress_percentage_accuracy(self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]):
+    async def test_progress_percentage_accuracy(
+        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+    ):
         """Verify progress percentage increases monotonically and stays 0-100%."""
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -782,14 +774,16 @@ class TestProgressTracking:
             previous_progress = progress
 
     @pytest.mark.asyncio
-    async def test_progress_reaches_completion(self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]):
+    async def test_progress_reaches_completion(
+        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+    ):
         """Verify simulation reaches 100% completion."""
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -815,22 +809,22 @@ class TestProgressTracking:
 # ============================================================================
 
 
-class TestGrantHVACAIScenario:
+class TestSentinelAnnualScenario:
     """
-    Validates Grant's HVAC + DALI + AI scenario specific behavior.
+    Validates unified sentinel_annual scenario covering HVAC, DALI, and Solar/BESS.
     """
 
     @pytest.mark.asyncio
     async def test_hvac_setpoint_recommendations(
-        self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
     ):
         """Verify HVAC setpoint change recommendations are present."""
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -856,15 +850,15 @@ class TestGrantHVACAIScenario:
 
     @pytest.mark.asyncio
     async def test_dali_lighting_recommendations(
-        self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
     ):
         """Verify DALI lighting optimization is included in recommendations."""
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -889,21 +883,17 @@ class TestGrantHVACAIScenario:
         # DALI events should be present in at least some days
         assert len(dali_events) > 0, "No DALI lighting events found in simulation"
 
-
-class TestGrantSolarBESSScenario:
-    """
-    Validates Grant's Solar + BESS + AI scenario specific behavior.
-    """
-
     @pytest.mark.asyncio
-    async def test_solar_dispatch_events(self, async_client: AsyncClient, solar_bess_ai_scenario: Dict[str, Any]):
+    async def test_solar_bess_dispatch_events(
+        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+    ):
         """Verify solar generation and BESS dispatch events are present."""
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": solar_bess_ai_scenario["scenario"],
-                "duration_minutes": solar_bess_ai_scenario["duration_minutes"],
-                "start_hour": solar_bess_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -918,16 +908,9 @@ class TestGrantSolarBESSScenario:
 
         events = status_data.get("recent_events", [])
 
-        # Look for solar/BESS related events
-        solar_events = [
-            e
-            for e in events
-            if any(term in e.get("description", "").lower() for term in ["solar", "bess", "battery", "dispatch"])
-        ]
-
         # Solar events might not appear in every simulation segment,
         # but should appear overall
-        assert len(events) > 0, "No events in solar scenario"
+        assert len(events) > 0, "No events in sentinel_annual scenario"
 
 
 # ============================================================================
@@ -942,7 +925,7 @@ class TestSimulationStress:
 
     @pytest.mark.asyncio
     async def test_simulation_completes_within_time_budget(
-        self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]
+        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
     ):
         """Verify 365-day simulation completes within specified duration."""
         import time
@@ -952,9 +935,9 @@ class TestSimulationStress:
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
-                "duration_minutes": hvac_dali_ai_scenario["duration_minutes"],
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "scenario": sentinel_annual_scenario["scenario"],
+                "duration_minutes": sentinel_annual_scenario["duration_minutes"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
@@ -975,55 +958,53 @@ class TestSimulationStress:
         assert progress > 90, f"Simulation only {progress}% complete after {elapsed:.1f} seconds"
 
         # Should complete within 2x the requested duration (30 min → 1 hour max)
-        max_allowed = hvac_dali_ai_scenario["duration_minutes"] * 120 + 30  # seconds
+        max_allowed = sentinel_annual_scenario["duration_minutes"] * 120 + 30  # seconds
         assert elapsed < max_allowed, f"Simulation took {elapsed:.1f}s, exceeded max {max_allowed}s"
 
     @pytest.mark.asyncio
-    async def test_concurrent_simulations(
-        self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any], solar_bess_ai_scenario: Dict[str, Any]
-    ):
-        """Verify multiple simulations can run concurrently without interference."""
-        # Start both simulations
-        hvac_response = await async_client.post(
+    async def test_concurrent_simulations(self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]):
+        """Verify same scenario can run concurrently on two sites without interference."""
+        # Start sentinel_annual on two different sites
+        site1_response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
+                "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": 10,  # Shorter for testing
-                "start_hour": hvac_dali_ai_scenario["start_hour"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
-        solar_response = await async_client.post(
+        site2_response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": solar_bess_ai_scenario["scenario"],
+                "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": 10,  # Shorter for testing
-                "start_hour": solar_bess_ai_scenario["start_hour"],
+                "start_hour": sentinel_annual_scenario["start_hour"],
             },
         )
 
-        assert hvac_response.status_code == 200
-        assert solar_response.status_code == 200
+        assert site1_response.status_code == 200
+        assert site2_response.status_code == 200
 
-        hvac_task_id = hvac_response.json()["task_id"]
-        solar_task_id = solar_response.json()["task_id"]
+        site1_task_id = site1_response.json()["task_id"]
+        site2_task_id = site2_response.json()["task_id"]
 
         # Wait for both to complete
         await asyncio.sleep(2)
 
         # Both should have made progress
-        hvac_status = await async_client.get(f"/api/lifecycle/status/{hvac_task_id}")
-        solar_status = await async_client.get(f"/api/lifecycle/status/{solar_task_id}")
+        site1_status = await async_client.get(f"/api/lifecycle/status/{site1_task_id}")
+        site2_status = await async_client.get(f"/api/lifecycle/status/{site2_task_id}")
 
-        assert hvac_status.status_code == 200
-        assert solar_status.status_code == 200
+        assert site1_status.status_code == 200
+        assert site2_status.status_code == 200
 
-        hvac_progress = hvac_status.json().get("progress_pct", 0)
-        solar_progress = solar_status.json().get("progress_pct", 0)
+        site1_progress = site1_status.json().get("progress_pct", 0)
+        site2_progress = site2_status.json().get("progress_pct", 0)
 
         # Both should have made significant progress
-        assert hvac_progress > 50, f"HVAC simulation only {hvac_progress}% complete"
-        assert solar_progress > 50, f"Solar simulation only {solar_progress}% complete"
+        assert site1_progress > 50, f"Site 1 simulation only {site1_progress}% complete"
+        assert site2_progress > 50, f"Site 2 simulation only {site2_progress}% complete"
 
 
 # ============================================================================
@@ -1052,12 +1033,14 @@ class TestSimulationErrorHandling:
         assert response.status_code in (400, 404), f"Expected 400/404 for invalid scenario, got {response.status_code}"
 
     @pytest.mark.asyncio
-    async def test_invalid_start_hour_rejected(self, async_client: AsyncClient, hvac_dali_ai_scenario: Dict[str, Any]):
+    async def test_invalid_start_hour_rejected(
+        self, async_client: AsyncClient, sentinel_annual_scenario: Dict[str, Any]
+    ):
         """Verify invalid start hour is rejected."""
         response = await async_client.post(
             "/api/lifecycle/start",
             json={
-                "scenario": hvac_dali_ai_scenario["scenario"],
+                "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": 30.0,
                 "start_hour": 25,  # Invalid: > 23
             },

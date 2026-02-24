@@ -103,11 +103,15 @@ Automatically triggered when advancing from Step 1. Calls `POST /api/niagara/dis
 
 ### What Happens
 
-1. BACnet Who-Is broadcast discovers devices on the network
+1. BACnet Who-Is broadcast discovers devices on the network (or loads from equipment JSON files in demo/simulation mode)
 2. Point enumeration reads all BACnet objects from each device
-3. AI classifier maps points to equipment using Haystack/Brick ontology
-4. Points are grouped into equipment models (AHU, Chiller, FCU, etc.)
-5. Confidence scores assigned: **high** (exact match), **medium** (partial), **low** (guessed)
+3. **Vendor-agnostic 3-tier classification:**
+   - **Tier 1 — Metadata:** When equipment JSON files provide `_equipment_id`, `_equipment_type`, `_point_type`, the classifier uses them directly (100% high confidence, any BMS vendor)
+   - **Tier 2 — ID extraction:** For points with unknown type, extracts the type code from equipment ID segments (e.g., `COLD`, `LIFT`, `JACE` from `site-005-UMH-COLD-B1-001`)
+   - **Tier 3 — Regex fallback:** Haystack/Brick ontology pattern matching for raw BACnet points without metadata
+4. Points are grouped into equipment models (30+ types: AHU, Chiller, FCU, Lift, JACE, Cold Room, MEDGAS, etc.)
+5. Equipment IDs converted to SENTINEL v2.0 format (`S###-TYPE-FLOOR-ZONE`) with vendor-agnostic floor extraction
+6. Confidence scores assigned: **high** (metadata or exact match), **medium** (partial), **low** (guessed)
 
 ### Summary Display
 
@@ -280,5 +284,6 @@ SENTINEL VM must have IP access to the BMS controllers — either on the same BM
 ---
 
 *Feature: BMS Connection Wizard (Multi-Vendor)*
-*Document version: 2.0.0*
+*Document version: 2.1.0*
 *Created: 2026-02-04*
+*Updated: 2026-02-23 — Vendor-agnostic 3-tier classifier, 30+ equipment types, metadata-first classification*

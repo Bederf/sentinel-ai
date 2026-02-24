@@ -1,0 +1,1211 @@
+{
+  "discovery_id": "3570738f",
+  "site_id": "site-005",
+  "created_at": "2026-02-23T17:27:49.913656",
+  "equipment_count": 27,
+  "total_points": 38,
+  "equipment": {
+    "S005-AHU-B1-LAU": {
+      "equipment_id": "S005-AHU-B1-LAU",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (S005-AHU-B1-LAU)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-AHU-B1-LAUN.fan.status",
+          "standardized_name": "site-005-UMH-AHU-B1-LAUN.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryValue",
+          "instance": 1000,
+          "present_value": true,
+          "writable": true
+        },
+        {
+          "original_name": "site-005-UMH-AHU-B1-LAUN.fan.speed",
+          "standardized_name": "site-005-UMH-AHU-B1-LAUN.fan/setpoint_sensor",
+          "point_type": "sensor",
+          "point_category": "setpoint",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 1001,
+          "present_value": 70,
+          "writable": true
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-AHU-B1-LAUN.fan",
+        "zone": {
+          "zone_id": "Zone-B1-LAU",
+          "floor": "B1",
+          "zone_letter": "LAU",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.908792",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-AHU-L2-001": {
+      "equipment_id": "S005-AHU-L2-001",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (S005-AHU-L2-001)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-AHU-L2-001.fan.speed",
+          "standardized_name": "site-005-UMH-AHU-L2-001.fan/setpoint_sensor",
+          "point_type": "sensor",
+          "point_category": "setpoint",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 1002,
+          "present_value": 60,
+          "writable": true
+        },
+        {
+          "original_name": "site-005-UMH-AHU-L2-001.fan.status",
+          "standardized_name": "site-005-UMH-AHU-L2-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryValue",
+          "instance": 1003,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-AHU-L2-001.fan",
+        "zone": {
+          "zone_id": "Zone-L2-001",
+          "floor": "L2",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.908856",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-AHU-L3-ICU": {
+      "equipment_id": "S005-AHU-L3-ICU",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (S005-AHU-L3-ICU)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-AHU-L3-ICU.room.pressure",
+          "standardized_name": "site-005-UMH-AHU-L3-ICU.room/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 1008,
+          "present_value": 10,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-AHU-L3-ICU.room",
+        "zone": {
+          "zone_id": "Zone-L3-ICU",
+          "floor": "L3",
+          "zone_letter": "ICU",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.909009",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-AHU-L3-TH1": {
+      "equipment_id": "S005-AHU-L3-TH1",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (S005-AHU-L3-TH1)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-AHU-L3-TH1.room.pressure",
+          "standardized_name": "site-005-UMH-AHU-L3-TH1.room/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 1013,
+          "present_value": 15,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-AHU-L3-TH1.room",
+        "zone": {
+          "zone_id": "Zone-L3-TH1",
+          "floor": "L3",
+          "zone_letter": "TH1",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.909101",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-AHU-L3-TH2": {
+      "equipment_id": "S005-AHU-L3-TH2",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (S005-AHU-L3-TH2)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-AHU-L3-TH2.room.pressure",
+          "standardized_name": "site-005-UMH-AHU-L3-TH2.room/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 1019,
+          "present_value": 15,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-AHU-L3-TH2.room",
+        "zone": {
+          "zone_id": "Zone-L3-TH2",
+          "floor": "L3",
+          "zone_letter": "TH2",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.909256",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-AHU-L3-TH3": {
+      "equipment_id": "S005-AHU-L3-TH3",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (S005-AHU-L3-TH3)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-AHU-L3-TH3.room.pressure",
+          "standardized_name": "site-005-UMH-AHU-L3-TH3.room/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "Pa",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 1024,
+          "present_value": 15,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 1
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-AHU-L3-TH3.room",
+        "zone": {
+          "zone_id": "Zone-L3-TH3",
+          "floor": "L3",
+          "zone_letter": "TH3",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.909386",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-AHU-L4-001": {
+      "equipment_id": "S005-AHU-L4-001",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (S005-AHU-L4-001)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-AHU-L4-001.fan.speed",
+          "standardized_name": "site-005-UMH-AHU-L4-001.fan/setpoint_sensor",
+          "point_type": "sensor",
+          "point_category": "setpoint",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 1025,
+          "present_value": 70,
+          "writable": true
+        },
+        {
+          "original_name": "site-005-UMH-AHU-L4-001.fan.status",
+          "standardized_name": "site-005-UMH-AHU-L4-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryValue",
+          "instance": 1026,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-AHU-L4-001.fan",
+        "zone": {
+          "zone_id": "Zone-L4-001",
+          "floor": "L4",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.909411",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-AHU-L5-001": {
+      "equipment_id": "S005-AHU-L5-001",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (S005-AHU-L5-001)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-AHU-L5-001.fan.speed",
+          "standardized_name": "site-005-UMH-AHU-L5-001.fan/setpoint_sensor",
+          "point_type": "sensor",
+          "point_category": "setpoint",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 1027,
+          "present_value": 72,
+          "writable": true
+        },
+        {
+          "original_name": "site-005-UMH-AHU-L5-001.fan.status",
+          "standardized_name": "site-005-UMH-AHU-L5-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryValue",
+          "instance": 1028,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-AHU-L5-001.fan",
+        "zone": {
+          "zone_id": "Zone-L5-001",
+          "floor": "L5",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.909435",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-AHU-L6-001": {
+      "equipment_id": "S005-AHU-L6-001",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (S005-AHU-L6-001)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-AHU-L6-001.fan.speed",
+          "standardized_name": "site-005-UMH-AHU-L6-001.fan/setpoint_sensor",
+          "point_type": "sensor",
+          "point_category": "setpoint",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 1030,
+          "present_value": 75,
+          "writable": true
+        },
+        {
+          "original_name": "site-005-UMH-AHU-L6-001.fan.status",
+          "standardized_name": "site-005-UMH-AHU-L6-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryValue",
+          "instance": 1031,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-AHU-L6-001.fan",
+        "zone": {
+          "zone_id": "Zone-L6-001",
+          "floor": "L6",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.909505",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-AHU-L7-001": {
+      "equipment_id": "S005-AHU-L7-001",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (S005-AHU-L7-001)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-AHU-L7-001.fan.speed",
+          "standardized_name": "site-005-UMH-AHU-L7-001.fan/setpoint_sensor",
+          "point_type": "sensor",
+          "point_category": "setpoint",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 1032,
+          "present_value": 68,
+          "writable": true
+        },
+        {
+          "original_name": "site-005-UMH-AHU-L7-001.fan.status",
+          "standardized_name": "site-005-UMH-AHU-L7-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryValue",
+          "instance": 1033,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-AHU-L7-001.fan",
+        "zone": {
+          "zone_id": "Zone-L7-001",
+          "floor": "L7",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.909529",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-AHU-L8-001": {
+      "equipment_id": "S005-AHU-L8-001",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (S005-AHU-L8-001)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-AHU-L8-001.fan.speed",
+          "standardized_name": "site-005-UMH-AHU-L8-001.fan/setpoint_sensor",
+          "point_type": "sensor",
+          "point_category": "setpoint",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 1034,
+          "present_value": 65,
+          "writable": true
+        },
+        {
+          "original_name": "site-005-UMH-AHU-L8-001.fan.status",
+          "standardized_name": "site-005-UMH-AHU-L8-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryValue",
+          "instance": 1035,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-AHU-L8-001.fan",
+        "zone": {
+          "zone_id": "Zone-L8-001",
+          "floor": "L8",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.909553",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-AHU-L9-001": {
+      "equipment_id": "S005-AHU-L9-001",
+      "equipment_type": "ahu",
+      "equipment_name": "Air Handling Unit (S005-AHU-L9-001)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-AHU-L9-001.fan.speed",
+          "standardized_name": "site-005-UMH-AHU-L9-001.fan/setpoint_sensor",
+          "point_type": "sensor",
+          "point_category": "setpoint",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 1036,
+          "present_value": 72,
+          "writable": true
+        },
+        {
+          "original_name": "site-005-UMH-AHU-L9-001.fan.status",
+          "standardized_name": "site-005-UMH-AHU-L9-001.fan/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryValue",
+          "instance": 1037,
+          "present_value": true,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ahu": 2
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-AHU-L9-001.fan",
+        "zone": {
+          "zone_id": "Zone-L9-001",
+          "floor": "L9",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.909577",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-BOILER-B1-001": {
+      "equipment_id": "S005-BOILER-B1-001",
+      "equipment_type": "boiler",
+      "equipment_name": "Boiler (S005-BOILER-B1-001)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-BOILER-B1-001.hw.temperature",
+          "standardized_name": "site-005-UMH-BOILER-B1-001.hw/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 1038,
+          "present_value": 70.0,
+          "writable": false
+        },
+        {
+          "original_name": "site-005-UMH-BOILER-B1-001.hw.temperature_sensor",
+          "standardized_name": "site-005-UMH-BOILER-B1-001.hw/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 1039,
+          "present_value": 70.0,
+          "writable": true
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "boiler": 2
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-BOILER-B1-001.hw",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.909620",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-BOILER-B1-002": {
+      "equipment_id": "S005-BOILER-B1-002",
+      "equipment_type": "boiler",
+      "equipment_name": "Boiler (S005-BOILER-B1-002)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-BOILER-B1-002.hw.temperature",
+          "standardized_name": "site-005-UMH-BOILER-B1-002.hw/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 1040,
+          "present_value": 68.0,
+          "writable": false
+        },
+        {
+          "original_name": "site-005-UMH-BOILER-B1-002.hw.temperature_sensor",
+          "standardized_name": "site-005-UMH-BOILER-B1-002.hw/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 1041,
+          "present_value": 70.0,
+          "writable": true
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "boiler": 2
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-BOILER-B1-002.hw",
+        "zone": {
+          "zone_id": "Zone-B1-002",
+          "floor": "B1",
+          "zone_letter": "002",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.909655",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-UNKNOWN-B1-001": {
+      "equipment_id": "S005-UNKNOWN-B1-001",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S005-UNKNOWN-B1-001)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-MSB-B1-001.total.power",
+          "standardized_name": "site-005-UMH-MSB-B1-001.total/power_sensor",
+          "point_type": "sensor",
+          "point_category": "power",
+          "unit": "kW",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 1105,
+          "present_value": 1200,
+          "writable": false
+        },
+        {
+          "original_name": "site-005-UMH-MSB-B1-001.total.unknown",
+          "standardized_name": "site-005-UMH-MSB-B1-001.total/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "kVA",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 1106,
+          "present_value": 1350,
+          "writable": false
+        }
+      ],
+      "point_count": 2,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-MSB-B1-001.total",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.913250",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-UNKNOWN-L1-001": {
+      "equipment_id": "S005-UNKNOWN-L1-001",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S005-UNKNOWN-L1-001)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-SPLIT-L1-001.fan.speed",
+          "standardized_name": "site-005-UMH-SPLIT-L1-001.fan/setpoint_sensor",
+          "point_type": "sensor",
+          "point_category": "setpoint",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "multistateValue",
+          "instance": 1110,
+          "present_value": 2,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-SPLIT-L1-001.fan",
+        "zone": {
+          "zone_id": "Zone-L1-001",
+          "floor": "L1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.913500",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-UNKNOWN-L1-002": {
+      "equipment_id": "S005-UNKNOWN-L1-002",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S005-UNKNOWN-L1-002)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-COLD-L1-002.door.status",
+          "standardized_name": "site-005-UMH-COLD-L1-002.door/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 1044,
+          "present_value": false,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-COLD-L1-002.door",
+        "zone": {
+          "zone_id": "Zone-L1-002",
+          "floor": "L1",
+          "zone_letter": "002",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.909965",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-CT-R-001": {
+      "equipment_id": "S005-CT-R-001",
+      "equipment_type": "cooling_tower",
+      "equipment_name": "Cooling Tower (S005-CT-R-001)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-CT-R-001.wet.temperature",
+          "standardized_name": "site-005-UMH-CT-R-001.wet/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 1050,
+          "present_value": 24.0,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "cooling_tower": 1
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-CT-R-001.wet",
+        "zone": {
+          "zone_id": "Zone-R-001",
+          "floor": "R",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.910124",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-CT-R-002": {
+      "equipment_id": "S005-CT-R-002",
+      "equipment_type": "cooling_tower",
+      "equipment_name": "Cooling Tower (S005-CT-R-002)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-CT-R-002.wet.temperature",
+          "standardized_name": "site-005-UMH-CT-R-002.wet/temperature_sensor",
+          "point_type": "sensor",
+          "point_category": "temperature",
+          "unit": "degC",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 1056,
+          "present_value": 24.0,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "cooling_tower": 1
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-CT-R-002.wet",
+        "zone": {
+          "zone_id": "Zone-R-002",
+          "floor": "R",
+          "zone_letter": "002",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.910221",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-UNKNOWN-L3-001": {
+      "equipment_id": "S005-UNKNOWN-L3-001",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S005-UNKNOWN-L3-001)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-DB-L3-001.total.power",
+          "standardized_name": "site-005-UMH-DB-L3-001.total/power_sensor",
+          "point_type": "sensor",
+          "point_category": "power",
+          "unit": "kW",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 1057,
+          "present_value": 85,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-DB-L3-001.total",
+        "zone": {
+          "zone_id": "Zone-L3-001",
+          "floor": "L3",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.910282",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-UNKNOWN-L3-002": {
+      "equipment_id": "S005-UNKNOWN-L3-002",
+      "equipment_type": "unknown",
+      "equipment_name": "Unknown (S005-UNKNOWN-L3-002)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-DB-L3-002.total.power",
+          "standardized_name": "site-005-UMH-DB-L3-002.total/power_sensor",
+          "point_type": "sensor",
+          "point_category": "power",
+          "unit": "kW",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 1058,
+          "present_value": 65,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {},
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-DB-L3-002.total",
+        "zone": {
+          "zone_id": "Zone-L3-002",
+          "floor": "L3",
+          "zone_letter": "002",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.910332",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-GEN-B1-001": {
+      "equipment_id": "S005-GEN-B1-001",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (S005-GEN-B1-001)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-GEN-B1-001.run.status",
+          "standardized_name": "site-005-UMH-GEN-B1-001.run/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "hours",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 1067,
+          "present_value": 4500,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 1
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-GEN-B1-001.run",
+        "zone": {
+          "zone_id": "Zone-B1-001",
+          "floor": "B1",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.910814",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-GEN-B1-002": {
+      "equipment_id": "S005-GEN-B1-002",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (S005-GEN-B1-002)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-GEN-B1-002.run.status",
+          "standardized_name": "site-005-UMH-GEN-B1-002.run/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "hours",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 1071,
+          "present_value": 3800,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 1
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-GEN-B1-002.run",
+        "zone": {
+          "zone_id": "Zone-B1-002",
+          "floor": "B1",
+          "zone_letter": "002",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.910904",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-GEN-B1-003": {
+      "equipment_id": "S005-GEN-B1-003",
+      "equipment_type": "generator",
+      "equipment_name": "Generator (S005-GEN-B1-003)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-GEN-B1-003.run.status",
+          "standardized_name": "site-005-UMH-GEN-B1-003.run/status_status",
+          "point_type": "status",
+          "point_category": "status",
+          "unit": "hours",
+          "confidence": "high",
+          "object_type": "analogValue",
+          "instance": 1075,
+          "present_value": 2200,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "generator": 1
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-GEN-B1-003.run",
+        "zone": {
+          "zone_id": "Zone-B1-003",
+          "floor": "B1",
+          "zone_letter": "003",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.910995",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-PUMP-B1-CHW1": {
+      "equipment_id": "S005-PUMP-B1-CHW1",
+      "equipment_type": "pump",
+      "equipment_name": "Pump (S005-PUMP-B1-CHW1)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-PUMP-B1-CHW1.vfd.alarm",
+          "standardized_name": "site-005-UMH-PUMP-B1-CHW1.vfd/alarm_alarm",
+          "point_type": "alarm",
+          "point_category": "alarm",
+          "unit": "",
+          "confidence": "high",
+          "object_type": "binaryInput",
+          "instance": 1108,
+          "present_value": false,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "pump": 1
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-PUMP-B1-CHW1.vfd",
+        "zone": {
+          "zone_id": "Zone-B1-CHW",
+          "floor": "B1",
+          "zone_letter": "CHW",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.913375",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-PUMP-B1-CW1": {
+      "equipment_id": "S005-PUMP-B1-CW1",
+      "equipment_type": "pump",
+      "equipment_name": "Pump (S005-PUMP-B1-CW1)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-PUMP-B1-CW1.dp.pressure",
+          "standardized_name": "site-005-UMH-PUMP-B1-CW1.dp/pressure_sensor",
+          "point_type": "sensor",
+          "point_category": "pressure",
+          "unit": "bar",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 1109,
+          "present_value": 3.2,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "pump": 1
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-PUMP-B1-CW1.dp",
+        "zone": {
+          "zone_id": "Zone-B1-CW1",
+          "floor": "B1",
+          "zone_letter": "CW1",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.913408",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    },
+    "S005-UPS-L3-001": {
+      "equipment_id": "S005-UPS-L3-001",
+      "equipment_type": "ups",
+      "equipment_name": "UPS (S005-UPS-L3-001)",
+      "site_id": "site-005",
+      "points": [
+        {
+          "original_name": "site-005-UMH-UPS-L3-001.load.unknown",
+          "standardized_name": "site-005-UMH-UPS-L3-001.load/sensor",
+          "point_type": "sensor",
+          "point_category": "unknown",
+          "unit": "%",
+          "confidence": "high",
+          "object_type": "analogInput",
+          "instance": 1112,
+          "present_value": 55,
+          "writable": false
+        }
+      ],
+      "point_count": 1,
+      "confidence": "high",
+      "metadata": {
+        "type_vote_counts": {
+          "ups": 1
+        },
+        "avg_confidence_score": 3.0,
+        "bms_original_id": "site-005-UMH-UPS-L3-001.load",
+        "zone": {
+          "zone_id": "Zone-L3-001",
+          "floor": "L3",
+          "zone_letter": "001",
+          "zone_type": "open_office",
+          "building_id": "site-005"
+        }
+      },
+      "created_at": "2026-02-23T17:27:49.913558",
+      "approved": false,
+      "approved_at": null,
+      "approved_by": null
+    }
+  }
+}

@@ -4,7 +4,7 @@ type: "guide"
 status: "approved"
 version: "2.0.0"
 created: "2026-01-31"
-updated: "2026-02-21"
+updated: "2026-02-23"
 author: "SENTINEL Development Team"
 tags: ["onboarding", "bms", "import", "mcp", "ai", "desigo", "metasys", "ebi"]
 domain: "general"
@@ -659,24 +659,39 @@ For best results, always specify the `bms_vendor` when you know the system.
 
 ## Point Name Parsing
 
-The import_point_list tool recognizes common BMS naming patterns:
+### 3-Tier Vendor-Agnostic Classification
 
-| Pattern | Example | Device Type |
-|---------|---------|-------------|
-| AHU-xxx | AHU-L12-01 | Air Handling Unit |
-| FCU-xxx | FCU-L12-03 | Fan Coil Unit |
-| VAV-xxx | VAV-L12-03A | Variable Air Volume |
-| CH-xxx, Chiller | CH-001, Chiller-1 | Chiller |
-| CT-xxx | CT-001 | Cooling Tower |
-| PUMP-xxx, CHWP | CHWP-001 | Pump |
-| BLR-xxx, Boiler | BLR-001 | Boiler |
-| Meter-xxx | Meter-01 | Energy Meter |
+The classifier uses a metadata-first approach that works with any BMS vendor:
 
-**Floor extraction patterns:**
-- L12, L11 -> Level 12, Level 11
-- B1, B2 -> Basement 1, 2
-- GF, G -> Ground Floor
-- Floor12 -> Normalized to L12
+1. **Tier 1 — Metadata (preferred):** When equipment JSON files provide `_equipment_id`, `_equipment_type`, `_point_type`, they are used directly with HIGH confidence. No regex needed.
+2. **Tier 2 — ID extraction:** When metadata says `equipment_type: "unknown"`, the type code is extracted from the equipment ID segments (e.g., `COLD` from `site-005-UMH-COLD-B1-001`).
+3. **Tier 3 — Regex fallback:** Pattern matching for raw BACnet points without metadata.
+
+### Supported Equipment Types (30+)
+
+| Category | Type Codes | Device Type |
+|----------|-----------|-------------|
+| **HVAC** | AHU, FCU, VAV, CH/CHILLER, CT, SPLIT, CRAC, PUMP, BOILER, COLD, KEF | Air Handling, Fan Coil, VAV, Chiller, Cooling Tower, Split Unit, CRAC, Pump, Boiler, Cold Room, Kitchen Extract Fan |
+| **Electrical** | GEN, UPS, ATS, MSB, DB, MTR/METER, TX, PFC, FDR, MV | Generator, UPS, Transfer Switch, Switchboard, Distribution Board, Meter, Transformer, PFC, Feeder, Medium Voltage |
+| **Lighting** | DALI, LUM | DALI Controller, Luminaire |
+| **Fire/Safety** | FIRE | Fire Panel |
+| **Security** | ACC, CCTV | Access Control, CCTV Camera |
+| **Transport** | LIFT | Lift/Elevator |
+| **Medical** | MEDGAS | Medical Gas System |
+| **Controllers** | JACE, PXC, BMS | JACE Controller, Siemens PXC, BMS Controller |
+
+### Floor Extraction (Vendor-Agnostic)
+
+Floor codes are extracted from any position in hyphen/dot-separated equipment IDs:
+
+| Pattern | Example ID | Extracted Floor |
+|---------|-----------|-----------------|
+| L## | `site-005-UMH-AHU-L3-ICU` | L3 |
+| B## | `site-005-UMH-GEN-B1-001` | B1 |
+| G | `S002-AHU-G-01` | G |
+| R | `site-005-UMH-CT-R-001` | R (Roof) |
+
+Works for Niagara, Desigo, Schneider, Honeywell, Trend, and generic BACnet naming.
 
 ## Device ID Naming Convention
 

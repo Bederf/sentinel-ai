@@ -64,6 +64,26 @@ async def startup_event(app: FastAPI) -> None:
             "Set JWT_SECRET_KEY for a dedicated signing secret."
         )
 
+    # === SENTINEL LIVE MODE BANNER ===
+    # Sprint 0 hardening: loud banner when hardware writes are possible
+    if settings.solar_connector_mode == "live":
+        _logger.critical(
+            "\n"
+            "╔══════════════════════════════════════════════════════════╗\n"
+            "║            ⚡ SENTINEL IS LIVE ⚡                       ║\n"
+            "║  SOLAR_CONNECTOR_MODE = live                            ║\n"
+            "║  MODBUS_BESS_IP       = %-30s  ║\n"
+            "║  AEGIS WRITE GATE     = %-30s  ║\n"
+            "║  DEMO_MODE            = %-30s  ║\n"
+            "║                                                        ║\n"
+            "║  Real hardware reads are ACTIVE.                       ║\n"
+            "║  Kill switch: POST /api/dispatch-optimizer/kill-switch  ║\n"
+            "╚══════════════════════════════════════════════════════════╝",
+            settings.modbus_bess_ip or "(not set)",
+            "OPEN" if settings.aegis_bess_writer_enabled else "CLOSED",
+            str(settings.demo_mode),
+        )
+
     # === PARASITE Autonomous Control Safety Checks ===
     # Phase 100 Security: Prevent accidental Tier 3 autonomous control in production
     if settings.parasite_tier3_enabled and settings.environment == "production":

@@ -23,17 +23,23 @@ backend/ml/
 ├── models/               # Saved models
 │   ├── lstm/            # LSTM model files (.h5, _scaler.joblib)
 │   ├── autoencoder/     # Autoencoder model files
+│   ├── classifier/      # Random Forest classifier files (.joblib)
 │   └── registry.json    # Model registry
 ├── lstm/
 │   ├── __init__.py
 │   ├── data_prep.py     # Training data preparation
 │   ├── model.py         # LSTM architecture (128-64-32)
 │   └── train.py         # Training pipeline
-└── autoencoder/
+├── autoencoder/
+│   ├── __init__.py
+│   ├── data_prep.py     # Normal data preparation
+│   ├── model.py         # LSTM autoencoder
+│   └── train.py         # Training pipeline
+└── classifier/
     ├── __init__.py
-    ├── data_prep.py     # Normal data preparation
-    ├── model.py         # LSTM autoencoder
-    └── train.py         # Training pipeline
+    ├── data_prep.py     # Failure-labeled data prep + synthetic generation
+    ├── model.py         # Random Forest multi-class classifier
+    └── train.py         # Training pipeline with registry integration
 ```
 
 ## LSTM Forecasting
@@ -234,12 +240,93 @@ if result["is_anomaly"]:
 - Minimum 3 months of normal operation data
 - Exclude 7 days before and 3 days after known failures
 
+## Random Forest Fault Classification (v25.0)
+
+### Overview
+
+When an anomaly is detected, the classifier identifies the **specific failure type** (compressor failure, refrigerant leak, etc.) using a Random Forest ensemble trained on failure-labeled data.
+
+**Pipeline:** Anomaly detected → Fault classified → Actionable diagnosis
+
+### Model Architecture
+
+- **Algorithm**: Random Forest (scikit-learn)
+- **Trees**: 100 estimators, max depth 10
+- **Class weighting**: Balanced (handles imbalanced failure types)
+- **Output**: Multi-class probabilities for each failure type + "normal"
+
+### Failure Types Per Equipment
+
+| Equipment | Failure Classes |
+|-----------|----------------|
+| Chiller | compressor_failure, refrigerant_leak, condenser_fouling, oil_issue, electrical, normal |
+| AHU | fan_motor, belt_failure, coil_fouling, damper_actuator, filter_blockage, normal |
+| Generator | battery_failure, fuel_system, starter_motor, alternator, cooling_system, normal |
+| FCU | fan_motor, valve_actuator, thermostat, filter_blockage, normal |
+| UPS | battery_failure, inverter, capacitor, overload, normal |
+
+### Training
+
+```bash
+# Train single equipment type
+cd backend
+python -m ml.classifier.train --equipment-type chiller
+
+# Train all equipment types (~5-10 seconds total)
+python -m ml.classifier.train --all
+```
+
+### API Usage
+
+```bash
+# Train classifier via API
+curl -X POST "http://localhost:9095/api/ml/train/classifier/chiller"
+
+# Classification happens automatically during anomaly check
+curl "http://localhost:9095/api/ml/anomalies/equipment/S002-CHILLER-B1-001?equipment_type=chiller"
+# If anomaly detected, response includes fault_classification field
+
+# Direct classification endpoint (7 endpoints at /api/classification)
+curl "http://localhost:9095/api/classification/failure-type/S002-CHILLER-B1-001"
+```
+
+Response (when anomaly detected):
+```json
+{
+  "is_anomaly": true,
+  "fault_classification": {
+    "predicted_failure": "compressor_failure",
+    "confidence": 0.72,
+    "all_probabilities": {"compressor_failure": 0.72, "refrigerant_leak": 0.12, ...},
+    "contributing_factors": [{"feature": "avg_temp", "importance": 0.15}]
+  }
+}
+```
+
+### Integration with Inference
+
+```python
+from app.services.classification_service import get_classification_service
+
+classifier = get_classification_service()
+result = classifier.predict_failure_type("S002-CHILLER-B1-001")
+print(f"Predicted: {result['predicted_failure']} ({result['confidence']:.0%})")
+```
+
+### Service Layer
+
+- **ClassifierDataPrep** (`ml/classifier/data_prep.py`): Generates labeled training data from work orders or synthetic fallback
+- **FailureClassifier** (`ml/classifier/model.py`): Random Forest with cross-validation, feature importance, prediction explanation
+- **ClassifierTrainer** (`ml/classifier/train.py`): Training pipeline with model registry integration
+- **FailureClassificationService** (`app/services/classification_service.py`): Singleton inference service with lazy model loading
+
 ## Current Limitations
 
 1. **Demo Data**: Uses synthetic data for development/testing
 2. **No InfluxDB Integration**: Would connect to time-series database in production
 3. **Single Feature Target**: LSTM predicts single target per model
 4. **Fixed Window Sizes**: 168h (LSTM), 24h (autoencoder)
+5. **Classifier uses synthetic data**: Real failure labels from CAFM will improve accuracy
 
 ## Future Enhancements
 
@@ -248,3 +335,4 @@ if result["is_anomaly"]:
 - Attention mechanisms
 - Transfer learning between equipment types
 - Online learning for model updates
+- CAFM failure label integration for classifier training

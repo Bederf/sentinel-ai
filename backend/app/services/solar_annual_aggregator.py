@@ -207,7 +207,7 @@ class SolarAnnualAggregator:
     async def aggregate_annual_results(
         self,
         hourly_data: List[HourlySnapshot],
-        scenario: str = "grant_solar_bess_ai_annual",
+        scenario: str = "sentinel_annual",
     ) -> AnnualSummary:
         """
         Aggregate 8760 hourly snapshots into monthly/seasonal/annual summaries.

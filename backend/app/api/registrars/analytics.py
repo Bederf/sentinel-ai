@@ -17,6 +17,7 @@ from app.api import mcp, mcp_sse, mcp_openai
 from app.api import recommendations, simulation_analytics, optimization_quality
 from app.api import system_health, solar, solar_grid, solar_performance, solar_arbitrage
 from app.api import solar_config, peak_demand, solar_annual
+from app.api import load_forecast, dispatch_optimizer
 
 
 def register_analytics_routers(app: FastAPI) -> None:
@@ -69,6 +70,10 @@ def register_analytics_routers(app: FastAPI) -> None:
     app.include_router(solar_performance.router, prefix="/api", tags=["solar-performance"])
     app.include_router(solar_arbitrage.router, prefix="/api", tags=["solar-arbitrage"])
     app.include_router(solar_annual.router, tags=["solar-annual"])
+
+    # Load Forecast & Dispatch Optimizer (v26.0: MIP-optimized BESS dispatch)
+    app.include_router(load_forecast.router, tags=["load-forecast"])
+    app.include_router(dispatch_optimizer.router, tags=["dispatch-optimizer"])
 
     # Peak Demand Management (Phase 081: Cross-module coordination)
     app.include_router(peak_demand.router, tags=["peak-demand"])

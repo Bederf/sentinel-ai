@@ -4,7 +4,7 @@ type: "troubleshooting"
 status: "published"
 version: "1.0.0"
 created: "2026-02-09"
-updated: "2026-02-09"
+updated: "2026-02-23"
 author: "Sentinel Development Team"
 tags: ["ml", "troubleshooting", "model-health", "performance"]
 domain: "operations"
@@ -21,6 +21,7 @@ estimated_read_time: 12
 |---------|--------------|----------|
 | Model Health = Red (< 70%) | Models missing or stale | Train missing models or retrain stale ones |
 | No predictions available | Equipment type not supported | Add equipment type config + train models |
+| No fault classification | Classifier not trained | Run `POST /api/ml/train/classifier/{type}` |
 | Predictions don't match reality | Model too old (stale) | Retrain model with latest data |
 | Too many false anomaly alerts | Threshold too sensitive | Increase anomaly threshold or retrain |
 | Training fails with "Unknown equipment type" | Config not added | Add equipment to SENSOR_CONFIGS files |
@@ -47,15 +48,17 @@ estimated_read_time: 12
 - Multiple R² scores < 0.60
 - System not ready for production decisions
 
-### Current Status (Feb 9, 2026)
+### Current Status (Feb 23, 2026)
 
 ```
 Model Health: 95% ✅
-├─ Fresh Models: 14/14 (100%)
-├─ Stale Models: 0/14
-├─ Missing Models: 0/14
-├─ Underperforming Models: 0/14
-└─ Average R² Score: 0.667
+├─ Active Models: 20 (7 LSTM + 7 Autoencoder + 5 Classifier + 1 Survival)
+├─ LSTM Models: 7 (chiller, ahu, fcu, ups, generator, vav, pump)
+├─ Autoencoder Models: 7 (same types)
+├─ Classifier Models: 5 (chiller, ahu, generator, fcu, ups)
+├─ Stale Models: 0
+├─ Missing Models: 0
+└─ Average R²/CV Accuracy: 0.667 (LSTM) / 0.607 (Classifier)
 ```
 
 ---
@@ -79,8 +82,13 @@ Predictions unavailable for VAV, PUMP, some FCU/UPS
 - Result: 5/14 models available = 36% health
 
 **After Feb 9, 2026:**
-- All 14 models trained (7 LSTM + 7 Autoencoder)
+- All 14 LSTM+Autoencoder models trained (7 LSTM + 7 Autoencoder)
 - Result: 14/14 models = 95%+ health
+
+**After Feb 23, 2026 (v25.0):**
+- 5 Random Forest classifiers added (chiller, ahu, generator, fcu, ups)
+- Total: 20 active models (7 LSTM + 7 Autoencoder + 5 Classifier + 1 Survival)
+- Anomaly detection now auto-classifies fault type when anomaly detected
 
 ### Solution
 

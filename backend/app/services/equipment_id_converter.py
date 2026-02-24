@@ -36,6 +36,10 @@ class EquipmentIDConverter:
         "ct": "CT",
         "cooling_tower": "CT",
         "crac": "CRAC",
+        "pump": "PUMP",
+        "boiler": "BOILER",
+        "cold": "COLD",
+        "kef": "KEF",
         # Lighting
         "dali": "DALI",
         "lum": "LUM",
@@ -54,6 +58,13 @@ class EquipmentIDConverter:
         "fdr": "FDR",
         "mv": "MV",
         "db": "DB",
+        # Transport / Vertical
+        "lift": "LIFT",
+        "elevator": "LIFT",
+        # Medical
+        "medgas": "MEDGAS",
+        # Controllers
+        "jace": "JACE",
         # Other
         "fire": "FIRE",
         "acc": "ACC",
@@ -186,7 +197,7 @@ class EquipmentIDConverter:
         # Normalize input
         normalized = bms_id.upper().replace("_", "-")
 
-        # Try various parsing patterns
+        # Try various parsing patterns (most specific first)
         patterns = [
             # Pattern 1: TYPE-FLOOR-ZONE (e.g., FCU-L2-A)
             r"(?:FCU|VAV|AHU|DALI|LUM|TS|CO2|OCC|DLS|ACC|CCTV|SPLIT|CRAC)-([BGL]\d*|G|R)-([A-Z0-9]{1,3})",
@@ -206,6 +217,23 @@ class EquipmentIDConverter:
                 floor = self._normalize_floor(floor)
 
                 logger.debug(f"Parsed '{bms_id}': floor='{floor}', zone='{zone}'")
+                return {"floor": floor, "zone": zone}
+
+        # Pattern 4: Vendor-agnostic fallback — find floor code anywhere in a
+        # hyphen/dot-separated ID. Handles Niagara (site-005-UMH-AHU-L3-ICU),
+        # Desigo, Schneider, etc. Looks for L##, B##, G, R as a standalone segment.
+        segments = re.split(r"[-.]", normalized)
+        for i, seg in enumerate(segments):
+            floor_match = re.match(r"^(L\d+|B\d+|G|R|PH|M)$", seg)
+            if floor_match:
+                floor = self._normalize_floor(floor_match.group(1))
+                # Use next segment as zone/location if available
+                zone = segments[i + 1] if i + 1 < len(segments) else "001"
+                # Clean zone: strip trailing dot-parts (e.g., from "ICU.FAN")
+                zone = re.sub(r"\..*", "", zone)
+                if not zone or len(zone) > 10:
+                    zone = "001"
+                logger.debug(f"Parsed '{bms_id}' (vendor-agnostic): floor='{floor}', zone='{zone}'")
                 return {"floor": floor, "zone": zone}
 
         logger.debug(f"Could not parse floor/zone from '{bms_id}'")

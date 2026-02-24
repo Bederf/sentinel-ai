@@ -48,7 +48,7 @@ async def get_annual_summary(
             supabase.table("solar_annual_simulations")
             .select("*")
             .eq("site_id", site_id)
-            .eq("scenario", "grant_solar_bess_ai_annual")
+            .in_("scenario", ["sentinel_annual", "grant_solar_bess_ai_annual"])
         )
 
         # If year specified, filter by it. Otherwise, get the most recent
@@ -83,7 +83,7 @@ async def get_annual_summary(
 @router.post("/{site_id}/simulate")
 async def start_annual_simulation(
     site_id: str,
-    scenario: str = "grant_solar_bess_ai_annual",
+    scenario: str = "sentinel_annual",
     duration_minutes: float = 30.0,
     background_tasks: BackgroundTasks = None,
     current_user: Dict = None,

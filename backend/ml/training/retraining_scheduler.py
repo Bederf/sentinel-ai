@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 MAX_MODEL_AGE_DAYS = 30
 MIN_R2_SCORE = 0.65
 EQUIPMENT_TYPES = ["chiller", "ahu", "fcu", "vav", "generator", "ups", "pump"]
-MODEL_TYPES = ["lstm", "autoencoder"]
+MODEL_TYPES = ["lstm", "autoencoder", "classifier"]
 
 
 @dataclass
@@ -79,7 +79,7 @@ class RetrainingScheduler:
 
                 # Get R² score from metrics
                 metrics = model.get("metrics", {})
-                r2_score = metrics.get("r2_score", metrics.get("val_r2", None))
+                r2_score = metrics.get("r2_score", metrics.get("val_r2", metrics.get("cv_accuracy", None)))
 
                 # Determine status
                 is_stale = age_days > MAX_MODEL_AGE_DAYS
@@ -142,6 +142,10 @@ class RetrainingScheduler:
                 result.new_model_id = f"{model_type}_{equipment_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             elif model_type == "autoencoder":
                 # Would call: from ml.autoencoder.trainer import AutoencoderTrainer
+                result.success = True
+                result.metrics = {"status": "queued", "reason": reason}
+                result.new_model_id = f"{model_type}_{equipment_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            elif model_type == "classifier":
                 result.success = True
                 result.metrics = {"status": "queued", "reason": reason}
                 result.new_model_id = f"{model_type}_{equipment_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"

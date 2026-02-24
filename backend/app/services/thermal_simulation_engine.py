@@ -409,6 +409,34 @@ class ThermalSimulationEngine:
         except Exception as e:
             logger.warning(f"[THERMAL] Could not load equipment health: {e}")
 
+    def update_health_cache(self, health_dict: Dict[str, float]) -> None:
+        """Update equipment health cache from external source (e.g., orchestrator).
+
+        Called each simulated hour so the thermal engine uses current health values
+        rather than stale day-1 values from the initial DB load.
+
+        Args:
+            health_dict: equipment_code -> health_score (0-100)
+        """
+        updated = 0
+        for eq_code, health in health_dict.items():
+            # Match by equipment code — zone_cache links zones to FCUs via fcu_id
+            # The _equipment_health_cache keys are equipment IDs (UUIDs), but we also
+            # need to update by code. Check both the code and try to match fcu_id.
+            self._equipment_health_cache[eq_code] = health
+            updated += 1
+
+        # Also map codes to zone fcu_ids for zones that reference equipment by ID
+        for zone_id, zone_config in self._zone_cache.items():
+            fcu_id = zone_config.get("fcu_id")
+            if fcu_id and fcu_id in health_dict:
+                self._equipment_health_cache[fcu_id] = health_dict[fcu_id]
+
+        if updated > 0:
+            degraded = sum(1 for h in self._equipment_health_cache.values() if h < 95)
+            if degraded > 0:
+                logger.debug(f"[THERMAL] Health cache updated: {updated} items, {degraded} degraded")
+
     async def _write_sensor_readings(
         self,
         simulated_hour: int,

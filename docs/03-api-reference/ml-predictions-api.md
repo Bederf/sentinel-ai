@@ -2,21 +2,21 @@
 title: "ML Predictions API Reference"
 type: "reference"
 status: "approved"
-version: "2.0.0"
+version: "3.0.0"
 created: "2026-02-06"
-updated: "2026-02-12"
+updated: "2026-02-23"
 author: "Sentinel Development Team"
-tags: ["api", "ml", "predictions", "lstm", "anomaly", "maintenance", "registry", "phase-68-03"]
+tags: ["api", "ml", "predictions", "lstm", "anomaly", "classifier", "maintenance", "registry", "phase-68-03"]
 domain: "general"
 audience: "developers"
 complexity: "intermediate"
-estimated_read_time: 15
-changes: "Phase 68-03: Database-driven ML registry, async endpoints, multi-site support"
+estimated_read_time: 18
+changes: "v25.0: Fault classification pipeline — classifier training, anomaly→classification wiring, health check"
 ---
 
 # ML Predictions API Reference
 
-ML Model Development endpoints. LSTM forecasting, autoencoder anomaly detection, model management, training, and maintenance recommendations. **Phase 68-03+:** Database-driven registry with async support for multi-site deployment.
+ML Model Development endpoints. LSTM forecasting, autoencoder anomaly detection, Random Forest fault classification, model management, training, and maintenance recommendations. **Phase 68-03+:** Database-driven registry with async support for multi-site deployment.
 
 **Architecture:**
 - Backend queries Supabase `ml_models` and `model_thresholds` tables
@@ -92,9 +92,28 @@ Check for anomalous behavior using autoencoder model.
   "severity": "warning",
   "explanation": "Reconstruction error elevated...",
   "related_faults": ["compressor_overload"],
-  "recommended_actions": ["Inspect compressor bearings"]
+  "recommended_actions": ["Inspect compressor bearings"],
+  "fault_classification": {
+    "predicted_failure": "compressor_failure",
+    "confidence": 0.72,
+    "all_probabilities": {
+      "compressor_failure": 0.72,
+      "refrigerant_leak": 0.12,
+      "condenser_fouling": 0.08,
+      "oil_issue": 0.05,
+      "electrical": 0.02,
+      "normal": 0.01
+    },
+    "contributing_factors": [
+      {"feature": "avg_temp", "importance": 0.15},
+      {"feature": "run_hours", "importance": 0.12},
+      {"feature": "efficiency_ratio", "importance": 0.10}
+    ]
+  }
 }
 ```
+
+> **Note:** `fault_classification` is only present when `is_anomaly: true` and a trained classifier exists for the equipment type. Returns `null` if no classifier available.
 
 ### GET `/api/ml/anomalies/all`
 
@@ -125,7 +144,7 @@ List all registered ML models.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| model_type | string | Filter: lstm, autoencoder |
+| model_type | string | Filter: lstm, autoencoder, classifier |
 | equipment_type | string | Filter by equipment type |
 | status | string | Filter: active, candidate, retired |
 
@@ -169,9 +188,25 @@ Train new LSTM model (background).
 
 Train new autoencoder model.
 
+### POST `/api/ml/train/classifier/{equipment_type}`
+
+Train a new Random Forest failure type classifier. Uses synthetic data (100 samples per failure type + normal class). Trains in ~2 seconds per equipment type.
+
+**Response:**
+```json
+{
+  "status": "completed",
+  "message": "Classifier trained for chiller",
+  "model_id": "/opt/.../chiller_rf_20260223.joblib",
+  "metrics": {"accuracy": 0.61, "n_classes": 6}
+}
+```
+
+Supported equipment types: `chiller`, `ahu`, `generator`, `fcu`, `ups`
+
 ### POST `/api/ml/train/all`
 
-Train all model types for all equipment types.
+Train all model types (LSTM + Autoencoder + Classifier) for all equipment types.
 
 ## Maintenance Recommendations
 
@@ -216,3 +251,16 @@ Submit feedback on recommendation accuracy.
 ### GET `/api/ml/health`
 
 ML service health and model availability.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "total_models": 25,
+  "active_models": 20,
+  "lstm_models_active": 7,
+  "autoencoder_models_active": 7,
+  "classifier_models_active": 5,
+  "equipment_types_covered": ["chiller", "ahu", "fcu", "ups", "generator", "vav", "pump"]
+}
+```

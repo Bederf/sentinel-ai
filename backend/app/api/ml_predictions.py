@@ -12,6 +12,7 @@ Endpoints:
 - POST /api/ml/train/{model_type}/{equipment_type} - Train new model
 """
 
+import logging
 from dataclasses import asdict
 from datetime import datetime
 
@@ -19,6 +20,8 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel
 
 from app.utils.ai_provenance import get_ml_provenance
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ml", tags=["ml"])
 
@@ -260,6 +263,23 @@ async def check_equipment_anomaly(
             result["related_faults"] = []
             result["recommended_actions"] = []
 
+    # Auto-classify fault type when anomaly detected
+    if result.get("is_anomaly"):
+        try:
+            from app.services.classification_service import get_classification_service
+
+            classifier = get_classification_service()
+            classification = classifier.predict_failure_type(equipment_id)
+            result["fault_classification"] = {
+                "predicted_failure": classification["predicted_failure"],
+                "confidence": classification["confidence"],
+                "all_probabilities": classification["all_failure_probabilities"],
+                "contributing_factors": classification["contributing_factors"][:3],
+            }
+        except Exception as e:
+            result["fault_classification"] = None
+            logger.debug(f"Fault classification unavailable: {e}")
+
     result["ai_provenance"] = get_ml_provenance(f"autoencoder-{equipment_type}-v1").model_dump()
     return result
 
@@ -428,6 +448,32 @@ async def train_autoencoder_model(equipment_type: str, request: TrainRequest, ba
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/train/classifier/{equipment_type}", response_model=TrainResponse)
+async def train_classifier_model(equipment_type: str, background_tasks: BackgroundTasks):
+    """Train a new Random Forest failure classifier for an equipment type."""
+
+    def train_task():
+        from ml.classifier.train import ClassifierTrainer
+
+        trainer = ClassifierTrainer()
+        return trainer.train_equipment_type(equipment_type)
+
+    try:
+        result = train_task()
+        if result.get("status") == "failed":
+            raise HTTPException(status_code=500, detail=result.get("error"))
+        return TrainResponse(
+            status="completed",
+            message=f"Classifier trained for {equipment_type}",
+            model_id=result.get("model_path"),
+            metrics={"accuracy": result.get("accuracy"), "n_classes": result.get("n_classes")},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/train/all")
 async def train_all_models(request: TrainRequest):
     """
@@ -435,7 +481,7 @@ async def train_all_models(request: TrainRequest):
 
     This is a long-running operation. In production, would run in background.
     """
-    results = {"lstm": [], "autoencoder": []}
+    results = {"lstm": [], "autoencoder": [], "classifier": []}
 
     # Train LSTM models
     try:
@@ -457,6 +503,16 @@ async def train_all_models(request: TrainRequest):
     except Exception as e:
         results["autoencoder"] = [{"error": str(e)}]
 
+    # Train classifier models
+    try:
+        from ml.classifier.train import ClassifierTrainer
+
+        trainer = ClassifierTrainer()
+        classifier_results = trainer.train_all()
+        results["classifier"] = classifier_results
+    except Exception as e:
+        results["classifier"] = [{"error": str(e)}]
+
     return results
 
 
@@ -476,6 +532,7 @@ async def ml_health_check():
 
     lstm_active = [m for m in active_models if m["model_type"] == "lstm"]
     ae_active = [m for m in active_models if m["model_type"] == "autoencoder"]
+    classifier_active = [m for m in active_models if m["model_type"] == "classifier"]
 
     return {
         "status": "healthy",
@@ -483,6 +540,7 @@ async def ml_health_check():
         "active_models": len(active_models),
         "lstm_models_active": len(lstm_active),
         "autoencoder_models_active": len(ae_active),
+        "classifier_models_active": len(classifier_active),
         "equipment_types_covered": list(set(m["equipment_type"] for m in active_models)),
     }
 

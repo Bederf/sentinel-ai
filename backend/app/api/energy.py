@@ -1101,7 +1101,7 @@ async def get_energy_comparison(
     Scenarios:
     - Baseline: Traditional lighting (no DALI)
     - With DALI: Occupancy + daylight harvesting (-20% savings)
-    - With SENTINEL: AI optimization on top (-30% total savings)
+    - With SENTINEL: AI optimization on top (real savings from rules engine)
 
     Args:
         site_id: Site ID to analyze (default: site-002)
@@ -1110,21 +1110,80 @@ async def get_energy_comparison(
     Returns:
         Dictionary with 3 scenarios showing kWh, savings, and descriptions
     """
-    # Fetch actual energy data using existing get_energy function
-    energy_response = await get_energy(site_id=site_id, days=days)
+    # Try to get real data from running simulation
+    try:
+        from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
 
-    # Calculate total from actual data
+        orchestrator = get_lifecycle_orchestrator()
+        if orchestrator.running and orchestrator.days_simulated > 0:
+            data = orchestrator.get_energy_comparison_data()
+            return {
+                "site_id": site_id,
+                "period_days": data["days_simulated"],
+                "data_source": "simulation",
+                "scenarios": [
+                    {
+                        "name": "Baseline (No DALI)",
+                        "kwh": data["baseline_kwh"],
+                        "description": "Traditional lighting controls",
+                        "savings_percent": 0,
+                    },
+                    {
+                        "name": "With DALI (Tridonic)",
+                        "kwh": data["dali_kwh"],
+                        "description": "Occupancy & daylight harvesting",
+                        "savings_percent": 20,
+                        "savings_kwh": round(data["baseline_kwh"] - data["dali_kwh"], 2),
+                    },
+                    {
+                        "name": "With SENTINEL (AI)",
+                        "kwh": data["sentinel_kwh"],
+                        "description": "AI optimization + Solar/BESS integration",
+                        "savings_percent": data["savings_percent"],
+                        "savings_kwh": data["savings_kwh"],
+                        "solar_gen_kwh": data.get("solar_gen_kwh", 0),
+                        "bess_discharge_kwh": data.get("bess_discharge_kwh", 0),
+                    },
+                ],
+            }
+    except Exception:
+        pass
+
+    # Fallback: estimate from energy data when no simulation is running
+    energy_response = await get_energy(site_id=site_id, days=days)
     total_kwh = sum(d.total_kwh for d in energy_response.data)
 
-    # Calculate scenarios (based on industry benchmarks)
-    # Assume current is 70% of baseline (already optimized)
-    baseline_kwh = total_kwh / 0.70
-    with_dali_kwh = baseline_kwh * 0.80  # 20% savings with DALI
-    with_sentinel_kwh = baseline_kwh * 0.70  # 30% total savings
+    # Use rules engine for a realistic estimate instead of hardcoded percentages
+    try:
+        engine = get_energy_rules_engine(site_id)
+        sample_state = BuildingState(
+            current_hour=12,
+            occupancy_percent=70,
+            daylight_lux=600,
+            chiller_load_percent=65,
+            peak_demand_kw=total_kwh / max(days, 1) / 24,
+            tariff_band="standard",
+            ambient_temp_c=25.0,
+            site_id=site_id,
+            date=datetime.now().date().isoformat(),
+        )
+        rules_output = engine.evaluate_rules(
+            building_state=sample_state,
+            active_modules=["hvac", "dali", "solar"],
+            baseline_kwh=total_kwh,
+        )
+        sentinel_savings_pct = rules_output.delta_percent
+    except Exception:
+        sentinel_savings_pct = 10.0  # Conservative fallback
+
+    baseline_kwh = total_kwh
+    with_dali_kwh = baseline_kwh * 0.80
+    with_sentinel_kwh = baseline_kwh * (1 - sentinel_savings_pct / 100)
 
     return {
         "site_id": site_id,
         "period_days": days,
+        "data_source": "estimated",
         "scenarios": [
             {
                 "name": "Baseline (No DALI)",
@@ -1143,7 +1202,7 @@ async def get_energy_comparison(
                 "name": "With SENTINEL (AI)",
                 "kwh": round(with_sentinel_kwh, 2),
                 "description": "AI optimization on top of DALI",
-                "savings_percent": 30,
+                "savings_percent": round(sentinel_savings_pct, 1),
                 "savings_kwh": round(baseline_kwh - with_sentinel_kwh, 2),
             },
         ],

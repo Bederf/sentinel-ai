@@ -405,10 +405,29 @@ class SolarIngestionService:
         config: Dict,
         bess: Optional[Dict] = None,
     ) -> Optional[SolarConnector]:
-        """Factory method — create the appropriate connector for a manufacturer."""
+        """Factory method — create the appropriate connector for a manufacturer.
+
+        Respects settings.solar_connector_mode:
+          - "simulation" (default): always returns simulated connectors
+          - "live": attempts real Modbus TCP connector, falls back to simulated on failure
+        """
+        from app.config.settings import settings
+
         meters = config.get("meters", [])
+        mode = settings.solar_connector_mode
 
         if manufacturer == "huawei":
+            if mode == "live":
+                try:
+                    from app.services.solar_connector_huawei import RealHuaweiConnector
+
+                    return RealHuaweiConnector(
+                        inverters=inverters,
+                        bess=bess or config.get("bess"),
+                        meters=[m for m in meters if m.get("manufacturer", "").lower() != "schneider"],
+                    )
+                except Exception as e:
+                    logger.warning("Real Huawei connector failed, falling back to simulated: %s", e)
             return SimulatedHuaweiConnector(
                 inverters=inverters,
                 bess=bess or config.get("bess"),
@@ -604,7 +623,7 @@ class SolarIngestionService:
                 supabase.table("solar_annual_simulations")
                 .select("*")
                 .eq("site_id", site_id)
-                .eq("scenario", "grant_solar_bess_ai_annual")
+                .in_("scenario", ["sentinel_annual", "grant_solar_bess_ai_annual"])
                 .order("created_at", desc=True)
                 .limit(1)
                 .execute()

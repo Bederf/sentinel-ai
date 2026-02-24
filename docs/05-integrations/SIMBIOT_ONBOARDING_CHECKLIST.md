@@ -160,19 +160,26 @@ Guided inspection generation is intentionally scoped to major plant first. This 
 
 3. **AI Classification** (15 min) — ✅ AUTO + CONSULTANT ASSIST
    - [ ] Points automatically mapped to SENTINEL equipment types:
-     - **HVAC:** Temps, setpoints, valve positions, fan speeds, alarms
-     - **Electrical:** Voltages, currents, generator status, UPS load
-     - **Lighting:** DALI ballast levels, luminaire groupings
-     - **Fire:** Detector status, suppression system status
-     - **Security:** Door contact, motion sensors, alarm panel status
+     - **HVAC:** AHU, FCU, VAV, Chiller, Boiler, Pump, Split, CRAC, Cooling Tower, Cold Room, KEF
+     - **Electrical:** Generator, UPS, ATS, MSB, Distribution Board, Meter, Transformer, PFC
+     - **Lighting:** DALI, Luminaire
+     - **Fire/Safety:** Fire Panel
+     - **Security:** Access Control, CCTV
+     - **Transport:** Lift/Elevator
+     - **Medical:** Medical Gas System (MEDGAS)
+     - **Controllers:** JACE, PXC, BMS
 
-   - [ ] Points matched to buildings/floors (using:
-     - [ ] Naming convention patterns (if provided)
-     - [ ] Controller floor mapping (from consultant)
-     - [ ] AI inference from point names
+   - [ ] Vendor-agnostic classification (3-tier approach):
+     - [ ] **Tier 1 — Metadata:** Uses equipment JSON metadata (`equipment_type`, `equipment_id`) when available — 100% high confidence, works for any BMS vendor
+     - [ ] **Tier 2 — ID extraction:** Extracts type code from equipment ID segments (e.g., `COLD`, `LIFT`, `JACE`) using KNOWN_TYPE_CODES lookup
+     - [ ] **Tier 3 — Regex fallback:** Pattern matching against point names for raw BACnet points without metadata
 
-   - [ ] Equipment instances created (e.g., "S002-CHILLER-B1-001")
-     - Naming uses SENTINEL v2.0 format
+   - [ ] Floor/zone extraction from equipment IDs (vendor-agnostic):
+     - [ ] Finds floor codes (L3, B1, G, R) anywhere in hyphen/dot-separated IDs
+     - [ ] Works for Niagara (`site-005-UMH-AHU-L3-ICU`), Desigo, Schneider, etc.
+
+   - [ ] Equipment instances created (e.g., "S005-AHU-L3-ICU")
+     - Naming uses SENTINEL v2.0 format: `S###-TYPE-FLOOR-ZONE`
      - **Count:** X equipment instances created
 
 4. **Verification** (10 min) — CONSULTANT REVIEWS
@@ -399,7 +406,7 @@ timestamp,point_name,value,unit
 **A:** No. SIMBIOT's BACnet discovery automatically creates equipment records from discovered points. Your job is to verify they're correct (30% of discovery process) and provide optional metadata (floor mapping).
 
 ### Q2: "What if BMS uses non-standard point naming?"
-**A:** SIMBIOT's AI pattern-matching handles most variations. If names are cryptic (e.g., "P_001", "T_234"), provide a naming convention doc and SIMBIOT reclassifies automatically.
+**A:** SIMBIOT uses a 3-tier vendor-agnostic classifier: (1) equipment metadata from JSON files (100% accuracy), (2) type code extraction from equipment IDs, (3) regex pattern matching as fallback. Works for Niagara, Desigo, Schneider, Honeywell, and any vendor. No code changes needed per client — if a new equipment type appears, it's a one-line addition to the type lookup table.
 
 ### Q3: "How often do I need to export data?"
 **A:** Only during onboarding (one-time). Going forward, SIMBIOT collects data automatically via BACnet COV (change-of-value) and polling. No ongoing exports needed.
@@ -417,7 +424,7 @@ timestamp,point_name,value,unit
 **A:** Yes (with caveats). If no BACnet gateway exists, SIMBIOT requires manual equipment list + Modbus register mapping (more consultant effort). BACnet is strongly recommended.
 
 ### Q8: "What's the typical success rate?"
-**A:** ~95% of points discovered correctly; ~85% classified to equipment type automatically. Consultant verification catches the remaining 10-15% in ~15 minutes.
+**A:** ~95% of points discovered correctly. When equipment JSON metadata is available (simulation or pre-configured sites), 100% classification at high confidence. For raw BACnet discovery, ~85-95% classified automatically — consultant verification catches the remainder in ~15 minutes.
 
 ---
 
@@ -427,8 +434,9 @@ timestamp,point_name,value,unit
 
 1. **Equipment Discovery Accuracy**
    - [ ] 95%+ of BMS points detected by SIMBIOT
-   - [ ] 85%+ correctly classified to SENTINEL equipment types
-   - [ ] <15% requiring manual correction
+   - [ ] 100% classified at high confidence (when equipment metadata available)
+   - [ ] 85-95% classified automatically for raw BACnet discovery
+   - [ ] 0% needs review (metadata path) or <15% requiring manual correction (regex path)
 
 2. **Data Collection**
    - [ ] All discovered points receiving live data (no nulls)
@@ -508,7 +516,7 @@ Account Manager: ________________    Date: ________________
 
 ---
 
-**Document Version:** 1.1  
-**Last Updated:** 2026-02-21  
-**Audience:** BMS Consultants, Facility Managers, Sales Team  
+**Document Version:** 1.2
+**Last Updated:** 2026-02-23
+**Audience:** BMS Consultants, Facility Managers, Sales Team
 **Status:** Ready for Production Use

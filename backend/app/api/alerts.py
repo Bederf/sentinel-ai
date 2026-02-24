@@ -114,6 +114,8 @@ def load_alerts() -> list[dict]:
                 "site_name": sa.get("site_name", "Sandton City Office Tower"),
                 "health_score": sa.get("health_score"),
                 "fault_codes": sa.get("fault_codes", []),
+                "recommended_action": sa.get("recommended_action") or sa.get("suggested_action"),
+                "operational_context": sa.get("operational_context"),
                 "is_simulation": True,
             }
             alerts.append(alert)
@@ -176,6 +178,8 @@ class AlertResponse(BaseModel):
     equipment_name: Optional[str] = None
     site_name: Optional[str] = None
     device_id: Optional[str] = None  # Maps to mock_devices.json for control navigation
+    recommended_action: Optional[str] = None
+    operational_context: Optional[dict] = None
 
 
 class AlertListResponse(BaseModel):

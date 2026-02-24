@@ -9,7 +9,6 @@ FSR Domain: 4.7 - Logical Access Control
 """
 
 import logging
-import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
@@ -359,55 +358,8 @@ async def login_with_email(request: Request, email: str):
             "session_id": session_id,
         }
 
-        # Auto-start 365-day SENTINEL simulation for demo users (Grant & Bederf)
-        # Single unified simulation: HVAC + DALI + Solar + BESS + Sentinel AI
-        if email in ("grant@grantdemo.co.za", "bederf@protonmail.com"):
-            try:
-                from app.database.supabase_client import Supabase
-
-                task_id = str(uuid.uuid4())
-                client = Supabase.instance()
-
-                (
-                    client.table("lifecycle_simulation_tasks")
-                    .insert(
-                        {
-                            "task_id": task_id,
-                            "site_id": "site-002",
-                            "scenario": "sentinel_annual",
-                            "simulation_type": "lifecycle",
-                            "status": "queued",
-                            "progress_pct": 0,
-                            "days_completed": 0,
-                            "duration_minutes": 480.0,  # 365 days in 480 min (8h)
-                        }
-                    )
-                    .execute()
-                )
-
-                logger.info(
-                    f"Auto-started SENTINEL demo for {email}: task_id={task_id}, "
-                    f"scenario=sentinel_annual (365d → 480min/8h)"
-                )
-
-                response["demo_auto_start"] = True
-                response["demo_type"] = "sentinel-full-annual"
-                response["demo_description"] = (
-                    "365-day HVAC + DALI + Solar + BESS + Sentinel AI simulation with live data accumulation from zero"
-                )
-                response["demo_scenario"] = "sentinel_annual"
-                response["demo_status"] = "queued"
-                response["demo_task_id"] = task_id
-                response["demo_duration_minutes"] = 480.0
-                response["demo_note"] = (
-                    "Simulation runs in background (8 hours). "
-                    "Dashboard will update live as simulation progresses through 365 days."
-                )
-
-            except Exception as e:
-                logger.error(f"Error auto-starting SENTINEL demo for {email}: {e}", exc_info=True)
-                response["demo_auto_start"] = False
-                response["demo_error"] = str(e)
+        # Building simulation auto-starts on server boot (startup/events.py).
+        # All users observe the same running simulation — no per-login queue needed.
 
         # Add enrollment prompt for admins who haven't enrolled yet
         if mfa_required and not mfa_enrolled:

@@ -1445,7 +1445,7 @@ class BackgroundSchedulerService:
         Args:
             task_id: Task identifier
             orchestrator: LifecycleOrchestrator instance
-            scenario: Scenario name (fault_day, grant_hvac_dali_ai_annual, etc)
+            scenario: Scenario name (fault_day, sentinel_annual, etc)
             duration_minutes: Simulation duration in real minutes
         """
         from app.database.supabase_client import Supabase
@@ -1472,6 +1472,16 @@ class BackgroundSchedulerService:
                 # CRASH RECOVERY PATH: Restore full orchestrator state from checkpoint
                 # Get scenario config
                 orchestrator.current_scenario = ALL_SCENARIOS.get(scenario, ALL_SCENARIOS["sentinel_annual"])
+
+                # Set max_days, max_cycles, and speed_multiplier BEFORE restoring state
+                # Without this, the orchestrator uses __init__ defaults (max_days=1)
+                # which causes 365-day sims to stop after 1 day on recovery
+                is_annual_scenario = "annual" in scenario.lower()
+                orchestrator.max_days = 365 if is_annual_scenario else 1
+                orchestrator.max_cycles = 1
+                orchestrator.speed_multiplier = max(
+                    0.1, min(10000, float(state_snapshot.get("speed_multiplier", 10.0)))
+                )
 
                 # Restore all state from checkpoint
                 restored = orchestrator.deserialize_state(state_snapshot)
@@ -1684,6 +1694,113 @@ class BackgroundSchedulerService:
                 logger.warning("Failed to write retention enforcement audit event: %s", exc)
         except Exception as e:
             logger.error(f"Failed to run POPIA retention enforcement: {e}", exc_info=True)
+
+    def add_mip_dispatch_optimize_job(self, interval_seconds: int = 900):
+        """Add a job to run MIP dispatch optimization every 15 minutes.
+
+        Solves the CP-SAT optimal BESS schedule using current load and
+        solar forecasts. The cached schedule is consumed by the dispatch
+        service's 5-minute execution cycle.
+
+        Args:
+            interval_seconds: How often to re-optimize (default: 900 = 15 min)
+        """
+        job_id = "mip_dispatch_optimize"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing MIP dispatch optimize job")
+
+        self.scheduler.add_job(
+            func=self._run_mip_dispatch_optimize,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="MIP Dispatch Optimization",
+            replace_existing=True,
+        )
+        logger.info(f"Added MIP dispatch optimize job with {interval_seconds}s interval")
+
+    def _run_mip_dispatch_optimize(self):
+        """Run MIP dispatch optimization for site-002."""
+        try:
+            from app.services.mip_dispatch_optimizer import get_mip_dispatch_optimizer
+            from app.services.load_forecast_service import get_load_forecast_service
+
+            optimizer = get_mip_dispatch_optimizer()
+            load_svc = get_load_forecast_service()
+
+            # Get current load forecast
+            load_forecast = load_svc.get_forecast("site-002", intervals_ahead=96)
+            load_values = [i.demand_kw for i in load_forecast.intervals]
+
+            # Get solar forecast (optional)
+            solar_values = None
+            try:
+                from app.services.solar_forecast_service import get_solar_forecast_service
+
+                solar_svc = get_solar_forecast_service()
+                solar_obj = solar_svc.get_forecast("site-002", hours_ahead=24)
+                solar_values = []
+                for h in solar_obj.hourly:
+                    solar_values.extend([h.generation_kw] * 4)
+                solar_values = solar_values[:96]
+            except Exception:
+                pass
+
+            schedule = optimizer.optimize(
+                "site-002",
+                load_forecast=load_values,
+                solar_forecast=solar_values,
+            )
+
+            logger.info(
+                "MIP dispatch optimized: status=%s cost=R%.2f peak=%.0f kW cycles=%.2f solve=%.0f ms",
+                schedule.solver_status,
+                schedule.total_cost_zar,
+                schedule.peak_grid_import_kw,
+                schedule.cycles,
+                schedule.solve_time_ms,
+            )
+        except Exception as e:
+            logger.error(f"Failed to run MIP dispatch optimization: {e}", exc_info=True)
+
+    def add_load_forecast_job(self, interval_seconds: int = 900):
+        """Add a job to refresh the 15-minute load forecast every 15 minutes.
+
+        Re-generates the 96-interval demand forecast used by the MIP
+        dispatch optimizer. Does NOT retrain the model (that happens daily).
+
+        Args:
+            interval_seconds: How often to refresh forecast (default: 900 = 15 min)
+        """
+        job_id = "load_forecast_15min"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing load forecast job")
+
+        self.scheduler.add_job(
+            func=self._run_load_forecast,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="15-Min Load Forecast Refresh",
+            replace_existing=True,
+        )
+        logger.info(f"Added load forecast job with {interval_seconds}s interval")
+
+    def _run_load_forecast(self):
+        """Refresh 15-min load forecast for all solar sites."""
+        try:
+            from app.services.load_forecast_service import get_load_forecast_service
+
+            service = get_load_forecast_service()
+            forecast = service.get_forecast("site-002")
+            logger.info(
+                "Load forecast refreshed: site=site-002 intervals=%d peak=%.0f kW avg=%.0f kW",
+                len(forecast.intervals),
+                forecast.peak_demand_kw,
+                forecast.avg_demand_kw,
+            )
+        except Exception as e:
+            logger.error(f"Failed to refresh load forecast: {e}", exc_info=True)
 
     def add_site_mode_policy_dry_run_job(self, interval_seconds: int = 300, site_id: str = "site-002"):
         """Add periodic dry-run evaluation for deterministic site onboarding policy."""

@@ -1039,12 +1039,13 @@ class BMSimulationService:
         return self.alert_history.copy()
 
     def acknowledge_alert(self, alert_id: str, acknowledged_by: str = "Facilities Manager") -> bool:
-        """Acknowledge an alert"""
+        """Acknowledge an alert — removes it from active alerts list."""
         for alert in self.alert_queue:
             if alert["id"] == alert_id:
                 alert["acknowledged"] = True
                 alert["acknowledged_by"] = acknowledged_by
                 alert["acknowledged_at"] = datetime.now().isoformat()
+                alert["status"] = "acknowledged"
                 return True
         return False
 

@@ -2,9 +2,9 @@
 title: "Solar & BESS API Reference"
 type: "reference"
 status: "approved"
-version: "1.0.0"
+version: "2.0.0"
 created: "2026-02-06"
-updated: "2026-02-06"
+updated: "2026-02-24"
 author: "SENTINEL Development Team"
 tags: ["api", "solar", "pv", "bess", "dispatch", "compliance", "financial", "maintenance"]
 domain: "solar"
@@ -560,6 +560,170 @@ Solar dashboard shows:
   - BESS discharge: 200 kW for 60 min
   - HVAC adjustment: +2°C setpoint
   - "Approve" button triggers Tier 2 approval workflow
+
+---
+
+## Load Forecast (v26.0)
+
+15-minute building load forecast using GradientBoostingRegressor.
+
+**Base path:** `/api/load-forecast`
+
+### GET `/api/load-forecast/{site_id}`
+
+Get 96-interval (24h) load forecast with confidence bands.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `intervals` | int | `96` | Number of 15-min intervals (1-192) |
+
+**Response:**
+```json
+{
+  "site_id": "site-002",
+  "generated_at": "2026-02-24T10:00:00Z",
+  "intervals": [
+    {
+      "timestamp": "2026-02-24T10:00",
+      "demand_kw": 1650.3,
+      "confidence_high_kw": 1815.3,
+      "confidence_low_kw": 1485.3,
+      "tariff_band": "standard",
+      "is_peak": false
+    }
+  ],
+  "peak_demand_kw": 1850.0,
+  "avg_demand_kw": 1420.0,
+  "total_energy_kwh": 34080.0,
+  "accuracy": {
+    "rmse_kw": 120.5,
+    "mae_kw": 95.2,
+    "r2_score": 0.82,
+    "training_samples": 8640
+  }
+}
+```
+
+### GET `/api/load-forecast/{site_id}/accuracy`
+
+Get model accuracy metrics (RMSE, MAE, R²).
+
+### POST `/api/load-forecast/{site_id}/retrain`
+
+Trigger model retraining on fresh synthetic data.
+
+**Response:**
+```json
+{
+  "status": "retrained",
+  "site_id": "site-002",
+  "accuracy": { "rmse_kw": 118.3, "mae_kw": 92.1, "r2_score": 0.84 }
+}
+```
+
+## MIP Dispatch Optimizer (v26.0)
+
+CP-SAT optimised BESS dispatch scheduling — minimises energy cost + demand charge + battery degradation.
+
+**Base path:** `/api/dispatch-optimizer`
+
+### GET `/api/dispatch-optimizer/{site_id}/schedule`
+
+Get the current optimal 96-interval dispatch schedule. Returns cached MIP solution if available, otherwise triggers a fresh solve.
+
+**Response:**
+```json
+{
+  "site_id": "site-002",
+  "solver_status": "optimal",
+  "generated_at": "2026-02-24T10:00:00Z",
+  "solve_time_ms": 2340.5,
+  "total_cost_zar": 8450.20,
+  "peak_grid_import_kw": 1620.0,
+  "total_energy_kwh": 28500.0,
+  "total_solar_kwh": 12400.0,
+  "cycles": 1.25,
+  "demand_charge_zar": 2135.50,
+  "degradation_cost_zar": 18.75,
+  "intervals": [
+    {
+      "timestamp": "2026-02-24T00:00",
+      "charge_kw": 85.0,
+      "discharge_kw": 0.0,
+      "soc_kwh": 120.5,
+      "grid_import_kw": 1585.0,
+      "solar_kw": 0.0,
+      "load_kw": 1500.0,
+      "tariff_rate": 0.649,
+      "tariff_band": "off_peak",
+      "interval_cost_zar": 257.30
+    }
+  ]
+}
+```
+
+**Solver status values:**
+| Status | Meaning |
+|--------|---------|
+| `optimal` | CP-SAT found provably optimal solution |
+| `feasible` | CP-SAT found a feasible (not proven optimal) solution within timeout |
+| `rules_fallback` | Solver failed/infeasible — used rules-based heuristic |
+
+### GET `/api/dispatch-optimizer/{site_id}/compare`
+
+Compare MIP-optimised vs rules-based dispatch side by side.
+
+**Response:**
+```json
+{
+  "site_id": "site-002",
+  "mip": { "...schedule..." },
+  "rules": { "...schedule..." },
+  "savings_zar": 1240.50,
+  "savings_pct": 12.8,
+  "mip_peak_kw": 1620.0,
+  "rules_peak_kw": 1780.0
+}
+```
+
+### POST `/api/dispatch-optimizer/{site_id}/solve`
+
+Trigger a fresh MIP optimisation solve with current forecasts.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `initial_soc_kwh` | float | `100.0` | Initial BESS state of charge (0-200 kWh) |
+
+### POST `/api/dispatch-optimizer/kill-switch`
+
+Emergency stop for BESS hardware control. Executes 4 actions in sequence:
+
+1. Send idle command to BESS (power → 0)
+2. Close AEGIS write gate (runtime override)
+3. Switch to simulation mode (runtime override)
+4. Disconnect Modbus TCP connection
+
+**Response:**
+```json
+{
+  "status": "killed",
+  "timestamp": "2026-02-24T14:30:00Z",
+  "actions": [
+    "idle_command_sent",
+    "aegis_gate_closed",
+    "mode_switched_to_simulation",
+    "modbus_disconnected"
+  ],
+  "errors": [],
+  "message": "BESS kill switch activated. All writes disabled. Mode: simulation."
+}
+```
+
+**Notes:**
+- Each action is independent — partial failures don't prevent other safety actions
+- Idempotent: safe to call multiple times
+- Always ends with gate CLOSED + mode SIMULATION
+- Audit log records `who=operator_kill_switch`
 
 ---
 

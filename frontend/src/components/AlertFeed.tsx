@@ -195,27 +195,22 @@ export function AlertFeed({
     return alert.acknowledged || locallyReadAlerts.has(alert.id);
   };
 
-  // Handle clear all - mark all alerts as read
+  // Handle clear all - acknowledge and remove all alerts
   const handleClearAll = async () => {
-    // Get all unread alert IDs
-    const unreadAlerts = alerts.filter(a => !isAlertRead(a));
+    const alertsToClear = [...alerts];
+    if (alertsToClear.length === 0) return;
 
-    if (unreadAlerts.length === 0) return;
-
-    // Mark all as locally read immediately
-    setLocallyReadAlerts(prev => {
-      const newSet = new Set(prev);
-      unreadAlerts.forEach(a => newSet.add(a.id));
-      return newSet;
-    });
+    // Remove all alerts from the list immediately
+    setAlerts([]);
+    setLocallyReadAlerts(new Set());
 
     // Notify parent
     if (onClearAll) {
       onClearAll();
     }
 
-    // Call API for each alert (fire and forget)
-    for (const alert of unreadAlerts) {
+    // Acknowledge each alert on the backend (fire and forget)
+    for (const alert of alertsToClear) {
       try {
         await api.acknowledgeAlert(alert.id);
       } catch (err) {
@@ -439,6 +434,61 @@ export function AlertFeed({
                         {alert.equipment_name}
                       </span>
                     </div>
+
+                    {/* Recommended Action */}
+                    {alert.recommended_action && (
+                      <div
+                        className="text-xs mb-2 px-2 py-1.5 rounded"
+                        style={{
+                          borderLeft: "3px solid var(--color-grafana-blue)",
+                          backgroundColor: "rgba(61, 113, 217, 0.08)",
+                          color: "var(--color-grafana-text-primary)",
+                        }}
+                      >
+                        <span style={{ color: "var(--color-grafana-blue)", fontWeight: 600 }}>Action: </span>
+                        {alert.recommended_action}
+                      </div>
+                    )}
+
+                    {/* Operational Context Tags */}
+                    {alert.operational_context && (
+                      <div className="flex items-center gap-1.5 flex-wrap text-xs mb-2">
+                        {alert.operational_context.is_peak_hours && (
+                          <span
+                            className="px-1.5 py-0.5 rounded"
+                            style={{
+                              backgroundColor: "rgba(255, 152, 48, 0.15)",
+                              color: "#ff9830",
+                              fontSize: "0.65rem",
+                            }}
+                          >
+                            Peak Hours
+                          </span>
+                        )}
+                        <span
+                          className="px-1.5 py-0.5 rounded"
+                          style={{
+                            backgroundColor: "rgba(140, 140, 140, 0.12)",
+                            color: "var(--color-grafana-text-secondary)",
+                            fontSize: "0.65rem",
+                          }}
+                        >
+                          {alert.operational_context.building_state.replace(/_/g, " ")}
+                        </span>
+                        {alert.operational_context.occupancy_pct > 0 && (
+                          <span
+                            className="px-1.5 py-0.5 rounded"
+                            style={{
+                              backgroundColor: "rgba(140, 140, 140, 0.12)",
+                              color: "var(--color-grafana-text-secondary)",
+                              fontSize: "0.65rem",
+                            }}
+                          >
+                            {Math.round(alert.operational_context.occupancy_pct)}% occupied
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Timestamp */}
                     <div className="flex items-center gap-1">

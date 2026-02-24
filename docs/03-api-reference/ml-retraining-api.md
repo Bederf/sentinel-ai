@@ -4,7 +4,7 @@ type: "reference"
 status: "approved"
 version: "1.0.0"
 created: "2026-02-06"
-updated: "2026-02-06"
+updated: "2026-02-23"
 author: "Sentinel Development Team"
 tags: ["api", "ml", "retraining", "ab-testing"]
 domain: "general"
@@ -56,7 +56,7 @@ Trigger model retraining for a specific model type and equipment type.
 **Query Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| model_type | string | Yes | `lstm` or `autoencoder` |
+| model_type | string | Yes | `lstm`, `autoencoder`, or `classifier` |
 | equipment_type | string | Yes | `chiller`, `ahu`, `fcu`, `vav`, `generator`, `ups`, `pump` |
 | reason | string | No | Reason for retraining (default: `manual`) |
 

@@ -575,6 +575,14 @@ export interface Alert {
   status?: string;
   category?: string;
   device_id?: string; // Maps to mock_devices.json for control navigation
+  recommended_action?: string;
+  operational_context?: {
+    building_state: string;
+    is_peak_hours: boolean;
+    occupancy_pct: number;
+    hvac_mode: string;
+    hour: number;
+  };
 }
 
 // Anomaly prediction interface

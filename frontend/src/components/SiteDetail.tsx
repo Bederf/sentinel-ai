@@ -75,28 +75,31 @@ import { BUILDING_TAB_ITEMS } from "../lib/navigation";
 import type { BuildingTabId } from "../lib/navigation";
 
 // ─── Lazy-loaded tab components ─────────────────────────────────────
+// System Health
 const SystemHealthPage = lazy(() => import("./SystemHealthPage"));
+const AssetWorkflowDashboard = lazy(() => import("./AssetWorkflowDashboard").then(m => ({ default: m.AssetWorkflowDashboard })));
+// Operations
 const ControlDashboard = lazy(() => import("./ControlDashboard").then(m => ({ default: m.ControlDashboard })));
-const DigitalTwin = lazy(() => import("./digital-twin").then(m => ({ default: m.DigitalTwin })));
-const ControlAuditTrail = lazy(() => import("./ControlAuditTrail").then(m => ({ default: m.ControlAuditTrail })));
 const TechnicianPortalGated = lazy(() => import("./TechnicianPortalGated").then(m => ({ default: m.TechnicianPortalGated })));
-const OptimizationPage = lazy(() => import("../pages/OptimizationPage").then(m => ({ default: m.OptimizationPage })));
+const ControlAuditTrail = lazy(() => import("./ControlAuditTrail").then(m => ({ default: m.ControlAuditTrail })));
+const DigitalTwin = lazy(() => import("./digital-twin").then(m => ({ default: m.DigitalTwin })));
+// Lighting & Occupancy
 const LightingPage = lazy(() => import("./lighting/LightingPage").then(m => ({ default: m.LightingPage })));
 const OccupancyFullPanel = lazy(() => import("./OccupancyPanel").then(m => ({ default: m.OccupancyPanel })));
 const OccupancyAnalyticsPage = lazy(() => import("../pages/OccupancyAnalyticsPage").then(m => ({ default: m.OccupancyAnalyticsPage })));
 const OccupancyEnergyCorrelationPage = lazy(() => import("../pages/OccupancyEnergyCorrelationPage").then(m => ({ default: m.OccupancyEnergyCorrelationPage })));
+// Solar & BESS
 const SolarDashboard = lazy(() => import("./solar/SolarDashboard").then(m => ({ default: m.SolarDashboard })));
 const AegisConsolePage = lazy(() => import("../pages/AegisConsolePage").then(m => ({ default: m.AegisConsolePage })));
-const SecurityDashboard = lazy(() => import("./SecurityDashboard").then(m => ({ default: m.SecurityDashboard })));
+// Standalone tabs
 const WaterPanel = lazy(() => import("./water").then(m => ({ default: m.WaterPanel })));
 const ESGPage = lazy(() => import("./sustainability/ESGPage").then(m => ({ default: m.ESGPage })));
-const AssetWorkflowDashboard = lazy(() => import("./AssetWorkflowDashboard").then(m => ({ default: m.AssetWorkflowDashboard })));
-const ContractManagementPage = lazy(() => import("../pages/ContractManagementPage").then(m => ({ default: m.ContractManagementPage })));
-const ProfitabilityDashboardPage = lazy(() => import("../pages/ProfitabilityDashboardPage").then(m => ({ default: m.ProfitabilityDashboardPage })));
-const BudgetReportPage = lazy(() => import("../pages/BudgetReportPage").then(m => ({ default: m.BudgetReportPage })));
-const FleetInsights = lazy(() => import("./FleetInsights").then(m => ({ default: m.FleetInsights })));
-const MLMetrics = lazy(() => import("./MLMetrics").then(m => ({ default: m.MLMetrics })));
-const SimulationDashboard = lazy(() => import("./SimulationDashboard").then(m => ({ default: m.SimulationDashboard })));
+
+// ─── Sub-tab types for consolidated tabs ────────────────────────────
+type SystemHealthSub = "Health" | "Workflow";
+type OperationsSub = "Control" | "Tech Chat" | "Audit" | "Twin";
+type LightingOccupancySub = "Lighting" | "Occupancy" | "Analytics" | "Correlation";
+type SolarBessSub = "Dashboard" | "AEGIS";
 
 /** Loading spinner shown while lazy tabs load */
 function TabLoading() {
@@ -160,6 +163,10 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("equipment");
   const [activeMainTab, setActiveMainTab] = useState<BuildingTabId>("overview");
+  const [systemHealthSub, setSystemHealthSub] = useState<SystemHealthSub>("Health");
+  const [operationsSub, setOperationsSub] = useState<OperationsSub>("Control");
+  const [lightingOccupancySub, setLightingOccupancySub] = useState<LightingOccupancySub>("Lighting");
+  const [solarBessSub, setSolarBessSub] = useState<SolarBessSub>("Dashboard");
   const [equipmentExpanded, setEquipmentExpanded] = useState(false);
 
   // Equipment control
@@ -792,7 +799,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════
-          Scrollable Main Tab Bar — Overview + module-gated building tabs
+          Main Tab Bar — 7 consolidated tabs (single row, no scrolling)
           ═══════════════════════════════════════════════════════════ */}
       <div
         className="mb-6 rounded-md overflow-hidden"
@@ -802,37 +809,17 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
         }}
       >
         <div
-          className="flex overflow-x-auto border-b scrollbar-hide"
-          style={{
-            borderColor: "var(--color-sentinel-border)",
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
-          }}
+          className="flex border-b"
+          style={{ borderColor: "var(--color-sentinel-border)" }}
         >
-          {BUILDING_TAB_ITEMS
-            .filter((tab) => {
-              // Module gating
-              if (tab.requiredModule && !isModuleActive(tab.requiredModule)) return false;
-              // Role gating (simulation = admin only)
-              if (tab.requiredRole === "admin") {
-                const storedUser = localStorage.getItem("sentinel_user");
-                if (storedUser) {
-                  try {
-                    const user = JSON.parse(storedUser);
-                    if (user.role !== "admin") return false;
-                  } catch { return false; }
-                } else { return false; }
-              }
-              return true;
-            })
-            .map((tab) => {
+          {BUILDING_TAB_ITEMS.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeMainTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveMainTab(tab.id)}
-                  className="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap flex-shrink-0"
+                  className="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap"
                   style={{
                     color: isActive
                       ? "var(--color-sentinel-amber)"
@@ -1584,36 +1571,115 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
       </>
       ) : (
       /* ═══════════════════════════════════════════════════════════
-         Non-overview tabs — lazy-loaded full-page components
+         Non-overview tabs — consolidated with sub-tab pills
          ═══════════════════════════════════════════════════════════ */
       <Suspense fallback={<TabLoading />}>
         <div className="min-h-[400px]">
-          {activeMainTab === "system-health" && <SystemHealthPage />}
-          {activeMainTab === "control" && <ControlDashboard onError={() => {}} />}
-          {activeMainTab === "digital-twin" && (
-            <div className="h-[calc(100vh-300px)]"><DigitalTwin /></div>
+          {/* System Health — Health | Workflow */}
+          {activeMainTab === "system-health" && (
+            <>
+              <div className="flex gap-2 mb-4">
+                {(["Health", "Workflow"] as SystemHealthSub[]).map(sub => (
+                  <button
+                    key={sub}
+                    onClick={() => setSystemHealthSub(sub)}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                    style={{
+                      background: systemHealthSub === sub ? "var(--color-sentinel-amber)" : "var(--color-sentinel-bg-secondary)",
+                      color: systemHealthSub === sub ? "white" : "var(--color-sentinel-text-secondary)",
+                    }}
+                  >
+                    {sub}
+                  </button>
+                ))}
+              </div>
+              {systemHealthSub === "Health" && <SystemHealthPage />}
+              {systemHealthSub === "Workflow" && <AssetWorkflowDashboard />}
+            </>
           )}
-          {activeMainTab === "audit-logs" && <ControlAuditTrail onError={() => {}} onViewDevice={() => {}} />}
-          {activeMainTab === "tech-chat" && <TechnicianPortalGated />}
-          {activeMainTab === "loadshedding" && <OptimizationPage onError={() => {}} />}
-          {activeMainTab === "lighting" && <LightingPage />}
-          {activeMainTab === "occupancy" && (
-            <div className="p-4 md:p-6"><OccupancyFullPanel compact={false} /></div>
+
+          {/* Operations — Control | Tech Chat | Audit | Twin */}
+          {activeMainTab === "operations" && (
+            <>
+              <div className="flex gap-2 mb-4">
+                {(["Control", "Tech Chat", "Audit", "Twin"] as OperationsSub[]).map(sub => (
+                  <button
+                    key={sub}
+                    onClick={() => setOperationsSub(sub)}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                    style={{
+                      background: operationsSub === sub ? "var(--color-sentinel-amber)" : "var(--color-sentinel-bg-secondary)",
+                      color: operationsSub === sub ? "white" : "var(--color-sentinel-text-secondary)",
+                    }}
+                  >
+                    {sub}
+                  </button>
+                ))}
+              </div>
+              {operationsSub === "Control" && <ControlDashboard onError={() => {}} />}
+              {operationsSub === "Tech Chat" && <TechnicianPortalGated />}
+              {operationsSub === "Audit" && <ControlAuditTrail onError={() => {}} onViewDevice={() => {}} />}
+              {operationsSub === "Twin" && (
+                <div className="h-[calc(100vh-300px)]"><DigitalTwin /></div>
+              )}
+            </>
           )}
-          {activeMainTab === "occupancy-analytics" && <OccupancyAnalyticsPage />}
-          {activeMainTab === "energy-correlation" && <OccupancyEnergyCorrelationPage />}
-          {activeMainTab === "solar" && <SolarDashboard />}
-          {activeMainTab === "aegis" && <AegisConsolePage />}
-          {activeMainTab === "security" && <SecurityDashboard />}
+
+          {/* Lighting & Occupancy — Lighting | Occupancy | Analytics | Correlation */}
+          {activeMainTab === "lighting-occupancy" && (
+            <>
+              <div className="flex gap-2 mb-4">
+                {(["Lighting", "Occupancy", "Analytics", "Correlation"] as LightingOccupancySub[]).map(sub => (
+                  <button
+                    key={sub}
+                    onClick={() => setLightingOccupancySub(sub)}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                    style={{
+                      background: lightingOccupancySub === sub ? "var(--color-sentinel-amber)" : "var(--color-sentinel-bg-secondary)",
+                      color: lightingOccupancySub === sub ? "white" : "var(--color-sentinel-text-secondary)",
+                    }}
+                  >
+                    {sub}
+                  </button>
+                ))}
+              </div>
+              {lightingOccupancySub === "Lighting" && <LightingPage />}
+              {lightingOccupancySub === "Occupancy" && (
+                <div className="p-4 md:p-6"><OccupancyFullPanel compact={false} /></div>
+              )}
+              {lightingOccupancySub === "Analytics" && <OccupancyAnalyticsPage />}
+              {lightingOccupancySub === "Correlation" && <OccupancyEnergyCorrelationPage />}
+            </>
+          )}
+
+          {/* Solar & BESS — Dashboard | AEGIS */}
+          {activeMainTab === "solar-bess" && (
+            <>
+              <div className="flex gap-2 mb-4">
+                {(["Dashboard", "AEGIS"] as SolarBessSub[]).map(sub => (
+                  <button
+                    key={sub}
+                    onClick={() => setSolarBessSub(sub)}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                    style={{
+                      background: solarBessSub === sub ? "var(--color-sentinel-amber)" : "var(--color-sentinel-bg-secondary)",
+                      color: solarBessSub === sub ? "white" : "var(--color-sentinel-text-secondary)",
+                    }}
+                  >
+                    {sub}
+                  </button>
+                ))}
+              </div>
+              {solarBessSub === "Dashboard" && <SolarDashboard />}
+              {solarBessSub === "AEGIS" && <AegisConsolePage />}
+            </>
+          )}
+
+          {/* Energy (standalone) */}
+          {activeMainTab === "energy" && <ESGPage selectedBuilding={undefined} />}
+
+          {/* Water (standalone) */}
           {activeMainTab === "water" && <WaterPanel />}
-          {activeMainTab === "esg" && <ESGPage selectedBuilding={undefined} />}
-          {activeMainTab === "asset-workflow" && <AssetWorkflowDashboard />}
-          {activeMainTab === "contracts" && <ContractManagementPage />}
-          {activeMainTab === "profitability" && <ProfitabilityDashboardPage />}
-          {activeMainTab === "budget" && <BudgetReportPage />}
-          {activeMainTab === "fleet-ml" && <FleetInsights />}
-          {activeMainTab === "ml-metrics" && <MLMetrics />}
-          {activeMainTab === "simulation" && <SimulationDashboard />}
         </div>
       </Suspense>
       )}
