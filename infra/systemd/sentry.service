@@ -1,0 +1,36 @@
+[Unit]
+Description=SENTRY Telegram Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bederf
+WorkingDirectory=/opt/bms-intelligence/sentry-gateway
+
+# Pre-start: create temp files + kill any orphan gateway on port 18789
+ExecStartPre=/bin/bash -c 'mkdir -p /tmp/sentry && echo "[]" > /tmp/sentinel_health_alerts.json && fuser -k 18789/tcp 2>/dev/null; true'
+
+ExecStart=/usr/local/bin/node /opt/bms-intelligence/sentry-gateway/bin/sentry.mjs gateway
+
+# Ensure all child processes (gateway subprocess) are killed on stop
+KillMode=control-group
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+# Restart handling
+Restart=always
+RestartSec=5
+
+# Environment
+Environment=NODE_ENV=production
+Environment=PATH=/opt/bms-intelligence/sentry-gateway/node_modules/.bin:/home/bederf/.npm-global/bin:/usr/local/bin:/usr/bin:/bin
+Environment=HOME=/home/bederf
+Environment=SENTRY_CONFIG_DIR=/home/bederf/.sentry/gateway
+
+# Node.js tuning for network resilience
+Environment=NODE_OPTIONS=--dns-result-order=ipv4first
+Environment=UV_THREADPOOL_SIZE=16
+
+[Install]
+WantedBy=multi-user.target
