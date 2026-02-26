@@ -212,7 +212,7 @@ bms_control.py safety <device>
 }
 ```
 
-Header `X-User-Id: sentrybot` identifies bot for audit logging.
+Header `X-User-Id: sentry` identifies bot for audit logging.
 
 ## Demo Desks
 
@@ -315,13 +315,13 @@ Safety-critical operations use cloud tool path only. If POPIA cross-border conse
 
 All Sentry actions are logged in SENTINEL:
 
-- User ID: `sentrybot`
+- User ID: `sentry`
 - Source: Telegram user ID passed in metadata
 - Actions logged: Device reads, control actions, complaints submitted
 
 Query audit logs:
 ```
-GET /api/audit/logs?user=sentrybot
+GET /api/audit/logs?user=sentry
 ```
 
 ## Troubleshooting
@@ -400,14 +400,14 @@ FCU valve stuck at 15% - insufficient chilled water flow
 Telegram bot commands can only contain letters, numbers, and underscores. Commands end at hyphens or spaces. Therefore:
 
 - Equipment code `FCU-L10-03` becomes command `/WO_FCU_L10_03`
-- Sentrybot converts underscores back to dashes when looking up equipment
+- Sentry converts underscores back to dashes when looking up equipment
 - The actual equipment code is displayed in the `Code:` field for reference
 
 ### Alert Notifier Service
 
 **Location**: `backend/app/services/sentry_integration/alert_notifier.py`
 
-The alert notifier sends Telegram messages via the `sentrybot` CLI tool.
+The alert notifier sends Telegram messages via the `sentry` CLI tool.
 
 ```python
 from app.services.sentry_integration.alert_notifier import alert_notifier
@@ -428,11 +428,11 @@ alert_notifier.send_alert_sync({
 The notifier automatically:
 1. Formats the equipment code with underscores for clickable Telegram commands
 2. Includes the original code in the message body for reference
-3. Sends via `sentrybot message send` CLI
+3. Sends via `sentry message send` CLI
 
 **Configuration**:
 - FM Chat ID: Set in `alert_notifier.py` or via `SENTRY_FM_CHAT_ID` env var
-- Sentrybot must be installed and in PATH
+- Sentry CLI must be installed and in PATH (vendored at `sentry-gateway/bin/sentry.mjs`)
 
 ## Slash Commands
 
@@ -462,7 +462,7 @@ The `/inspect_` command is a **silent dispatch** — it creates a work order and
 
 1. FM sends `/inspect_S002_FCU_301`
 2. Bot calls `POST /api/sentry/create-work-order` with `telegram_user_id` for audit
-3. Bot sends tech a Telegram message via `sentrybot message send --target {technician_telegram_id}`:
+3. Bot sends tech a Telegram message via `sentry message send --target {technician_telegram_id}`:
    ```
    #WO-2026-0030 — S002-FCU-301
    ━━━━━━━━━━━━━━━━━━
@@ -667,7 +667,7 @@ After the technician completes all checklist items, the bot:
 1. Analyses all answers against equipment health data and alert history
 2. Highlights abnormalities (e.g., blocked filter + noisy fan = restricted airflow)
 3. Recommends next action: schedule service, raise WO, monitor, or no action
-4. Sends diagnosis to FM via `sentrybot message send --target {fm_chat_id}`
+4. Sends diagnosis to FM via `sentry message send --target {fm_chat_id}`
 5. Ends with relevant slash commands for the FM to act on
 
 ### API Reference
