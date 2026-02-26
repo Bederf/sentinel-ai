@@ -107,7 +107,10 @@ class AutoencoderTrainer:
                 else:
                     logger.warning(f"Insufficient real data for {equipment_type}, falling back to demo data")
                     X_normal, X_all, anomaly_indices = data_prep.generate_demo_data(
-                        n_hours=5000, n_features=n_features, n_anomalies=10, anomaly_magnitude=3.0,
+                        n_hours=5000,
+                        n_features=n_features,
+                        n_anomalies=10,
+                        anomaly_magnitude=3.0,
                     )
             else:
                 logger.info(f"Using demo data for {equipment_type}")
@@ -319,8 +322,12 @@ class AutoencoderTrainer:
         model.build()
 
         history = model.train(
-            X_train_scaled, X_val_scaled,
-            epochs=epochs, batch_size=batch_size, patience=10, verbose=verbose,
+            X_train_scaled,
+            X_val_scaled,
+            epochs=epochs,
+            batch_size=batch_size,
+            patience=10,
+            verbose=verbose,
         )
 
         # Save
@@ -405,8 +412,15 @@ def main():
     parser.add_argument("--all", "-a", action="store_true", help="Train all equipment types")
     parser.add_argument("--epochs", type=int, default=50, help="Maximum training epochs (default: 50)")
     parser.add_argument("--latent-dim", type=int, default=16, help="Latent space dimension (default: 16)")
-    parser.add_argument("--demo-data", action="store_true", default=False, help="Force synthetic demo data instead of real Supabase data")
-    parser.add_argument("--real-data", action="store_true", default=False, help="Force real data from Supabase (fail if unavailable)")
+    parser.add_argument(
+        "--demo-data",
+        action="store_true",
+        default=False,
+        help="Force synthetic demo data instead of real Supabase data",
+    )
+    parser.add_argument(
+        "--real-data", action="store_true", default=False, help="Force real data from Supabase (fail if unavailable)"
+    )
     parser.add_argument("--verbose", "-v", type=int, default=1, help="Verbosity level")
 
     args = parser.parse_args()

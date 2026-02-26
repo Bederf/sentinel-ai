@@ -23,7 +23,7 @@ Usage:
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -215,8 +215,7 @@ class SupabaseTrainingDataLoader:
         min_date = datetime.utcnow() - timedelta(days=lookback_days)
 
         logger.info(
-            f"[DATA LOADER] Querying {equipment_type} readings "
-            f"(sensors: {sensor_types}, since: {min_date.date()})"
+            f"[DATA LOADER] Querying {equipment_type} readings (sensors: {sensor_types}, since: {min_date.date()})"
         )
 
         rows = self._query_readings(
@@ -236,17 +235,11 @@ class SupabaseTrainingDataLoader:
         if df is None:
             return None
 
-        logger.info(
-            f"[DATA LOADER] Pivoted to {len(df)} hourly rows, "
-            f"columns: {list(df.columns)}"
-        )
+        logger.info(f"[DATA LOADER] Pivoted to {len(df)} hourly rows, columns: {list(df.columns)}")
 
         # Check we have enough data
         if len(df) < min_hours:
-            logger.warning(
-                f"[DATA LOADER] Insufficient data for {equipment_type}: "
-                f"{len(df)} hours (need {min_hours})"
-            )
+            logger.warning(f"[DATA LOADER] Insufficient data for {equipment_type}: {len(df)} hours (need {min_hours})")
             return None
 
         # Check all required features are present
@@ -276,9 +269,7 @@ class SupabaseTrainingDataLoader:
         Returns:
             Array of shape (hours, n_features) or None
         """
-        df = self.load_equipment_type_dataframe(
-            equipment_type, min_hours=min_hours, lookback_days=lookback_days
-        )
+        df = self.load_equipment_type_dataframe(equipment_type, min_hours=min_hours, lookback_days=lookback_days)
         if df is None:
             return None
 
@@ -289,8 +280,7 @@ class SupabaseTrainingDataLoader:
         available = [f for f in features if f in df.columns]
         if len(available) < len(features):
             logger.warning(
-                f"[DATA LOADER] Only {len(available)}/{len(features)} features "
-                f"available for {equipment_type}"
+                f"[DATA LOADER] Only {len(available)}/{len(features)} features available for {equipment_type}"
             )
             return None
 
@@ -299,8 +289,7 @@ class SupabaseTrainingDataLoader:
 
         if len(data) < min_hours:
             logger.warning(
-                f"[DATA LOADER] After cleaning, only {len(data)} hours "
-                f"(need {min_hours}) for {equipment_type}"
+                f"[DATA LOADER] After cleaning, only {len(data)} hours (need {min_hours}) for {equipment_type}"
             )
             return None
 

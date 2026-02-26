@@ -137,7 +137,9 @@ class RetrainingScheduler:
 
                 trainer = LSTMTrainer()
                 train_result = trainer.train_equipment_type(
-                    equipment_type, epochs=50, use_demo_data=False,
+                    equipment_type,
+                    epochs=50,
+                    use_demo_data=False,
                 )
                 result.success = True
                 result.metrics = train_result.get("metrics", {})
@@ -147,7 +149,9 @@ class RetrainingScheduler:
 
                 trainer = AutoencoderTrainer()
                 train_result = trainer.train_equipment_type(
-                    equipment_type, epochs=50, use_demo_data=False,
+                    equipment_type,
+                    epochs=50,
+                    use_demo_data=False,
                 )
                 result.success = True
                 result.metrics = train_result.get("metrics", {})

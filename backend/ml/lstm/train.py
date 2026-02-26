@@ -270,8 +270,14 @@ class LSTMTrainer:
         model.build()
 
         history = model.train(
-            X_train_scaled, y_train, X_val_scaled, y_val,
-            epochs=epochs, batch_size=batch_size, patience=10, verbose=verbose,
+            X_train_scaled,
+            y_train,
+            X_val_scaled,
+            y_val,
+            epochs=epochs,
+            batch_size=batch_size,
+            patience=10,
+            verbose=verbose,
         )
 
         # Evaluate
@@ -352,8 +358,15 @@ def main():
     )
     parser.add_argument("--all", "-a", action="store_true", help="Train all equipment types")
     parser.add_argument("--epochs", type=int, default=50, help="Maximum training epochs (default: 50)")
-    parser.add_argument("--demo-data", action="store_true", default=False, help="Force synthetic demo data instead of real Supabase data")
-    parser.add_argument("--real-data", action="store_true", default=False, help="Force real data from Supabase (fail if unavailable)")
+    parser.add_argument(
+        "--demo-data",
+        action="store_true",
+        default=False,
+        help="Force synthetic demo data instead of real Supabase data",
+    )
+    parser.add_argument(
+        "--real-data", action="store_true", default=False, help="Force real data from Supabase (fail if unavailable)"
+    )
     parser.add_argument(
         "--verbose", "-v", type=int, default=1, help="Verbosity level (0=silent, 1=progress, 2=detailed)"
     )

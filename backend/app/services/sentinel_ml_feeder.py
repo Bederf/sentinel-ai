@@ -95,9 +95,7 @@ class SentinelMLFeeder:
         self._hours_ingested = 0
 
         # Per equipment-type time series: {equip_type: {feature_name: [values]}}
-        self._buffers: Dict[str, Dict[str, List[float]]] = defaultdict(
-            lambda: defaultdict(list)
-        )
+        self._buffers: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
         # Track which equipment codes map to which types
         self._code_to_type: Dict[str, str] = {}
         self._training_results: List[Dict[str, Any]] = []
@@ -176,9 +174,7 @@ class SentinelMLFeeder:
         # Check all features have data
         min_samples = min(len(buf.get(f, [])) for f in features)
         if min_samples < 500:
-            logger.warning(
-                f"{equipment_type}: only {min_samples} samples, need 500+"
-            )
+            logger.warning(f"{equipment_type}: only {min_samples} samples, need 500+")
             return None
 
         # Build DataFrame-like array: (timesteps, n_features)
@@ -204,7 +200,7 @@ class SentinelMLFeeder:
 
         Returns (X_normal, X_all, anomaly_indices) or None.
         """
-        from ml.autoencoder.data_prep import AutoencoderDataPrep, AUTOENCODER_SENSOR_CONFIGS
+        from ml.autoencoder.data_prep import AUTOENCODER_SENSOR_CONFIGS
 
         if equipment_type not in AUTOENCODER_SENSOR_CONFIGS:
             return None
@@ -218,16 +214,13 @@ class SentinelMLFeeder:
 
         min_samples = min(len(buf.get(f, [])) for f in features)
         if min_samples < 200:
-            logger.warning(
-                f"{equipment_type} autoencoder: only {min_samples} samples"
-            )
+            logger.warning(f"{equipment_type} autoencoder: only {min_samples} samples")
             return None
 
         n = min_samples
         data = np.column_stack([np.array(buf[f][:n]) for f in features])
 
         # Create windowed data (assumed normal operation)
-        data_prep = AutoencoderDataPrep(window_size=24)
         try:
             windows = []
             for i in range(len(data) - 24):
@@ -255,9 +248,7 @@ class SentinelMLFeeder:
             return []
 
         results = []
-        logger.info(
-            f"[ML FEEDER] Training with {self._hours_ingested} hours of data"
-        )
+        logger.info(f"[ML FEEDER] Training with {self._hours_ingested} hours of data")
 
         # Train LSTM models
         try:
@@ -286,6 +277,7 @@ class SentinelMLFeeder:
 
             trainer = AutoencoderTrainer()
             from ml.autoencoder.data_prep import AUTOENCODER_SENSOR_CONFIGS
+
             for eq_type in AUTOENCODER_SENSOR_CONFIGS:
                 data = self.prepare_autoencoder_data(eq_type)
                 if data is None:
@@ -305,9 +297,7 @@ class SentinelMLFeeder:
         self._last_train_time = datetime.now()
 
         successful = [r for r in results if "error" not in r]
-        logger.info(
-            f"[ML FEEDER] Training complete: {len(successful)}/{len(results)} models trained"
-        )
+        logger.info(f"[ML FEEDER] Training complete: {len(successful)}/{len(results)} models trained")
         return results
 
     def reset(self):
