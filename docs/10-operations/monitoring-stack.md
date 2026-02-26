@@ -8,10 +8,11 @@ The monitoring stack runs on the shared `/opt/aimthelaw` infrastructure alongsid
 
 | Service | Port | Purpose |
 |---------|------|---------|
+| Prometheus | 9090 | Metrics scraping (SENTINEL, node-exporter, self) |
+| Grafana | 3001 (→3000) | Dashboards, alerting, visualization |
 | Loki | 3100 | Log aggregation and querying |
 | Promtail | 9080 | Log collection agent (tails files, ships to Loki) |
-| Grafana | 3000 | Dashboards, alerting, visualization |
-| Prometheus | 9090 | Metrics collection (optional) |
+| Node Exporter | 9100 | System-level metrics (CPU, memory, disk, network) |
 
 ## Configuration Files
 
@@ -23,6 +24,7 @@ All configs live at `/opt/aimthelaw/config/`:
 | `promtail-config.yml` | Scrape jobs, label extraction, file paths |
 | `grafana/provisioning/dashboards/*.json` | Auto-provisioned Grafana dashboards |
 | `grafana/provisioning/alerting/*.yml` | Alert rules |
+| `prometheus.yml` | Prometheus scrape targets (sentinel-backend, node, self) |
 | `docker-compose.monitoring.yml` | Container orchestration |
 
 **Repo copies** (version-controlled, may differ from deployed):
@@ -53,6 +55,15 @@ docker restart grafana   # Dashboards
 ### Check service health
 
 ```bash
+# Prometheus healthy
+curl -s http://localhost:9090/-/healthy
+
+# Prometheus scrape targets
+curl -s http://localhost:9090/api/v1/targets | python3 -c "
+import sys, json; d = json.load(sys.stdin)
+for t in d['data']['activeTargets']:
+    print(f\"{t['labels']['job']:25s} health={t['health']}\")"
+
 # Loki readiness
 curl -s http://localhost:3100/ready
 
@@ -60,7 +71,10 @@ curl -s http://localhost:3100/ready
 curl -s http://localhost:9080/targets | grep READY
 
 # Grafana health
-curl -s http://localhost:3000/api/health
+curl -s http://localhost:3001/api/health
+
+# SENTINEL /metrics endpoint
+curl -s http://localhost:9095/metrics | grep "^sentinel_" | head -20
 ```
 
 ### View service logs
@@ -112,6 +126,48 @@ asyncio.run(main())
 PY
 ```
 
+## Prometheus Metrics (Phase 127)
+
+The SENTINEL backend exposes 13 Prometheus metric families at `GET /metrics` (Prometheus text exposition format).
+
+### Scrape Targets
+
+| Target | Job Name | Endpoint | Interval |
+|--------|----------|----------|----------|
+| SENTINEL Backend | `sentinel-backend` | `localhost:9095/metrics` | 30s |
+| Node Exporter | `node` | `localhost:9100/metrics` | 15s |
+| Prometheus Self | `prometheus` | `localhost:9090/metrics` | 15s |
+
+### SENTINEL Metric Families
+
+| # | Metric | Type | Source | Wired |
+|---|--------|------|--------|-------|
+| 1 | `sentinel_quality_gate_evaluations_total` | Counter | quality_gate_evaluator.py | Yes |
+| 2 | `sentinel_quality_gate_enforcement` | Gauge | quality_gate_evaluator.py | Yes |
+| 3 | `sentinel_recommendations_total` | Counter | tier_routing_engine.py | Yes |
+| 4 | `sentinel_approval_decisions_total` | Counter | approval_service.py | Yes |
+| 5 | `sentinel_safety_violations_total` | Counter | safety_interlocks.py | Yes |
+| 6 | `sentinel_model_drift_alerts` | Gauge | background_scheduler.py | Yes |
+| 7 | `sentinel_rollback_total` | Counter | approval_service.py | Yes |
+| 8 | `sentinel_info` | Info | metrics.py (static) | Yes |
+| 9 | `sentinel_http_requests_total` | Counter | request_metrics.py | Yes |
+| 10 | `sentinel_http_request_duration_seconds` | Histogram | request_metrics.py | Yes |
+| 11 | `sentinel_http_requests_in_progress` | Gauge | request_metrics.py | Yes |
+| 12 | `sentinel_tool_calls_total` | Counter | chat_tools.py | Yes |
+| 13 | `sentinel_tool_call_duration_seconds` | Histogram | chat_tools.py | Yes |
+
+### RequestMetricsMiddleware
+
+`backend/app/middleware/request_metrics.py` — captures HTTP request count, duration, and in-progress gauge for every request. Registered as outermost middleware to capture full lifecycle.
+
+**Path normalization** prevents label cardinality explosion:
+- UUIDs → `{id}`
+- Equipment codes (`S002-AHU-B1-001`) → `{id}`
+- Site IDs (`site-002`) → `{id}`
+- Numeric IDs → `{id}`
+
+Paths `/metrics`, `/health`, `/docs`, `/openapi.json` are skipped.
+
 ## Promtail Scrape Jobs
 
 The deployed Promtail config has these SENTINEL-specific scrape jobs:
@@ -134,10 +190,11 @@ The deployed Promtail config has these SENTINEL-specific scrape jobs:
 
 ### Provisioned dashboards
 
-| Dashboard | UID | Panels |
-|-----------|-----|--------|
-| PARASITE Decision Pipeline | `sentinel-parasite-decisions` | 9 (stats, pie charts, logs, timeseries) |
-| Security Operations | `sentinel-security-operations` | 7 (failed logins, suspicious UAs, device control, API errors) |
+| Dashboard | UID | Panels | Data Source |
+|-----------|-----|--------|-------------|
+| SENTINEL AI Governance | `sentinel-ai-governance` | 8 (quality gate, safety, recommendations, drift, rollbacks, build info) | Prometheus |
+| PARASITE Decision Pipeline | `sentinel-parasite-decisions` | 9 (stats, pie charts, logs, timeseries) | Loki |
+| Security Operations | `sentinel-security-operations` | 7 (failed logins, suspicious UAs, device control, API errors) | Loki |
 
 ### Adding a new dashboard
 
@@ -185,7 +242,9 @@ If `/var/log/sentinel/` is not available, the backend falls back to `backend/app
 
 ## Alert Rules
 
-Five SENTINEL alert rules are provisioned via `/opt/aimthelaw/config/grafana/provisioning/alerting/sentinel-security-alert-rules.yml`:
+Alert rules are provisioned in two files under `/opt/aimthelaw/config/grafana/provisioning/alerting/`:
+
+**Security alert rules** (`sentinel-security-alert-rules.yml`):
 
 | Rule | Trigger | Severity |
 |------|---------|----------|
@@ -194,6 +253,15 @@ Five SENTINEL alert rules are provisioned via `/opt/aimthelaw/config/grafana/pro
 | Error Spike | >10 ERROR/CRITICAL in 5min | Warning |
 | Suspicious Request Pattern | SQLi/scanner in 15min | Warning |
 | Audit Log Flow Check | No audit data in 24h | Warning |
+
+**AI governance alert rules** (`sentinel-ai-governance-alert-rules.yml`):
+
+| Rule | Trigger | Severity |
+|------|---------|----------|
+| AI Safety Violation | Any safety violation in 5min | Critical |
+| Quality Gate BLOCK_WRITES | Block writes enforcement active | Critical |
+| Model Drift Persistent | Drift alerts active for 1hr | Warning |
+| Rollback Spike | High rollback volume in 1hr | Warning |
 
 ## Related Docs
 

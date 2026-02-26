@@ -15,12 +15,16 @@ estimated_read_time: 15
 
 # AI Monitoring and Metrics Governance
 
-## Current State
+## Current State (Updated 2026-02-26, Phase 127)
 
 - AI health and drift are exposed via JSON APIs under `backend/app/api/mlops.py`.
 - Audit/decision telemetry is strong in log-based observability (Loki/Promtail/Grafana).
-- Prometheus runs from `/opt/aimthelaw` (`docker-compose.monitoring.yml`), not from this repository stack.
-- **NEW:** Prometheus-format `/metrics` endpoint available at `backend/app/api/metrics.py` (Phase 114-05).
+- Prometheus runs from `/opt/aimthelaw` (`docker-compose.monitoring.yml`), scraping SENTINEL every 30s.
+- **13 Prometheus metric families** at `/metrics` endpoint (`backend/app/api/metrics.py`): 8 AI governance + 3 HTTP request + 2 tool-call.
+- **7 of 8 AI governance metrics wired to production code** (Phase 127). Only approval `expired` has no code path (no expiry mechanism exists).
+- **RequestMetricsMiddleware** (`backend/app/middleware/request_metrics.py`) captures all HTTP routes.
+- **Tool-call instrumentation** in `chat_tools.execute_tool()` tracks duration + success/fail per tool.
+- Monitoring stack fully running: Prometheus, Grafana, Loki, Promtail, Node Exporter.
 
 ## Observability Gaps
 
@@ -29,22 +33,40 @@ estimated_read_time: 15
 | Prometheus backend scraping for AI controls is incomplete | `/opt/aimthelaw/config/prometheus.yml` now includes `sentinel-backend` scrape job | **RESOLVED** -- scrape target validated `UP` (`2026-02-23`) |
 | No canonical Prometheus exposition for AI controls | `/api/mlops/metrics` returns JSON (not Prometheus text format) | **RESOLVED** -- `/metrics` endpoint ships Prometheus text format |
 | Alerting focuses on log events | `/opt/aimthelaw/config/grafana/provisioning/alerting/sentinel-ai-governance-alert-rules.yml` | **RESOLVED** -- 4 AI governance alert rules provisioned (`2026-02-23`) |
-| Cost/approval metrics are not standardized | Mixed APIs and logs | 8 stable metric names defined below |
+| Cost/approval metrics are not standardized | Mixed APIs and logs | **RESOLVED** -- 13 stable metric families defined and wired (Phase 127) |
+| Metrics defined but not wired to production code | 8 counters/gauges existed as dead code | **RESOLVED** -- 7 of 8 wired to services, 5 new metrics added (Phase 127) |
 
 ## Prometheus Metrics
 
 The `/metrics` endpoint (`backend/app/api/metrics.py`) exposes the following AI governance metrics in Prometheus text exposition format.
 
-| # | Metric Name | Type | Labels | Description |
-|---|---|---|---|---|
-| 1 | `sentinel_quality_gate_evaluations_total` | Counter | `site_id`, `status` (pass/warn/fail) | Total quality-gate evaluations by site and outcome |
-| 2 | `sentinel_quality_gate_enforcement` | Gauge | `site_id`, `enforcement` (normal/cap_confidence/suppress_tier3/block_writes) | Current enforcement level per site (1 = active) |
-| 3 | `sentinel_recommendations_total` | Counter | `site_id`, `tier` (tier1/tier2/tier3), `action` (advisory/pending_approval/auto_execute/blocked) | Total recommendations by site, tier, and action disposition |
-| 4 | `sentinel_approval_decisions_total` | Counter | `site_id`, `decision` (approved/rejected/expired) | Total approval workflow decisions by site and outcome |
-| 5 | `sentinel_safety_violations_total` | Counter | `site_id`, `severity` (warning/block/alarm) | Total safety boundary violations by site and severity |
-| 6 | `sentinel_model_drift_alerts` | Gauge | `site_id`, `model_type` | Active model drift alerts by site and model type |
-| 7 | `sentinel_rollback_total` | Counter | `site_id`, `equipment_type` | Total automated rollback events by site and equipment type |
-| 8 | `sentinel_info` | Info | `version`, `mode`, `build_date` | SENTINEL build and configuration metadata |
+### AI Governance Metrics (1-8)
+
+| # | Metric Name | Type | Labels | Description | Wired |
+|---|---|---|---|---|---|
+| 1 | `sentinel_quality_gate_evaluations_total` | Counter | `site_id`, `status` (pass/warn/fail) | Total quality-gate evaluations by site and outcome | `quality_gate_evaluator.py` |
+| 2 | `sentinel_quality_gate_enforcement` | Gauge | `site_id`, `enforcement` (normal/cap_confidence/suppress_tier3/block_writes) | Current enforcement level per site (1 = active) | `quality_gate_evaluator.py` |
+| 3 | `sentinel_recommendations_total` | Counter | `site_id`, `tier` (tier1/tier2/tier3), `action` (advisory/pending_approval/auto_execute/blocked) | Total recommendations by site, tier, and action disposition | `tier_routing_engine.py` |
+| 4 | `sentinel_approval_decisions_total` | Counter | `site_id`, `decision` (approved/rejected/expired) | Total approval workflow decisions by site and outcome | `approval_service.py` |
+| 5 | `sentinel_safety_violations_total` | Counter | `site_id`, `severity` (warning/block/alarm) | Total safety boundary violations by site and severity | `safety_interlocks.py` |
+| 6 | `sentinel_model_drift_alerts` | Gauge | `site_id`, `model_type` | Active model drift alerts by site and model type | `background_scheduler.py` |
+| 7 | `sentinel_rollback_total` | Counter | `site_id`, `equipment_type` | Total automated rollback events by site and equipment type | `approval_service.py` |
+| 8 | `sentinel_info` | Info | `version`, `mode`, `build_date` | SENTINEL build and configuration metadata | `metrics.py` (static) |
+
+### HTTP Request Metrics (9-11, Phase 127)
+
+| # | Metric Name | Type | Labels | Description | Wired |
+|---|---|---|---|---|---|
+| 9 | `sentinel_http_requests_total` | Counter | `method`, `path`, `status_code` | Total HTTP requests (path normalized) | `request_metrics.py` |
+| 10 | `sentinel_http_request_duration_seconds` | Histogram | `method`, `path` | HTTP request duration (9 buckets: 10ms-10s) | `request_metrics.py` |
+| 11 | `sentinel_http_requests_in_progress` | Gauge | — | Number of HTTP requests currently being processed | `request_metrics.py` |
+
+### Tool-Call Metrics (12-13, Phase 127)
+
+| # | Metric Name | Type | Labels | Description | Wired |
+|---|---|---|---|---|---|
+| 12 | `sentinel_tool_calls_total` | Counter | `tool_name`, `outcome` (success/error) | Total tool calls by tool name and outcome | `chat_tools.py` |
+| 13 | `sentinel_tool_call_duration_seconds` | Histogram | `tool_name` | Tool call execution duration (9 buckets: 50ms-30s) | `chat_tools.py` |
 
 ### Scrape Configuration
 
@@ -194,9 +216,14 @@ In `/opt/aimthelaw/config/prometheus.yml`, the `sentinel-backend` scrape job is 
 
 ## Phase 2 Roadmap
 
-The following enhancements remain for Phase 2 (Control Implementation, 2026-04-01 to 2026-05-31):
+**Completed (Phase 127, 2026-02-26):**
 
-- Wire real metric collection hooks into existing services (quality gate evaluator, approval workflow, safety engine)
-- Add histogram metrics for approval latency and recommendation processing time
+- ~~Wire real metric collection hooks into existing services~~ — 7 of 8 AI governance metrics wired, RequestMetricsMiddleware added, tool-call instrumentation added
+- ~~Add histogram metrics for approval latency and recommendation processing time~~ — HTTP duration + tool-call duration histograms added
+
+**Remaining (Control Implementation, 2026-04-01 to 2026-05-31):**
+
+- Wire approval `expired` counter (requires building an expiry mechanism first)
 - Gather 14 consecutive days of scrape stability evidence for gate closure
 - Tune alert thresholds against production baseline
+- Add dedicated approval latency histogram (current counter tracks decisions, not duration)
