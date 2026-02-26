@@ -1,0 +1,87 @@
+flowchart TD
+    classDef client fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef helpdesk fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef concept fill:#fef9c3,stroke:#d97706,color:#78350f
+    classDef team fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef technician fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef servicenow fill:#f3e8ff,stroke:#7c3aed,color:#4c1d95
+    classDef vendor fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+    classDef manager fill:#e0e7ff,stroke:#4f46e5,color:#312e81
+    classDef admin fill:#fce7f3,stroke:#db2777,color:#831843
+    classDef sentinel fill:#d1fae5,stroke:#059669,color:#064e3b
+    classDef sentry fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ml fill:#ecfdf5,stroke:#10b981,color:#064e3b
+    classDef decision fill:#fef9c3,stroke:#d97706,color:#78350f
+
+    subgraph PROACTIVE ["🤖 Proactive Path — SENTINEL detects before client calls"]
+        P1(["SENTINEL monitors<br/>BMS sensors 24/7<br/>across all buildings"]):::sentinel
+        P2["Anomaly detected:<br/><b>ML fault classification</b><br/>identifies discipline +<br/>likely root cause"]:::sentinel
+        P3["Job auto-created in<br/><b>Concept</b> — pre-filled<br/>with building, discipline,<br/>AI diagnosis + equipment history"]:::concept
+        P4["<b>Sentry WhatsApp</b><br/>sent to discipline team<br/>with job details +<br/>AI-suggested diagnosis"]:::sentry
+    end
+
+    subgraph REACTIVE ["📞 Reactive Path — Client reports issue"]
+        R1(["🏢 Client notices issue"]):::client
+        R2["Client sends email to<br/><b>REMSHelpdesk@fnb.co.za</b>"]:::client
+        R3["<b>SENTINEL parses email</b><br/>auto-extracts: building,<br/>issue type, priority<br/>suggests discipline"]:::sentinel
+        R4["Helpdesk assistant<br/>reviews + confirms<br/>pre-filled details<br/>(seconds, not minutes)"]:::helpdesk
+        R5["Job logged in <b>Concept</b><br/>with full context:<br/>AI diagnosis, equipment<br/>history, similar past jobs"]:::concept
+    end
+
+    subgraph DISPATCH ["📲 Dispatch & Execution"]
+        D1["Email + <b>Sentry WhatsApp</b><br/>to discipline team at<br/>building with AI context<br/>+ priority indicator"]:::sentry
+        D2["Team picks up call<br/>on iPads via Concept<br/><b>SLA countdown visible</b>"]:::team
+        D3["Technician attends<br/>issue on site with<br/><b>AI pre-diagnosis,<br/>equipment history +<br/>suggested parts</b>"]:::technician
+        D4{"Can the<br/>technician<br/>fix it?"}:::decision
+    end
+
+    subgraph INTERNAL ["✅ Internal Fix"]
+        I1["Technician closes<br/>job on <b>Concept</b>"]:::concept
+        I2["Confirmation email<br/>sent automatically"]:::concept
+        I3["<b>SENTINEL captures</b><br/>resolution data:<br/>fault type, fix applied,<br/>time to resolve"]:::sentinel
+    end
+
+    subgraph EXTERNAL ["🔧 External Vendor Path"]
+        E1["Technician escalates<br/>on <b>ServiceNow</b> —<br/>SENTINEL pre-fills incident<br/>with diagnosis context"]:::servicenow
+        E2["Email + <b>Sentry WhatsApp</b><br/>to service provider<br/>to submit quote"]:::sentry
+        E3["Service provider<br/>submits quote<br/>on the system"]:::vendor
+        E4["Manager approves quote<br/>on <b>ServiceNow</b><br/>(sign + upload)<br/><b>SLA alert if delayed</b>"]:::manager
+        E5["<b>PO created</b> and<br/>sent to service provider"]:::servicenow
+        E6["Service provider<br/>performs the work"]:::vendor
+        E7["Service provider gets<br/><b>job card signed</b><br/>on site"]:::vendor
+        E8["Service provider loads<br/><b>invoice + signed job card</b><br/>on FNB portal"]:::vendor
+        E9["Admin does <b>GRV</b><br/>to confirm work completed"]:::admin
+        E10["<b>SENTINEL captures</b><br/>vendor resolution data:<br/>response time, cost,<br/>fix applied"]:::sentinel
+    end
+
+    subgraph INTELLIGENCE ["🧠 Closure & Intelligence"]
+        ML1["<b>ML retrains</b> on every<br/>closure — fault signatures<br/>improve over time"]:::ml
+        ML2["<b>Live dashboard</b><br/>all buildings, real-time<br/>SLA status, open jobs —<br/>no spreadsheets"]:::sentinel
+        ML3["<b>PPM shifts</b> to<br/>condition-based<br/>scheduling over time"]:::ml
+        SLA1["<b>SLA auto-monitored</b><br/>at every step —<br/>alerts before breach<br/>via WhatsApp"]:::sentry
+    end
+
+    %% Proactive path
+    P1 --> P2 --> P3 --> P4 --> D2
+
+    %% Reactive path
+    R1 --> R2 --> R3 --> R4 --> R5 --> D1
+
+    %% Dispatch
+    D1 --> D2 --> D3 --> D4
+
+    %% Internal fix
+    D4 -- "Yes — can fix" --> I1 --> I2
+    I1 --> I3
+
+    %% External vendor
+    D4 -- "No — needs external help" --> E1 --> E2 --> E3 --> E4 --> E5
+    E5 --> E6 --> E7 --> E8 --> E9 --> E10
+
+    %% Intelligence loop
+    I3 --> ML1
+    E10 --> ML1
+    ML1 --> ML2
+    ML1 --> ML3
+    I3 --> SLA1
+    E10 --> SLA1

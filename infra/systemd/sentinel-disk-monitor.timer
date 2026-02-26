@@ -1,0 +1,9 @@
+[Unit]
+Description=Run SENTINEL disk monitor daily at 07:00 SAST
+
+[Timer]
+OnCalendar=*-*-* 07:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

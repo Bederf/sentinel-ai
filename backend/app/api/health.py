@@ -98,6 +98,19 @@ async def control_health_check() -> ControlHealthResponse:
             "error": str(e),
         }
 
+    # Circuit breaker states
+    try:
+        from app.services.circuit_breaker import get_all_breaker_statuses
+
+        breaker_statuses = get_all_breaker_statuses()
+        if breaker_statuses:
+            services["circuit_breakers"] = {
+                "status": "healthy" if all(b["state"] == "closed" for b in breaker_statuses) else "degraded",
+                "breakers": breaker_statuses,
+            }
+    except Exception:
+        pass
+
     # Determine overall status
     all_healthy = all(s.get("status") == "healthy" for s in services.values())
     overall_status = "ok" if all_healthy else "degraded"

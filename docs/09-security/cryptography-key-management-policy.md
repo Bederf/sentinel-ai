@@ -167,8 +167,10 @@ The following cryptographic controls are currently deployed in SENTINEL:
 | Requirement | Detail |
 |-------------|--------|
 | **Environment variables** | Primary method for all runtime secrets |
+| **At-rest encryption** | All `.env` files encrypted with SOPS + age → `.env.enc` (AES-256-GCM). Encrypted files safe to commit to git. Decrypt with `sudo infra/scripts/sops-decrypt.sh` |
+| **Encryption key** | Age private key at `/etc/sentinel/sops-key.txt` (root:root, chmod 600). Public key in `.sops.yaml` |
 | **Source code** | Keys must NEVER appear in source code |
-| **Enforcement** | Pre-commit hooks (detect-secrets, gitleaks from Phase 63-03) automatically block commits containing secrets |
+| **Enforcement** | Pre-commit hooks block plaintext `.env` commits (`.enc` and `.example` exempted). Additional hooks detect hardcoded API keys |
 | **Backup** | Key backups encrypted and stored separately from systems using them |
 | **Access control** | Key access restricted to roles that require them |
 

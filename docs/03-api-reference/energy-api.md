@@ -213,6 +213,11 @@ Get predicted/optimized energy consumption for a scenario.
 
 Get daily energy consumption data (aggregated by system type).
 
+Data source behavior:
+- Supabase is authoritative by default.
+- If no rows match, returns an empty `data` array.
+- Synthetic fallback is disabled by default and only enabled when `ENERGY_ALLOW_MOCK_FALLBACK=true`.
+
 **Parameters:**
 
 | Name | Type | Description | Default |

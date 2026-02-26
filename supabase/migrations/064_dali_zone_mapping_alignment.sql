@@ -6,7 +6,7 @@
 -- =====================================================================
 
 -- Create mapping table: DALI zones to desk-based zones
-CREATE TABLE dali_zone_mapping (
+CREATE TABLE IF NOT EXISTS dali_zone_mapping (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     building_id UUID NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
 
@@ -30,9 +30,9 @@ CREATE TABLE dali_zone_mapping (
     CONSTRAINT valid_mapping_confidence CHECK (mapping_confidence >= 0 AND mapping_confidence <= 1.0)
 );
 
-CREATE INDEX idx_dali_zone_mapping_building ON dali_zone_mapping(building_id);
-CREATE INDEX idx_dali_zone_mapping_dali_zone ON dali_zone_mapping(dali_zone_id);
-CREATE INDEX idx_dali_zone_mapping_desk_zone ON dali_zone_mapping(desk_zone_id);
+CREATE INDEX IF NOT EXISTS idx_dali_zone_mapping_building ON dali_zone_mapping(building_id);
+CREATE INDEX IF NOT EXISTS idx_dali_zone_mapping_dali_zone ON dali_zone_mapping(dali_zone_id);
+CREATE INDEX IF NOT EXISTS idx_dali_zone_mapping_desk_zone ON dali_zone_mapping(desk_zone_id);
 
 -- Enable RLS
 ALTER TABLE dali_zone_mapping ENABLE ROW LEVEL SECURITY;

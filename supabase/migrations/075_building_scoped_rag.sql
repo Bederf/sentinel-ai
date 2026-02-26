@@ -7,10 +7,10 @@
 -- System documentation remains unscoped (building_id = NULL)
 
 -- Add building_id column to documents table (nullable for backward compat with system docs)
-ALTER TABLE documents ADD COLUMN building_id UUID REFERENCES buildings(id) ON DELETE CASCADE;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS building_id UUID REFERENCES buildings(id) ON DELETE CASCADE;
 
 -- Add building_id column to document_chunks table (denormalized for query performance)
-ALTER TABLE document_chunks ADD COLUMN building_id UUID;
+ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS building_id UUID;
 
 -- Indexes for building-scoped queries
 CREATE INDEX idx_documents_building ON documents(building_id) WHERE building_id IS NOT NULL;

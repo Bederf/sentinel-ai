@@ -26,6 +26,7 @@ from app.database.repositories.parasite_decision_repository import (
     get_parasite_decision_repository,
 )
 from app.services.decision_event_logger import emit_decision_event
+from app.services.circuit_breaker import get_breaker, call_with_breaker
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,10 @@ class TierRoutingEngine:
         self.parasite_repo = get_parasite_decision_repository()
         self._auto_executions_this_hour = 0
         self._hour_start = datetime.utcnow()
+
+        # Circuit breakers for downstream dependencies
+        self._cb_decision_db = get_breaker("parasite_decisions_db", failure_threshold=5, recovery_timeout_seconds=30.0)
+        self._cb_threshold_db = get_breaker("model_thresholds_db", failure_threshold=3, recovery_timeout_seconds=20.0)
 
     async def route_recommendation(self, recommendation: Dict) -> TierRoutingResult:
         """Route a recommendation to the appropriate autonomy tier.
@@ -218,36 +223,43 @@ class TierRoutingEngine:
             },
         )
         _point = recommendation.get("action", {}).get("point", "unknown")
-        await self.parasite_repo.record_decision(
-            {
-                "site_id": site_id,
-                "equipment_code": equipment_code,
-                "correlation_id": correlation_id,
-                "decision_type": f"tier{tier_num}_{action}",
-                "tier": f"tier{tier_num}",
-                "confidence_score": confidence_score,
-                "mode": settings.resolved_ingestion_mode.value,
-                "actor": "auto_tier3" if tier_num == 3 else ("human_tier2" if tier_num == 2 else "system"),
-                "point_name": _point,
+        decision_data = {
+            "site_id": site_id,
+            "equipment_code": equipment_code,
+            "correlation_id": correlation_id,
+            "decision_type": f"tier{tier_num}_{action}",
+            "tier": f"tier{tier_num}",
+            "confidence_score": confidence_score,
+            "mode": settings.resolved_ingestion_mode.value,
+            "actor": "auto_tier3" if tier_num == 3 else ("human_tier2" if tier_num == 2 else "system"),
+            "point_name": _point,
+            "control_point": _point,
+            "target_value": recommendation.get("action", {}).get("value"),
+            "contributing_factors": {
+                "confidence": confidence_score,
+                "risk_level": risk_level,
+                "threshold_source": threshold_source,
+                "tier2_threshold": tier2_threshold,
+                "tier3_threshold": tier3_threshold,
+                # Merge domain-specific factors (e.g. AEGIS BESS audit fields)
+                **(recommendation.get("contributing_factors") or {}),
+            },
+            "decision_details": {
+                "target_equipment": equipment_code,
+                "action_type": recommendation.get("action_type", "unknown"),
                 "control_point": _point,
-                "target_value": recommendation.get("action", {}).get("value"),
-                "contributing_factors": {
-                    "confidence": confidence_score,
-                    "risk_level": risk_level,
-                    "threshold_source": threshold_source,
-                    "tier2_threshold": tier2_threshold,
-                    "tier3_threshold": tier3_threshold,
-                    # Merge domain-specific factors (e.g. AEGIS BESS audit fields)
-                    **(recommendation.get("contributing_factors") or {}),
-                },
-                "decision_details": {
-                    "target_equipment": equipment_code,
-                    "action_type": recommendation.get("action_type", "unknown"),
-                    "control_point": _point,
-                    "target_value": str(recommendation.get("action", {}).get("value", "")),
-                    "reasoning": reason,
-                },
-            }
+                "target_value": str(recommendation.get("action", {}).get("value", "")),
+                "reasoning": reason,
+            },
+        }
+
+        # Record decision with circuit breaker — never block tier routing if DB is down
+        await call_with_breaker(
+            self._cb_decision_db,
+            self.parasite_repo.record_decision,
+            decision_data,
+            fallback=None,
+            timeout_seconds=5.0,
         )
 
         return TierRoutingResult(
@@ -285,8 +297,14 @@ class TierRoutingEngine:
         settings_tier3 = self.settings.parasite_confidence_tier3_min
 
         try:
-            # Query database for equipment-specific thresholds
-            db_thresholds = await self.model_registry.get_thresholds(equipment_type)
+            # Query database for equipment-specific thresholds (with circuit breaker)
+            db_thresholds = await call_with_breaker(
+                self._cb_threshold_db,
+                self.model_registry.get_thresholds,
+                equipment_type,
+                fallback=None,
+                timeout_seconds=2.0,
+            )
             if db_thresholds and db_thresholds.is_enabled():
                 db_tier2 = db_thresholds.tier2_confidence_min
                 db_tier3 = db_thresholds.tier3_confidence_min

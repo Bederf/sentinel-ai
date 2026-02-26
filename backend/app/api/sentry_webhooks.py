@@ -310,8 +310,11 @@ async def reset_equipment_fault(
         from app.services.remote_command_service import RemoteCommandService
 
         service = RemoteCommandService()
+        # Use provenance-formatted user_id for audit trail
+        who = f"sentry:telegram:{request.user_id}" if request.user_id else "sentry"
+
         result = await service.execute_remote_command(
-            user_id=request.user_id,
+            user_id=who,
             user_role="engineer",
             device_id=equipment_code,
             command_type="fault_reset",
@@ -679,6 +682,197 @@ async def get_inspection_checklist_for_telegram(equipment_type: str):
 
 
 # ---------------------------------------------------------------------------
+# Inspection Result Submission (Sentry-authenticated)
+# ---------------------------------------------------------------------------
+
+
+class SentryInspectionItem(BaseModel):
+    """Single checklist item result."""
+
+    item_id: str = Field(..., description="Checklist item ID (e.g., filter_condition)")
+    question: str = Field(..., description="Question text")
+    answer: str = Field(..., description="Technician's answer")
+    status: str = Field("ok", description="ok, warning, or critical")
+
+
+class SentryInspectionResultRequest(BaseModel):
+    """Inspection result submission from Sentry bot after guided debrief."""
+
+    equipment_code: str = Field(..., description="Equipment code (e.g., S002-FCU-301)")
+    work_order_code: str = Field(..., description="WO code (e.g., WO-2026-0030)")
+    technician_name: str = Field(..., description="Name of technician who performed inspection")
+    telegram_user_id: Optional[str] = Field(None, description="Telegram user ID for audit")
+    items: list[SentryInspectionItem] = Field(..., description="Checklist item results")
+    ai_diagnosis: Optional[str] = Field(None, description="AI-curated diagnosis summary")
+    recommendations: Optional[str] = Field(None, description="AI recommendations for FM")
+
+
+@router.post("/inspection-result", status_code=status.HTTP_200_OK)
+async def sentry_submit_inspection_result(
+    req: SentryInspectionResultRequest,
+    x_sentry_secret: Optional[str] = Header(None),
+):
+    """Submit inspection results from Sentry bot after technician guided debrief.
+
+    Stores results in inspection_results, inspection_deficiencies, and
+    inspection_measurements tables. Links to equipment and work order.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="inspection_result")
+
+    from app.database.repositories.inspection_repository import InspectionRepository
+
+    try:
+        inspection_repo = InspectionRepository()
+
+        # Resolve equipment ID from code
+        from app.database.supabase_client import get_supabase_client
+
+        sb = get_supabase_client()
+        eq_result = sb.table("equipment").select("id").eq("code", req.equipment_code).execute()
+        if not eq_result.data:
+            raise HTTPException(status_code=404, detail=f"Equipment not found: {req.equipment_code}")
+
+        equipment_id = eq_result.data[0]["id"]
+
+        # Build provenance
+        who = req.technician_name
+        if req.telegram_user_id:
+            who = f"sentry:telegram:{req.telegram_user_id}"
+
+        # Build item_results as list and count deficiencies
+        item_results = []
+        deficiencies = []
+        deficiency_count = 0
+        critical_count = 0
+
+        for item in req.items:
+            item_results.append(
+                {
+                    "item_id": item.item_id,
+                    "question": item.question,
+                    "status": item.status,
+                    "measurement_value": item.answer,
+                    "notes": item.answer,
+                }
+            )
+            if item.status in ("warning", "critical"):
+                deficiency_count += 1
+                if item.status == "critical":
+                    critical_count += 1
+                deficiencies.append(
+                    {
+                        "equipment_id": equipment_id,
+                        "deficiency_title": item.question,
+                        "deficiency_description": f"{item.question}: {item.answer}",
+                        "severity": item.status,
+                        "category": "operational",
+                        "checklist_item_id": item.item_id,
+                        "work_order_id": req.work_order_code,
+                        "reported_by": who,
+                    }
+                )
+
+        # Determine overall status
+        if critical_count > 0:
+            overall_status = "fail"
+        elif deficiency_count > 0:
+            overall_status = "pass_with_issues"
+        else:
+            overall_status = "pass"
+
+        # Create inspection task first (required FK for result)
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc).isoformat()
+        task_data = {
+            "task_name": f"Inspection — {req.equipment_code}",
+            "task_description": f"Telegram inspection via {req.work_order_code}",
+            "equipment_id": equipment_id,
+            "scheduled_date": now,
+            "due_date": now,
+            "assigned_to": req.technician_name,
+            "assigned_by": "sentry",
+            "status": "completed",
+            "completed_date": now,
+            "completed_by": who,
+            "priority": "normal",
+        }
+        created_task = await inspection_repo.create_inspection_task(task_data)
+        task_id = str(created_task.id)
+
+        # Create inspection result
+        result_data = {
+            "task_id": task_id,
+            "inspected_by": who,
+            "inspection_date": datetime.now(timezone.utc).isoformat(),
+            "overall_status": overall_status,
+            "item_results": item_results,
+            "deficiencies_found": deficiency_count,
+            "critical_findings": critical_count,
+            "recommendations": req.recommendations,
+            "general_notes": req.ai_diagnosis,
+        }
+        import uuid as uuid_mod
+
+        result_data["id"] = str(uuid_mod.uuid4())
+        result_data["created_at"] = now
+        result_data["updated_at"] = now
+        sb.table("inspection_results").insert(result_data).execute()
+        result_id = result_data["id"]
+
+        # Create deficiency records for any warnings/criticals
+        for deficiency in deficiencies:
+            deficiency["id"] = str(uuid_mod.uuid4())
+            deficiency["result_id"] = result_id
+            deficiency["task_id"] = task_id
+            deficiency["reported_date"] = now
+            deficiency["updated_at"] = now
+            sb.table("inspection_deficiencies").insert(deficiency).execute()
+
+        # Update work order status to completed
+        from app.database.repositories.work_order_repository import get_work_order_repository
+
+        wo_repo = get_work_order_repository()
+        wo = await wo_repo.get_work_order_by_code(req.work_order_code)
+        if wo:
+            await wo_repo.update_work_order(
+                wo["id"],
+                {
+                    "status": "completed",
+                    "completed_by": who,
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "resolution_notes": req.ai_diagnosis,
+                },
+            )
+
+        logger.info(
+            "Inspection result saved: %s on %s — %s (%d deficiencies, %d critical)",
+            req.work_order_code,
+            req.equipment_code,
+            overall_status,
+            deficiency_count,
+            critical_count,
+        )
+
+        return {
+            "success": True,
+            "inspection_id": result_id,
+            "task_id": task_id,
+            "equipment_code": req.equipment_code,
+            "work_order_code": req.work_order_code,
+            "overall_status": overall_status,
+            "deficiencies_found": deficiency_count,
+            "critical_findings": critical_count,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Sentry inspection result submission failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
 # Work Order Creation (Sentry-authenticated)
 # ---------------------------------------------------------------------------
 
@@ -691,6 +885,7 @@ class SentryWorkOrderRequest(BaseModel):
     description: str = Field(..., description="Full description")
     priority: str = Field("medium", description="low, medium, high, urgent, critical")
     created_by: str = Field("SENTINEL", description="Creator identifier")
+    telegram_user_id: Optional[str] = Field(None, description="Telegram user ID for audit provenance")
 
 
 @router.post("/create-work-order", status_code=status.HTTP_200_OK)
@@ -715,13 +910,18 @@ async def sentry_create_work_order(
         # Get technician for this equipment
         tech = await tech_repo.get_technician_for_equipment_code(req.equipment_code)
 
+        # Build provenance: include Telegram user_id when available
+        who = req.created_by
+        if req.telegram_user_id:
+            who = f"sentry:telegram:{req.telegram_user_id}"
+
         wo_data = {
             "equipment_code": req.equipment_code,
             "title": req.title,
             "description": req.description,
             "priority": req.priority if req.priority != "critical" else "urgent",
             "status": "scheduled",
-            "created_by": req.created_by,
+            "created_by": who,
         }
 
         if tech:
@@ -751,3 +951,260 @@ async def sentry_create_work_order(
     except Exception as e:
         logger.error(f"Sentry WO creation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Call Logging — General Staff Facilities Defect Reports
+# ---------------------------------------------------------------------------
+
+
+class CallLogRequest(BaseModel):
+    """Facilities defect report from general staff via Sentry bot."""
+
+    site_id: str = Field("site-002", description="Site identifier")
+    zone_id: str = Field("", description="Zone from desk mapping")
+    floor: str = Field("", description="Floor level (L0, L1, L2)")
+    desk_id: str = Field("", description="Desk number (e.g., 120)")
+    location_text: str = Field("", description="Free-text location if no desk")
+    category: str = Field(..., description="Discipline (Plumbing, Electrical, HVAC, etc.)")
+    sub_category: str = Field("", description="Sub-category from fixed taxonomy")
+    specialty: str = Field("general", description="Team specialty for routing")
+    priority: str = Field("medium", description="Auto-classified priority")
+    title: str = Field(..., description="Brief issue title")
+    description: str = Field(..., description="Full description with context")
+    reported_by: str = Field("", description="Reporter display name")
+    reporter_telegram_id: str = Field("", description="Reporter Telegram ID")
+    original_message: str = Field("", description="Raw message from user")
+
+
+class CallLogEscalationRequest(BaseModel):
+    """Escalation for unmatched complaints that don't fit the fixed taxonomy."""
+
+    reporter_name: str = Field("", description="Reporter display name")
+    reporter_telegram_id: str = Field("", description="Reporter Telegram ID")
+    original_message: str = Field(..., description="The complaint text that couldn't be classified")
+    reason: str = Field("", description="Why it was escalated")
+    site_id: str = Field("site-002", description="Site identifier")
+    timestamp: str = Field("", description="ISO timestamp of the complaint")
+
+
+@router.post("/call-log", status_code=status.HTTP_200_OK)
+async def sentry_call_log(
+    req: CallLogRequest,
+    x_sentry_secret: Optional[str] = Header(None),
+):
+    """Log a facilities defect from general staff and create an inspection work order.
+
+    Called by the Sentry bot call-logging conversation handler when a
+    non-technical user (office worker, cleaner, security guard) reports
+    a building issue via Telegram.
+
+    Creates a work order, assigns a technician by specialty, and returns
+    the WO reference for the user.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="call_log")
+
+    try:
+        from app.database.repositories.work_order_repository import WorkOrderRepository
+
+        wo_repo = WorkOrderRepository()
+
+        # Build who-provenance string
+        who = f"sentry:call_log:{req.reporter_telegram_id or req.reported_by or 'unknown'}"
+
+        # Build location string for WO
+        if req.desk_id:
+            location = f"Desk {req.desk_id}, {req.floor}, {req.zone_id}"
+        elif req.location_text:
+            location = req.location_text
+        else:
+            location = "Location not specified"
+
+        # Try to find a technician for this specialty at this site
+        tech = None
+        try:
+            # Look up technician by specialty
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            if sb:
+                # Get building_id from site code
+                bld = sb.table("buildings").select("id").eq("code", req.site_id).execute()
+                if bld.data:
+                    building_id = bld.data[0]["id"]
+                    tech_result = (
+                        sb.table("site_technicians")
+                        .select("specialty, technicians(id, name, email, phone, telegram_id)")
+                        .eq("building_id", building_id)
+                        .eq("specialty", req.specialty)
+                        .eq("is_primary", True)
+                        .execute()
+                    )
+                    if tech_result.data:
+                        tech = tech_result.data[0].get("technicians", {})
+
+                    # Fallback to general specialty
+                    if not tech and req.specialty != "general":
+                        tech_result = (
+                            sb.table("site_technicians")
+                            .select("specialty, technicians(id, name, email, phone, telegram_id)")
+                            .eq("building_id", building_id)
+                            .eq("specialty", "general")
+                            .eq("is_primary", True)
+                            .execute()
+                        )
+                        if tech_result.data:
+                            tech = tech_result.data[0].get("technicians", {})
+        except Exception as e:
+            logger.warning(f"Technician lookup failed for call-log: {e}")
+
+        # Map priority for WO (critical -> urgent in WO system)
+        wo_priority = "urgent" if req.priority == "critical" else req.priority
+
+        wo_data = {
+            "title": req.title,
+            "description": req.description,
+            "priority": wo_priority,
+            "status": "scheduled",
+            "created_by": who,
+            "service_type": "callout",
+            "category": req.category,
+        }
+
+        if tech:
+            wo_data["assigned_to"] = tech.get("name")
+            wo_data["assigned_team"] = req.specialty
+
+        created = await wo_repo.create_work_order(wo_data)
+
+        if not created:
+            raise HTTPException(status_code=500, detail="Failed to create work order")
+
+        wo_code = created.get("code", "pending")
+        assigned_name = tech.get("name", "maintenance team") if tech else "maintenance team"
+
+        logger.info(
+            f"Call log WO created: {wo_code} | "
+            f"Category: {req.category} | Priority: {req.priority} | "
+            f"Location: {location} | Reporter: {req.reported_by} | "
+            f"Assigned: {assigned_name}"
+        )
+
+        # Try to send Telegram notification to technician
+        notify_sent = False
+        if tech and tech.get("telegram_id"):
+            try:
+                notify_response = await work_order_notifier.notify_technician(
+                    work_order_id=wo_code,
+                    equipment_id=f"ZONE-{req.zone_id}" if req.zone_id else req.site_id,
+                    equipment_name=req.title,
+                    building_id=req.site_id,
+                    technician_id=tech.get("telegram_id"),
+                    technician_name=tech.get("name"),
+                    service_type="callout",
+                    criticality=req.priority.upper(),
+                    problem_description=req.description,
+                )
+                notify_sent = bool(notify_response and notify_response.get("success"))
+            except Exception as e:
+                logger.warning(f"Telegram notification failed for call-log WO: {e}")
+
+        return {
+            "success": True,
+            "work_order_code": wo_code,
+            "work_order_id": created.get("id"),
+            "category": req.category,
+            "priority": req.priority,
+            "location": location,
+            "assigned_to": assigned_name,
+            "technician_telegram_id": tech.get("telegram_id", "") if tech else "",
+            "technician_notified": notify_sent,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Call log creation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/call-log/escalate", status_code=status.HTTP_200_OK)
+async def sentry_call_log_escalate(
+    req: CallLogEscalationRequest,
+    x_sentry_secret: Optional[str] = Header(None),
+):
+    """Escalate an unmatched complaint to the facilities supervisor.
+
+    Called by the call-log handler when a user's complaint doesn't match
+    any discipline/sub-category in the fixed taxonomy. The complaint is
+    logged as an anomaly and the supervisor is notified.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="call_log_escalate")
+
+    logger.warning(
+        f"[CALL_LOG_ESCALATION] Unmatched complaint from "
+        f"{req.reporter_name} ({req.reporter_telegram_id}): "
+        f"{req.original_message[:100]}"
+    )
+
+    # Store escalation record
+    escalation_record = {
+        "reporter_name": req.reporter_name,
+        "reporter_telegram_id": req.reporter_telegram_id,
+        "original_message": req.original_message,
+        "reason": req.reason,
+        "site_id": req.site_id,
+        "timestamp": req.timestamp,
+        "status": "pending_review",
+    }
+
+    # Try to persist to file-based log
+    import json
+    from pathlib import Path
+
+    escalation_file = Path("app/data/call_log_escalations.json")
+    try:
+        existing = []
+        if escalation_file.exists():
+            existing = json.loads(escalation_file.read_text())
+        existing.append(escalation_record)
+        escalation_file.write_text(json.dumps(existing, indent=2))
+    except Exception as e:
+        logger.warning(f"Failed to persist escalation record: {e}")
+
+    # Try to notify supervisor via Telegram
+    supervisor_notified = False
+    supervisor_telegram_id = os.getenv("CALL_LOG_SUPERVISOR_TELEGRAM_ID", "")
+    if supervisor_telegram_id:
+        try:
+            notify_msg = (
+                f"⚠️ CALL LOG ESCALATION\n\n"
+                f"A complaint was received that doesn't match any "
+                f"known discipline:\n\n"
+                f"Reporter: {req.reporter_name}\n"
+                f"Message: {req.original_message}\n"
+                f"Site: {req.site_id}\n"
+                f"Time: {req.timestamp}\n\n"
+                f"Please review and follow up."
+            )
+            bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+            if bot_token:
+                async with httpx.AsyncClient() as client:
+                    await client.post(
+                        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                        json={
+                            "chat_id": supervisor_telegram_id,
+                            "text": notify_msg,
+                        },
+                        timeout=10,
+                    )
+                supervisor_notified = True
+        except Exception as e:
+            logger.warning(f"Failed to notify supervisor: {e}")
+
+    return {
+        "success": True,
+        "escalated": True,
+        "supervisor_notified": supervisor_notified,
+        "message": "Complaint flagged for supervisor review",
+    }

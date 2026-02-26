@@ -17,6 +17,10 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 os.environ.setdefault("DEMO_MODE", "true")
 
+from app.services.popia_consent_guard import IngressConsentDecision
+
+_CONSENT_GRANTED = IngressConsentDecision(allow_processing=True, status="active")
+
 
 # ===================================================================
 # Helpers
@@ -498,13 +502,19 @@ class TestProcessPendingEndpoint:
 class TestTelegramApprovalHandler:
     """Tests for Telegram-based recommendation approvals."""
 
+    _consent_patch = patch(
+        "app.services.sentry_integration.work_order_notifier.evaluate_ingress_processing_consent",
+        return_value=_CONSENT_GRANTED,
+    )
+
     @pytest.mark.asyncio
     async def test_non_approval_returns_none(self):
         from app.services.sentry_integration.work_order_notifier import (
             handle_telegram_recommendation_approval,
         )
 
-        result = await handle_telegram_recommendation_approval("user123", "hello")
+        with self._consent_patch:
+            result = await handle_telegram_recommendation_approval("user123", "hello")
         assert result is None
 
     @pytest.mark.asyncio
@@ -515,7 +525,10 @@ class TestTelegramApprovalHandler:
 
         # Without an active session, fallback resolves rec ID directly.
         # When rec ID can't be found, returns a "not found" message.
-        with patch("app.agents.get_recommendation_graph") as mock_graph:
+        with (
+            self._consent_patch,
+            patch("app.agents.get_recommendation_graph") as mock_graph,
+        ):
             mock_compiled = MagicMock()
             mock_state = MagicMock()
             mock_state.values = {}  # No active session
@@ -532,7 +545,10 @@ class TestTelegramApprovalHandler:
             handle_telegram_recommendation_approval,
         )
 
-        with patch("app.agents.get_recommendation_graph") as mock_graph:
+        with (
+            self._consent_patch,
+            patch("app.agents.get_recommendation_graph") as mock_graph,
+        ):
             mock_compiled = MagicMock()
             mock_state = MagicMock()
             mock_state.values = {"needs_input": True}

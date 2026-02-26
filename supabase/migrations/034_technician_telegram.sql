@@ -13,7 +13,10 @@ COMMENT ON COLUMN technicians.telegram_id IS 'Telegram user ID for work order no
 
 -- =====================================================
 -- Update the helper function to include telegram_id
+-- Must DROP first because return type is changing
 -- =====================================================
+
+DROP FUNCTION IF EXISTS get_technician_for_equipment(UUID);
 
 CREATE OR REPLACE FUNCTION get_technician_for_equipment(p_equipment_id UUID)
 RETURNS TABLE (

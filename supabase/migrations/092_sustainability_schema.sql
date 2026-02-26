@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS emissions_baseline (
     floor_area_m2 NUMERIC,
     intensity_kg_per_m2 NUMERIC GENERATED ALWAYS AS (
         CASE
-            WHEN floor_area_m2 > 0 THEN total_kg_co2e / floor_area_m2
+            WHEN floor_area_m2 > 0 THEN (scope1_kg_co2e + scope2_kg_co2e + scope3_kg_co2e) / floor_area_m2
             ELSE NULL
         END
     ) STORED,

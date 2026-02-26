@@ -26,7 +26,9 @@ from app.models.optimization import (
     SiteOptimizationStatus,
 )
 from app.models.device import Device, DeviceType, DevicePoint, ZoneType, ExposureDirection
+from app.config.settings import settings
 from app.services.claude_service import claude_service
+from app.services.zai_service import zai_service
 from app.services.device_abstraction import device_manager
 from app.services.safety_interlocks import safety_engine
 from app.services.dali_service import get_dali_service
@@ -76,8 +78,6 @@ async def ensure_device_manager_initialized() -> None:
 
 def load_sites() -> List[Dict[str, Any]]:
     """Load sites data from Supabase, with fallback to JSON file."""
-    from app.config.settings import settings
-
     # Try Supabase first
     if not settings.use_json_storage:
         try:
@@ -124,7 +124,13 @@ class AIOptimizerService:
 
     def __init__(self):
         """Initialize AI optimizer service."""
-        self._claude_service = claude_service
+        # Route through configured cloud provider (anthropic or zai)
+        if settings.ai_cloud_provider == "zai" and zai_service.is_configured():
+            self._llm_service = zai_service
+            self._llm_provider = "zai"
+        else:
+            self._llm_service = claude_service
+            self._llm_provider = "anthropic"
         self._sites = None
         self._optimization_status_cache: Dict[str, SiteOptimizationStatus] = {}
 
@@ -213,7 +219,7 @@ class AIOptimizerService:
 
         try:
             # Try to use Claude for analysis
-            if self._claude_service.is_configured():
+            if self._llm_service.is_configured():
                 recommendation = await self._analyze_with_claude(
                     site_id, prompt, current_conditions, equipment_inventory, dali_zones, profile
                 )
@@ -756,10 +762,12 @@ HVAC:
 - Zone setpoints: 20-26°C (standard), 21-23°C (executive), 18-22°C (server)
 - Humidity: 30-65% RH
 
-Lighting (DALI):
-- Minimum 10% (level 25) in occupied zones for safety
-- Minimum 70% (level 178) in emergency zones
-- Unoccupied zones: dim to 20% (level 51) not off
+Lighting (DALI) — Tridonic net4more handles natively:
+- Daylight harvesting, occupancy-based dimming, emergency zones
+- Occupancy-based HVAC setback via BACnet gateway to BMS
+- Air quality ventilation via CO2/VOC sensors to BMS
+- DO NOT recommend dim levels or occupancy-based changes — Tridonic does this
+- SENTINEL adds: tariff-aware scheduling, predictive pre-conditioning, energy analytics
 
 Power/Generators:
 - Generator: start only during load shedding or mains failure
@@ -787,7 +795,9 @@ BESS (Battery Storage):
 4. Apply zone-aware rules based on zone_type and exposure
 5. Recommend setpoint changes for ALL relevant equipment types:
    - HVAC: temperature setpoints, fan speeds, damper positions
-   - Lighting: DALI dim levels (0-254), scene selection
+   - Lighting: DO NOT recommend dim levels or occupancy dimming
+(Tridonic handles natively via DALI-2 + net4more). Only recommend
+tariff-based demand response overrides or predictive pre-conditioning.
    - Power: generator start/stop (only if load shedding), UPS mode
    - Solar: performance alerts, curtailment if export limit reached
    - BESS: dispatch mode (charge/discharge/idle), SOC targets, load shedding response
@@ -795,10 +805,11 @@ BESS (Battery Storage):
 6. CRITICAL: Use EXACT point_name from "All Available Control Points" above
 7. Project energy savings in ZAR per hour (breakdown by system)
 8. Ensure all recommendations are within safety limits
-9. Prioritize cross-system coordination:
-   - Unoccupied zones: raise HVAC AND dim lights
+9. Prioritize coordination:
+   - Tridonic handles occupancy-based HVAC setback and lighting dimming natively
    - Peak solar: charge BESS
    - Load shedding: BESS before generator
+   - Tariff scheduling: shift discretionary loads to off-peak
 
 **Response Format (JSON):**
 ```json
@@ -819,9 +830,9 @@ BESS (Battery Storage):
       "equipment_name": "Level 11 South",
       "point_name": "dim_level",
       "current_value": 254,
-      "recommended_value": 51,
+      "recommended_value": 102,
       "unit": "level",
-      "reason": "Zone unoccupied - dim to 20%",
+      "reason": "Peak tariff demand response - reduce to 40% (Tridonic override)",
       "system": "lighting"
     }},
     {{
@@ -897,12 +908,12 @@ Provide ONLY the JSON response, no additional text."""
             profile: Active optimization profile (if any)
         """
         try:
-            logger.info(f"Using Claude AI for optimization of site {site_id}")
+            logger.info(f"Using {self._llm_provider} for optimization of site {site_id}")
 
-            # Call Claude (synchronous call for analysis)
+            # Call LLM (via configured provider)
 
             response_text = ""
-            async for chunk in self._claude_service.stream_response(
+            async for chunk in self._llm_service.stream_response(
                 messages=[{"role": "user", "content": prompt}],
                 include_building_context=False,  # Don't include full context to save tokens
             ):
@@ -2023,11 +2034,16 @@ Provide ONLY the JSON response, no additional text."""
         # ============================================================
         # DALI Lighting — Tridonic Handles Native Controls
         # ============================================================
-        # Tridonic DALI-2 gateway natively handles:
+        # Tridonic net4more + DALI-2 natively handles (when properly installed):
         #   - Daylight harvesting (continuous proportional dimming to 500 lux setpoint)
         #   - Occupancy-based dimming (PIR sensors → 20% when unoccupied)
+        #   - Occupancy-based HVAC setback (via BACnet gateway to BMS)
+        #   - Air quality driven ventilation (CO2/VOC sensors → BMS)
         #   - Emergency zone protection (maintains 70% minimum)
-        # AI does NOT duplicate these. Only cross-system coordination recommended.
+        # AI does NOT duplicate these. SENTINEL adds value through:
+        #   - Tariff-aware scheduling (shift loads to off-peak)
+        #   - Predictive pre-conditioning (anticipate occupancy patterns)
+        #   - Cross-zone energy balancing (redistribute across building)
         lighting_recommendations = []
         cross_system_recommendations = []
         lighting_savings_kw = 0.0
@@ -2042,17 +2058,21 @@ Provide ONLY the JSON response, no additional text."""
 
                 zone_name = zone.get("zone_name", zone_id)
 
-                # Cross-system only: coordinate HVAC + lighting when zone unoccupied
-                # (Tridonic dims lighting on its own, but can't adjust HVAC)
+                # Tridonic handles occupancy-based dimming AND HVAC setback natively
+                # via net4more BACnet integration. SENTINEL adds predictive/tariff value.
                 if not is_occupied:
                     cross_system_recommendations.append(
                         {
                             "zone_id": zone_id,
                             "zone_name": zone_name,
-                            "hvac_action": "Raise setpoint +2°C",
-                            "lighting_action": "Managed by Tridonic controller",
-                            "reason": "Zone unoccupied - HVAC setback (lighting handled by Tridonic)",
-                            "combined_savings_kw": round(0.5, 2),  # HVAC savings only
+                            "hvac_action": "Managed by Tridonic net4more (occupancy-based setback via BACnet)",
+                            "lighting_action": "Managed by Tridonic controller (occupancy-based dimming)",
+                            "sentinel_action": "Monitor for predictive pre-conditioning and tariff optimization",
+                            "reason": (
+                                "Zone unoccupied - native Tridonic control active, "
+                                "SENTINEL monitoring for optimization"
+                            ),
+                            "combined_savings_kw": round(0.5, 2),
                         }
                     )
 

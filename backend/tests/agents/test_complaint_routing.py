@@ -7,11 +7,16 @@ chat tools, WhatsApp webhooks, and Telegram.
 
 import os
 import sys
+from unittest.mock import patch
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 os.environ.setdefault("DEMO_MODE", "true")
+
+from app.services.popia_consent_guard import IngressConsentDecision
+
+_CONSENT_GRANTED = IngressConsentDecision(allow_processing=True, status="active")
 
 
 class TestChatToolRegistration:
@@ -84,7 +89,11 @@ class TestTelegramRouting:
     """Verify Telegram comfort complaint handler is available."""
 
     @pytest.mark.asyncio
-    async def test_telegram_handler_exists(self):
+    @patch(
+        "app.services.sentry_integration.work_order_notifier.evaluate_ingress_processing_consent",
+        return_value=_CONSENT_GRANTED,
+    )
+    async def test_telegram_handler_exists(self, _mock_consent):
         from app.services.sentry_integration.work_order_notifier import (
             handle_telegram_comfort_complaint,
         )
@@ -94,7 +103,11 @@ class TestTelegramRouting:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_telegram_handler_processes_complaint(self):
+    @patch(
+        "app.services.sentry_integration.work_order_notifier.evaluate_ingress_processing_consent",
+        return_value=_CONSENT_GRANTED,
+    )
+    async def test_telegram_handler_processes_complaint(self, _mock_consent):
         from app.services.sentry_integration.work_order_notifier import (
             handle_telegram_comfort_complaint,
         )

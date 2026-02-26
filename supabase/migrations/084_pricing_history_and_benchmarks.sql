@@ -119,8 +119,7 @@ FROM contracts c
 LEFT JOIN pricing_history ph ON c.id = ph.contract_id AND ph.decision_date = (
     SELECT MAX(decision_date) FROM pricing_history WHERE contract_id = c.id
 )
-LEFT JOIN benchmarks b ON (c.equipment_types::TEXT ILIKE '%' || b.equipment_type || '%' OR b.equipment_type = 'all')
-    AND c.sla_tier = b.sla_tier
+LEFT JOIN benchmarks b ON b.equipment_type = 'all'
 LEFT JOIN win_loss_analysis wl ON ph.id = wl.quote_id;
 
 -- Create index on materialized view for performance

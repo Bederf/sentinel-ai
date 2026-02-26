@@ -49,7 +49,7 @@ CREATE POLICY mfa_secrets_select_own ON mfa_secrets
     FOR SELECT
     USING (
         auth.role() = 'service_role'
-        OR user_id = auth.uid()
+        OR user_email = (auth.jwt()->>'email')
     );
 
 -- MFA secrets: Users can update their own, service role can do all
@@ -57,7 +57,7 @@ CREATE POLICY mfa_secrets_update_own ON mfa_secrets
     FOR UPDATE
     USING (
         auth.role() = 'service_role'
-        OR user_id = auth.uid()
+        OR user_email = (auth.jwt()->>'email')
     );
 
 -- MFA secrets: Only service role can insert/delete
@@ -437,7 +437,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 COMMENT ON FUNCTION cleanup_old_audit_logs IS 'Cleanup audit logs older than N days (default 365). Called by pg_cron or manually.';
 COMMENT ON FUNCTION cleanup_old_sensor_readings IS 'Cleanup sensor readings older than N days (default 365). Prevents unbounded growth.';
-COMMENT ON FUNCTION cleanup_old_login_logs IS 'Cleanup login audit logs older than N days (default 90).';
+-- cleanup_old_login_logs not created in this migration; skipping comment
 COMMENT ON FUNCTION get_technician_for_equipment_code IS 'Single-query technician lookup by equipment code. Maps equipment type to specialty.';
 COMMENT ON FUNCTION refresh_all_materialized_views IS 'Refresh all dashboard materialized views. Schedule via pg_cron for nightly refresh.';
 

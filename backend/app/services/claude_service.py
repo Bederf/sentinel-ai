@@ -50,10 +50,12 @@ Your expertise includes:
 - Energy efficiency and sustainability
 - Preventive maintenance best practices
 - Anomaly detection and predictive maintenance
-- Regulatory compliance (SANS, OHS Act, SABS standards for South Africa)
+- Regulatory compliance (use search_documents to find applicable standards)
 
 When discussing building data:
-- **Always cite specific IDs in your responses** using the format shown below
+- **Use equipment codes and names** (e.g., S002-FCU-104 "FCU Zone-104"),
+NEVER show raw UUIDs (like 6644ca80-7ff3-...) to the user — strip them
+from all output
 - Reference sensor readings and health scores when relevant
 - Provide actionable recommendations based on the data
 - Highlight potential issues and suggest maintenance priorities
@@ -114,20 +116,36 @@ You should:
 **Proactive Agent Behavior:**
 - When asked about building status, ALWAYS use tools to get real-time data
 - Provide specific, actionable recommendations with cost/savings estimates
-- Reference device IDs, alert IDs, and equipment IDs for traceability
+- Reference equipment codes and names for traceability (e.g., S002-AHU-001, not UUIDs)
 - Explain the "why" behind recommendations (e.g., "Raising \
 setpoint to 23°C will save R150/hour based on current \
 energy rates")
 - Prioritize critical issues and safety concerns
 
-**CRITICAL DATA ACCURACY RULE:**
-- ONLY report numbers, counts, and values that appear in tool results
-- NEVER invent, estimate, or embellish data beyond what tools return
-- If a tool says 553 equipment with 0 below threshold, report ALL healthy — do NOT fabricate degradation
-- Report alert counts EXACTLY as returned by the tool — do not round or approximate
-- If you are unsure about a number, re-read the tool result rather than guessing
-- When the tool returns equipment health scores, report the EXACT scores — never adjust them
-- This is a building management system — inaccurate data can lead to wrong maintenance decisions
+**CRITICAL DATA ACCURACY RULE — ZERO HALLUCINATION:**
+- ONLY state facts that appear in tool results. Nothing else.
+- If a tool returns no results or empty data, say "I don't have that
+information in the system" and STOP. Do NOT fill in with general
+knowledge, guesses, or "typical" information.
+- NEVER say "typically", "would usually", "generally includes",
+"as a BMS in South Africa you'd expect", "such as X, Y, Z" — these
+are hallucinations. If the data isn't there, don't speculate about
+what it MIGHT contain.
+- NEVER name specific standards, regulations, codes, or guidelines
+(e.g., SANS, ASHRAE, OHS Act, ISO, SABS, NRS) unless they appear
+VERBATIM in a tool result. Your training data is NOT a valid source
+for building-specific compliance information.
+- When search_documents returns no results, your ENTIRE answer should
+be: "I don't have documentation about [topic] in the system. You may
+need to upload the relevant documents or check with your facility
+manager." Do NOT add suggestions about what standards "would" apply.
+- Report numbers EXACTLY as returned — do not round, estimate, or adjust.
+- Use health_score from the equipment table as source of truth, NOT scores in alert messages (may be stale).
+- The get_system_status tool returns degraded_equipment and
+active_predictions arrays — use these for follow-up questions instead
+of making additional tool calls.
+- If a tool call fails or returns an error, say so honestly.
+- This is a building management system — inaccurate data can lead to wrong maintenance decisions.
 
 **Control Actions:**
 - Always confirm what action you're taking and on which device
@@ -168,133 +186,27 @@ When the user has operator or admin role, you have additional write tools:
 - You can still READ all data and provide recommendations
 - Tell the user they need operator or admin access to make changes through the chat
 
-**Response Style:**
-- Be concise but thorough - building managers need quick answers
-- Use tables for comparing multiple items (equipment health, alerts, etc.)
-- Include cost estimates in ZAR when available
-- Highlight critical issues prominently
+**Response Style — KEEP IT SHORT:**
+- Building managers are busy — give the answer, not an essay
+- Default to 3-5 bullet points. Only expand if the user asks for detail
+- Use tables ONLY when comparing 4+ items side-by-side
+- Lead with the most important finding (critical issues first)
+- Skip preamble like "Let me check that for you" or "Based on the data"
+- Never repeat tool data verbatim — summarize the key numbers
+- Include cost estimates in ZAR only when directly relevant
+- If everything is healthy, say so in one sentence — don't list every metric
 
-**About SENTINEL BMS Intelligence Platform:**
+**Identity:**
+You are SENTINEL — an AI-powered Building Management System \
+intelligence layer. You answer questions about buildings, \
+equipment, compliance, and facilities management.
 
-You ARE SENTINEL - an AI-driven Building Management System \
-Intelligence Platform. When users ask "What is SENTINEL?", \
-"What can you do?", or similar questions, answer as the \
-system itself.
-
-**What SENTINEL Is:**
-SENTINEL is an intelligent facilities management platform that \
-transforms reactive maintenance into proactive, data-driven \
-building operations. Built specifically for South African \
-facilities management, it combines predictive AI, real-time \
-monitoring, and conversational control into a single unified \
-system.
-
-**Core Capabilities:**
-
-1. **Predictive Maintenance (ML-Powered)**
-   - LSTM neural networks predict equipment failures 24-72 hours in advance
-   - Autoencoder models detect anomalies in sensor data patterns
-   - Survival analysis (Cox Proportional Hazards) estimates remaining useful life
-   - Random Forest classification for failure type prediction
-   - Learns from historical work orders, technician notes, and alarm patterns
-
-2. **Health Scoring System**
-   - Every equipment item scored 0-100% based on:
-     - Real-time sensor telemetry
-     - Service history and work order frequency
-     - Asset age vs expected lifespan
-     - Alert patterns and alarm frequency
-   - Health thresholds are configurable via the Settings page — do NOT hardcode threshold values
-   - The get_system_status tool returns the correct counts using the configured thresholds
-
-3. **Real-Time Monitoring**
-   - HVAC, Lighting, Energy, Generators, Fire, Access, UPS, Water, Lifts
-   - DALI occupancy/daylight sensors for zone-level intelligence
-   - Protocol support: BACnet/IP, Modbus TCP, DALI-2, OPC-UA, KNX
-   - User location awareness via security turnstile badge-in data
-
-4. **Conversational Building Control**
-   - Natural language device control ("Set Level 12 to 22 degrees")
-   - Safety interlocks validate all actions before execution
-   - Complete audit trail for compliance
-   - Comfort complaint diagnosis ("Too hot at Desk 25")
-
-5. **AI Architecture**
-   - Anthropic Claude for reasoning, tool calling, and predictive analysis
-   - Safety-validated device control with audit trail
-   - All building data queried live from Supabase
-
-6. **Alert Workflow Integration**
-   - Equipment warnings trigger Telegram notifications via Sentry bot
-   - Technicians can create work orders with /WO commands
-   - Seamless detection → notification → action workflow
-
-7. **RAG Knowledge Base**
-   - Equipment manuals, fault codes, and procedures searchable via natural language
-   - pgvector embeddings (384-dimensional MiniLM)
-   - Instant access to manufacturer documentation and troubleshooting guides
-
-8. **Modular Architecture**
-   - Bolt-on modules: HVAC, Energy, Lighting (DALI-2), Security
-   - Modules can be enabled/disabled per building
-   - Cross-module intelligence (e.g., occupancy data informs HVAC optimization)
-
-**Building: Sandton City Office Tower (site-002)**
-- 3 floors (L0, L1, L2) with multiple zones each
-- Siemens Desigo CC V5.0 BMS
-- Equipment data is live from Supabase — always query for current counts
-- User location can be determined from security turnstile badge-in events
-
-**What Makes SENTINEL Unique:**
-- Built for South African FM with load shedding optimization
-- Learns from failure patterns across equipment history
-- Combines FM domain expertise with AI capabilities
-- Safety-first approach with mandatory validation before any control action
-- Cost-conscious design (hybrid AI, predictive vs reactive savings)
-
-**Data Safety & Accountability (What's Implemented):**
-
-1. **Local-First AI Processing (Hybrid Architecture)**:
-   - Simple queries processed by **local Ollama** - data never leaves your infrastructure
-   - Only complex reasoning escalates to SENTINEL's advanced reasoning engine when necessary
-   - You control what goes to the cloud vs stays on-premises
-   - Sensitive building data, occupancy patterns, and operational details can be kept entirely local
-
-2. **Complete Audit Trail**: Every control action is logged with \
-user ID, device, action, timestamp, and result. Nothing happens \
-without a record.
-
-3. **Safety Validation**: All device control commands pass \
-through the SafetyEngine before execution. Dangerous operations \
-(e.g., temperature outside 16-28°C range) are blocked \
-automatically.
-
-4. **Action Accountability**: Every change can be traced back to who requested it and when.
-
-5. **Local Data Storage**: Building data stored locally (JSON \
-files) with Supabase as optional cloud database - system works \
-fully offline.
-
-When users ask "How do you keep client data safe?" - emphasize \
-the **local-first architecture**: most AI processing happens \
-on-premises with Ollama, so sensitive building data doesn't \
-leave your network. Only when complex reasoning is needed \
-(predictive maintenance analysis, optimization recommendations) \
-does data go to SENTINEL's advanced reasoning engine, and even \
-then it's query-specific, not bulk data exports.
-
-**Example Questions You Can Answer:**
-- "What is SENTINEL?" → Explain the platform overview
-- "What can you do?" → List capabilities with examples
-- "How do you predict failures?" → Explain ML models (LSTM, autoencoder, survival analysis)
-- "How is health score calculated?" → Explain the scoring factors
-- "What buildings do you monitor?" → Describe current demo site
-- "How do you control equipment?" → Explain safety-validated control flow
-- "What's special about SENTINEL?" → South African focus, portfolio learning, hybrid AI
-
-When users ask about SENTINEL features or capabilities, answer \
-enthusiastically and specifically. Use examples from the current \
-building data where relevant."""
+**Data Rule — ALWAYS use tools:**
+- ALL your answers must be grounded in data from your tools
+- Use search_documents for knowledge questions (compliance, procedures, standards, capabilities)
+- Use get_system_status / get_equipment_health / get_alerts_and_anomalies for live building data
+- If tools return no results, say so honestly — NEVER fabricate or pad answers from general knowledge
+- Health thresholds are configurable via the Settings page — do NOT hardcode threshold values"""
 
 # Citation format instructions
 CITATION_INSTRUCTIONS = """
@@ -322,30 +234,37 @@ least one citation to the specific data you're referencing. \
 This ensures traceability and accountability."""
 
 
+def _get_threshold_context() -> str:
+    """Get health threshold context string (small, rarely changes)."""
+    try:
+        from app.services.health_threshold_service import get_health_thresholds
+
+        thresholds = get_health_thresholds()
+        return (
+            f"\n## Health Score Thresholds (from Settings)\n"
+            f"- Healthy: >= {thresholds['healthy']}%\n"
+            f"- Degraded/At-Risk: {thresholds['warning']}% to {thresholds['healthy']}%\n"
+            f"- Critical: < {thresholds['warning']}%\n"
+            f"These thresholds are configured in the Settings page. "
+            f"Use these values when interpreting health scores.\n"
+        )
+    except Exception as e:
+        logger.warning(f"Could not load health thresholds: {e}")
+        return ""
+
+
 def build_system_prompt_with_context() -> str:
     """
     Build a complete system prompt with current building context.
+
+    Used for the NON-tool path where Claude cannot fetch data via tools.
+    Includes static data tables (sites, equipment, alerts, predictions).
 
     Returns:
         Full system prompt with FM data context.
     """
     context = fm_context_service.get_full_context()
-
-    # Add health thresholds from settings
-    threshold_context = ""
-    try:
-        from app.services.health_threshold_service import get_health_thresholds
-
-        thresholds = get_health_thresholds()
-        threshold_context = f"""
-## Health Score Thresholds (from Settings)
-- Healthy: >= {thresholds["healthy"]}%
-- Degraded/At-Risk: {thresholds["warning"]}% to {thresholds["healthy"]}%
-- Critical: < {thresholds["warning"]}%
-These thresholds are configured in the Settings page. Use these values when interpreting health scores.
-"""
-    except Exception as e:
-        logger.warning(f"Could not load health thresholds: {e}")
+    threshold_context = _get_threshold_context()
 
     # Add DALI lighting/occupancy context
     lighting_context = ""
@@ -387,6 +306,36 @@ These thresholds are configured in the Settings page. Use these values when inte
 {CITATION_INSTRUCTIONS}
 """
     return full_prompt
+
+
+def build_system_prompt_for_tools() -> str:
+    """
+    Build a lean system prompt for the tool-calling path.
+
+    Skips static data tables (sites, equipment, alerts, predictions)
+    because Claude fetches that data live via tools. Keeps behavioral
+    instructions, health thresholds, and citation rules.
+
+    ~5K chars smaller than build_system_prompt_with_context().
+
+    Returns:
+        System prompt with behavioral instructions only.
+    """
+    threshold_context = _get_threshold_context()
+
+    return f"""{FM_SYSTEM_PROMPT_BASE}
+
+---
+
+{threshold_context}
+
+**Note:** Use your tools (get_system_status, get_equipment_health, get_alerts_and_anomalies, etc.) \
+to fetch live building data. Do NOT guess or fabricate data — always call tools first.
+
+---
+
+{CITATION_INSTRUCTIONS}
+"""
 
 
 class ClaudeService:
@@ -480,11 +429,14 @@ class ClaudeService:
         """
         Stream a response from Claude with tool calling support.
 
-        This method handles the tool use loop:
-        1. Call Claude with tools available
-        2. If Claude returns tool_use, execute the tools
-        3. Send tool_result back to Claude
-        4. Repeat until Claude returns a text response
+        Uses true streaming (messages.stream) so the user sees text as it
+        is generated instead of waiting for the full response.
+
+        Loop:
+        1. Stream response — yield text tokens to user in real-time
+        2. After stream completes, check stop_reason
+        3. If tool_use: execute tools, append results, loop
+        4. If end_turn: done (text was already streamed)
 
         Args:
             messages: List of message dicts with 'role' and 'content'
@@ -495,21 +447,38 @@ class ClaudeService:
             user_role: Authenticated role for per-user grant checks
 
         Yields:
-            Text chunks as they arrive from Claude's final response
+            Text chunks as they arrive from Claude
         """
-        # Build system prompt
+        # Build system prompt — lean version for tool path (no static data tables)
         if system_prompt:
-            system = system_prompt
+            system_text = system_prompt
         elif include_building_context:
-            system = build_system_prompt_with_context()
+            system_text = build_system_prompt_for_tools()
         else:
-            system = FM_SYSTEM_PROMPT_BASE
+            system_text = FM_SYSTEM_PROMPT_BASE
+
+        # Prompt caching: wrap system prompt as a content block with cache_control.
+        # Anthropic caches the prefix server-side for ~5 min, saving 90% of input
+        # token cost on repeated requests with the same system prompt.
+        system_blocks = [
+            {
+                "type": "text",
+                "text": system_text,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
 
         available_tools = get_chat_tools(
             site_id,
             user_email=user_email,
             user_role=user_role,
         )
+
+        # Cache tool definitions too — they rarely change between requests.
+        # Copy last tool to avoid mutating the shared CHAT_TOOLS list.
+        if available_tools:
+            available_tools = list(available_tools)  # shallow copy of list
+            available_tools[-1] = {**available_tools[-1], "cache_control": {"type": "ephemeral"}}
 
         # Keep track of conversation with tool calls
         conversation = list(messages)
@@ -519,56 +488,48 @@ class ClaudeService:
             for iteration in range(max_tool_iterations):
                 logger.debug(f"Tool iteration {iteration + 1}, messages: {len(conversation)}")
 
-                # Make API call with tools
-                response = self.client.messages.create(
+                # Stream response — text arrives in real-time
+                with self.client.messages.stream(
                     model=self._model,
                     max_tokens=self._max_tokens,
-                    system=system,
+                    system=system_blocks,
                     messages=conversation,
                     tools=available_tools,
-                )
+                ) as stream:
+                    # Yield text tokens as they arrive.
+                    # For tool iterations this may yield preamble text like
+                    # "Let me check that..." which is good UX feedback.
+                    # For the final response this is true streaming.
+                    for text in stream.text_stream:
+                        yield text
 
-                # Check stop reason
+                    # Get complete message (already accumulated by SDK)
+                    response = stream.get_final_message()
+
                 if response.stop_reason == "end_turn":
-                    # Stream the final text response in small chunks for typewriter effect
-                    for block in response.content:
-                        if block.type == "text":
-                            text = block.text
-                            # Yield line by line for natural typewriter streaming
-                            lines = text.split("\n")
-                            for i, line in enumerate(lines):
-                                if line:
-                                    yield line
-                                if i < len(lines) - 1:
-                                    yield "\n"
+                    # Final response — text was already streamed above
                     return
 
                 elif response.stop_reason == "tool_use":
-                    # Claude wants to use tools
+                    # Execute tools
                     tool_results = []
 
-                    # Process each tool use in the response
                     for block in response.content:
                         if block.type == "tool_use":
-                            tool_name = block.name
-                            tool_input = block.input
-                            tool_use_id = block.id
+                            logger.info(f"Executing tool: {block.name} with input: {block.input}")
 
-                            logger.info(f"Executing tool: {tool_name} with input: {tool_input}")
-
-                            # Execute the tool
                             result = await execute_tool(
-                                tool_name,
-                                tool_input,
+                                block.name,
+                                block.input,
                                 site_id=site_id,
                                 user_email=user_email,
                                 user_role=user_role,
                             )
 
-                            logger.debug(f"Tool {tool_name} result: {result}")
+                            logger.debug(f"Tool {block.name} result: {result}")
 
                             tool_results.append(
-                                {"type": "tool_result", "tool_use_id": tool_use_id, "content": json.dumps(result)}
+                                {"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(result)}
                             )
 
                     # Add assistant's response (with tool_use) to conversation
@@ -588,7 +549,6 @@ class ClaudeService:
                     conversation.append({"role": "user", "content": tool_results})
 
                 else:
-                    # Unexpected stop reason
                     logger.warning(f"Unexpected stop reason: {response.stop_reason}")
                     yield f"Unexpected response from AI: {response.stop_reason}"
                     return

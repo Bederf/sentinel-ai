@@ -364,7 +364,7 @@ describe('Dashboard', () => {
       });
     });
 
-    it('should display protected site count badge', async () => {
+    it('should display elevated site count badge', async () => {
       const sites = [
         createMockSite({ id: 'site-001', status: 'normal' }),
         createMockSite({ id: 'site-002', status: 'normal' }),
@@ -380,7 +380,7 @@ describe('Dashboard', () => {
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
-        expect(screen.getByText('2 protected')).toBeInTheDocument();
+        expect(screen.getByText('1 elevated')).toBeInTheDocument();
       });
     });
   });

@@ -45,6 +45,7 @@ export function KPICard({
   deltaText,
   isInverseTrend = false,
   subtitle,
+  tooltip,
   onClick,
   accentColor = "blue",
 }: KPICardProps) {
@@ -80,6 +81,7 @@ export function KPICard({
         maxHeight: "180px",
       }}
       onClick={onClick}
+      title={tooltip}
     >
       {/* Top accent bar */}
       <div

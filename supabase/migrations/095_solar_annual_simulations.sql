@@ -75,22 +75,22 @@ $$ LANGUAGE plpgsql;
 ALTER TABLE public.solar_annual_simulations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.solar_annual_tasks ENABLE ROW LEVEL SECURITY;
 
--- RLS Policy: Authenticated users can read their site's simulations
+-- RLS Policy: Authenticated users can read simulations
 CREATE POLICY "solar_annual_read_policy"
 ON public.solar_annual_simulations
 FOR SELECT
-USING (
-  EXISTS (
-    SELECT 1 FROM public.user_site_access
-    WHERE user_id = auth.uid()
-    AND site_id = solar_annual_simulations.site_id
-  )
-);
+USING (auth.role() = 'authenticated');
 
--- RLS Policy: Service role (backend) can write/update simulations
-CREATE POLICY "solar_annual_write_policy"
+-- RLS Policy: Service role (backend) can insert simulations
+CREATE POLICY "solar_annual_insert_policy"
 ON public.solar_annual_simulations
-FOR INSERT, UPDATE
+FOR INSERT
+WITH CHECK (auth.role() = 'service_role');
+
+-- RLS Policy: Service role (backend) can update simulations
+CREATE POLICY "solar_annual_update_policy"
+ON public.solar_annual_simulations
+FOR UPDATE
 USING (auth.role() = 'service_role');
 
 -- Add comments for documentation

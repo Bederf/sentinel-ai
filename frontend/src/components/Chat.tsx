@@ -11,7 +11,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
-import { Send, MessageSquare, Bot, BookOpen, Mic, MicOff } from "lucide-react";
+import { Send, MessageSquare, Bot, Mic, MicOff, Trash2 } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
 import { DocumentUpload } from "./DocumentUpload";
 import { BuildingSelector } from "./BuildingSelector";
@@ -26,12 +26,13 @@ interface Message {
   content: string;
 }
 
+const CHAT_AUTOGREET_DISABLED_KEY = "sentinel_chat_autogreet_disabled";
+
 export function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
-  const [searchDocs, setSearchDocs] = useState(false);
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("site-002");
 
@@ -112,6 +113,7 @@ export function Chat() {
   useEffect(() => {
     if (hasAutoGreetedRef.current || messages.length > 0 || isLoading) return;
     if (!selectedSiteId) return;
+    if (localStorage.getItem(CHAT_AUTOGREET_DISABLED_KEY) === "true") return;
     hasAutoGreetedRef.current = true;
 
     const autoGreet = async () => {
@@ -130,7 +132,7 @@ export function Chat() {
         await streamChat(greetMessage, undefined, (chunk) => {
           fullResponse += chunk;
           setStreamingContent(fullResponse);
-        }, false, selectedSiteId);
+        }, selectedSiteId);
 
         setMessages((prev) => [
           ...prev,
@@ -153,6 +155,17 @@ export function Chat() {
   // Generate unique ID for messages
   const generateId = () => `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
+  const handleClearChat = () => {
+    setMessages([]);
+    setInput("");
+    setStreamingContent("");
+    setIsLoading(false);
+    localStorage.setItem(CHAT_AUTOGREET_DISABLED_KEY, "true");
+    stt.reset();
+    tts.stop();
+    inputRef.current?.focus();
+  };
+
   // Handle form submission
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -174,11 +187,11 @@ export function Chat() {
     try {
       let fullResponse = "";
 
-      // Stream the response (pass searchDocs to enable documentation mode)
+      // Stream the response
       await streamChat(trimmedInput, undefined, (chunk) => {
         fullResponse += chunk;
         setStreamingContent(fullResponse);
-      }, searchDocs, selectedSiteId);
+      }, selectedSiteId);
 
       // When streaming completes, add assistant message with full content
       setMessages((prev) => [
@@ -255,13 +268,32 @@ export function Chat() {
           </div>
         </div>
 
-        {/* Building selector */}
-        <BuildingSelector
-          value={selectedSiteId}
-          onChange={setSelectedSiteId}
-          sites={sites}
-          disabled={sites.length === 0}
-        />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleClearChat}
+            disabled={isLoading || (messages.length === 0 && !streamingContent)}
+            className="px-3 py-1.5 rounded text-xs flex items-center gap-1 transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100"
+            style={{
+              background: "var(--color-grafana-bg-secondary)",
+              border: "1px solid var(--color-grafana-border)",
+              color: "var(--color-grafana-text-secondary)",
+            }}
+            aria-label="Clear chat"
+            title="Clear chat"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Clear chat</span>
+          </button>
+
+          {/* Building selector */}
+          <BuildingSelector
+            value={selectedSiteId}
+            onChange={setSelectedSiteId}
+            sites={sites}
+            disabled={sites.length === 0}
+          />
+        </div>
       </div>
 
       {/* Messages area */}
@@ -284,18 +316,8 @@ export function Chat() {
                 className="text-xs mt-2"
                 style={{ color: "var(--color-grafana-text-disabled)" }}
               >
-                {searchDocs
-                  ? "Ask about SENTINEL features, capabilities, or how things work"
-                  : "Ask about equipment status, alerts, or maintenance insights"}
+                Ask about equipment status, documentation, alerts, or maintenance insights
               </p>
-              {!searchDocs && (
-                <p
-                  className="text-xs mt-1"
-                  style={{ color: "var(--color-grafana-text-disabled)" }}
-                >
-                  Toggle <strong>Docs</strong> to search system documentation
-                </p>
-              )}
             </div>
           </div>
         )}
@@ -366,46 +388,6 @@ export function Chat() {
           background: "var(--color-grafana-bg-secondary)",
         }}
       >
-        {/* Documentation toggle */}
-        <div className="flex items-center gap-2 mb-3">
-          <button
-            type="button"
-            onClick={() => setSearchDocs(!searchDocs)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs transition-all hover:brightness-110 hover:scale-105"
-            style={{
-              background: searchDocs
-                ? "rgba(50, 116, 217, 0.2)"
-                : "var(--color-grafana-bg-panel)",
-              border: searchDocs
-                ? "1px solid var(--color-grafana-blue)"
-                : "1px solid var(--color-grafana-border)",
-              color: searchDocs
-                ? "var(--color-grafana-blue)"
-                : "var(--color-grafana-text-secondary)",
-            }}
-            title={searchDocs ? "Documentation mode: ON" : "Documentation mode: OFF"}
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Docs</span>
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{
-                background: searchDocs
-                  ? "var(--color-grafana-blue)"
-                  : "var(--color-grafana-text-disabled)",
-              }}
-            />
-          </button>
-          {searchDocs && (
-            <span
-              className="text-xs"
-              style={{ color: "var(--color-grafana-text-disabled)" }}
-            >
-              Searching SENTINEL documentation
-            </span>
-          )}
-        </div>
-
         {/* STT error message */}
         {stt.error && (
           <p className="text-xs mb-2" style={{ color: "#f44" }}>
@@ -423,9 +405,7 @@ export function Chat() {
             placeholder={
               stt.isListening
                 ? "Listening..."
-                : searchDocs
-                  ? "Ask about SENTINEL features..."
-                  : "Ask about building management..."
+                : "Ask about building management..."
             }
             disabled={isLoading || stt.isListening}
             className="flex-1 px-3 py-2 md:px-4 md:py-2 text-sm md:text-base rounded focus:outline-none disabled:cursor-not-allowed"
@@ -439,33 +419,30 @@ export function Chat() {
             aria-label="Chat message input"
           />
 
-          {/* Document upload button (only in docs mode) */}
-          {searchDocs && (
-            <DocumentUpload
-              buildingId={selectedSiteId}
-              onUploadComplete={() => {
-                // Show success feedback
-                setMessages((prev) => [
-                  ...prev,
-                  {
-                    id: generateId(),
-                    role: "assistant",
-                    content: "Document uploaded and indexed successfully. It's now available for search.",
-                  },
-                ]);
-              }}
-              onError={(error) => {
-                setMessages((prev) => [
-                  ...prev,
-                  {
-                    id: generateId(),
-                    role: "assistant",
-                    content: `Upload failed: ${error}`,
-                  },
-                ]);
-              }}
-            />
-          )}
+          {/* Document upload button */}
+          <DocumentUpload
+            buildingId={selectedSiteId}
+            onUploadComplete={() => {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: generateId(),
+                  role: "assistant",
+                  content: "Document uploaded and indexed successfully. It's now available for search.",
+                },
+              ]);
+            }}
+            onError={(error) => {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: generateId(),
+                  role: "assistant",
+                  content: `Upload failed: ${error}`,
+                },
+              ]);
+            }}
+          />
 
           {/* Mic button (only when browser supports Web Speech API) */}
           {stt.isSupported && (

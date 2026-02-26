@@ -2,10 +2,10 @@
 title: "Testing patterns, coverage, and debugging"
 type: "guide"
 status: "approved"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-02-18"
-updated: "2026-02-18"
-tags: ["testing", "pytest", "vitest", "coverage", "debugging", "e2e"]
+updated: "2026-02-26"
+tags: ["testing", "pytest", "vitest", "coverage", "debugging", "e2e", "k6", "load-testing"]
 related: ["../01-setup/local-development-setup.md", "../02-architecture/system-overview.md"]
 domain: "general"
 audience: "developers"
@@ -34,6 +34,9 @@ pytest tests/ --durations=10
 # Frontend checks
 npm run lint
 npm run build
+
+# Optional smoke load test before major performance-sensitive releases
+cd /opt/bms-intelligence/k6 && k6 run --stage 10s:3 --stage 10s:0 scenarios/api-smoke-test.js
 ```
 
 ## Backend testing (pytest)
@@ -344,7 +347,8 @@ Verify complete workflows across frontend → backend → database:
 ./start-frontend.sh
 
 # Terminal 3: Run E2E tests
-npm run test:e2e
+cd e2e
+npm test
 ```
 
 ### E2E test pattern
@@ -386,6 +390,39 @@ test('complete device control workflow', async ({ page }) => {
   expect(response.setpoint).toBe(22)
 })
 ```
+
+## Load testing workflows (k6)
+
+Run API load tests from `k6/scenarios`:
+
+```bash
+cd /opt/bms-intelligence/k6
+
+# Basic platform/API load
+k6 run scenarios/api-smoke-test.js
+
+# Device control load
+k6 run scenarios/device-control.js
+
+# Hybrid chat load
+k6 run scenarios/chat-load-test.js
+
+# Mixed suite
+k6 run scenarios/full-suite.js
+```
+
+Environment variables:
+- `API_URL` (default: `http://localhost:9095`)
+- `AUTH_TOKEN` (optional bearer token)
+
+Example:
+```bash
+API_URL=http://localhost:9095 AUTH_TOKEN=your_token_here k6 run scenarios/api-smoke-test.js
+```
+
+Notes:
+- Current scenarios discover live devices from `/api/devices`, so they do not depend on hardcoded IDs.
+- Control scenarios dynamically choose writable points where available.
 
 ## Pre-commit requirements
 
@@ -498,6 +535,7 @@ Tests exceeding timeout will fail and block commits.
 - [ ] `npm run lint` passes with no errors
 - [ ] `npm run test:run` passes with 80%+ coverage
 - [ ] `npm run build` compiles without errors
+- [ ] For performance-sensitive changes, run `k6` smoke scenario
 - [ ] No `.skip()` or `@pytest.mark.skip` in tests (use `@pytest.mark.xfail` for known failures)
 - [ ] All mocked API calls verified with `.assert_called()`
 - [ ] Error cases tested (not just happy path)
@@ -539,12 +577,23 @@ Tests exceeding timeout will fail and block commits.
 - Add tests for uncovered lines
 - Focus on logic branches, not just happy path
 
+### Load testing
+
+**k6 returns 401/403:**
+- Set `AUTH_TOKEN` when auth is enforced
+- Verify backend URL with `API_URL`
+
+**k6 returns many 404s:**
+- Confirm backend is running on `:9095`
+- Verify routes from OpenAPI docs (`/docs`)
+
 ## Resources
 
 - **Jest/Vitest documentation**: https://vitest.dev/
 - **React Testing Library**: https://testing-library.com/react
 - **pytest documentation**: https://docs.pytest.org/
 - **Playwright**: https://playwright.dev/
+- **k6 documentation**: https://k6.io/docs/
 
 ## Related documentation
 

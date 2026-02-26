@@ -345,7 +345,8 @@ SENTINEL recommends the use of approved password managers for credential storage
 | Manager | Approved For | Notes |
 |---|---|---|
 | 1Password / Bitwarden | Personal and team credentials | End-to-end encrypted, MFA support |
-| HashiCorp Vault | Service account secrets | Infrastructure-grade secrets management |
+| **SOPS + age** | **Service & application secrets** | **Deployed — encrypts .env to .env.enc (AES-256-GCM). Key at `/etc/sentinel/sops-key.txt`. 90-day rotation via `infra/scripts/sops-rotate-key.sh`** |
+| HashiCorp Vault | Service account secrets (large-scale) | Infrastructure-grade secrets management (not deployed — SOPS+age covers current needs) |
 
 ### 13.2 Password Manager Requirements
 

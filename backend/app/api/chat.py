@@ -13,7 +13,6 @@ from slowapi.util import get_remote_address
 from app.services.claude_service import claude_service
 from app.services.demo_cache import DemoCache
 from app.services.work_order_service import work_order_service
-from app.services.doc_rag_service import search_documentation, get_doc_rag_system_prompt
 from app.services.feature_request_logger import log_chat_query
 from app.services.prompt_injection_guard import check_query_safety
 from app.services.hybrid_ai_service import hybrid_ai_service
@@ -34,7 +33,7 @@ class ChatRequest(BaseModel):
 
     message: str
     conversation_id: str | None = None
-    search_docs: bool = True  # Default to documentation RAG mode
+    search_docs: bool = False  # Deprecated: doc search is now a tool, not a mode
     site_id: str | None = None  # Selected building/site for context
 
 
@@ -84,32 +83,66 @@ def get_chat_provenance_headers(data_subject_id: str | None = None) -> dict[str,
     )
 
 
-def build_local_docs_prompt(user_message: str, doc_results: list[dict], site_id: str | None) -> str:
-    """Build a compact local-LLM prompt using retrieved documentation snippets."""
-    snippets: list[str] = []
-    for idx, doc in enumerate(doc_results[:5], 1):
-        title = doc.get("document_title", doc.get("title", "Documentation"))
-        section = doc.get("section_title", "")
-        content = (doc.get("content") or "").strip()
-        if not content:
-            continue
-        if len(content) > 1200:
-            content = content[:1200] + "..."
-        header = f"{title}" + (f" > {section}" if section else "")
-        snippets.append(f"[{idx}] {header}\n{content}")
+# Keywords that signal a knowledge/documentation query (not live building data).
+# When detected, we pre-fetch doc search results and inject them into the
+# first Claude call — saving one full API round-trip (~13s).
+_KNOWLEDGE_KEYWORDS = {
+    "compliance",
+    "standard",
+    "regulation",
+    "procedure",
+    "manual",
+    "documentation",
+    "guide",
+    "policy",
+    "protocol",
+    "certification",
+    "how does sentinel",
+    "what is sentinel",
+    "what can you do",
+    "troubleshoot",
+    "fault code",
+    "maintenance procedure",
+    "best practice",
+    "specification",
+    "requirement",
+}
 
-    docs_block = "\n\n---\n\n".join(snippets) if snippets else "No documentation snippets were found for this question."
-    site_context = f"site '{site_id}'" if site_id else "no specific site selected"
 
-    return (
-        "You are SENTINEL running in local-only AI mode. "
-        "Answer using the documentation snippets below. "
-        "If evidence is missing, say so clearly.\n\n"
-        f"Context: User is asking about {site_context}.\n\n"
-        f"Documentation snippets:\n{docs_block}\n\n"
-        f"User question: {user_message}\n\n"
-        "Respond clearly and concisely. Do not invent capabilities."
-    )
+def _is_knowledge_query(message: str) -> bool:
+    """Detect if a query is about documentation/knowledge (not live data)."""
+    lower = message.lower()
+    return any(kw in lower for kw in _KNOWLEDGE_KEYWORDS)
+
+
+_NO_RESULTS_SENTINEL = "__NO_RESULTS__"
+
+
+async def _prefetch_doc_results(query: str) -> str | None:
+    """Run doc search and format results as context for injection.
+
+    Returns:
+        _NO_RESULTS_SENTINEL if search ran but found nothing (caller can fast-path).
+        A context string with results if docs were found.
+        None if search failed (caller should fall through to normal path).
+    """
+    try:
+        from app.services.chat_tools import search_documents
+
+        result = await search_documents(query=query, n_results=5)
+        if not result.get("success") or not result.get("results"):
+            return _NO_RESULTS_SENTINEL
+        docs = result["results"]
+        lines = [f'[Pre-fetched documentation search results for: "{query}"]']
+        for i, doc in enumerate(docs, 1):
+            title = doc.get("title", "Unknown")
+            content = doc.get("content", "")[:1200]
+            relevance = doc.get("relevance", 0)
+            lines.append(f"\n--- Result {i} (relevance: {relevance}) ---\n{title}\n{content}")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning(f"Doc pre-fetch failed: {e}")
+        return None
 
 
 async def generate_sse_stream(
@@ -122,6 +155,10 @@ async def generate_sse_stream(
 ) -> AsyncGenerator[str, None]:
     """
     Generate SSE-formatted stream from Claude response.
+
+    For knowledge queries (compliance, procedures, documentation), pre-fetches
+    doc search results and injects them into the first Claude call — saving
+    one full API round-trip (~13s).
 
     Args:
         user_message: The user's message to send to Claude
@@ -138,22 +175,43 @@ async def generate_sse_stream(
     else:
         message_with_context = user_message
 
+    # Pre-fetch doc search for knowledge queries to avoid an extra Claude round-trip.
+    # If search returns no results, fast-path with a static answer (skip Claude entirely).
+    knowledge_fast_path = False
+    if use_tools and _is_knowledge_query(user_message):
+        doc_context = await _prefetch_doc_results(user_message)
+        if doc_context == _NO_RESULTS_SENTINEL:
+            # No docs in RAG — we already know the honest answer.
+            # Skip the 20s Claude API call entirely.
+            knowledge_fast_path = True
+        elif doc_context:
+            message_with_context = f"{doc_context}\n\n---\n\n{message_with_context}"
+
+    if knowledge_fast_path:
+        yield format_sse_chunk(
+            "I don't have documentation about that topic in the system. "
+            "You may need to upload the relevant documents or check with your facility manager."
+        )
+        yield "data: [DONE]\n\n"
+        return
+
     messages = [{"role": "user", "content": message_with_context}]
 
+    # POPIA cross-border routing guard: fall back to local AI when cloud
+    # processing consent is missing for the data subject.
+    use_local_fallback = not hybrid_ai_service.is_local_ai_only_mode() and not should_allow_cloud_processing(
+        data_subject_id
+    )
+
     try:
-        cloud_allowed = should_allow_cloud_processing(data_subject_id)
-        if hybrid_ai_service.is_local_ai_only_mode() or not cloud_allowed:
-            # Local-only mode: route all non-doc chat through hybrid local path.
+        if use_local_fallback:
             async for chunk in hybrid_ai_service.stream_response(
                 message_with_context,
-                use_tools=False if not cloud_allowed else use_tools,
+                use_tools=False,
                 data_subject_id=data_subject_id,
             ):
                 yield format_sse_chunk(chunk)
-            yield "data: [DONE]\n\n"
-            return
-
-        if use_tools:
+        elif use_tools:
             # Use tool-enabled streaming for device control capabilities
             async for chunk in claude_service.stream_response_with_tools(
                 messages,
@@ -205,95 +263,6 @@ async def generate_static_sse(message: str) -> AsyncGenerator[str, None]:
     yield "data: [DONE]\n\n"
 
 
-async def generate_docs_sse_stream(
-    user_message: str,
-    site_id: str | None = None,
-    data_subject_id: str | None = None,
-) -> AsyncGenerator[str, None]:
-    """
-    Generate SSE-formatted stream for documentation search mode.
-
-    Searches the documentation RAG first, then uses Claude to answer
-    based on the retrieved documentation + building context.
-
-    Args:
-        user_message: The user's question about SENTINEL documentation
-        site_id: Selected building/site for context (e.g., "site-002")
-
-    Yields:
-        SSE-formatted data chunks
-    """
-    try:
-        # Convert site_id (building code) to building_id (UUID) for RAG filtering
-        building_id = None
-        if site_id:
-            try:
-                from app.database.supabase_client import get_supabase_client
-
-                client = get_supabase_client()
-                result = client.table("buildings").select("id").eq("code", site_id).single().execute()
-                building_id = result.data["id"] if result.data else None
-            except Exception as e:
-                logger.warning(f"Failed to resolve building code '{site_id}' to UUID: {e}")
-                # Continue without building filter
-
-        # Search documentation RAG for relevant content (with optional building scope)
-        doc_results = await search_documentation(user_message, building_id=building_id)
-
-        if hybrid_ai_service.is_local_ai_only_mode() or not should_allow_cloud_processing(data_subject_id):
-            local_prompt = build_local_docs_prompt(user_message, doc_results, site_id)
-            async for chunk in hybrid_ai_service.stream_response(
-                local_prompt,
-                use_tools=False,
-                data_subject_id=data_subject_id,
-            ):
-                yield format_sse_chunk(chunk)
-            yield "data: [DONE]\n\n"
-            return
-
-        # Build system prompt with documentation context
-        system_prompt = get_doc_rag_system_prompt(doc_results)
-
-        # Add site context to the message if provided
-        if site_id:
-            context_prefix = f"[Context: User is asking about building/site '{site_id}']\n\n"
-            message_with_context = context_prefix + user_message
-        else:
-            message_with_context = user_message
-
-        messages = [{"role": "user", "content": message_with_context}]
-
-        # Stream response with documentation context (no device control tools)
-        provider = hybrid_ai_service.get_active_cloud_provider()
-        if provider == "zai":
-            async for chunk in zai_service.stream_response(
-                messages,
-                system_prompt=system_prompt,
-                include_building_context=True,
-            ):
-                yield format_sse_chunk(chunk)
-        else:
-            async for chunk in claude_service.stream_response(
-                messages,
-                system_prompt=system_prompt,
-                include_building_context=True,  # Still include building data
-            ):
-                yield format_sse_chunk(chunk)
-
-        # Send completion sentinel
-        yield "data: [DONE]\n\n"
-
-    except ValueError as e:
-        logger.error(f"Configuration error: {e}")
-        yield f"data: Error: {str(e)}\n\n"
-        yield "data: [DONE]\n\n"
-
-    except Exception as e:
-        logger.error(f"Documentation chat error: {e}")
-        yield f"data: Error: {str(e)}\n\n"
-        yield "data: [DONE]\n\n"
-
-
 @router.post("/chat")
 @limiter.limit("20/minute")
 async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingResponse:
@@ -339,33 +308,14 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
     auth_ctx = get_current_auth(request)
     data_subject_id = getattr(auth_ctx, "email", None) or getattr(auth_ctx, "user_id", None)
 
-    # 1. Documentation search mode takes priority - this is Q&A, not device control
-    #    No work order detection or demo cache in docs mode
-    if chat_request.search_docs:
-        logger.info(f"Documentation search mode enabled, site_id={chat_request.site_id}")
-        # Log query for feature request tracking
-        log_chat_query(user_message)
-        return StreamingResponse(
-            generate_docs_sse_stream(user_message, chat_request.site_id, data_subject_id=data_subject_id),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-                "X-Response-Type": "ai_response",
-                "X-Search-Docs": "true",
-                **get_chat_provenance_headers(data_subject_id),
-            },
-        )
-
-    # 2. System chat mode (search_docs=false) - work orders and device control
+    # Doc search is now a tool available in all chat modes (no separate docs-only path).
+    # Log query for feature tracking
+    log_chat_query(user_message)
 
     # When Claude tools are available, let Claude handle work orders
     # (better UX: confirms details, looks up equipment, validates).
     # Only fall back to direct detection when tools are not available.
-    tools_enabled = (
-        not hybrid_ai_service.is_local_ai_only_mode() and hybrid_ai_service.get_active_cloud_provider() == "anthropic"
-    )
+    tools_enabled = hybrid_ai_service.get_active_cloud_provider() == "anthropic"
 
     if not tools_enabled:
         wo_detection = work_order_service.detect_work_order_request(user_message)
@@ -421,9 +371,7 @@ async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingR
                 },
             )
 
-    tools_enabled = (
-        not hybrid_ai_service.is_local_ai_only_mode() and hybrid_ai_service.get_active_cloud_provider() == "anthropic"
-    )
+    tools_enabled = hybrid_ai_service.get_active_cloud_provider() == "anthropic"
     return StreamingResponse(
         generate_sse_stream(
             user_message,
@@ -455,7 +403,7 @@ async def chat_status():
     cloud_provider = hybrid_ai_service.get_active_cloud_provider()
     configured = local_mode or hybrid_ai_service.is_cloud_configured()
     active_model = "phi3:mini (local-only)" if local_mode else hybrid_ai_service.get_active_cloud_model()
-    tools_enabled = (not local_mode) and cloud_provider == "anthropic"
+    tools_enabled = cloud_provider == "anthropic"
 
     return {
         "configured": configured,

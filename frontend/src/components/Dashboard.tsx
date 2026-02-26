@@ -229,8 +229,9 @@ export function Dashboard({ onViewChange }: DashboardProps) {
         title: "Protected Sites",
         value: buildingsList.length,
         icon: <Building2 className="h-5 w-5" />,
-        subtitle: `${normalSites} protected, ${warningSites} elevated`,
+        subtitle: `${warningSites} elevated`,
         accentColor: "blue" as const,
+        tooltip: "Total buildings under SENTINEL monitoring. Elevated = sites with warning/critical equipment state.",
       },
       'kpi-monitored-assets': {
         title: "Monitored Assets",
@@ -244,6 +245,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
           ? "vs 95% target"
           : undefined,
         accentColor: "cyan" as const,
+        tooltip: "Equipment tracked across all sites — chillers, AHUs, generators, meters, UPS, and more. Delta shows uptime vs 95% SLA target.",
       },
       'kpi-active-risks': {
         title: "Active Risks",
@@ -258,6 +260,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
           ? `${stats.critical_alerts} critical`
           : undefined,
         accentColor: "orange" as const,
+        tooltip: "AI-detected risks requiring attention. Critical risks need immediate action; warnings are monitored.",
       },
       'kpi-potential-savings': {
         title: isSimulationRunning ? "Live Energy (Simulated)" : "Potential Savings",
@@ -269,6 +272,9 @@ export function Dashboard({ onViewChange }: DashboardProps) {
           ? `Current power: ${(displayCurrentPower || 0).toFixed(2)} kW`
           : "If all preventive actions taken",
         accentColor: isSimulationRunning ? "blue" as const : "green" as const,
+        tooltip: isSimulationRunning
+          ? "Live energy consumption from the running simulation."
+          : "Estimated savings if all AI-recommended preventive maintenance actions are completed.",
       },
       'kpi-risk-predictions': {
         title: "Risk Predictions",
@@ -276,6 +282,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
         icon: <Shield className="h-5 w-5" />,
         subtitle: "AI-detected risk events",
         accentColor: "purple" as const,
+        tooltip: "ML-predicted equipment failures and anomalies. Based on LSTM forecasting, autoencoder anomaly detection, and fault classification.",
       },
     };
   }, [stats, normalSites, warningSites, totalPotentialSavings, predictions.length, isSimulationRunning, ambientTemp, occupancyPercent, hvacLoadPercent, totalEnergyKwh, currentHourPowerKw]);
@@ -388,6 +395,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
                 <h3
                   className="font-medium text-sm"
                   style={{ color: "var(--color-sentinel-text-primary)" }}
+                  title="Overview of all buildings under SENTINEL monitoring. Click any site card to drill into equipment details."
                 >
                   Site Protection Status
                 </h3>
@@ -395,18 +403,20 @@ export function Dashboard({ onViewChange }: DashboardProps) {
                   className="text-xs"
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                 >
-                  {buildingsList.length} sites under protection
+                  {buildingsList.length} sites monitored
                 </span>
               </div>
             </div>
             <span
               className="text-xs px-2 py-1 rounded"
               style={{
-                background: "rgba(16, 185, 129, 0.15)",
-                color: "var(--color-sentinel-green)",
+                background:
+                  warningSites > 0 ? "rgba(245, 158, 11, 0.15)" : "rgba(148, 163, 184, 0.15)",
+                color:
+                  warningSites > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-secondary)",
               }}
             >
-              {normalSites} protected
+              {warningSites} elevated
             </span>
           </div>
 
@@ -458,6 +468,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
               <h3
                 className="font-medium text-sm"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
+                title="Energy consumption trends across all sites. Filter by site or adjust the time window."
               >
                 Energy Analytics
               </h3>

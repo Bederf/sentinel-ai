@@ -15,10 +15,10 @@
  * - Eliminates 30+ concurrent requests
  */
 
-import { Building2, Cpu, AlertTriangle, MapPin, Shield, Clock } from "lucide-react";
+import { Building2, Cpu, AlertTriangle, MapPin, Shield, Clock, ShieldOff } from "lucide-react";
 import { useState } from "react";
 import { useSiteSummary } from "@/hooks/useSiteSummary";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api, { type Site, type OptimizationRecommendation, type BuildingEquipmentItem, createWorkOrder } from '@/lib/api';
 import { OptimizationStatusBadge } from "./OptimizationStatusBadge";
 import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
@@ -109,6 +109,7 @@ function getSafePercentageColor(safe: number, total: number): string {
 export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizationStatus = false, onEquipmentControlNavigate }: SiteCardProps) {
   const statusConfig = getStatusConfig(site.status);
   const hasAlerts = site.alert_count > 0;
+  const queryClient = useQueryClient();
 
   // Fetch aggregated site summary (replaces per-device API calls)
   const { data: siteSummary, isLoading: loadingSafety } = useSiteSummary(site.id, {
@@ -120,6 +121,33 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
   const [hasRecommendation, setHasRecommendation] = useState(false);
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
   const [currentRecommendation, setCurrentRecommendation] = useState<OptimizationRecommendation | null>(null);
+
+  // SENTINEL processing toggle state
+  const [processingEnabled, setProcessingEnabled] = useState(site.sentinel_processing_enabled !== false);
+  const [processingLoading, setProcessingLoading] = useState(false);
+
+  const handleProcessingToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (processingLoading) return;
+
+    const newEnabled = !processingEnabled;
+    // Optimistic update
+    setProcessingEnabled(newEnabled);
+    setProcessingLoading(true);
+
+    try {
+      const result = await api.toggleSiteProcessing(site.id, newEnabled);
+      setProcessingEnabled(result.sentinel_processing_enabled);
+      // Invalidate sites query so list refreshes
+      queryClient.invalidateQueries({ queryKey: ['sites'] });
+    } catch (error) {
+      console.error("Failed to toggle SENTINEL processing:", error);
+      // Rollback on error
+      setProcessingEnabled(!newEnabled);
+    } finally {
+      setProcessingLoading(false);
+    }
+  };
 
   // Expandable risk list state
   const [riskListExpanded, setRiskListExpanded] = useState(false);
@@ -277,6 +305,7 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
     <div
       className={`relative rounded-md overflow-hidden transition-all duration-150 glass-card ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
       onClick={handleClick}
+      title={`${site.name} — ${statusConfig.label}. ${site.equipment_count} equipment monitored. Click to view details.`}
     >
       {/* Left status accent bar */}
       <div
@@ -308,19 +337,60 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
             </span>
           </div>
           <div className="flex flex-col items-end gap-1">
-            {/* Status badge */}
-            <div
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium"
-              style={{
-                background: statusConfig.bg,
-                color: statusConfig.color,
-              }}
-            >
+            {/* SENTINEL processing toggle + Status badge row */}
+            <div className="flex items-center gap-2">
+              {/* Processing toggle */}
+              <button
+                type="button"
+                onClick={handleProcessingToggle}
+                disabled={processingLoading}
+                className="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+                style={{
+                  backgroundColor: processingEnabled
+                    ? "var(--color-sentinel-green)"
+                    : "rgba(142, 142, 142, 0.4)",
+                  opacity: processingLoading ? 0.5 : 1,
+                  cursor: processingLoading ? "not-allowed" : "pointer",
+                }}
+                title={
+                  processingLoading
+                    ? "Updating..."
+                    : processingEnabled
+                    ? "SENTINEL active — click to mute processing"
+                    : "SENTINEL muted — click to resume processing"
+                }
+                role="switch"
+                aria-checked={processingEnabled}
+                aria-label="Toggle SENTINEL processing"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow ring-0 transition duration-200 ease-in-out ${
+                    processingEnabled ? "translate-x-4" : "translate-x-0"
+                  }`}
+                  style={{ backgroundColor: "white" }}
+                >
+                  {processingEnabled ? (
+                    <Shield className="h-2.5 w-2.5 m-[3px]" style={{ color: "var(--color-sentinel-green)" }} />
+                  ) : (
+                    <ShieldOff className="h-2.5 w-2.5 m-[3px]" style={{ color: "rgba(142, 142, 142, 0.6)" }} />
+                  )}
+                </span>
+              </button>
+
+              {/* Status badge */}
               <div
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ background: statusConfig.color }}
-              />
-              {statusConfig.label}
+                className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium"
+                style={{
+                  background: statusConfig.bg,
+                  color: statusConfig.color,
+                }}
+              >
+                <div
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: statusConfig.color }}
+                />
+                {statusConfig.label}
+              </div>
             </div>
             {/* Optimization badge (if enabled) */}
             {showOptimizationStatus && site.optimization_enabled && (

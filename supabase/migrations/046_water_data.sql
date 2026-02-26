@@ -109,8 +109,8 @@ BEGIN
             ) VALUES (
                 'S002-MTR-W-MAIN',
                 'site-002',
-                ROUND(v_base_volume, 2),
-                ROUND(v_flow_rate, 2),
+                ROUND(v_base_volume::numeric, 2),
+                ROUND(v_flow_rate::numeric, 2),
                 v_date + (v_hour || ' hours')::INTERVAL,
                 FLOOR(v_base_volume / 10)::INTEGER, -- 10 liters per pulse
                 18 + (random() * 4), -- 18-22°C water temperature

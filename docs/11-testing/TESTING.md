@@ -2,12 +2,12 @@
 title: "Testing Strategy Guide"
 type: "guide"
 status: "approved"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-01-30"
-updated: "2026-01-30"
+updated: "2026-02-26"
 author: "Sentinel Development Team"
-tags: ["testing", "strategy", "pytest", "vitest"]
-related: ["e2e-testing.md", "test-data.md", "../12-development/tool-use-best-practices.md"]
+tags: ["testing", "strategy", "pytest", "vitest", "playwright", "k6"]
+related: ["E2E_GUIDE.md", "TEST_DATA.md", "../../k6/README.md"]
 domain: "general"
 audience: "developers"
 complexity: "intermediate"
@@ -18,30 +18,31 @@ estimated_read_time: 15
 
 ## Overview
 
-The BMS Intelligence system uses a comprehensive testing strategy with unit tests, integration tests, and end-to-end (E2E) tests across both frontend and backend.
+The BMS Intelligence platform uses multiple test layers:
+- `pytest` for backend and Python domain tests
+- `vitest` for frontend unit/integration tests
+- `playwright` for browser E2E flows
+- `k6` for API/load testing
+- module-specific test suites (for example, `runner/tests`)
 
 ## Test Structure
 
 ```
 bms-intelligence/
 ├── frontend/
-│   ├── src/
-│   │   ├── __tests__/          # Unit and integration tests
-│   │   ├── components/
-│   │   │   └── __tests__/      # Component unit tests
-│   │   └── test-utils/         # Test utilities and factories
+│   ├── src/**/__tests__/       # Frontend unit/integration tests
 │   └── vitest.config.ts        # Vitest configuration
 ├── backend/
-│   ├── tests/
-│   │   ├── api/                # API endpoint tests
-│   │   ├── services/           # Service unit tests
-│   │   ├── integration/        # Integration tests
-│   │   ├── performance/        # Performance tests
-│   │   └── security/          # Security tests
+│   ├── tests/                  # Backend test suite
 │   └── pytest.ini              # Pytest configuration
+├── tests/                      # Repo-level Python tests
 └── e2e/
     ├── tests/                  # E2E test scenarios
     └── playwright.config.ts    # Playwright configuration
+├── k6/
+│   ├── scenarios/              # Load test scripts
+│   └── README.md               # Load test guide
+└── runner/tests/               # Runner module tests
 ```
 
 ## Running Tests
@@ -49,10 +50,10 @@ bms-intelligence/
 ### Frontend Tests
 
 ```bash
-cd frontend
+cd /opt/bms-intelligence/frontend
 
 # Run all tests
-npm test
+npm run test:run
 
 # Run tests in watch mode
 npm run test:watch
@@ -67,7 +68,7 @@ npm run test:coverage
 ### Backend Tests
 
 ```bash
-cd backend
+cd /opt/bms-intelligence/backend
 
 # Run all tests
 pytest
@@ -85,10 +86,21 @@ pytest -m unit
 pytest -m integration
 ```
 
+### Repo-level Python Tests
+
+```bash
+cd /opt/bms-intelligence
+
+# Runs tests from root pytest.ini testpaths:
+# - tests/
+# - backend/tests/
+pytest
+```
+
 ### E2E Tests
 
 ```bash
-cd e2e
+cd /opt/bms-intelligence/e2e
 
 # Run all E2E tests
 npm test
@@ -98,6 +110,40 @@ npm run test:ui
 
 # Run in debug mode
 npm run test:debug
+```
+
+### Load Tests (k6)
+
+```bash
+cd /opt/bms-intelligence/k6
+
+# Smoke/API load test
+k6 run scenarios/api-smoke-test.js
+
+# Device control load
+k6 run scenarios/device-control.js
+
+# Hybrid chat load
+k6 run scenarios/chat-load-test.js
+
+# Mixed traffic suite
+k6 run scenarios/full-suite.js
+```
+
+Optional environment variables:
+- `API_URL` (default `http://localhost:9095`)
+- `AUTH_TOKEN` for authenticated environments
+
+Example:
+```bash
+API_URL=http://localhost:9095 AUTH_TOKEN=your_token_here k6 run scenarios/api-smoke-test.js
+```
+
+### Runner Module Tests
+
+```bash
+cd /opt/bms-intelligence/runner
+pytest
 ```
 
 ## Writing Tests
@@ -179,6 +225,7 @@ device = DeviceFactory.create(
 - **Unit Tests**: 80%+ coverage
 - **Integration Tests**: All critical paths covered
 - **E2E Tests**: All user workflows covered
+- **Load Tests**: SLA thresholds in each k6 scenario
 
 ## CI/CD Integration
 
@@ -187,6 +234,13 @@ Tests run automatically on:
 - Pushes to main/develop branches
 
 See `.github/workflows/test.yml` for configuration.
+
+Current CI workflow covers:
+- frontend lint/typecheck/unit/coverage
+- backend pytest + coverage
+- Playwright E2E
+
+`k6` is currently run manually unless added to a dedicated workflow.
 
 ## Best Practices
 
@@ -205,6 +259,16 @@ See `.github/workflows/test.yml` for configuration.
 - Check environment variables
 - Verify dependencies are installed
 - Check for timing issues (use `waitFor`)
+
+### k6 scenarios failing with 401/403
+
+- Provide `AUTH_TOKEN` if auth is enforced
+- Confirm backend is reachable at `API_URL`
+
+### k6 scenarios failing due to stale device IDs
+
+- Current scenarios discover devices dynamically from `/api/devices`
+- If `/api/devices` returns empty, seed or load demo/mock equipment first
 
 ### Coverage not updating
 

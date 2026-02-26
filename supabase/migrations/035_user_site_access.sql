@@ -76,3 +76,10 @@ SELECT 'auditor@sentinel.bms', b.id, 'system'
 FROM buildings b
 WHERE b.code = 'site-002'
 ON CONFLICT (user_email, building_id) DO NOTHING;
+
+-- FNB user gets site-002 (Sandton City)
+INSERT INTO user_site_access (user_email, building_id, granted_by)
+SELECT 'ntaote.moshoeshoe@fnb.co.za', b.id, 'system'
+FROM buildings b
+WHERE b.code = 'site-002'
+ON CONFLICT (user_email, building_id) DO NOTHING;

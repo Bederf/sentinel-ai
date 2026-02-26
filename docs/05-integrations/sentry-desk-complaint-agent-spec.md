@@ -1,6 +1,6 @@
 # Sentry Desk Complaint Agent — Full Specification
 
-> **Version:** 1.0 | **Last Updated:** 2026-02-22 | **Location:** `/home/bederf/.sentry/`
+> **Version:** 1.1 | **Last Updated:** 2026-02-25 | **Location:** `/home/bederf/.sentry/`
 
 ## 1. Goals & Success Metrics
 
@@ -26,7 +26,7 @@
 | **Runtime** | Python 3, standalone process |
 | **Framework** | Pattern-matching router (no LangGraph) |
 | **Entry Point** | `bot.py` -> `sentry_ai_bridge.detect_and_route()` |
-| **Key Files** | `tools/bms_desk_diagnosis.py`, `tools/sentry_ai_bridge.py`, `tools/work_order.py`, `handlers/wo_conversation_handler.py` |
+| **Key Files** | `tools/bms_desk_diagnosis.py`, `tools/sentry_ai_bridge.py`, `tools/work_order.py`, `tools/call_log.py`, `handlers/wo_conversation_handler.py`, `handlers/call_log_handler.py` |
 | **AI Tiers** | 4-tier fallback: tinydolphin (fast) -> GPT-3.5/Gemini (cloud) -> Claude Haiku (complex) -> phi3:mini (quality) |
 | **Auth** | `X-Sentry-API-Key`, `X-User-Id: sentry`, `X-Sentry-Secret` headers |
 
@@ -38,7 +38,8 @@
 /home/bederf/.sentry/
 ├── bot.py                                 # Main Telegram bot (Phase 41 WO handlers)
 ├── handlers/
-│   └── wo_conversation_handler.py        # Work Order conversation state machine
+│   ├── wo_conversation_handler.py        # Work Order conversation state machine
+│   └── call_log_handler.py              # Call logging: fixed taxonomy, discovery, escalation
 ├── tools/
 │   ├── bms_desk_diagnosis.py            # PRIMARY DESK COMPLAINT TOOL
 │   ├── sentry_ai_bridge.py              # AI routing & message orchestration
@@ -47,9 +48,12 @@
 │   ├── sentinel_health_alert.py         # Equipment health monitoring
 │   ├── work_order.py                    # Work order creation & email
 │   ├── ai_performance_monitor.py        # Response latency tracking
+│   ├── call_log.py                    # Call logging CLI (classify/log/categories)
 │   └── load_docker_secrets.py           # Secret management
 ├── skills/
-│   └── sentinel_desk_complaint.md       # Skill documentation
+│   ├── sentinel_desk_complaint.md       # Desk comfort complaint skill
+│   ├── sentinel_inspection.md           # Inspection debrief skill
+│   └── sentry_call_logging.md           # Call logging skill (fixed taxonomy)
 ├── memory/
 │   ├── work-orders.json                 # Persisted WO state
 │   ├── rate_limit_state.json            # Rate limiting tracker
@@ -122,9 +126,20 @@ message
   ├── Pattern: /info_<code>            -> handle_info_command()
   ├── Pattern: SR-XXXX-XXXXXX + "done" -> handle_work_order_initial()
   ├── Pattern: Desk complaint regex    -> diagnose_comfort_issue()
+  ├── Active call log conversation     -> continue_call_log()
+  ├── Facilities complaint keywords    -> start_call_log()
   ├── Pattern: BMS status query        -> check_equipment_health()
   └── Default: Fast AI response        -> tiered_ai_router
 ```
+
+**Call log routing details:**
+
+The `sentry_ai_bridge.py` checks call log routing after desk complaints but before the general fallback:
+
+1. `has_active_call_log(user_id)` → Continue the discovery conversation (`call_log_continue`)
+2. `is_facilities_complaint(message)` → Start a new call log (`call_log_start`)
+
+The `is_facilities_complaint()` function returns `True` if the message matches the fixed taxonomy OR contains facility action words (`fix`, `repair`, `broken`, `send someone`, etc.). IT-related messages are excluded.
 
 ---
 
@@ -418,7 +433,7 @@ Technician receives WO -> completes -> "done" -> data collection
 |---|---------------|--------|--------|
 | 1 | No persistence across bot restarts — `_user_context` lost, active WO collections abandoned | Medium | Consider persisting to Redis or JSON |
 | 2 | Single-building assumption — defaults to "site-002" | Low | Add multi-site support when needed |
-| 3 | No NLP beyond regex — "my area is uncomfortable" not matched | Medium | Consider lightweight NLP classifier |
+| 3 | No NLP beyond regex — "my area is uncomfortable" not matched | Medium | Partially addressed: Call log handler uses 46-entry keyword taxonomy with multi-word scoring. Unmatched complaints escalate to supervisor. |
 | 4 | Root cause accuracy not measured — no feedback loop from technician | High | Add technician confirmation flow |
 | 5 | Rate limiting per-user only — no global rate limit | Low | Monitor and add if needed |
 | 6 | AI tier fallback latency — if fast local fails, cloud adds 1-3s | Medium | Implement streaming/interim responses |

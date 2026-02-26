@@ -117,7 +117,7 @@ def get_equipment_from_supabase(site_id: Optional[str] = None, equipment_type: O
 
 
 def get_zones_from_supabase(site_id: Optional[str] = None, floor: Optional[str] = None) -> list:
-    """Get HVAC zones from Supabase.
+    """Get HVAC zones — Supabase primary, hvac_zones.json fallback.
 
     Args:
         site_id: Optional site code to filter by
@@ -126,19 +126,34 @@ def get_zones_from_supabase(site_id: Optional[str] = None, floor: Optional[str] 
     Returns:
         List of zone dictionaries
     """
+    zones = []
+
+    # Tier 1: Supabase
     try:
         if site_id:
             zones = zone_repo.get_by_building_code(site_id)
         else:
             zones = zone_repo.get_all()
-
-        if floor:
-            zones = [z for z in zones if z.get("floor") == floor]
-
-        return zones
     except Exception as e:
-        logger.error(f"Error fetching zones from Supabase: {e}")
-        return []
+        logger.debug(f"Supabase zone query failed: {e}")
+
+    # Tier 2: JSON fallback
+    if not zones:
+        try:
+            hvac_zones_path = DATA_DIR / "hvac_zones.json"
+            if hvac_zones_path.exists():
+                with open(hvac_zones_path) as f:
+                    zones = json.load(f)
+                if site_id:
+                    zones = [z for z in zones if z.get("building_id") == site_id]
+                logger.debug(f"Loaded {len(zones)} zones from hvac_zones.json")
+        except Exception as e:
+            logger.error(f"Error loading zones from JSON fallback: {e}")
+
+    if floor:
+        zones = [z for z in zones if z.get("floor") == floor]
+
+    return zones
 
 
 def get_zone_limits(zone_id: str) -> tuple[float, float]:

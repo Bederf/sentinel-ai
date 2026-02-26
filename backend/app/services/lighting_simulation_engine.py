@@ -13,12 +13,17 @@ Creates realistic lighting power consumption that feeds:
 - Cost calculations via municipal tariffs
 - ROI analysis for lighting upgrades (DALI vs baseline)
 
+Also generates per-luminaire sceneCOM telemetry (energy, diagnostics,
+emergency gear) so SENTINEL has realistic data in demo/dev mode.
+
 Integration point: Called from thermal_simulation_engine each hour
 """
 
+import hashlib
 import logging
-from datetime import datetime
-from typing import Optional, Dict, Any
+import random
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any, List
 
 from app.database.supabase_client import get_supabase_client
 
@@ -54,6 +59,23 @@ class LightingSimulationEngine:
         "Entry": True,  # Entry with skylight
     }
 
+    # sceneCOM telemetry simulation parameters
+    LUMINAIRE_SQM_PER_FIXTURE = 8.0  # 1 LED panel per 8 sqm (office standard)
+    LIGHTING_POWER_DENSITY_W_SQM = 15.0  # 15 W/sqm office lighting (AS/NZS 1680)
+    DRIVER_AMBIENT_TEMP_C = 35.0  # Plenum ambient (above ceiling)
+    DRIVER_TEMP_RISE_FACTOR = 0.33  # °C per watt → ~40°C rise at 120W full load
+    DRIVER_TEMP_NOISE_C = 2.0  # Random ±noise on driver temp
+    DRIVER_WARN_TEMP_C = 85.0  # Driver health = "warning"
+    DRIVER_FAULT_TEMP_C = 95.0  # Driver health = "fault"
+    LAMP_HOUR_INCREMENT = 1  # Hours per simulation step
+    LIGHT_OUTPUT_DEGRADATION_RATE = 0.002  # % loss per 1000 hours (L90 at 50k)
+    COLOUR_SHIFT_PER_10K_HOURS = 0.005  # SDCM shift per 10k hours
+    EMERGENCY_GEAR_RATIO = 0.10  # 10% of luminaires have emergency gear
+    EMERGENCY_BATTERY_NOMINAL_PCT = 96  # Nominal full charge %
+    EMERGENCY_BATTERY_DAILY_DRAIN = 0.05  # % per day self-discharge
+    FAULT_PROBABILITY_PER_HOUR = 0.0001  # ~0.01% per luminaire per hour (~2.4% pa)
+    FAULT_TYPES = ["lamp_failure", "driver_overtemp", "ballast_fault", "comm_error"]
+
     def __init__(self, building_id: str):
         self.building_id = building_id
         self.supabase = get_supabase_client()
@@ -64,6 +86,16 @@ class LightingSimulationEngine:
 
         # Daily tracking for energy history
         self._daily_hourly_lighting: Dict[int, float] = {}  # hour -> total lighting kW
+
+        # --- sceneCOM telemetry state ---
+        # Per-luminaire persistent state: {luminaire_id: {...}}
+        self._luminaire_state: Dict[str, Dict[str, Any]] = {}
+        # Latest telemetry snapshot (populated each hour)
+        self._latest_telemetry: Dict[str, Any] = {}
+        # Zone-to-luminaire mapping: {zone_id: [luminaire_ids]}
+        self._zone_luminaires: Dict[str, List[str]] = {}
+        # Deterministic RNG seeded per building for reproducible faults
+        self._rng = random.Random(int(hashlib.md5(building_id.encode()).hexdigest()[:8], 16))
 
     async def calculate_lighting_power(
         self,
@@ -128,6 +160,14 @@ class LightingSimulationEngine:
                 zone_power=zone_power,
                 total_power=total_power,
                 daylight_lux=daylight_lux,
+            )
+
+            # Generate per-luminaire sceneCOM telemetry
+            self._generate_scenecom_telemetry(
+                zone_power=zone_power,
+                occupancy_data=occupancy_data,
+                daylight_lux=daylight_lux,
+                simulated_hour=simulated_hour,
             )
 
             logger.debug(
@@ -207,6 +247,291 @@ class LightingSimulationEngine:
         logger.debug(f"[LIGHT CALC] {zone_id}: occ={occupancy_pct:.0f}% lux={daylight_lux:.0f} → {power_kw:.2f}kW")
 
         return power_kw
+
+    # ------------------------------------------------------------------
+    # sceneCOM telemetry generation
+    # ------------------------------------------------------------------
+
+    def get_latest_telemetry(self) -> Dict[str, Any]:
+        """Return the latest sceneCOM telemetry snapshot.
+
+        Structure::
+
+            {
+                "timestamp": "...",
+                "luminaires": [{ luminaire_id, zone_id, active_power_w, ... }],
+                "sensors": [{ sensor_id, zone_id, occupancy_count, lux, ... }],
+                "controllers": [{ controller_id, zones_served, mqtt_connected, ... }],
+                "emergency_gear": [{ luminaire_id, battery_pct, charge_status, ... }],
+                "faults": [{ luminaire_id, fault_type, ... }],
+            }
+        """
+        return self._latest_telemetry
+
+    def _ensure_luminaire_topology(self) -> None:
+        """Build zone→luminaire mapping from zone metadata (lazy init)."""
+        if self._zone_luminaires:
+            return
+
+        for zone_id, zone_config in self._zone_cache.items():
+            area = zone_config.get("area_sqm", 50)
+            count = max(2, int(area / self.LUMINAIRE_SQM_PER_FIXTURE))
+            # Derive per-luminaire rated power from zone power budget
+            zone_budget_w = area * self.LIGHTING_POWER_DENSITY_W_SQM
+            rated_power_w = round(zone_budget_w / count, 1)
+            lum_ids = []
+            for i in range(count):
+                lum_id = f"LUM-{zone_id}-{i + 1:03d}"
+                lum_ids.append(lum_id)
+                # Initialise persistent state if first run
+                if lum_id not in self._luminaire_state:
+                    is_emergency = i < max(1, int(count * self.EMERGENCY_GEAR_RATIO))
+                    self._luminaire_state[lum_id] = {
+                        "zone_id": zone_id,
+                        "rated_power_w": rated_power_w,
+                        "lamp_hours": self._rng.randint(0, 5000),
+                        "accumulated_energy_kwh": round(self._rng.uniform(0, 50), 2),
+                        "fault_status": False,
+                        "fault_code": None,
+                        "is_emergency": is_emergency,
+                        "emergency_battery_pct": (self.EMERGENCY_BATTERY_NOMINAL_PCT if is_emergency else None),
+                        "emergency_last_test": None,
+                        "emergency_test_result": None,
+                    }
+            self._zone_luminaires[zone_id] = lum_ids
+
+        total = sum(len(v) for v in self._zone_luminaires.values())
+        logger.info(
+            f"[SCENECOM] Built luminaire topology: {total} luminaires across {len(self._zone_luminaires)} zones"
+        )
+
+    def _generate_scenecom_telemetry(
+        self,
+        zone_power: Dict[str, float],
+        occupancy_data: Dict[str, float],
+        daylight_lux: float,
+        simulated_hour: int,
+    ) -> None:
+        """Generate per-luminaire sceneCOM telemetry from zone-level power.
+
+        Populates ``self._latest_telemetry`` with energy, diagnostics,
+        emergency gear, and sensor data — the same fields a real sceneCOM
+        controller would expose via REST / MQTT.
+        """
+        self._ensure_luminaire_topology()
+
+        now_iso = datetime.utcnow().isoformat() + "Z"
+        luminaire_records: List[Dict[str, Any]] = []
+        sensor_records: List[Dict[str, Any]] = []
+        controller_zones: Dict[str, List[str]] = {}  # controller_id → zone_ids
+        emergency_records: List[Dict[str, Any]] = []
+        fault_records: List[Dict[str, Any]] = []
+
+        for zone_id, lum_ids in self._zone_luminaires.items():
+            zone_power_kw = zone_power.get(zone_id, 0.0)
+            zone_power_w = zone_power_kw * 1000.0
+            occupancy_pct = occupancy_data.get(zone_id, 0.0)
+
+            # Get rated power for this zone's luminaires (all same within a zone)
+            sample_rated = self._luminaire_state[lum_ids[0]]["rated_power_w"]
+            # Per-luminaire power, clamped to rated capacity
+            per_lum_power_w = min(zone_power_w / len(lum_ids), sample_rated) if lum_ids else 0.0
+
+            # Determine dim level (0-254 DALI scale)
+            dim_ratio = per_lum_power_w / sample_rated if sample_rated > 0 else 0.0
+            dim_ratio = min(1.0, dim_ratio)
+            dali_level = int(round(dim_ratio * 254))
+
+            # Assign zone to a sceneCOM controller (1 per floor)
+            zone_config = self._zone_cache.get(zone_id, {})
+            floor = zone_config.get("floor", "L0")
+            ctrl_id = f"SCOM-{self.building_id}-{floor}"
+            controller_zones.setdefault(ctrl_id, []).append(zone_id)
+
+            for lum_id in lum_ids:
+                state = self._luminaire_state[lum_id]
+
+                # --- Energy telemetry ---
+                # Add ±5% noise per luminaire for realism
+                noise = 1.0 + self._rng.uniform(-0.05, 0.05)
+                active_power_w = round(per_lum_power_w * noise, 1)
+                energy_increment = active_power_w / 1000.0  # kWh per hour
+                state["accumulated_energy_kwh"] = round(state["accumulated_energy_kwh"] + energy_increment, 3)
+                state["lamp_hours"] += self.LAMP_HOUR_INCREMENT
+
+                # --- Driver diagnostics ---
+                driver_temp = (
+                    self.DRIVER_AMBIENT_TEMP_C
+                    + active_power_w * self.DRIVER_TEMP_RISE_FACTOR
+                    + self._rng.uniform(-self.DRIVER_TEMP_NOISE_C, self.DRIVER_TEMP_NOISE_C)
+                )
+                driver_temp = round(driver_temp, 1)
+
+                if state["fault_status"]:
+                    driver_health = "fault"
+                elif driver_temp >= self.DRIVER_FAULT_TEMP_C:
+                    driver_health = "fault"
+                    state["fault_status"] = True
+                    state["fault_code"] = "driver_overtemp"
+                elif driver_temp >= self.DRIVER_WARN_TEMP_C:
+                    driver_health = "warning"
+                else:
+                    driver_health = "ok"
+
+                # Light output degradation (L90 at 50k hours)
+                hours = state["lamp_hours"]
+                light_output_pct = round(100.0 - (hours / 1000.0) * self.LIGHT_OUTPUT_DEGRADATION_RATE, 1)
+                light_output_pct = max(70.0, light_output_pct)  # Floor at L70
+
+                # Colour shift (SDCM drift)
+                colour_shift = round((hours / 10000.0) * self.COLOUR_SHIFT_PER_10K_HOURS, 4)
+
+                # --- Random fault injection ---
+                if not state["fault_status"] and self._rng.random() < self.FAULT_PROBABILITY_PER_HOUR:
+                    state["fault_status"] = True
+                    state["fault_code"] = self._rng.choice(self.FAULT_TYPES)
+
+                if state["fault_status"]:
+                    fault_records.append(
+                        {
+                            "luminaire_id": lum_id,
+                            "zone_id": zone_id,
+                            "fault_type": state["fault_code"],
+                            "driver_temp_c": driver_temp,
+                            "lamp_hours": hours,
+                            "timestamp": now_iso,
+                        }
+                    )
+
+                luminaire_records.append(
+                    {
+                        "luminaire_id": lum_id,
+                        "zone_id": zone_id,
+                        "controller_id": ctrl_id,
+                        "dali_level": dali_level,
+                        "active_power_w": active_power_w,
+                        "accumulated_energy_kwh": state["accumulated_energy_kwh"],
+                        "rated_power_w": state["rated_power_w"],
+                        "driver_temp_c": driver_temp,
+                        "driver_health": driver_health,
+                        "light_output_pct": light_output_pct,
+                        "colour_shift_sdcm": colour_shift,
+                        "lamp_hours": hours,
+                        "fault_status": state["fault_status"],
+                        "fault_code": state["fault_code"],
+                        "timestamp": now_iso,
+                    }
+                )
+
+                # --- Emergency gear ---
+                if state["is_emergency"]:
+                    battery = state["emergency_battery_pct"]
+                    # Self-discharge
+                    battery -= self.EMERGENCY_BATTERY_DAILY_DRAIN / 24.0
+                    # Recharge when mains power is on (dim_ratio > 0)
+                    if dim_ratio > 0.1 and battery < self.EMERGENCY_BATTERY_NOMINAL_PCT:
+                        battery += 0.1  # Trickle charge
+                    battery = round(min(self.EMERGENCY_BATTERY_NOMINAL_PCT, max(0, battery)), 1)
+                    state["emergency_battery_pct"] = battery
+
+                    if battery > 80:
+                        charge_status = "charged"
+                    elif battery > 20:
+                        charge_status = "charging"
+                    else:
+                        charge_status = "fault"
+
+                    # Schedule monthly function test at 02:00 on day 1
+                    last_test = state.get("emergency_last_test")
+                    if simulated_hour == 2 and last_test is None:
+                        state["emergency_last_test"] = now_iso
+                        state["emergency_test_result"] = "pass" if battery > 50 else "fail"
+
+                    compliance_due = None
+                    if state.get("emergency_last_test"):
+                        try:
+                            lt = datetime.fromisoformat(state["emergency_last_test"].replace("Z", "+00:00"))
+                            compliance_due = (lt + timedelta(days=30)).isoformat()
+                        except (ValueError, TypeError):
+                            pass
+
+                    emergency_records.append(
+                        {
+                            "luminaire_id": lum_id,
+                            "zone_id": zone_id,
+                            "battery_pct": battery,
+                            "charge_status": charge_status,
+                            "last_function_test": state.get("emergency_last_test"),
+                            "test_result": state.get("emergency_test_result"),
+                            "compliance_due": compliance_due,
+                            "timestamp": now_iso,
+                        }
+                    )
+
+            # --- Sensor telemetry (one per zone) ---
+            # Derive occupancy count from percent and typical occupancy
+            typical = zone_config.get("typical_occupancy", 10)
+            occ_count = max(0, int(round(occupancy_pct / 100.0 * typical)))
+            sensor_records.append(
+                {
+                    "sensor_id": f"PIR-{zone_id}",
+                    "zone_id": zone_id,
+                    "controller_id": ctrl_id,
+                    "occupancy": occupancy_pct >= self.OCCUPANCY_SENSOR_RESPONSE,
+                    "occupancy_count": occ_count,
+                    "lux_level": round(daylight_lux * (0.3 if not self.WINDOW_ZONES.get(zone_id, False) else 1.0), 1),
+                    "sensor_health": "ok",
+                    "timestamp": now_iso,
+                }
+            )
+
+        # --- Controller telemetry ---
+        controller_records = []
+        for ctrl_id, zones in controller_zones.items():
+            lum_count = sum(len(self._zone_luminaires.get(z, [])) for z in zones)
+            fault_count = sum(
+                1
+                for z in zones
+                for lid in self._zone_luminaires.get(z, [])
+                if self._luminaire_state.get(lid, {}).get("fault_status")
+            )
+            controller_records.append(
+                {
+                    "controller_id": ctrl_id,
+                    "building_id": self.building_id,
+                    "zones_served": zones,
+                    "luminaire_count": lum_count,
+                    "fault_count": fault_count,
+                    "mqtt_connected": True,
+                    "polling_interval_sec": 30,
+                    "firmware_version": "sceneCOM-evo-3.2.1",
+                    "status": "online" if fault_count == 0 else "degraded",
+                    "timestamp": now_iso,
+                }
+            )
+
+        self._latest_telemetry = {
+            "timestamp": now_iso,
+            "building_id": self.building_id,
+            "luminaires": luminaire_records,
+            "sensors": sensor_records,
+            "controllers": controller_records,
+            "emergency_gear": emergency_records,
+            "faults": fault_records,
+            "summary": {
+                "total_luminaires": len(luminaire_records),
+                "total_faults": len(fault_records),
+                "total_emergency": len(emergency_records),
+                "total_active_power_w": round(sum(r["active_power_w"] for r in luminaire_records), 1),
+            },
+        }
+
+        logger.debug(
+            f"[SCENECOM] Generated telemetry: "
+            f"{len(luminaire_records)} luminaires, "
+            f"{len(fault_records)} faults, "
+            f"{len(emergency_records)} emergency gear"
+        )
 
     async def _load_zone_metadata(self) -> None:
         """Load zone configuration from database."""

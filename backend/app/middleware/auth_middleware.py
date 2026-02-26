@@ -686,14 +686,14 @@ def require_auth(level: AuthLevel = AuthLevel.AUTHENTICATED):
                     is_bot_agent=True,
                 )
             else:
-                # Create demo context (OPERATOR role avoids 30/min admin rate limit)
+                # Create demo context with ADMIN role so Supabase queries return all buildings
                 demo_ctx = AuthContext(
                     user_id="demo-user",
-                    role=SentinelRole.OPERATOR,  # Demo gets operator access (avoids admin rate limit)
+                    role=SentinelRole.ADMIN,
                     auth_method="demo_mode",
                     source_ip=source_ip,
                     email="demo@sentinel.local",
-                    scopes=["operator:all"],
+                    scopes=["admin:all"],
                     metadata={"demo_mode": True},
                 )
             request.state.auth = demo_ctx

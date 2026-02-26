@@ -89,7 +89,7 @@ export function RecommendationCard({
 
   return (
     <div
-      className="fixed right-4 top-20 z-50 w-96 rounded-lg shadow-2xl overflow-hidden"
+      className="fixed right-4 top-4 z-50 w-96 rounded-lg shadow-2xl overflow-hidden"
       style={{
         background: 'var(--color-sentinel-bg-panel, #1a1a2e)',
         border: '1px solid var(--color-sentinel-border, #2a2a4a)',

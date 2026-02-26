@@ -134,7 +134,7 @@ SELECT
      AND building_id = (SELECT id FROM buildings WHERE code = 'site-002')) || ')',
     code,
     type,
-    SUBSTRING(name FROM 1, 40) as name,
+    SUBSTRING(name, 1, 40) as name,
     health_score
 FROM equipment
 WHERE building_id = (SELECT id FROM buildings WHERE code = 'site-002')

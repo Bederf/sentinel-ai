@@ -136,7 +136,7 @@ CREATE TABLE IF NOT EXISTS emergency_light_testing (
     -- Equipment identification
     light_code TEXT NOT NULL, -- e.g., 'S002-EMERG-L2-001'
     fixture_location TEXT NOT NULL, -- Zone/area description
-    control_point_id UUID REFERENCES equipment_points(id), -- Link to device abstraction layer
+    control_point_id UUID, -- Link to device abstraction layer (FK deferred until equipment_points table exists)
 
     -- Testing schedule
     last_test_date TIMESTAMPTZ,

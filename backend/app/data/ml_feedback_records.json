@@ -1833,6 +1833,196 @@
           "energy_savings_percent": 0
         }
       }
+    },
+    {
+      "id": "mlf-mod-20260224161328-0087",
+      "equipment_id": "S002-VAV-100",
+      "work_order_id": "be71b4fd-d7aa-4ee9-b4ae-76445ed17f78",
+      "feedback_type": "module_outcome",
+      "repair_successful": true,
+      "effectiveness_score": 100.0,
+      "prediction_id": "be71b4fd-d7aa-4ee9-b4ae-76445ed17f78",
+      "predicted_failure_type": null,
+      "actual_failure_type": null,
+      "prediction_was_correct": true,
+      "time_to_failure_predicted": null,
+      "time_to_failure_actual": null,
+      "recorded_at": "2026-02-24T16:13:28.242696",
+      "metadata": {
+        "source": "approval_service.execute_approval",
+        "site_id": "S002",
+        "action_type": "ai_optimization",
+        "approved_by": "dashboard",
+        "module_type": "hvac",
+        "source_path": "approval_service",
+        "actual_impact": {
+          "cov_verified": false,
+          "device_write": {
+            "message": "Demo mode - device write simulated",
+            "success": true
+          },
+          "target_value": 90
+        },
+        "correlation_id": "d25758aa-8b3e-4bd7-a4e5-6077efc96f94",
+        "outcome_status": "executed",
+        "confidence_score": 0.9,
+        "predicted_impact": {
+          "description": "Open VAV damper to 90% for adequate airflow during high occupancy",
+          "energy_savings_percent": 0
+        }
+      }
+    },
+    {
+      "id": "mlf-mod-20260224172526-0088",
+      "equipment_id": "S002-VAV-100",
+      "work_order_id": "2a448d09-fd2b-44e2-b1fb-1056f832fb0e",
+      "feedback_type": "module_outcome",
+      "repair_successful": true,
+      "effectiveness_score": 100.0,
+      "prediction_id": "2a448d09-fd2b-44e2-b1fb-1056f832fb0e",
+      "predicted_failure_type": null,
+      "actual_failure_type": null,
+      "prediction_was_correct": true,
+      "time_to_failure_predicted": null,
+      "time_to_failure_actual": null,
+      "recorded_at": "2026-02-24T17:25:26.650482",
+      "metadata": {
+        "source": "approval_service.execute_approval",
+        "site_id": "S002",
+        "action_type": "ai_optimization",
+        "approved_by": "dashboard",
+        "module_type": "hvac",
+        "source_path": "approval_service",
+        "actual_impact": {
+          "cov_verified": false,
+          "device_write": {
+            "message": "Demo mode - device write simulated",
+            "success": true
+          },
+          "target_value": 90
+        },
+        "correlation_id": "f7dab2d0-e0c3-4b24-afad-90f68ef81e6a",
+        "outcome_status": "executed",
+        "confidence_score": 0.9,
+        "predicted_impact": {
+          "description": "Open VAV damper to 90% for adequate airflow during high occupancy",
+          "energy_savings_percent": 0
+        }
+      }
+    },
+    {
+      "id": "mlf-mod-20260224172555-0089",
+      "equipment_id": "S002-VAV-101",
+      "work_order_id": "6ac4a1a2-3a0b-4466-9f92-a3a7fcae4c7d",
+      "feedback_type": "module_outcome",
+      "repair_successful": true,
+      "effectiveness_score": 100.0,
+      "prediction_id": "6ac4a1a2-3a0b-4466-9f92-a3a7fcae4c7d",
+      "predicted_failure_type": null,
+      "actual_failure_type": null,
+      "prediction_was_correct": true,
+      "time_to_failure_predicted": null,
+      "time_to_failure_actual": null,
+      "recorded_at": "2026-02-24T17:25:55.709337",
+      "metadata": {
+        "source": "approval_service.execute_approval",
+        "site_id": "S002",
+        "action_type": "ai_optimization",
+        "approved_by": "dashboard",
+        "module_type": "hvac",
+        "source_path": "approval_service",
+        "actual_impact": {
+          "cov_verified": false,
+          "device_write": {
+            "message": "Demo mode - device write simulated",
+            "success": true
+          },
+          "target_value": 90
+        },
+        "correlation_id": "3dff5983-ba10-4592-bc76-1513bd1a56c4",
+        "outcome_status": "executed",
+        "confidence_score": 0.9,
+        "predicted_impact": {
+          "description": "Open VAV damper to 90% for adequate airflow during high occupancy",
+          "energy_savings_percent": 0
+        }
+      }
+    },
+    {
+      "id": "mlf-mod-20260224172556-0090",
+      "equipment_id": "S002-CHILLER-B1-001",
+      "work_order_id": "8cd1a5f6-6faf-4169-a84a-d8607eaeed19",
+      "feedback_type": "module_outcome",
+      "repair_successful": true,
+      "effectiveness_score": 100.0,
+      "prediction_id": "8cd1a5f6-6faf-4169-a84a-d8607eaeed19",
+      "predicted_failure_type": null,
+      "actual_failure_type": null,
+      "prediction_was_correct": true,
+      "time_to_failure_predicted": null,
+      "time_to_failure_actual": null,
+      "recorded_at": "2026-02-24T17:25:56.100526",
+      "metadata": {
+        "source": "approval_service.execute_approval",
+        "site_id": "S002",
+        "action_type": "ai_optimization",
+        "approved_by": "dashboard",
+        "module_type": "hvac",
+        "source_path": "approval_service",
+        "actual_impact": {
+          "cov_verified": false,
+          "device_write": {
+            "message": "Demo mode - device write simulated",
+            "success": true
+          },
+          "target_value": 100
+        },
+        "correlation_id": "5aed53e9-1e93-4789-a12d-c09229e3f190",
+        "outcome_status": "executed",
+        "confidence_score": 0.9,
+        "predicted_impact": {
+          "description": "Set chiller to 100% capacity for peak cooling demand",
+          "energy_savings_percent": 0
+        }
+      }
+    },
+    {
+      "id": "mlf-mod-20260224172556-0091",
+      "equipment_id": "S002-AHU-R-001",
+      "work_order_id": "228efebd-8628-46ea-a92a-1f898c9f5ac9",
+      "feedback_type": "module_outcome",
+      "repair_successful": true,
+      "effectiveness_score": 100.0,
+      "prediction_id": "228efebd-8628-46ea-a92a-1f898c9f5ac9",
+      "predicted_failure_type": null,
+      "actual_failure_type": null,
+      "prediction_was_correct": true,
+      "time_to_failure_predicted": null,
+      "time_to_failure_actual": null,
+      "recorded_at": "2026-02-24T17:25:56.474502",
+      "metadata": {
+        "source": "approval_service.execute_approval",
+        "site_id": "S002",
+        "action_type": "ai_optimization",
+        "approved_by": "dashboard",
+        "module_type": "hvac",
+        "source_path": "approval_service",
+        "actual_impact": {
+          "cov_verified": false,
+          "device_write": {
+            "message": "Demo mode - device write simulated",
+            "success": true
+          },
+          "target_value": 12.0
+        },
+        "correlation_id": "f268bef4-294c-4f9f-8294-a85261aeb60c",
+        "outcome_status": "executed",
+        "confidence_score": 0.9,
+        "predicted_impact": {
+          "description": "Set AHU supply air to 12\u00b0C for maximum cooling capacity",
+          "energy_savings_percent": 2
+        }
+      }
     }
   ],
   "training_data": [
@@ -2980,6 +3170,76 @@
       "days_to_failure": null,
       "repair_effectiveness": 100.0,
       "source": "module_outcome"
+    },
+    {
+      "equipment_id": "S002-VAV-100",
+      "equipment_type": "hvac",
+      "features": {
+        "success_flag": 1.0,
+        "confidence_score": 0.9,
+        "effectiveness_score": 100.0
+      },
+      "label": "successful",
+      "failure_type": null,
+      "days_to_failure": null,
+      "repair_effectiveness": 100.0,
+      "source": "module_outcome"
+    },
+    {
+      "equipment_id": "S002-VAV-100",
+      "equipment_type": "hvac",
+      "features": {
+        "success_flag": 1.0,
+        "confidence_score": 0.9,
+        "effectiveness_score": 100.0
+      },
+      "label": "successful",
+      "failure_type": null,
+      "days_to_failure": null,
+      "repair_effectiveness": 100.0,
+      "source": "module_outcome"
+    },
+    {
+      "equipment_id": "S002-VAV-101",
+      "equipment_type": "hvac",
+      "features": {
+        "success_flag": 1.0,
+        "confidence_score": 0.9,
+        "effectiveness_score": 100.0
+      },
+      "label": "successful",
+      "failure_type": null,
+      "days_to_failure": null,
+      "repair_effectiveness": 100.0,
+      "source": "module_outcome"
+    },
+    {
+      "equipment_id": "S002-CHILLER-B1-001",
+      "equipment_type": "hvac",
+      "features": {
+        "success_flag": 1.0,
+        "confidence_score": 0.9,
+        "effectiveness_score": 100.0
+      },
+      "label": "successful",
+      "failure_type": null,
+      "days_to_failure": null,
+      "repair_effectiveness": 100.0,
+      "source": "module_outcome"
+    },
+    {
+      "equipment_id": "S002-AHU-R-001",
+      "equipment_type": "hvac",
+      "features": {
+        "success_flag": 1.0,
+        "confidence_score": 0.9,
+        "effectiveness_score": 100.0
+      },
+      "label": "successful",
+      "failure_type": null,
+      "days_to_failure": null,
+      "repair_effectiveness": 100.0,
+      "source": "module_outcome"
     }
   ],
   "prediction_accuracy": {},
@@ -2994,8 +3254,8 @@
         "hvac": 100.0,
         "control": 100.0
       },
-      "records": 11,
-      "refreshed_at": "2026-02-24T08:39:08.727263"
+      "records": 16,
+      "refreshed_at": "2026-02-26T14:21:42.111021"
     },
     "site-002": {
       "site_id": "site-002",
@@ -3006,9 +3266,9 @@
         "hvac": 50.0
       },
       "records": 16,
-      "refreshed_at": "2026-02-24T08:39:08.727329"
+      "refreshed_at": "2026-02-26T14:21:42.110950"
     }
   },
-  "record_counter": 86,
-  "updated_at": "2026-02-24T08:39:08.730076"
+  "record_counter": 91,
+  "updated_at": "2026-02-26T14:21:42.112111"
 }

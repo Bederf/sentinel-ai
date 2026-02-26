@@ -1,0 +1,56 @@
+flowchart TD
+    classDef client fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef helpdesk fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef concept fill:#fef9c3,stroke:#d97706,color:#78350f
+    classDef team fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef technician fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef servicenow fill:#f3e8ff,stroke:#7c3aed,color:#4c1d95
+    classDef vendor fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+    classDef manager fill:#e0e7ff,stroke:#4f46e5,color:#312e81
+    classDef admin fill:#fce7f3,stroke:#db2777,color:#831843
+    classDef decision fill:#fef9c3,stroke:#d97706,color:#78350f
+
+    A(["🏢 Client notices issue"]):::client
+    B["Client sends email to<br/><b>REMSHelpdesk@fnb.co.za</b>"]:::client
+
+    C["Helpdesk assistant<br/>gathers relevant info:<br/>building, cost centre,<br/>additional details"]:::helpdesk
+    D["Helpdesk logs job via<br/><b>Concept portal</b><br/>enters details, assigns<br/>building + discipline"]:::concept
+
+    E["Email sent to<br/><b>discipline team</b> at building<br/>(e.g. Plumbing team —<br/>not an individual)"]:::concept
+    F["Team has SLA to<br/>log into Concept<br/>on iPads and<br/>pick up the call"]:::team
+    G["Technician attends<br/>the issue on site"]:::technician
+
+    H{"Can the<br/>technician<br/>fix it?"}:::decision
+
+    I["Technician closes<br/>job on <b>Concept</b>"]:::concept
+    J["Confirmation email sent"]:::concept
+
+    K["Technician logs<br/>incident on <b>ServiceNow</b><br/>for external service<br/>provider to assist"]:::servicenow
+    L["Email sent to<br/><b>service provider</b><br/>to submit a quote"]:::servicenow
+    M["Service provider<br/>submits quote<br/>on the system"]:::vendor
+    N["Manager logs into<br/><b>ServiceNow</b>, approves<br/>quote by signing<br/>and uploading it"]:::manager
+    O["<b>PO created</b> and<br/>sent to service provider"]:::servicenow
+
+    P["Service provider<br/>performs the work"]:::vendor
+    Q["Service provider gets<br/><b>job card signed</b><br/>on site"]:::vendor
+    R["Service provider loads<br/><b>invoice + signed job card</b><br/>on FNB portal for payment"]:::vendor
+    S["Admin does <b>GRV</b><br/>(Goods Received Verification)<br/>to confirm work<br/>was completed"]:::admin
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> H
+    H -- "Yes — can fix" --> I
+    I --> J
+    H -- "No — needs external help" --> K
+    K --> L
+    L --> M
+    M --> N
+    N --> O
+    O --> P
+    P --> Q
+    Q --> R
+    R --> S

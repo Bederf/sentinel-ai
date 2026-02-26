@@ -59,12 +59,17 @@ def get_simulation_by_task_id(task_id: str) -> Optional[LifecycleOrchestrator]:
     """
     Look up a running simulation by task ID.
 
+    Special case: task_id="default" returns the first active simulation
+    (used by /status endpoint for backwards compatibility).
+
     Args:
-        task_id: Task identifier
+        task_id: Task identifier or "default" for any active simulation
 
     Returns:
         LifecycleOrchestrator if found and running, None otherwise
     """
+    if task_id == "default" and _active_simulations:
+        return next(iter(_active_simulations.values()))
     return _active_simulations.get(task_id)
 
 

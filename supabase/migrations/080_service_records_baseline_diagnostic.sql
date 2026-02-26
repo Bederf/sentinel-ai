@@ -56,12 +56,25 @@ CREATE TABLE IF NOT EXISTS service_records (
   CONSTRAINT fk_building FOREIGN KEY (building_id) REFERENCES buildings(id) ON DELETE SET NULL
 );
 
+-- Add columns that may be missing if table existed from earlier migration (019)
+ALTER TABLE service_records ADD COLUMN IF NOT EXISTS code TEXT;
+ALTER TABLE service_records ADD COLUMN IF NOT EXISTS building_id UUID;
+ALTER TABLE service_records ADD COLUMN IF NOT EXISTS service_type TEXT DEFAULT 'diagnostic_assessment';
+ALTER TABLE service_records ADD COLUMN IF NOT EXISTS technician_name TEXT;
+ALTER TABLE service_records ADD COLUMN IF NOT EXISTS items_collected JSONB DEFAULT '[]';
+ALTER TABLE service_records ADD COLUMN IF NOT EXISTS current_prompt TEXT;
+ALTER TABLE service_records ADD COLUMN IF NOT EXISTS diagnostic_context JSONB;
+ALTER TABLE service_records ADD COLUMN IF NOT EXISTS confirmed_fault TEXT;
+ALTER TABLE service_records ADD COLUMN IF NOT EXISTS actual_repair TEXT;
+ALTER TABLE service_records ADD COLUMN IF NOT EXISTS observations JSONB DEFAULT '{}'::JSONB;
+ALTER TABLE service_records ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+
 -- Indexes for common queries
-CREATE INDEX idx_service_records_code ON service_records(code);
-CREATE INDEX idx_service_records_work_order ON service_records(work_order_id);
-CREATE INDEX idx_service_records_equipment ON service_records(equipment_id);
-CREATE INDEX idx_service_records_status ON service_records(status);
-CREATE INDEX idx_service_records_created_at ON service_records(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_service_records_code ON service_records(code);
+CREATE INDEX IF NOT EXISTS idx_service_records_work_order ON service_records(work_order_id);
+CREATE INDEX IF NOT EXISTS idx_service_records_equipment ON service_records(equipment_id);
+CREATE INDEX IF NOT EXISTS idx_service_records_status ON service_records(status);
+CREATE INDEX IF NOT EXISTS idx_service_records_created_at ON service_records(created_at DESC);
 
 -- ============================================================================
 -- service_record_attachments table
@@ -103,10 +116,10 @@ CREATE TABLE IF NOT EXISTS service_record_attachments (
 );
 
 -- Indexes for common queries
-CREATE INDEX idx_service_record_attachments_service_record ON service_record_attachments(service_record_id);
-CREATE INDEX idx_service_record_attachments_type ON service_record_attachments(attachment_type);
-CREATE INDEX idx_service_record_attachments_status ON service_record_attachments(analysis_status);
-CREATE INDEX idx_service_record_attachments_uploaded_at ON service_record_attachments(uploaded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_service_record_attachments_service_record ON service_record_attachments(service_record_id);
+CREATE INDEX IF NOT EXISTS idx_service_record_attachments_type ON service_record_attachments(attachment_type);
+CREATE INDEX IF NOT EXISTS idx_service_record_attachments_status ON service_record_attachments(analysis_status);
+CREATE INDEX IF NOT EXISTS idx_service_record_attachments_uploaded_at ON service_record_attachments(uploaded_at DESC);
 
 -- ============================================================================
 -- Enable Row Level Security (RLS)
@@ -180,7 +193,7 @@ SELECT
   sr.technician_name,
   sr.confirmed_fault,
   sr.actual_repair,
-  array_length(sr.items_collected, 1) AS items_count,
+  jsonb_array_length(COALESCE(sr.items_collected, '[]'::jsonb)) AS items_count,
   sr.created_at,
   sr.completed_at
 FROM service_records sr

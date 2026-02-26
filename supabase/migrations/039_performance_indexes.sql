@@ -87,18 +87,17 @@ ON equipment(building_id, type);
 CREATE INDEX IF NOT EXISTS idx_equipment_status_health
 ON equipment(status, health_score DESC);
 
--- Baseline queries by equipment and status
-CREATE INDEX IF NOT EXISTS idx_equipment_baselines_equipment_status
-ON equipment_baselines(equipment_id, status);
+-- Baseline queries by equipment
+CREATE INDEX IF NOT EXISTS idx_equipment_baselines_equipment
+ON equipment_baselines(equipment_id);
 
 -- ==============================================================================
 -- MEDIUM: Sensor Readings Optimization
 -- ==============================================================================
 
--- Recent readings partial index (most queries target last 7 days)
+-- Recent readings index (equipment + time ordering for dashboard queries)
 CREATE INDEX IF NOT EXISTS idx_equipment_sensor_readings_recent
-ON equipment_sensor_readings(equipment_id, recorded_at DESC)
-WHERE recorded_at > NOW() - INTERVAL '7 days';
+ON equipment_sensor_readings(equipment_id, recorded_at DESC);
 
 -- Building sensor readings for dashboard aggregation
 CREATE INDEX IF NOT EXISTS idx_equipment_sensor_readings_building_time
@@ -114,8 +113,8 @@ ON site_technicians(building_id, specialty, is_primary);
 
 -- MFA lookup optimization
 CREATE INDEX IF NOT EXISTS idx_mfa_secrets_user_enabled
-ON mfa_secrets(user_id, is_enabled)
-WHERE is_enabled = TRUE;
+ON mfa_secrets(user_email, enabled)
+WHERE enabled = TRUE;
 
 -- ==============================================================================
 -- CLEANUP: Drop redundant indexes (if they exist)

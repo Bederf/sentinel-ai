@@ -101,7 +101,7 @@ function App() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<View>("ai-chat");
+  const [currentView, setCurrentView] = useState<View>("dashboard");
   const [viewRefreshKey, setViewRefreshKey] = useState(0);
   // Card library removed — dashboard now shows only portfolio-level sections
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -321,6 +321,9 @@ function App() {
     if (!audioRef.current) {
       audioRef.current = new Audio('/audio/sentinel-logo.mp3');
     }
+
+    // Reset to start so re-clicks always play
+    audioRef.current.currentTime = 0;
 
     // Play audio
     audioRef.current.play().catch((error) => {
@@ -868,7 +871,7 @@ function App() {
 
       {/* Toast notifications */}
       <Toaster
-        position="bottom-left"
+        position="bottom-right"
         toastOptions={{
           style: {
             background: "var(--color-sentinel-bg-panel)",

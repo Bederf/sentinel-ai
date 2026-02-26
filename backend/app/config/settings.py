@@ -132,6 +132,7 @@ class Settings(BaseSettings):
     supabase_key: str = ""
     supabase_service_role_key: str = ""
     use_json_storage: bool = False
+    energy_allow_mock_fallback: bool = False  # If true, /api/energy may generate synthetic data when Supabase fails
 
     # Database URL (for direct PostgreSQL access if needed)
     database_url: str = ""

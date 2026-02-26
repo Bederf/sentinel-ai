@@ -2,7 +2,7 @@
 -- Stores building structure (floors) and equipment placement data for 3D visualization
 -- Linked 1:1 to buildings table
 
-CREATE TABLE building_3d_configs (
+CREATE TABLE IF NOT EXISTS building_3d_configs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   building_id UUID NOT NULL UNIQUE REFERENCES buildings(id) ON DELETE CASCADE,
   site_id TEXT NOT NULL,
@@ -32,8 +32,8 @@ CREATE TABLE building_3d_configs (
 );
 
 -- Indexes for query performance
-CREATE INDEX idx_building_3d_configs_building_id ON building_3d_configs(building_id);
-CREATE INDEX idx_building_3d_configs_site_id ON building_3d_configs(site_id);
+CREATE INDEX IF NOT EXISTS idx_building_3d_configs_building_id ON building_3d_configs(building_id);
+CREATE INDEX IF NOT EXISTS idx_building_3d_configs_site_id ON building_3d_configs(site_id);
 
 -- Enable RLS (Row Level Security)
 ALTER TABLE building_3d_configs ENABLE ROW LEVEL SECURITY;

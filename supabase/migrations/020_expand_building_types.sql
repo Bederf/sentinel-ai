@@ -35,3 +35,40 @@ UPDATE buildings SET type = 'regional_office' WHERE name ILIKE '%Rosebank Towers
 UPDATE buildings SET type = 'regional_office' WHERE name ILIKE '%Sandton City Office%';
 UPDATE buildings SET type = 'regional_office' WHERE name ILIKE '%Standard Bank Centre%';
 UPDATE buildings SET type = 'regional_office' WHERE name ILIKE '%Standard Bank Durban%';
+
+-- =====================================================
+-- Seed core buildings
+-- These must exist before any equipment/zone/seed migrations
+-- =====================================================
+
+-- Sandton City Office Tower (primary demo site)
+INSERT INTO buildings (code, name, address, region, type, sqm, floors, year_built, latitude, longitude, contact_phone, operating_hours)
+VALUES (
+  'site-002',
+  'Sandton City Office Tower',
+  'Sandton City Complex, 83 Rivonia Road, Sandton',
+  'Gauteng',
+  'regional_office',
+  9000,
+  5,
+  2016,
+  -26.1076,
+  28.0567,
+  '+27 11 350 4000',
+  '{"weekday": "07:00-18:00", "weekend": "closed"}'::jsonb
+) ON CONFLICT (code) DO NOTHING;
+
+-- Busamed Gateway Private Hospital
+INSERT INTO buildings (code, name, address, region, type, sqm, floors, year_built, latitude, longitude)
+VALUES (
+  'site-005',
+  'Busamed Gateway Private Hospital',
+  '36-38 Aurora Dr, Umhlanga Rocks, uMhlanga, 4319',
+  'KwaZulu-Natal',
+  'hospital',
+  15000,
+  10,
+  2010,
+  -29.7286,
+  31.0689
+) ON CONFLICT (code) DO NOTHING;

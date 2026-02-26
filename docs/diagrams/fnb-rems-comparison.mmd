@@ -1,0 +1,87 @@
+block-beta
+    columns 3
+
+    block:header:3
+        columns 3
+        H1["<b>Process Step</b>"] H2["<b>AS-IS (Current)</b>"] H3["<b>SENTINEL TO-BE</b>"]
+    end
+
+    block:row1:3
+        columns 3
+        R1A["🔍 Fault Detection"]
+        R1B["Client notices issue<br/>and reports manually"]
+        R1C["BMS sensors detect<br/>before client calls"]
+    end
+
+    block:row2:3
+        columns 3
+        R2A["📧 Intake"]
+        R2B["Free-text email to helpdesk<br/>Manual info gathering"]
+        R2C["SENTINEL auto-parses email<br/>Helpdesk confirms pre-filled"]
+    end
+
+    block:row3:3
+        columns 3
+        R3A["📋 Job Logging"]
+        R3B["Helpdesk manually enters<br/>all details in Concept"]
+        R3C["Auto-created in Concept<br/>with AI diagnosis + history"]
+    end
+
+    block:row4:3
+        columns 3
+        R4A["📲 Team Notification"]
+        R4B["Email only to<br/>discipline team"]
+        R4C["Email + Sentry WhatsApp<br/>with priority + AI context"]
+    end
+
+    block:row5:3
+        columns 3
+        R5A["🔧 Technician Context"]
+        R5B["Minimal info —<br/>client description only"]
+        R5C["AI pre-diagnosis,<br/>equipment history,<br/>suggested parts"]
+    end
+
+    block:row6:3
+        columns 3
+        R6A["🏢 Vendor Escalation"]
+        R6B["Manual ServiceNow incident<br/>Email to vendor"]
+        R6C["Pre-filled incident<br/>WhatsApp + email to vendor"]
+    end
+
+    block:row7:3
+        columns 3
+        R7A["✅ Quote Approval"]
+        R7B["Manager logs in manually<br/>No alert if delayed"]
+        R7C["Same approval flow<br/>SLA alert if delayed"]
+    end
+
+    block:row8:3
+        columns 3
+        R8A["⏱️ SLA Monitoring"]
+        R8B["Manual — discovered<br/>in monthly reports"]
+        R8C["Auto-monitored at every step<br/>WhatsApp alert before breach"]
+    end
+
+    block:row9:3
+        columns 3
+        R9A["📊 Reporting"]
+        R9B["Monthly spreadsheet<br/>export to management"]
+        R9C["Live dashboard —<br/>all buildings, real-time"]
+    end
+
+    block:row10:3
+        columns 3
+        R10A["🧠 ML Learning"]
+        R10B["None — same faults<br/>recur without learning"]
+        R10C["Every closure retrains model<br/>PPM shifts to condition-based"]
+    end
+
+    classDef header fill:#1e293b,stroke:#334155,color:#f8fafc
+    classDef label fill:#f1f5f9,stroke:#94a3b8,color:#1e293b
+    classDef asis fill:#fee2e2,stroke:#fca5a5,color:#7f1d1d
+    classDef tobe fill:#d1fae5,stroke:#6ee7b7,color:#064e3b
+
+    class H1,H2,H3 header
+    class R1A,R2A,R3A,R4A,R5A,R6A,R7A,R8A,R9A,R10A label
+    class R1B,R2B,R3B,R4B,R5B,R6B,R7B,R8B,R9B,R10B asis
+    class R1C,R2C,R3C,R4C,R5C,R6C,R7C,R8C,R9C,R10C tobe

@@ -11,6 +11,7 @@ enforcement actions. Collects metrics from existing services:
 The evaluator never recomputes metrics — it aggregates from existing services.
 """
 
+import asyncio
 import logging
 from datetime import datetime
 from typing import Dict, Optional
@@ -243,19 +244,19 @@ class QualityGateEvaluator:
             logger.warning("collect_metrics called without site_id in live mode — fail-closed")
             return metrics
 
-        # a) MonitoringService
-        try:
+        # Collect from all sources concurrently with individual timeouts.
+        # Each source is independent — one failure must not block others.
+        # Uses asyncio.wait_for per source (3-5s timeout each).
+
+        async def _collect_monitoring():
             from app.services.monitoring_service import MonitoringService
 
             monitoring = MonitoringService()
-            snapshot = await monitoring.get_snapshot(building_id=site_id)
-
+            snapshot = await asyncio.wait_for(monitoring.get_snapshot(building_id=site_id), timeout=5.0)
             metrics["freshness_minutes"] = snapshot.ingestion.freshness_hours * 60.0
             metrics["ingest_error_rate_pct_1h"] = snapshot.ingestion.error_rate * 100.0
             metrics["match_coverage_pct"] = snapshot.ingestion.match_coverage * 100.0
             metrics["unmatched_points_pct"] = 100.0 - metrics["match_coverage_pct"]
-
-            # Provenance: manual_source_pct
             prov = snapshot.ingestion.provenance_summary
             live_count = prov.get("live_protocol", 0)
             manual_count = prov.get("file_manual", 0)
@@ -264,16 +265,11 @@ class QualityGateEvaluator:
                 metrics["manual_source_pct"] = (manual_count / total_sources) * 100.0
             else:
                 metrics["manual_source_pct"] = 0.0
-
-            # Commissioning from snapshot
             if snapshot.commissioning is not None:
                 metrics["commissioning_all_gates_passed"] = 1.0 if snapshot.commissioning.all_gates_passed else 0.0
                 metrics["consecutive_pass_days"] = float(snapshot.commissioning.consecutive_pass_days)
-        except Exception as e:
-            logger.warning(f"Failed to collect monitoring metrics: {e}")
 
-        # b) Truth check from CommissioningService
-        try:
+        async def _collect_truth_check():
             from app.services.commissioning_service import CommissioningService
 
             comm_svc = CommissioningService()
@@ -282,11 +278,8 @@ class QualityGateEvaluator:
                 if truth_data and isinstance(truth_data, dict):
                     pass_rate = truth_data.get("pass_rate", 1.0)
                     metrics["truth_check_pass_rate_pct"] = pass_rate * 100.0
-        except Exception as e:
-            logger.debug(f"Failed to collect truth check metrics: {e}")
 
-        # c) MVVerificationService
-        try:
+        async def _collect_mv():
             from app.services.mv_verification_service import MVVerificationService
 
             mv_svc = MVVerificationService()
@@ -295,46 +288,30 @@ class QualityGateEvaluator:
                 avg_acc = summary.get("average_accuracy")
                 if avg_acc is not None:
                     metrics["mv_accuracy_7d_pct"] = avg_acc * 100.0
-
                 total_verifications = summary.get("total_verifications", 0)
                 rollbacks = summary.get("rollbacks_recommended", 0)
                 if total_verifications > 0:
                     metrics["rollback_rate_7d_pct"] = (rollbacks / total_verifications) * 100.0
-                else:
-                    # No verifications: use default (safe for simulation, fail for live)
-                    pass
-        except Exception as e:
-            logger.warning(f"Failed to collect M&V metrics: {e}")
 
-        # d) MLFeedbackService
-        try:
+        async def _collect_ml_feedback():
             from app.services.ml_feedback_service import MLFeedbackService
 
             fb_svc = MLFeedbackService()
             fb_summary = fb_svc.get_feedback_summary()
-
             total_records = fb_summary.total_feedback_records
             predictions_evaluated = fb_summary.predictions_evaluated
             if predictions_evaluated > 0:
                 metrics["feedback_capture_rate_7d_pct"] = min(
                     (total_records / max(predictions_evaluated, 1)) * 100.0, 100.0
                 )
-
-            # label_lag_p95_hours: estimate from avg_prediction_accuracy timing
-            # Since we don't have precise timing, use a heuristic
             if fb_summary.avg_prediction_accuracy > 0:
-                # Better accuracy implies tighter feedback loop
                 metrics["label_lag_p95_hours"] = max(1.0, 48.0 * (1.0 - fb_summary.avg_prediction_accuracy))
-        except Exception as e:
-            logger.warning(f"Failed to collect ML feedback metrics: {e}")
 
-        # e) Drift critical alerts (from audit log)
-        try:
+        async def _collect_drift_alerts():
             from app.services.audit_logger import AuditLogger
-
-            audit = AuditLogger()
             from datetime import timedelta
 
+            audit = AuditLogger()
             cutoff = datetime.now() - timedelta(hours=24)
             entries = audit.get_logs(start_time=cutoff, limit=500)
             drift_count = sum(
@@ -344,8 +321,25 @@ class QualityGateEvaluator:
                 or (hasattr(e, "action") and "drift" in str(getattr(e, "action", "")).lower())
             )
             metrics["drift_critical_alerts_24h"] = float(drift_count)
-        except Exception as e:
-            logger.debug(f"Failed to collect drift alert metrics: {e}")
+
+        # Run all collectors concurrently; each wrapped in try/except
+        collectors = [
+            ("monitoring", _collect_monitoring),
+            ("truth_check", _collect_truth_check),
+            ("mv_verification", _collect_mv),
+            ("ml_feedback", _collect_ml_feedback),
+            ("drift_alerts", _collect_drift_alerts),
+        ]
+
+        async def _safe_collect(name: str, coro_fn):
+            try:
+                await asyncio.wait_for(coro_fn(), timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.warning(f"Quality gate collector '{name}' timed out (5s)")
+            except Exception as e:
+                logger.warning(f"Failed to collect {name} metrics: {e}")
+
+        await asyncio.gather(*[_safe_collect(name, fn) for name, fn in collectors])
 
         return metrics
 

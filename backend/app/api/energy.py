@@ -9,6 +9,7 @@ import random
 from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel
 
+from app.config.settings import settings
 from app.database.repositories.energy_consumption_repository import get_energy_consumption_repository
 from app.services.building_loader import BuildingDataLoader
 from app.services.energy_rules_engine import get_energy_rules_engine
@@ -587,7 +588,8 @@ def get_energy_from_supabase(
         days: Number of days of data
 
     Returns:
-        Tuple of (data points, success flag)
+        Tuple of (data points, success flag).
+        Success is True when Supabase query executes, even if zero records are found.
     """
     from app.database.supabase_client import get_supabase_client
 
@@ -602,7 +604,7 @@ def get_energy_from_supabase(
             records = repo.get_all_buildings(days)
 
         if not records:
-            return [], False
+            return [], True
 
         # Get building info from Supabase for names
         result = client.table("buildings").select("code, name").execute()
@@ -655,20 +657,31 @@ async def get_energy(
         - total_kwh: Sum of all categories
 
     Note:
-        Tries to load from Supabase first. Falls back to mock data if unavailable.
+        Uses Supabase as the authoritative source. Mock fallback is disabled by default
+        and can be explicitly enabled with ENERGY_ALLOW_MOCK_FALLBACK=true.
     """
     # Try Supabase first
     supabase_data, success = get_energy_from_supabase(site_id, days)
-    if success and supabase_data:
-        logger.info(f"Using Supabase energy data ({len(supabase_data)} records)")
+    if success:
+        logger.info("Using Supabase energy data (%s records)", len(supabase_data))
         return EnergyResponse(
             days=days,
             site_id=site_id,
             data=supabase_data,
         )
 
+    if not settings.energy_allow_mock_fallback:
+        logger.warning(
+            "Supabase energy query failed; returning empty dataset because ENERGY_ALLOW_MOCK_FALLBACK is disabled"
+        )
+        return EnergyResponse(
+            days=days,
+            site_id=site_id,
+            data=[],
+        )
+
     # Fall back to mock data generation using Supabase buildings
-    logger.info("Supabase energy data empty, using mock generation")
+    logger.warning("Supabase energy query failed; using mock generation (ENERGY_ALLOW_MOCK_FALLBACK=true)")
 
     from app.database.supabase_client import get_supabase_client
 

@@ -64,5 +64,5 @@ COMMENT ON COLUMN parasite_decisions.decision_details IS 'What the AI decided an
 COMMENT ON COLUMN parasite_decisions.original_value IS 'Device value before write - stored for potential rollback';
 COMMENT ON COLUMN parasite_decisions.actual_value IS 'Value read back from device after write (COV verification result)';
 COMMENT ON COLUMN parasite_decisions.cov_verified IS 'Boolean: did device read-back confirm the write was accepted?';
-COMMENT ON COLUMN parasite_decisions.outcome JSONB IS 'Measured outcomes after measurement window (e.g., energy_saved_kwh, temperature_achieved, comfort_index, peak_demand_reduction)';
+COMMENT ON COLUMN parasite_decisions.outcome IS 'Measured outcomes after measurement window (e.g., energy_saved_kwh, temperature_achieved, comfort_index, peak_demand_reduction)';
 COMMENT ON COLUMN parasite_decisions.outcome_matched_prediction IS 'Did actual outcome match what AI predicted when making the decision?';

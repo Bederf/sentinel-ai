@@ -46,10 +46,12 @@ def is_safety_critical_intent(intent: str) -> bool:
 
 class HybridAIService:
     """
-    Routes AI requests to local Ollama or configured cloud provider.
+    Routes AI requests to Anthropic Claude (primary) with Z.ai fallback.
 
-    - Tier 1/simple tasks -> Ollama
-    - Tier 2/complex tasks -> active cloud provider
+    Originally routed Tier 1→Ollama, Tier 2+→Cloud. On CPU-only VPS,
+    Ollama generates ~0.1 tok/s — unusable. All tiers now route through
+    cloud providers.  Set USE_OLLAMA=true to re-enable local routing
+    (requires GPU hardware).
     """
 
     def __init__(self):
@@ -103,7 +105,12 @@ class HybridAIService:
         return should_allow_cloud_processing(data_subject_id)
 
     def classify_task(self, message: str) -> dict[str, Any]:
-        """Classify task complexity and route to provider/model."""
+        """Classify task complexity and route to cloud provider.
+
+        All tiers now route through Anthropic/Z.ai — Ollama disabled on
+        CPU-only VPS.  Tier classification is preserved for logging/cost
+        tracking.
+        """
         message_lower = message.lower()
         cloud_provider = self.get_active_cloud_provider()
         cloud_model = self.get_active_cloud_model()
@@ -130,10 +137,10 @@ class HybridAIService:
         ]
         if any(re.match(pattern, message_lower) for pattern in simple_patterns):
             return {
-                "provider": "ollama",
-                "model": self.ollama_models["fast"],
+                "provider": cloud_provider,
+                "model": cloud_model,
                 "reason": "Simple lookup/retrieval",
-                "estimated_cost": 0.0,
+                "estimated_cost": cloud_cost,
                 "tier": 1,
             }
 
@@ -149,10 +156,10 @@ class HybridAIService:
         ]
         if any(re.search(pattern, message_lower) for pattern in data_patterns):
             return {
-                "provider": "ollama",
-                "model": self.ollama_models["balanced"],
+                "provider": cloud_provider,
+                "model": cloud_model,
                 "reason": "Data query/retrieval",
-                "estimated_cost": 0.0,
+                "estimated_cost": cloud_cost,
                 "tier": 1,
             }
 
@@ -292,70 +299,46 @@ class HybridAIService:
         include_building_context: bool = True,
         data_subject_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
-        """Try active cloud provider and fallback to Ollama on failure."""
-        if self._is_local_ai_only() or not self._is_cloud_allowed_for_subject(data_subject_id):
-            model = self.ollama_models["balanced"]
-            response = await self.query_ollama(
-                message,
-                model=model,
-                escalate_on_fail=False,
-                data_subject_id=data_subject_id,
-            )
-            yield f"[Local-only mode - using {model}] {response}"
-            return
-
+        """Try Anthropic Claude, fallback to Z.ai on failure."""
         provider = self.get_active_cloud_provider()
 
+        # --- Anthropic (primary) ---
         if provider == "anthropic":
             try:
                 if self.rate_tracker:
                     self.rate_tracker.record_request()
-
                 async for chunk in claude_service.stream_response(
                     [{"role": "user", "content": message}],
                     include_building_context=include_building_context,
                 ):
                     yield chunk
                 return
-
             except RateLimitError as e:
-                logger.warning("Claude rate limit hit: %s", e)
+                logger.warning("Claude rate limited: %s — falling back to Z.ai", e)
                 if self.rate_tracker:
                     self.rate_tracker.record_rate_limit_hit()
                 else:
                     self.claude_rate_limited = True
                     self.rate_limit_time = time.time()
-
-                routing = self.classify_task(message)
-                model = self.ollama_models["fast"] if routing["tier"] == 1 else self.ollama_models["balanced"]
-                response = await self.query_ollama(
-                    message,
-                    model=model,
-                    escalate_on_fail=False,
-                    data_subject_id=data_subject_id,
-                )
-                yield f"[Claude rate limited - using {model}] {response}"
-                return
-
             except Exception as e:
-                error_type = type(e).__name__
-                logger.error("Claude error (%s): %s", error_type, e)
-                routing = self.classify_task(message)
-                model = self.ollama_models["fast"] if routing["tier"] == 1 else self.ollama_models["balanced"]
-                try:
-                    response = await self.query_ollama(
-                        message,
-                        model=model,
-                        escalate_on_fail=False,
-                        data_subject_id=data_subject_id,
-                    )
-                    yield f"[Claude unavailable ({error_type}) - using {model}] {response}"
-                    return
-                except Exception as ollama_error:
-                    logger.error("Ollama fallback also failed: %s", ollama_error)
-                    yield "I'm having trouble with both AI services. Please try again in a moment."
-                    return
+                logger.error("Claude error (%s): %s — falling back to Z.ai", type(e).__name__, e)
 
+            # --- Z.ai fallback ---
+            if zai_service.is_configured():
+                try:
+                    async for chunk in zai_service.stream_response(
+                        [{"role": "user", "content": message}],
+                        include_building_context=include_building_context,
+                    ):
+                        yield chunk
+                    return
+                except Exception as zai_err:
+                    logger.error("Z.ai fallback also failed: %s", zai_err)
+
+            yield "I'm having trouble with the AI service. Please try again in a moment."
+            return
+
+        # --- Z.ai primary ---
         try:
             async for chunk in zai_service.stream_response(
                 [{"role": "user", "content": message}],
@@ -364,23 +347,20 @@ class HybridAIService:
                 yield chunk
             return
         except Exception as e:
-            error_type = type(e).__name__
-            logger.error("Z.ai error (%s): %s", error_type, e)
-            routing = self.classify_task(message)
-            model = self.ollama_models["fast"] if routing["tier"] == 1 else self.ollama_models["balanced"]
-            try:
-                response = await self.query_ollama(
-                    message,
-                    model=model,
-                    escalate_on_fail=False,
-                    data_subject_id=data_subject_id,
-                )
-                yield f"[Z.ai unavailable ({error_type}) - using {model}] {response}"
-                return
-            except Exception as ollama_error:
-                logger.error("Ollama fallback also failed: %s", ollama_error)
-                yield "I'm having trouble with both AI services. Please try again in a moment."
-                return
+            logger.error("Z.ai error (%s): %s — trying Claude fallback", type(e).__name__, e)
+
+        # --- Claude fallback ---
+        try:
+            async for chunk in claude_service.stream_response(
+                [{"role": "user", "content": message}],
+                include_building_context=include_building_context,
+            ):
+                yield chunk
+            return
+        except Exception as claude_err:
+            logger.error("Claude fallback also failed: %s", claude_err)
+            yield "I'm having trouble with both AI services. Please try again in a moment."
+            return
 
     async def stream_response(
         self,
@@ -388,16 +368,9 @@ class HybridAIService:
         use_tools: bool = False,
         data_subject_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
-        """Stream response from routed provider."""
+        """Stream response from Anthropic (primary) with Z.ai fallback."""
         provider = self.get_active_cloud_provider()
-        cloud_allowed = self._is_cloud_allowed_for_subject(data_subject_id)
 
-        if use_tools and (self._is_local_ai_only() or not cloud_allowed):
-            yield (
-                "[Local AI only mode] Tool-based actions require Claude and are unavailable right now. "
-                "Please use advisory queries only."
-            )
-            return
         if use_tools and provider != "anthropic":
             yield (
                 f"[{provider} cloud mode] Tool-based actions currently require Claude. "
@@ -406,18 +379,6 @@ class HybridAIService:
             return
 
         routing = self.classify_task(message)
-        if self._is_local_ai_only():
-            routing["provider"] = "ollama"
-            routing["model"] = (
-                self.ollama_models["fast"] if routing.get("tier") == 1 else self.ollama_models["balanced"]
-            )
-            routing["reason"] = f"{routing['reason']} (local-only mode)"
-        elif not cloud_allowed:
-            routing["provider"] = "ollama"
-            routing["model"] = (
-                self.ollama_models["fast"] if routing.get("tier") == 1 else self.ollama_models["balanced"]
-            )
-            routing["reason"] = f"{routing['reason']} (POPIA cross-border consent not active)"
 
         logger.info(
             "Routing decision: provider=%s, model=%s, reason=%s, tier=%s",
@@ -466,30 +427,7 @@ class HybridAIService:
                     return
                 raise
 
-        if routing["provider"] == "anthropic":
-            can_use_claude, reason = self._should_use_claude()
-            if not can_use_claude:
-                logger.info("Claude unavailable: %s, forcing Ollama fallback", reason)
-                routing["provider"] = "ollama"
-                routing["model"] = self.ollama_models["balanced"]
-                routing["reason"] += f" ({reason})"
-                if self.rate_tracker:
-                    self.rate_tracker.record_request()
-
-        if routing["provider"] == "ollama":
-            try:
-                response = await self.query_ollama(
-                    message,
-                    model=routing["model"],
-                    escalate_on_fail=not self._is_local_ai_only(),
-                    data_subject_id=data_subject_id,
-                )
-                yield response
-            except Exception as e:
-                logger.error("Ollama routing failed: %s", e)
-                yield "I'm having trouble with the local AI. Please try again."
-            return
-
+        # Non-tool path: Anthropic → Z.ai fallback
         logger.info("Using cloud provider with fallback: %s", routing["provider"])
         async for chunk in self._try_cloud_with_fallback(
             message,

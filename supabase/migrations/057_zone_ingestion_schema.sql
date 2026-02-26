@@ -6,7 +6,7 @@
 
 -- Zones table: Stores building-level zone configuration
 -- Each building can have a different zone structure
-CREATE TABLE zones (
+CREATE TABLE IF NOT EXISTS zones (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     building_id UUID NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
     zone_id TEXT NOT NULL,                    -- e.g., "Zone-L1-A"

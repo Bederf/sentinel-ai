@@ -3,7 +3,7 @@
     "chw_supply_temp": 7.2,
     "chw_return_temp": 12.5,
     "chiller_status": 1,
-    "chw_supply_temp_setpoint": 8.5,
+    "chw_supply_temp_setpoint": 7,
     "compressor_pressure": 12.5
   },
   "S001-AHU-L3-001": {
@@ -182,7 +182,7 @@
     "fcu_status": 1
   },
   "S002-VAV-L2-C": {
-    "damper_position": 70,
+    "damper_position": 50,
     "airflow_setpoint": 350,
     "airflow_actual": 340,
     "reheat_valve": 0,

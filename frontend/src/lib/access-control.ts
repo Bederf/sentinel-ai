@@ -127,11 +127,11 @@ export function getUserViewMode(email: string): 'auditor' | 'operator' | 'admin'
  * DEFAULT LANDING PAGE: 'ai-chat'
  *
  * Grant Demo (grantdemo.co.za) users override this and default to 'occupancy'.
- * All other users default to 'ai-chat'.
+ * All other users default to 'dashboard'.
  */
 export function getDefaultView(email: string): View {
   const config = getCompanyDemoConfig(email);
-  return config?.defaultView || 'ai-chat';
+  return config?.defaultView || 'dashboard';
 }
 
 /**

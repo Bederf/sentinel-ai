@@ -55,12 +55,14 @@ WHERE type IS NULL
    OR LOWER(type) IN ('unknown', 'n/a', 'na', 'none');
 
 -- Log the changes
-INSERT INTO audit_log (table_name, operation, record_id, changes_summary)
+INSERT INTO audit_log (action, entity_type, entity_id, new_value, result, metadata)
 SELECT
+  'CONFIG_CHANGE',
   'equipment',
-  'UPDATE',
   id,
-  jsonb_build_object('type', extract_equipment_type(code))
+  jsonb_build_object('type', extract_equipment_type(code)),
+  'success',
+  jsonb_build_object('migration', '068_fix_equipment_types')
 FROM equipment
 WHERE type IS NULL
    OR type = ''

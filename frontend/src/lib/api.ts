@@ -539,6 +539,8 @@ export interface Site {
   };
   last_optimization?: string;
   optimization_history?: OptimizationHistoryEntry[];
+  // SENTINEL processing toggle (Phase 125)
+  sentinel_processing_enabled?: boolean;
 }
 
 // Equipment interface
@@ -1159,13 +1161,12 @@ async function fetchApi<T>(
  * @param message - User message to send
  * @param conversationId - Optional conversation ID for context
  * @param onChunk - Callback called for each text chunk received
- * @param searchDocs - When true, searches documentation RAG instead of using device control tools
+ * @param siteId - Optional site ID for building context
  */
 export async function streamChat(
   message: string,
   conversationId: string | undefined,
   onChunk: (chunk: string) => void,
-  searchDocs: boolean = true,
   siteId?: string
 ): Promise<void> {
   const url = `${API_BASE_URL}/api/chat`;
@@ -1182,7 +1183,6 @@ export async function streamChat(
     body: JSON.stringify({
       message,
       conversation_id: conversationId,
-      search_docs: searchDocs,
       site_id: siteId,
     }),
   });
@@ -1802,6 +1802,26 @@ export const api = {
     enabled: boolean
   ): Promise<OptimizationStatusResponse> {
     return fetchApi(`/api/optimization/toggle/${siteId}`, {
+      method: "POST",
+      body: JSON.stringify({ enabled }),
+    });
+  },
+
+  /**
+   * Get SENTINEL processing state for a site
+   */
+  async getSiteProcessing(siteId: string): Promise<{ site_id: string; sentinel_processing_enabled: boolean }> {
+    return fetchApi(`/api/sites/${siteId}/processing`);
+  },
+
+  /**
+   * Toggle SENTINEL processing for a site (mute/unmute intelligence layer)
+   */
+  async toggleSiteProcessing(
+    siteId: string,
+    enabled: boolean
+  ): Promise<{ site_id: string; sentinel_processing_enabled: boolean }> {
+    return fetchApi(`/api/sites/${siteId}/processing`, {
       method: "POST",
       body: JSON.stringify({ enabled }),
     });

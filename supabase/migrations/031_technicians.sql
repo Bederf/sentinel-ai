@@ -51,9 +51,11 @@ CREATE TRIGGER update_technicians_updated_at BEFORE UPDATE ON technicians
 -- Seed data for Sandton City (site-002)
 -- =====================================================
 
--- Insert a default technician
+-- Insert technicians
 INSERT INTO technicians (code, name, email, phone) VALUES
-  ('TECH-001', 'John Smith', 'bederf@gmail.com', '+27-82-555-0101');
+  ('TECH-001', 'John Smith', 'bederf@gmail.com', '+27-82-555-0101'),
+  ('TECH-002', 'Ntaote Moshoeshoe', 'ntaote.moshoeshoe@fnb.co.za', '')
+ON CONFLICT (code) DO NOTHING;
 
 -- Assign to Sandton City for all specialties
 INSERT INTO site_technicians (building_id, technician_id, specialty, is_primary)

@@ -305,7 +305,7 @@ COMMENT ON COLUMN zones.zone_id IS 'Numeric zone identifier encoding floor: 001-
 
 COMMENT ON COLUMN desks.zone_id IS 'Numeric zone reference (e.g., Zone-001 for Ground floor Zone A). Replaces letter-based naming (Zone-L0-A).';
 
-COMMENT ON TABLE zone_centroids IS 'Calculates zone centroids from desk positions using numeric zone IDs for accurate equipment positioning in 3D visualization.';
+COMMENT ON VIEW zone_centroids IS 'Calculates zone centroids from desk positions using numeric zone IDs for accurate equipment positioning in 3D visualization.';
 
 COMMENT ON VIEW dali_zone_alignment_status IS 'Shows DALI zone mapping status with numeric zone IDs. Zone number self-documents floor: 001-099=L0, 100-199=L1, 200-299=L2, 300-399=B1.';
 

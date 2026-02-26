@@ -114,8 +114,13 @@ class TestLightingPromptFormatting:
 class TestRuleBasedLightingOptimization:
     """Test rule-based lighting optimization logic."""
 
-    def test_unoccupied_zone_dimming_recommendation(self):
-        """Test that unoccupied zones get dimming recommendations."""
+    def test_unoccupied_zone_cross_system_recommendation(self):
+        """Test that unoccupied zones get cross-system monitoring recommendations.
+
+        Tridonic net4more natively handles BOTH lighting dimming AND HVAC setback
+        via BACnet when zones are unoccupied. SENTINEL monitors and adds value
+        through predictive pre-conditioning and tariff optimization.
+        """
         optimizer = AIOptimizerService()
 
         mock_zones = {
@@ -156,15 +161,21 @@ class TestRuleBasedLightingOptimization:
             mock_zones,
         )
 
-        # Should have a lighting recommendation for the unoccupied zone
-        lighting_recs = [r for r in result.recommendations if r.get("system") == "lighting"]
-        assert len(lighting_recs) > 0
+        # Tridonic-first: dimming handled natively, AI provides cross-system coordination
+        assert result.cross_system_recommendations is not None
+        assert len(result.cross_system_recommendations) > 0
 
-        zone_rec = next((r for r in lighting_recs if r["equipment_id"] == "Zone-L11-S"), None)
+        zone_rec = next(
+            (r for r in result.cross_system_recommendations if r["zone_id"] == "Zone-L11-S"),
+            None,
+        )
         assert zone_rec is not None
-        assert zone_rec["point_name"] == "dim_level"
-        assert zone_rec["recommended_value"] == 51  # 20% = level 51
         assert "unoccupied" in zone_rec["reason"].lower()
+        # Tridonic handles both lighting AND HVAC natively via net4more + BACnet
+        assert "Tridonic" in zone_rec["lighting_action"]
+        assert "Tridonic" in zone_rec["hvac_action"]
+        # SENTINEL adds predictive/tariff optimization on top
+        assert "sentinel_action" in zone_rec
 
     def test_daylight_harvesting_recommendation(self):
         """Test that high-lux zones get daylight harvesting recommendations."""
