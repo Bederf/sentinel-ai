@@ -22,6 +22,7 @@ from app.middleware.audit_middleware import AuditMiddleware
 from app.middleware.security_logging import SecurityLoggingMiddleware
 from app.middleware.error_sanitization import ErrorSanitizationMiddleware
 from app.middleware.agent_security.middleware import AgentSecurityMiddleware, check_unmapped_routes
+from app.middleware.request_metrics import RequestMetricsMiddleware
 
 _logger = logging.getLogger("sentinel.security")
 
@@ -313,3 +314,7 @@ def register_middleware(app: FastAPI) -> None:
     # Cross-check registered routes against agent security PATH_TOOL_MAP
     # Logs warnings for unmapped agent-sensitive routes
     check_unmapped_routes(app)
+
+    # Request metrics middleware (Phase 127 — outermost, captures full lifecycle)
+    # Registered last so it wraps all other middleware (reverse execution order).
+    app.add_middleware(RequestMetricsMiddleware)

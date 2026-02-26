@@ -21,6 +21,7 @@ from prometheus_client import (
     CollectorRegistry,
     Counter,
     Gauge,
+    Histogram,
     Info,
     generate_latest,
     CONTENT_TYPE_LATEST,
@@ -98,6 +99,55 @@ sentinel_rollback_total = Counter(
 sentinel_info = Info(
     "sentinel",
     "SENTINEL build and configuration metadata",
+    registry=REGISTRY,
+)
+
+# ---------------------------------------------------------------------------
+# HTTP request metrics (Phase 127 — RequestMetricsMiddleware)
+# ---------------------------------------------------------------------------
+
+# 9. HTTP request counter
+sentinel_http_requests_total = Counter(
+    "sentinel_http_requests_total",
+    "Total HTTP requests by method, path pattern, and status code",
+    labelnames=["method", "path", "status_code"],
+    registry=REGISTRY,
+)
+
+# 10. HTTP request duration histogram
+sentinel_http_request_duration_seconds = Histogram(
+    "sentinel_http_request_duration_seconds",
+    "HTTP request duration in seconds",
+    labelnames=["method", "path"],
+    buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
+    registry=REGISTRY,
+)
+
+# 11. HTTP requests in progress
+sentinel_http_requests_in_progress = Gauge(
+    "sentinel_http_requests_in_progress",
+    "Number of HTTP requests currently being processed",
+    registry=REGISTRY,
+)
+
+# ---------------------------------------------------------------------------
+# Tool-call metrics (Phase 127 — chat pipeline instrumentation)
+# ---------------------------------------------------------------------------
+
+# 12. Tool call counter
+sentinel_tool_calls_total = Counter(
+    "sentinel_tool_calls_total",
+    "Total tool calls by tool name and outcome",
+    labelnames=["tool_name", "outcome"],
+    registry=REGISTRY,
+)
+
+# 13. Tool call duration histogram
+sentinel_tool_call_duration_seconds = Histogram(
+    "sentinel_tool_call_duration_seconds",
+    "Tool call execution duration in seconds",
+    labelnames=["tool_name"],
+    buckets=[0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0],
     registry=REGISTRY,
 )
 

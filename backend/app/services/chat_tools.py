@@ -323,6 +323,20 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
         # High-priority predictions
         urgent_predictions = [p for p in predictions if p.get("probability_percent", 0) >= 70]
 
+        # Build alerts lookup by equipment_id for enrichment
+        alerts_by_equipment = {}
+        for a in active_alerts:
+            eq_id = a.get("equipment_id")
+            if eq_id:
+                alerts_by_equipment.setdefault(eq_id, []).append(a)
+
+        # Build predictions lookup by equipment_id for enrichment
+        preds_by_equipment = {}
+        for p in predictions:
+            eq_id = p.get("equipment_id")
+            if eq_id:
+                preds_by_equipment.setdefault(eq_id, []).append(p)
+
         # Build status response
         status = {
             "success": True,
@@ -341,6 +355,8 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
                 "urgent_predictions": len(urgent_predictions),
             },
             "critical_issues": [],
+            "degraded_equipment": [],
+            "active_predictions": [],
             "recommendations": [],
         }
 
@@ -358,6 +374,9 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
             )
 
         for eq in critical_equipment[:5]:
+            eq_id = eq.get("id")
+            eq_alerts = alerts_by_equipment.get(eq_id, [])
+            eq_preds = preds_by_equipment.get(eq_id, [])
             status["critical_issues"].append(
                 {
                     "type": "equipment_health",
@@ -366,6 +385,57 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
                     "health_score": eq.get("health_score", 0),
                     "status": eq.get("status"),
                     "last_service": eq.get("last_service"),
+                    "active_alerts": [
+                        {"severity": a.get("severity"), "message": a.get("message")} for a in eq_alerts[:3]
+                    ],
+                    "predictions": [
+                        {
+                            "id": p.get("id"),
+                            "type": p.get("prediction_type"),
+                            "probability_percent": p.get("probability_percent"),
+                        }
+                        for p in eq_preds[:2]
+                    ],
+                }
+            )
+
+        # Add degraded equipment details so Claude has full context
+        for eq in degraded_equipment[:10]:
+            eq_id = eq.get("id")
+            eq_alerts = alerts_by_equipment.get(eq_id, [])
+            eq_preds = preds_by_equipment.get(eq_id, [])
+            status["degraded_equipment"].append(
+                {
+                    "id": eq.get("code") or eq["id"],
+                    "name": eq.get("name"),
+                    "type": eq.get("type"),
+                    "health_score": eq.get("health_score", 0),
+                    "status": eq.get("status"),
+                    "last_service": eq.get("last_service"),
+                    "active_alerts": [
+                        {"severity": a.get("severity"), "message": a.get("message")} for a in eq_alerts[:3]
+                    ],
+                    "predictions": [
+                        {
+                            "id": p.get("id"),
+                            "type": p.get("prediction_type"),
+                            "probability_percent": p.get("probability_percent"),
+                        }
+                        for p in eq_preds[:2]
+                    ],
+                }
+            )
+
+        # Add active predictions with equipment context
+        for pred in predictions[:10]:
+            eq_info = pred.get("equipment", {}) or {}
+            status["active_predictions"].append(
+                {
+                    "id": pred.get("id"),
+                    "equipment_code": eq_info.get("code"),
+                    "equipment_name": eq_info.get("name"),
+                    "prediction_type": pred.get("prediction_type"),
+                    "probability_percent": pred.get("probability_percent", 0),
                 }
             )
 
@@ -393,7 +463,10 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
                 {
                     "priority": "medium",
                     "action": "Plan preventive maintenance",
-                    "details": f"{len(degraded_equipment)} equipment items showing degradation",
+                    "details": (
+                        f"{len(degraded_equipment)} equipment items showing degradation "
+                        f"({thresholds['warning']}-{thresholds['healthy']}% health)"
+                    ),
                 }
             )
 
@@ -3029,6 +3102,35 @@ CHAT_TOOLS = [
         },
     },
     # ================================================================
+    # Documentation / Knowledge Base Search
+    # ================================================================
+    {
+        "name": "search_documents",
+        "description": (
+            "Search SENTINEL documentation, equipment manuals, fault codes, "
+            "and procedures. Use this when the user asks about how SENTINEL "
+            "works, equipment troubleshooting guides, manufacturer documentation, "
+            "maintenance procedures, or system capabilities. Returns relevant "
+            "document excerpts ranked by relevance. Do NOT use this for live "
+            "building data — use the other tools for real-time equipment status."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search query — natural language question or keywords",
+                },
+                "n_results": {
+                    "type": "integer",
+                    "description": "Maximum results to return (default: 5, max: 10)",
+                    "default": 5,
+                },
+            },
+            "required": ["query"],
+        },
+    },
+    # ================================================================
     # Write/Action Tools — Operator+ only (role-gated)
     # ================================================================
     {
@@ -3883,6 +3985,48 @@ async def reset_equipment_fault_chat(
         return {"success": False, "error": str(e)}
 
 
+async def search_documents(
+    query: str,
+    n_results: int = 5,
+) -> dict[str, Any]:
+    """Search indexed documentation and knowledge base via hybrid search."""
+    try:
+        from app.services.doc_rag_service import search_documentation
+
+        results = await search_documentation(
+            query=query,
+            n_results=min(n_results, 10),
+        )
+
+        if not results:
+            return {
+                "success": True,
+                "results": [],
+                "message": f"No documentation found matching '{query}'.",
+            }
+
+        formatted = []
+        for r in results:
+            formatted.append(
+                {
+                    "title": r.get("document_title", "Unknown"),
+                    "content": r.get("content", "")[:1500],
+                    "source": r.get("source", ""),
+                    "relevance": round(r.get("similarity", r.get("hybrid_score", 0)), 3),
+                }
+            )
+
+        return {
+            "success": True,
+            "results": formatted,
+            "count": len(formatted),
+            "query": query,
+        }
+    except Exception as e:
+        logger.error(f"Error searching documents: {e}")
+        return {"success": False, "error": str(e), "results": []}
+
+
 # Tool handler dispatch
 TOOL_HANDLERS = {
     "list_devices": list_devices,
@@ -3917,6 +4061,7 @@ TOOL_HANDLERS = {
     "approve_recommendation": approve_recommendation_chat,
     "reject_recommendation": reject_recommendation_chat,
     "reset_equipment_fault": reset_equipment_fault_chat,
+    "search_documents": search_documents,
 }
 
 
@@ -3970,10 +4115,31 @@ async def execute_tool(
     if tool_name == "create_work_order" and user_email:
         tool_input["_user_email"] = user_email
 
+    import time as _time
+
+    _t0 = _time.perf_counter()
+    _outcome = "success"
     try:
-        return await handler(**tool_input)
+        result = await handler(**tool_input)
+        if isinstance(result, dict) and "error" in result:
+            _outcome = "error"
+        return result
     except TypeError as e:
+        _outcome = "error"
         return {"error": f"Invalid parameters for {tool_name}: {e}"}
     except Exception as e:
+        _outcome = "error"
         logger.error(f"Error executing tool {tool_name}: {e}")
         return {"error": str(e)}
+    finally:
+        _duration = _time.perf_counter() - _t0
+        try:
+            from app.api.metrics import (
+                sentinel_tool_calls_total,
+                sentinel_tool_call_duration_seconds,
+            )
+
+            sentinel_tool_calls_total.labels(tool_name=tool_name, outcome=_outcome).inc()
+            sentinel_tool_call_duration_seconds.labels(tool_name=tool_name).observe(_duration)
+        except Exception:
+            pass

@@ -936,6 +936,24 @@ class BackgroundSchedulerService:
             trigger = RetrainingTrigger()
             result = trigger.evaluate_and_trigger()
 
+            # Update Prometheus drift gauge (Phase 127)
+            try:
+                from app.api.metrics import sentinel_model_drift_alerts
+
+                # Count triggers per model_type
+                drift_counts: dict[str, int] = {}
+                for t in result.get("triggered", []):
+                    mt = t.get("model_type", "unknown").upper()
+                    drift_counts[mt] = drift_counts.get(mt, 0) + 1
+
+                # Set gauge for each model type (0 = no drift, N = active alerts)
+                for model_type in ["LSTM", "AUTOENCODER", "CLASSIFIER"]:
+                    sentinel_model_drift_alerts.labels(site_id="site-002", model_type=model_type).set(
+                        drift_counts.get(model_type, 0)
+                    )
+            except Exception as metrics_err:
+                logger.debug(f"Drift metrics update skipped: {metrics_err}")
+
             if result.get("triggers_fired", 0) > 0:
                 logger.info(
                     f"🔄 Drift detected! Triggered {result['triggers_fired']} retraining job(s). "
