@@ -15,7 +15,8 @@ class BuildingRepository:
 
     _COLUMNS = (
         "id, code, name, type, region, address, latitude, longitude, "
-        "equipment_count, floor_count, total_area_sqm, created_at, updated_at"
+        "equipment_count, floors, sqm, created_at, updated_at, "
+        "sentinel_processing_enabled"
     )
 
     def __init__(self):

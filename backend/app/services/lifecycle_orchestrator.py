@@ -47,6 +47,7 @@ from app.services.feedback_collection_service import (
 )
 from app.services.power_meter_validation_engine import get_power_meter_validation_engine
 from app.services.seasonal_modeler import SeasonalModeler
+from app.services.sentinel_ml_feeder import SentinelMLFeeder
 from app.services.simulation_persistence import get_simulation_persistence
 from app.services.sustainability_metrics_collector import SustainabilityMetricsCollector
 from app.services.thermal_simulation_engine import update_simulation_temperatures
@@ -332,8 +333,15 @@ class LifecycleOrchestrator:
         # Maps "equipment_code::alert_type" -> datetime of last dashboard push.
         self._dashboard_alert_cooldown: dict[str, datetime] = {}
 
+        # Zone temperature alert tracking — status transitions + cooldown (like health monitor)
+        self._zone_temp_status_cache: dict[str, str] = {}  # zone_id -> "normal"|"warning"|"critical"
+        self._zone_temp_last_alert: dict[str, int] = {}  # zone_id -> absolute_hour of last alert
+
         # Supabase persistence for dashboard visibility (104-02)
         self.persistence = get_simulation_persistence(site_id=site_id)
+
+        # ML feeder: accumulates sensor data in-memory, feeds ML trainers directly
+        self.ml_feeder = SentinelMLFeeder()
 
         # BESS state of charge tracking across hours
         self.bess_soc: float = 50.0  # Start at 50% SoC
@@ -363,6 +371,17 @@ class LifecycleOrchestrator:
         # DALI→HVAC occupancy bridge state
         self.current_occupancy_data: dict[str, float] = {}
         self._prev_zone_occupancy_state: dict[str, bool] = {}  # zone -> was_occupied
+
+        # SENTINEL optimization wiring (v28.0)
+        # In sentinel mode, the simulation calls AIOptimizerService.analyze_building()
+        # — the same code path SENTINEL uses with real buildings. The simulation writes
+        # BMS data to Supabase; SENTINEL reads it back through the BMS data layer.
+        from app.config.settings import settings as app_settings
+
+        self._last_state_fingerprint = ""  # For intelligent caching
+        self._cached_sentinel_recs: list[dict] = []  # Cached recs for unchanged state
+        self._llm_call_count = 0  # Token budget tracking
+        self._optimization_mode = app_settings.simulation_optimization_mode
 
     @property
     def site_prefix(self) -> str:
@@ -869,6 +888,13 @@ class LifecycleOrchestrator:
 
     def pause(self):
         """Pause the simulation."""
+        self.paused = True
+        logger.info(f"[SIMULATION] Paused at {self.simulated_time}")
+
+    def unpause(self):
+        """Resume a paused simulation."""
+        self.paused = False
+        logger.info(f"[SIMULATION] Resumed at {self.simulated_time}")
 
     def get_status(self) -> dict[str, Any]:
         """Get current simulation status including weather and seasonal data."""
@@ -1279,8 +1305,8 @@ class LifecycleOrchestrator:
         ai_savings_kwh = 0.0
         if schedule_state.hvac_mode != HVACMode.OFF:
             try:
-                from app.services.energy_rules_engine import get_energy_rules_engine
                 from app.models.energy_rules import BuildingState as RulesBuildingState
+                from app.services.energy_rules_engine import get_energy_rules_engine
 
                 rules_engine = get_energy_rules_engine(self.site_prefix)
 
@@ -1410,6 +1436,35 @@ class LifecycleOrchestrator:
         except Exception as e:
             logger.warning(f"[PERSISTENCE] Failed to persist hourly state: {e}")
 
+        # === SENTINEL PROCESSING GATE ===
+        # When processing is disabled for this site, skip ML feeding, health
+        # monitoring, alerts, and recommendations. Data persistence above continues.
+        sentinel_processing = True
+        try:
+            from app.api.sites import is_site_processing_enabled
+
+            sentinel_processing = await is_site_processing_enabled(self.site_id)
+        except Exception as e:
+            logger.debug(f"[PROCESSING GATE] Could not check state, defaulting to enabled: {e}")
+
+        if not sentinel_processing:
+            logger.debug(
+                f"[PROCESSING GATE] SENTINEL processing disabled for {self.site_id}, skipping intelligence layer"
+            )
+            return
+
+        # === ML FEEDER: accumulate sensor data for training ===
+        try:
+            if equipment_states:
+                self.ml_feeder.ingest(equipment_states, self.simulated_time)
+                # Check if enough data to trigger ML training
+                ml_results = self.ml_feeder.train_if_ready()
+                if ml_results:
+                    successful = [r for r in ml_results if "error" not in r]
+                    logger.info(f"[ML FEEDER] Trained {len(successful)} models from simulation data")
+        except Exception as e:
+            logger.debug(f"[ML FEEDER] {e}")
+
         # === HEALTH MONITORING & ALERT PIPELINE (106-01) ===
         # Monitor equipment health against thresholds, trigger alerts on transitions
         try:
@@ -1424,6 +1479,15 @@ class LifecycleOrchestrator:
                 self._scan_safety_boundaries(equipment_states, hour, schedule_state)
         except Exception as e:
             logger.warning(f"[SAFETY SCAN] Failed safety boundary scan at hour {hour}: {e}")
+
+        # === ZONE TEMPERATURE DEVIATION MONITORING ===
+        # Check zone temps against setpoints — independent of equipment running state.
+        # This catches building-wide cooling/heating failures that equipment-level scans miss.
+        try:
+            if self.zone_temperatures:
+                await self._monitor_zone_temperatures(hour)
+        except Exception as e:
+            logger.warning(f"[ZONE TEMP] Failed zone temperature monitoring at hour {hour}: {e}")
 
     async def _write_daily_sustainability(self):
         """Emit daily sustainability metrics at end of simulated day (111-01)."""
@@ -1857,66 +1921,89 @@ class LifecycleOrchestrator:
             if not site_equipment:
                 site_equipment = equipment_list
 
+            # Filter to controllable equipment
+            controllable_equipment = [
+                eq for eq in site_equipment if self.device_control_service.is_controllable(eq.get("code", eq.get("id")))
+            ]
+
             recommendations_created = []
             hvac_recs = []
             dali_recs = []
 
+            # Track DALI equipment (never optimized by AI — Tridonic handles natively)
             for eq in site_equipment:
-                eq_code = eq.get("code", eq.get("id"))
                 eq_type = eq.get("type", "unknown").upper()
+                if eq_type in ["DALI", "LUM", "DALI_CONTROLLER", "LUMINAIRE", "DALI_LUMINAIRE"]:
+                    dali_recs.append(eq.get("code", eq.get("id")))
 
-                # Skip if not controllable
-                if not self.device_control_service.is_controllable(eq_code):
-                    continue
-
-                # ========== HVAC OPTIMIZATION (type-specific dispatch) ==========
-                hvac_recommendation = None
-                if eq_type == "FCU":
-                    hvac_recommendation = self._generate_fcu_recommendation(
-                        eq_code, context, occupancy_percent, current_hour
-                    )
-                elif eq_type == "AHU":
-                    hvac_recommendation = self._generate_ahu_recommendation(
-                        eq_code, context, occupancy_percent, current_hour
-                    )
-                elif eq_type == "CHILLER":
-                    hvac_recommendation = self._generate_chiller_recommendation(
-                        eq_code, context, occupancy_percent, current_hour
-                    )
-                elif eq_type == "VAV":
-                    hvac_recommendation = self._generate_vav_recommendation(
-                        eq_code, context, occupancy_percent, current_hour
-                    )
-                elif eq_type == "PUMP":
-                    hvac_recommendation = self._generate_pump_recommendation(
-                        eq_code, context, occupancy_percent, current_hour
-                    )
-                elif eq_type in ["CT", "SPLIT", "ZONE", "CONTROLLER"]:
-                    # Generic HVAC fallback for cooling towers, splits, zone controllers
-                    hvac_recommendation = self._generate_hvac_recommendation(
-                        eq_code, eq_type, context, occupancy_percent, current_hour
-                    )
-
-                if hvac_recommendation:
-                    recommendations_created.append(hvac_recommendation)
-                    hvac_recs.append(hvac_recommendation["equipment"])
-
-                    # Create control recommendation
+            # ========== OPTIMIZATION MODE DISPATCH ==========
+            if self._optimization_mode == "sentinel":
+                sentinel_recs = await self._sentinel_optimization(
+                    controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
+                )
+                recommendations_created = sentinel_recs
+                hvac_recs = [r.get("equipment", "") for r in sentinel_recs]
+            elif self._optimization_mode == "hybrid":
+                sentinel_recs = await self._sentinel_optimization(
+                    controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
+                )
+                hardcoded_recs = self._hardcoded_optimization_batch(
+                    controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
+                )
+                self._log_optimization_comparison(sentinel_recs, hardcoded_recs, current_hour)
+                # Use SENTINEL results, log hardcoded for comparison
+                recommendations_created = sentinel_recs
+                hvac_recs = [r.get("equipment", "") for r in sentinel_recs]
+                # Store hardcoded recs too (for comparison in DB)
+                for hc_rec in hardcoded_recs:
+                    try:
+                        rec = Recommendation(
+                            site_id=self.site_prefix,
+                            timestamp=datetime.utcnow(),
+                            action_type="ai_optimization_hardcoded_comparison",
+                            risk_level=ActionRiskLevel.LOW,
+                            target_equipment=hc_rec.get("equipment", ""),
+                            action={
+                                "point": hc_rec["control_point"],
+                                "value": hc_rec["target_value"],
+                            },
+                            reason=hc_rec["reason"],
+                            expected_impact={
+                                "description": hc_rec.get("description", ""),
+                                "energy_savings_percent": hc_rec.get("savings", 5),
+                                "source": "hardcoded_comparison",
+                            },
+                            confidence="high",
+                            profile=context,
+                            status=RecommendationStatus.PENDING,
+                            requires_approval=True,
+                        )
+                        await self.recommendation_repo.create(rec)
+                    except Exception:
+                        pass
+            else:  # "hardcoded"
+                hardcoded_recs = self._hardcoded_optimization_batch(
+                    controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
+                )
+                recommendations_created = hardcoded_recs
+                hvac_recs = [r.get("equipment", "") for r in hardcoded_recs]
+                # Store hardcoded recs (original behavior)
+                for hc_rec in hardcoded_recs:
                     try:
                         rec = Recommendation(
                             site_id=self.site_prefix,
                             timestamp=datetime.utcnow(),
                             action_type="ai_optimization",
                             risk_level=ActionRiskLevel.LOW,
-                            target_equipment=eq_code,
+                            target_equipment=hc_rec.get("equipment", ""),
                             action={
-                                "point": hvac_recommendation["control_point"],
-                                "value": hvac_recommendation["target_value"],
+                                "point": hc_rec["control_point"],
+                                "value": hc_rec["target_value"],
                             },
-                            reason=hvac_recommendation["reason"],
+                            reason=hc_rec["reason"],
                             expected_impact={
-                                "description": hvac_recommendation["description"],
-                                "energy_savings_percent": hvac_recommendation.get("savings", 5),
+                                "description": hc_rec.get("description", ""),
+                                "energy_savings_percent": hc_rec.get("savings", 5),
                             },
                             confidence="high",
                             profile=context,
@@ -1925,19 +2012,7 @@ class LifecycleOrchestrator:
                         )
                         await self.recommendation_repo.create(rec)
                     except Exception as e:
-                        logger.warning(f"Failed to create HVAC recommendation for {eq_code}: {e}")
-
-                # ========== DALI/TRIDONIC — Native Controller Handles Lighting ==========
-                # Tridonic DALI-2 gateway natively handles: daylight harvesting,
-                # occupancy-based dimming, and emergency zone protection in real-time.
-                # AI should NOT duplicate these — only recommend cross-system actions
-                # that Tridonic can't do (e.g. coordinated HVAC+lighting for unoccupied zones).
-                if eq_type in ["DALI", "LUM", "DALI_CONTROLLER", "LUMINAIRE", "DALI_LUMINAIRE"]:
-                    dali_recs.append(eq_code)  # Track for cross-system coordination
-                    logger.debug(
-                        f"DALI {eq_code}: brightness managed by Tridonic controller "
-                        f"(daylight={daylight_factor}%, occupancy={occupancy_percent}%)"
-                    )
+                        logger.warning(f"Failed to create recommendation: {e}")
 
             # ========== DEMO MODE: BESS TOU ARBITRAGE ==========
             if self.current_scenario and self.current_scenario.demo_mode:
@@ -2084,6 +2159,191 @@ class LifecycleOrchestrator:
         """Return (low_occupancy, high_occupancy) thresholds adjusted for demo mode."""
         is_demo = self.current_scenario and self.current_scenario.demo_mode
         return (30 if is_demo else 20, 70 if is_demo else 80)
+
+    # ========== SENTINEL AI OPTIMIZATION WIRING (v28.0) ==========
+    #
+    # Architecture: The simulation is the fake building. SENTINEL is the real system.
+    # The simulation writes BMS data to Supabase (equipment health, sensor readings,
+    # zone history). SENTINEL reads from Supabase through AIOptimizerService — the
+    # exact same code path it uses with a real building.
+    #
+    # Flow:
+    #   Simulation → persist_hourly_state() → Supabase
+    #   SENTINEL  → AIOptimizerService.analyze_building() → reads Supabase → Claude → QualityGate
+    #
+
+    def _compute_state_fingerprint(self, occupancy_percent: int, current_hour: int, daylight_factor: int) -> str:
+        """Quantize building state into coarse buckets for analyze_building() caching.
+
+        Same fingerprint = skip re-running SENTINEL. Reduces LLM calls by ~60%.
+        Expected ~8-12 unique fingerprints per day instead of 24.
+        """
+        # Occupancy: 10% buckets
+        occ_bucket = (occupancy_percent // 10) * 10
+        # Hour: 3-hour periods
+        hour_bucket = (current_hour // 3) * 3
+        # Daylight: 25% buckets
+        day_bucket = (daylight_factor // 25) * 25
+        # HVAC mode from building schedule
+        hvac_mode = "unknown"
+        if self.building_schedule:
+            try:
+                state = self.building_schedule.get_state(self.simulated_time)
+                hvac_mode = state.hvac_mode.value
+            except Exception:
+                pass
+        return f"occ{occ_bucket}_hr{hour_bucket}_dl{day_bucket}_hvac{hvac_mode}"
+
+    async def _sentinel_optimization(
+        self,
+        controllable_equipment: list[dict],
+        context: str,
+        occupancy_percent: int,
+        daylight_factor: int,
+        current_hour: int,
+    ) -> list[dict]:
+        """Run real SENTINEL optimization — same code path as production.
+
+        Calls AIOptimizerService.analyze_building() which:
+        1. Reads equipment + sensor data from Supabase (written by simulation)
+        2. Gathers current conditions from device_manager
+        3. Builds optimization prompt for Claude
+        4. Calls Claude (with Z.ai fallback)
+        5. Applies quality gate (14 metrics, enforcement)
+        6. Applies health feature enrichment
+        7. Returns OptimizationRecommendation
+
+        The simulation never feeds data directly to SENTINEL — it goes through
+        the BMS data layer (Supabase), just like a real building would.
+
+        Returns list of recommendation dicts for event tracking.
+        """
+        from app.config.settings import settings as app_settings
+
+        # Skip if no LLM available
+        if app_settings.local_ai_only:
+            logger.debug("local_ai_only=true, falling back to hardcoded optimization")
+            return self._hardcoded_optimization_batch(
+                controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
+            )
+
+        # Fingerprint cache — avoid redundant analyze_building() calls
+        fingerprint = self._compute_state_fingerprint(occupancy_percent, current_hour, daylight_factor)
+        if fingerprint == self._last_state_fingerprint and self._cached_sentinel_recs:
+            logger.info(
+                f"SENTINEL cache hit (fingerprint={fingerprint}), reusing {len(self._cached_sentinel_recs)} recs"
+            )
+            return self._cached_sentinel_recs
+
+        # Budget check
+        if self._llm_call_count >= app_settings.simulation_llm_budget_max_calls:
+            logger.warning(
+                f"SENTINEL LLM budget exhausted "
+                f"({self._llm_call_count}/{app_settings.simulation_llm_budget_max_calls}), "
+                "falling back to hardcoded"
+            )
+            return self._hardcoded_optimization_batch(
+                controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
+            )
+
+        # Call the REAL SENTINEL optimization service — same as production
+        try:
+            from app.services.ai_optimizer import get_ai_optimizer
+
+            optimizer = get_ai_optimizer()
+            result = await optimizer.analyze_building(self.site_id)
+            self._llm_call_count += 1
+
+            # Convert OptimizationRecommendation to list of dicts for event tracking
+            recs_out = []
+            for rec_dict in result.recommendations:
+                recs_out.append(
+                    {
+                        "equipment": rec_dict.get("equipment_id", rec_dict.get("equipment_name", "")),
+                        "control_point": rec_dict.get("point_name", ""),
+                        "target_value": rec_dict.get("recommended_value"),
+                        "reason": rec_dict.get("reason", ""),
+                        "confidence": result.confidence if hasattr(result, "confidence") else 0.75,
+                        "energy_savings_percent": rec_dict.get("savings_kwh", 0),
+                        "source": "sentinel_analyze_building",
+                        "quality_gate_status": getattr(result, "quality_gate_status", None),
+                        "quality_gate_enforcement": getattr(result, "quality_gate_enforcement", None),
+                    }
+                )
+
+            logger.info(
+                f"SENTINEL analyze_building({self.site_id}): {len(recs_out)} recommendations "
+                f"(LLM call #{self._llm_call_count}, fingerprint={fingerprint}, "
+                f"quality_gate={getattr(result, 'quality_gate_status', 'n/a')})"
+            )
+
+            # Update cache
+            self._last_state_fingerprint = fingerprint
+            self._cached_sentinel_recs = recs_out
+            return recs_out
+
+        except Exception as e:
+            logger.warning(f"SENTINEL analyze_building failed: {e}, falling back to hardcoded")
+            return self._hardcoded_optimization_batch(
+                controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
+            )
+
+    def _hardcoded_optimization_batch(
+        self,
+        equipment_list: list[dict],
+        context: str,
+        occupancy_percent: int,
+        daylight_factor: int,
+        current_hour: int,
+    ) -> list[dict]:
+        """Run original hardcoded threshold-based optimization for all equipment.
+
+        Calls the existing _generate_*_recommendation() methods that are preserved
+        as fallback. Returns list of recommendation dicts.
+        """
+        recommendations = []
+        for eq in equipment_list:
+            eq_code = eq.get("code", eq.get("id"))
+            eq_type = eq.get("type", "unknown").upper()
+
+            hvac_rec = None
+            if eq_type == "FCU":
+                hvac_rec = self._generate_fcu_recommendation(eq_code, context, occupancy_percent, current_hour)
+            elif eq_type == "AHU":
+                hvac_rec = self._generate_ahu_recommendation(eq_code, context, occupancy_percent, current_hour)
+            elif eq_type == "CHILLER":
+                hvac_rec = self._generate_chiller_recommendation(eq_code, context, occupancy_percent, current_hour)
+            elif eq_type == "VAV":
+                hvac_rec = self._generate_vav_recommendation(eq_code, context, occupancy_percent, current_hour)
+            elif eq_type == "PUMP":
+                hvac_rec = self._generate_pump_recommendation(eq_code, context, occupancy_percent, current_hour)
+            elif eq_type in ["CT", "SPLIT", "ZONE", "CONTROLLER"]:
+                hvac_rec = self._generate_hvac_recommendation(
+                    eq_code, eq_type, context, occupancy_percent, current_hour
+                )
+
+            if hvac_rec:
+                recommendations.append(hvac_rec)
+
+        return recommendations
+
+    def _log_optimization_comparison(self, sentinel_recs: list[dict], hardcoded_recs: list[dict], hour: int):
+        """Log comparison between SENTINEL and hardcoded recommendations for hybrid mode."""
+        logger.info(f"[HYBRID] Hour {hour}: SENTINEL={len(sentinel_recs)} recs, hardcoded={len(hardcoded_recs)} recs")
+        # Log equipment overlap
+        sentinel_equip = {r.get("equipment", "") for r in sentinel_recs}
+        hardcoded_equip = {r.get("equipment", "") for r in hardcoded_recs}
+        overlap = sentinel_equip & hardcoded_equip
+        sentinel_only = sentinel_equip - hardcoded_equip
+        hardcoded_only = hardcoded_equip - sentinel_equip
+        if overlap:
+            logger.info(f"[HYBRID]   Both recommend: {overlap}")
+        if sentinel_only:
+            logger.info(f"[HYBRID]   SENTINEL only: {sentinel_only}")
+        if hardcoded_only:
+            logger.info(f"[HYBRID]   Hardcoded only: {hardcoded_only}")
+
+    # ========== ORIGINAL HARDCODED RECOMMENDATION GENERATORS (fallback) ==========
 
     def _generate_fcu_recommendation(
         self, eq_code: str, context: str, occupancy_percent: int, hour: int
@@ -2627,6 +2887,172 @@ class LifecycleOrchestrator:
             details={"health": health},
         )
 
+    async def _monitor_zone_temperatures(self, simulated_hour: int):
+        """Monitor zone temperatures against configured safety limits.
+
+        Checks self.zone_temperatures against temp_min/temp_max from the
+        settings page (controlLimits.temperature_setpoint). These are the
+        configured safety thresholds — any zone outside them needs attention.
+
+        Unlike _scan_safety_boundaries which checks per-equipment sensor
+        readings, this monitors zones directly — catching building-wide
+        cooling/heating failures even when individual equipment reports healthy.
+
+        Uses transition-based alerting with 2-hour cooldown to prevent spam.
+
+        Thresholds (from settings):
+            temp < temp_min or temp > temp_max → critical
+            temp within 1°C of limit           → warning
+            otherwise                          → normal
+
+        Args:
+            simulated_hour: Current simulated hour (0-23)
+        """
+        # Load zone setpoints from thermal engine cache
+        try:
+            from app.services.thermal_simulation_engine import get_thermal_engine
+
+            thermal_engine = get_thermal_engine(self.building_id, consider_equipment_health=False)
+            zone_cache = thermal_engine._zone_cache
+        except Exception:
+            return  # Can't check without zone config
+
+        if not zone_cache:
+            return
+
+        # Load configured safety limits from settings
+        try:
+            import json
+            from pathlib import Path
+
+            settings_path = Path("/opt/bms-intelligence/backend/app/data/settings.json")
+            with open(settings_path) as f:
+                site_settings = json.load(f)
+            temp_limits = site_settings.get("controlLimits", {}).get("temperature_setpoint", {})
+            temp_min = float(temp_limits.get("min", 18))
+            temp_max = float(temp_limits.get("max", 26))
+        except Exception:
+            temp_min = 18.0
+            temp_max = 26.0
+
+        absolute_hour = self.days_simulated * 24 + simulated_hour
+
+        for zone_id, temp in self.zone_temperatures.items():
+            config = zone_cache.get(zone_id)
+            if not config:
+                continue
+
+            setpoint = config.get("setpoint", 22.0)
+
+            # Classify against configured safety limits (not deviation from setpoint)
+            if temp < temp_min or temp > temp_max:
+                current_status = "critical"
+                deviation = temp - temp_min if temp < temp_min else temp - temp_max
+            elif temp < temp_min + 1.0 or temp > temp_max - 1.0:
+                current_status = "warning"
+                deviation = temp - setpoint
+            else:
+                current_status = "normal"
+                deviation = temp - setpoint
+
+            previous_status = self._zone_temp_status_cache.get(zone_id, "normal")
+            self._zone_temp_status_cache[zone_id] = current_status
+
+            # Only alert on transitions (normal->warning, warning->critical, etc.)
+            if current_status == "normal" or current_status == previous_status:
+                continue
+
+            # Cooldown: 2 hours between alerts per zone
+            last_alert = self._zone_temp_last_alert.get(zone_id, -999)
+            if absolute_hour - last_alert < 2:
+                continue
+
+            self._zone_temp_last_alert[zone_id] = absolute_hour
+
+            zone_name = config.get("zone_name", zone_id)
+            fcu_code = config.get("fcu_id", "")
+            direction = "cold" if temp < setpoint else "hot"
+
+            if current_status == "critical":
+                breach = f"below minimum {temp_min}°C" if temp < temp_min else f"above maximum {temp_max}°C"
+                message = (
+                    f"Zone temperature OUTSIDE SAFETY LIMITS: {zone_name} at {temp:.1f}°C "
+                    f"({breach}, setpoint {setpoint:.1f}°C). "
+                    f"IMMEDIATE: Check chiller plant and central HVAC controls."
+                )
+            else:
+                approaching = (
+                    f"approaching minimum {temp_min}°C"
+                    if temp < temp_min + 1.0
+                    else f"approaching maximum {temp_max}°C"
+                )
+                message = (
+                    f"Zone temperature warning: {zone_name} at {temp:.1f}°C "
+                    f"({approaching}, setpoint {setpoint:.1f}°C). "
+                    f"Monitor zone FCU/VAV operation."
+                )
+
+            # Write to Supabase alerts table via EquipmentAlertService
+            try:
+                from app.services.equipment_alert_service import get_equipment_alert_service
+
+                alert_svc = get_equipment_alert_service()
+                # Use the FCU code if available, otherwise use zone_id as equipment reference
+                equipment_ref = fcu_code if fcu_code else f"ZONE-{zone_id}"
+                alert_svc.create_alert_for_equipment(
+                    equipment_id=equipment_ref,
+                    alert_type="temperature_deviation",
+                    severity=current_status,
+                    message=message,
+                    building_id=self.building_id,
+                    notify_telegram=(current_status == "critical"),
+                )
+            except Exception as e:
+                logger.debug(f"Could not create zone temp alert: {e}")
+
+            # Emit lifecycle event
+            self._emit_event(
+                LifecycleEvent(
+                    timestamp=datetime.now(),
+                    simulated_hour=simulated_hour,
+                    event_type=EventType.SAFETY_VIOLATION if current_status == "critical" else EventType.ALERT_CREATED,
+                    equipment_id=fcu_code or f"ZONE-{zone_id}",
+                    description=message,
+                    details={
+                        "zone_id": zone_id,
+                        "zone_name": zone_name,
+                        "current_temp": temp,
+                        "setpoint": setpoint,
+                        "temp_min": temp_min,
+                        "temp_max": temp_max,
+                        "deviation": deviation,
+                        "direction": direction,
+                        "severity": current_status,
+                    },
+                )
+            )
+
+            # Push to dashboard
+            self._push_alert_to_dashboard(
+                equipment_code=fcu_code or f"ZONE-{zone_id}",
+                severity=current_status,
+                alert_type="temperature_deviation",
+                message=message,
+                details={
+                    "zone_name": zone_name,
+                    "temp": temp,
+                    "setpoint": setpoint,
+                    "temp_min": temp_min,
+                    "temp_max": temp_max,
+                    "deviation": deviation,
+                },
+            )
+
+            logger.info(
+                f"[ZONE TEMP] {current_status.upper()}: {zone_name} at {temp:.1f}°C "
+                f"(limits {temp_min}-{temp_max}°C, setpoint {setpoint:.1f}°C)"
+            )
+
     async def _auto_create_work_order(self, code: str, equip_type: str, health: float, simulated_hour: int):
         """Auto-create work order with technician specialty matching.
 
@@ -2691,6 +3117,18 @@ class LifecycleOrchestrator:
                 },
             )
         )
+
+        # Notify technician via Sentry bot (Telegram + email) — same pipeline as production
+        if self.current_scenario and getattr(self.current_scenario, "sentry_notifications", False):
+            equipment_dict = {"type": equip_type, "code": code, "name": code}
+            fault_info = {
+                "equipment_id": code,
+                "equipment_code": code,
+                "equipment_name": code,
+                "fault_type": f"Health critical ({health:.1f}%)",
+                "severity": 90 if health < 40 else 60,
+            }
+            await self._notify_sentry(equipment_dict, fault_info, wo_id)
 
     def _equipment_to_zone(self, equipment_code: str) -> str:
         """Map equipment code to zone ID for temperature lookup.
@@ -3239,11 +3677,34 @@ class LifecycleOrchestrator:
             logger.error(f"Alert generation error: {e}")
 
     async def _notify_sentry(self, equipment: dict, fault_info: dict, work_order_code: str):
-        """Send notification to Sentry bot."""
+        """Send notification to Sentry bot via email and Telegram."""
         try:
-            # This would send actual Telegram message
-            # For simulation, we just log it
-            logger.info(f"[SENTRY] Notification sent for {work_order_code}: {fault_info['fault_type']}")
+            from app.services.sentry_integration.work_order_notifier import WorkOrderNotifier
+
+            notifier = WorkOrderNotifier()
+
+            # Build work_order_data in the format WorkOrderNotifier expects
+            work_order_data = {
+                "work_order_id": work_order_code,
+                "work_order_code": work_order_code,
+                "equipment_id": fault_info.get("equipment_id"),
+                "equipment_code": fault_info.get("equipment_code"),
+                "equipment_name": fault_info.get("equipment_name"),
+                "equipment_type": equipment.get("type", "unknown"),
+                "building_code": self.site_id,
+                "title": f"Repair: {fault_info['fault_type']}",
+                "description": f"Automated work order for {fault_info['equipment_name']}: {fault_info['fault_type']}",
+                "criticality": "HIGH" if fault_info.get("severity", 0) >= 75 else "MEDIUM",
+                "service_type": "callout",
+                "technician_id": "bederf@gmail.com",
+                "technician_email": "bederf@gmail.com",
+                "technician_name": "John Smith",
+            }
+
+            result = await notifier.notify_technician_with_code(work_order_data)
+            email_sent = result.get("email_sent", False)
+            telegram_sent = result.get("telegram_sent", False)
+            logger.info(f"[SENTRY] Notification for {work_order_code}: email={email_sent}, telegram={telegram_sent}")
 
             self._emit_event(
                 LifecycleEvent(
@@ -3253,12 +3714,17 @@ class LifecycleOrchestrator:
                     equipment_id=fault_info["equipment_code"],
                     equipment_name=fault_info["equipment_name"],
                     description=f"Technician notified via Sentry for {work_order_code}",
-                    details={"notification_method": "telegram", "work_order": work_order_code},
+                    details={
+                        "notification_method": "email+telegram",
+                        "work_order": work_order_code,
+                        "email_sent": email_sent,
+                        "telegram_sent": telegram_sent,
+                    },
                 )
             )
 
         except Exception as e:
-            logger.warning(f"Sentry notification skipped: {e}")
+            logger.warning(f"Sentry notification failed: {e}")
 
     async def _check_pending_repairs(self):
         """Check if any repairs are due."""

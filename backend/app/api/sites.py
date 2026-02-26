@@ -184,19 +184,29 @@ def get_equipment_status_breakdown(building_uuid: str) -> dict:
 
         client = get_supabase_client()
 
-        # Count equipment by status
-        counts = {"total": 0, "ok": 0, "warning": 0, "critical": 0}
+        # Read once and derive health-aware safety buckets.
+        # This keeps site status aligned with equipment warning state, not predictor events.
+        result = client.table("equipment").select("status, health_score").eq("building_id", building_uuid).execute()
 
-        for status, key in [("normal", "ok"), ("warning", "warning"), ("critical", "critical")]:
-            result = (
-                client.table("equipment")
-                .select("id", count="exact")
-                .eq("building_id", building_uuid)
-                .eq("status", status)
-                .execute()
-            )
-            counts[key] = result.count or 0
-            counts["total"] += counts[key]
+        equipment = result.data or []
+        counts = {"total": len(equipment), "ok": 0, "warning": 0, "critical": 0}
+
+        for eq in equipment:
+            status = (eq.get("status") or "normal").lower()
+            health = eq.get("health_score", 100)
+            try:
+                health_value = float(health)
+            except (TypeError, ValueError):
+                health_value = 100.0
+
+            # Critical is explicit critical status or severe health degradation.
+            if status == "critical" or health_value < 57:
+                counts["critical"] += 1
+            # Warning includes explicit warning plus non-operational or degraded-but-not-critical.
+            elif status in ("warning", "offline", "maintenance") or health_value < 80:
+                counts["warning"] += 1
+            else:
+                counts["ok"] += 1
 
         return counts
     except Exception as e:
@@ -252,6 +262,21 @@ def calculate_site_status(site_alerts: list[dict]) -> Literal["normal", "warning
     return "normal"
 
 
+def calculate_site_status_from_equipment(equipment_status: Optional[dict]) -> Literal["normal", "warning", "critical"]:
+    """Calculate site status from equipment warning/critical state."""
+    if not equipment_status:
+        return "normal"
+
+    critical = int(equipment_status.get("critical", 0) or 0)
+    warning = int(equipment_status.get("warning", 0) or 0)
+
+    if critical > 0:
+        return "critical"
+    if warning > 0:
+        return "warning"
+    return "normal"
+
+
 def db_to_site_dict(
     db_building: dict,
     equipment_count: int = 0,
@@ -273,6 +298,14 @@ def db_to_site_dict(
         try:
             operating_hours = json.loads(operating_hours)
         except (json.JSONDecodeError, TypeError):
+            operating_hours = {"start": "08:00", "end": "18:00"}
+    # Normalize Supabase format {"weekday": "07:00-18:00"} to API format {"start": "07:00", "end": "18:00"}
+    if "start" not in operating_hours and "weekday" in operating_hours:
+        weekday = operating_hours.get("weekday", "08:00-18:00")
+        if "-" in str(weekday):
+            parts = str(weekday).split("-", 1)
+            operating_hours = {"start": parts[0], "end": parts[1]}
+        else:
             operating_hours = {"start": "08:00", "end": "18:00"}
 
     # ⚠️  IMPORTANT: Always use equipment_count from Supabase, never from asset_summary or JSON
@@ -298,6 +331,7 @@ def db_to_site_dict(
         "optimization_status": db_building.get("optimization_status") or "unknown",
         "control_enabled": db_building.get("control_enabled") or False,
         "control_note": db_building.get("control_note"),
+        "sentinel_processing_enabled": db_building.get("sentinel_processing_enabled", True) is not False,
         "equipment_count": total_assets,  # Total assets from Supabase only
         "alert_count": alert_count,
         "active_alerts": alert_count,
@@ -359,6 +393,7 @@ class SiteResponse(SiteBase):
     control_enabled: bool = False
     control_note: Optional[str] = None
     equipment_status: Optional[EquipmentStatusBreakdown] = None
+    sentinel_processing_enabled: bool = True
 
 
 class SiteListResponse(BaseModel):
@@ -510,9 +545,7 @@ async def list_sites(
     if success and sites:
         result = []
         for site in sites:
-            status = "normal"  # Default status, alerts already counted
-            if site.get("alert_count", 0) > 0:
-                status = "warning"
+            status = calculate_site_status_from_equipment(site.get("equipment_status"))
             result.append(
                 SiteResponse(
                     **site,
@@ -886,6 +919,102 @@ def _seed_municipal_tariff_and_account(client, site_id: str, region: str) -> Non
         logger.info("Municipal account auto-seed failed: %s", exc)
 
 
+# ============= SENTINEL Processing Toggle =============
+
+# Demo-mode fallback for processing state
+_PROCESSING_STATE_FILE = DATA_DIR / "site_processing_state.json"
+
+
+def _load_processing_state() -> dict:
+    """Load processing state from JSON fallback."""
+    if _PROCESSING_STATE_FILE.exists():
+        with open(_PROCESSING_STATE_FILE) as f:
+            return json.load(f)
+    return {}
+
+
+def _save_processing_state(state: dict) -> None:
+    """Save processing state to JSON fallback."""
+    with open(_PROCESSING_STATE_FILE, "w") as f:
+        json.dump(state, f, indent=2)
+
+
+class ProcessingToggleRequest(BaseModel):
+    """Request to toggle SENTINEL processing."""
+
+    enabled: bool
+
+
+class ProcessingToggleResponse(BaseModel):
+    """Response from processing toggle."""
+
+    site_id: str
+    sentinel_processing_enabled: bool
+
+
+async def is_site_processing_enabled(site_id: str) -> bool:
+    """Check if SENTINEL processing is enabled for a site.
+
+    Used by lifecycle orchestrator and ML feeder to gate processing.
+    Returns True by default (fail-open: if we can't read state, process).
+    """
+    if not settings.use_json_storage:
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            result = (
+                client.table("buildings").select("sentinel_processing_enabled").eq("code", site_id).limit(1).execute()
+            )
+            if result.data:
+                return result.data[0].get("sentinel_processing_enabled", True) is not False
+        except Exception as e:
+            logger.warning(f"Failed to check processing state for {site_id}: {e}")
+
+    # JSON fallback / demo mode
+    state = _load_processing_state()
+    return state.get(site_id, True)
+
+
+@router.get("/sites/{site_id}/processing", response_model=ProcessingToggleResponse)
+async def get_site_processing(site_id: str) -> ProcessingToggleResponse:
+    """Get SENTINEL processing state for a site."""
+    enabled = await is_site_processing_enabled(site_id)
+    return ProcessingToggleResponse(site_id=site_id, sentinel_processing_enabled=enabled)
+
+
+@router.post("/sites/{site_id}/processing", response_model=ProcessingToggleResponse)
+async def toggle_site_processing(
+    site_id: str,
+    request: ProcessingToggleRequest,
+) -> ProcessingToggleResponse:
+    """Toggle SENTINEL processing for a site.
+
+    When disabled, SENTINEL stops ML feeding, health monitoring, alerts, and
+    recommendations for this building. Data persistence (Supabase writes for
+    dashboard) continues regardless.
+    """
+    enabled = request.enabled
+
+    if not settings.use_json_storage:
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            client.table("buildings").update({"sentinel_processing_enabled": enabled}).eq("code", site_id).execute()
+            logger.info(f"SENTINEL processing {'enabled' if enabled else 'disabled'} for {site_id}")
+            return ProcessingToggleResponse(site_id=site_id, sentinel_processing_enabled=enabled)
+        except Exception as e:
+            logger.warning(f"Failed to update processing state in Supabase for {site_id}: {e}")
+
+    # JSON fallback / demo mode
+    state = _load_processing_state()
+    state[site_id] = enabled
+    _save_processing_state(state)
+    logger.info(f"SENTINEL processing {'enabled' if enabled else 'disabled'} for {site_id} (JSON fallback)")
+    return ProcessingToggleResponse(site_id=site_id, sentinel_processing_enabled=enabled)
+
+
 # ============= Get Single Site Endpoint =============
 # NOTE: This MUST come after the specific routes above
 
@@ -899,9 +1028,7 @@ async def get_site(site_id: str) -> SiteResponse:
 
     if success:
         if site:
-            status = "normal"
-            if site.get("alert_count", 0) > 0:
-                status = "warning"
+            status = calculate_site_status_from_equipment(site.get("equipment_status"))
             return SiteResponse(
                 **site,
                 location=site.get("address", ""),
@@ -996,9 +1123,7 @@ async def batch_get_sites(payload: BatchSiteRequest) -> BatchSiteResponse:
             site, success = get_site_from_supabase(site_id)
 
             if success and site:
-                status = "normal"
-                if site.get("alert_count", 0) > 0:
-                    status = "warning"
+                status = calculate_site_status_from_equipment(site.get("equipment_status"))
                 results[site_id] = {
                     **site,
                     "location": site.get("address", ""),
