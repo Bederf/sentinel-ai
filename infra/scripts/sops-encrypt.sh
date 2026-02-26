@@ -37,9 +37,12 @@ if ! command -v sops &>/dev/null; then
     exit 1
 fi
 
+AGE_PUBKEY="age15fnu6t3nln087fx4qlzgms5zk6e00xy49dqqmu22t5eh8yp7wdxq6v3kc0"
+
 encrypt_file() {
     local plain_file="$1"
     local enc_file="${plain_file}.enc"
+    local input_type="${2:-dotenv}"
 
     if [[ ! -f "$plain_file" ]]; then
         err "Plaintext file not found: $plain_file"
@@ -48,8 +51,10 @@ encrypt_file() {
 
     SOPS_AGE_KEY_FILE="$KEY_FILE" sops \
         --encrypt \
-        --input-type dotenv \
-        --output-type dotenv \
+        --age "$AGE_PUBKEY" \
+        --input-type "$input_type" \
+        --output-type "$input_type" \
+        --config /dev/null \
         "$plain_file" > "$enc_file"
 
     ok "$plain_file → $enc_file"
@@ -70,6 +75,16 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "frontend" ]]; then
     echo "Frontend:"
     for plain_file in "$REPO_ROOT"/frontend/.env.production "$REPO_ROOT"/frontend/.env.local "$REPO_ROOT"/frontend/.env.development; do
         [[ -f "$plain_file" ]] && encrypt_file "$plain_file"
+    done
+fi
+
+SENTRY_DIR="$HOME/.sentry/gateway"
+if [[ "$SCOPE" == "all" || "$SCOPE" == "sentry" ]]; then
+    echo "Sentry Gateway:"
+    [[ -f "$SENTRY_DIR/.env" ]] && encrypt_file "$SENTRY_DIR/.env" dotenv
+    [[ -f "$SENTRY_DIR/sentry.json" ]] && encrypt_file "$SENTRY_DIR/sentry.json" json
+    for plain_file in "$SENTRY_DIR"/credentials/*.json; do
+        [[ -f "$plain_file" && ! "$plain_file" == *.enc ]] && encrypt_file "$plain_file" json
     done
 fi
 

@@ -39,6 +39,7 @@ fi
 decrypt_file() {
     local enc_file="$1"
     local out_file="${enc_file%.enc}"
+    local input_type="${2:-dotenv}"
 
     if [[ ! -f "$enc_file" ]]; then
         err "Encrypted file not found: $enc_file"
@@ -47,8 +48,9 @@ decrypt_file() {
 
     SOPS_AGE_KEY_FILE="$KEY_FILE" sops \
         --decrypt \
-        --input-type dotenv \
-        --output-type dotenv \
+        --input-type "$input_type" \
+        --output-type "$input_type" \
+        --config /dev/null \
         "$enc_file" > "$out_file"
 
     # Set restrictive permissions (owner read-only)
@@ -77,6 +79,16 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "frontend" ]]; then
     done
 fi
 
+SENTRY_DIR="$HOME/.sentry/gateway"
+if [[ "$SCOPE" == "all" || "$SCOPE" == "sentry" ]]; then
+    echo "Sentry Gateway:"
+    [[ -f "$SENTRY_DIR/.env.enc" ]] && decrypt_file "$SENTRY_DIR/.env.enc" dotenv
+    [[ -f "$SENTRY_DIR/sentry.json.enc" ]] && decrypt_file "$SENTRY_DIR/sentry.json.enc" json
+    for enc_file in "$SENTRY_DIR"/credentials/*.json.enc; do
+        [[ -f "$enc_file" ]] && decrypt_file "$enc_file" json
+    done
+fi
+
 echo ""
 echo "Done. Restart services to pick up new secrets:"
-echo "  sudo systemctl restart sentinel-backend sentinel-frontend"
+echo "  sudo systemctl restart sentinel-backend sentinel-frontend sentry"
