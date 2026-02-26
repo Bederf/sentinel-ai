@@ -1,0 +1,140 @@
+{
+  "chiller": {
+    "equipment_type": "chiller",
+    "typical_replacement_cost_zar": 1750000,
+    "typical_repair_cost_zar": 85000,
+    "expected_life_years": 20,
+    "residual_value_pct": 0.10,
+    "annual_maintenance_new_zar": 55000,
+    "maintenance_escalation_pct": 0.06,
+    "downtime_cost_per_day_zar": 45000,
+    "energy_efficiency_degradation_pct_per_year": 0.02,
+    "depreciation_method": "straight_line"
+  },
+  "ahu": {
+    "equipment_type": "ahu",
+    "typical_replacement_cost_zar": 380000,
+    "typical_repair_cost_zar": 35000,
+    "expected_life_years": 25,
+    "residual_value_pct": 0.10,
+    "annual_maintenance_new_zar": 15000,
+    "maintenance_escalation_pct": 0.06,
+    "downtime_cost_per_day_zar": 15000,
+    "energy_efficiency_degradation_pct_per_year": 0.015,
+    "depreciation_method": "straight_line"
+  },
+  "fcu": {
+    "equipment_type": "fcu",
+    "typical_replacement_cost_zar": 18000,
+    "typical_repair_cost_zar": 3500,
+    "expected_life_years": 15,
+    "residual_value_pct": 0.05,
+    "annual_maintenance_new_zar": 1200,
+    "maintenance_escalation_pct": 0.06,
+    "downtime_cost_per_day_zar": 2000,
+    "energy_efficiency_degradation_pct_per_year": 0.02,
+    "depreciation_method": "straight_line"
+  },
+  "vav": {
+    "equipment_type": "vav",
+    "typical_replacement_cost_zar": 12000,
+    "typical_repair_cost_zar": 2500,
+    "expected_life_years": 15,
+    "residual_value_pct": 0.05,
+    "annual_maintenance_new_zar": 800,
+    "maintenance_escalation_pct": 0.06,
+    "downtime_cost_per_day_zar": 1500,
+    "energy_efficiency_degradation_pct_per_year": 0.01,
+    "depreciation_method": "straight_line"
+  },
+  "generator": {
+    "equipment_type": "generator",
+    "typical_replacement_cost_zar": 1200000,
+    "typical_repair_cost_zar": 65000,
+    "expected_life_years": 25,
+    "residual_value_pct": 0.15,
+    "annual_maintenance_new_zar": 45000,
+    "maintenance_escalation_pct": 0.06,
+    "downtime_cost_per_day_zar": 80000,
+    "energy_efficiency_degradation_pct_per_year": 0.01,
+    "depreciation_method": "straight_line"
+  },
+  "ups": {
+    "equipment_type": "ups",
+    "typical_replacement_cost_zar": 650000,
+    "typical_repair_cost_zar": 45000,
+    "expected_life_years": 15,
+    "residual_value_pct": 0.05,
+    "annual_maintenance_new_zar": 28000,
+    "maintenance_escalation_pct": 0.06,
+    "downtime_cost_per_day_zar": 120000,
+    "energy_efficiency_degradation_pct_per_year": 0.02,
+    "depreciation_method": "straight_line"
+  },
+  "cooling_tower": {
+    "equipment_type": "cooling_tower",
+    "typical_replacement_cost_zar": 380000,
+    "typical_repair_cost_zar": 40000,
+    "expected_life_years": 25,
+    "residual_value_pct": 0.10,
+    "annual_maintenance_new_zar": 25000,
+    "maintenance_escalation_pct": 0.06,
+    "downtime_cost_per_day_zar": 20000,
+    "energy_efficiency_degradation_pct_per_year": 0.02,
+    "depreciation_method": "straight_line"
+  },
+  "split": {
+    "equipment_type": "split",
+    "typical_replacement_cost_zar": 45000,
+    "typical_repair_cost_zar": 8000,
+    "expected_life_years": 12,
+    "residual_value_pct": 0.05,
+    "annual_maintenance_new_zar": 3000,
+    "maintenance_escalation_pct": 0.06,
+    "downtime_cost_per_day_zar": 3000,
+    "energy_efficiency_degradation_pct_per_year": 0.03,
+    "depreciation_method": "straight_line"
+  },
+  "led_panel": {
+    "equipment_type": "led_panel",
+    "typical_replacement_cost_zar": 85000,
+    "typical_repair_cost_zar": 12000,
+    "expected_life_years": 10,
+    "residual_value_pct": 0.05,
+    "annual_maintenance_new_zar": 3500,
+    "maintenance_escalation_pct": 0.04,
+    "downtime_cost_per_day_zar": 1000,
+    "energy_efficiency_degradation_pct_per_year": 0.005,
+    "depreciation_method": "straight_line"
+  },
+  "distribution_board": {
+    "equipment_type": "distribution_board",
+    "typical_replacement_cost_zar": 320000,
+    "typical_repair_cost_zar": 25000,
+    "expected_life_years": 30,
+    "residual_value_pct": 0.10,
+    "annual_maintenance_new_zar": 8000,
+    "maintenance_escalation_pct": 0.05,
+    "downtime_cost_per_day_zar": 60000,
+    "energy_efficiency_degradation_pct_per_year": 0.005,
+    "depreciation_method": "straight_line"
+  },
+  "crac": {
+    "equipment_type": "crac",
+    "typical_replacement_cost_zar": 420000,
+    "typical_repair_cost_zar": 40000,
+    "expected_life_years": 15,
+    "residual_value_pct": 0.10,
+    "annual_maintenance_new_zar": 22000,
+    "maintenance_escalation_pct": 0.06,
+    "downtime_cost_per_day_zar": 150000,
+    "energy_efficiency_degradation_pct_per_year": 0.02,
+    "depreciation_method": "straight_line"
+  },
+  "_defaults": {
+    "discount_rate": 0.10,
+    "inflation_rate": 0.06,
+    "analysis_horizon_years": 10,
+    "currency": "ZAR"
+  }
+}

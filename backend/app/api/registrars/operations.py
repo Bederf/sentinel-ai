@@ -20,6 +20,7 @@ from app.api import privacy
 from app.api import asset_health
 from app.api import health_rating
 from app.api import cafm_integration
+from app.api import capex
 
 
 def register_operations_routers(app: FastAPI) -> None:
@@ -108,3 +109,6 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # CAFM integration (Phase 110 — completes v5.0)
     app.include_router(cafm_integration.router, tags=["cafm-integration"])
+
+    # CapEx planning engine (Phase 128)
+    app.include_router(capex.router, prefix="/api", tags=["capex"])
