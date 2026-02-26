@@ -130,25 +130,36 @@ class RetrainingScheduler:
         )
 
         try:
-            # In production this would call the actual trainer
             logger.info(f"Retraining triggered: {model_type}/{equipment_type} - reason: {reason}")
 
             if model_type == "lstm":
-                # Would call: from ml.lstm.trainer import LSTMTrainer
-                # trainer = LSTMTrainer(equipment_type)
-                # new_model = trainer.train()
+                from ml.lstm.train import LSTMTrainer
+
+                trainer = LSTMTrainer()
+                train_result = trainer.train_equipment_type(
+                    equipment_type, epochs=50, use_demo_data=False,
+                )
                 result.success = True
-                result.metrics = {"status": "queued", "reason": reason}
-                result.new_model_id = f"{model_type}_{equipment_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                result.metrics = train_result.get("metrics", {})
+                result.new_model_id = train_result.get("model_id", "")
             elif model_type == "autoencoder":
-                # Would call: from ml.autoencoder.trainer import AutoencoderTrainer
+                from ml.autoencoder.train import AutoencoderTrainer
+
+                trainer = AutoencoderTrainer()
+                train_result = trainer.train_equipment_type(
+                    equipment_type, epochs=50, use_demo_data=False,
+                )
                 result.success = True
-                result.metrics = {"status": "queued", "reason": reason}
-                result.new_model_id = f"{model_type}_{equipment_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                result.metrics = train_result.get("metrics", {})
+                result.new_model_id = train_result.get("model_id", "")
             elif model_type == "classifier":
+                from ml.classifier.train import ClassifierTrainer
+
+                trainer = ClassifierTrainer()
+                train_result = trainer.train_equipment_type(equipment_type)
                 result.success = True
-                result.metrics = {"status": "queued", "reason": reason}
-                result.new_model_id = f"{model_type}_{equipment_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                result.metrics = train_result.get("metrics", {})
+                result.new_model_id = train_result.get("model_id", "")
             else:
                 result.error = f"Unknown model type: {model_type}"
 

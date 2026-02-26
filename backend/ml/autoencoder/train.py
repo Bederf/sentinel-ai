@@ -89,16 +89,34 @@ class AutoencoderTrainer:
         data_prep = AutoencoderDataPrep(window_size=self.window_size)
 
         try:
-            if use_demo_data:
+            if not use_demo_data:
+                # Load real data from Supabase equipment_sensor_readings
+                from ml.data.supabase_loader import SupabaseTrainingDataLoader
+
+                loader = SupabaseTrainingDataLoader()
+                data_array = loader.load_equipment_type_array(equipment_type, min_hours=200)
+                if data_array is not None:
+                    logger.info(f"Loaded {len(data_array)} hours of real data for {equipment_type}")
+                    # Create windows from real data (assumed normal operation)
+                    windows = []
+                    for i in range(len(data_array) - self.window_size):
+                        windows.append(data_array[i : i + self.window_size])
+                    X_normal = np.array(windows)
+                    X_all = X_normal  # No known anomalies in real data
+                    anomaly_indices = []
+                else:
+                    logger.warning(f"Insufficient real data for {equipment_type}, falling back to demo data")
+                    X_normal, X_all, anomaly_indices = data_prep.generate_demo_data(
+                        n_hours=5000, n_features=n_features, n_anomalies=10, anomaly_magnitude=3.0,
+                    )
+            else:
                 logger.info(f"Using demo data for {equipment_type}")
                 X_normal, X_all, anomaly_indices = data_prep.generate_demo_data(
-                    n_hours=5000,  # More data for training
+                    n_hours=5000,
                     n_features=n_features,
                     n_anomalies=10,
                     anomaly_magnitude=3.0,
                 )
-            else:
-                raise NotImplementedError("Real data loading not yet implemented")
 
         except Exception as e:
             logger.warning(f"Could not load real data: {e}. Using demo data.")
@@ -249,6 +267,116 @@ class AutoencoderTrainer:
             "total_anomalies": len(anomaly_indices),
         }
 
+    def train_with_data(
+        self,
+        equipment_type: str,
+        X_normal: np.ndarray,
+        epochs: int = 50,
+        batch_size: int = 32,
+        test_size: float = 0.2,
+        latent_dim: int = 16,
+        verbose: int = 0,
+    ) -> Dict[str, Any]:
+        """Train autoencoder with pre-prepared data (from SimulationMLFeeder).
+
+        Args:
+            equipment_type: Type of equipment
+            X_normal: Normal operation windows (samples, window_size, features)
+            epochs: Training epochs
+            batch_size: Batch size
+            test_size: Validation fraction
+            latent_dim: Latent space dimension
+            verbose: Verbosity
+
+        Returns:
+            Training results dictionary
+        """
+        logger.info(f"Training autoencoder for {equipment_type} with {len(X_normal)} samples (fed by SENTINEL)")
+        start_time = datetime.now()
+
+        config = AUTOENCODER_SENSOR_CONFIGS[equipment_type]
+        n_features = X_normal.shape[-1]
+
+        if len(X_normal) < 100:
+            raise ValueError(f"Insufficient data for {equipment_type}: {len(X_normal)} samples")
+
+        # Split
+        X_train, X_val = train_test_split(X_normal, test_size=test_size, shuffle=True)
+
+        # Scale
+        data_prep = AutoencoderDataPrep(window_size=self.window_size)
+        X_train_scaled = data_prep.fit_scaler(X_train)
+        X_val_scaled = data_prep.transform(X_val)
+
+        # Build & train
+        model = SensorAutoencoder(
+            window_size=self.window_size,
+            n_features=n_features,
+            latent_dim=latent_dim,
+            lstm_units=(64, 32),
+            dropout_rate=0.2,
+        )
+        model.build()
+
+        history = model.train(
+            X_train_scaled, X_val_scaled,
+            epochs=epochs, batch_size=batch_size, patience=10, verbose=verbose,
+        )
+
+        # Save
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        model_filename = f"{equipment_type}_autoencoder_{timestamp}.h5"
+        model_path = self.model_dir / model_filename
+        model.save(str(model_path))
+
+        scaler_path = str(model_path).replace(".h5", "_scaler.joblib")
+        data_prep.save_scaler(scaler_path)
+
+        # Metrics
+        val_errors = model.get_reconstruction_error(X_val_scaled)
+        metrics = {
+            "threshold": float(model.threshold),
+            "val_loss": float(history["loss"][-1]),
+            "val_error_mean": float(val_errors.mean()),
+            "val_error_std": float(val_errors.std()),
+            "val_error_max": float(val_errors.max()),
+        }
+
+        # Register
+        model_id = self.registry.register_model(
+            model_type="autoencoder",
+            equipment_type=equipment_type,
+            model_path=str(model_path),
+            metrics=metrics,
+            metadata={
+                "scaler_path": scaler_path,
+                "window_size": self.window_size,
+                "latent_dim": latent_dim,
+                "n_features": n_features,
+                "feature_names": config["features"],
+                "training_samples": len(X_train),
+                "validation_samples": len(X_val),
+                "epochs_trained": len(history["loss"]),
+                "threshold_percentile": model.threshold_percentile,
+                "use_demo_data": False,
+                "data_source": "sentinel_ml_feeder",
+            },
+            auto_activate=True,
+        )
+
+        training_time = (datetime.now() - start_time).total_seconds()
+        return {
+            "equipment_type": equipment_type,
+            "model_id": model_id,
+            "model_path": str(model_path),
+            "scaler_path": scaler_path,
+            "normal_samples": len(X_normal),
+            "metrics": metrics,
+            "training_time_seconds": training_time,
+            "epochs_trained": len(history["loss"]),
+            "threshold": model.threshold,
+        }
+
     def train_all(self, epochs: int = 100, use_demo_data: bool = True) -> List[Dict[str, Any]]:
         """Train models for all equipment types."""
         results = []
@@ -277,7 +405,8 @@ def main():
     parser.add_argument("--all", "-a", action="store_true", help="Train all equipment types")
     parser.add_argument("--epochs", type=int, default=50, help="Maximum training epochs (default: 50)")
     parser.add_argument("--latent-dim", type=int, default=16, help="Latent space dimension (default: 16)")
-    parser.add_argument("--demo-data", action="store_true", default=True, help="Use synthetic demo data")
+    parser.add_argument("--demo-data", action="store_true", default=False, help="Force synthetic demo data instead of real Supabase data")
+    parser.add_argument("--real-data", action="store_true", default=False, help="Force real data from Supabase (fail if unavailable)")
     parser.add_argument("--verbose", "-v", type=int, default=1, help="Verbosity level")
 
     args = parser.parse_args()
@@ -287,8 +416,12 @@ def main():
 
     trainer = AutoencoderTrainer()
 
+    # Default: try real data first (use_demo_data=False), fall back to demo.
+    # --demo-data forces demo. --real-data forces real (no fallback).
+    use_demo = args.demo_data
+
     if args.all:
-        results = trainer.train_all(epochs=args.epochs, use_demo_data=args.demo_data)
+        results = trainer.train_all(epochs=args.epochs, use_demo_data=use_demo)
         print("\n=== Training Results ===")
         for r in results:
             if "error" in r:
@@ -303,7 +436,7 @@ def main():
             args.equipment_type,
             epochs=args.epochs,
             latent_dim=args.latent_dim,
-            use_demo_data=args.demo_data,
+            use_demo_data=use_demo,
             verbose=args.verbose,
         )
         print(f"\n=== Training Result: {args.equipment_type} ===")

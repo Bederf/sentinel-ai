@@ -4,7 +4,7 @@ type: "architecture"
 status: "published"
 version: "1.0.0"
 created: "2026-02-09"
-updated: "2026-02-09"
+updated: "2026-02-26"
 author: "Sentinel Development Team"
 tags: ["ml", "retraining", "background-jobs", "scheduler", "automation"]
 domain: "operations"
@@ -21,9 +21,9 @@ SENTINEL uses **background automated retraining** to keep ML models fresh in pro
 
 ### The Problem It Solves
 
-**Question:** "We trained all 14 models (7 equipment types × 2 model types). If training takes 2+ hours, how doesn't this block live buildings?"
+**Question:** "We trained all 21 models (7 equipment types × 3 model types: LSTM, autoencoder, classifier). If training takes 2+ hours, how doesn't this block live buildings?"
 
-**Answer:** The system runs training in a **background thread pool** using APScheduler. Only ONE model is retrained per 24-hour cycle, allowing all 14 models to refresh within 2 weeks while keeping the API responsive.
+**Answer:** The system runs training in a **background thread pool** using APScheduler. Only ONE model is retrained per 24-hour cycle, allowing all 21 models to refresh within 3 weeks while keeping the API responsive.
 
 **Key Guarantee:** API requests, device control, predictions, and optimization continue normally while retraining happens in the background.
 
@@ -54,10 +54,11 @@ SENTINEL uses **background automated retraining** to keep ML models fresh in pro
 │  │  │  Background ML Retraining Worker                    │   │ │
 │  │  │  (_run_ml_retraining)                               │   │ │
 │  │  │                                                      │   │ │
-│  │  │  1. Check all 14 models for staleness             │   │ │
+│  │  │  1. Check all 21 models for staleness             │   │ │
 │  │  │  2. Find stale/underperforming models             │   │ │
 │  │  │  3. Retrain ONE highest-priority model            │   │ │
-│  │  │  4. Log results                                    │   │ │
+│  │  │  4. Load real data from Supabase (or demo data)   │   │ │
+│  │  │  5. Log results                                    │   │ │
 │  │  │                                                      │   │ │
 │  │  └─────────────────────────────────────────────────────┘   │ │
 │  │                          ↓                                   │ │
@@ -132,14 +133,15 @@ Detects stale/underperforming models and triggers retraining.
 class RetrainingScheduler:
     def check_all_models(self) -> List[Dict]:
         """
-        Check freshness and performance of all 14 active models.
+        Check freshness and performance of all 21 active models
+        (7 equipment types × 3 model types: lstm, autoencoder, classifier).
 
         Returns list with:
-        - model_type: 'lstm' or 'autoencoder'
+        - model_type: 'lstm', 'autoencoder', or 'classifier'
         - equipment_type: 'chiller', 'ahu', 'fcu', 'vav', 'generator', 'ups', 'pump'
         - status: 'fresh', 'stale', 'underperforming', 'missing'
         - age_days: How old the model is
-        - r2_score: Model's R² performance metric
+        - r2_score: Model's performance metric (R² for LSTM, cv_accuracy for classifier)
         - needs_retrain: Boolean flag
         - reason: Explanation of status
         """
@@ -151,15 +153,19 @@ class RetrainingScheduler:
         reason: str = "manual"
     ) -> RetrainResult:
         """
-        Trigger retraining for a specific model.
+        Trigger retraining for a specific model. Invokes the actual trainer
+        (LSTMTrainer, AutoencoderTrainer, or ClassifierTrainer) which loads
+        real data from Supabase equipment_sensor_readings via
+        SupabaseTrainingDataLoader, falling back to synthetic demo data
+        if insufficient real data is available.
 
         Args:
-            model_type: 'lstm' or 'autoencoder'
+            model_type: 'lstm', 'autoencoder', or 'classifier'
             equipment_type: Equipment type (chiller, ahu, etc.)
             reason: Why retraining was triggered
 
         Returns:
-            RetrainResult with success status and new model ID
+            RetrainResult with success status, new model ID, and training metrics
         """
 
     def auto_retrain_stale(self) -> List[RetrainResult]:
@@ -188,7 +194,7 @@ class RetrainingScheduler:
 
 ```
 06:00 AM (or whenever cycle triggers):
-  └─ Check all 14 models
+  └─ Check all 21 models
      ├─ Chiller (LSTM): 25 days old, R²=0.84 → FRESH ✅
      ├─ Chiller (Autoencoder): 28 days old, R²=0.72 → FRESH ✅
      ├─ AHU (LSTM): 35 days old, R²=0.69 → STALE 🚨
@@ -247,7 +253,7 @@ With **one model per 24-hour cycle**:
 | 4 | (No stale models) | — | All fresh ✅ |
 | 5-14 | — | — | All remain fresh ✅ |
 
-**Result:** All 14 models refreshed within **3-14 days maximum**.
+**Result:** All 21 models refreshed within **3-21 days maximum**.
 
 ---
 
@@ -493,6 +499,37 @@ curl http://localhost:9095/api/ml/predictions/lstm/S002-CHILLER-B1-001
 
 ---
 
+## Training Data Source
+
+### Real Data Pipeline
+
+Retraining now loads real sensor data from Supabase via `SupabaseTrainingDataLoader` (`ml/data/supabase_loader.py`):
+
+```
+equipment_sensor_readings (Supabase)
+  ↓  Query by equipment code pattern (e.g., %-CHILLER-%)
+  ↓  Map BMS sensor names → ML feature names (SENSOR_MAPPING)
+  ↓  Pivot long-format → wide-format (one row per hour)
+  ↓
+SupabaseTrainingDataLoader
+  ├─ .load_equipment_type_dataframe() → LSTM training (pd.DataFrame)
+  ├─ .load_equipment_type_array()     → Autoencoder training (np.ndarray)
+  └─ .get_data_summary()              → Training data status API
+```
+
+**Data thresholds:**
+- LSTM requires **500+ hours** of real data
+- Autoencoder requires **200+ hours** of real data
+- If insufficient real data exists, trainers automatically fall back to synthetic demo data
+
+### Checking Available Data
+
+```bash
+curl http://localhost:9095/api/ml-retraining/training-data | jq '.equipment_types'
+```
+
+---
+
 ## Troubleshooting
 
 ### Problem: Background Retraining Not Happening
@@ -719,11 +756,11 @@ Background retraining never blocks device control:
 | Aspect | Details |
 |--------|---------|
 | **When** | Daily (24h default, configurable) |
-| **What** | Checks all 14 models for staleness (age > 30d or R² < 0.65) |
+| **What** | Checks all 21 models for staleness (age > 30d or R²/accuracy < 0.65) |
 | **How Many** | ONE model per cycle (prevents overload) |
 | **How Long** | ~2-3 hours per model (runs in background, doesn't block API) |
 | **Priority** | Missing models → oldest models → worst performers |
-| **Result** | All 14 models refreshed within 2 weeks |
+| **Result** | All 21 models refreshed within 3 weeks |
 | **Monitoring** | `/api/ml-retraining/status`, `/api/ml-retraining/history` |
 | **Production Ready** | ✅ Yes - fully automated, tested, production-safe |
 

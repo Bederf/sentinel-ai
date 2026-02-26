@@ -4,7 +4,7 @@ type: "reference"
 status: "approved"
 version: "1.0.0"
 created: "2026-02-06"
-updated: "2026-02-23"
+updated: "2026-02-26"
 author: "Sentinel Development Team"
 tags: ["api", "ml", "retraining", "ab-testing"]
 domain: "general"
@@ -72,6 +72,43 @@ Trigger model retraining for a specific model type and equipment type.
 }
 ```
 
+## Training Data Status
+
+### GET `/api/ml-retraining/training-data`
+
+Check available real training data per equipment type from `equipment_sensor_readings` in Supabase.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| site_id | string | No | Filter by site ID (default: all sites) |
+
+**Response:**
+```json
+{
+  "site_id": "all",
+  "equipment_types": {
+    "chiller": {
+      "available_hours": 1200,
+      "ready_for_lstm": true,
+      "ready_for_autoencoder": true,
+      "min_lstm_hours": 500,
+      "min_autoencoder_hours": 200
+    },
+    "ahu": {
+      "available_hours": 45,
+      "ready_for_lstm": false,
+      "ready_for_autoencoder": false,
+      "min_lstm_hours": 500,
+      "min_autoencoder_hours": 200
+    }
+  },
+  "ready_for_lstm_training": 1,
+  "ready_for_autoencoder_training": 1,
+  "total_types": 7
+}
+```
+
 ## Retrain History
 
 ### GET `/api/ml-retraining/history`
@@ -88,7 +125,7 @@ Trigger model retraining for a specific model type and equipment type.
       "reason": "auto_stale",
       "success": true,
       "new_model_id": "lstm_chiller_20260206_150000",
-      "metrics": {"status": "queued"},
+      "metrics": {"mae_24h": 0.42, "r2_24h": 0.84, "mae_avg": 0.51, "r2_avg": 0.78},
       "error": null
     }
   ]

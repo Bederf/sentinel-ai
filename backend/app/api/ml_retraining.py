@@ -34,6 +34,34 @@ async def get_model_status(request: Request):
     }
 
 
+@router.get("/training-data")
+@limiter.limit("1000/minute")
+async def get_training_data_status(
+    request: Request,
+    site_id: Optional[str] = Query(None, description="Filter by site ID"),
+):
+    """Check available training data per equipment type.
+
+    Shows hours of real sensor data available in Supabase, and whether
+    each equipment type has enough data for LSTM (500h) or autoencoder (200h) training.
+    """
+    from ml.data.supabase_loader import SupabaseTrainingDataLoader
+
+    loader = SupabaseTrainingDataLoader(site_id=site_id)
+    summary = loader.get_data_summary()
+
+    ready_lstm = sum(1 for v in summary.values() if v["ready_for_lstm"])
+    ready_ae = sum(1 for v in summary.values() if v["ready_for_autoencoder"])
+
+    return {
+        "site_id": site_id or "all",
+        "equipment_types": summary,
+        "ready_for_lstm_training": ready_lstm,
+        "ready_for_autoencoder_training": ready_ae,
+        "total_types": len(summary),
+    }
+
+
 @router.post("/trigger")
 @limiter.limit("100/minute")
 async def trigger_retraining(

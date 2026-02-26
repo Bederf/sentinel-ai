@@ -1,7 +1,7 @@
 ---
 status: implemented
-version: 43-01
-date: 2026-01-31
+version: 43-02
+date: 2026-02-26
 ---
 
 # Phase 43: ML Model Development
@@ -25,6 +25,9 @@ backend/ml/
 │   ├── autoencoder/     # Autoencoder model files
 │   ├── classifier/      # Random Forest classifier files (.joblib)
 │   └── registry.json    # Model registry
+├── data/                 # Real data loading from Supabase
+│   ├── __init__.py
+│   └── supabase_loader.py  # SupabaseTrainingDataLoader
 ├── lstm/
 │   ├── __init__.py
 │   ├── data_prep.py     # Training data preparation
@@ -65,12 +68,18 @@ backend/ml/
 ### Training
 
 ```bash
-# Train single equipment type
+# Train single equipment type (tries real Supabase data first, falls back to demo)
 cd backend
 python -m ml.lstm.train --equipment-type chiller --epochs 50
 
 # Train all equipment types
 python -m ml.lstm.train --all --epochs 50
+
+# Force synthetic demo data (skip Supabase)
+python -m ml.lstm.train --all --epochs 50 --demo-data
+
+# Force real data only (fail if insufficient)
+python -m ml.lstm.train --equipment-type chiller --epochs 50 --real-data
 ```
 
 ### API Usage
@@ -115,12 +124,18 @@ Autoencoders learn to compress and reconstruct "normal" operation patterns. When
 ### Training
 
 ```bash
-# Train single equipment type
+# Train single equipment type (tries real Supabase data first, falls back to demo)
 cd backend
 python -m ml.autoencoder.train --equipment-type chiller --epochs 50
 
 # Train all equipment types
 python -m ml.autoencoder.train --all --epochs 50
+
+# Force synthetic demo data (skip Supabase)
+python -m ml.autoencoder.train --all --epochs 50 --demo-data
+
+# Force real data only (fail if insufficient)
+python -m ml.autoencoder.train --equipment-type chiller --epochs 50 --real-data
 ```
 
 ### API Usage
@@ -232,13 +247,30 @@ if result["is_anomaly"]:
 
 ## Data Requirements
 
+### Real Data Source
+
+Training data is loaded from the `equipment_sensor_readings` Supabase table via `SupabaseTrainingDataLoader` (`ml/data/supabase_loader.py`). This table is populated hourly by `SimulationPersistence` during lifecycle simulation or by real BMS data ingestion.
+
+The loader:
+1. Queries `equipment_sensor_readings` filtered by equipment code pattern (e.g., `%-CHILLER-%`)
+2. Maps BMS sensor names to ML feature names via `SENSOR_MAPPING` from `sentinel_ml_feeder.py`
+3. Pivots long-format rows (one row per sensor reading) into wide-format (one row per hour with all features as columns)
+4. Falls back to synthetic demo data if insufficient real data is available
+
+```bash
+# Check available training data per equipment type
+curl "http://localhost:9095/api/ml-retraining/training-data"
+```
+
 ### LSTM
-- Minimum 6 months of hourly sensor data
+- Minimum 500 hours of hourly sensor data (from `equipment_sensor_readings`)
 - 168+ hours of continuous data for single prediction
+- Looks back up to 365 days for training data
 
 ### Autoencoder
-- Minimum 3 months of normal operation data
-- Exclude 7 days before and 3 days after known failures
+- Minimum 200 hours of normal operation data
+- Creates 24-hour sliding windows from hourly data
+- Looks back up to 365 days for training data
 
 ## Random Forest Fault Classification (v25.0)
 
@@ -322,17 +354,15 @@ print(f"Predicted: {result['predicted_failure']} ({result['confidence']:.0%})")
 
 ## Current Limitations
 
-1. **Demo Data**: Uses synthetic data for development/testing
-2. **No InfluxDB Integration**: Would connect to time-series database in production
-3. **Single Feature Target**: LSTM predicts single target per model
-4. **Fixed Window Sizes**: 168h (LSTM), 24h (autoencoder)
-5. **Classifier uses synthetic data**: Real failure labels from CAFM will improve accuracy
+1. **Single Feature Target**: LSTM predicts single target per model
+2. **Fixed Window Sizes**: 168h (LSTM), 24h (autoencoder)
+3. **Classifier uses synthetic data**: Real failure labels from CAFM will improve accuracy
+4. **Real data requires simulation**: The `equipment_sensor_readings` table must be populated by running lifecycle simulation or connecting to real BMS
 
 ## Future Enhancements
 
-- Phase 42 integration (InfluxDB feature store)
 - Multi-variate prediction
 - Attention mechanisms
 - Transfer learning between equipment types
-- Online learning for model updates
 - CAFM failure label integration for classifier training
+- Real-time incremental learning from streaming sensor data

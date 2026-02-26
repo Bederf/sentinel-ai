@@ -80,13 +80,26 @@ class LSTMTrainer:
         data_prep = LSTMDataPrep(window_size=self.window_size, forecast_horizons=self.forecast_horizons)
 
         try:
-            # Try to load real data (would connect to InfluxDB/Supabase)
-            # For now, fall back to demo data
-            if use_demo_data:
+            if not use_demo_data:
+                # Load real data from Supabase equipment_sensor_readings
+                from ml.data.supabase_loader import SupabaseTrainingDataLoader
+
+                loader = SupabaseTrainingDataLoader()
+                df = loader.load_equipment_type_dataframe(equipment_type, min_hours=500)
+                if df is not None:
+                    logger.info(f"Loaded {len(df)} hours of real data for {equipment_type}")
+                    X, y = data_prep.prepare_from_dataframe(
+                        df,
+                        feature_cols=config["features"],
+                        target_col=config["target"],
+                        timestamp_col="timestamp",
+                    )
+                else:
+                    logger.warning(f"Insufficient real data for {equipment_type}, falling back to demo data")
+                    X, y = data_prep.generate_demo_data(n_samples=5000, n_features=n_features, noise_level=0.1)
+            else:
                 logger.info(f"Using demo data for {equipment_type}")
                 X, y = data_prep.generate_demo_data(n_samples=5000, n_features=n_features, noise_level=0.1)
-            else:
-                raise NotImplementedError("Real data loading not yet implemented")
 
         except Exception as e:
             logger.warning(f"Could not load real data: {e}. Using demo data.")
@@ -203,6 +216,113 @@ class LSTMTrainer:
 
         return metrics
 
+    def train_with_data(
+        self,
+        equipment_type: str,
+        X: np.ndarray,
+        y: np.ndarray,
+        epochs: int = 50,
+        batch_size: int = 32,
+        test_size: float = 0.2,
+        verbose: int = 0,
+    ) -> Dict[str, Any]:
+        """Train LSTM model with pre-prepared data (from SimulationMLFeeder).
+
+        Args:
+            equipment_type: Type of equipment
+            X: Input sequences (samples, window_size, features)
+            y: Target values (samples, forecast_horizons)
+            epochs: Training epochs
+            batch_size: Batch size
+            test_size: Validation fraction
+            verbose: Verbosity
+
+        Returns:
+            Training results dictionary
+        """
+        logger.info(f"Training LSTM for {equipment_type} with {len(X)} samples (fed by SENTINEL)")
+        start_time = datetime.now()
+
+        config = EquipmentDataLoader.get_config(equipment_type)
+        n_features = X.shape[-1]
+
+        if len(X) < 100:
+            raise ValueError(f"Insufficient data for {equipment_type}: {len(X)} samples")
+
+        # Split (time-series: no shuffle)
+        split_idx = int(len(X) * (1 - test_size))
+        X_train, X_val = X[:split_idx], X[split_idx:]
+        y_train, y_val = y[:split_idx], y[split_idx:]
+
+        # Scale
+        data_prep = LSTMDataPrep(window_size=self.window_size, forecast_horizons=self.forecast_horizons)
+        X_train_scaled = data_prep.fit_scaler(X_train)
+        X_val_scaled = data_prep.transform(X_val)
+
+        # Build & train
+        model = SensorLSTM(
+            window_size=self.window_size,
+            n_features=n_features,
+            n_outputs=y.shape[1] if y.ndim > 1 else 1,
+            lstm_units=(128, 64, 32),
+            dropout_rate=0.2,
+        )
+        model.build()
+
+        history = model.train(
+            X_train_scaled, y_train, X_val_scaled, y_val,
+            epochs=epochs, batch_size=batch_size, patience=10, verbose=verbose,
+        )
+
+        # Evaluate
+        val_predictions = model.predict(X_val_scaled)
+        metrics = self._calculate_metrics(y_val, val_predictions)
+
+        # Save
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        model_filename = f"{equipment_type}_lstm_{timestamp}.h5"
+        model_path = self.model_dir / model_filename
+        model.save(str(model_path))
+
+        scaler_path = str(model_path).replace(".h5", "_scaler.joblib")
+        data_prep.save_scaler(scaler_path)
+
+        # Register
+        model_id = self.registry.register_model(
+            model_type="lstm",
+            equipment_type=equipment_type,
+            model_path=str(model_path),
+            metrics=metrics,
+            metadata={
+                "scaler_path": scaler_path,
+                "window_size": self.window_size,
+                "forecast_horizons": self.forecast_horizons,
+                "n_features": n_features,
+                "feature_names": config["features"],
+                "target": config["target"],
+                "training_samples": len(X_train),
+                "validation_samples": len(X_val),
+                "epochs_trained": len(history["loss"]),
+                "use_demo_data": False,
+                "data_source": "sentinel_ml_feeder",
+            },
+            auto_activate=True,
+        )
+
+        training_time = (datetime.now() - start_time).total_seconds()
+        return {
+            "equipment_type": equipment_type,
+            "model_id": model_id,
+            "model_path": str(model_path),
+            "scaler_path": scaler_path,
+            "samples": len(X),
+            "metrics": metrics,
+            "training_time_seconds": training_time,
+            "epochs_trained": len(history["loss"]),
+            "final_loss": history["loss"][-1],
+            "final_val_loss": history.get("val_loss", [None])[-1],
+        }
+
     def train_all(self, epochs: int = 100, use_demo_data: bool = True) -> List[Dict[str, Any]]:
         """Train models for all equipment types."""
         results = []
@@ -232,7 +352,8 @@ def main():
     )
     parser.add_argument("--all", "-a", action="store_true", help="Train all equipment types")
     parser.add_argument("--epochs", type=int, default=50, help="Maximum training epochs (default: 50)")
-    parser.add_argument("--demo-data", action="store_true", default=True, help="Use synthetic demo data")
+    parser.add_argument("--demo-data", action="store_true", default=False, help="Force synthetic demo data instead of real Supabase data")
+    parser.add_argument("--real-data", action="store_true", default=False, help="Force real data from Supabase (fail if unavailable)")
     parser.add_argument(
         "--verbose", "-v", type=int, default=1, help="Verbosity level (0=silent, 1=progress, 2=detailed)"
     )
@@ -244,8 +365,12 @@ def main():
 
     trainer = LSTMTrainer()
 
+    # Default: try real data first (use_demo_data=False), fall back to demo.
+    # --demo-data forces demo. --real-data forces real (no fallback).
+    use_demo = args.demo_data  # Explicit demo requested
+
     if args.all:
-        results = trainer.train_all(epochs=args.epochs, use_demo_data=args.demo_data)
+        results = trainer.train_all(epochs=args.epochs, use_demo_data=use_demo)
         print("\n=== Training Results ===")
         for r in results:
             if "error" in r:
@@ -255,7 +380,7 @@ def main():
 
     elif args.equipment_type:
         result = trainer.train_equipment_type(
-            args.equipment_type, epochs=args.epochs, use_demo_data=args.demo_data, verbose=args.verbose
+            args.equipment_type, epochs=args.epochs, use_demo_data=use_demo, verbose=args.verbose
         )
         print(f"\n=== Training Result: {args.equipment_type} ===")
         print(f"  Model ID: {result['model_id']}")
