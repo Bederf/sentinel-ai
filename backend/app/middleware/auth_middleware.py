@@ -576,14 +576,25 @@ async def _authenticate_request(request: Request) -> Optional[AuthContext]:
     if api_key:
         key_info = _validate_api_key(api_key)
         if key_info:
+            role = key_info["role"]
+            is_bot = False
+
+            # Detect bot agent API keys (Phase 120-03):
+            # 1. DB row has role="bot_agent"
+            # 2. API key starts with "sent_bot_"
+            if role == SentinelRole.BOT_AGENT or api_key.startswith("sent_bot_"):
+                role = SentinelRole.BOT_AGENT
+                is_bot = True
+
             auth_ctx = AuthContext(
                 user_id=f"svc:{key_info['owner']}",
-                role=key_info["role"],
+                role=role,
                 auth_method="api_key",
                 source_ip=source_ip,
                 scopes=key_info.get("scopes", []),
                 api_key_id=key_info.get("key_hash", "")[:12],
                 metadata={"description": key_info.get("description", "")},
+                is_bot_agent=is_bot,
             )
 
             # Load user entitlements for API key auth (if applicable)
@@ -593,7 +604,7 @@ async def _authenticate_request(request: Request) -> Optional[AuthContext]:
 
             logger.debug(
                 f"Auth success: user={auth_ctx.user_id} role={auth_ctx.role.value} "
-                f"method=api_key ip={source_ip} entitlements={auth_ctx.entitlements}"
+                f"method=api_key ip={source_ip} is_bot={is_bot} entitlements={auth_ctx.entitlements}"
             )
             return auth_ctx
         else:
@@ -657,18 +668,36 @@ def require_auth(level: AuthLevel = AuthLevel.AUTHENTICATED):
                 request.state.auth = auth_ctx
                 return auth_ctx
 
-            # Create demo context (OPERATOR role avoids 30/min admin rate limit)
-            demo_ctx = AuthContext(
-                user_id="demo-user",
-                role=SentinelRole.OPERATOR,  # Demo gets operator access (avoids admin rate limit)
-                auth_method="demo_mode",
-                source_ip=source_ip,
-                email="demo@sentinel.local",
-                scopes=["operator:all"],
-                metadata={"demo_mode": True},
-            )
+            # Phase 120-03: Detect bot agents in demo mode via header or key prefix.
+            # Bots get BOT_AGENT role instead of OPERATOR to prevent privilege escalation.
+            _is_demo_bot = request.headers.get("X-Agent-Type", "").lower() == "bot" or (
+                _extract_api_key(request) or ""
+            ).startswith("sent_bot_")
+
+            if _is_demo_bot:
+                demo_ctx = AuthContext(
+                    user_id="demo-bot",
+                    role=SentinelRole.BOT_AGENT,
+                    auth_method="demo_mode",
+                    source_ip=source_ip,
+                    email="bot@sentinel.local",
+                    scopes=["bot_agent:all"],
+                    metadata={"demo_mode": True},
+                    is_bot_agent=True,
+                )
+            else:
+                # Create demo context (OPERATOR role avoids 30/min admin rate limit)
+                demo_ctx = AuthContext(
+                    user_id="demo-user",
+                    role=SentinelRole.OPERATOR,  # Demo gets operator access (avoids admin rate limit)
+                    auth_method="demo_mode",
+                    source_ip=source_ip,
+                    email="demo@sentinel.local",
+                    scopes=["operator:all"],
+                    metadata={"demo_mode": True},
+                )
             request.state.auth = demo_ctx
-            logger.debug(f"Demo mode auth: path={request.url.path} ip={source_ip}")
+            logger.debug(f"Demo mode auth: path={request.url.path} ip={source_ip} is_bot={_is_demo_bot}")
             return demo_ctx
 
         # PUBLIC endpoints don't need auth
@@ -771,18 +800,35 @@ def require_role(*roles: SentinelRole):
                 request.state.auth = auth_ctx
                 return auth_ctx
 
-            # Create demo context - request the highest required role (avoids 30/min admin limit if possible)
-            # If ADMIN is required, use ADMIN, otherwise use highest required role
-            demo_role = max(roles, key=lambda r: ROLE_HIERARCHY.get(r, 0))
-            demo_ctx = AuthContext(
-                user_id="demo-user",
-                role=demo_role,
-                auth_method="demo_mode",
-                source_ip=source_ip,
-                email="demo@sentinel.local",
-                scopes=[f"{demo_role.value}:all"],
-                metadata={"demo_mode": True},
-            )
+            # Phase 120-03: Detect bot agents in demo mode via header or key prefix
+            _is_demo_bot = request.headers.get("X-Agent-Type", "").lower() == "bot" or (
+                _extract_api_key(request) or ""
+            ).startswith("sent_bot_")
+
+            if _is_demo_bot:
+                demo_ctx = AuthContext(
+                    user_id="demo-bot",
+                    role=SentinelRole.BOT_AGENT,
+                    auth_method="demo_mode",
+                    source_ip=source_ip,
+                    email="bot@sentinel.local",
+                    scopes=["bot_agent:all"],
+                    metadata={"demo_mode": True},
+                    is_bot_agent=True,
+                )
+            else:
+                # Create demo context - request the highest required role (avoids 30/min admin limit if possible)
+                # If ADMIN is required, use ADMIN, otherwise use highest required role
+                demo_role = max(roles, key=lambda r: ROLE_HIERARCHY.get(r, 0))
+                demo_ctx = AuthContext(
+                    user_id="demo-user",
+                    role=demo_role,
+                    auth_method="demo_mode",
+                    source_ip=source_ip,
+                    email="demo@sentinel.local",
+                    scopes=[f"{demo_role.value}:all"],
+                    metadata={"demo_mode": True},
+                )
             request.state.auth = demo_ctx
             return demo_ctx
 

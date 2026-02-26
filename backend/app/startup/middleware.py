@@ -21,6 +21,7 @@ from app.middleware.rate_limiter import limiter
 from app.middleware.audit_middleware import AuditMiddleware
 from app.middleware.security_logging import SecurityLoggingMiddleware
 from app.middleware.error_sanitization import ErrorSanitizationMiddleware
+from app.middleware.agent_security.middleware import AgentSecurityMiddleware, check_unmapped_routes
 
 _logger = logging.getLogger("sentinel.security")
 
@@ -296,5 +297,19 @@ def register_middleware(app: FastAPI) -> None:
     # SecurityLoggingMiddleware runs first (outermost), captures all security events
     app.add_middleware(SecurityLoggingMiddleware)
 
+    # Agent security middleware (Phase 120-05 — gates bot agent requests)
+    # Runs AFTER enforce_authentication (so request.state.auth is available)
+    # and BEFORE AuditMiddleware (so agent actions are audited).
+    app.add_middleware(AgentSecurityMiddleware)
+
     # Audit middleware (existing - captures device control actions)
     app.add_middleware(AuditMiddleware)
+
+    # Register agent security API router (confirmation + circuit breaker endpoints)
+    from app.api.agent_security import router as agent_security_router
+
+    app.include_router(agent_security_router, tags=["Agent Security"])
+
+    # Cross-check registered routes against agent security PATH_TOOL_MAP
+    # Logs warnings for unmapped agent-sensitive routes
+    check_unmapped_routes(app)

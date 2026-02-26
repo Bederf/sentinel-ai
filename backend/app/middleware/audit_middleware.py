@@ -148,8 +148,23 @@ class AuditMiddleware(BaseHTTPMiddleware):
             raise
 
     def _extract_user(self, request: Request) -> str:
-        """Extract user from request (demo implementation)."""
-        # Demo: Check for user header or default to "system"
+        """Extract user from request, with bot agent detection (Phase 120-03).
+
+        If the request is from a bot agent (AuthContext.is_bot_agent), the
+        user_id is prefixed with "bot:" so audit logs clearly distinguish
+        bot traffic from human traffic.
+        """
+        # Phase 120-03: Check AuthContext for bot agent identity
+        auth_ctx = getattr(getattr(request, "state", None), "auth", None)
+        if auth_ctx is not None:
+            user_id = getattr(auth_ctx, "user_id", None)
+            is_bot = getattr(auth_ctx, "is_bot_agent", False)
+            if user_id:
+                if is_bot and not user_id.startswith("bot:"):
+                    return f"bot:{user_id}"
+                return user_id
+
+        # Fallback: Check for user header or default to "system"
         user_header = request.headers.get("X-User-Id")
         if user_header:
             return user_header
@@ -205,9 +220,14 @@ class AuditMiddleware(BaseHTTPMiddleware):
             # Calculate duration
             duration_ms = (datetime.now() - request_start).total_seconds() * 1000
 
+            # Phase 120-03: Determine agent type for audit metadata
+            auth_ctx = getattr(getattr(request, "state", None), "auth", None)
+            agent_type = "bot_agent" if (auth_ctx and getattr(auth_ctx, "is_bot_agent", False)) else "human"
+            event_type = f"bot_{action_type.lower()}" if agent_type == "bot_agent" else f"api_{action_type.lower()}"
+
             # Log to audit system
             self.audit_logger.log_system_event(
-                event_type=f"api_{action_type.lower()}",
+                event_type=event_type,
                 user=user,
                 result=AuditResultType.SUCCESS,
                 metadata={
@@ -218,10 +238,13 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     "response_status": response.status_code,
                     "duration_ms": round(duration_ms, 2),
                     "correlation_id": correlation_id,
+                    "agent_type": agent_type,
                 },
             )
 
-            logger.info(f"Audit logged: {action_type} by {user} (device: {device_id or 'N/A'}) - SUCCESS")
+            logger.info(
+                f"Audit logged: {action_type} by {user} (device: {device_id or 'N/A'}, agent: {agent_type}) - SUCCESS"
+            )
 
         except Exception as e:
             logger.error(f"Failed to log successful action: {e}")
@@ -263,8 +286,13 @@ class AuditMiddleware(BaseHTTPMiddleware):
             except Exception:
                 pass
 
+            # Phase 120-03: Determine agent type for audit metadata
+            auth_ctx = getattr(getattr(request, "state", None), "auth", None)
+            agent_type = "bot_agent" if (auth_ctx and getattr(auth_ctx, "is_bot_agent", False)) else "human"
+            event_type = f"bot_{action_type.lower()}" if agent_type == "bot_agent" else f"api_{action_type.lower()}"
+
             self.audit_logger.log_system_event(
-                event_type=f"api_{action_type.lower()}",
+                event_type=event_type,
                 user=user,
                 result=AuditResultType.FAILED,
                 error_message=error_message,
@@ -276,11 +304,14 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     "response_status": response.status_code,
                     "duration_ms": round(duration_ms, 2),
                     "correlation_id": correlation_id,
+                    "agent_type": agent_type,
                 },
             )
 
             logger.warning(
-                f"Audit logged: {action_type} by {user} (device: {device_id or 'N/A'}) - FAILED: {error_message}"
+                f"Audit logged: {action_type} by {user} "
+                f"(device: {device_id or 'N/A'}, agent: {agent_type}) "
+                f"- FAILED: {error_message}"
             )
 
         except Exception as e:

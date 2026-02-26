@@ -37,6 +37,7 @@ class EmergencyMode(str, Enum):
     READ_ONLY = "read_only"  # Blocks writes (database maintenance)
     SAFETY_LOCKDOWN = "safety_lockdown"  # Blocks device control (BMS emergency)
     API_SHUTDOWN = "api_shutdown"  # Blocks all API calls (full shutdown)
+    BOT_LOCKDOWN = "bot_lockdown"  # Blocks bot agent requests only (Phase 120-03)
 
 
 class EmergencyControlsService:
@@ -195,6 +196,22 @@ class EmergencyControlsService:
 
         # Normal mode - allow everything
         if self._mode == EmergencyMode.NORMAL:
+            return None
+
+        # BOT_LOCKDOWN - block bot agent requests, allow human requests (Phase 120-03)
+        if self._mode == EmergencyMode.BOT_LOCKDOWN:
+            auth_ctx = getattr(getattr(request, "state", None), "auth", None)
+            is_bot = getattr(auth_ctx, "is_bot_agent", False) if auth_ctx else False
+            if is_bot:
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "error": "Bot agents are temporarily locked out",
+                        "mode": "bot_lockdown",
+                        "reason": self._reason or "Bot agent access suspended by administrator",
+                    },
+                )
+            # Human requests pass through normally during BOT_LOCKDOWN
             return None
 
         # API Shutdown - block everything except always-allowed

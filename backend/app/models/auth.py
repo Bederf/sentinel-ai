@@ -38,6 +38,7 @@ class SentinelRole(str, Enum):
     OPERATOR = "operator"  # BMS operations, device control, optimization
     DEVELOPER = "developer"  # Development access, debugging, testing
     AUDITOR = "auditor"  # Read-only access for compliance review
+    BOT_AGENT = "bot_agent"  # Restricted role for automated bot agents (Phase 120-03)
 
 
 # Role hierarchy: higher roles inherit lower role permissions
@@ -46,6 +47,7 @@ ROLE_HIERARCHY: Dict[SentinelRole, int] = {
     SentinelRole.DEVELOPER: 3,
     SentinelRole.OPERATOR: 2,
     SentinelRole.AUDITOR: 1,
+    SentinelRole.BOT_AGENT: 1,  # Same rank as AUDITOR — cannot pass OPERATOR checks (Phase 120-03)
 }
 
 # Map AuthLevel to minimum required role
@@ -74,6 +76,7 @@ class AuthContext:
     api_key_id: Optional[str] = None
     authenticated_at: datetime = field(default_factory=datetime.utcnow)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    is_bot_agent: bool = False  # True when authenticated as bot agent (Phase 120-03)
     entitlements: List[str] = field(default_factory=list)  # Module types user has access to
 
     def has_role(self, required_role: SentinelRole) -> bool:

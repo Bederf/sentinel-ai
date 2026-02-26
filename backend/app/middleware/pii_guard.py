@@ -68,6 +68,15 @@ class PIIGuard:
             "email": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
             # Credit card numbers (basic pattern, 13-19 digits with separators)
             "credit_card": re.compile(r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4,7}\b"),
+            # --- Phase 120-03: API keys, tokens, and secrets ---
+            # Anthropic API keys (sk-ant-...)
+            "anthropic_api_key": re.compile(r"sk-ant-[a-zA-Z0-9\-]{20,}"),
+            # SENTINEL API keys (sent_sk_...)
+            "sentinel_api_key": re.compile(r"sent_sk_[a-zA-Z0-9]{16,}"),
+            # JWT tokens (two base64url-encoded segments)
+            "jwt_token": re.compile(r"eyJ[a-zA-Z0-9_-]{30,}\.eyJ[a-zA-Z0-9_-]{30,}"),
+            # SSH private key headers
+            "ssh_private_key": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
         }
 
     def redact(
