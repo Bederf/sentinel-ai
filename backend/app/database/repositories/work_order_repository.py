@@ -13,6 +13,13 @@ logger = logging.getLogger(__name__)
 class WorkOrderRepository:
     """Repository for work order operations."""
 
+    _LIST_COLUMNS = (
+        "id, code, title, description, priority, status, "
+        "assigned_to, assigned_team, equipment_id, building_id, "
+        "scheduled_date, completed_at, created_at, created_by, "
+        "estimated_duration_hours"
+    )
+
     def __init__(self):
         self.client = get_supabase_client()
 
@@ -154,7 +161,7 @@ class WorkOrderRepository:
         try:
             query = (
                 self.client.table("work_orders")
-                .select("*")
+                .select(self._LIST_COLUMNS)
                 .eq("equipment_id", equipment_id)
                 .order("created_at", desc=True)
                 .limit(limit)
@@ -201,7 +208,7 @@ class WorkOrderRepository:
         try:
             query = (
                 self.client.table("work_orders")
-                .select("*")
+                .select(self._LIST_COLUMNS)
                 .in_("equipment_id", equipment_ids)
                 .order("completed_at", desc=True)
                 .limit(limit)
@@ -238,7 +245,9 @@ class WorkOrderRepository:
             return []
 
         try:
-            query = self.client.table("work_orders").select("*").order("created_at", desc=True).limit(limit)
+            query = (
+                self.client.table("work_orders").select(self._LIST_COLUMNS).order("created_at", desc=True).limit(limit)
+            )
 
             if status:
                 query = query.eq("status", status)

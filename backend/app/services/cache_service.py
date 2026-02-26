@@ -24,6 +24,8 @@ Usage:
 
 import json
 import logging
+import time as _time
+from contextlib import contextmanager
 from functools import wraps
 from typing import Any, Callable, Optional, TypeVar, ParamSpec
 
@@ -107,11 +109,14 @@ class CacheService:
             data = client.get(full_key)
             if data:
                 self._stats["hits"] += 1
+                self._inc_prometheus("hit")
                 return json.loads(data)
             self._stats["misses"] += 1
+            self._inc_prometheus("miss")
             return None
         except Exception as e:
             self._stats["errors"] += 1
+            self._inc_prometheus("error")
             logger.debug(f"Cache get error for {key}: {e}")
             return None
 
@@ -318,10 +323,32 @@ class CacheService:
 
         return decorator
 
+    def _inc_prometheus(self, operation: str) -> None:
+        """Increment Prometheus cache counter (lazy import to avoid circular deps)."""
+        try:
+            from app.api.metrics import sentinel_cache_operations_total
+
+            sentinel_cache_operations_total.labels(operation=operation).inc()
+        except Exception:
+            pass
+
+    def _sync_prometheus_gauge(self) -> None:
+        """Update Prometheus gauge with current hit rate."""
+        try:
+            from app.api.metrics import sentinel_cache_hit_rate_percent
+
+            total = self._stats["hits"] + self._stats["misses"]
+            if total > 0:
+                sentinel_cache_hit_rate_percent.set(round(self._stats["hits"] / total * 100, 2))
+        except Exception:
+            pass
+
     def get_stats(self) -> dict:
         """Get cache statistics."""
         total = self._stats["hits"] + self._stats["misses"]
         hit_rate = (self._stats["hits"] / total * 100) if total > 0 else 0.0
+
+        self._sync_prometheus_gauge()
 
         return {
             "connected": self._connected,
@@ -448,3 +475,24 @@ class CacheInvalidation:
     def on_user_access_change(email: str):
         """Invalidate user access cache."""
         cache.delete(CacheKeys.user_access(email))
+
+
+@contextmanager
+def track_query(repository: str, method: str):
+    """Context manager to time Supabase queries for Prometheus.
+
+    Usage:
+        with track_query("equipment", "get_all"):
+            response = query.execute()
+    """
+    start = _time.perf_counter()
+    try:
+        yield
+    finally:
+        duration = _time.perf_counter() - start
+        try:
+            from app.api.metrics import sentinel_db_query_duration_seconds
+
+            sentinel_db_query_duration_seconds.labels(repository=repository, method=method).observe(duration)
+        except Exception:
+            pass

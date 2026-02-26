@@ -4,12 +4,24 @@ from typing import List, Optional, Dict, Any
 import time
 import logging
 from app.database.supabase_client import get_supabase_client
+from app.services.cache_service import cache, CacheKeys, CacheService, CacheInvalidation, track_query
 
 logger = logging.getLogger(__name__)
 
 
 class EquipmentRepository:
     """Repository for equipment database operations."""
+
+    # Column selection constants to avoid SELECT * overhead
+    _LIST_COLUMNS = "id, code, name, status, health_score, type, building_id, location"
+    _DETAIL_COLUMNS = (
+        "id, code, name, status, health_score, type, building_id, "
+        "manufacturer, model, install_date, commissioning_date, "
+        "device_info, operating_data, network_info, location, "
+        "service_provider_name, service_provider_email, "
+        "service_provider_phone, service_provider_specialty, "
+        "created_at, updated_at"
+    )
 
     def __init__(self):
         """Initialize the repository with a Supabase client."""
@@ -57,13 +69,25 @@ class EquipmentRepository:
         Returns:
             List of equipment items
         """
-        query = self.client.table("equipment").select("*")
+        # Cache equipment-by-building (most common call)
+        if building_id:
+            cached = cache.get(CacheKeys.equipment_by_building(building_id))
+            if cached is not None:
+                return cached
+
+        query = self.client.table("equipment").select(self._LIST_COLUMNS)
 
         if building_id:
             query = query.eq("building_id", building_id)
 
-        response = query.execute()
-        return response.data
+        with track_query("equipment", "get_all"):
+            response = query.execute()
+        result = response.data
+
+        if building_id:
+            cache.set(CacheKeys.equipment_by_building(building_id), result, CacheService.TTL_SEMI_STATIC)
+
+        return result
 
     def get_by_id(self, equipment_id: str) -> Optional[Dict[str, Any]]:
         """Get equipment by its code.
@@ -74,10 +98,17 @@ class EquipmentRepository:
         Returns:
             Equipment data or None if not found
         """
-        response = self.client.table("equipment").select("*").eq("code", equipment_id).execute()
+        cached = cache.get(CacheKeys.equipment_by_code(equipment_id))
+        if cached is not None:
+            return cached
+
+        with track_query("equipment", "get_by_id"):
+            response = self.client.table("equipment").select(self._DETAIL_COLUMNS).eq("code", equipment_id).execute()
 
         if response.data:
-            return response.data[0]
+            result = response.data[0]
+            cache.set(CacheKeys.equipment_by_code(equipment_id), result, CacheService.TTL_SEMI_STATIC)
+            return result
         return None
 
     def get_by_uuid(self, uuid: str) -> Optional[Dict[str, Any]]:
@@ -89,7 +120,7 @@ class EquipmentRepository:
         Returns:
             Equipment data or None if not found
         """
-        response = self.client.table("equipment").select("*").eq("id", uuid).execute()
+        response = self.client.table("equipment").select(self._DETAIL_COLUMNS).eq("id", uuid).execute()
 
         if response.data:
             return response.data[0]
@@ -114,7 +145,7 @@ class EquipmentRepository:
         building_uuid = building_response.data[0]["id"]
 
         # Get equipment for this building (with retry)
-        equipment_query = self.client.table("equipment").select("*").eq("building_id", building_uuid)
+        equipment_query = self.client.table("equipment").select(self._LIST_COLUMNS).eq("building_id", building_uuid)
         equipment_response = self._execute_with_retry(equipment_query)
 
         return equipment_response.data
@@ -128,7 +159,7 @@ class EquipmentRepository:
         Returns:
             List of equipment items
         """
-        response = self.client.table("equipment").select("*").eq("type", equipment_type).execute()
+        response = self.client.table("equipment").select(self._LIST_COLUMNS).eq("type", equipment_type).execute()
 
         return response.data
 
@@ -138,7 +169,7 @@ class EquipmentRepository:
         Returns:
             List of critical equipment items
         """
-        response = self.client.table("equipment").select("*").eq("status", "critical").execute()
+        response = self.client.table("equipment").select(self._LIST_COLUMNS).eq("status", "critical").execute()
 
         return response.data
 
@@ -152,7 +183,7 @@ class EquipmentRepository:
             List of equipment with low health
         """
         # Note: Supabase uses lt for less than
-        response = self.client.table("equipment").select("*").lt("health_score", threshold).execute()
+        response = self.client.table("equipment").select(self._LIST_COLUMNS).lt("health_score", threshold).execute()
 
         return response.data
 
@@ -166,7 +197,9 @@ class EquipmentRepository:
             Created equipment
         """
         response = self.client.table("equipment").insert(equipment_data).execute()
-        return response.data[0]
+        result = response.data[0]
+        CacheInvalidation.on_equipment_change(building_id=equipment_data.get("building_id"))
+        return result
 
     def update(self, equipment_id: str, equipment_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update equipment.
@@ -185,6 +218,10 @@ class EquipmentRepository:
         response = self.client.table("equipment").update(equipment_data).eq("id", equipment["id"]).execute()
 
         if response.data:
+            CacheInvalidation.on_equipment_change(
+                building_id=equipment.get("building_id"),
+                equipment_code=equipment_id,
+            )
             return response.data[0]
         return None
 
@@ -257,7 +294,13 @@ class EquipmentRepository:
 
         response = self.client.table("equipment").delete().eq("id", equipment["id"]).execute()
 
-        return len(response.data) > 0
+        if len(response.data) > 0:
+            CacheInvalidation.on_equipment_change(
+                building_id=equipment.get("building_id"),
+                equipment_code=equipment_id,
+            )
+            return True
+        return False
 
     def update_status(self, equipment_id: str, status: str) -> Optional[Dict[str, Any]]:
         """Update equipment status.
@@ -327,7 +370,9 @@ class EquipmentRepository:
         Returns:
             List of equipment items
         """
-        response = self.client.table("equipment").select("*").eq("service_provider_email", email).execute()
+        response = (
+            self.client.table("equipment").select(self._LIST_COLUMNS).eq("service_provider_email", email).execute()
+        )
 
         return response.data
 
@@ -340,7 +385,12 @@ class EquipmentRepository:
         Returns:
             List of equipment items
         """
-        response = self.client.table("equipment").select("*").eq("service_provider_specialty", specialty).execute()
+        response = (
+            self.client.table("equipment")
+            .select(self._LIST_COLUMNS)
+            .eq("service_provider_specialty", specialty)
+            .execute()
+        )
 
         return response.data
 

@@ -2,10 +2,17 @@
 
 from typing import List, Optional, Dict, Any
 from app.database.supabase_client import get_supabase_client
+from app.services.cache_service import cache, CacheKeys, CacheService, CacheInvalidation, track_query
 
 
 class AlertRepository:
     """Repository for alert database operations."""
+
+    _COLUMNS = (
+        "id, title, message, severity, status, type, "
+        "building_id, equipment_id, created_at, updated_at, "
+        "acknowledged_by, acknowledged_at"
+    )
 
     def __init__(self):
         """Initialize the repository with a Supabase client."""
@@ -29,7 +36,7 @@ class AlertRepository:
         Returns:
             List of alerts
         """
-        query = self.client.table("alerts").select("*")
+        query = self.client.table("alerts").select(self._COLUMNS)
 
         if building_id:
             query = query.eq("building_id", building_id)
@@ -52,7 +59,7 @@ class AlertRepository:
         Returns:
             Alert data or None if not found
         """
-        response = self.client.table("alerts").select("*").eq("id", alert_id).execute()
+        response = self.client.table("alerts").select(self._COLUMNS).eq("id", alert_id).execute()
 
         if response.data:
             return response.data[0]
@@ -67,11 +74,22 @@ class AlertRepository:
         Returns:
             List of active alerts
         """
-        response = (
-            self.client.table("alerts").select("*").eq("building_id", building_uuid).eq("status", "active").execute()
-        )
+        cached = cache.get(CacheKeys.alerts_active(building_uuid))
+        if cached is not None:
+            return cached
 
-        return response.data
+        with track_query("alert", "get_active_by_building"):
+            response = (
+                self.client.table("alerts")
+                .select(self._COLUMNS)
+                .eq("building_id", building_uuid)
+                .eq("status", "active")
+                .execute()
+            )
+
+        result = response.data
+        cache.set(CacheKeys.alerts_active(building_uuid), result, CacheService.TTL_DYNAMIC)
+        return result
 
     def get_active_by_equipment(self, equipment_uuid: str) -> List[Dict[str, Any]]:
         """Get active alerts for equipment.
@@ -83,7 +101,11 @@ class AlertRepository:
             List of active alerts
         """
         response = (
-            self.client.table("alerts").select("*").eq("equipment_id", equipment_uuid).eq("status", "active").execute()
+            self.client.table("alerts")
+            .select(self._COLUMNS)
+            .eq("equipment_id", equipment_uuid)
+            .eq("status", "active")
+            .execute()
         )
 
         return response.data
@@ -118,7 +140,13 @@ class AlertRepository:
         Returns:
             List of critical alerts
         """
-        response = self.client.table("alerts").select("*").eq("severity", "critical").eq("status", "active").execute()
+        response = (
+            self.client.table("alerts")
+            .select(self._COLUMNS)
+            .eq("severity", "critical")
+            .eq("status", "active")
+            .execute()
+        )
 
         return response.data
 
@@ -132,7 +160,9 @@ class AlertRepository:
             Created alert
         """
         response = self.client.table("alerts").insert(alert_data).execute()
-        return response.data[0]
+        result = response.data[0]
+        CacheInvalidation.on_alert_change(building_id=alert_data.get("building_id"))
+        return result
 
     def update(self, alert_id: str, alert_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update an alert.
@@ -147,6 +177,7 @@ class AlertRepository:
         response = self.client.table("alerts").update(alert_data).eq("id", alert_id).execute()
 
         if response.data:
+            CacheInvalidation.on_alert_change(building_id=response.data[0].get("building_id"))
             return response.data[0]
         return None
 
@@ -193,7 +224,10 @@ class AlertRepository:
         """
         response = self.client.table("alerts").delete().eq("id", alert_id).execute()
 
-        return len(response.data) > 0
+        if len(response.data) > 0:
+            CacheInvalidation.on_alert_change()
+            return True
+        return False
 
     def resolve_by_equipment(self, equipment_id: str) -> int:
         """Resolve all active alerts for a specific equipment.

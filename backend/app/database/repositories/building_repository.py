@@ -5,12 +5,18 @@ import time
 from typing import List, Optional, Dict, Any
 from app.database.supabase_client import get_supabase_client
 from app.models.auth import SentinelRole
+from app.services.cache_service import cache, CacheKeys, CacheService, CacheInvalidation, track_query
 
 logger = logging.getLogger(__name__)
 
 
 class BuildingRepository:
     """Repository for building/site database operations."""
+
+    _COLUMNS = (
+        "id, code, name, type, region, address, latitude, longitude, "
+        "equipment_count, floor_count, total_area_sqm, created_at, updated_at"
+    )
 
     def __init__(self):
         """Initialize the repository with a Supabase client."""
@@ -51,15 +57,27 @@ class BuildingRepository:
         Returns:
             List of buildings
         """
-        query = self.client.table("buildings").select("*")
+        # Only cache unfiltered full list
+        if not region and not site_type:
+            cached = cache.get(CacheKeys.buildings_all())
+            if cached is not None:
+                return cached
+
+        query = self.client.table("buildings").select(self._COLUMNS)
 
         if region:
             query = query.eq("region", region)
         if site_type:
             query = query.eq("type", site_type)
 
-        response = self._execute_with_retry(query)
-        return response.data
+        with track_query("building", "get_all"):
+            response = self._execute_with_retry(query)
+        result = response.data
+
+        if not region and not site_type:
+            cache.set(CacheKeys.buildings_all(), result, CacheService.TTL_SEMI_STATIC)
+
+        return result
 
     def get_by_id(self, building_id: str) -> Optional[Dict[str, Any]]:
         """Get a building by its code.
@@ -70,11 +88,18 @@ class BuildingRepository:
         Returns:
             Building data or None if not found
         """
-        query = self.client.table("buildings").select("*").eq("code", building_id)
-        response = self._execute_with_retry(query)
+        cached = cache.get(CacheKeys.building(building_id))
+        if cached is not None:
+            return cached
+
+        query = self.client.table("buildings").select(self._COLUMNS).eq("code", building_id)
+        with track_query("building", "get_by_id"):
+            response = self._execute_with_retry(query)
 
         if response.data:
-            return response.data[0]
+            result = response.data[0]
+            cache.set(CacheKeys.building(building_id), result, CacheService.TTL_SEMI_STATIC)
+            return result
         return None
 
     def get_by_uuid(self, uuid: str) -> Optional[Dict[str, Any]]:
@@ -86,11 +111,17 @@ class BuildingRepository:
         Returns:
             Building data or None if not found
         """
-        query = self.client.table("buildings").select("*").eq("id", uuid)
+        cached = cache.get(CacheKeys.building_by_id(uuid))
+        if cached is not None:
+            return cached
+
+        query = self.client.table("buildings").select(self._COLUMNS).eq("id", uuid)
         response = self._execute_with_retry(query)
 
         if response.data:
-            return response.data[0]
+            result = response.data[0]
+            cache.set(CacheKeys.building_by_id(uuid), result, CacheService.TTL_SEMI_STATIC)
+            return result
         return None
 
     def get_equipment_count(self, building_uuid: str) -> int:
@@ -185,7 +216,9 @@ class BuildingRepository:
             Created building
         """
         response = self.client.table("buildings").insert(building_data).execute()
-        return response.data[0]
+        result = response.data[0]
+        CacheInvalidation.on_building_change()
+        return result
 
     def update(self, building_id: str, building_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a building.
@@ -205,6 +238,7 @@ class BuildingRepository:
         response = self.client.table("buildings").update(building_data).eq("id", building["id"]).execute()
 
         if response.data:
+            CacheInvalidation.on_building_change(building_id=building["id"], building_code=building_id)
             return response.data[0]
         return None
 
@@ -223,7 +257,10 @@ class BuildingRepository:
 
         response = self.client.table("buildings").delete().eq("id", building["id"]).execute()
 
-        return len(response.data) > 0
+        if len(response.data) > 0:
+            CacheInvalidation.on_building_change(building_id=building["id"], building_code=building_id)
+            return True
+        return False
 
     def get_asset_summary(self, building_uuid: str) -> Optional[Dict[str, Any]]:
         """Get categorized asset counts from Supabase view.
@@ -303,7 +340,7 @@ class BuildingRepository:
             building_ids = [a["building_id"] for a in access_result.data]
 
             # Get buildings with those IDs
-            query = self.client.table("buildings").select("*").in_("id", building_ids)
+            query = self.client.table("buildings").select(self._COLUMNS).in_("id", building_ids)
 
             if region:
                 query = query.eq("region", region)

@@ -1,4 +1,4 @@
-"""Tests for /metrics Prometheus endpoint (Phase 127)."""
+"""Tests for /metrics Prometheus endpoint (Phases 125, 127)."""
 
 
 class TestMetricsEndpoint:
@@ -61,8 +61,23 @@ class TestMetricsEndpoint:
         for metric in expected:
             assert f"# HELP {metric}" in output, f"Missing metric: {metric}"
 
+    def test_database_cache_metrics_present(self):
+        """Phase 125 database and cache metrics are registered."""
+        from app.api.metrics import REGISTRY, generate_latest
+
+        output = generate_latest(REGISTRY).decode("utf-8")
+
+        expected = [
+            "sentinel_db_query_duration_seconds",
+            "sentinel_cache_operations_total",
+            "sentinel_cache_hit_rate_percent",
+        ]
+
+        for metric in expected:
+            assert f"# HELP {metric}" in output, f"Missing metric: {metric}"
+
     def test_total_metric_count(self):
-        """At least 13 metric families registered (excludes _created auto-generated)."""
+        """At least 16 metric families registered (excludes _created auto-generated)."""
         from app.api.metrics import REGISTRY, generate_latest
 
         output = generate_latest(REGISTRY).decode("utf-8")
@@ -70,7 +85,7 @@ class TestMetricsEndpoint:
         families = [
             line for line in output.split("\n") if line.startswith("# HELP sentinel_") and "_created " not in line
         ]
-        assert len(families) >= 13, f"Expected >=13 metric families, got {len(families)}: {families}"
+        assert len(families) >= 16, f"Expected >=16 metric families, got {len(families)}: {families}"
 
     def test_ip_allowlist_blocks_external(self):
         """Metrics endpoint blocks non-local IPs."""

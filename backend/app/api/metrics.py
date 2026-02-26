@@ -152,6 +152,34 @@ sentinel_tool_call_duration_seconds = Histogram(
 )
 
 # ---------------------------------------------------------------------------
+# Database & cache metrics (Phase 125 — Supabase Performance Completion)
+# ---------------------------------------------------------------------------
+
+# 14. Supabase query duration
+sentinel_db_query_duration_seconds = Histogram(
+    "sentinel_db_query_duration_seconds",
+    "Supabase PostgREST query duration in seconds",
+    labelnames=["repository", "method"],
+    buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5],
+    registry=REGISTRY,
+)
+
+# 15. Cache operations counter
+sentinel_cache_operations_total = Counter(
+    "sentinel_cache_operations_total",
+    "Cache operations by type (hit, miss, error)",
+    labelnames=["operation"],
+    registry=REGISTRY,
+)
+
+# 16. Cache hit rate gauge
+sentinel_cache_hit_rate_percent = Gauge(
+    "sentinel_cache_hit_rate_percent",
+    "Current cache hit rate percentage",
+    registry=REGISTRY,
+)
+
+# ---------------------------------------------------------------------------
 # Static info set once at import time
 # ---------------------------------------------------------------------------
 _MODE = os.getenv("SENTINEL_MODE", "simulation")

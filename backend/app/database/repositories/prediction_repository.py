@@ -2,10 +2,19 @@
 
 from typing import List, Optional, Dict, Any
 from app.database.supabase_client import get_supabase_client
+from app.services.cache_service import cache, CacheKeys, CacheService, CacheInvalidation
 
 
 class PredictionRepository:
     """Repository for prediction database operations."""
+
+    _COLUMNS = (
+        "id, code, equipment_id, building_id, severity, status, "
+        "probability_percent, failure_type, predicted_date, "
+        "repair_cost_zar, replacement_cost_zar, "
+        "downtime_cost_per_hour_zar, potential_loss_zar, "
+        "created_at, updated_at"
+    )
 
     def __init__(self):
         """Initialize the repository with a Supabase client."""
@@ -55,7 +64,7 @@ class PredictionRepository:
         Returns:
             Prediction data or None if not found
         """
-        response = self.client.table("predictions").select("*").eq("code", prediction_id).execute()
+        response = self.client.table("predictions").select(self._COLUMNS).eq("code", prediction_id).execute()
 
         if response.data:
             return response.data[0]
@@ -70,7 +79,7 @@ class PredictionRepository:
         Returns:
             Prediction data or None if not found
         """
-        response = self.client.table("predictions").select("*").eq("id", uuid).execute()
+        response = self.client.table("predictions").select(self._COLUMNS).eq("id", uuid).execute()
 
         if response.data:
             return response.data[0]
@@ -85,15 +94,21 @@ class PredictionRepository:
         Returns:
             List of active predictions
         """
+        cached = cache.get(CacheKeys.predictions_active(building_uuid))
+        if cached is not None:
+            return cached
+
         response = (
             self.client.table("predictions")
-            .select("*")
+            .select(self._COLUMNS)
             .eq("building_id", building_uuid)
             .eq("status", "active")
             .execute()
         )
 
-        return response.data
+        result = response.data
+        cache.set(CacheKeys.predictions_active(building_uuid), result, CacheService.TTL_DYNAMIC)
+        return result
 
     def get_active_by_equipment(self, equipment_uuid: str) -> List[Dict[str, Any]]:
         """Get active predictions for equipment.
@@ -106,7 +121,7 @@ class PredictionRepository:
         """
         response = (
             self.client.table("predictions")
-            .select("*")
+            .select(self._COLUMNS)
             .eq("equipment_id", equipment_uuid)
             .eq("status", "active")
             .execute()
@@ -121,7 +136,11 @@ class PredictionRepository:
             List of critical predictions
         """
         response = (
-            self.client.table("predictions").select("*").eq("severity", "critical").eq("status", "active").execute()
+            self.client.table("predictions")
+            .select(self._COLUMNS)
+            .eq("severity", "critical")
+            .eq("status", "active")
+            .execute()
         )
 
         return response.data
@@ -137,7 +156,7 @@ class PredictionRepository:
         """
         response = (
             self.client.table("predictions")
-            .select("*")
+            .select(self._COLUMNS)
             .gte("probability_percent", threshold)
             .eq("status", "active")
             .execute()
@@ -155,7 +174,9 @@ class PredictionRepository:
             Created prediction
         """
         response = self.client.table("predictions").insert(prediction_data).execute()
-        return response.data[0]
+        result = response.data[0]
+        CacheInvalidation.on_prediction_change(building_id=prediction_data.get("building_id"))
+        return result
 
     def update(self, prediction_id: str, prediction_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a prediction.
@@ -174,6 +195,7 @@ class PredictionRepository:
         response = self.client.table("predictions").update(prediction_data).eq("id", prediction["id"]).execute()
 
         if response.data:
+            CacheInvalidation.on_prediction_change()
             return response.data[0]
         return None
 
@@ -225,7 +247,10 @@ class PredictionRepository:
 
         response = self.client.table("predictions").delete().eq("id", prediction["id"]).execute()
 
-        return len(response.data) > 0
+        if len(response.data) > 0:
+            CacheInvalidation.on_prediction_change()
+            return True
+        return False
 
     def has_active_prediction_for_equipment(self, equipment_id: str) -> bool:
         """Check if equipment already has an active or acknowledged prediction.
@@ -278,4 +303,7 @@ class PredictionRepository:
             .execute()
         )
 
-        return len(response.data)
+        count = len(response.data)
+        if count > 0:
+            CacheInvalidation.on_prediction_change()
+        return count

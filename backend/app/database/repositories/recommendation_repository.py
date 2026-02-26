@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from app.config.settings import settings
 from app.models.recommendation import Recommendation, RecommendationStatus
+from app.services.cache_service import cache
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,12 @@ class RecommendationRepository:
     Manages recommendations with Supabase as primary storage and JSON files as fallback.
     Supports querying by status and site_id.
     """
+
+    _COLUMNS = (
+        "id, site_id, status, action_type, target_equipment, "
+        "action, reason, expected_impact, confidence, risk_level, "
+        "tier, timestamp, executed_at, rejected_at, rejected_reason"
+    )
 
     def __init__(self):
         """Initialize the repository."""
@@ -311,6 +318,7 @@ class RecommendationRepository:
         try:
             result = self.client.table("recommendations").insert(rec_dict).execute()
             if result.data and len(result.data) > 0:
+                cache.delete_pattern("recommendations:*")
                 return result.data[0]
             return None
         except Exception as e:
@@ -323,7 +331,7 @@ class RecommendationRepository:
             return None
 
         try:
-            result = self.client.table("recommendations").select("*").eq("id", rec_id).execute()
+            result = self.client.table("recommendations").select(self._COLUMNS).eq("id", rec_id).execute()
             if result.data and len(result.data) > 0:
                 return result.data[0]
             return None
@@ -364,6 +372,7 @@ class RecommendationRepository:
         try:
             result = self.client.table("recommendations").update(rec_dict).eq("id", rec_id).execute()
             if result.data and len(result.data) > 0:
+                cache.delete_pattern("recommendations:*")
                 return result.data[0]
             return None
         except Exception as e:
