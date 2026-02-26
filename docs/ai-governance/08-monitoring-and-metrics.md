@@ -15,15 +15,16 @@ estimated_read_time: 15
 
 # AI Monitoring and Metrics Governance
 
-## Current State (Updated 2026-02-26, Phase 127)
+## Current State (Updated 2026-02-26, Phases 127 + 125)
 
 - AI health and drift are exposed via JSON APIs under `backend/app/api/mlops.py`.
 - Audit/decision telemetry is strong in log-based observability (Loki/Promtail/Grafana).
 - Prometheus runs from `/opt/aimthelaw` (`docker-compose.monitoring.yml`), scraping SENTINEL every 30s.
-- **13 Prometheus metric families** at `/metrics` endpoint (`backend/app/api/metrics.py`): 8 AI governance + 3 HTTP request + 2 tool-call.
+- **16 Prometheus metric families** at `/metrics` endpoint (`backend/app/api/metrics.py`): 8 AI governance + 3 HTTP request + 2 tool-call + 3 database/cache (Phase 125).
 - **7 of 8 AI governance metrics wired to production code** (Phase 127). Only approval `expired` has no code path (no expiry mechanism exists).
 - **RequestMetricsMiddleware** (`backend/app/middleware/request_metrics.py`) captures all HTTP routes.
 - **Tool-call instrumentation** in `chat_tools.execute_tool()` tracks duration + success/fail per tool.
+- **Database/cache instrumentation** (Phase 125): Supabase query duration histogram, cache hit/miss/error counter, cache hit rate gauge.
 - Monitoring stack fully running: Prometheus, Grafana, Loki, Promtail, Node Exporter.
 
 ## Observability Gaps
@@ -33,7 +34,7 @@ estimated_read_time: 15
 | Prometheus backend scraping for AI controls is incomplete | `/opt/aimthelaw/config/prometheus.yml` now includes `sentinel-backend` scrape job | **RESOLVED** -- scrape target validated `UP` (`2026-02-23`) |
 | No canonical Prometheus exposition for AI controls | `/api/mlops/metrics` returns JSON (not Prometheus text format) | **RESOLVED** -- `/metrics` endpoint ships Prometheus text format |
 | Alerting focuses on log events | `/opt/aimthelaw/config/grafana/provisioning/alerting/sentinel-ai-governance-alert-rules.yml` | **RESOLVED** -- 4 AI governance alert rules provisioned (`2026-02-23`) |
-| Cost/approval metrics are not standardized | Mixed APIs and logs | **RESOLVED** -- 13 stable metric families defined and wired (Phase 127) |
+| Cost/approval metrics are not standardized | Mixed APIs and logs | **RESOLVED** -- 16 stable metric families defined and wired (Phases 127 + 125) |
 | Metrics defined but not wired to production code | 8 counters/gauges existed as dead code | **RESOLVED** -- 7 of 8 wired to services, 5 new metrics added (Phase 127) |
 
 ## Prometheus Metrics
@@ -67,6 +68,16 @@ The `/metrics` endpoint (`backend/app/api/metrics.py`) exposes the following AI 
 |---|---|---|---|---|---|
 | 12 | `sentinel_tool_calls_total` | Counter | `tool_name`, `outcome` (success/error) | Total tool calls by tool name and outcome | `chat_tools.py` |
 | 13 | `sentinel_tool_call_duration_seconds` | Histogram | `tool_name` | Tool call execution duration (9 buckets: 50ms-30s) | `chat_tools.py` |
+
+### Database & Cache Metrics (14-16, Phase 125)
+
+| # | Metric Name | Type | Labels | Description | Wired |
+|---|---|---|---|---|---|
+| 14 | `sentinel_db_query_duration_seconds` | Histogram | `repository`, `method` | Supabase PostgREST query duration (9 buckets: 5ms-2.5s) | `cache_service.py` via `track_query()` context manager |
+| 15 | `sentinel_cache_operations_total` | Counter | `operation` (hit/miss/error) | Redis cache operations by outcome | `cache_service.py` |
+| 16 | `sentinel_cache_hit_rate_percent` | Gauge | — | Current cache hit rate percentage | `cache_service.py` |
+
+Repositories instrumented with `track_query()`: `equipment` (get_all, get_by_id), `building` (get_all, get_by_id), `alert` (get_active_by_building).
 
 ### Scrape Configuration
 

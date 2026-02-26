@@ -126,9 +126,9 @@ asyncio.run(main())
 PY
 ```
 
-## Prometheus Metrics (Phase 127)
+## Prometheus Metrics (Phases 127, 125)
 
-The SENTINEL backend exposes 13 Prometheus metric families at `GET /metrics` (Prometheus text exposition format).
+The SENTINEL backend exposes 16 Prometheus metric families at `GET /metrics` (Prometheus text exposition format).
 
 ### Scrape Targets
 
@@ -155,6 +155,9 @@ The SENTINEL backend exposes 13 Prometheus metric families at `GET /metrics` (Pr
 | 11 | `sentinel_http_requests_in_progress` | Gauge | request_metrics.py | Yes |
 | 12 | `sentinel_tool_calls_total` | Counter | chat_tools.py | Yes |
 | 13 | `sentinel_tool_call_duration_seconds` | Histogram | chat_tools.py | Yes |
+| 14 | `sentinel_db_query_duration_seconds` | Histogram | cache_service.py / repositories | Yes |
+| 15 | `sentinel_cache_operations_total` | Counter | cache_service.py | Yes |
+| 16 | `sentinel_cache_hit_rate_percent` | Gauge | cache_service.py | Yes |
 
 ### RequestMetricsMiddleware
 
