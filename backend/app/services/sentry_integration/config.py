@@ -11,7 +11,7 @@ from app.config.settings import settings
 def get_sentry_bot_cli() -> str:
     """Resolve sentry bot CLI command with safe fallback."""
     cli = (settings.sentry_bot_cli or "").strip()
-    return cli or "sentrybot"
+    return cli or "sentry"
 
 
 def get_sentry_webhook_secret() -> str:

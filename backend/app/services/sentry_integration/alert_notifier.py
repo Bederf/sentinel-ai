@@ -45,7 +45,7 @@ def _load_notification_settings() -> Dict[str, Any]:
 
 
 class AlertNotifier:
-    """Send BMS alerts via sentrybot CLI."""
+    """Send BMS alerts via sentry CLI."""
 
     def __init__(self):
         self.fm_chat_id = (os.getenv("SENTRY_FM_CHAT_ID", "") or "").strip()
@@ -101,14 +101,19 @@ class AlertNotifier:
         commands_section = ""
         enabled_commands = []
 
-        # For warning/critical alerts, add inspection command at the top
-        if alert.get("severity", "info").lower() in ["warning", "critical"]:
-            enabled_commands.append(f"{command_map['inspect']} - Create Inspection Work Order")
+        # Alert messages show all commands: info first (FM needs context), then actions
+        alert_command_order = [
+            ("info", "More info"),
+            ("reset", "Remote reset"),
+            ("inspect", "Send technician"),
+            ("wo", "Raise work order"),
+            ("note", "Add note"),
+        ]
 
-        for key in ["reset", "info", "note", "wo"]:
+        for key, default_label in alert_command_order:
             cmd_config = alert_commands.get(key, {})
             if cmd_config.get("enabled", True):
-                label = cmd_config.get("label", key.title())
+                label = cmd_config.get("label", default_label)
                 enabled_commands.append(f"{command_map[key]} - {label}")
 
         if enabled_commands:
@@ -128,7 +133,7 @@ class AlertNotifier:
         return message
 
     async def send_alert(self, alert: Dict[str, Any]) -> bool:
-        """Send alert to FM team via sentrybot (async wrapper)."""
+        """Send alert to FM team via sentry CLI (async wrapper)."""
         return self.send_alert_sync(alert)
 
     @staticmethod
@@ -159,7 +164,7 @@ class AlertNotifier:
             status=status,
             error_code=error_code,
             error_message=error_message,
-            provider="sentrybot",
+            provider="sentry",
             provider_response=provider_response or {},
             sent_at=datetime.utcnow() if status == NotificationStatus.SENT else None,
         )
@@ -255,7 +260,7 @@ class AlertNotifier:
             return True
 
     def send_alert_sync(self, alert: Dict[str, Any]) -> bool:
-        """Send alert via sentrybot CLI.
+        """Send alert via sentry CLI.
 
         Phase 58-04 H-5: Message is sanitised before passing to subprocess
         and arguments are always passed as a list (never shell=True).
@@ -309,7 +314,7 @@ class AlertNotifier:
                     status=NotificationStatus.SENT,
                     provider_response={"stdout": result.stdout},
                 )
-                logger.info("Alert sent via sentrybot: %s", alert.get("id", "")[:8])
+                logger.info("Alert sent via sentry: %s", alert.get("id", "")[:8])
                 return True
             else:
                 self._log_delivery(
@@ -317,10 +322,10 @@ class AlertNotifier:
                     message=message,
                     status=NotificationStatus.FAILED,
                     error_code="send_failed",
-                    error_message=result.stderr or "Unknown sentrybot error",
+                    error_message=result.stderr or "Unknown sentry CLI error",
                     provider_response={"stderr": result.stderr},
                 )
-                logger.error("sentrybot error: %s", result.stderr)
+                logger.error("sentry CLI error: %s", result.stderr)
                 return False
 
         except subprocess.TimeoutExpired:
@@ -329,9 +334,9 @@ class AlertNotifier:
                 message=message,
                 status=NotificationStatus.FAILED,
                 error_code="timeout",
-                error_message="sentrybot request timed out after 30 seconds",
+                error_message="sentry request timed out after 30 seconds",
             )
-            logger.error("sentrybot timeout")
+            logger.error("sentry CLI timeout")
             return False
         except FileNotFoundError:
             self._log_delivery(

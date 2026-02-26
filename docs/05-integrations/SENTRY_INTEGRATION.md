@@ -65,19 +65,21 @@ For Telegram-driven AI chat and hybrid routing:
 │         Pattern matching & intelligent routing               │
 └─────────────────────────────────────────────────────────────┘
                               │
-              ┌───────────────┴───────────────┐
-              ▼                               ▼
-┌──────────────────────────┐    ┌──────────────────────────┐
-│   Desk Complaint?        │    │   General Query?         │
-│   ▼ YES                  │    │   ▼                      │
-│   bms_desk_diagnosis.py  │    │   tiered_ai_router.py    │
-└──────────────────────────┘    └──────────────────────────┘
-              │                               │
-              ▼                               ▼
-┌──────────────────────────┐    ┌──────────────────────────┐
-│   SENTINEL API           │    │   Ollama / Cloud LLM     │
-│   localhost:9095         │    │   (Hybrid AI routing)    │
-└──────────────────────────┘    └──────────────────────────┘
+              ┌──────────────┼───────────────┐
+              ▼              ▼               ▼
+┌──────────────────┐ ┌──────────────┐ ┌──────────────────┐
+│ Desk Complaint?  │ │ Call Log?    │ │ General Query?   │
+│ ▼ YES            │ │ ▼ YES        │ │ ▼                │
+│ bms_desk_diag.py │ │ call_log_    │ │ tiered_ai_router │
+│                  │ │ handler.py   │ │                  │
+└──────────────────┘ └──────────────┘ └──────────────────┘
+        │                   │                  │
+        ▼                   ▼                  ▼
+┌──────────────────┐ ┌──────────────┐ ┌──────────────────┐
+│ SENTINEL API     │ │ /call-log    │ │ Ollama / Cloud   │
+│ localhost:9095   │ │ /call-log/   │ │ (Hybrid AI)      │
+│                  │ │   escalate   │ │                  │
+└──────────────────┘ └──────────────┘ └──────────────────┘
 ```
 
 ## Sentry BMS Tools
@@ -91,6 +93,14 @@ Located in `$SENTRY_HOME/tools/`:
 | `bms_monitor.py` | Health monitoring alerts | `/api/alerts`, `/api/equipment` |
 | `sentry_ai_bridge.py` | AI routing with BMS detection | Routes to appropriate tool |
 | `tiered_ai_router.py` | Cloud/Ollama fallback | N/A (AI routing) |
+| `call_log.py` | General staff defect reporting | `/api/sentry/call-log`, `/api/sentry/call-log/escalate` |
+
+Located in `$SENTRY_HOME/handlers/`:
+
+| Handler | Purpose |
+|---------|---------|
+| `wo_conversation_handler.py` | Work order data collection state machine |
+| `call_log_handler.py` | Call logging taxonomy, classification, discovery conversation |
 
 ## Desk Comfort Diagnosis
 
@@ -356,15 +366,12 @@ Root Cause Analysis (FCU valve stuck at 15%)
     ↓
 Alert Notifier → Sentry Bot → Telegram FM Group
     ↓
-FM replies: /dispatch
-    ↓
-Work Order Created with Diagnostic Context
-    ↓
-Technician Email (Gmail API)
-    ↓
-Technician repairs → replies "done"
-    ↓
-Context-Aware Data Collection
+FM chooses action via slash commands:
+  /info_    → Equipment details + checklist
+  /reset_   → Remote on/off to clear fault
+  /inspect_ → Dispatch technician for physical check
+  /WO_      → Formal maintenance work order
+  /note_    → Log observation only
 ```
 
 ### Alert Notification Format
@@ -372,17 +379,20 @@ Context-Aware Data Collection
 ```
 ⚠️ WARNING ALERT - Sandton City Office Tower
 
-Zone: Level 10 Zone C
-Equipment: FCU-L10-03
-Type: FCU
-Code: FCU-L10-03
+🏢 Zone: Level 10 Zone C
+🔧 Equipment: FCU-L10-03
+📋 Type: FCU
+🆔 Code: S002-FCU-L10-03
 
 FCU valve stuck at 15% - insufficient chilled water flow
 
-Time: 14:32:15
-
-/WO_FCU_L10_03 - Create Work Order
-/note_FCU_L10_03 - Log note only
+⏰ Time: 14:32:15
+━━━━━━━━━━━━━━━━━━
+/info_S002_FCU_L10_03 - More info
+/reset_S002_FCU_L10_03 - Remote reset
+/inspect_S002_FCU_L10_03 - Send technician
+/WO_S002_FCU_L10_03 - Raise work order
+/note_S002_FCU_L10_03 - Add note
 ```
 
 **Important: Telegram Command Format**
@@ -424,56 +434,247 @@ The notifier automatically:
 - FM Chat ID: Set in `alert_notifier.py` or via `SENTRY_FM_CHAT_ID` env var
 - Sentrybot must be installed and in PATH
 
-## Work Order Commands
+## Slash Commands
 
-### `/WO_<equipment_code>` - Create Work Order
+Sentry uses AI-driven slash commands (not hardcoded handlers). The bot reads `SOUL.md` for routing rules and `TOOLS.md` for API instructions.
 
-When FM clicks the `/WO_` command in a Telegram alert, Sentrybot:
+### FM Workflow
 
-1. Extracts equipment code (converts underscores back to dashes)
-2. Looks up equipment from SENTINEL API
-3. Creates a Concept Evolution-compatible work order
-4. Returns confirmation with job card number
+**Standard flow:** Alert → `/info_` → Action (`/reset_`, `/inspect_`, `/WO_`) → `/note_`
 
-**Handler**: `sentry_ai_bridge.py:handle_wo_command()`
+Each response ends with clickable next-step buttons (excluding the command just used).
 
-**Example**:
+### Command Reference
+
+| Command | Purpose | Response to FM |
+|---------|---------|----------------|
+| `/info_{code}` | Full equipment details: health, make, model, service history, inspection checklist | Detailed report + buttons: `/reset_`, `/inspect_`, `/WO_`, `/note_` |
+| `/reset_{code}` | Remote on/off to clear fault (blocked for FIRE/GEN) | Reset result + buttons: `/info_`, `/inspect_`, `/WO_`, `/note_` |
+| `/inspect_{code}` | Create inspection WO + dispatch technician via Telegram | One-line ack: `✅ #WO-XXXX sent to {name}` |
+| `/WO_{code}` | Formal maintenance work order (asks FM for title/desc/priority) | WO confirmation + buttons: `/reset_`, `/info_`, `/inspect_`, `/note_` |
+| `/note_{code}` | Add maintenance note to equipment record | Confirmation + buttons: `/info_`, `/reset_`, `/inspect_`, `/WO_` |
+
+**Telegram command format:** Equipment dashes become underscores (`S002-FCU-301` → `/info_S002_FCU_301`). Bot converts back when calling API.
+
+### `/inspect_` — Dispatch Flow
+
+The `/inspect_` command is a **silent dispatch** — it creates a work order and notifies the technician without verbose output to the FM:
+
+1. FM sends `/inspect_S002_FCU_301`
+2. Bot calls `POST /api/sentry/create-work-order` with `telegram_user_id` for audit
+3. Bot sends tech a Telegram message via `sentrybot message send --target {technician_telegram_id}`:
+   ```
+   #WO-2026-0030 — S002-FCU-301
+   ━━━━━━━━━━━━━━━━━━
+   /info_S002_FCU_301 - Equipment details
+   /note_S002_FCU_301 - Add note
+   ```
+4. Bot replies to FM: `✅ #WO-2026-0030 sent to John Smith` (one line, no buttons)
+
+**Important:** Technicians only get `/info_` and `/note_` buttons. They do NOT get `/reset_`, `/WO_`, or `/inspect_`.
+
+### `/WO_` — Formal Work Order
+
+When FM clicks `/WO_`, the bot asks for title, description, and priority before creating the work order:
+
+1. FM sends `/WO_S002_FCU_301`
+2. Bot asks for work order details (title, description, priority)
+3. Bot calls `POST /api/sentry/create-work-order`
+4. Bot sends email notification to assigned technician
+5. Bot confirms to FM with WO code and assignment
+
+### `/note_` — Log Note
+
+For observations that don't require action. Bot asks the FM for the note text, then logs it against the equipment record.
+
+## Call Logging Skill — General Staff Defect Reporting
+
+The call logging skill allows non-technical users (office workers, cleaners, security guards) to report building defects via natural language Telegram messages. The bot runs a guided discovery conversation, classifies the issue against a fixed taxonomy, and creates an inspection work order.
+
+### Security Model — Fixed Taxonomy
+
+Classification uses a **closed set of 10 disciplines / 46 sub-categories**. The Python handler (`call_log_handler.py`) does ALL classification via keyword matching — the LLM never decides the category.
+
+If the complaint doesn't match any taxonomy entry, it is **NOT logged as a work order**. Instead, it is escalated to the facilities supervisor for manual review.
+
+| Discipline | Sub-categories | Default Priority |
+|---|---|---|
+| **Plumbing** | Leaking tap, Leaking pipe, Blocked drain, Blocked toilet, No hot water, Flooding | medium–critical |
+| **Electrical** | Power outlet not working, Tripped breaker, Sparking, Light flickering, Light not working, Emergency light fault | medium–critical |
+| **HVAC** | Too hot, Too cold, Noisy unit, Stuffy air, Water dripping from AC unit, AC unit not working | medium–high |
+| **Building Fabric** | Carpet lifting, Damaged floor tile, Broken window, Ceiling tile damaged, Wall damage, Paint peeling | low–high |
+| **Access & Security** | Door won't close, Door won't lock, Badge reader not working, Boom gate fault | medium |
+| **Fire & Life Safety** | Fire alarm sounding, Smoke detected, Gas smell, Sprinkler issue, Extinguisher missing, Emergency exit blocked | high–critical |
+| **Furniture & Fittings** | Broken chair, Broken desk, Broken blind | low |
+| **Pest Control** | Insects, Rodents, Birds | low–medium |
+| **Cleaning** | Spill on floor, Bad odour, Biohazard | medium–high |
+| **Grounds & Parking** | Pothole, Outdoor lighting, Landscaping | low–medium |
+
+### Conversation Flow
+
 ```
-User clicks: /WO_FCU_L12_03
-
-Sentrybot response:
-Work order created:
-
-JC-2026-0202143256 🟡
-
-• Site: Sandton City (SC-JHB-001)
-• Equipment: Fan Coil Unit Zone-L12-C
-• Code: FCU-L12-03
-• Priority: P3 - Medium (24hr SLA)
-• Issue: Health degradation - maintenance required
-
-Reply /email to send to maintenance team.
+User: "there is a dripping tap in the ladies bathroom"
+    ↓
+sentry_ai_bridge.py: is_facilities_complaint() → True
+    ↓
+call_log_handler.py: start_call_log()
+    ↓
+classify_issue() → Plumbing / Leaking tap / medium
+    ↓
+Location check: area="Ladies Bathroom" but no floor
+    ↓
+Bot: "Which floor is the ladies bathroom on?"
+User: "level 2"
+    ↓
+continue_call_log() → state=CONFIRMING
+    ↓
+Bot: "I'll log that for you:
+      Discipline: Plumbing
+      Issue: Leaking tap
+      Location: L2, Ladies Bathroom
+      Priority: MEDIUM
+      Shall I go ahead and log this?"
+User: "yes"
+    ↓
+POST /api/sentry/call-log → WO created
+    ↓
+Bot: "Logged! Ref: WO-2026-0035
+      Our John Smith has been notified."
 ```
 
-### `/note_<equipment_code>` - Log Note Only
+### State Machine
 
-For alerts that don't require a work order (acknowledged but no action needed).
-
-**Handler**: `sentry_ai_bridge.py:handle_note_command()`
-
-**Example**:
 ```
-User clicks: /note_FCU_L12_03
-
-Sentrybot response:
-📝 Note logged for FCU-L12-03
-
-Logged by: @username
-Time: 2026-02-02 14:35
-
-Alert acknowledged - no work order created.
-Equipment will continue to be monitored.
+IDLE → COMPLAINT_DETECTED → AWAITING_LOCATION → CONFIRMING → LOGGED
+IDLE → COMPLAINT_DETECTED → NO_MATCH → ESCALATED (supervisor notified)
 ```
+
+### Urgency Escalation (automatic)
+
+Keywords automatically bump priority without asking the user:
+- `trip`, `tripping`, `someone could` → bumps to HIGH
+- `flooding`, `burst`, `pouring`, `sparking`, `danger` → bumps to CRITICAL
+- `fire`, `smoke`, `gas`, `trapped`, `emergency` → bumps to CRITICAL
+
+### IT Exclusion
+
+Messages about PCs, laptops, WiFi, printers, software, etc. are rejected with a redirect to the IT helpdesk. Facility keywords (`power`, `outlet`, `socket`, `light`) override the IT exclusion.
+
+### Supervisor Escalation
+
+When a complaint doesn't match any taxonomy entry but contains action words (`fix`, `repair`, `broken`, `send someone`, etc.):
+1. The complaint is logged as an anomaly in `call_log_escalations.json`
+2. The supervisor is notified via Telegram (if `CALL_LOG_SUPERVISOR_TELEGRAM_ID` configured)
+3. The user receives: "I've flagged it for the facilities supervisor who will follow up."
+
+### Location Discovery
+
+| Input | Desk Mapping | Floor |
+|-------|-------------|-------|
+| Desk 001–099 | Zone mapping | L0 (Ground) |
+| Desk 100–199 | Zone mapping | L1 |
+| Desk 200–299 | Zone mapping | L2 |
+| Named area + floor | Free text | From user |
+| Named area only | Free text | Bot asks |
+
+### API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/sentry/call-log` | POST | Create inspection WO from classified complaint |
+| `/api/sentry/call-log/escalate` | POST | Escalate unmatched complaint to supervisor |
+
+See `docs/03-api-reference/call-log-api.md` for full request/response schemas.
+
+### Files
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `call_log_handler.py` | `$SENTRY_HOME/handlers/` | Taxonomy, classification, conversation state machine |
+| `call_log.py` | `$SENTRY_HOME/tools/` | CLI tool for classify/log/categories commands |
+| `sentry_call_logging.md` | `$SENTRY_HOME/skills/` | Skill documentation for Sentry gateway |
+| `sentry_webhooks.py` | `backend/app/api/` | Backend endpoints (call-log + escalation) |
+| `call_log_escalations.json` | `backend/app/data/` | Persisted escalation records |
+
+---
+
+## Inspection Skill — Guided Debrief & Supabase Persistence
+
+The inspection skill is a complete end-to-end workflow: FM dispatches, tech inspects, bot guides data collection, results persist to Supabase, FM receives AI diagnosis.
+
+### Full Flow
+
+```
+FM: /inspect_S002_FCU_301
+    ↓
+Bot: Creates WO via POST /api/sentry/create-work-order
+    ↓
+Bot → Tech (Telegram): "#WO-2026-0030 — S002-FCU-301" + /info_ + /note_
+Bot → FM: "✅ #WO-2026-0030 sent to John Smith"
+    ↓
+Tech: /info_S002_FCU_301 (sees equipment details + inspection checklist)
+    ↓
+Tech inspects on-site
+    ↓
+Tech: "done #WO-2026-0030"
+    ↓
+Bot: Fetches checklist via GET /api/sentry/inspection-checklist/{type}
+    ↓
+Bot: Prompts tech ONE ITEM AT A TIME:
+  "Filter? (Clean / Dirty / Blocked)"
+  "Fan? (Normal / Noisy / Not running)"
+  "Thermostat? (Responding / Slow / No response)"
+    ↓
+Bot: Saves to Supabase via POST /api/sentry/inspection-result
+    ↓
+Bot → FM: AI-curated diagnosis with findings + recommendations + next-step commands
+    ↓
+FM: /WO_S002_FCU_301 (if needed, creates formal repair work order)
+```
+
+### Data Persistence
+
+The `POST /api/sentry/inspection-result` endpoint writes to three Supabase tables:
+
+| Table | What it stores |
+|-------|---------------|
+| `inspection_tasks` | Task record linked to equipment, status `completed` |
+| `inspection_results` | `item_results` JSONB with all checklist answers, `overall_status`, deficiency counts |
+| `inspection_deficiencies` | One row per warning/critical finding, linked to result + equipment |
+
+**Overall status:** `pass` (all OK), `pass_with_issues` (warnings only), `fail` (any critical).
+
+**Audit provenance:** `telegram_user_id` is formatted as `sentry:telegram:{user_id}` in the `inspected_by` and `completed_by` fields.
+
+### Checklist Templates
+
+Seven equipment types have inspection checklists in `backend/app/data/inspection_checklist_templates.json`:
+
+| Type | Items | Duration |
+|------|-------|----------|
+| FCU | Filter, fan, thermostat, drain, coil | ~20 min |
+| AHU | Filters, belts, dampers, coils, sensors | ~45 min |
+| Chiller | Compressor, condenser, evaporator, refrigerant, oil | ~60 min |
+| Generator | Oil, coolant, battery, belts, fuel, load test | ~45 min |
+| Pump | Bearings, seals, alignment, vibration, flow | ~30 min |
+| UPS | Battery, load, transfer, alarms, ventilation | ~30 min |
+| VAV | Damper, actuator, sensor, airflow, controls | ~20 min |
+
+### AI Diagnosis to FM
+
+After the technician completes all checklist items, the bot:
+
+1. Analyses all answers against equipment health data and alert history
+2. Highlights abnormalities (e.g., blocked filter + noisy fan = restricted airflow)
+3. Recommends next action: schedule service, raise WO, monitor, or no action
+4. Sends diagnosis to FM via `sentrybot message send --target {fm_chat_id}`
+5. Ends with relevant slash commands for the FM to act on
+
+### API Reference
+
+See `docs/03-api-reference/inspection.md` for full request/response schemas.
+
+---
 
 ## Zone Diagnostics
 
@@ -690,8 +891,12 @@ All corrections tracked for ML data quality:
 - `backend/app/api/complaints.py` - Complaint endpoints
 - `backend/app/api/alerts.py` - Alert and dispatch endpoints
 - `backend/app/api/ocr.py` - OCR processing endpoints
-- `backend/app/api/sentry_webhooks.py` - Sentry webhook endpoints (WO + OCR)
+- `backend/app/api/sentry_webhooks.py` - Sentry webhook endpoints (WO + OCR + inspection)
+- `backend/app/api/inspection.py` - Standard inspection task endpoints
 - `backend/app/services/complaint_handler.py` - Diagnosis logic
+- `backend/app/services/checklist_service.py` - Inspection checklist template service
+- `backend/app/database/repositories/inspection_repository.py` - Inspection data access
+- `backend/app/data/inspection_checklist_templates.json` - Checklist templates (7 equipment types)
 - `backend/app/services/zone_diagnostics.py` - Zone fault analysis
 - `backend/app/services/ocr_service.py` - 3-stage OCR pipeline
 - `backend/app/services/sentry_integration/alert_notifier.py` - Alert notifications
@@ -706,4 +911,14 @@ All corrections tracked for ML data quality:
 - `tools/bms_control.py` - Device control client
 - `tools/sentry_ai_bridge.py` - Pattern detection & routing
 - `tools/tiered_ai_router.py` - AI model routing
+- `tools/call_log.py` - Call logging CLI (classify, log, categories)
+- `handlers/call_log_handler.py` - Fixed taxonomy classification & conversation state machine
 - Gmail skill - Email notifications to technicians
+
+### Sentry Bot Configuration (`$SENTRY_HOME/`)
+- `SOUL.md` - Bot identity, slash command routing rules, data integrity rules
+- `TOOLS.md` - API endpoints, CLI commands, slash command procedures
+- `SKILL.md` - Skill-specific instructions (inspection flow, debrief prompts)
+- `skills/sentry_call_logging.md` - Call logging skill (discovery flow, taxonomy reference)
+- `skills/sentinel_inspection.md` - Inspection skill documentation
+- `skills/sentinel_desk_complaint.md` - Desk comfort complaint skill

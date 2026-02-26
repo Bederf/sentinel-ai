@@ -32,7 +32,7 @@ class BaseNotificationProvider(ABC):
     @property
     @abstractmethod
     def provider_name(self) -> str:
-        """Name of the provider/service (e.g., 'sentrybot', 'meta', 'bulksms')."""
+        """Name of the provider/service (e.g., 'sentry', 'meta', 'bulksms')."""
         pass
 
     @abstractmethod

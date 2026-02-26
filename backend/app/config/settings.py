@@ -59,10 +59,10 @@ class Settings(BaseSettings):
     # Claude AI settings
     anthropic_api_key: str = ""
     claude_model: str = "claude-sonnet-4-20250514"
-    claude_max_tokens: int = 4096
+    claude_max_tokens: int = 1536
     ai_cloud_provider: str = "anthropic"  # anthropic|zai
     zai_api_key: str = ""
-    zai_model: str = "glm-4.5-flash"
+    zai_model: str = "glm-4.7-flash"
     zai_base_url: str = "https://api.z.ai/api/paas/v4"
     local_ai_only: bool = False  # Force local-only AI mode (no Anthropic/Claude calls)
     popia_require_cross_border_consent: bool = True  # Block cloud LLM without explicit cross-border consent
@@ -109,7 +109,7 @@ class Settings(BaseSettings):
 
     # Sentry bot API key (for authenticated access to /api/sites/* endpoints)
     sentry_bot_api_key: str = Field(default="", validation_alias="SENTRY_BOT_API_KEY")
-    sentry_bot_cli: str = Field(default="sentrybot", validation_alias="SENTRY_BOT_CLI")
+    sentry_bot_cli: str = Field(default="sentry", validation_alias="SENTRY_BOT_CLI")
 
     # SIMBIOT Concept Evolution (FSI Public API) credentials
     simbiot_api_key: str = ""
@@ -225,6 +225,12 @@ class Settings(BaseSettings):
     # Sprint 0 hard safety limits (enforced in code, not just config)
     sprint0_max_power_kw: float = 5.0  # Max power per command during Sprint 0
     sprint0_max_duration_min: int = 10  # Max duration per command during Sprint 0
+
+    # Lifecycle simulation optimization mode (v28.0 — real SENTINEL wiring)
+    simulation_optimization_mode: str = "sentinel"  # sentinel | hardcoded | hybrid
+    simulation_llm_budget_max_calls: int = 5000  # Hard cap per simulation run
+    simulation_llm_model: str = ""  # Override model (empty = use claude_model)
+    simulation_llm_temperature: float = 0.3  # Low temp for deterministic structured output
 
     # Modbus BESS Writer (v26.0 — Huawei LUNA2000 register writes)
     modbus_bess_ip: str = ""  # LUNA2000 Modbus TCP IP (empty = DEMO_MODE, no TCP)

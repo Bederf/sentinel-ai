@@ -1,7 +1,7 @@
 """
-Telegram notification provider — wraps existing sentrybot CLI integration.
+Telegram notification provider — wraps existing sentry CLI integration.
 
-Uses subprocess to call sentrybot for Telegram message delivery.
+Uses subprocess to call sentry gateway for Telegram message delivery.
 Phase 102: Direct technician notifications (in addition to FM group broadcast).
 """
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class TelegramProvider(BaseNotificationProvider):
-    """Send notifications via Telegram using sentrybot CLI."""
+    """Send notifications via Telegram using sentry CLI."""
 
     def __init__(self):
         self.bot_token = os.getenv("SENTRY_BOT_TOKEN", "")
@@ -29,14 +29,14 @@ class TelegramProvider(BaseNotificationProvider):
 
     @property
     def provider_name(self) -> str:
-        return "sentrybot"
+        return "sentry"
 
     def is_enabled(self) -> bool:
-        """Check if sentrybot is available and configured."""
+        """Check if sentry CLI is available and configured."""
         return bool(self.bot_token and self.webhook_secret)
 
     async def test_connection(self) -> bool:
-        """Test if sentrybot CLI is available."""
+        """Test if sentry CLI is available."""
         try:
             result = subprocess.run([self._cli_command, "--version"], capture_output=True, timeout=5)
             return result.returncode == 0
@@ -45,7 +45,7 @@ class TelegramProvider(BaseNotificationProvider):
             return False
 
     async def send(self, recipient: str, title: str, body: str, **kwargs) -> NotificationResult:
-        """Send Telegram message via sentrybot CLI.
+        """Send Telegram message via sentry CLI.
 
         Args:
             recipient: Telegram user ID or chat ID
@@ -67,7 +67,7 @@ class TelegramProvider(BaseNotificationProvider):
             # Format message
             message = f"{title}\n\n{body}"
 
-            # Call sentrybot
+            # Call sentry CLI
             result = subprocess.run(
                 [
                     self._cli_command,
@@ -92,7 +92,7 @@ class TelegramProvider(BaseNotificationProvider):
                 )
             else:
                 error = result.stderr or "Unknown error"
-                logger.error(f"sentrybot error: {error}")
+                logger.error(f"sentry CLI error: {error}")
                 return NotificationResult(
                     success=False,
                     error_code="send_failed",

@@ -173,7 +173,7 @@ class NotificationDeliveryLog:
     delivered_at: Optional[datetime] = None
 
     # Provider details
-    provider: str = ""  # 'sentrybot', 'meta', 'bulksms'
+    provider: str = ""  # 'sentry', 'meta', 'bulksms'
     provider_response: dict = field(default_factory=dict)
 
     # Retry tracking
