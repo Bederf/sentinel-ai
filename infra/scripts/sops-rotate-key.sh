@@ -77,8 +77,13 @@ echo "Step 4: Re-encrypting with new key..."
 # Step 7: Verify round-trip
 echo ""
 echo "Step 5: Verifying round-trip..."
-SOPS_AGE_KEY_FILE="$KEY_FILE" sops --decrypt --input-type dotenv --output-type dotenv "$REPO_ROOT/backend/.env.enc" > /dev/null 2>&1
-ok "Round-trip verification passed"
+SOPS_AGE_KEY_FILE="$KEY_FILE" sops --decrypt --input-type dotenv --output-type dotenv --config /dev/null "$REPO_ROOT/backend/.env.enc" > /dev/null 2>&1
+ok "Round-trip verification passed (backend)"
+SENTRY_ENC="$HOME/.sentry/gateway/.env.enc"
+if [[ -f "$SENTRY_ENC" ]]; then
+    SOPS_AGE_KEY_FILE="$KEY_FILE" sops --decrypt --input-type dotenv --output-type dotenv --config /dev/null "$SENTRY_ENC" > /dev/null 2>&1
+    ok "Round-trip verification passed (sentry)"
+fi
 
 # Step 8: Clean up old archived keys (>90 days)
 find "$ARCHIVE_DIR" -name 'sops-key-*.txt' -mtime +90 -delete 2>/dev/null && \
@@ -89,7 +94,7 @@ echo "Key rotation complete!"
 echo ""
 echo "Next steps:"
 echo "  1. Commit updated .sops.yaml and .enc files"
-echo "  2. Restart services: sudo systemctl restart sentinel-backend sentinel-frontend"
+echo "  2. Restart services: sudo systemctl restart sentinel-backend sentinel-frontend sentry"
 echo "  3. Verify services start correctly"
 echo ""
 echo "Rollback (if needed):"
