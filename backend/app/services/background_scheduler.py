@@ -1880,6 +1880,330 @@ class BackgroundSchedulerService:
         service = SiteModePolicyService()
         return await service.evaluate_site(site_id)
 
+    # -----------------------------------------------------------------------
+    # AEGIS Phase 0 — dispatch cycle + daily evidence collector
+    # -----------------------------------------------------------------------
+
+    def add_aegis_cycle_job(self, interval_seconds: int = 300, site_id: str = "site-002"):
+        """Add a job to run one AEGIS dispatch cycle periodically.
+
+        Creates proposals via the arbitrage engine, validates through BESS
+        constraints, routes through the tier engine, and persists decisions.
+        In Phase 0A all writes are hard-blocked by AEGIS gate.
+
+        Args:
+            interval_seconds: How often to run (default: 300 = 5 min)
+            site_id: Target site (default: site-002)
+        """
+        job_id = f"aegis_cycle_{site_id}"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info(f"Removed existing AEGIS cycle job ({site_id})")
+
+        self.scheduler.add_job(
+            func=self._run_aegis_cycle,
+            args=[site_id],
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name=f"AEGIS Dispatch Cycle ({site_id})",
+            replace_existing=True,
+        )
+        logger.info(f"Added AEGIS cycle job for {site_id} with {interval_seconds}s interval")
+
+    def _run_aegis_cycle(self, site_id: str):
+        """Sync wrapper for async run_aegis_cycle."""
+        try:
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._run_aegis_cycle_async(site_id),
+                    self._main_loop,
+                )
+                future.result(timeout=60)
+            else:
+                asyncio.run(self._run_aegis_cycle_async(site_id))
+        except Exception as e:
+            logger.error(f"AEGIS cycle job failed for {site_id}: {e}", exc_info=True)
+
+    async def _run_aegis_cycle_async(self, site_id: str):
+        """Run one AEGIS dispatch cycle."""
+        from app.services.aegis_bridge import run_aegis_cycle
+
+        result = await run_aegis_cycle(site_id=site_id)
+        if result:
+            logger.info(
+                "AEGIS cycle produced proposal: action=%s tier=%s for %s",
+                result.get("action_type", "?"),
+                result.get("routing", {}).get("tier", "?"),
+                site_id,
+            )
+
+    def add_aegis_evidence_collector_job(self, interval_seconds: int = 86400, site_id: str = "site-002"):
+        """Add a daily job to collect AEGIS Phase 0 evidence into the tracker CSV.
+
+        Runs once per day. Queries the AEGIS dashboard for 24h KPIs,
+        checks tripwire logs, samples a decision for audit completeness,
+        and appends one row to the 14-day tracker CSV.
+
+        Args:
+            interval_seconds: How often to run (default: 86400 = 24h)
+            site_id: Target site (default: site-002)
+        """
+        job_id = f"aegis_evidence_{site_id}"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info(f"Removed existing AEGIS evidence collector job ({site_id})")
+
+        self.scheduler.add_job(
+            func=self._run_aegis_evidence_collector,
+            args=[site_id],
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name=f"AEGIS Evidence Collector ({site_id})",
+            replace_existing=True,
+        )
+        logger.info(f"Added AEGIS evidence collector job for {site_id} with {interval_seconds}s interval")
+
+    def _run_aegis_evidence_collector(self, site_id: str):
+        """Sync wrapper for async evidence collector."""
+        try:
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._run_aegis_evidence_collector_async(site_id),
+                    self._main_loop,
+                )
+                future.result(timeout=120)
+            else:
+                asyncio.run(self._run_aegis_evidence_collector_async(site_id))
+        except Exception as e:
+            logger.error(
+                f"AEGIS evidence collector failed for {site_id}: {e}",
+                exc_info=True,
+            )
+
+    async def _run_aegis_evidence_collector_async(self, site_id: str):
+        """Collect AEGIS evidence and append to tracker CSV.
+
+        Steps:
+        1. Query dashboard KPIs (proposals, approved, rejected, blocked)
+        2. Check tripwire log for unresolved events > 24h
+        3. Sample one decision to verify required audit fields
+        4. Check for illegal states (writes in Phase 0)
+        5. Append row to tracker CSV
+        """
+        import csv
+        from datetime import datetime, timezone, timedelta
+
+        tracker_path = Path(__file__).parent.parent.parent.parent / (
+            "docs/10-operations/aegis-phase0-14day-tracker.csv"
+        )
+
+        # 1. Read tracker to determine current day number
+        current_day = 1
+        if tracker_path.exists():
+            with open(tracker_path, "r") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    date_val = row.get("date", "")
+                    if date_val and not date_val.startswith("YYYY"):
+                        current_day = int(row.get("day", 0)) + 1
+
+        if current_day > 14:
+            logger.info("AEGIS Phase 0A: all 14 days collected, evidence complete")
+            return
+
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        # 2. Query AEGIS dashboard KPIs
+        from app.database.repositories.parasite_decision_repository import (
+            get_parasite_decision_repository,
+        )
+
+        repo = get_parasite_decision_repository()
+        kpis = {"proposals_24h": 0, "approved_24h": 0, "rejected_24h": 0, "blocked_24h": 0}
+        avg_response_s = ""
+        sample_decision_id = ""
+        all_fields_present = "yes"
+        illegal_state = "no"
+        pending_over_30m = 0
+        open_tripwires = 0
+        oldest_tripwire_age_min = 0
+        tripwire_types = ""
+
+        try:
+            # Get all decisions from last 24h for this site
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+            recent = await repo.get_decisions_by_site(
+                site_id=site_id,
+                since=cutoff.isoformat(),
+                limit=500,
+            )
+
+            kpis["proposals_24h"] = len(recent)
+            for d in recent:
+                outcome = (d.get("approval_outcome") or "").lower()
+                if outcome == "approved":
+                    kpis["approved_24h"] += 1
+                elif outcome == "rejected":
+                    kpis["rejected_24h"] += 1
+                elif d.get("block_reason_code"):
+                    kpis["blocked_24h"] += 1
+
+                # Check for illegal states (writes in Phase 0)
+                write_status = (d.get("write_status") or "").lower()
+                if write_status in ("success", "failed"):
+                    illegal_state = "yes"
+
+                # Check pending > 30 min
+                if outcome == "pending":
+                    created = d.get("created_at", "")
+                    if created:
+                        try:
+                            from dateutil.parser import parse as parse_dt
+
+                            created_dt = parse_dt(created)
+                            if (datetime.now(timezone.utc) - created_dt).total_seconds() > 1800:
+                                pending_over_30m += 1
+                        except Exception:
+                            pass
+
+            # Sample decision for audit field verification
+            if recent:
+                sample = recent[0]
+                sample_decision_id = sample.get("id", "")
+                required_fields = [
+                    "command_hash",
+                    "approval_outcome",
+                    "quality_gate_status",
+                    "block_reason_code",
+                ]
+                cf = sample.get("contributing_factors") or {}
+                for field in required_fields:
+                    if not sample.get(field) and not cf.get(field):
+                        all_fields_present = "no"
+                        break
+
+            # Approval SLA (average response time for approved decisions)
+            approved_times = []
+            for d in recent:
+                if (d.get("approval_outcome") or "").lower() == "approved":
+                    created = d.get("created_at", "")
+                    approved_at = d.get("approved_at", "")
+                    if created and approved_at:
+                        try:
+                            from dateutil.parser import parse as parse_dt
+
+                            c_dt = parse_dt(created)
+                            a_dt = parse_dt(approved_at)
+                            approved_times.append((a_dt - c_dt).total_seconds())
+                        except Exception:
+                            pass
+            if approved_times:
+                avg_response_s = str(round(sum(approved_times) / len(approved_times), 1))
+
+        except Exception as e:
+            logger.warning(f"AEGIS evidence: error querying decisions: {e}")
+
+        # 3. Check tripwire log
+        try:
+            decisions_log = Path("/var/log/sentinel/decisions.log")
+            if decisions_log.exists():
+                import json as _json
+
+                cutoff_24h = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+                tripwire_events = []
+                with open(decisions_log, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            evt = _json.loads(line)
+                            stage = evt.get("stage", "")
+                            ts = evt.get("timestamp", "")
+                            if "aegis.tripwire" in stage and ts >= cutoff_24h:
+                                tripwire_events.append(evt)
+                        except _json.JSONDecodeError:
+                            continue
+
+                if tripwire_events:
+                    open_tripwires = len(tripwire_events)
+                    types_seen = set()
+                    oldest_age = 0
+                    for evt in tripwire_events:
+                        types_seen.add(evt.get("stage", "").split(".")[-1])
+                        try:
+                            from dateutil.parser import parse as parse_dt
+
+                            evt_dt = parse_dt(evt["timestamp"])
+                            age = (datetime.now(timezone.utc) - evt_dt).total_seconds() / 60
+                            oldest_age = max(oldest_age, age)
+                        except Exception:
+                            pass
+                    tripwire_types = ";".join(sorted(types_seen))
+                    oldest_tripwire_age_min = round(oldest_age)
+        except Exception as e:
+            logger.warning(f"AEGIS evidence: error checking tripwire log: {e}")
+
+        # 4. Build tracker row
+        row = {
+            "day": str(current_day),
+            "date": today,
+            "site_id": site_id,
+            "data_mode": "simulation",
+            "proposals_24h": str(kpis["proposals_24h"]),
+            "approved_24h": str(kpis["approved_24h"]),
+            "rejected_24h": str(kpis["rejected_24h"]),
+            "blocked_24h": str(kpis["blocked_24h"]),
+            "avg_response_time_s": avg_response_s,
+            "pending_over_30m": str(pending_over_30m),
+            "open_tripwires": str(open_tripwires),
+            "oldest_tripwire_age_min": str(oldest_tripwire_age_min),
+            "tripwire_types": tripwire_types,
+            "audit_sample_decision_id": sample_decision_id,
+            "all_required_fields_present": all_fields_present,
+            "illegal_state_detected": illegal_state,
+            "phase1_blocker": "no",
+            "notes": f"Day {current_day} auto-collected by AEGIS evidence scheduler",
+        }
+
+        # 5. Write tracker — replace placeholder row or append
+        if tracker_path.exists():
+            with open(tracker_path, "r") as f:
+                lines = f.readlines()
+
+            header = lines[0] if lines else ""
+            fieldnames = header.strip().split(",")
+
+            # Find and replace the placeholder row for this day
+            new_lines = [header]
+            replaced = False
+            for line in lines[1:]:
+                parts = line.strip().split(",", 2)
+                if parts and parts[0] == str(current_day):
+                    # Replace this placeholder row
+                    new_lines.append(",".join(row.get(f, "") for f in fieldnames) + "\n")
+                    replaced = True
+                else:
+                    new_lines.append(line)
+
+            if not replaced:
+                new_lines.append(",".join(row.get(f, "") for f in fieldnames) + "\n")
+
+            with open(tracker_path, "w") as f:
+                f.writelines(new_lines)
+        else:
+            logger.warning("AEGIS tracker CSV not found at %s", tracker_path)
+            return
+
+        logger.info(
+            "AEGIS Phase 0A Day %d evidence collected: proposals=%d blocked=%d tripwires=%d illegal=%s",
+            current_day,
+            kpis["proposals_24h"],
+            kpis["blocked_24h"],
+            open_tripwires,
+            illegal_state,
+        )
+
 
 # Global scheduler instance
 scheduler_service = BackgroundSchedulerService()

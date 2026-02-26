@@ -128,6 +128,21 @@ async def startup_event(app: FastAPI) -> None:
     else:
         print("Redis cache unavailable - running without caching")
 
+    # Pre-warm embedding model in background so first doc search doesn't pay 11s load cost
+    def _warm_embedding_model():
+        try:
+            from app.services.embedding_service import get_embedding_service
+
+            svc = get_embedding_service()
+            svc.warmup()
+            _logger.info("✅ Embedding model pre-warmed")
+        except Exception as e:
+            _logger.warning(f"⚠️ Embedding model warmup failed (will load on first use): {e}")
+
+    import threading
+
+    threading.Thread(target=_warm_embedding_model, daemon=True).start()
+
     # Initialize device manager with mock devices + building equipment
     from app.api.devices import startup_event as devices_startup
 
@@ -274,6 +289,20 @@ async def startup_event(app: FastAPI) -> None:
             _logger.info("✅ POPIA retention enforcement job initialized")
         except Exception as e:
             _logger.warning(f"⚠️ POPIA retention job initialization failed: {e}")
+
+    # AEGIS Phase 0 — dispatch cycle (5 min) + daily evidence collector (24h)
+    # Generates proposals via arbitrage engine, collects tracker evidence automatically
+    try:
+        scheduler_service.add_aegis_cycle_job(interval_seconds=300, site_id="site-002")
+        _logger.info("✅ AEGIS dispatch cycle job initialized (5 min interval)")
+    except Exception as e:
+        _logger.warning(f"⚠️ AEGIS cycle job initialization failed: {e}")
+
+    try:
+        scheduler_service.add_aegis_evidence_collector_job(interval_seconds=86400, site_id="site-002")
+        _logger.info("✅ AEGIS evidence collector job initialized (24h interval)")
+    except Exception as e:
+        _logger.warning(f"⚠️ AEGIS evidence collector job initialization failed: {e}")
 
     # Phase 083: Recover crashed simulations from database
     # Queries for any tasks marked as 'running' and resumes from checkpoint
@@ -482,10 +511,11 @@ async def startup_event(app: FastAPI) -> None:
         except Exception as e:
             _logger.error(f"⚠️ Failed to auto-start sentinel_annual simulation: {e}")
 
-    try:
-        await auto_start_sentinel_simulation()
-    except Exception as e:
-        _logger.error(f"Error during sentinel auto-start: {e}")
+    # Auto-start disabled — simulation should be started manually via API
+    # try:
+    #     await auto_start_sentinel_simulation()
+    # except Exception as e:
+    #     _logger.error(f"Error during sentinel auto-start: {e}")
 
     # Start system health snapshot job (runs every 5 minutes)
     # Stores point-in-time health snapshots for trend analysis and historical reporting
