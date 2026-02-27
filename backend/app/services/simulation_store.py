@@ -29,6 +29,17 @@ logger = logging.getLogger(__name__)
 
 _DATA_ROOT = Path(__file__).parent.parent / "data" / "simulation"
 
+# JSONL file size caps (bytes).  When a file exceeds its cap the oldest
+# half of its lines are discarded (truncate-in-place).
+_JSONL_MAX_BYTES: Dict[str, int] = {
+    "sensor_readings.jsonl": 100 * 1024 * 1024,  # 100 MB
+    "zone_history.jsonl": 50 * 1024 * 1024,  # 50 MB
+    "solar_hourly_snapshots.jsonl": 20 * 1024 * 1024,  # 20 MB
+    "solar_daily_aggregates.jsonl": 10 * 1024 * 1024,  # 10 MB
+    "validations.jsonl": 10 * 1024 * 1024,  # 10 MB
+}
+_DEFAULT_JSONL_MAX_BYTES = 50 * 1024 * 1024  # 50 MB default
+
 
 class SimulationStore:
     """JSON-backed store for a single building's simulation state."""
@@ -78,13 +89,38 @@ class SimulationStore:
                 tmp.unlink()
 
     def _append_jsonl(self, filename: str, record: Dict[str, Any]):
-        """Append a single JSON record to a JSONL file."""
+        """Append a single JSON record to a JSONL file, rotating if over size cap."""
         path = self._dir / filename
         try:
             with open(path, "a") as f:
                 f.write(json.dumps(record, default=str) + "\n")
         except Exception as e:
             logger.error(f"[SIM-STORE] Failed to append to {filename}: {e}")
+            return
+
+        # Check size cap and rotate if needed
+        try:
+            max_bytes = _JSONL_MAX_BYTES.get(filename, _DEFAULT_JSONL_MAX_BYTES)
+            if path.stat().st_size > max_bytes:
+                self._rotate_jsonl(path, filename)
+        except Exception as e:
+            logger.warning(f"[SIM-STORE] Rotation check failed for {filename}: {e}")
+
+    def _rotate_jsonl(self, path: Path, filename: str):
+        """Truncate a JSONL file by keeping only the newest half of lines."""
+        try:
+            with open(path, "r") as f:
+                lines = f.readlines()
+            if len(lines) < 2:
+                return
+            keep = lines[len(lines) // 2 :]
+            tmp = path.with_suffix(".rotate.tmp")
+            with open(tmp, "w") as f:
+                f.writelines(keep)
+            tmp.rename(path)
+            logger.info(f"[SIM-STORE] Rotated {filename}: {len(lines)} → {len(keep)} lines")
+        except Exception as e:
+            logger.error(f"[SIM-STORE] Rotation failed for {filename}: {e}")
 
     # ------------------------------------------------------------------
     # Sensor Readings (append-only JSONL)
