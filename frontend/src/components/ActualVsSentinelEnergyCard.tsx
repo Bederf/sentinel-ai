@@ -1,8 +1,8 @@
 /**
- * DALI Tridonic vs SENTINEL AI Energy Comparison Card
+ * Smart Lighting vs SENTINEL AI Energy Comparison Card
  *
  * Side-by-side energy comparison driven reactively by simulation context:
- * - Left column: DALI Tridonic (smart lighting automation)
+ * - Left column: Smart Lighting (occupancy + daylight harvesting)
  * - Right column: SENTINEL AI (full AI optimization)
  *
  * Computes hourly energy accumulation based on:
@@ -71,7 +71,7 @@ function getSystemIcon(system: 'hvac' | 'lighting' | 'power') {
  *
  * Target energy split (typical commercial): ~55% HVAC, ~25% Lighting, ~20% Other
  *
- * Tridonic DALI reduces lighting via daylight harvesting + occupancy sensing.
+ * Smart lighting reduces lighting via daylight harvesting + occupancy sensing.
  * SENTINEL AI further reduces HVAC (predictive setpoints) + lighting (pre-emptive dimming).
  */
 function computeComparison(
@@ -115,7 +115,7 @@ function computeComparison(
     // --- HVAC (kW this hour) ---
     // 300 kW peak during business (2 chillers + AHUs + FCUs), 50 kW standby off-hours
     const hvacBase = isBusinessHour ? 300 : 50
-    // Tridonic: HVAC not affected by DALI (same as baseline occupancy-scaled)
+    // Smart lighting: HVAC not affected by lighting automation (same as baseline occupancy-scaled)
     const triHvacHour = hvacBase * (hourOcc / 100) * 0.85
     // SENTINEL: predictive setpoints reduce HVAC 12-18% during business hours
     const sentinelHvacSaving = isBusinessHour ? 0.85 : 0.95 // 15% saving business, 5% off
@@ -124,7 +124,7 @@ function computeComparison(
     // --- Lighting (kW this hour) ---
     // 125 kW total lighting capacity (8 DALI zones × ~15.6 kW each)
     const lightingCapacity = 125
-    // Tridonic: daylight harvesting reduces artificial light
+    // Smart lighting: daylight harvesting reduces artificial light
     const triDaylightReduction = daylight * 0.65 // harvests up to 65% from daylight
     const triOccReduction = hourOcc < 15 ? 0.7 : 0 // standby mode saves 70% in empty zones
     const triLightHour = lightingCapacity * (hourOcc / 100)
@@ -262,7 +262,7 @@ export function ActualVsSentinelEnergyCard({ siteId }: ActualVsSentinelEnergyCar
           </div>
           <div>
             <h3 className="font-medium text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>
-              Energy: DALI Tridonic vs SENTINEL AI
+              Energy: Smart Lighting vs SENTINEL AI
             </h3>
             <span className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
               Monthly projected energy comparison
@@ -290,10 +290,10 @@ export function ActualVsSentinelEnergyCard({ siteId }: ActualVsSentinelEnergyCar
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold uppercase" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-                  DALI Tridonic
+                  Smart Lighting
                 </span>
                 <span className="text-xs" style={{ color: 'var(--color-sentinel-text-disabled)' }}>
-                  Smart Lighting
+                  Installed System
                 </span>
               </div>
 

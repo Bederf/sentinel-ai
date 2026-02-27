@@ -679,10 +679,10 @@ async def get_integration_health(
     # Get DALI source health
     dali_sources: List[DALISourceHealth] = []
     try:
-        from app.services.dali_service import get_dali_service
+        from app.services.lighting_service import get_lighting_service
 
-        dali_service = get_dali_service()
-        for dh in dali_service.get_sources_health():
+        lighting_service = get_lighting_service()
+        for dh in lighting_service.get_sources_health():
             # If filtering by building_id, only include matching site
             if resolved_id and dh.get("site_id") != building_id:
                 continue

@@ -14,7 +14,7 @@ from app.services.lifecycle_orchestrator import ALL_SCENARIOS, SCENARIOS
 from app.services.simulation_orchestrator import (
     get_simulation_by_task_id,
 )
-from app.database.supabase_client import Supabase
+from app.services.simulation_store import get_simulation_store
 from datetime import datetime
 import uuid
 
@@ -117,6 +117,8 @@ class SimulationStatusResponse(BaseModel):
     current_hour_power_kw: Optional[float] = None  # Current hour's power in kW
     # SENTINEL response loop status (106-02)
     sentinel_status: Optional[dict] = None
+    # ML feeder status
+    ml_feeder: Optional[dict] = None
 
 
 class ScenarioInfo(BaseModel):
@@ -182,25 +184,23 @@ async def start_simulation(request: StartSimulationRequest):
         )
 
     try:
-        client = Supabase.instance()
         task_id = str(uuid.uuid4())
 
-        # Create task in database (status='queued')
-        (
-            client.table("lifecycle_simulation_tasks")
-            .insert(
-                {
-                    "task_id": task_id,
-                    "site_id": request.site_id,
-                    "scenario": request.scenario,
-                    "simulation_type": "lifecycle",
-                    "status": "queued",
-                    "progress_pct": 0,
-                    "days_completed": 0,
-                    "duration_minutes": request.duration_minutes,
-                }
-            )
-            .execute()
+        # Create task in JSON simulation store (not Supabase)
+        store = get_simulation_store(request.site_id)
+        store.update_task_progress(
+            task_id,
+            {
+                "task_id": task_id,
+                "site_id": request.site_id,
+                "scenario": request.scenario,
+                "simulation_type": "lifecycle",
+                "status": "queued",
+                "progress_pct": 0,
+                "days_completed": 0,
+                "duration_minutes": request.duration_minutes,
+                "created_at": datetime.now().isoformat(),
+            },
         )
 
         logger.info(
@@ -242,11 +242,15 @@ async def stop_simulation(task_id: str):
             await orchestrator.stop()
             return {"success": True, "status": "cancelled", "message": "Simulation stopped successfully"}
         else:
-            # Simulation not running - try to update database status to cancelled
-            client = Supabase.instance()
-            client.table("lifecycle_simulation_tasks").update(
-                {"status": "failed", "error_message": "Cancelled by user"}
-            ).eq("task_id", task_id).execute()
+            # Simulation not running - update JSON store status
+            store = get_simulation_store("site-002")  # TODO: resolve from task_id
+            store.update_task_progress(
+                task_id,
+                {
+                    "status": "failed",
+                    "error_message": "Cancelled by user",
+                },
+            )
 
             return {"success": True, "status": "cancelled", "message": "Task cancelled"}
     except Exception as e:
@@ -398,23 +402,17 @@ async def get_simulation_status(task_id: str):
     # If this looks like a site_id (e.g., "site-002"), find the most recent running/queued task
     if task_id.startswith("site-"):
         try:
-            client = Supabase.instance()
-            # Look for the most recent running or queued task for this site
-            site_task = (
-                client.table("lifecycle_simulation_tasks")
-                .select("task_id")
-                .eq("site_id", task_id)
-                .in_("status", ["running", "queued"])
-                .order("created_at", desc=True)
-                .limit(1)
-                .execute()
-            )
-            if site_task.data and site_task.data[0].get("task_id"):
-                # Redirect to the actual task status
-                task_id = site_task.data[0]["task_id"]
-                logger.info(f"Resolved site {task_id} to running task: {task_id}")
+            store = get_simulation_store(task_id)
+            all_tasks = store._task_progress  # Direct access to find running tasks
+            running_task = None
+            for tid, tdata in all_tasks.items():
+                if tdata.get("status") in ("running", "queued"):
+                    running_task = tid
+                    break
+            if running_task:
+                task_id = running_task
+                logger.info(f"Resolved site to running task: {task_id}")
             else:
-                # No running simulation for this site
                 return SimulationStatusResponse(
                     running=False,
                     paused=False,
@@ -443,16 +441,16 @@ async def get_simulation_status(task_id: str):
             )
 
     try:
-        client = Supabase.instance()
+        # Query task from JSON store (check all building stores)
+        task = None
+        for site_id in ["site-002", "site-005", "site-012"]:
+            store = get_simulation_store(site_id)
+            task_data = store.get_task_progress(task_id)
+            if task_data:
+                task = task_data
+                break
 
-        # Query task from database
-        response = client.table("lifecycle_simulation_tasks").select("*").eq("task_id", task_id).execute()
-
-        if not response or not response.data or len(response.data) == 0:
-            raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
-
-        task = response.data[0]
-        if not task or not isinstance(task, dict):
+        if not task:
             raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
         # Check if running orchestrator (for real-time event updates)
@@ -544,6 +542,10 @@ async def get_simulation_status(task_id: str):
                 # SENTINEL response loop status (106-02)
                 sentinel_status=orchestrator._get_sentinel_status()
                 if hasattr(orchestrator, "_get_sentinel_status")
+                else None,
+                # ML feeder stats from SENTINEL persistence layer
+                ml_feeder=orchestrator.persistence.ml_feeder.get_buffer_stats()
+                if hasattr(orchestrator.persistence, "ml_feeder")
                 else None,
             )
         else:

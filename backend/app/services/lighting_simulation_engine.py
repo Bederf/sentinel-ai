@@ -26,6 +26,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 
 from app.database.supabase_client import get_supabase_client
+from app.services.simulation_store import get_simulation_store
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ class LightingSimulationEngine:
     """Calculates and updates zone lighting consumption during simulation."""
 
     # Lighting hardware parameters (per zone)
-    BASELINE_POWER_PER_ZONE = 1.8  # kW (15 LED panels × 120W)
+    BASELINE_POWER_PER_ZONE = 4.5  # kW (450 sqm × 10 W/sqm modern LED office)
     DALI_MIN_DIM = 0.05  # 5% minimum (DALI spec)
 
     # Occupancy detection response
@@ -47,21 +48,38 @@ class LightingSimulationEngine:
     CLOUDY_REDUCTION = 0.3  # Cloudy weather reduces daylight by 30%
     RAIN_REDUCTION = 0.6  # Rain reduces daylight by 60%
 
-    # Zone characteristics
+    # Zone characteristics — True = has windows (perimeter), False = interior
+    # Zone naming: Zone-{id} where North/East/South = perimeter, Central/West = interior
     WINDOW_ZONES = {
-        "Zone-001": True,  # Level 0 Zone A (window)
-        "Zone-002": False,  # Level 0 Zone B (interior)
-        "Zone-101": True,  # Level 1 Zone A (window)
-        "Zone-102": False,  # Level 1 Zone B (interior)
-        "Zone-201": True,  # Level 2 Zone A (window)
-        "Zone-202": False,  # Level 2 Zone B (interior)
-        "Zone-R": False,  # Common area
-        "Entry": True,  # Entry with skylight
+        # L0
+        "Zone-001": True,  # L0 North (perimeter)
+        "Zone-021": True,  # L0 East (perimeter)
+        "Zone-041": False,  # L0 Central (interior)
+        "Zone-061": False,  # L0 West (interior)
+        "Zone-081": True,  # L0 South (perimeter)
+        # L1
+        "Zone-101": True,  # L1 North (perimeter)
+        "Zone-121": True,  # L1 East (perimeter)
+        "Zone-141": False,  # L1 Central (interior)
+        "Zone-161": False,  # L1 West (interior)
+        "Zone-181": True,  # L1 South (perimeter)
+        # L2
+        "Zone-201": True,  # L2 North (perimeter)
+        "Zone-221": True,  # L2 East (perimeter)
+        "Zone-241": False,  # L2 Central (interior)
+        "Zone-261": False,  # L2 West (interior)
+        "Zone-281": True,  # L2 South (perimeter)
+        # L3
+        "Zone-301": True,  # L3 North (perimeter)
+        "Zone-321": True,  # L3 East (perimeter)
+        "Zone-341": False,  # L3 Central (interior)
+        "Zone-361": False,  # L3 West (interior)
+        "Zone-381": True,  # L3 South (perimeter)
     }
 
     # sceneCOM telemetry simulation parameters
     LUMINAIRE_SQM_PER_FIXTURE = 8.0  # 1 LED panel per 8 sqm (office standard)
-    LIGHTING_POWER_DENSITY_W_SQM = 15.0  # 15 W/sqm office lighting (AS/NZS 1680)
+    LIGHTING_POWER_DENSITY_W_SQM = 10.0  # 10 W/sqm modern LED office lighting
     DRIVER_AMBIENT_TEMP_C = 35.0  # Plenum ambient (above ceiling)
     DRIVER_TEMP_RISE_FACTOR = 0.33  # °C per watt → ~40°C rise at 120W full load
     DRIVER_TEMP_NOISE_C = 2.0  # Random ±noise on driver temp
@@ -79,6 +97,7 @@ class LightingSimulationEngine:
     def __init__(self, building_id: str):
         self.building_id = building_id
         self.supabase = get_supabase_client()
+        self.sim_store = get_simulation_store(building_id)
 
         # Cache zone metadata
         self._zone_cache: Dict[str, Dict[str, Any]] = {}
@@ -160,6 +179,7 @@ class LightingSimulationEngine:
                 zone_power=zone_power,
                 total_power=total_power,
                 daylight_lux=daylight_lux,
+                simulated_date=simulated_date,
             )
 
             # Generate per-luminaire sceneCOM telemetry
@@ -572,6 +592,7 @@ class LightingSimulationEngine:
         zone_power: Dict[str, float],
         total_power: float,
         daylight_lux: float,
+        simulated_date: Optional[datetime] = None,
     ) -> None:
         """
         Write lighting power to power_meters table.
@@ -579,48 +600,15 @@ class LightingSimulationEngine:
         Updates the lighting feeder meter with total power.
         """
         try:
-            # Calculate hourly energy (kW * 1 hour = kWh)
             lighting_kwh = round(total_power, 2)
+            # Use simulated date, not real clock
+            date_str = simulated_date.strftime("%Y-%m-%d") if simulated_date else datetime.utcnow().strftime("%Y-%m-%d")
 
-            # Update power_meters table for lighting feeder
-            # Update existing power meter (skip if meter doesn't exist yet)
-            try:
-                self.supabase.table("power_meters").update(
-                    {
-                        "active_power_kw": round(total_power, 2),
-                        "last_poll": datetime.utcnow().isoformat() + "Z",
-                    }
-                ).eq("meter_id", "S002-MTR-B1-LIGHT").execute()
-            except Exception:
-                logger.debug("[LIGHTING] Meter S002-MTR-B1-LIGHT not found, skipping update")
+            # Write to simulation store (JSON), not Supabase
+            self.sim_store.update_power_meter("S002-MTR-B1-LIGHT", total_power)
+            self.sim_store.update_energy_history(date_str, "lighting_kwh", lighting_kwh)
 
-            # Update daily energy_consumption_history (upsert lighting_kwh for today)
-            today_str = datetime.utcnow().strftime("%Y-%m-%d")
-            try:
-                existing = (
-                    self.supabase.table("energy_consumption_history")
-                    .select("lighting_kwh")
-                    .eq("building_id", self.building_id)
-                    .eq("date", today_str)
-                    .maybe_single()
-                    .execute()
-                )
-                prev_kwh = float(existing.data.get("lighting_kwh", 0)) if existing.data else 0
-                self.supabase.table("energy_consumption_history").upsert(
-                    {
-                        "building_id": self.building_id,
-                        "date": today_str,
-                        "lighting_kwh": round(prev_kwh + lighting_kwh, 2),
-                    },
-                    on_conflict="building_id,date",
-                ).execute()
-            except Exception as e:
-                logger.warning(f"[LIGHTING] Could not record energy history: {e}")
-
-            logger.debug(
-                f"[LIGHTING] Updated meter S002-MTR-B1-LIGHT: "
-                f"{total_power:.1f}kW, {lighting_kwh:.2f}kWh at hour {simulated_hour:02d}"
-            )
+            logger.debug(f"[LIGHTING] Meter: {total_power:.1f}kW, +{lighting_kwh:.2f}kWh at hour {simulated_hour:02d}")
 
         except Exception as e:
             logger.error(f"[LIGHTING] Failed to write power: {e}", exc_info=True)

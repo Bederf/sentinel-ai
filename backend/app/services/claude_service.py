@@ -265,14 +265,15 @@ def build_system_prompt_with_context() -> str:
     """
     context = fm_context_service.get_full_context()
     threshold_context = _get_threshold_context()
+    agent_memory_context = fm_context_service.get_agent_memory_context()
 
-    # Add DALI lighting/occupancy context
+    # Add lighting/occupancy context
     lighting_context = ""
     try:
         analyzer = get_cross_system_analyzer()
-        building_occupancy = analyzer.dali.get_building_occupancy()
+        building_occupancy = analyzer.lighting.get_building_occupancy()
         lighting_context = f"""
-## Real-Time Occupancy (from DALI sensors)
+## Real-Time Occupancy (from lighting sensors)
 - Overall building occupancy: {building_occupancy["occupancy_percent"]:.0f}%
 - Total sensors: {building_occupancy["total_sensors"]}
 - Currently occupied: {building_occupancy["occupied_sensors"]}
@@ -301,6 +302,8 @@ def build_system_prompt_with_context() -> str:
 
 {lighting_context}
 
+{agent_memory_context}
+
 ---
 
 {CITATION_INSTRUCTIONS}
@@ -314,20 +317,24 @@ def build_system_prompt_for_tools() -> str:
 
     Skips static data tables (sites, equipment, alerts, predictions)
     because Claude fetches that data live via tools. Keeps behavioral
-    instructions, health thresholds, and citation rules.
+    instructions, health thresholds, agent memory, and citation rules.
 
-    ~5K chars smaller than build_system_prompt_with_context().
+    Agent memory IS included here (not tool-fetchable — it's institutional
+    knowledge that should always be in context).
 
     Returns:
         System prompt with behavioral instructions only.
     """
     threshold_context = _get_threshold_context()
+    agent_memory_context = fm_context_service.get_agent_memory_context()
 
     return f"""{FM_SYSTEM_PROMPT_BASE}
 
 ---
 
 {threshold_context}
+
+{agent_memory_context}
 
 **Note:** Use your tools (get_system_status, get_equipment_health, get_alerts_and_anomalies, etc.) \
 to fetch live building data. Do NOT guess or fabricate data — always call tools first.

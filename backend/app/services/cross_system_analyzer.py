@@ -6,7 +6,7 @@ for intelligent comfort diagnostics.
 
 Data Sources:
 - HVAC: zones.json via BuildingDataLoader (zone temps, setpoints, FCU/VAV/AHU)
-- Lighting: dali_mock_data.json via DALIService (lux, occupancy, luminaires)
+- Lighting: lighting mock data via LightingService (lux, occupancy, luminaires)
 - Desks: desks.json via BuildingDataLoader (desk context: near_window, etc.)
 """
 
@@ -15,9 +15,9 @@ from dataclasses import dataclass
 import logging
 import asyncio
 
-from app.services.dali_service import get_dali_service
+from app.services.lighting_service import get_lighting_service
 from app.services.building_loader import get_building_loader
-from app.models.dali import ZoneOccupancy, ZoneLighting
+from app.models.lighting import ZoneOccupancy, ZoneLighting
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ class CrossSystemAnalyzer:
     """Analyzes comfort issues using combined HVAC + Lighting data"""
 
     def __init__(self):
-        self.dali = get_dali_service()
+        self.lighting = get_lighting_service()
         self._building_loader = get_building_loader()
         self._hvac_data: Dict[str, Dict] = {}
         self._load_hvac_from_zones()
@@ -221,8 +221,8 @@ class CrossSystemAnalyzer:
         This is the hero use case: "Too hot at Desk 25" gets intelligent diagnosis.
         """
         # Get zone data
-        occupancy = self.dali.get_zone_occupancy(zone_id)
-        lighting = self.dali.get_zone_lighting(zone_id)
+        occupancy = self.lighting.get_zone_occupancy(zone_id)
+        lighting = self.lighting.get_zone_lighting(zone_id)
         hvac = self._hvac_data.get(zone_id, {"temp": 22.0, "setpoint": 22.0, "status": "unknown"})
 
         # Get VAV device data (Desigo simulation)
@@ -233,7 +233,7 @@ class CrossSystemAnalyzer:
         desk_sensor = None
         desk_data = {}
         if desk_id:
-            desk_sensor = self.dali.get_sensor_by_desk(desk_id)
+            desk_sensor = self.lighting.get_sensor_by_desk(desk_id)
             if desk_sensor:
                 desk_data = {
                     "desk_id": desk_id,
@@ -564,8 +564,8 @@ class CrossSystemAnalyzer:
 
     def get_zone_context_for_chat(self, zone_id: str) -> str:
         """Get formatted zone context for AI chat (includes VAV data from Desigo)"""
-        occupancy = self.dali.get_zone_occupancy(zone_id)
-        lighting = self.dali.get_zone_lighting(zone_id)
+        occupancy = self.lighting.get_zone_occupancy(zone_id)
+        lighting = self.lighting.get_zone_lighting(zone_id)
         hvac = self._hvac_data.get(zone_id, {})
 
         lines = [f"## Zone: {zone_id}"]

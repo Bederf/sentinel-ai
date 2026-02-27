@@ -2,9 +2,9 @@
 title: "SENTINEL ML Model Specifications & Equipment Type Mapping"
 type: "technical-reference"
 status: "active"
-version: "2.0.0"
+version: "2.1.0"
 created: "2026-02-10"
-updated: "2026-02-12"
+updated: "2026-02-27"
 author: "SENTINEL Development Team"
 tags: ["ml", "lstm", "autoencoder", "models", "equipment-type", "predictions", "registry", "database-driven"]
 domain: "ai-ml"
@@ -17,6 +17,8 @@ changes: "Phase 68-03: Database-driven ML registry, async infrastructure, multi-
 # SENTINEL ML Model Specifications & Equipment Type Mapping
 
 Complete specifications for SENTINEL's ML models and equipment type mapping system. Used by the ML inference engine to determine which predictive models apply to discovered equipment and generate equipment-specific health scores and maintenance recommendations.
+
+> **Phase 132 (2026-02-27):** ML model outputs are now injected into Claude's optimisation prompt via `_gather_ml_context()` in `ai_optimizer.py`. This bridges trained models to the AI Recommendation Engine. See [AI Recommendation System — ML Context Injection](./ai-recommendation-system.md#ml-context-injection-phase-132) and [ML Data Architecture](../02-architecture/ML-DATA-ARCHITECTURE.md).
 
 ## Database-Driven ML Registry (Phase 68-03)
 

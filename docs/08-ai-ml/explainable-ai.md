@@ -721,12 +721,25 @@ ollama pull qwen:7b  # or your preferred model
 - Automated quality monitoring dashboard
 - Active learning from technician feedback
 
+## ML Context Injection (Phase 132)
+
+With Phase 132, the same ML model outputs that power XAI explanations are also injected directly into Claude's AI Optimization prompts via `_gather_ml_context()`. This means:
+
+- **LSTM forecasts** used in explanations are also available for proactive recommendations
+- **Anomaly scores** that trigger explanations also inform Claude's optimization reasoning
+- **Fault classifications** are shared across both explanation and recommendation pipelines
+
+The two systems are complementary: XAI explains individual predictions to technicians, while ML Context Injection lets Claude reason over fleet-wide ML outputs to produce building-level optimization recommendations.
+
+See [AI Recommendation System — ML Context Injection](ai-recommendation-system.md#ml-context-injection-phase-132) and [ML Data Architecture](../02-architecture/ML-DATA-ARCHITECTURE.md).
+
 ## Related Documentation
 
 - **[44-01: RAG Integration](44-01-rag-integration.md)** - Vector database and semantic search
 - **[ML Model Development](../04-features/43-ml-model-development.md)** - LSTM and Autoencoder models
 - **[AI Operations & Monitoring](../04-features/ai-operations-monitoring.md)** - Day-to-day AI monitoring
 - **[Asset Baseline Assessment](../04-features/44-asset-baseline-assessment.md)** - Asset condition scoring
+- **[ML Data Architecture](../02-architecture/ML-DATA-ARCHITECTURE.md)** - Full ML→Claude context injection pipeline
 
 ## References
 

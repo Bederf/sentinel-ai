@@ -1,6 +1,8 @@
 """
 Simulation API endpoints for BMS Intelligence
-Provides control and access to simulated equipment data
+
+Unified simulation engine — powered by LifecycleOrchestrator.
+BMSimulationService is deprecated; all endpoints now route through the orchestrator.
 """
 
 from fastapi import APIRouter, HTTPException, Query
@@ -8,51 +10,56 @@ from typing import Optional
 from datetime import datetime
 import logging
 import random
+import uuid
 
-from app.services.bms_simulation_service import create_simulation_service
+from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
 from app.services.health_threshold_service import get_health_status
+from app.services.simulation_store import get_simulation_store
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/simulation", tags=["simulation"])
 
-# Global simulation service instance
-simulation_service = create_simulation_service()
+
+def _get_orchestrator():
+    """Get the singleton lifecycle orchestrator."""
+    return get_lifecycle_orchestrator()
 
 
 @router.on_event("startup")
 async def startup_event():
-    """Start the simulation service on API startup.
-
-    DISABLED: Simulation now starts manually via POST /api/simulation/start
-    This prevents alert spam during development/demos.
-    """
-    # Auto-start disabled - use POST /api/simulation/start to begin
-    logger.info("BMS Simulation ready (not auto-started). Use POST /api/simulation/start to begin.")
-    # try:
-    #     await simulation_service.start_simulation()
-    #     logger.info("BMS Simulation service started successfully")
-    # except Exception as e:
-    #     logger.error(f"Failed to start simulation service: {e}")
+    """Simulation ready — starts manually via POST /api/simulation/start."""
+    logger.info("Unified Simulation ready (not auto-started). Use POST /api/simulation/start to begin.")
 
 
 @router.on_event("shutdown")
 async def shutdown_event():
-    """Stop the simulation service on API shutdown"""
+    """Save checkpoint on shutdown — leave task status as 'running' for auto-resume."""
     try:
-        await simulation_service.stop_simulation()
-        logger.info("BMS Simulation service stopped")
+        orchestrator = _get_orchestrator()
+        if orchestrator.running:
+            # Save final checkpoint so we can resume on next startup
+            await orchestrator.save_checkpoint()
+            orchestrator.running = False
+            if orchestrator._task and not orchestrator._task.done():
+                orchestrator._task.cancel()
+            logger.info(
+                f"Simulation checkpoint saved on shutdown (day {orchestrator.days_simulated}). "
+                "Will auto-resume on next startup."
+            )
     except Exception as e:
-        logger.error(f"Error stopping simulation service: {e}")
+        logger.error(f"Error saving simulation checkpoint on shutdown: {e}")
 
 
 @router.get("/status")
 async def get_simulation_status():
-    """Get current simulation status"""
+    """Get current simulation status."""
+    orchestrator = _get_orchestrator()
     return {
-        "is_running": simulation_service.is_running,
-        "simulation_speed": simulation_service.simulation_speed,
-        "total_equipment": len(simulation_service.equipment),
+        "is_running": orchestrator.running,
+        "simulation_speed": orchestrator.speed_multiplier,
+        "total_equipment": len(orchestrator._simulation_equipment),
+        "days_simulated": orchestrator.days_simulated,
         "last_update": datetime.now().isoformat(),
     }
 
@@ -60,37 +67,45 @@ async def get_simulation_status():
 @router.get("/equipment")
 async def get_equipment(
     equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
-    building: Optional[str] = Query(None, description="Filter by building"),
     health_threshold: Optional[float] = Query(None, description="Filter by health score threshold"),
-    include_faults: bool = Query(True, description="Include fault codes"),
     limit: int = Query(100, description="Maximum number of results"),
 ):
-    """Get simulated equipment data"""
+    """Get simulated equipment data from the unified engine."""
     try:
-        equipment_data = simulation_service.get_real_time_data()
+        orchestrator = _get_orchestrator()
+        states = orchestrator._simulation_equipment
 
+        equipment_list = []
+        for code, state in states.items():
+            entry = {
+                "id": code,
+                "code": code,
+                "type": state.get("type", "unknown"),
+                "health_score": round(state.get("health_score", 0), 1),
+                "status": state.get("status", "unknown"),
+                "is_running": state.get("is_running", False),
+                "runtime_hours": state.get("runtime_hours", 0),
+                "sensor_readings": state.get("sensor_readings", {}),
+                "fault_codes": list(orchestrator.active_faults.get(code, {}).keys())
+                if code in orchestrator.active_faults
+                else [],
+            }
+            equipment_list.append(entry)
+
+        # Apply filters
         if equipment_type:
-            equipment_data["equipment"] = [eq for eq in equipment_data["equipment"] if eq.get("type") == equipment_type]
-
-        if building:
-            equipment_data["equipment"] = [
-                eq for eq in equipment_data["equipment"] if building.lower() in eq.get("location", "").lower()
-            ]
+            equipment_list = [eq for eq in equipment_list if eq["type"] == equipment_type]
 
         if health_threshold is not None:
-            equipment_data["equipment"] = [
-                eq for eq in equipment_data["equipment"] if eq.get("health_score", 0) >= health_threshold
-            ]
+            equipment_list = [eq for eq in equipment_list if eq["health_score"] >= health_threshold]
 
-        # Limit results
-        equipment_data["equipment"] = equipment_data["equipment"][:limit]
+        equipment_list = equipment_list[:limit]
 
-        # Optionally remove faults
-        if not include_faults:
-            for eq in equipment_data["equipment"]:
-                eq["fault_codes"] = []
-
-        return equipment_data
+        return {
+            "total": len(states),
+            "returned": len(equipment_list),
+            "equipment": equipment_list,
+        }
     except Exception as e:
         logger.error(f"Error getting equipment data: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting equipment data: {e}")
@@ -98,31 +113,40 @@ async def get_equipment(
 
 @router.get("/equipment/{equipment_id}")
 async def get_equipment_by_id(equipment_id: str):
-    """Get specific equipment by ID"""
-    try:
-        equipment_data = simulation_service.get_real_time_data(equipment_id)
+    """Get specific equipment by code."""
+    orchestrator = _get_orchestrator()
+    state = orchestrator._simulation_equipment.get(equipment_id)
 
-        if "error" in equipment_data:
-            raise HTTPException(status_code=404, detail=equipment_data["error"])
+    if not state:
+        raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
 
-        return equipment_data
-    except Exception as e:
-        logger.error(f"Error getting equipment {equipment_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting equipment: {e}")
+    return {
+        "id": equipment_id,
+        "code": equipment_id,
+        "type": state.get("type", "unknown"),
+        "health_score": round(state.get("health_score", 0), 1),
+        "status": state.get("status", "unknown"),
+        "health_status": get_health_status(state.get("health_score", 0)),
+        "is_running": state.get("is_running", False),
+        "runtime_hours": state.get("runtime_hours", 0),
+        "sensor_readings": state.get("sensor_readings", {}),
+        "has_fault": equipment_id in orchestrator.active_faults,
+    }
 
 
 @router.post("/fault/inject")
 async def inject_fault(equipment_id: str, fault_code: str, description: Optional[str] = None):
-    """Manually inject a fault for testing"""
+    """Manually inject a fault for testing."""
     try:
-        simulation_service.inject_fault(equipment_id, fault_code)
-
-        return {
-            "success": True,
-            "message": f"Fault {fault_code} injected into {equipment_id}",
-            "description": description,
-            "timestamp": datetime.now().isoformat(),
-        }
+        orchestrator = _get_orchestrator()
+        result = orchestrator.inject_fault(equipment_id, fault_code)
+        if not result.get("success"):
+            raise HTTPException(status_code=404, detail=result.get("error", "Unknown error"))
+        result["description"] = description
+        result["timestamp"] = datetime.now().isoformat()
+        return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error injecting fault: {e}")
         raise HTTPException(status_code=500, detail=f"Error injecting fault: {e}")
@@ -130,10 +154,10 @@ async def inject_fault(equipment_id: str, fault_code: str, description: Optional
 
 @router.delete("/fault/clear/{equipment_id}")
 async def clear_faults(equipment_id: str):
-    """Clear all faults from equipment"""
+    """Clear all faults from equipment."""
     try:
-        simulation_service.clear_faults(equipment_id)
-
+        orchestrator = _get_orchestrator()
+        orchestrator.clear_faults(equipment_id)
         return {
             "success": True,
             "message": f"Faults cleared from {equipment_id}",
@@ -146,10 +170,10 @@ async def clear_faults(equipment_id: str):
 
 @router.post("/control/speed")
 async def set_simulation_speed(speed: float = Query(..., description="Simulation speed multiplier", ge=0.1, le=10.0)):
-    """Set simulation speed (0.1 = 10x slower, 10.0 = 10x faster)"""
+    """Set simulation speed multiplier."""
     try:
-        simulation_service.simulation_speed = speed
-
+        orchestrator = _get_orchestrator()
+        orchestrator.speed_multiplier = speed
         return {
             "success": True,
             "message": f"Simulation speed set to {speed}x",
@@ -163,13 +187,15 @@ async def set_simulation_speed(speed: float = Query(..., description="Simulation
 
 @router.post("/stop")
 async def stop_simulation():
-    """Stop the BMS simulation completely"""
+    """Stop the unified simulation."""
     try:
-        await simulation_service.stop_simulation()
+        orchestrator = _get_orchestrator()
+        result = await orchestrator.stop()
         return {
             "success": True,
             "message": "Simulation stopped",
-            "is_running": simulation_service.is_running,
+            "is_running": orchestrator.running,
+            "summary": result,
             "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
@@ -179,13 +205,39 @@ async def stop_simulation():
 
 @router.post("/start")
 async def start_simulation():
-    """Start the BMS simulation"""
+    """Start the unified simulation engine (LifecycleOrchestrator).
+
+    Registers the task in the simulation store so checkpoints are saved
+    and the simulation can auto-resume after server restart.
+    """
     try:
-        await simulation_service.start_simulation()
+        orchestrator = _get_orchestrator()
+
+        # Register in simulation store for checkpoint persistence
+        task_id = str(uuid.uuid4())
+        store = get_simulation_store(orchestrator.building_id)
+        store.update_task_progress(
+            task_id,
+            {
+                "task_id": task_id,
+                "site_id": orchestrator.building_id,
+                "scenario": "sentinel_annual",
+                "simulation_type": "lifecycle",
+                "status": "running",
+                "progress_pct": 0,
+                "days_completed": 0,
+                "duration_minutes": 3650.0,
+                "created_at": datetime.now().isoformat(),
+            },
+        )
+        orchestrator.task_id = task_id
+
+        result = await orchestrator.start(scenario="sentinel_annual")
         return {
             "success": True,
-            "message": "Simulation started",
-            "is_running": simulation_service.is_running,
+            "message": "Unified simulation started",
+            "is_running": orchestrator.running,
+            "result": result,
             "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
@@ -195,10 +247,10 @@ async def start_simulation():
 
 @router.get("/stats")
 async def get_simulation_stats():
-    """Get simulation statistics"""
+    """Get simulation statistics from the unified engine."""
     try:
-        stats = simulation_service.get_equipment_summary()
-        return stats
+        orchestrator = _get_orchestrator()
+        return orchestrator.get_equipment_summary()
     except Exception as e:
         logger.error(f"Error getting simulation stats: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting simulation stats: {e}")
@@ -208,7 +260,7 @@ async def get_simulation_stats():
 async def run_scenario(
     scenario_name: str, duration_minutes: int = Query(60, description="Duration in minutes", ge=1, le=1440)
 ):
-    """Run a predefined simulation scenario"""
+    """Run a predefined simulation scenario via the unified engine."""
     scenarios = {
         "summer_peak": "High ambient temperature, maximum cooling load",
         "winter_night": "Low ambient temperature, minimal occupancy",
@@ -221,15 +273,17 @@ async def run_scenario(
         raise HTTPException(status_code=400, detail=f"Unknown scenario: {scenario_name}")
 
     try:
-        # Implementation would adjust simulation parameters based on scenario
-        logger.info(f"Running scenario: {scenario_name} for {duration_minutes} minutes")
-
+        orchestrator = _get_orchestrator()
+        result = await orchestrator.start(
+            scenario=scenario_name,
+            duration_minutes=float(duration_minutes),
+        )
         return {
             "success": True,
             "scenario": scenario_name,
             "description": scenarios[scenario_name],
             "duration_minutes": duration_minutes,
-            "message": f"Scenario {scenario_name} started",
+            "result": result,
             "timestamp": datetime.now().isoformat(),
         }
     except Exception as e:
@@ -239,19 +293,19 @@ async def run_scenario(
 
 @router.get("/health")
 async def get_system_health():
-    """Get overall system health summary"""
+    """Get overall system health summary from unified engine."""
     try:
-        summary = simulation_service.get_equipment_summary()
+        orchestrator = _get_orchestrator()
+        summary = orchestrator.get_equipment_summary()
 
-        # Calculate additional health metrics
-        total_equipment = summary["total_equipment"]
-        equipment_with_faults = summary["fault_summary"]["equipment_with_faults"]
-        avg_health = summary["health_stats"]["avg_health"]
+        total = summary.get("total", 0)
+        faults = summary.get("faults", 0)
+        avg_health = summary.get("health_stats", {}).get("avg", 0)
 
         health_status = "healthy"
         if avg_health < 70:
             health_status = "degraded"
-        elif equipment_with_faults > total_equipment * 0.1:  # >10% with faults
+        elif total > 0 and faults > total * 0.1:
             health_status = "warning"
 
         return {
@@ -259,8 +313,8 @@ async def get_system_health():
             "summary": summary,
             "recommendations": [
                 f"Average equipment health: {avg_health:.1f}%",
-                f"{equipment_with_faults} equipment items have faults",
-                f"{total_equipment - equipment_with_faults} equipment items operating normally",
+                f"{faults} equipment items have faults",
+                f"{total - faults} equipment items operating normally",
             ],
             "timestamp": datetime.now().isoformat(),
         }
@@ -271,10 +325,11 @@ async def get_system_health():
 
 @router.get("/alerts")
 async def get_simulation_alerts():
-    """Get active alerts from simulation"""
+    """Get active alerts from unified simulation."""
     try:
-        active_alerts = simulation_service.get_active_alerts()
-        alert_history = simulation_service.get_alert_history()
+        orchestrator = _get_orchestrator()
+        active_alerts = orchestrator.get_active_alerts()
+        alert_history = orchestrator.get_alert_history()
 
         return {
             "active_count": len(active_alerts),
@@ -282,9 +337,9 @@ async def get_simulation_alerts():
             "active_alerts": active_alerts,
             "recent_history": alert_history[-20:] if alert_history else [],
             "by_severity": {
-                "critical": len([a for a in active_alerts if a["severity"] == "critical"]),
-                "warning": len([a for a in active_alerts if a["severity"] == "warning"]),
-                "info": len([a for a in active_alerts if a["severity"] == "info"]),
+                "critical": len([a for a in active_alerts if a.get("severity") == "critical"]),
+                "warning": len([a for a in active_alerts if a.get("severity") == "warning"]),
+                "info": len([a for a in active_alerts if a.get("severity") == "info"]),
             },
             "timestamp": datetime.now().isoformat(),
         }
@@ -297,9 +352,10 @@ async def get_simulation_alerts():
 async def acknowledge_simulation_alert(
     alert_id: str, acknowledged_by: str = Query("Facilities Manager", description="Name of person acknowledging")
 ):
-    """Acknowledge a simulation alert"""
+    """Acknowledge a simulation alert."""
     try:
-        success = simulation_service.acknowledge_alert(alert_id, acknowledged_by)
+        orchestrator = _get_orchestrator()
+        success = orchestrator.acknowledge_alert(alert_id)
         if success:
             return {
                 "success": True,
@@ -317,9 +373,10 @@ async def acknowledge_simulation_alert(
 
 @router.post("/alerts/{alert_id}/clear")
 async def clear_simulation_alert(alert_id: str):
-    """Clear/resolve a simulation alert"""
+    """Clear/resolve a simulation alert."""
     try:
-        success = simulation_service.clear_alert(alert_id)
+        orchestrator = _get_orchestrator()
+        success = orchestrator.clear_alert(alert_id)
         if success:
             return {"success": True, "message": f"Alert {alert_id} cleared", "timestamp": datetime.now().isoformat()}
         else:
@@ -333,13 +390,14 @@ async def clear_simulation_alert(alert_id: str):
 
 @router.post("/maintenance/{equipment_id}")
 async def perform_maintenance(equipment_id: str):
-    """Perform maintenance on equipment - restores health and clears faults"""
+    """Perform maintenance on equipment — restores health and clears faults."""
     try:
-        result = simulation_service.perform_maintenance(equipment_id)
+        orchestrator = _get_orchestrator()
+        result = orchestrator.perform_maintenance(equipment_id)
         if result["success"]:
             return result
         else:
-            raise HTTPException(status_code=404, detail=result["message"])
+            raise HTTPException(status_code=404, detail=result.get("error", "Not found"))
     except HTTPException:
         raise
     except Exception as e:
@@ -349,31 +407,27 @@ async def perform_maintenance(equipment_id: str):
 
 @router.get("/equipment/{equipment_id}/status")
 async def get_equipment_status(equipment_id: str):
-    """Get detailed status of specific equipment"""
-    if equipment_id not in simulation_service.equipment:
+    """Get detailed status of specific equipment."""
+    orchestrator = _get_orchestrator()
+    state = orchestrator._simulation_equipment.get(equipment_id)
+
+    if not state:
         raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
 
-    eq = simulation_service.equipment[equipment_id]
-
-    # Get alerts for this equipment
-    eq_alerts = [a for a in simulation_service.get_active_alerts() if a["equipment_id"] == equipment_id]
+    eq_alerts = [a for a in orchestrator.get_active_alerts() if a.get("equipment_code") == equipment_id]
 
     return {
-        "id": eq.id,
-        "name": eq.name,
-        "type": eq.type,
-        "status": eq.status,
-        "health_score": eq.health_score,
-        "health_status": get_health_status(eq.health_score),
-        "fault_codes": eq.fault_codes,
-        "temperature": eq.temperature,
-        "power_consumption": eq.power_consumption,
-        "runtime_hours": eq.runtime_hours,
-        "last_maintenance": eq.last_maintenance.isoformat(),
-        "days_since_maintenance": (datetime.now() - eq.last_maintenance).days,
-        "sensor_readings": eq.sensor_readings,
+        "id": equipment_id,
+        "code": equipment_id,
+        "type": state.get("type", "unknown"),
+        "status": state.get("status", "unknown"),
+        "health_score": round(state.get("health_score", 0), 1),
+        "health_status": get_health_status(state.get("health_score", 0)),
+        "is_running": state.get("is_running", False),
+        "runtime_hours": state.get("runtime_hours", 0),
+        "sensor_readings": state.get("sensor_readings", {}),
         "active_alerts": eq_alerts,
-        "timestamp": eq.timestamp.isoformat(),
+        "has_fault": equipment_id in orchestrator.active_faults,
     }
 
 
@@ -381,24 +435,29 @@ async def get_equipment_status(equipment_id: str):
 async def force_equipment_degradation(
     equipment_id: str, amount: float = Query(10.0, description="Amount to degrade health (0-50)", ge=0, le=50)
 ):
-    """Force equipment health to degrade (for demo purposes)"""
-    if equipment_id not in simulation_service.equipment:
+    """Force equipment health to degrade (for demo purposes)."""
+    orchestrator = _get_orchestrator()
+    if equipment_id not in orchestrator._equipment_health:
         raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
 
-    eq = simulation_service.equipment[equipment_id]
-    old_health = eq.health_score
-    eq.health_score = max(0, eq.health_score - amount)
+    old_health = orchestrator._equipment_health[equipment_id]
+    new_health = max(0, old_health - amount)
+    orchestrator._equipment_health[equipment_id] = new_health
 
-    # Trigger status update
-    simulation_service._update_equipment_status(eq, old_health)
+    # Update snapshot
+    if equipment_id in orchestrator._simulation_equipment:
+        orchestrator._simulation_equipment[equipment_id]["health_score"] = new_health
+        orchestrator._simulation_equipment[equipment_id]["status"] = (
+            "online" if new_health >= 70 else ("degraded" if new_health >= 40 else "offline")
+        )
 
     return {
         "success": True,
         "equipment_id": equipment_id,
-        "old_health": old_health,
-        "new_health": eq.health_score,
-        "status": eq.status,
-        "message": f"Degraded {eq.name} health by {amount}%",
+        "old_health": round(old_health, 1),
+        "new_health": round(new_health, 1),
+        "status": "online" if new_health >= 70 else ("degraded" if new_health >= 40 else "offline"),
+        "message": f"Degraded {equipment_id} health by {amount}%",
     }
 
 
@@ -504,7 +563,6 @@ from app.database.repositories.prediction_repository import PredictionRepository
 from app.services.maintenance_recommender import get_maintenance_recommender  # noqa: E402
 from app.services.module_registry_service import ModuleRegistryService  # noqa: E402
 from app.models.module_registry import AIRecommendation, ModuleType, RecommendationType, RecommendationPriority  # noqa: E402
-import uuid  # noqa: E402
 
 
 @router.post("/demo/trigger-warnings")
@@ -912,4 +970,4 @@ async def resume_all_scheduler_jobs():
 
 
 # Export the router
-__all__ = ["router", "simulation_service", "health_simulation_service"]
+__all__ = ["router", "health_simulation_service"]

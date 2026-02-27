@@ -13,7 +13,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.services.dali_discovery_service import DALIDiscoveryService, SimulatedDALIDiscovery
+from app.services.lighting_discovery_service import LightingDiscoveryService, SimulatedLightingDiscovery
 from app.services.bacnet_discovery_service import BACnetDiscoveryService, SimulatedBACnetDiscovery
 from app.services.modbus_discovery_service import ModbusDiscoveryService, SimulatedModbusDiscovery
 from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
@@ -277,7 +277,7 @@ async def _discover_dali(request: UnifiedDiscoveryRequest) -> Optional[dict]:
     if not ip:
         return None
 
-    service = DALIDiscoveryService(
+    service = LightingDiscoveryService(
         gateway_ip=ip,
         gateway_type=request.gateway_type or "tridonic",
     )
@@ -373,7 +373,7 @@ def _get_simulated_data(equipment_code: str, protocol: str, equipment_type: Opti
         elif "DOWN" in equipment_code.upper():
             device_type = "led_downlight"
 
-        return SimulatedDALIDiscovery.generate_device_info(
+        return SimulatedLightingDiscovery.generate_device_info(
             equipment_code=equipment_code,
             device_type=device_type,
             dali_address=1,

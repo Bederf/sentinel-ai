@@ -1,6 +1,14 @@
 """
 BMS Simulation Service - Generates realistic, changing equipment data
 for testing AI responses and fallback scenarios
+
+DEPRECATED: This module is superseded by LifecycleOrchestrator which provides
+a unified simulation engine supporting all 58+ equipment types (HVAC, lighting,
+solar/BESS, meters, DALI, pumps, fire). The simulation API endpoints
+(backend/app/api/simulation.py) now route through LifecycleOrchestrator.
+
+Retained for reference during transition. Do not add new features here.
+Use ``lifecycle_orchestrator.py`` and ``equipment_json_loader.py`` instead.
 """
 
 import asyncio

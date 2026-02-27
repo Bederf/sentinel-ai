@@ -1,12 +1,11 @@
 """
 Thermal Simulation Engine
 
-Simulates realistic zone temperature behavior based on:
-- Occupancy levels (people generate ~100W heat each)
-- HVAC setpoints and fan speed
-- Ambient conditions (temperature, solar gain)
-- Thermal mass (building's heat capacity)
-- Previous temperature (thermal inertia)
+Simulates realistic building physics:
+- Zone temperatures (occupancy heat, solar gain, HVAC cooling, thermal mass)
+- CO2 levels (occupant generation, ventilation dilution, outdoor baseline)
+- Chiller plant with N+1 redundancy (lead/lag staging, cascade on fault)
+- HVAC power consumption (zone FCUs/AHUs + chiller plant)
 
 This creates realistic sensor readings that feed ML models and AI recommendations.
 
@@ -23,6 +22,7 @@ from app.services.lighting_simulation_engine import update_simulation_lighting
 from app.services.water_consumption_engine import update_simulation_water
 from app.services.power_meter_validation_engine import get_power_meter_validation_engine
 from app.services.cost_validation_engine import get_cost_validation_engine
+from app.services.simulation_store import get_simulation_store
 
 logger = logging.getLogger(__name__)
 
@@ -33,14 +33,15 @@ class ThermalSimulationEngine:
     def __init__(self, building_id: str, consider_equipment_health: bool = False):
         self.building_id = building_id
         self.supabase = get_supabase_client()
+        self.sim_store = get_simulation_store(building_id)
 
         # Initialize cost service for tariff calculations
         self.cost_service = EnergyCostService(building_id=building_id)
 
         # Thermal parameters (building-specific, can be customized)
         self.OCCUPANT_HEAT_GAIN = 100  # Watts per person
-        self.EQUIPMENT_HEAT_GAIN = 50  # Watts per zone baseline
-        self.THERMAL_MASS_FACTOR = 0.7  # Inertia: how much temp carries over (0-1)
+        self.EQUIPMENT_HEAT_GAIN = 150  # Watts per zone baseline (450 sqm zone)
+        self.THERMAL_MASS_FACTOR = 0.92  # Inertia: 9000 sqm concrete office retains ~92% per hour
         self.HVAC_RESPONSE_FACTOR = 0.5  # How quickly HVAC reaches setpoint
         self.SOLAR_GAIN_FACTOR = 1.2  # Afternoon solar gain multiplier
         self.NIGHT_SETBACK_OFFSET = -2  # Degrees offset for night mode
@@ -54,15 +55,46 @@ class ThermalSimulationEngine:
         self._zone_cache: Dict[str, Dict[str, Any]] = {}
         self._last_temps: Dict[str, float] = {}  # Track previous hour temps
         self._equipment_health_cache: Dict[str, int] = {}  # equipment_id -> health_score
+        self._sensor_id_cache: Dict[str, str] = {}  # sensor_code -> sensor_id (UUID)
+        self._sensor_cache_loaded: bool = False
+
+        # CO2 Simulation Parameters
+        self.OUTDOOR_CO2_PPM = 420.0  # Outdoor baseline (2026 global avg)
+        self.CO2_PER_PERSON_PER_HOUR = 20.0  # ppm rise per person per hour (typical office zone)
+        self.VENTILATION_DILUTION_RATE = 0.4  # Fraction of CO2 above baseline removed per hour by AHU
+        self.DCV_CO2_THRESHOLD = 800.0  # ppm — demand-controlled ventilation kicks in harder
+        self.DCV_BOOST_FACTOR = 1.5  # Extra ventilation multiplier above threshold
+
+        # CO2 state tracking
+        self._zone_co2: Dict[str, float] = {}  # zone_id -> current CO2 ppm
 
         # HVAC Power Consumption Parameters
         # FCU = Fan Coil Unit, AHU = Air Handling Unit
-        self.FCU_BASELINE_POWER = 2.0  # kW when running at base load
-        self.AHU_BASELINE_POWER = 5.0  # kW when running at base load
-        self.FCU_MAX_POWER = 8.0  # kW at maximum load
-        self.AHU_MAX_POWER = 25.0  # kW at maximum load
-        self.CHILLER_COP = 3.5  # Coefficient of Performance (typical value)
-        self.CHILLER_MIN_POWER = 15.0  # kW minimum power when running
+        self.FCU_BASELINE_POWER = 5.0  # kW when running at base load (450 sqm zone ≈ 3 FCUs)
+        self.AHU_BASELINE_POWER = 15.0  # kW when running at base load
+        self.FCU_MAX_POWER = 18.0  # kW at maximum load
+        self.AHU_MAX_POWER = 45.0  # kW at maximum load
+
+        # Chiller Plant — N+1 Redundancy
+        # Two chillers: lead handles base load, lag picks up on high demand or lead fault
+        self.CHILLER_COP = 3.5  # Coefficient of Performance at full load
+        self.CHILLER_PART_LOAD_COP = {  # COP varies with load fraction
+            0.0: 0.0,
+            0.2: 2.0,
+            0.4: 3.0,
+            0.6: 3.5,
+            0.8: 3.4,
+            1.0: 3.2,
+        }
+        self.CHILLER_MIN_POWER = 25.0  # kW minimum power when running
+        self.CHILLER_CAPACITY_KW = 350.0  # kW cooling capacity per chiller (9,000 sqm building)
+        self.CHILLER_IDS = ["S002-CHILLER-B1-001", "S002-CHILLER-B1-002"]
+
+        # Chiller plant state
+        self._chiller_states: Dict[str, Dict[str, Any]] = {
+            cid: {"role": "lead" if i == 0 else "lag", "running": False, "load_pct": 0.0, "health": 100.0}
+            for i, cid in enumerate(self.CHILLER_IDS)
+        }
 
         # Power consumption tracking
         self._hvac_power_cache: Dict[str, float] = {}  # zone_id -> power_kw
@@ -125,6 +157,16 @@ class ThermalSimulationEngine:
                 # Update in-memory last temp for next hour's calculation
                 self._last_temps[zone_id] = new_temp
 
+                # Calculate CO2 level for this zone
+                fan_speed = zone_config.get("fan_speed", "auto")
+                fan_response = {"off": 0.1, "low": 0.3, "medium": 0.5, "auto": 0.7, "high": 0.9}.get(fan_speed, 0.7)
+                self._calculate_zone_co2(
+                    zone_id=zone_id,
+                    occupancy_pct=occupancy_pct,
+                    fan_response_factor=fan_response,
+                    zone_config=zone_config,
+                )
+
             # Write sensor readings to database
             await self._write_sensor_readings(
                 simulated_hour=simulated_hour,
@@ -140,6 +182,7 @@ class ThermalSimulationEngine:
                 zone_temps=calculated_temps,
                 occupancy_data=occupancy_data,
                 ambient_temp=ambient_temp,
+                simulated_date=simulated_date,
             )
 
             # Track daily power and calculate cost at end of day
@@ -177,10 +220,12 @@ class ThermalSimulationEngine:
                 simulated_date=simulated_date,
             )
 
+            avg_co2 = sum(self._zone_co2.values()) / max(len(self._zone_co2), 1)
             logger.debug(
                 f"[THERMAL] Updated {len(calculated_temps)} zones at hour {simulated_hour:02d}:00 | "
                 f"Ambient: {ambient_temp:.1f}°C | "
-                f"Avg occupancy: {sum(occupancy_data.values()) / max(len(occupancy_data), 1):.0f}%"
+                f"Avg occupancy: {sum(occupancy_data.values()) / max(len(occupancy_data), 1):.0f}% | "
+                f"Avg CO2: {avg_co2:.0f}ppm"
             )
 
             return calculated_temps
@@ -258,7 +303,7 @@ class ThermalSimulationEngine:
 
         # === Building Losses ===
         # Natural cooling/heating toward ambient (through walls, ventilation)
-        wall_loss_rate = 0.15  # How much zone temp approaches ambient per hour
+        wall_loss_rate = 0.04  # How much zone temp approaches ambient per hour (well-insulated 9000 sqm)
         ambient_loss = (ambient_temp - prev_temp) * wall_loss_rate
 
         # === Thermal Inertia ===
@@ -272,8 +317,9 @@ class ThermalSimulationEngine:
         # New temperature: blend previous temp (inertia) with change
         new_temp = (inertia_contribution + temp_change) / (self.THERMAL_MASS_FACTOR + 1)
 
-        # Clamp to reasonable bounds (5°C - 35°C)
-        new_temp = max(5.0, min(35.0, new_temp))
+        # Building safety floor: BMS night setback keeps zones above 19°C
+        # (heating kicks in before reaching the 18°C safety minimum)
+        new_temp = max(19.0, min(35.0, new_temp))
 
         logger.debug(
             f"[TEMP CALC] {zone_id} h={simulated_hour:02d}: "
@@ -302,6 +348,162 @@ class ThermalSimulationEngine:
             return 0.5  # Late afternoon: declining
         else:
             return 0.0
+
+    # ------------------------------------------------------------------
+    # CO2 Simulation
+    # ------------------------------------------------------------------
+
+    def _calculate_zone_co2(
+        self,
+        zone_id: str,
+        occupancy_pct: float,
+        fan_response_factor: float,
+        zone_config: Dict[str, Any],
+    ) -> float:
+        """Calculate zone CO2 level based on occupancy and ventilation.
+
+        Physics model (simplified mass-balance per hour):
+            CO2_new = CO2_prev
+                    + generation (people breathing)
+                    - dilution   (AHU fresh-air exchange)
+                    + infiltration toward outdoor baseline
+
+        When CO2 exceeds the DCV threshold the AHU increases fresh-air,
+        modelled by multiplying the dilution rate by DCV_BOOST_FACTOR.
+        """
+        prev_co2 = self._zone_co2.get(zone_id, self.OUTDOOR_CO2_PPM)
+
+        # --- Generation: people produce CO2 ---
+        typical_occ = zone_config.get("typical_occupancy") or 10
+        people_count = max(0, int(typical_occ * (occupancy_pct / 100.0)))
+        generation = people_count * self.CO2_PER_PERSON_PER_HOUR  # ppm rise
+
+        # --- Dilution: ventilation removes CO2 above outdoor baseline ---
+        dilution_rate = self.VENTILATION_DILUTION_RATE * fan_response_factor
+        if prev_co2 > self.DCV_CO2_THRESHOLD:
+            dilution_rate *= self.DCV_BOOST_FACTOR  # DCV kicks in harder
+        dilution = (prev_co2 - self.OUTDOOR_CO2_PPM) * dilution_rate
+
+        # --- Infiltration: slow drift toward outdoor baseline ---
+        infiltration = (self.OUTDOOR_CO2_PPM - prev_co2) * 0.05
+
+        new_co2 = prev_co2 + generation - dilution + infiltration
+        new_co2 = max(self.OUTDOOR_CO2_PPM, min(2000.0, new_co2))  # clamp
+
+        self._zone_co2[zone_id] = new_co2
+        return new_co2
+
+    # ------------------------------------------------------------------
+    # Chiller Plant — N+1 Redundancy
+    # ------------------------------------------------------------------
+
+    def _interpolate_cop(self, load_fraction: float) -> float:
+        """Interpolate COP from part-load curve.
+
+        The curve is defined as {load_fraction: COP} in CHILLER_PART_LOAD_COP.
+        Linear interpolation between the two nearest points.
+        """
+        load_fraction = max(0.0, min(1.0, load_fraction))
+        points = sorted(self.CHILLER_PART_LOAD_COP.items())
+
+        # Exact match
+        for lf, cop in points:
+            if abs(lf - load_fraction) < 1e-6:
+                return cop
+
+        # Find bracketing points
+        for i in range(len(points) - 1):
+            lf_lo, cop_lo = points[i]
+            lf_hi, cop_hi = points[i + 1]
+            if lf_lo <= load_fraction <= lf_hi:
+                t = (load_fraction - lf_lo) / (lf_hi - lf_lo)
+                return cop_lo + t * (cop_hi - cop_lo)
+
+        return points[-1][1]  # fallback: full-load COP
+
+    def _update_chiller_plant(self, total_cooling_demand_kw: float) -> float:
+        """Update chiller plant state and return total chiller electrical power (kW).
+
+        N+1 redundancy logic:
+        - Lead chiller handles up to 100% of its capacity.
+        - If demand exceeds lead capacity OR lead health < 50%, lag starts.
+        - If lead faults (health < 20%), lag takes full load.
+        - Each running chiller's electrical power = cooling_output / COP(load_fraction).
+        """
+        total_capacity = self.CHILLER_CAPACITY_KW  # per chiller
+
+        # Identify lead and lag
+        lead_id = next((cid for cid, s in self._chiller_states.items() if s["role"] == "lead"), self.CHILLER_IDS[0])
+        lag_id = next((cid for cid, s in self._chiller_states.items() if s["role"] == "lag"), self.CHILLER_IDS[1])
+        lead = self._chiller_states[lead_id]
+        lag = self._chiller_states[lag_id]
+
+        # Health-aware capacity: degraded chiller can't deliver full cooling
+        lead_effective_capacity = total_capacity * (lead["health"] / 100.0)
+        lag_effective_capacity = total_capacity * (lag["health"] / 100.0)
+
+        # --- Cascade logic ---
+        lead_faulted = lead["health"] < 20.0
+        demand_exceeds_lead = total_cooling_demand_kw > lead_effective_capacity
+        lead_degraded = lead["health"] < 50.0
+
+        total_power = 0.0
+
+        if lead_faulted:
+            # Lead is down — lag takes full load
+            lead["running"] = False
+            lead["load_pct"] = 0.0
+
+            lag_load = min(total_cooling_demand_kw, lag_effective_capacity)
+            lag_frac = lag_load / total_capacity if total_capacity > 0 else 0
+            lag["running"] = lag_load > 0
+            lag["load_pct"] = round(lag_frac * 100, 1)
+
+            cop = self._interpolate_cop(lag_frac)
+            total_power = lag_load / cop if cop > 0 else 0
+
+            logger.warning(
+                f"[CHILLER] Lead {lead_id} FAULTED (health={lead['health']:.0f}%). "
+                f"Lag {lag_id} serving {lag_load:.1f}kW @ COP {cop:.2f}"
+            )
+        elif demand_exceeds_lead or lead_degraded:
+            # Lead can't handle alone — split load
+            lead_load = min(total_cooling_demand_kw, lead_effective_capacity)
+            remaining = max(0, total_cooling_demand_kw - lead_load)
+            lag_load = min(remaining, lag_effective_capacity)
+
+            lead_frac = lead_load / total_capacity if total_capacity > 0 else 0
+            lag_frac = lag_load / total_capacity if total_capacity > 0 else 0
+
+            lead["running"] = lead_load > 0
+            lead["load_pct"] = round(lead_frac * 100, 1)
+            lag["running"] = lag_load > 0
+            lag["load_pct"] = round(lag_frac * 100, 1)
+
+            lead_cop = self._interpolate_cop(lead_frac)
+            lag_cop = self._interpolate_cop(lag_frac)
+
+            lead_power = lead_load / lead_cop if lead_cop > 0 else 0
+            lag_power = lag_load / lag_cop if lag_cop > 0 else 0
+            total_power = lead_power + lag_power
+        else:
+            # Lead handles it alone — lag standby
+            lead_frac = total_cooling_demand_kw / total_capacity if total_capacity > 0 else 0
+            lead_frac = min(1.0, lead_frac)
+
+            lead["running"] = total_cooling_demand_kw > 0
+            lead["load_pct"] = round(lead_frac * 100, 1)
+            lag["running"] = False
+            lag["load_pct"] = 0.0
+
+            cop = self._interpolate_cop(lead_frac)
+            total_power = total_cooling_demand_kw / cop if cop > 0 else 0
+
+        # Minimum power when any chiller is running
+        if any(s["running"] for s in self._chiller_states.values()):
+            total_power = max(self.CHILLER_MIN_POWER, total_power)
+
+        return round(total_power, 2)
 
     def _estimate_daylight_lux(self, simulated_hour: int, cloud_cover: float) -> float:
         """
@@ -374,6 +576,12 @@ class ThermalSimulationEngine:
                     "status": zone.get("status") or "idle",
                     "fcu_id": zone.get("fcu_id"),  # Link to FCU equipment for health checks
                 }
+
+            # Seed zone temperatures to setpoint (building is already conditioned)
+            # This prevents unrealistic cold-start alerts on simulation boot
+            for zone_id, zc in self._zone_cache.items():
+                if zone_id not in self._last_temps:
+                    self._last_temps[zone_id] = zc.get("setpoint", 22.0)
 
             # Load equipment health if enabled
             if self.CONSIDER_EQUIPMENT_HEALTH:
@@ -454,6 +662,11 @@ class ThermalSimulationEngine:
             if fcu_id and fcu_id in health_dict:
                 self._equipment_health_cache[fcu_id] = health_dict[fcu_id]
 
+        # Also update chiller plant health from equipment codes
+        for cid in self.CHILLER_IDS:
+            if cid in health_dict:
+                self._chiller_states[cid]["health"] = health_dict[cid]
+
         if updated > 0:
             degraded = sum(1 for h in self._equipment_health_cache.values() if h < 95)
             if degraded > 0:
@@ -467,56 +680,45 @@ class ThermalSimulationEngine:
         ambient_temp: float,
         is_night_mode: bool,
     ) -> None:
-        """
-        Write temperature sensor readings to database.
-        Called once per simulated hour for each zone.
-        """
+        """Write temperature and CO2 sensor readings to JSON simulation store."""
         try:
-            # Build rows for sensor_readings table
-            sensor_readings = []
+            readings = []
 
             for zone_id, zone_config in self._zone_cache.items():
                 temp = zone_temps.get(zone_id, zone_config.get("setpoint", 22.0))
                 occupancy = occupancy_data.get(zone_id, 0.0)
 
-                # Find sensor code for this zone
-                sensor_code = f"{zone_id}-TEMP"
-
-                # Get sensor ID from database
-                sensor_response = self.supabase.table("sensors").select("id").eq("code", sensor_code).execute()
-
-                if not sensor_response.data:
-                    logger.warning(f"[THERMAL] Sensor not found: {sensor_code}")
-                    continue
-
-                sensor_id = sensor_response.data[0]["id"]
-
-                # Create reading row
-                # Timestamp is NOW (real time), but we track simulated hour in metadata
-                reading_row = {
-                    "sensor_id": sensor_id,
-                    "time": datetime.utcnow().isoformat() + "Z",
-                    "value": round(temp, 2),
-                    "quality": "good",
-                    "metadata": {
+                readings.append(
+                    {
+                        "sensor_code": f"{zone_id}-TEMP",
+                        "time": datetime.utcnow().isoformat() + "Z",
+                        "value": round(temp, 2),
+                        "quality": "good",
                         "simulated_hour": simulated_hour,
                         "occupancy_pct": round(occupancy, 1),
                         "ambient_temp": round(ambient_temp, 1),
                         "night_mode": is_night_mode,
                         "zone_id": zone_id,
-                        "zone_name": zone_config.get("zone_name"),
-                    },
-                }
-
-                sensor_readings.append(reading_row)
-
-            if sensor_readings:
-                # Insert batch of readings
-                self.supabase.table("sensor_readings").insert(sensor_readings).execute()
-
-                logger.debug(
-                    f"[THERMAL] Inserted {len(sensor_readings)} sensor readings for hour {simulated_hour:02d}:00"
+                    }
                 )
+
+                co2_value = self._zone_co2.get(zone_id, self.OUTDOOR_CO2_PPM)
+                readings.append(
+                    {
+                        "sensor_code": f"{zone_id}-CO2",
+                        "time": datetime.utcnow().isoformat() + "Z",
+                        "value": round(co2_value, 1),
+                        "quality": "good",
+                        "simulated_hour": simulated_hour,
+                        "occupancy_pct": round(occupancy, 1),
+                        "zone_id": zone_id,
+                        "unit": "ppm",
+                    }
+                )
+
+            if readings:
+                self.sim_store.write_sensor_readings(readings)
+                logger.debug(f"[THERMAL] Wrote {len(readings)} sensor readings for hour {simulated_hour:02d}:00")
 
         except Exception as e:
             logger.error(f"[THERMAL] Failed to write sensor readings: {e}", exc_info=True)
@@ -527,6 +729,7 @@ class ThermalSimulationEngine:
         zone_temps: Dict[str, float],
         occupancy_data: Dict[str, float],
         ambient_temp: float,
+        simulated_date: Optional[datetime] = None,
     ) -> Dict[str, float]:
         """
         Calculate HVAC power consumption per zone and for chiller.
@@ -552,8 +755,9 @@ class ThermalSimulationEngine:
                 temp_offset = abs(current_temp - setpoint)
 
                 # Calculate cooling load for this zone (in kW)
-                # Load increases with temp_offset and occupancy
-                cooling_load = temp_offset * 0.5 + (occupancy_pct / 100.0) * 2.0
+                # Load increases with temp_offset and occupancy, scaled by zone area
+                area_factor = zone_config.get("area_sqm", 450) / 120.0
+                cooling_load = (temp_offset * 0.5 + (occupancy_pct / 100.0) * 2.0) * area_factor
 
                 # Determine equipment type and calculate power
                 equipment_type = "FCU"  # Default
@@ -567,8 +771,8 @@ class ThermalSimulationEngine:
                     baseline = self.AHU_BASELINE_POWER
                     max_power = self.AHU_MAX_POWER
 
-                # Power ∝ cooling_load (normalized 0-1)
-                load_fraction = min(1.0, cooling_load / 5.0)
+                # Power ∝ cooling_load (normalized 0-1, scaled by zone area)
+                load_fraction = min(1.0, cooling_load / (5.0 * area_factor))
                 hvac_power = baseline + (max_power - baseline) * load_fraction
 
                 # Apply equipment health factor if enabled
@@ -584,25 +788,28 @@ class ThermalSimulationEngine:
                 total_zone_cooling_demand += cooling_load
                 self._hvac_power_cache[zone_id] = hvac_power
 
-            # Calculate chiller power
-            # Chiller power = (Total cooling load / COP) + margin for distribution
-            chiller_load_kw = total_zone_cooling_demand * 1.2  # 20% margin for chilled water distribution
-            chiller_power = max(self.CHILLER_MIN_POWER, chiller_load_kw / self.CHILLER_COP)
-            self._chiller_power_cache = round(chiller_power, 2)
+            # Calculate chiller power via N+1 plant model
+            # 20% margin for chilled water distribution losses
+            chiller_load_kw = total_zone_cooling_demand * 1.2
+            chiller_power = self._update_chiller_plant(chiller_load_kw)
+            self._chiller_power_cache = chiller_power
 
             # Write power to database
             await self._write_power_consumption(
                 simulated_hour=simulated_hour,
                 zone_power=zone_power,
                 chiller_power=chiller_power,
+                simulated_date=simulated_date,
             )
 
             total_hvac = sum(zone_power.values()) + chiller_power
 
+            # Chiller plant summary for logging
+            running_chillers = [cid for cid, s in self._chiller_states.items() if s["running"]]
             logger.debug(
                 f"[POWER] Hour {simulated_hour:02d}: "
                 f"Zones={sum(zone_power.values()):.1f}kW + "
-                f"Chiller={chiller_power:.1f}kW = "
+                f"Chiller={chiller_power:.1f}kW ({len(running_chillers)} running) = "
                 f"Total {total_hvac:.1f}kW"
             )
 
@@ -621,6 +828,7 @@ class ThermalSimulationEngine:
         simulated_hour: int,
         zone_power: Dict[str, float],
         chiller_power: float,
+        simulated_date: Optional[datetime] = None,
     ) -> None:
         """
         Write HVAC power consumption to power_meters table.
@@ -630,53 +838,18 @@ class ThermalSimulationEngine:
         - Can be extended to track chiller separately if meter exists
         """
         try:
-            # Calculate total HVAC power
             total_hvac_power = sum(zone_power.values()) + chiller_power
+            kwh_consumed = round(total_hvac_power, 2)
 
-            # Update HVAC feeder power meter
-            # This meter tracks all HVAC consumption (zones + chiller)
-            # Update existing power meter (skip if meter doesn't exist yet)
-            try:
-                self.supabase.table("power_meters").update(
-                    {
-                        "active_power_kw": round(total_hvac_power, 2),
-                        "last_poll": datetime.utcnow().isoformat() + "Z",
-                    }
-                ).eq("meter_id", "S002-MTR-B1-HVAC").execute()
-            except Exception:
-                logger.debug("[POWER] Meter S002-MTR-B1-HVAC not found, skipping update")
+            # Write to simulation store (JSON), not Supabase
+            self.sim_store.update_power_meter("S002-MTR-B1-HVAC", total_hvac_power)
 
-            # Also track hourly energy consumption
-            # Convert kW * 1 hour to kWh
-            kwh_consumed = round(total_hvac_power, 2)  # 1 hour = 1 * kW = kWh
-
-            # Update daily energy_consumption_history (upsert hvac_kwh for today)
-            today_str = datetime.utcnow().strftime("%Y-%m-%d")
-            try:
-                # Fetch existing row for today
-                existing = (
-                    self.supabase.table("energy_consumption_history")
-                    .select("hvac_kwh")
-                    .eq("building_id", self.building_id)
-                    .eq("date", today_str)
-                    .maybe_single()
-                    .execute()
-                )
-                prev_kwh = float(existing.data.get("hvac_kwh", 0)) if existing.data else 0
-                self.supabase.table("energy_consumption_history").upsert(
-                    {
-                        "building_id": self.building_id,
-                        "date": today_str,
-                        "hvac_kwh": round(prev_kwh + kwh_consumed, 2),
-                    },
-                    on_conflict="building_id,date",
-                ).execute()
-            except Exception as e:
-                logger.warning(f"[POWER] Could not record energy history: {e}")
+            # Use simulated date, not real clock
+            date_str = simulated_date.strftime("%Y-%m-%d") if simulated_date else datetime.utcnow().strftime("%Y-%m-%d")
+            self.sim_store.update_energy_history(date_str, "hvac_kwh", kwh_consumed)
 
             logger.debug(
-                f"[POWER] Updated power meter S002-MTR-B1-HVAC: "
-                f"{total_hvac_power:.1f}kW, {kwh_consumed:.2f}kWh for hour {simulated_hour:02d}"
+                f"[POWER] HVAC meter: {total_hvac_power:.1f}kW, +{kwh_consumed:.2f}kWh for hour {simulated_hour:02d}"
             )
 
         except Exception as e:

@@ -1,12 +1,22 @@
 """
-Test cases for Hybrid AI Service fallback mechanism.
+Test cases for Hybrid AI Service cloud-to-cloud fallback mechanism.
 
 Verifies that transient API errors (500, 502, 503, timeouts, connection failures)
-automatically trigger fallback to local Ollama AI, ensuring system resilience.
+automatically trigger fallback to the next cloud provider, ensuring system resilience.
+
+Provider architecture:
+  - anthropic: Claude (tool support)
+  - openai: GPT-4.1 nano/mini (tool support, tiered models)
+  - zai: Z.ai GLM (advisory only, NO tool support)
+
+Fallback chains:
+  - anthropic → openai → zai
+  - openai → anthropic → zai
+  - zai → openai → anthropic
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 from anthropic import APIError, APIConnectionError, APITimeoutError, RateLimitError
 import httpx
 
@@ -22,21 +32,21 @@ def _create_api_error(message: str) -> APIError:
 
 
 def _create_connection_error(message: str) -> APIConnectionError:
-    """Helper to create APIConnectionError with proper signature."""
+    """Helper to create APIConnectionError."""
     mock_request = MagicMock(spec=httpx.Request)
     mock_request.url = "https://api.anthropic.com/v1/messages"
     return APIConnectionError(request=mock_request, message=message)
 
 
 def _create_timeout_error() -> APITimeoutError:
-    """Helper to create APITimeoutError with proper signature."""
+    """Helper to create APITimeoutError."""
     mock_request = MagicMock(spec=httpx.Request)
     mock_request.url = "https://api.anthropic.com/v1/messages"
     return APITimeoutError(request=mock_request)
 
 
 def _create_rate_limit_error(message: str) -> RateLimitError:
-    """Helper to create RateLimitError with proper signature."""
+    """Helper to create RateLimitError."""
     mock_request = MagicMock(spec=httpx.Request)
     mock_response = MagicMock(spec=httpx.Response)
     mock_response.status_code = 429
@@ -44,8 +54,18 @@ def _create_rate_limit_error(message: str) -> RateLimitError:
     return RateLimitError(message=message, response=mock_response, body=None)
 
 
-class TestHybridAIFallback:
-    """Test automatic fallback to Ollama on Claude API failures."""
+def _mock_async_generator(*chunks):
+    """Create a mock async generator that yields given chunks."""
+
+    async def _gen(*args, **kwargs):
+        for chunk in chunks:
+            yield chunk
+
+    return _gen
+
+
+class TestCloudFallback:
+    """Test automatic fallback between cloud providers."""
 
     @pytest.fixture
     def hybrid_ai(self):
@@ -53,335 +73,215 @@ class TestHybridAIFallback:
         return HybridAIService()
 
     @pytest.mark.asyncio
-    async def test_fallback_on_api_error_500(self, hybrid_ai):
-        """Test fallback to Ollama when Claude returns 500 Internal Server Error."""
-        message = "Why is AHU-7 showing bearing degradation?"  # Tier 2 query to ensure Claude routing
+    async def test_primary_success_no_fallback(self, hybrid_ai):
+        """Successful primary provider response — no fallback triggered."""
+        with patch.object(
+            hybrid_ai,
+            "_stream_from_provider",
+            side_effect=_mock_async_generator("Building occupancy is 56%"),
+        ) as mock_stream:
+            chunks = []
+            async for chunk in hybrid_ai.stream_response("What is the building occupancy?"):
+                chunks.append(chunk)
 
-        # Mock Claude to raise 500 error
-        mock_api_error = _create_api_error("Internal server error")
-
-        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
-            # Claude raises APIError
-            mock_claude.stream_response.side_effect = mock_api_error
-
-            # Mock Ollama to succeed
-            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
-                mock_ollama_response = "Here are optimization recommendations from Ollama..."
-                mock_ollama.return_value = mock_ollama_response
-
-                # Collect response chunks
-                response_chunks = []
-                async for chunk in hybrid_ai.stream_response(message, use_tools=False):
-                    response_chunks.append(chunk)
-
-                full_response = "".join(response_chunks)
-
-                # Verify Ollama was called as fallback
-                mock_ollama.assert_called_once()
-                assert "Claude unavailable" in full_response
-                assert "Ollama" in full_response or mock_ollama_response in full_response
+            assert "56%" in "".join(chunks)
 
     @pytest.mark.asyncio
-    async def test_fallback_on_api_connection_error(self, hybrid_ai):
-        """Test fallback to Ollama when Claude connection fails."""
-        message = "Diagnose the chiller refrigerant leak"  # Tier 2 query
+    async def test_fallback_on_primary_error(self, hybrid_ai):
+        """When primary fails, fallback provider responds."""
+        call_count = 0
 
-        # Mock connection error
-        mock_conn_error = _create_connection_error("Connection to api.anthropic.com failed")
+        async def _mock_stream(provider, messages, include_building_context=True, tier=2):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise Exception("Primary provider down")
+            yield "Fallback response from second provider"
 
-        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
-            mock_claude.stream_response.side_effect = mock_conn_error
+        with patch.object(hybrid_ai, "_stream_from_provider", side_effect=_mock_stream):
+            chunks = []
+            async for chunk in hybrid_ai._try_cloud_with_fallback("test query"):
+                chunks.append(chunk)
 
-            # Mock Ollama to succeed
-            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
-                mock_ollama.return_value = "AHU-7 status: Online, 72% health"
-
-                response_chunks = []
-                async for chunk in hybrid_ai.stream_response(message, use_tools=False):
-                    response_chunks.append(chunk)
-
-                full_response = "".join(response_chunks)
-
-                # Verify fallback occurred
-                mock_ollama.assert_called_once()
-                assert "Claude unavailable" in full_response
-                assert "AHU-7" in full_response
+            assert "Fallback response" in "".join(chunks)
+            assert call_count == 2
 
     @pytest.mark.asyncio
-    async def test_fallback_on_api_timeout(self, hybrid_ai):
-        """Test fallback to Ollama when Claude request times out."""
-        message = "Diagnose comfort complaint at Desk 25"
+    async def test_all_providers_fail_graceful_message(self, hybrid_ai):
+        """When ALL providers fail, user sees a friendly error."""
 
-        # Mock timeout error
-        mock_timeout = _create_timeout_error()
+        async def _always_fail(provider, messages, include_building_context=True, tier=2):
+            raise Exception(f"{provider} unavailable")
+            yield  # Make it an async generator  # noqa: E501  (unreachable but needed for type)
 
-        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
-            mock_claude.stream_response.side_effect = mock_timeout
+        with patch.object(hybrid_ai, "_stream_from_provider", side_effect=_always_fail):
+            chunks = []
+            async for chunk in hybrid_ai._try_cloud_with_fallback("test"):
+                chunks.append(chunk)
 
-            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
-                mock_ollama.return_value = "Desk 25 is in Zone L1-A with temperature 24°C"
-
-                response_chunks = []
-                async for chunk in hybrid_ai.stream_response(message, use_tools=False):
-                    response_chunks.append(chunk)
-
-                full_response = "".join(response_chunks)
-
-                mock_ollama.assert_called_once()
-                assert "timeout" in full_response.lower() or "unavailable" in full_response.lower()
-                assert "Desk 25" in full_response
+            full = "".join(chunks)
+            assert "trouble" in full.lower() or "try again" in full.lower()
 
     @pytest.mark.asyncio
-    async def test_fallback_on_rate_limit(self, hybrid_ai):
-        """Test fallback to Ollama when rate limit is hit."""
-        message = "Analyze why the chiller efficiency is dropping"  # Tier 2 query
+    async def test_tool_request_rejected_for_zai(self, hybrid_ai):
+        """Z.ai (no tool support) with tools → routes to tool-capable fallback or rejects."""
+        with patch.object(hybrid_ai, "get_active_cloud_provider", return_value="zai"):
+            # No tool-capable provider configured
+            with (
+                patch("app.services.hybrid_ai_service.openai_service") as mock_oai,
+                patch("app.services.hybrid_ai_service.claude_service") as mock_claude,
+            ):
+                mock_oai.is_configured.return_value = False
+                mock_claude.is_configured.return_value = False
 
-        # Mock rate limit error
-        mock_rate_limit = _create_rate_limit_error("Rate limit exceeded")
+                chunks = []
+                async for chunk in hybrid_ai.stream_response("Turn off AHU-7", use_tools=True):
+                    chunks.append(chunk)
 
-        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
-            mock_claude.stream_response.side_effect = mock_rate_limit
-
-            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
-                mock_ollama.return_value = "Equipment: CH-1, CH-2, CH-3, AHU-7..."
-
-                response_chunks = []
-                async for chunk in hybrid_ai.stream_response(message, use_tools=False):
-                    response_chunks.append(chunk)
-
-                full_response = "".join(response_chunks)
-
-                mock_ollama.assert_called_once()
-                assert "rate limited" in full_response.lower()
+                full = "".join(chunks)
+                assert "tool-capable" in full.lower() or "advisory" in full.lower()
 
     @pytest.mark.asyncio
-    async def test_fallback_with_tools_on_api_error(self, hybrid_ai):
-        """Test fallback behavior when tool calling and Claude API fails."""
-        message = "Turn off lights in Conference Room A"
+    async def test_tool_request_reroutes_to_openai_when_zai_primary(self, hybrid_ai):
+        """Z.ai primary + tools → automatically routes to OpenAI if configured."""
+        with (
+            patch.object(hybrid_ai, "get_active_cloud_provider", return_value="zai"),
+            patch("app.services.hybrid_ai_service.openai_service") as mock_oai,
+            patch.object(
+                hybrid_ai, "_stream_tools_from_provider", side_effect=_mock_async_generator("Tool response via OpenAI")
+            ),
+        ):
+            mock_oai.is_configured.return_value = True
 
-        mock_api_error = _create_api_error("Internal server error")
+            chunks = []
+            async for chunk in hybrid_ai.stream_response("Turn off lights", use_tools=True):
+                chunks.append(chunk)
 
-        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
-            mock_claude.stream_response_with_tools.side_effect = mock_api_error
-
-            response_chunks = []
-            async for chunk in hybrid_ai.stream_response(message, use_tools=True):
-                response_chunks.append(chunk)
-
-            full_response = "".join(response_chunks)
-
-            # Should show friendly error message (tool-based actions unavailable)
-            assert "unavailable" in full_response.lower() or "try again" in full_response.lower()
-
-    @pytest.mark.asyncio
-    async def test_fallback_ollama_also_fails(self, hybrid_ai):
-        """Test graceful handling when both Claude and Ollama fail."""
-        message = "Predict when UPS-1 will fail based on current trends"  # Tier 2 query
-
-        mock_api_error = _create_api_error("Internal server error")
-
-        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
-            mock_claude.stream_response.side_effect = mock_api_error
-
-            # Mock Ollama to also fail
-            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
-                mock_ollama.side_effect = Exception("Ollama service unavailable")
-
-                response_chunks = []
-                async for chunk in hybrid_ai.stream_response(message, use_tools=False):
-                    response_chunks.append(chunk)
-
-                full_response = "".join(response_chunks)
-
-                # Should show user-friendly error message
-                assert "trouble" in full_response.lower()
-                assert "try again" in full_response.lower()
+            full = "".join(chunks)
+            assert "Tool response" in full
 
     @pytest.mark.asyncio
-    async def test_no_fallback_on_programming_error(self, hybrid_ai):
-        """Test that programming errors are NOT caught by fallback mechanism."""
-        message = "Diagnose the HVAC problem"  # Tier 2 query to ensure Claude routing
+    async def test_tool_fallback_on_claude_api_error(self, hybrid_ai):
+        """Claude tool calling fails → falls back to OpenAI tools."""
+        call_count = 0
 
-        # Mock a ValueError (programming error, not API error)
-        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
-            mock_claude.stream_response.side_effect = ValueError("Invalid input format")
+        async def _mock_tools(provider, messages):
+            nonlocal call_count
+            call_count += 1
+            if provider == "anthropic":
+                raise _create_api_error("Internal server error")
+            yield "OpenAI handled the tool call"
 
-            # Should raise the error, not fall back to Ollama
-            with pytest.raises(ValueError, match="Invalid input format"):
-                async for _ in hybrid_ai.stream_response(message, use_tools=False):
-                    pass
+        with (
+            patch.object(hybrid_ai, "get_active_cloud_provider", return_value="anthropic"),
+            patch.object(hybrid_ai, "_stream_tools_from_provider", side_effect=_mock_tools),
+            patch("app.services.hybrid_ai_service.openai_service") as mock_oai,
+        ):
+            mock_oai.is_configured.return_value = True
 
-            # Should raise the error, not fall back to Ollama
-            with pytest.raises(ValueError, match="Invalid input format"):
-                async for _ in hybrid_ai.stream_response(message, use_tools=False):
-                    pass
+            chunks = []
+            async for chunk in hybrid_ai.stream_response("Adjust setpoint", use_tools=True):
+                chunks.append(chunk)
 
-    @pytest.mark.asyncio
-    async def test_claude_success_no_fallback(self, hybrid_ai):
-        """Test that successful Claude responses don't trigger fallback."""
-        message = "What is the building occupancy?"  # This might route to Ollama, so override
-
-        # Mock Claude to succeed
-        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
-
-            async def mock_stream(*args, **kwargs):
-                yield "Building occupancy is 56%"
-
-            mock_claude.stream_response.return_value = mock_stream()
-
-            # Mock Ollama (should NOT be called)
-            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
-                response_chunks = []
-                async for chunk in hybrid_ai.stream_response(message, use_tools=False):
-                    response_chunks.append(chunk)
-
-                full_response = "".join(response_chunks)
-
-                # Verify Claude was used, not Ollama
-                mock_ollama.assert_not_called()
-                assert "56%" in full_response
-                assert "Ollama" not in full_response
+            full = "".join(chunks)
+            assert "OpenAI handled" in full
 
     @pytest.mark.asyncio
-    async def test_fallback_message_format(self, hybrid_ai):
-        """Test that fallback message includes error type and model used."""
-        message = "Optimize the HVAC setpoints for energy savings"  # Tier 2 query
+    async def test_rate_limit_on_claude_falls_back(self, hybrid_ai):
+        """Claude rate limit during tool call → falls back to OpenAI."""
+        call_count = 0
 
-        mock_api_error = _create_api_error("Service unavailable")
+        async def _mock_tools(provider, messages):
+            nonlocal call_count
+            call_count += 1
+            if provider == "anthropic":
+                raise _create_rate_limit_error("Rate limit exceeded")
+            yield "OpenAI fallback response"
 
-        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
-            mock_claude.stream_response.side_effect = mock_api_error
+        with (
+            patch.object(hybrid_ai, "get_active_cloud_provider", return_value="anthropic"),
+            patch.object(hybrid_ai, "_stream_tools_from_provider", side_effect=_mock_tools),
+            patch("app.services.hybrid_ai_service.openai_service") as mock_oai,
+        ):
+            mock_oai.is_configured.return_value = True
 
-            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
-                mock_ollama.return_value = "Response from local AI"
+            chunks = []
+            async for chunk in hybrid_ai.stream_response("Check device", use_tools=True):
+                chunks.append(chunk)
 
-                response_chunks = []
-                async for chunk in hybrid_ai.stream_response(message, use_tools=False):
-                    response_chunks.append(chunk)
-
-                full_response = "".join(response_chunks)
-
-                # Verify message format: [Claude unavailable (ErrorType) - using model]
-                assert "[Claude unavailable" in full_response
-                assert "APIError" in full_response
-                assert "using" in full_response
-                assert "Response from local AI" in full_response
-
-    @pytest.mark.asyncio
-    async def test_fallback_model_selection_tier1(self, hybrid_ai):
-        """Test that Tier 1 (simple) queries use fast Ollama model on fallback."""
-        message = "What does error code E123 mean?"  # Simple lookup - but we need Tier 2 for Claude routing
-
-        mock_api_error = _create_api_error("Internal server error")
-
-        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
-            mock_claude.stream_response.side_effect = mock_api_error
-
-            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
-                mock_ollama.return_value = "Error E123: Temperature sensor fault"
-
-                # Override classification to force Tier 2 for this test
-                with patch.object(
-                    hybrid_ai,
-                    "classify_task",
-                    return_value={
-                        "provider": "anthropic",
-                        "model": "claude-sonnet-4-20250514",
-                        "reason": "Forced to Claude for test",
-                        "estimated_cost": 0.0105,
-                        "tier": 2,
-                    },
-                ):
-                    async for _ in hybrid_ai.stream_response(message, use_tools=False):
-                        pass
-
-                # Should use balanced model for forced Tier 2
-                call_args = mock_ollama.call_args
-                assert call_args[1]["model"] == "phi3:mini"  # Balanced model
-
-        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
-            mock_claude.stream_response.side_effect = mock_api_error
-
-            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
-                mock_ollama.return_value = "Error E123: Temperature sensor fault"
-
-                async for _ in hybrid_ai.stream_response(message, use_tools=False):
-                    pass
-
-                # Should use fast model for Tier 1 queries
-                call_args = mock_ollama.call_args
-                assert call_args[1]["model"] == "llama3.2:1b"  # Fast model
+            full = "".join(chunks)
+            assert "OpenAI fallback" in full
 
     @pytest.mark.asyncio
-    async def test_fallback_model_selection_tier2(self, hybrid_ai):
-        """Test that Tier 2 (complex) queries use balanced Ollama model on fallback."""
-        message = "Why is AHU-7 showing bearing degradation?"  # Complex reasoning
+    async def test_non_tool_path_uses_cloud_fallback_chain(self, hybrid_ai):
+        """Non-tool advisory query uses _try_cloud_with_fallback."""
+        with patch.object(
+            hybrid_ai,
+            "_try_cloud_with_fallback",
+            side_effect=_mock_async_generator("Advisory response"),
+        ):
+            chunks = []
+            async for chunk in hybrid_ai.stream_response(
+                "Why is AHU-7 showing degradation?",
+                use_tools=False,
+            ):
+                chunks.append(chunk)
 
-        mock_api_error = _create_api_error("Internal server error")
+            assert "Advisory response" in "".join(chunks)
 
-        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
-            mock_claude.stream_response.side_effect = mock_api_error
 
-            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
-                mock_ollama.return_value = "Based on vibration analysis..."
+class TestTieredModelSelection:
+    """Test that OpenAI uses different models for different tiers."""
 
-                async for _ in hybrid_ai.stream_response(message, use_tools=False):
-                    pass
+    @pytest.fixture
+    def hybrid_ai(self):
+        return HybridAIService()
 
-                # Should use balanced model for Tier 2 queries
-                call_args = mock_ollama.call_args
-                assert call_args[1]["model"] == "phi3:mini"  # Balanced model
+    def test_tier1_uses_nano(self, hybrid_ai):
+        """Tier 1 simple queries use gpt-4.1-nano."""
+        with patch.object(hybrid_ai, "get_active_cloud_provider", return_value="openai"):
+            routing = hybrid_ai.classify_task("What does error code E123 mean?")
+            assert routing["tier"] == 1
+            assert "nano" in routing["model"]
 
-    @pytest.mark.asyncio
-    async def test_fallback_prevents_escalation(self, hybrid_ai):
-        """Test that Ollama fallback doesn't escalate back to Claude."""
-        message = "Show me equipment health"  # This routes to Ollama (Tier 1), so override classification
+    def test_tier2_uses_mini(self, hybrid_ai):
+        """Tier 2 complex queries use gpt-4.1-mini."""
+        with patch.object(hybrid_ai, "get_active_cloud_provider", return_value="openai"):
+            routing = hybrid_ai.classify_task("Why is AHU-7 showing bearing degradation?")
+            assert routing["tier"] == 2
+            assert "mini" in routing["model"]
 
-        mock_api_error = _create_api_error("Internal server error")
+    def test_control_action_is_tier2(self, hybrid_ai):
+        """Control actions always classify as Tier 2 (needs capable model)."""
+        routing = hybrid_ai.classify_task("Turn off AHU-7")
+        assert routing["tier"] == 2
+        assert "safety critical" in routing["reason"].lower()
 
-        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
-            mock_claude.stream_response.side_effect = mock_api_error
 
-            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
-                mock_ollama.return_value = "Equipment health data..."
+class TestProviderConfiguration:
+    """Test provider configuration and capability detection."""
 
-                # Override classification to force Tier 2 for this test
-                with patch.object(
-                    hybrid_ai,
-                    "classify_task",
-                    return_value={
-                        "provider": "anthropic",
-                        "model": "claude-sonnet-4-20250514",
-                        "reason": "Forced to Claude for test",
-                        "estimated_cost": 0.0105,
-                        "tier": 2,
-                    },
-                ):
-                    async for _ in hybrid_ai.stream_response(message, use_tools=False):
-                        pass
+    @pytest.fixture
+    def hybrid_ai(self):
+        return HybridAIService()
 
-                # Verify Ollama was called with escalate_on_fail=False
-                call_args = mock_ollama.call_args
-                assert call_args[1]["escalate_on_fail"] is False
+    def test_tool_capable_providers(self, hybrid_ai):
+        """anthropic and openai support tools; zai does not."""
+        assert hybrid_ai.provider_supports_tools("anthropic") is True
+        assert hybrid_ai.provider_supports_tools("openai") is True
+        assert hybrid_ai.provider_supports_tools("zai") is False
 
-                # Claude should only be called once (the failed attempt)
-                assert mock_claude.stream_response.call_count == 1
+    def test_get_active_provider_reads_settings(self, hybrid_ai):
+        """Provider comes from settings.ai_cloud_provider."""
+        provider = hybrid_ai.get_active_cloud_provider()
+        assert provider in {"anthropic", "openai", "zai"}
 
-        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
-            mock_claude.stream_response.side_effect = mock_api_error
-
-            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
-                mock_ollama.return_value = "Equipment health data..."
-
-                async for _ in hybrid_ai.stream_response(message, use_tools=False):
-                    pass
-
-                # Verify Ollama was called with escalate_on_fail=False
-                call_args = mock_ollama.call_args
-                assert call_args[1]["escalate_on_fail"] is False
-
-                # Claude should only be called once (the failed attempt)
-                assert mock_claude.stream_response.call_count == 1
+    def test_fallback_order_excludes_primary(self, hybrid_ai):
+        """Fallback list never includes the primary provider."""
+        for primary in ["anthropic", "openai", "zai"]:
+            fallbacks = hybrid_ai._get_fallback_providers(primary)
+            assert primary not in fallbacks
+            assert len(fallbacks) == 2
 
 
 class TestRateLimitTracking:
@@ -389,30 +289,35 @@ class TestRateLimitTracking:
 
     @pytest.fixture
     def hybrid_ai(self):
-        """Create HybridAIService instance."""
         service = HybridAIService()
-        # Reset rate limit state
         service.claude_rate_limited = False
         service.rate_limit_time = 0
         return service
 
     @pytest.mark.asyncio
     async def test_rate_limit_triggers_cooldown(self, hybrid_ai):
-        """Test that rate limit error sets cooldown flag."""
-        mock_rate_limit = _create_rate_limit_error("Rate limit exceeded")
+        """Rate limit error on Claude sets cooldown flag."""
+        # Simulate Claude rate limit via _try_cloud_with_fallback
+        call_count = 0
 
-        with patch("app.services.hybrid_ai_service.claude_service") as mock_claude:
-            mock_claude.stream_response.side_effect = mock_rate_limit
+        async def _mock_stream(provider, messages, include_building_context=True, tier=2):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # Primary = anthropic, raise rate limit
+                raise _create_rate_limit_error("Rate limit exceeded")
+            yield "Fallback response"
 
-            with patch.object(hybrid_ai, "query_ollama", new_callable=AsyncMock) as mock_ollama:
-                mock_ollama.return_value = "Fallback response"
+        with (
+            patch.object(hybrid_ai, "get_active_cloud_provider", return_value="anthropic"),
+            patch.object(hybrid_ai, "_stream_from_provider", side_effect=_mock_stream),
+        ):
+            chunks = []
+            async for chunk in hybrid_ai._try_cloud_with_fallback("test"):
+                chunks.append(chunk)
 
-                async for _ in hybrid_ai.stream_response("test", use_tools=False):
-                    pass
-
-                # Verify rate limit state was set
-                assert hybrid_ai.claude_rate_limited is True
-                assert hybrid_ai.rate_limit_time > 0
+            assert hybrid_ai.claude_rate_limited is True
+            assert hybrid_ai.rate_limit_time > 0
 
 
 class TestErrorClassification:
@@ -420,26 +325,25 @@ class TestErrorClassification:
 
     @pytest.fixture
     def hybrid_ai(self):
-        """Create HybridAIService instance."""
         return HybridAIService()
 
     def test_classify_tier1_simple_lookup(self, hybrid_ai):
-        """Test classification of Tier 1 (simple) queries."""
+        """Tier 1 for simple queries, routed to active provider."""
         routing = hybrid_ai.classify_task("What does error code E123 mean?")
         assert routing["tier"] == 1
-        assert routing["provider"] == "ollama"
-        assert routing["estimated_cost"] == 0.0
+        assert routing["provider"] == hybrid_ai.get_active_cloud_provider()
+        assert routing["estimated_cost"] >= 0
 
     def test_classify_tier2_complex_reasoning(self, hybrid_ai):
-        """Test classification of Tier 2 (complex) queries."""
+        """Tier 2 for complex queries."""
         routing = hybrid_ai.classify_task("Why is AHU-7 showing bearing degradation?")
         assert routing["tier"] == 2
-        assert routing["provider"] == "anthropic"
+        assert routing["provider"] == hybrid_ai.get_active_cloud_provider()
         assert routing["estimated_cost"] > 0
 
     def test_classify_tier2_control_action(self, hybrid_ai):
-        """Test classification of control actions."""
+        """Control actions always Tier 2 (safety critical)."""
         routing = hybrid_ai.classify_task("Turn off AHU-7")
         assert routing["tier"] == 2
-        assert routing["provider"] == "anthropic"
-        assert "safety critical" in routing["reason"]
+        assert routing["provider"] == hybrid_ai.get_active_cloud_provider()
+        assert "safety critical" in routing["reason"].lower()

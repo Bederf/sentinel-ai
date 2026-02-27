@@ -169,3 +169,13 @@ List all available feedback templates with equipment types and configurations.
 ### GET `/api/service-feedback/health-impact-rules`
 
 Get health score impact calculation rules.
+
+## Session Persistence
+
+Feedback sessions are persisted via Redis (write-through) with a 4-hour TTL. This means:
+
+- **Restart resilience:** Sessions survive backend restarts — technicians don't lose progress
+- **Write-through pattern:** Every state change (new reading, status update) writes to both in-memory and Redis
+- **Graceful degradation:** If Redis is unavailable, sessions fall back to in-memory-only (lost on restart)
+- **Serialization:** `FeedbackSession.to_dict()`/`from_dict()` handle full roundtrip including `FeedbackTemplate`, `FeedbackItem` with enums (`FeedbackItemType`, `HealthImpact`)
+- **Key format:** `bms:feedback:{session_id}`

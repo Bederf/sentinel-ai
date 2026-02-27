@@ -9,15 +9,16 @@
     "ahu_id": "S002-AHU-L0-001",
     "temp_sensor": "S002-TS-001",
     "co2_sensor": "S002-CO2-001",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 24.6,
     "humidity": 43.3,
     "co2_ppm": 695,
     "status": "fault",
     "desk_range": "001-020",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-001"
   },
   {
     "zone_id": "Zone-021",
@@ -29,15 +30,16 @@
     "ahu_id": "S002-AHU-L0-001",
     "temp_sensor": "S002-TS-021",
     "co2_sensor": "S002-CO2-021",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 23.0,
     "humidity": 41.3,
     "co2_ppm": 569,
     "status": "running",
     "desk_range": "021-040",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-021"
   },
   {
     "zone_id": "Zone-041",
@@ -49,15 +51,16 @@
     "ahu_id": "S002-AHU-L0-001",
     "temp_sensor": "S002-TS-041",
     "co2_sensor": "S002-CO2-041",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 21.1,
     "humidity": 47.6,
     "co2_ppm": 411,
     "status": "running",
     "desk_range": "041-060",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-041"
   },
   {
     "zone_id": "Zone-061",
@@ -69,15 +72,16 @@
     "ahu_id": "S002-AHU-L0-001",
     "temp_sensor": "S002-TS-061",
     "co2_sensor": "S002-CO2-061",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 21.6,
     "humidity": 48.2,
     "co2_ppm": 488,
     "status": "running",
     "desk_range": "061-080",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-061"
   },
   {
     "zone_id": "Zone-081",
@@ -89,15 +93,16 @@
     "ahu_id": "S002-AHU-L0-001",
     "temp_sensor": "S002-TS-081",
     "co2_sensor": "S002-CO2-081",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 22.8,
     "humidity": 40.1,
     "co2_ppm": 722,
     "status": "running",
     "desk_range": "081-100",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-081"
   },
   {
     "zone_id": "Zone-101",
@@ -109,15 +114,16 @@
     "ahu_id": "S002-AHU-L1-001",
     "temp_sensor": "S002-TS-101",
     "co2_sensor": "S002-CO2-101",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 23.1,
     "humidity": 42.3,
     "co2_ppm": 783,
     "status": "running",
     "desk_range": "101-120",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-101"
   },
   {
     "zone_id": "Zone-121",
@@ -129,15 +135,16 @@
     "ahu_id": "S002-AHU-L1-001",
     "temp_sensor": "S002-TS-121",
     "co2_sensor": "S002-CO2-121",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 24.2,
     "humidity": 52.7,
     "co2_ppm": 641,
     "status": "fault",
     "desk_range": "121-140",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-121"
   },
   {
     "zone_id": "Zone-141",
@@ -149,15 +156,16 @@
     "ahu_id": "S002-AHU-L1-001",
     "temp_sensor": "S002-TS-141",
     "co2_sensor": "S002-CO2-141",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 23.4,
     "humidity": 48.0,
     "co2_ppm": 789,
     "status": "running",
     "desk_range": "141-160",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-141"
   },
   {
     "zone_id": "Zone-161",
@@ -169,15 +177,16 @@
     "ahu_id": "S002-AHU-L1-001",
     "temp_sensor": "S002-TS-161",
     "co2_sensor": "S002-CO2-161",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 22.1,
     "humidity": 52.4,
     "co2_ppm": 647,
     "status": "running",
     "desk_range": "161-180",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-161"
   },
   {
     "zone_id": "Zone-181",
@@ -189,15 +198,16 @@
     "ahu_id": "S002-AHU-L1-001",
     "temp_sensor": "S002-TS-181",
     "co2_sensor": "S002-CO2-181",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 23.6,
     "humidity": 50.6,
     "co2_ppm": 418,
     "status": "running",
     "desk_range": "181-200",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-181"
   },
   {
     "zone_id": "Zone-201",
@@ -209,15 +219,16 @@
     "ahu_id": "S002-AHU-L2-001",
     "temp_sensor": "S002-TS-201",
     "co2_sensor": "S002-CO2-201",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 21.7,
     "humidity": 41.2,
     "co2_ppm": 493,
     "status": "running",
     "desk_range": "201-220",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-201"
   },
   {
     "zone_id": "Zone-221",
@@ -229,15 +240,16 @@
     "ahu_id": "S002-AHU-L2-001",
     "temp_sensor": "S002-TS-221",
     "co2_sensor": "S002-CO2-221",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 21.3,
     "humidity": 49.5,
     "co2_ppm": 546,
     "status": "running",
     "desk_range": "221-240",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-221"
   },
   {
     "zone_id": "Zone-241",
@@ -249,15 +261,16 @@
     "ahu_id": "S002-AHU-L2-001",
     "temp_sensor": "S002-TS-241",
     "co2_sensor": "S002-CO2-241",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 22.1,
     "humidity": 44.0,
     "co2_ppm": 775,
     "status": "running",
     "desk_range": "241-260",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-241"
   },
   {
     "zone_id": "Zone-261",
@@ -269,15 +282,16 @@
     "ahu_id": "S002-AHU-L2-001",
     "temp_sensor": "S002-TS-261",
     "co2_sensor": "S002-CO2-261",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 22.9,
     "humidity": 42.6,
     "co2_ppm": 692,
     "status": "running",
     "desk_range": "261-280",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-261"
   },
   {
     "zone_id": "Zone-281",
@@ -289,15 +303,16 @@
     "ahu_id": "S002-AHU-L2-001",
     "temp_sensor": "S002-TS-281",
     "co2_sensor": "S002-CO2-281",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 21.5,
     "humidity": 54.8,
     "co2_ppm": 656,
     "status": "running",
     "desk_range": "281-300",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-281"
   },
   {
     "zone_id": "Zone-301",
@@ -309,15 +324,16 @@
     "ahu_id": "S002-AHU-L3-001",
     "temp_sensor": "S002-TS-301",
     "co2_sensor": "S002-CO2-301",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 22.7,
     "humidity": 52.6,
     "co2_ppm": 710,
     "status": "running",
     "desk_range": "301-320",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-301"
   },
   {
     "zone_id": "Zone-321",
@@ -329,15 +345,16 @@
     "ahu_id": "S002-AHU-L3-001",
     "temp_sensor": "S002-TS-321",
     "co2_sensor": "S002-CO2-321",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 24.6,
     "humidity": 44.0,
     "co2_ppm": 484,
     "status": "fault",
     "desk_range": "321-340",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-321"
   },
   {
     "zone_id": "Zone-341",
@@ -349,15 +366,16 @@
     "ahu_id": "S002-AHU-L3-001",
     "temp_sensor": "S002-TS-341",
     "co2_sensor": "S002-CO2-341",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 23.8,
     "humidity": 44.7,
     "co2_ppm": 662,
     "status": "running",
     "desk_range": "341-360",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-341"
   },
   {
     "zone_id": "Zone-361",
@@ -369,15 +387,16 @@
     "ahu_id": "S002-AHU-L3-001",
     "temp_sensor": "S002-TS-361",
     "co2_sensor": "S002-CO2-361",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 22.2,
     "humidity": 46.9,
     "co2_ppm": 506,
     "status": "running",
     "desk_range": "361-380",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-361"
   },
   {
     "zone_id": "Zone-381",
@@ -389,14 +408,15 @@
     "ahu_id": "S002-AHU-L3-001",
     "temp_sensor": "S002-TS-381",
     "co2_sensor": "S002-CO2-381",
-    "typical_occupancy": 20,
-    "area_sqm": 120,
+    "typical_occupancy": 50,
+    "area_sqm": 450,
     "setpoint": 22.0,
     "current_temp": 21.7,
     "humidity": 43.9,
     "co2_ppm": 634,
     "status": "running",
     "desk_range": "381-400",
-    "desk_count": 20
+    "desk_count": 50,
+    "lighting_id": "S002-LTG-381"
   }
 ]

@@ -1,5 +1,5 @@
 /**
- * OccupancyPanel Component - DALI Occupancy Dashboard Container
+ * OccupancyPanel Component - Occupancy Dashboard Container
  *
  * Features:
  * - Compact mode (for dashboard): Stats cards, floor summary bars, View Details button
@@ -17,10 +17,10 @@ import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Users, Lightbulb, AlertTriangle, Cpu, Eye, Zap, X, Radio, Clock, ThermometerSun, Wrench } from "lucide-react";
 import { OccupancyHeatmap } from "./OccupancyHeatmap";
 import { BuildingSelector } from "./BuildingSelector";
-import { api, daliApi, isExpectedApiError } from '@/lib/api';
+import { api, lightingApi, isExpectedApiError } from '@/lib/api';
 import { PageLoading } from "./PageLoading";
 import { useSimulation } from '@/contexts/SimulationContext';
-import type { BuildingOccupancy, DALIStats, ZoneLighting, ZoneOccupancy, DALISensor, DALILuminaire, Site } from '@/lib/api';
+import type { BuildingOccupancy, LightingStats, ZoneLighting, ZoneOccupancy, LightingSensor, LightingLuminaire, Site } from '@/lib/api';
 
 // Get occupancy color based on percentage
 function getOccupancyColor(percent: number): string {
@@ -35,15 +35,15 @@ interface OccupancyPanelProps {
   onViewDetails?: () => void;
 }
 
-// Sites with DALI-2 lighting integration installed
-const DALI_ENABLED_SITES = ["site-002"]; // Sandton City
+// Sites with lighting integration installed
+const LIGHTING_ENABLED_SITES = ["site-002"]; // Sandton City
 
 export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPanelProps) {
   // Get live simulation state when available
   const { running, occupancyPercent: simOccupancyPercent } = useSimulation();
 
   const [buildingOccupancy, setBuildingOccupancy] = useState<BuildingOccupancy | null>(null);
-  const [daliStats, setDaliStats] = useState<DALIStats | null>(null);
+  const [lightingStats, setDaliStats] = useState<LightingStats | null>(null);
   const [zoneLighting, setZoneLighting] = useState<Record<string, ZoneLighting>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,14 +55,14 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
   // Zone details panel state
   const [selectedZone, setSelectedZone] = useState<ZoneOccupancy | null>(null);
   const [zoneDetails, setZoneDetails] = useState<{
-    sensors: DALISensor[];
-    luminaires: DALILuminaire[];
+    sensors: LightingSensor[];
+    luminaires: LightingLuminaire[];
     lighting: ZoneLighting | null;
   } | null>(null);
   const [loadingZoneDetails, setLoadingZoneDetails] = useState(false);
 
-  // Filter sites to only show DALI-enabled buildings
-  const daliSites = sites.filter(site => DALI_ENABLED_SITES.includes(site.id));
+  // Filter sites to only show lighting-enabled buildings
+  const lightingSites = sites.filter(site => LIGHTING_ENABLED_SITES.includes(site.id));
 
   // Compute display occupancy: use simulated value if running, otherwise use API data
   const displayOccupancy = running ? simOccupancyPercent : buildingOccupancy?.occupancy_percent ?? 0;
@@ -73,10 +73,10 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
         setIsRefreshing(true);
       }
 
-      const occupancy = await daliApi.getBuildingOccupancy();
+      const occupancy = await lightingApi.getBuildingOccupancy();
       // Stagger subsequent requests by 250ms to avoid 429 rate limiting
       await new Promise((resolve) => setTimeout(resolve, 250));
-      const stats = await daliApi.getStats();
+      const stats = await lightingApi.getStats();
 
       // Fetch lighting for energy waste zones (low occupancy)
       const wasteZoneLighting: Record<string, ZoneLighting> = {};
@@ -84,7 +84,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
         for (const zone of floor.zones) {
           if (zone.occupancy_percent < 20) {
             try {
-              const lighting = await daliApi.getZoneLighting(zone.zone_id);
+              const lighting = await lightingApi.getZoneLighting(zone.zone_id);
               if (lighting.energy_waste_detected) {
                 wasteZoneLighting[zone.zone_id] = lighting;
               }
@@ -153,12 +153,12 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
     setZoneDetails(null);
 
     try {
-      const sensors = await daliApi.getSensors(zone.zone_id);
+      const sensors = await lightingApi.getSensors(zone.zone_id);
       // Stagger subsequent requests by 250ms to avoid 429 rate limiting
       await new Promise((resolve) => setTimeout(resolve, 250));
-      const luminaires = await daliApi.getLuminaires(zone.zone_id);
+      const luminaires = await lightingApi.getLuminaires(zone.zone_id);
       await new Promise((resolve) => setTimeout(resolve, 250));
-      const lighting = await daliApi.getZoneLighting(zone.zone_id);
+      const lighting = await lightingApi.getZoneLighting(zone.zone_id);
 
       setZoneDetails({ sensors, luminaires, lighting });
     } catch (err) {
@@ -210,7 +210,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
   }
 
   // Compact mode for dashboard
-  if (compact && buildingOccupancy && daliStats) {
+  if (compact && buildingOccupancy && lightingStats) {
     return (
       <div
         className="rounded-md overflow-hidden"
@@ -236,7 +236,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
                 Occupancy Signals
               </span>
               <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                {daliStats.total_sensors} occupancy sensors • {daliStats.total_luminaires} luminaires
+                {lightingStats.total_sensors} occupancy sensors • {lightingStats.total_luminaires} luminaires
               </span>
             </div>
           </div>
@@ -247,7 +247,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
               color: "var(--color-sentinel-blue)",
             }}
           >
-            Lighting protocol
+            Smart Lighting
           </span>
         </div>
 
@@ -270,7 +270,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
             {/* Power */}
             <div className="text-center">
               <span className="text-2xl font-bold block" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                {(daliStats.current_power_watts / 1000).toFixed(1)}
+                {(lightingStats.current_power_watts / 1000).toFixed(1)}
               </span>
               <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 kW
@@ -282,12 +282,12 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
               <span
                 className="text-2xl font-bold block"
                 style={{
-                  color: daliStats.faulty_luminaires > 0
+                  color: lightingStats.faulty_luminaires > 0
                     ? "var(--color-sentinel-amber)"
                     : "var(--color-sentinel-green)",
                 }}
               >
-                {daliStats.faulty_luminaires}
+                {lightingStats.faulty_luminaires}
               </span>
               <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 Faulty
@@ -351,7 +351,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
   }
 
   // Full mode for dedicated page
-  if (buildingOccupancy && daliStats) {
+  if (buildingOccupancy && lightingStats) {
     return (
       <div className="space-y-6">
         {/* Header */}
@@ -362,7 +362,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
               <BuildingSelector
                 value={selectedSiteId}
                 onChange={setSelectedSiteId}
-                sites={daliSites.map((s) => ({ id: s.id, name: s.name }))}
+                sites={lightingSites.map((s) => ({ id: s.id, name: s.name }))}
               />
             </div>
             <div>
@@ -370,7 +370,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
                 Occupancy Signals
               </h2>
               <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                {daliStats.total_sensors} occupancy sensors • {daliStats.total_luminaires} luminaires
+                {lightingStats.total_sensors} occupancy sensors • {lightingStats.total_luminaires} luminaires
               </p>
             </div>
           </div>
@@ -450,7 +450,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
               </span>
             </div>
             <span className="text-3xl font-bold block" style={{ color: "var(--color-sentinel-green)" }}>
-              {daliStats.online_controllers}/{daliStats.total_controllers}
+              {lightingStats.online_controllers}/{lightingStats.total_controllers}
             </span>
             <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               Online
@@ -477,10 +477,10 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
               </span>
             </div>
             <span className="text-3xl font-bold block" style={{ color: "var(--color-sentinel-text-primary)" }}>
-              {(daliStats.current_power_watts / 1000).toFixed(1)} kW
+              {(lightingStats.current_power_watts / 1000).toFixed(1)} kW
             </span>
             <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              {daliStats.energy_today_kwh} kWh today
+              {lightingStats.energy_today_kwh} kWh today
             </span>
           </div>
 
@@ -506,12 +506,12 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
             <span
               className="text-3xl font-bold block"
               style={{
-                color: daliStats.faulty_luminaires > 0
+                color: lightingStats.faulty_luminaires > 0
                   ? "var(--color-sentinel-amber)"
                   : "var(--color-sentinel-green)",
               }}
             >
-              {daliStats.faulty_luminaires}
+              {lightingStats.faulty_luminaires}
             </span>
             <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               Faulty luminaires
@@ -520,7 +520,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
         </div>
 
         {/* Energy Waste Alerts */}
-        {daliStats.energy_waste_alerts > 0 && (
+        {lightingStats.energy_waste_alerts > 0 && (
           <div
             className="rounded-md p-4 flex items-center gap-3"
             style={{
@@ -531,7 +531,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
             <AlertTriangle className="h-5 w-5 flex-shrink-0" style={{ color: "var(--color-sentinel-amber)" }} />
             <div>
               <span className="font-medium text-sm block" style={{ color: "var(--color-sentinel-amber)" }}>
-                {daliStats.energy_waste_alerts} Energy Waste Alert{daliStats.energy_waste_alerts > 1 ? "s" : ""}
+                {lightingStats.energy_waste_alerts} Energy Waste Alert{lightingStats.energy_waste_alerts > 1 ? "s" : ""}
               </span>
               <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 Empty or low-occupancy zones with active lighting detected

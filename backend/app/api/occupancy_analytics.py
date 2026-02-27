@@ -2,18 +2,23 @@
 OCCUPANCY ANALYTICS API
 
 Provides analytics endpoints for occupancy trends, zone utilization,
-and peak hour identification.
+peak hour identification, and occupancy-driven control loop management.
 
 Endpoints:
-- GET /api/occupancy/analytics/hourly-trend
-- GET /api/occupancy/analytics/zone-utilization
-- GET /api/occupancy/analytics/peak-hours
+- GET  /api/occupancy/analytics/hourly-trend
+- GET  /api/occupancy/analytics/zone-utilization
+- GET  /api/occupancy/analytics/peak-hours
+- POST /api/occupancy/control/trigger      — manually trigger one control cycle
+- GET  /api/occupancy/control/status        — current zone control states
+- GET  /api/occupancy/control/history       — audit trail from Supabase
 """
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 from datetime import datetime
+from typing import Optional
 
 router = APIRouter(prefix="/occupancy/analytics", tags=["occupancy-analytics"])
+control_router = APIRouter(prefix="/occupancy/control", tags=["occupancy-control"])
 
 
 @router.get("/hourly-trend")
@@ -55,7 +60,7 @@ async def get_hourly_occupancy_trend(
     hours = list(range(24))
 
     # Use same occupancy heuristics as Phase 4
-    from app.api.dali import calculate_zone_occupancy
+    from app.api.lighting import calculate_zone_occupancy
 
     # Generate data for each zone type
     zone_types = ["office", "meeting", "common", "utility", "entry"]
@@ -129,7 +134,7 @@ async def get_zone_utilization(building_id: str = Query("site-002")):
         }
     """
     # Simulate current occupancy (would use database in production)
-    from app.api.dali import calculate_zone_occupancy
+    from app.api.lighting import calculate_zone_occupancy
 
     now = datetime.now()
     hour = now.hour
@@ -242,3 +247,108 @@ async def get_peak_hours(building_id: str = Query("site-002")):
         "peak_hours_text": f"{min(peak_hours):02d}:00-{max(peak_hours) + 1:02d}:00" if peak_hours else "N/A",
         "recommendations": recommendations,
     }
+
+
+# ===========================================================================
+# Occupancy-Driven Control Loop (Phase 130)
+# ===========================================================================
+
+
+@control_router.post("/trigger")
+async def trigger_occupancy_control(
+    site_id: str = Query("site-002", description="Site to run control cycle for"),
+):
+    """Manually trigger one occupancy control cycle.
+
+    Reads DALI PIR + badge occupancy for every zone, adjusts HVAC setpoints
+    and lighting brightness accordingly, and logs actions to
+    ``occupancy_control_actions`` in Supabase.
+
+    Returns a summary with the number of actions taken and any errors.
+    """
+    from app.services.occupancy_control_service import get_occupancy_control_service
+
+    service = get_occupancy_control_service()
+    result = await service.run_cycle(site_id=site_id)
+    return {
+        "status": "ok",
+        "site_id": site_id,
+        "timestamp": datetime.now().isoformat(),
+        **result,
+    }
+
+
+@control_router.get("/status")
+async def get_occupancy_control_status():
+    """Return the current in-memory zone control states.
+
+    Shows which zones have HVAC setpoints relaxed or lighting dimmed,
+    their original values, and the last occupancy reading.
+    """
+    from app.services.occupancy_control_service import get_occupancy_control_service
+    from app.config.settings import settings
+
+    service = get_occupancy_control_service()
+    zones = []
+    for zone_id, state in service._zone_states.items():
+        zones.append(
+            {
+                "zone_id": zone_id,
+                "hvac_relaxed": state.hvac_relaxed,
+                "lighting_dimmed": state.lighting_dimmed,
+                "original_setpoint": state.original_setpoint,
+                "original_brightness": state.original_brightness,
+                "last_occupancy_pct": state.last_occupancy_pct,
+                "last_action_time": state.last_action_time.isoformat() if state.last_action_time else None,
+            }
+        )
+    return {
+        "poll_enabled": settings.occupancy_poll_enabled,
+        "poll_interval_seconds": settings.occupancy_poll_interval_seconds,
+        "zones": zones,
+        "zone_count": len(zones),
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@control_router.get("/history")
+async def get_occupancy_control_history(
+    site_id: str = Query("site-002"),
+    zone_id: Optional[str] = Query(None, description="Filter by zone"),
+    module: Optional[str] = Query(None, description="Filter: 'hvac' or 'lighting'"),
+    limit: int = Query(50, ge=1, le=500),
+):
+    """Query the ``occupancy_control_actions`` audit trail from Supabase.
+
+    Returns the most recent control actions, optionally filtered by zone
+    and module (hvac / lighting).
+    """
+    try:
+        from app.database.connection import get_supabase_client
+
+        client = get_supabase_client()
+        if not client:
+            raise HTTPException(status_code=503, detail="Supabase not available")
+
+        query = (
+            client.table("occupancy_control_actions")
+            .select("*")
+            .eq("site_id", site_id)
+            .order("timestamp", desc=True)
+            .limit(limit)
+        )
+        if zone_id:
+            query = query.eq("zone_id", zone_id)
+        if module:
+            query = query.eq("module", module)
+
+        result = query.execute()
+        return {
+            "site_id": site_id,
+            "count": len(result.data) if result.data else 0,
+            "actions": result.data or [],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Query failed: {e}")

@@ -414,11 +414,14 @@ async def get_equipment_info_for_technician(equipment_code: str):
         "lamp_hours": operating_data.get("lamp_hours"),
         "rated_capacity": operating_data.get("rated_capacity"),
         "power_cycles": operating_data.get("power_cycles"),
+        # Capacity
+        "capacity": operating_data.get("rated_capacity") or metadata.get("capacity"),
         # Service info
         "install_date": metadata.get("install_date"),
         "last_service": metadata.get("last_service"),
         "commissioning_date": metadata.get("commissioning_date"),
         "warranty_expiry": metadata.get("warranty_expiry"),
+        "service_provider_name": metadata.get("service_provider_name"),
         # Notes from facility manager
         "notes": metadata.get("notes"),
         # Discovery info

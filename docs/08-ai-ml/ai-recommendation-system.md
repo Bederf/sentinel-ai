@@ -2,9 +2,9 @@
 title: "AI Recommendation System"
 type: "technical"
 status: "approved"
-version: "2.0.0"
+version: "3.0.0"
 created: "2026-02-02"
-updated: "2026-02-19"
+updated: "2026-02-27"
 author: "Sentinel Development Team"
 tags: ["ai", "optimization", "recommendations", "claude", "zone-aware", "background-jobs"]
 related: ["./background-recommendation-generation.md", "../14-south-africa-context/load-shedding-optimization.md", "../06-safety-compliance/safety-interlocks-engine.md", "../08-ai-ml/hybrid-ai-routing.md", "../03-api-reference/recommendations-api.md"]
@@ -31,7 +31,16 @@ graph TB
         Devices[Device Inventory]
     end
 
+    subgraph ML["ML Intelligence (Phase 132)"]
+        LSTM[LSTM Forecasts<br/>24/48/72h]
+        Anomaly[Anomaly Scores<br/>per Equipment]
+        Faults[Fault Classification<br/>Probabilities]
+        Health[Health Trends<br/>Degrading Equipment]
+        Features[Building Features<br/>EUI, BLI, CDD]
+    end
+
     subgraph Analysis
+        MLContext[ML Context<br/>Gatherer]
         Route[AI Router]
         Claude[Claude AI Analysis]
         Rules[Rule-based Fallback]
@@ -54,6 +63,13 @@ graph TB
     Telemetry --> Route
     Devices --> Route
 
+    LSTM --> MLContext
+    Anomaly --> MLContext
+    Faults --> MLContext
+    Health --> MLContext
+    Features --> MLContext
+
+    MLContext --> Route
     Route --> Claude
     Route --> Rules
     Claude --> Zone
@@ -74,7 +90,10 @@ graph TB
 | Component | File | Responsibility |
 |-----------|------|----------------|
 | **Optimization API** | `backend/app/api/ai_recommendations.py` | REST endpoints for optimization |
-| **AI Optimizer Service** | `backend/app/services/ai_optimizer.py` | Core recommendation logic |
+| **AI Optimizer Service** | `backend/app/services/ai_optimizer.py` | Core recommendation logic + ML context injection |
+| **ML Context Bridge** | `backend/app/services/ai_optimizer.py` | `_gather_ml_context()` — collects ML model outputs for Claude |
+| **Feature Engineering** | `backend/app/services/feature_engineering_service.py` | Building-level features (EUI, BLI, CDD, Efficiency Score) |
+| **Inspection Priority** | `backend/app/services/inspection_priority_service.py` | Weighted inspection priority scoring (0-100) |
 | **Claude Service** | `backend/app/services/claude_service.py` | AI analysis integration |
 | **Safety Engine** | `backend/app/services/safety_interlocks.py` | Validation |
 | **M&V Verification** | `backend/app/services/mv_verification_service.py` | Post-action outcome tracking |
@@ -224,11 +243,63 @@ if temp_diff < 5.0 and zone_type not in [EXECUTIVE, SERVER_ROOM]:
 
 ---
 
+## ML Context Injection (Phase 132)
+
+Before building Claude's prompt, the system gathers outputs from all active ML models via `_gather_ml_context()`. This bridges the gap between trained models and the recommendation engine, enabling **predictive** recommendations (future state) rather than **reactive** ones (current state only).
+
+### Data Flow
+
+```
+analyze_building()
+    ├── _gather_current_conditions()        # Sensors, weather, occupancy
+    ├── _gather_ml_context()                # ML model predictions
+    │   ├── LSTMInferenceService.predict()  → 24/48/72h forecasts
+    │   ├── AnomalyDetectionService.check_all_equipment()  → scores > 0.5
+    │   ├── FailureClassificationService.get_fleet_failure_risks()  → confidence > 0.4
+    │   ├── HealthFeatureProvider.get_health_features()  → degrading trends (slope < -0.5)
+    │   └── FeatureEngineeringService.compute_building_features()  → EUI, BLI, CDD
+    ├── _build_optimization_prompt()        # Includes ML context section
+    └── _analyze_with_claude()              # Claude reasons over ML data
+```
+
+### ML Context Categories
+
+| Category | Source Service | Threshold | What Claude Sees |
+|----------|--------------|-----------|-----------------|
+| **LSTM Forecasts** | `ml_inference.LSTMInferenceService` | All available (cap 10) | 24/48/72h predictions + confidence |
+| **Anomaly Alerts** | `ml_inference.AnomalyDetectionService` | Score > 0.5 | Equipment ID, score, severity |
+| **Fault Classifications** | `classification_service` | Confidence > 0.4 | Fault type + probability |
+| **Health Trends** | `health_feature_provider` | 7d slope < -0.5 | Health score, status, degradation rate |
+| **Building Features** | `feature_engineering_service` | Always included | EUI, Base Load Index, CDD, Efficiency Score |
+
+### Claude Prompt Enhancement
+
+The ML context is injected as a dedicated section titled "ML MODEL INTELLIGENCE (Predictive Context)" between Current Conditions and Weather Forecast. Claude's task instructions explicitly direct it to:
+
+1. **Pre-cool/pre-heat** based on LSTM forecasts
+2. **Flag anomalous equipment** for inspection when anomaly scores are elevated
+3. **Factor fault probabilities** into maintenance recommendations (e.g., bearing wear risk → reduce loading)
+4. **Consider degradation trends** when deciding equipment loading
+5. **Reference building metrics** (EUI, base load index) for energy recommendations
+
+### Building-Level Features
+
+| Feature | Formula | Excellent | Poor |
+|---------|---------|-----------|------|
+| **EUI** | `daily_kWh / building_m²` | < 0.15 | > 0.50 |
+| **Base Load Index** | `off_hours_kWh / total_daily_kWh` | < 0.15 | > 0.40 |
+| **CDD** | `Σ max(0, T_hour - 18°C) / 24` | — | — |
+| **Efficiency Score** | Weighted composite (0-100) | > 80 | < 40 |
+
+Efficiency Score weights: EUI (35%), Base Load Index (25%), Setpoint Deviation (25%), CDD-adjusted efficiency (15%).
+
+---
+
 ## AI Analysis Flow
 
 ### Claude AI Mode
 
-When Claude API is available, the system generates natural language recommendations:
+When Claude API is available, the system generates natural language recommendations enriched with ML context:
 
 ```python
 prompt = f"""You are an expert HVAC optimization engineer. Analyze:
@@ -994,6 +1065,7 @@ START → fetch_pending
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 4.0.0 | 2026-02-27 | Phase 132: ML Context Injection — LSTM forecasts, anomaly scores, fault classifications, health trends injected into Claude prompt; Feature Engineering Service (EUI, BLI, CDD, Efficiency Score); Inspection Priority Scoring; updated architecture diagram |
 | 3.0.0 | 2026-02-19 | Added Recommendation Validation & Execution Agent (LangGraph): 13-node StateGraph, 3-tier routing, WhatsApp/Telegram approval flow, ML feedback loop, 72 tests |
 | 2.0.0 | 2026-02-19 | Fixed Southern Hemisphere exposure (NORTH=max gain); top-floor modifier (0.7→1.2x); sensor-health confidence penalty; schedule-aware savings; M&V verification loop; humidity seasonal guard |
 | 1.0.0 | 2026-02-02 | Initial documentation |

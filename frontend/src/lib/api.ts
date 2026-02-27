@@ -92,7 +92,7 @@ function getRateLimitBucket(url: string): string {
   }
   if (url.includes("/api/integration/")) return "integration";
   if (url.includes("/api/optimization/")) return "optimization";
-  if (url.includes("/api/dali/")) return "dali";
+  if (url.includes("/api/lighting/")) return "lighting";
   if (url.includes("/api/security/")) return "security";
   if (url.includes("/api/solar/")) return "solar";
   if (url.includes("/api/alerts")) return "alerts";
@@ -2940,10 +2940,10 @@ export const validationApi = {
   },
 };
 
-// ============= DALI Lighting Interfaces (Phase 21) =============
+// ============= Lighting Interfaces (Phase 21) =============
 
-// DALI Controller interface
-export interface DALIController {
+// Lighting Controller interface
+export interface LightingController {
   id: string;
   name: string;
   floor: string;
@@ -2956,8 +2956,8 @@ export interface DALIController {
   last_communication: string;
 }
 
-// DALI Sensor interface (PIR occupancy sensor)
-export interface DALISensor {
+// Lighting Sensor interface (PIR occupancy sensor)
+export interface LightingSensor {
   id: string;
   controller_id: string;
   desk_id: string;
@@ -2971,8 +2971,8 @@ export interface DALISensor {
   battery_level: number | null;
 }
 
-// DALI Luminaire interface
-export interface DALILuminaire {
+// Lighting Luminaire interface
+export interface LightingLuminaire {
   id: string;
   controller_id: string;
   zone_id: string;
@@ -3044,8 +3044,8 @@ export interface BuildingOccupancy {
   last_updated: string;
 }
 
-// DALI System Stats
-export interface DALIStats {
+// Lighting System Stats
+export interface LightingStats {
   total_controllers: number;
   online_controllers: number;
   total_sensors: number;
@@ -3059,54 +3059,54 @@ export interface DALIStats {
   last_sync: string;
 }
 
-// DALI API methods
-export const daliApi = {
+// Lighting API methods
+export const lightingApi = {
   /**
-   * Get all DALI controllers
+   * Get all lighting controllers
    * @param floor - Optional floor filter
    */
-  getControllers: async (floor?: string): Promise<DALIController[]> => {
+  getControllers: async (floor?: string): Promise<LightingController[]> => {
     const params = new URLSearchParams();
     if (floor) params.set('floor', floor);
     const queryString = params.toString();
-    return fetchApi<DALIController[]>(`/api/dali/controllers${queryString ? `?${queryString}` : ''}`);
+    return fetchApi<LightingController[]>(`/api/lighting/controllers${queryString ? `?${queryString}` : ''}`);
   },
 
   /**
-   * Get DALI sensors with optional filtering
+   * Get lighting sensors with optional filtering
    * @param zoneId - Optional zone ID filter
    */
-  getSensors: async (zoneId?: string): Promise<DALISensor[]> => {
+  getSensors: async (zoneId?: string): Promise<LightingSensor[]> => {
     const params = new URLSearchParams();
     if (zoneId) params.set('zone_id', zoneId);
     const queryString = params.toString();
-    return fetchApi<DALISensor[]>(`/api/dali/sensors${queryString ? `?${queryString}` : ''}`);
+    return fetchApi<LightingSensor[]>(`/api/lighting/sensors${queryString ? `?${queryString}` : ''}`);
   },
 
   /**
    * Get sensor by desk ID
    * @param deskId - Desk identifier
    */
-  getSensorByDesk: async (deskId: string): Promise<DALISensor> => {
-    return fetchApi<DALISensor>(`/api/dali/sensors/desk/${deskId}`);
+  getSensorByDesk: async (deskId: string): Promise<LightingSensor> => {
+    return fetchApi<LightingSensor>(`/api/lighting/sensors/desk/${deskId}`);
   },
 
   /**
-   * Get DALI luminaires with optional filtering
+   * Get lighting luminaires with optional filtering
    * @param zoneId - Optional zone ID filter
    */
-  getLuminaires: async (zoneId?: string): Promise<DALILuminaire[]> => {
+  getLuminaires: async (zoneId?: string): Promise<LightingLuminaire[]> => {
     const params = new URLSearchParams();
     if (zoneId) params.set('zone_id', zoneId);
     const queryString = params.toString();
-    return fetchApi<DALILuminaire[]>(`/api/dali/luminaires${queryString ? `?${queryString}` : ''}`);
+    return fetchApi<LightingLuminaire[]>(`/api/lighting/luminaires${queryString ? `?${queryString}` : ''}`);
   },
 
   /**
    * Get faulty luminaires
    */
-  getFaultyLuminaires: async (): Promise<DALILuminaire[]> => {
-    return fetchApi<DALILuminaire[]>("/api/dali/luminaires/faulty");
+  getFaultyLuminaires: async (): Promise<LightingLuminaire[]> => {
+    return fetchApi<LightingLuminaire[]>("/api/lighting/luminaires/faulty");
   },
 
   /**
@@ -3114,7 +3114,7 @@ export const daliApi = {
    * @param zoneId - Zone ID
    */
   getZoneOccupancy: async (zoneId: string): Promise<ZoneOccupancy> => {
-    return fetchApi<ZoneOccupancy>(`/api/dali/zones/${zoneId}/occupancy`);
+    return fetchApi<ZoneOccupancy>(`/api/lighting/zones/${zoneId}/occupancy`);
   },
 
   /**
@@ -3122,7 +3122,7 @@ export const daliApi = {
    * @param zoneId - Zone ID
    */
   getZoneLighting: async (zoneId: string): Promise<ZoneLighting> => {
-    return fetchApi<ZoneLighting>(`/api/dali/zones/${zoneId}/lighting`);
+    return fetchApi<ZoneLighting>(`/api/lighting/zones/${zoneId}/lighting`);
   },
 
   /**
@@ -3130,7 +3130,7 @@ export const daliApi = {
    * @param floor - Floor identifier (e.g., "L10", "L11", "L12")
    */
   getFloorSummary: async (floor: string): Promise<FloorSummary> => {
-    return fetchApi<FloorSummary>(`/api/dali/floors/${floor}/summary`);
+    return fetchApi<FloorSummary>(`/api/lighting/floors/${floor}/summary`);
   },
 
   /**
@@ -3138,7 +3138,7 @@ export const daliApi = {
    */
   getBuildingOccupancy: async (): Promise<BuildingOccupancy> => {
     try {
-      return await fetchApi<BuildingOccupancy>("/api/dali/building/occupancy");
+      return await fetchApi<BuildingOccupancy>("/api/lighting/building/occupancy");
     } catch (error) {
       if (isExpectedApiError(error)) {
         return {
@@ -3162,11 +3162,11 @@ export const daliApi = {
   },
 
   /**
-   * Get DALI system statistics
+   * Get lighting system statistics
    */
-  getStats: async (): Promise<DALIStats> => {
+  getStats: async (): Promise<LightingStats> => {
     try {
-      return await fetchApi<DALIStats>("/api/dali/stats");
+      return await fetchApi<LightingStats>("/api/lighting/stats");
     } catch (error) {
       if (isExpectedApiError(error)) {
         return {
@@ -3192,9 +3192,16 @@ export const daliApi = {
    * @param zoneId - Zone ID
    */
   getZoneSummary: async (zoneId: string): Promise<{ occupancy: ZoneOccupancy; lighting: ZoneLighting }> => {
-    return fetchApi<{ occupancy: ZoneOccupancy; lighting: ZoneLighting }>(`/api/dali/zones/${zoneId}/summary`);
+    return fetchApi<{ occupancy: ZoneOccupancy; lighting: ZoneLighting }>(`/api/lighting/zones/${zoneId}/summary`);
   },
 };
+
+// Backward compatibility alias
+export const daliApi = lightingApi;
+export type DALIController = LightingController;
+export type DALISensor = LightingSensor;
+export type DALILuminaire = LightingLuminaire;
+export type DALIStats = LightingStats;
 
 // ============= Comfort Complaints Interfaces (Phase 23) =============
 

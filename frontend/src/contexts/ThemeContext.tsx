@@ -2,10 +2,10 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 
 // ============================================================
 // Theme System — Sentinel BMS
-// Supports: sentinel (default), matrix, glass, ops
+// Supports: sentinel (default), matrix, glass, ops, teal
 // ============================================================
 
-export type ThemeId = "sentinel" | "matrix" | "glass" | "ops";
+export type ThemeId = "sentinel" | "matrix" | "glass" | "ops" | "teal";
 
 export interface ThemeDefinition {
   id: ThemeId;
@@ -51,6 +51,14 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
     className: "ops-theme",
     accentColor: "#00d2ff",
     icon: "\u26A1",
+  },
+  teal: {
+    id: "teal",
+    label: "Teal",
+    description: "SENTINEL brand palette \u2014 teal + amber on charcoal",
+    className: "teal-theme",
+    accentColor: "#00A89D",
+    icon: "\u{1F30A}",
   },
 };
 

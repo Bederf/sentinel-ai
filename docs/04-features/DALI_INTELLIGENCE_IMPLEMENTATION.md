@@ -249,6 +249,21 @@ For Grant (Demo Account):
    - Card should appear after Site Protection
    - Scroll down to view annual savings simulation
 
+## 🔌 Phase 130: Lighting Telemetry Intelligence (2026-02-26)
+
+### CSV Ingestion Tooling (Complete)
+
+The DALI Intelligence system now includes tooling to ingest real Desigo BACnet exports and classify lighting points:
+
+- **`POST /api/niagara/discover/csv`** — Upload CSV from Desigo CC, auto-classify HVAC + lighting
+- **8 lighting point categories**: `lighting_power`, `lighting_energy`, `driver_temperature`, `lamp_hours`, `light_output`, `emergency_battery`, `emergency_test`, `charge_status`
+- **Tridonic/net4more patterns**: Classifier recognizes Tridonic naming conventions (e.g., `Lum01_DimLevel`, `Em01_BattLevel`, `Sens01_Lux`)
+- **15 tests** in `test_desigo_csv_ingestion.py`
+
+This bridges the gap between the 365-day simulation (above) and real building data — when a real Desigo CSV is uploaded, the classifier identifies which points are lighting and categorizes them for health scoring, energy reporting, and predictive maintenance.
+
+See: [Tridonic DALI Discovery — CSV Ingestion](../05-integrations/tridonic-dali-discovery.md#desigo-csv-point-export-ingestion-phase-130)
+
 ## 💡 Future Enhancements
 
 1. **Custom Parameters:**

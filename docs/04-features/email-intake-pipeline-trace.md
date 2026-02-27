@@ -105,7 +105,7 @@ ext. 2145
     "building_name": "Centre Court",
     "active_alerts": [
       {
-        "code": "S002-AHU-B1-001",
+        "equipment_id": "uuid-of-S002-AHU-B1-001",
         "severity": "critical",
         "message": "High supply air temperature"
       }

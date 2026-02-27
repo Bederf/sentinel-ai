@@ -90,3 +90,6 @@ prometheus_client>=0.20.0      # Prometheus text exposition format for /metrics 
 # Solar+BESS Optimization (v26.0)
 ortools>=9.8.0                 # Google OR-Tools CP-SAT solver for MIP dispatch optimization
 pymodbus>=3.6.0                # Modbus TCP client for Huawei LUNA2000 BESS register writes
+
+# Email Reply Service (Phase 131.2b — threaded SMTP replies)
+aiosmtplib>=2.0.0              # Async SMTP client for RFC 822 threaded email replies

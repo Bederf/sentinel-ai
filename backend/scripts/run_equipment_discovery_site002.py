@@ -18,7 +18,7 @@ import asyncio
 sys.path.insert(0, "/opt/bms-intelligence/backend")
 
 from app.database.repositories.building_repository import BuildingRepository  # noqa: E402
-from app.services.dali_discovery_service import SimulatedDALIDiscovery  # noqa: E402
+from app.services.lighting_discovery_service import SimulatedLightingDiscovery  # noqa: E402
 from app.services.bacnet_discovery_service import SimulatedBACnetDiscovery  # noqa: E402
 from app.services.modbus_discovery_service import SimulatedModbusDiscovery  # noqa: E402
 from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository  # noqa: E402
@@ -54,7 +54,7 @@ def get_simulated_data(equipment_code: str, protocol: str, equipment_type: str) 
         elif "DOWN" in equipment_code.upper():
             device_type = "led_downlight"
 
-        return SimulatedDALIDiscovery.generate_device_info(
+        return SimulatedLightingDiscovery.generate_device_info(
             equipment_code=equipment_code,
             device_type=device_type,
             dali_address=1,

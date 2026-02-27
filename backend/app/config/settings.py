@@ -261,9 +261,14 @@ class Settings(BaseSettings):
 
     # Email intake pipeline (Phase 131)
     email_intake_enabled: bool = False  # Master switch for email intake pipeline
-    email_intake_auto_wo_enabled: bool = False  # Auto-create Concept WOs (stub in v1)
+    email_intake_auto_wo_enabled: bool = False  # Auto-create local WO-... work orders for high-confidence intakes
     email_intake_auto_wo_max_priority: int = 2  # Max urgency level for auto-WO (1=low, 4=critical)
     email_intake_duplicate_window_hours: int = 24  # Heuristic dedup window
+
+    # Email reply service (Phase 131.2b — backend SMTP threading)
+    email_reply_enabled: bool = False  # Send threaded replies from backend instead of n8n
+    email_reply_from_address: str = "workorder@sentinel-ai.co.za"
+    email_reply_from_name: str = "SENTINEL Work Orders"
 
     @property
     def resolved_ingestion_mode(self) -> IngestionMode:

@@ -18,6 +18,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Optional, Tuple, Any
 from app.database.supabase_client import get_supabase_client
+from app.services.simulation_store import get_simulation_store
 from app.database.repositories.water_cost_repository import WaterCostRepository
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,7 @@ class WaterConsumptionEngine:
         """
         self.building_id = building_id
         self.client = get_supabase_client()
+        self.sim_store = get_simulation_store(building_id)
         self.cost_repo = WaterCostRepository()
 
     def calculate_water_consumption(
@@ -173,45 +175,11 @@ class WaterConsumptionEngine:
             simulated_date: Simulated date
         """
         try:
-            # Update power_meters table (for consistency with energy tracking)
             meter_id = f"{self.building_id.split('-')[-1]}-MTR-B1-WATER"
 
-            # Update existing water meter (skip if meter doesn't exist yet)
-            try:
-                self.client.table("power_meters").update(
-                    {
-                        "active_power_kw": 0.0,
-                        "last_poll": simulated_date.isoformat(),
-                    }
-                ).eq("meter_id", meter_id).execute()
-            except Exception:
-                logger.debug(f"[WATER] Meter {meter_id} not found, skipping update")
+            # Write to simulation store (JSON), not Supabase
+            self.sim_store.update_power_meter(meter_id, 0.0)
 
-            # Update daily energy_consumption_history (water tracked under other_kwh)
-            today_str = simulated_date.strftime("%Y-%m-%d")
-            try:
-                existing = (
-                    self.client.table("energy_consumption_history")
-                    .select("other_kwh")
-                    .eq("building_id", self.building_id)
-                    .eq("date", today_str)
-                    .maybe_single()
-                    .execute()
-                )
-                prev_kwh = float(existing.data.get("other_kwh", 0)) if existing.data else 0
-                # Water pump energy is negligible; track volume in logs, not in energy table
-                self.client.table("energy_consumption_history").upsert(
-                    {
-                        "building_id": self.building_id,
-                        "date": today_str,
-                        "other_kwh": round(prev_kwh, 2),
-                    },
-                    on_conflict="building_id,date",
-                ).execute()
-            except Exception as e:
-                logger.warning(f"Could not update energy history for water: {e}")
-
-            # Log water volume for diagnostics
             logger.debug(
                 f"[WATER] {meter_id}: {total_liters:.1f}L/hr at hour {simulated_hour:02d}, zones: {zone_consumption}"
             )

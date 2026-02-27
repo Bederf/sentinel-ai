@@ -1,35 +1,36 @@
 """
-Persist simulation state to Supabase for dashboard visibility.
+SENTINEL Persistence Layer — writes data to Supabase and feeds ML pipeline.
 
 Called every simulation hour by LifecycleOrchestrator._process_hour().
-Writes equipment health, sensor readings, and energy data so that
-existing dashboards show live building operation.
+SENTINEL is data-agnostic: it receives equipment readings from whatever
+source is active (real BMS via SIMBIOT, or simulation engine) and:
+  1. Persists to JSON simulation store (local fast store)
+  2. Syncs to Supabase equipment.operating_data (dashboard/API)
+  3. Feeds ML pipeline after successful Supabase write
 """
 
+import json
 import logging
+import os
 from datetime import datetime
 from typing import Any, Dict, Optional
+
+from app.services.simulation_store import get_simulation_store
 
 logger = logging.getLogger(__name__)
 
 
 class SimulationPersistence:
-    """Writes simulation state to Supabase for real-time dashboard visibility."""
+    """SENTINEL persistence: writes to Supabase, feeds ML pipeline."""
 
     def __init__(self, site_id: str = "site-002"):
         self.site_id = site_id
-        self._supabase = None
+        self.store = get_simulation_store(site_id)
 
-    @property
-    def supabase(self):
-        if self._supabase is None:
-            try:
-                from app.database.supabase_client import get_supabase_client
+        # ML feeder — accumulates sensor data and triggers training
+        from app.services.sentinel_ml_feeder import SentinelMLFeeder
 
-                self._supabase = get_supabase_client()
-            except Exception as e:
-                logger.warning(f"Supabase not available: {e}")
-        return self._supabase
+        self.ml_feeder = SentinelMLFeeder()
 
     async def persist_hourly_state(
         self,
@@ -64,43 +65,49 @@ class SimulationPersistence:
         # 1. Update equipment health scores
         for code, state in equipment_states.items():
             try:
-                await self._update_equipment_health(code, state)
+                self._update_equipment_health(code, state)
                 results["equipment_updated"] += 1
             except Exception as e:
                 results["errors"].append(f"equipment {code}: {e}")
 
         # 2. Write sensor readings
         try:
-            count = await self._write_sensor_readings(simulated_time, equipment_states, ambient_temp, humidity)
+            count = self._write_sensor_readings(simulated_time, equipment_states, ambient_temp, humidity)
             results["readings_written"] = count
         except Exception as e:
             results["errors"].append(f"sensor_readings: {e}")
 
         # 3. Write energy consumption
         try:
-            await self._write_energy_reading(simulated_time, energy_kw)
+            self._write_energy_reading(simulated_time, energy_kw)
         except Exception as e:
             results["errors"].append(f"energy: {e}")
 
         # 4. Write zone history (temp, humidity, CO2 per zone)
         try:
-            zones_written = await self._write_zone_history(simulated_time, equipment_states, schedule_state)
+            zones_written = self._write_zone_history(simulated_time, equipment_states, schedule_state)
             results["zones_written"] = zones_written
         except Exception as e:
             results["errors"].append(f"zone_history: {e}")
 
-        # 5. Write equipment sensor readings to equipment_sensor_readings
+        # 5. Sync to Supabase equipment.operating_data
         try:
-            esr_count = await self._write_equipment_sensor_readings(simulated_time, equipment_states)
-            results["equipment_readings_written"] = esr_count
+            supabase_count = self._sync_to_supabase(simulated_time, equipment_states)
+            results["supabase_synced"] = supabase_count
         except Exception as e:
-            results["errors"].append(f"equipment_sensor_readings: {e}")
+            results["errors"].append(f"supabase_sync: {e}")
 
-        # 6. Update hvac_zones with current readings (for complaint handler)
+        # 6. Feed ML pipeline (after Supabase write — SENTINEL feeds ML)
         try:
-            await self._update_hvac_zones_live(simulated_time, equipment_states, schedule_state)
+            self.ml_feeder.ingest(equipment_states, simulated_time)
+            ml_results = self.ml_feeder.train_if_ready()
+            if ml_results:
+                successful = [r for r in ml_results if "error" not in r]
+                logger.info(f"[ML FEEDER] Trained {len(successful)} models from SENTINEL data")
+                results["ml_models_trained"] = len(successful)
+            results["ml_hours_ingested"] = self.ml_feeder.hours_ingested
         except Exception as e:
-            results["errors"].append(f"hvac_zones_live: {e}")
+            results["errors"].append(f"ml_feeder: {e}")
 
         if results["errors"]:
             logger.warning(f"Persistence errors: {results['errors']}")
@@ -108,21 +115,18 @@ class SimulationPersistence:
             logger.info(
                 f"Persisted: {results['equipment_updated']} equipment, "
                 f"{results['readings_written']} readings, "
-                f"{results.get('zones_written', 0)} zones, {energy_kw:.1f} kW"
+                f"{results.get('zones_written', 0)} zones, "
+                f"{results.get('supabase_synced', 0)} supabase, {energy_kw:.1f} kW"
             )
 
         return results
 
-    async def _update_equipment_health(self, equipment_code: str, state: Dict[str, Any]):
-        """Update equipment health_score and status in Supabase."""
-        if not self.supabase:
-            return
-
+    def _update_equipment_health(self, equipment_code: str, state: Dict[str, Any]):
+        """Update equipment health_score and status in JSON store."""
         health_score = state.get("health_score")
         if health_score is None:
             return
 
-        # Determine status from health
         if health_score >= 70:
             status = "online"
         elif health_score >= 40:
@@ -130,20 +134,95 @@ class SimulationPersistence:
         else:
             status = "offline"
 
-        try:
-            self.supabase.table("equipment").update(
-                {
-                    "health_score": health_score,
-                    "status": status,
-                    "updated_at": datetime.utcnow().isoformat(),
-                }
-            ).eq("code", equipment_code).execute()
-        except Exception as e:
-            # Fallback: update JSON file
-            logger.debug(f"Supabase update failed for {equipment_code}, using JSON fallback: {e}")
-            await self._update_json_fallback(equipment_code, health_score, status)
+        self.store.update_equipment_state(
+            equipment_code,
+            {
+                "health_score": health_score,
+                "status": status,
+                "updated_at": datetime.utcnow().isoformat(),
+            },
+        )
 
-    async def _write_sensor_readings(
+    def _sync_to_supabase(
+        self,
+        simulated_time: datetime,
+        equipment_states: Dict[str, Dict[str, Any]],
+    ) -> int:
+        """Sync equipment operating_data, health_score, and status to Supabase.
+
+        Uses batch SQL via psycopg2 for efficiency — one round-trip for all equipment.
+        """
+        import psycopg2
+        import psycopg2.extras
+
+        database_url = os.getenv(
+            "DATABASE_URL",
+            "postgresql://postgres:postgres@127.0.0.1:55322/postgres",
+        )
+
+        # Supabase status constraint: normal, warning, critical, offline, maintenance
+        def health_to_status(score: float) -> str:
+            if score >= 70:
+                return "normal"
+            elif score >= 40:
+                return "warning"
+            else:
+                return "critical"
+
+        updates = []
+        for code, state in equipment_states.items():
+            health_score = state.get("health_score")
+            sensor_readings = state.get("sensor_readings", {})
+            if not sensor_readings and health_score is None:
+                continue
+
+            # Build operating_data: {point_name: {value, timestamp, source}}
+            operating_data = {}
+            ts = simulated_time.isoformat()
+            for point_name, value in sensor_readings.items():
+                operating_data[point_name] = {
+                    "value": value,
+                    "timestamp": ts,
+                    "source": "sentinel",
+                }
+
+            status = health_to_status(health_score) if health_score is not None else "normal"
+            h = int(round(health_score)) if health_score is not None else 100
+
+            updates.append((code, json.dumps(operating_data), h, status))
+
+        if not updates:
+            return 0
+
+        try:
+            conn = psycopg2.connect(database_url)
+            conn.autocommit = True
+            cur = conn.cursor()
+
+            # Batch update using a VALUES list
+            values_sql = ",".join(cur.mogrify("(%s, %s::jsonb, %s::int, %s)", row).decode() for row in updates)
+
+            cur.execute(f"""
+                UPDATE equipment AS e SET
+                    operating_data = v.operating_data,
+                    health_score = v.health_score,
+                    status = v.status,
+                    updated_at = now()
+                FROM (VALUES {values_sql})
+                    AS v(code, operating_data, health_score, status)
+                WHERE e.code = v.code
+            """)
+
+            updated = cur.rowcount
+            cur.close()
+            conn.close()
+            return updated
+
+        except Exception as e:
+            logger.error(f"Supabase sync failed: {e}")
+            raise
+
+    def _write_sensor_readings(
         self,
         simulated_time: datetime,
         equipment_states: Dict[str, Dict[str, Any]],
@@ -151,9 +230,6 @@ class SimulationPersistence:
         humidity: float,
     ) -> int:
         """Write sensor readings for all equipment."""
-        if not self.supabase:
-            return 0
-
         readings = []
         for code, state in equipment_states.items():
             for point_name, value in state.get("sensor_readings", {}).items():
@@ -188,61 +264,28 @@ class SimulationPersistence:
         )
 
         if readings:
-            try:
-                self.supabase.table("sensor_readings").upsert(readings).execute()
-            except Exception:
-                logger.debug("sensor_readings table may not exist, skipping")
+            self.store.write_sensor_readings(readings)
 
         return len(readings)
 
-    async def _write_energy_reading(self, simulated_time: datetime, energy_kw: float):
+    def _write_energy_reading(self, simulated_time: datetime, energy_kw: float):
         """Write energy consumption reading."""
-        if not self.supabase:
-            return
+        date_str = simulated_time.date().isoformat()
+        self.store.update_energy_history(date_str, "total_kwh", energy_kw)
 
-        try:
-            self.supabase.table("energy_readings").upsert(
-                {
-                    "site_id": self.site_id,
-                    "timestamp": simulated_time.isoformat(),
-                    "power_kw": energy_kw,
-                    "source": "simulation",
-                }
-            ).execute()
-        except Exception:
-            logger.debug("energy_readings table may not exist, skipping")
-
-    async def _write_zone_history(
+    def _write_zone_history(
         self,
         simulated_time: datetime,
         equipment_states: Dict[str, Dict[str, Any]],
         schedule_state: Any,
     ) -> int:
-        """Aggregate zone-level readings from equipment and write to hvac_zone_history.
-
-        Extracts temperature from FCU/VAV readings, CO2 and humidity from zone sensors,
-        and writes one record per zone per hour.
-        """
-        if not self.supabase:
-            return 0
-
-        # Get building UUID
-        try:
-            bld_resp = self.supabase.table("buildings").select("id").eq("code", self.site_id).execute()
-            if not bld_resp.data:
-                return 0
-            building_uuid = bld_resp.data[0]["id"]
-        except Exception:
-            return 0
-
-        # Collect zone data from equipment readings
+        """Aggregate zone-level readings from equipment and write to zone history."""
         zone_data: Dict[str, Dict[str, Any]] = {}
 
         for code, state in equipment_states.items():
             readings = state.get("sensor_readings", {})
             equip_type = state.get("type", "").lower()
 
-            # Map equipment to zone
             parts = code.split("-")
             if len(parts) >= 3:
                 zone_id = f"Zone-{'-'.join(parts[2:])}"
@@ -252,7 +295,6 @@ class SimulationPersistence:
             if zone_id not in zone_data:
                 zone_data[zone_id] = {}
 
-            # Extract readings by equipment type
             if equip_type in ("fcu",):
                 if "room_temp" in readings:
                     zone_data[zone_id]["temp"] = readings["room_temp"]
@@ -271,26 +313,23 @@ class SimulationPersistence:
                 if "humidity_pct" in readings:
                     zone_data[zone_id]["humidity"] = readings["humidity_pct"]
 
-        # Get setpoint from schedule state
         setpoint = 22.0
         if hasattr(schedule_state, "setpoint_offset"):
             setpoint = 22.0 + schedule_state.setpoint_offset
 
-        # Get occupancy
         occupancy_pct = 0
         if hasattr(schedule_state, "target_occupancy_pct"):
             occupancy_pct = schedule_state.target_occupancy_pct
 
-        # Build records
         records = []
         for zone_id, data in zone_data.items():
             if not data.get("temp"):
-                continue  # Skip zones without temperature data
+                continue
             records.append(
                 {
                     "time": simulated_time.isoformat(),
                     "zone_id": zone_id,
-                    "building_id": building_uuid,
+                    "building_id": self.site_id,
                     "temp": data.get("temp"),
                     "humidity": data.get("humidity"),
                     "co2": data.get("co2"),
@@ -301,150 +340,113 @@ class SimulationPersistence:
             )
 
         if records:
-            try:
-                self.supabase.table("hvac_zone_history").insert(records).execute()
-            except Exception as e:
-                logger.debug(f"hvac_zone_history write failed: {e}")
+            self.store.write_zone_history(records)
 
         return len(records)
 
-    async def _write_equipment_sensor_readings(
+    # === Solar & BESS snapshot persistence ===
+
+    async def persist_solar_snapshot(
         self,
         simulated_time: datetime,
         equipment_states: Dict[str, Dict[str, Any]],
-    ) -> int:
-        """Write equipment-level sensor readings to equipment_sensor_readings table."""
-        if not self.supabase:
-            return 0
-
-        records = []
+        building_load_kw: float,
+        tariff_band: str,
+        tariff_rate: float,
+        hour_index: int,
+        scenario: str = "lifecycle_365",
+        year: int = 2026,
+    ) -> bool:
+        """Write one row to solar hourly snapshots from equipment states."""
+        # Extract solar generation from inverter equipment
+        solar_gen_kw = 0.0
         for code, state in equipment_states.items():
-            for point_name, value in state.get("sensor_readings", {}).items():
-                records.append(
-                    {
-                        "equipment_id": code,
-                        "sensor_type": point_name,
-                        "value": float(value) if value is not None else 0.0,
-                        "unit": self._get_unit(point_name),
-                        "recorded_at": simulated_time.isoformat(),
-                        "building_id": self.site_id,
-                    }
-                )
+            if state.get("type", "").lower() == "inverter":
+                readings = state.get("sensor_readings", {})
+                solar_gen_kw += readings.get("ac_power_kw", 0.0)
 
-        if records:
-            try:
-                # Insert in batches of 100 to avoid payload limits
-                for i in range(0, len(records), 100):
-                    batch = records[i : i + 100]
-                    self.supabase.table("equipment_sensor_readings").insert(batch).execute()
-            except Exception as e:
-                logger.debug(f"equipment_sensor_readings write failed: {e}")
-
-        return len(records)
-
-    async def _update_hvac_zones_live(
-        self,
-        simulated_time: datetime,
-        equipment_states: Dict[str, Dict[str, Any]],
-        schedule_state: Any,
-    ):
-        """Update hvac_zones table with current readings so complaint handler sees live data."""
-        if not self.supabase:
-            return
-
-        # Aggregate zone readings (same logic as _write_zone_history)
-        zone_data: Dict[str, Dict[str, Any]] = {}
+        # Extract BESS state
+        bess_soc_pct = 50.0
+        bess_charge_kw = 0.0
+        bess_discharge_kw = 0.0
+        grid_import_kw = 0.0
         for code, state in equipment_states.items():
-            readings = state.get("sensor_readings", {})
-            equip_type = state.get("type", "").lower()
-            parts = code.split("-")
-            if len(parts) >= 3:
-                zone_id = f"Zone-{'-'.join(parts[2:])}"
-            else:
-                continue
-            if zone_id not in zone_data:
-                zone_data[zone_id] = {}
-            if equip_type in ("fcu",) and "room_temp" in readings:
-                zone_data[zone_id]["temp"] = readings["room_temp"]
-            elif equip_type in ("vav",) and "zone_temp" in readings:
-                zone_data[zone_id].setdefault("temp", readings["zone_temp"])
-            elif equip_type in ("temp_sensor",) and "zone_temp" in readings:
-                zone_data[zone_id].setdefault("temp", readings["zone_temp"])
-            elif equip_type in ("co2_sensor", "zone_sensor") and "co2_ppm" in readings:
-                zone_data[zone_id]["co2"] = int(readings["co2_ppm"])
-            if equip_type in ("humidity_sensor",) and "humidity_pct" in readings:
-                zone_data[zone_id]["humidity"] = readings["humidity_pct"]
+            if state.get("type", "").lower() == "bess":
+                readings = state.get("sensor_readings", {})
+                bess_soc_pct = readings.get("state_of_charge_pct", 50.0)
+                bess_charge_kw = readings.get("charge_power_kw", 0.0)
+                bess_discharge_kw = readings.get("discharge_power_kw", 0.0)
+                grid_import_kw = readings.get("grid_import_kw", 0.0)
+                break
 
-        # Get setpoint from schedule
-        setpoint = 22.0
-        if hasattr(schedule_state, "setpoint_offset"):
-            setpoint = 22.0 + schedule_state.setpoint_offset
+        grid_export_kw = max(
+            0.0,
+            solar_gen_kw - building_load_kw - bess_charge_kw + bess_discharge_kw,
+        )
 
-        # Update each zone in hvac_zones
-        for zone_id, data in zone_data.items():
-            if not data.get("temp"):
-                continue
-            update = {
-                "current_temp": data["temp"],
-                "setpoint": setpoint,
-                "status": "running",
-                "last_updated": simulated_time.isoformat(),
-            }
-            if data.get("humidity") is not None:
-                update["current_humidity"] = data["humidity"]
-            if data.get("co2") is not None:
-                update["current_co2"] = data["co2"]
-            try:
-                self.supabase.table("hvac_zones").update(update).eq("zone_id", zone_id).execute()
-            except Exception as e:
-                logger.debug(f"hvac_zones update failed for {zone_id}: {e}")
+        sim_date = simulated_time.date()
+        hour_of_day = simulated_time.hour
+        day_of_year = sim_date.timetuple().tm_yday
 
-    @staticmethod
-    def _get_unit(point_name: str) -> str:
-        """Map sensor point name to unit."""
-        units = {
-            "zone_temp": "°C",
-            "room_temp": "°C",
-            "supply_temp": "°C",
-            "return_temp": "°C",
-            "supply_air_temp": "°C",
-            "outdoor_temperature": "°C",
-            "damper_position": "%",
-            "valve_position": "%",
-            "fan_speed_pct": "%",
-            "speed_pct": "%",
-            "load_pct": "%",
-            "brightness_pct": "%",
-            "battery_level": "%",
-            "co2_ppm": "ppm",
-            "humidity_pct": "%",
-            "outdoor_humidity": "%",
-            "airflow_lps": "L/s",
-            "flow_lps": "L/s",
-            "power_kw": "kW",
-            "differential_pressure_kpa": "kPa",
-            "cop": "ratio",
-            "power_factor": "ratio",
+        row = {
+            "site_id": self.site_id,
+            "scenario": scenario,
+            "year": year,
+            "hour": hour_index,
+            "date": sim_date.isoformat(),
+            "month": sim_date.month,
+            "day_of_year": day_of_year,
+            "hour_of_day": hour_of_day,
+            "solar_gen_kw": round(solar_gen_kw, 1),
+            "building_load_kw": round(building_load_kw, 1),
+            "bess_soc_pct": round(bess_soc_pct, 1),
+            "bess_charge_kw": round(bess_charge_kw, 1),
+            "bess_discharge_kw": round(bess_discharge_kw, 1),
+            "grid_import_kw": round(grid_import_kw, 1),
+            "grid_export_kw": round(grid_export_kw, 1),
+            "tariff_band": tariff_band,
+            "tariff_rate_c_kwh": round(tariff_rate, 2),
         }
-        return units.get(point_name, "")
 
-    async def _update_json_fallback(self, equipment_code: str, health_score: float, status: str):
-        """Update equipment JSON file as fallback."""
-        import json
-        from pathlib import Path
+        self.store.write_solar_snapshot(row)
+        return True
 
-        site_code = self.site_id
-        equip_dir = Path(f"backend/app/data/buildings/{site_code}/equipment")
-        equip_file = equip_dir / f"{equipment_code}.json"
+    async def persist_solar_daily(
+        self,
+        simulated_date,
+        solar_gen_kwh: float,
+        building_load_kwh: float,
+        bess_charge_kwh: float,
+        bess_discharge_kwh: float,
+        grid_import_kwh: float,
+        grid_export_kwh: float,
+        peak_generation_kw: float,
+        avg_bess_soc_pct: float,
+        scenario: str = "lifecycle_365",
+        year: int = 2026,
+    ) -> bool:
+        """Write one row to solar daily aggregates at end of simulated day."""
+        day_of_year = simulated_date.timetuple().tm_yday
 
-        if equip_file.exists():
-            try:
-                data = json.loads(equip_file.read_text())
-                data["health_score"] = health_score
-                data["status"] = status
-                equip_file.write_text(json.dumps(data, indent=2))
-            except Exception as e:
-                logger.debug(f"JSON fallback failed for {equipment_code}: {e}")
+        row = {
+            "site_id": self.site_id,
+            "scenario": scenario,
+            "year": year,
+            "date": simulated_date.isoformat(),
+            "month": simulated_date.month,
+            "day_of_year": day_of_year,
+            "solar_gen_kwh": round(solar_gen_kwh, 1),
+            "building_load_kwh": round(building_load_kwh, 1),
+            "bess_charge_kwh": round(bess_charge_kwh, 1),
+            "bess_discharge_kwh": round(bess_discharge_kwh, 1),
+            "grid_import_kwh": round(grid_import_kwh, 1),
+            "grid_export_kwh": round(grid_export_kwh, 1),
+            "peak_generation_kw": round(peak_generation_kw, 1),
+            "avg_bess_soc_pct": round(avg_bess_soc_pct, 1),
+        }
+
+        self.store.write_solar_daily(row)
+        return True
 
 
 _persistence_instance: Optional[SimulationPersistence] = None

@@ -227,6 +227,16 @@
 
 ---
 
+## Desigo CSV Point Export Ingestion (Phase 130)
+
+Added 2026-02-26. For buildings with Siemens Desigo CC + Tridonic net4more, a CSV point export can now be uploaded to SENTINEL for automatic HVAC + lighting classification.
+
+- **Endpoint**: `POST /api/niagara/discover/csv`
+- **Classifies**: 8 lighting categories + all standard HVAC types in a single pass
+- **Details**: [tridonic-dali-discovery.md — CSV Ingestion](tridonic-dali-discovery.md#desigo-csv-point-export-ingestion-phase-130)
+
+---
+
 ## Related Documents in SENTINEL
 
 - **API Reference**: `/docs/03-api-reference/`
@@ -248,8 +258,10 @@
   - `/backend/app/services/dali_service.py` - Occupancy + lighting
   - `/backend/app/services/security_occupancy_service.py` - Badge data
   - `/backend/app/services/ai_optimizer.py` - Forecasting
+  - `/backend/app/services/niagara/point_discovery.py` - CSV ingestion + point classification
   - `/backend/app/api/hvac.py` - HVAC endpoints
   - `/backend/app/api/dali.py` - DALI endpoints
+  - `/backend/app/api/niagara_discovery.py` - Discovery + CSV upload endpoints
 
 ---
 
@@ -298,7 +310,8 @@ For questions:
 | HVAC_DALI_INTEGRATION.md | 1.0 | Feb 14, 2026 | Complete |
 | HVAC_DALI_QUICKREF.md | 1.0 | Feb 14, 2026 | Complete |
 | HVAC_DALI_ARCHITECTURE.md | 1.0 | Feb 14, 2026 | Complete |
-| INDEX.md (this file) | 1.1 | Feb 22, 2026 | Complete |
+| tridonic-dali-discovery.md | 1.1 | Feb 26, 2026 | Updated (CSV ingestion) |
+| INDEX.md (this file) | 1.2 | Feb 26, 2026 | Updated |
 | sentry-desk-complaint-agent-spec.md | 1.0 | Feb 22, 2026 | Complete |
 
 ---

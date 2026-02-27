@@ -7,7 +7,7 @@ Registers routers for buildings, equipment, devices, and building systems.
 from fastapi import FastAPI
 
 from app.api import buildings, equipment, sensors, devices, devices_batch, device_init
-from app.api import dali, dali_discovery, equipment_discovery, equipment_metadata
+from app.api import lighting, lighting_discovery, equipment_discovery, equipment_metadata
 from app.api import generators, energy_centre, energy, modules
 from app.api import hvac, fire, security
 from app.api import niagara, niagara_bacnet, niagara_discovery
@@ -43,17 +43,20 @@ def register_building_routers(app: FastAPI) -> None:
     app.include_router(desks.router, tags=["desks"])
 
     # Equipment discovery
-    app.include_router(dali_discovery.router, prefix="/api", tags=["dali-discovery"])
+    app.include_router(lighting_discovery.router, prefix="/api", tags=["lighting-discovery"])
     app.include_router(equipment_discovery.router, prefix="/api", tags=["equipment-discovery"])
 
     # Building systems - HVAC
     app.include_router(hvac.router, prefix="/api", tags=["hvac"])
 
     # Building systems - Lighting
-    app.include_router(dali.router, prefix="/api/dali", tags=["dali-lighting"])
+    app.include_router(lighting.router, prefix="/api/lighting", tags=["lighting"])
 
     # Occupancy analytics (trends, zone utilization, peak hours)
     app.include_router(occupancy_analytics.router, prefix="/api", tags=["occupancy-analytics"])
+
+    # Occupancy-driven control loop (Phase 130: trigger, status, history)
+    app.include_router(occupancy_analytics.control_router, prefix="/api", tags=["occupancy-control"])
 
     # Occupancy-energy correlation (wasted energy, "lights left on" cost impact)
     app.include_router(occupancy_energy_correlation.router, prefix="/api", tags=["occupancy-energy"])

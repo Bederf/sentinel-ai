@@ -46,6 +46,10 @@ Step 4: Approve     → Confirm and activate monitoring
 
 Steps 2-4 are identical for all vendors — only the connection test in Step 1 differs.
 
+**Alternative: CSV Upload (Phase 130)**
+
+For offline onboarding or buildings with Desigo CC + Tridonic lighting, you can upload a BACnet CSV export directly via `POST /api/niagara/discover/csv`. This bypasses the live connection wizard and auto-classifies both HVAC and lighting points (8 lighting categories). See [AI-Assisted Onboarding](ai-assisted-onboarding.md) or [Tridonic DALI Discovery](../05-integrations/tridonic-dali-discovery.md#desigo-csv-point-export-ingestion-phase-130).
+
 ## Access
 
 Navigate to **Integration Monitoring** page and click the blue **Connect to BMS** button in the toolbar.

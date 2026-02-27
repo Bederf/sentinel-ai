@@ -33,6 +33,10 @@ from app.database.repositories.email_intake_repository import (
     EmailIntakeRepository,
     get_email_intake_repository,
 )
+from app.database.repositories.reporter_location_repository import (
+    ReporterLocationRepository,
+    get_reporter_location_repository,
+)
 
 __all__ = [
     "BuildingRepository",
@@ -61,4 +65,6 @@ __all__ = [
     "get_agent_memory_repository",
     "EmailIntakeRepository",
     "get_email_intake_repository",
+    "ReporterLocationRepository",
+    "get_reporter_location_repository",
 ]

@@ -1,0 +1,18 @@
+[
+  {
+    "site_id": "S002",
+    "site_name": "Sandton City",
+    "ai_enabled": true,
+    "auto_integration": true,
+    "created_at": "2026-02-25T09:26:46.395695+00:00",
+    "updated_at": "2026-02-25T09:26:46.395695+00:00"
+  },
+  {
+    "site_id": "site-002",
+    "site_name": "Sandton Data Centre",
+    "ai_enabled": true,
+    "auto_integration": true,
+    "created_at": "2026-02-25T09:26:46.395695+00:00",
+    "updated_at": "2026-02-25T09:26:46.395695+00:00"
+  }
+]

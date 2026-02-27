@@ -2,9 +2,9 @@
 title: "System Architecture Overview"
 type: "architecture"
 status: "approved"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-01-30"
-updated: "2026-02-19"
+updated: "2026-02-27"
 author: "Sentinel Development Team"
 tags: ["architecture", "system-design", "components"]
 related: ["device-abstraction-layer.md", "database-schema.md", "../03-api-reference/rest-api-endpoints.md"]
@@ -48,6 +48,7 @@ graph TB
         SafetyEngine[Safety Engine<br/>Interlocks]
         AIOptimizer[AI Optimizer<br/>Hybrid Router]
         AuditLogger[Audit Logger<br/>Immutable Trail]
+        MLContext[ML Context Bridge<br/>Forecasts + Anomalies]
     end
 
     subgraph Protocols["Protocol Layer"]
@@ -62,8 +63,16 @@ graph TB
         MCP[SIMBIOT MCP Server<br/>12 Tools]
     end
 
+    subgraph ML["ML Intelligence"]
+        LSTM[LSTM Forecasting<br/>7 Equipment Types]
+        Anomaly[Autoencoder<br/>Anomaly Detection]
+        Classifier[Random Forest<br/>Fault Classification]
+        FeatureEng[Feature Engineering<br/>EUI, CDD, BLI]
+    end
+
     subgraph Storage["Storage Layer"]
         Supabase[(Supabase DB<br/>PostgreSQL)]
+        Redis[(Redis Cache<br/>Sessions)]
         JSON[JSON Files<br/>Fallback]
     end
 
@@ -83,8 +92,14 @@ graph TB
     AIOptimizer --> Claude
     AIOptimizer --> Ollama
     AIOptimizer --> MCP
+    MLContext --> LSTM
+    MLContext --> Anomaly
+    MLContext --> Classifier
+    MLContext --> FeatureEng
+    AIOptimizer --> MLContext
 
     Services --> Supabase
+    Services --> Redis
     Services --> JSON
 
     classDef frontend fill:#e1f5fe,stroke:#01579b
@@ -96,10 +111,13 @@ graph TB
 
     class ReactApp,Components frontend
     class FastAPI,Routers,Services backend
-    class DeviceMgr,SafetyEngine,AIOptimizer,AuditLogger core
+    classDef ml fill:#e8eaf6,stroke:#283593
+
+    class DeviceMgr,SafetyEngine,AIOptimizer,AuditLogger,MLContext core
     class BACnet,Modbus,Mock protocol
     class Claude,Ollama,MCP ai
-    class Supabase,JSON storage
+    class LSTM,Anomaly,Classifier,FeatureEng ml
+    class Supabase,Redis,JSON storage
 ```
 
 ## Backend Architecture
@@ -172,6 +190,28 @@ backend/app/
   - Learning curve confidence 78%→92% over 12 months
   - Module-conditional logic (DALI rule only fires when module active)
   - System breakdown allocating savings to HVAC/Lighting/Power
+- **Agent Memory Service** - Persistent AI institutional knowledge
+  - Building quirks, equipment notes, operator preferences, seasonal patterns, safety notes
+  - Injected into Claude system prompts (both tool and non-tool paths) so AI doesn't re-discover known facts
+  - Supabase table with JSON fallback, CRUD API at `/api/agent-memory`
+- **Redis Session Store** - Write-through session persistence
+  - Generic `RedisSessionStore` used by DiagnosisFlowEngine (1h TTL) and FeedbackCollectionService (4h TTL)
+  - Write-through: always update in-memory + Redis; read: Redis first, memory fallback
+  - Lazy connection with 2s timeouts, graceful degradation to in-memory-only
+- **ML Context Bridge** (Phase 132) - Connects 20 trained ML models to Claude's recommendation engine
+  - `_gather_ml_context()` collects: LSTM forecasts (24/48/72h), anomaly scores (>0.5), fault classifications (>0.4 confidence), health trend slopes, building-level features
+  - `_format_ml_context_section()` formats ML data as readable section in Claude's optimisation prompt
+  - Enables PREDICTIVE recommendations based on future equipment behaviour, not just current state
+  - See: [ML Data Architecture](ML-DATA-ARCHITECTURE.md)
+- **Feature Engineering Service** (Phase 132) - Building-level derived metrics
+  - Energy Use Intensity (EUI): `kWh / m²`
+  - Base Load Index: off-hours consumption / total daily
+  - Cooling Degree Days (CDD): SA climate normalisation (base 18°C)
+  - Building Efficiency Score: composite 0-100 (EUI 35%, BLI 25%, setpoint deviation 25%, CDD-adjusted 15%)
+- **Inspection Priority Scoring** (Phase 132) - Weighted inspection priority per asset
+  - Formula: `days_overdue×0.25 + anomaly×0.25 + fault_history×0.20 + rul_inverse×0.15 + criticality×0.15`
+  - Levels: critical (80+), high (60+), medium (40+), low (20+), routine (<20)
+  - Feeds work order prioritisation and maintenance scheduling
 
 ## Frontend Architecture
 
@@ -510,7 +550,7 @@ flowchart TB
 
 - **Framework:** FastAPI (Python 3.11)
 - **Validation:** Pydantic v2
-- **Database:** Supabase (PostgreSQL) with JSON fallback
+- **Database:** Supabase (PostgreSQL) with Redis cache + JSON fallback
 - **Protocols:** BACnet IP, Modbus TCP/RTU
 - **AI:** Claude API (Sonnet 4), Ollama
 - **Testing:** Pytest
@@ -613,3 +653,8 @@ flowchart TB
 - [Peak Demand Management API](../03-api-reference/peak-demand-api.md) - Demand monitoring and NMD coordination (Phase 081)
 - [Municipal Billing API](../03-api-reference/municipal-billing.md) - Bill ingestion and NMD extraction
 - [Solar & BESS API](../03-api-reference/solar-api.md) - BESS dispatch coordination with demand management
+- [ML Data Architecture](ML-DATA-ARCHITECTURE.md) - ML models, feature engineering, recommendation engine
+- [ML Registry Architecture](ml-registry-architecture.md) - Model versioning and lifecycle
+- [ML Equipment Support](ml-equipment-support.md) - Per-equipment ML capabilities
+- [Optimization API](../03-api-reference/optimization.md) - AI optimisation endpoints with ML context injection
+- [Inspection API](../03-api-reference/inspection.md) - Inspection workflows and priority scoring

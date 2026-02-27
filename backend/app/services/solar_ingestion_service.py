@@ -490,11 +490,16 @@ class SolarIngestionService:
     # === Site overview ===
 
     async def get_site_overview(self, site_id: str) -> Optional[Dict]:
-        """Get high-level site overview combining annual simulation + live connectors.
+        """Get high-level site overview from Supabase snapshots.
+
+        Data source priority:
+        1. solar_hourly_snapshots (persisted by lifecycle simulation) — preferred
+        2. Live connectors (simulated or real hardware) — fallback
+        3. Zeros — when no data exists yet (start-from-0)
 
         Returns:
-        - Annual metrics from cached simulation (R405K savings, 5.88M kWh, learning curve)
-        - Real-time BESS/inverter status from live connectors
+        - Annual metrics from cached simulation
+        - Current solar/BESS values from latest snapshot or connector
         """
         site = self._sites.get(site_id)
         if not site:
@@ -504,58 +509,68 @@ class SolarIngestionService:
             # === Fetch annual summary from cache ===
             annual_data = await self._get_annual_summary(site_id)
 
-            # === Get real-time status from live connectors ===
-            # Connect all connectors
-            for key, connector in site.connectors.items():
-                if not connector.is_connected():
-                    try:
-                        await connector.connect()
-                    except Exception:
-                        continue
+            # === Try Supabase snapshot first (persisted simulation data) ===
+            snapshot = await self._get_latest_snapshot(site_id)
 
-            # Read all inverters from all connectors
-            all_inverters = await self.get_inverters(site_id)
-            inverter_count = len(all_inverters)
-            inverters_online = sum(1 for i in all_inverters if i.status == "online")
-            inverters_fault = sum(1 for i in all_inverters if i.status == "fault")
-            total_pv_kw = sum(i.ac_power_kw for i in all_inverters)
-            total_daily_kwh = sum(i.daily_yield_kwh for i in all_inverters)
-
-            # BESS status
-            bess = await self.get_bess_status(site_id)
-            bess_data = bess.to_dict() if bess else None
-
-            # Meter readings
-            meters = await self.get_meter_readings(site_id)
-            grid_import_kw = sum(m.import_kw for m in meters)
-            grid_export_kw = sum(m.export_kw for m in meters)
-
-            # Plant summaries
-            plant_summaries = []
-            for plant in site.plants.values():
-                plant_inverters = [i for i in all_inverters if i.plant_id == plant.plant_id]
-                current_kw = round(sum(i.ac_power_kw for i in plant_inverters), 1)
-                has_fault = any(i.status == "fault" for i in plant_inverters)
-                plant_summaries.append(
-                    {
-                        "plant_id": plant.plant_id,
-                        "name": plant.name,
-                        "plant_name": plant.name,
-                        "capacity_kwp": plant.capacity_kwp,
-                        "current_kw": current_kw,
-                        "current_generation_kw": current_kw,
-                        "inverters_online": sum(1 for i in plant_inverters if i.status == "online"),
-                        "inverters_total": len(plant_inverters),
-                        "inverter_count": len(plant_inverters),
-                        "status": "fault" if has_fault else "normal",
-                    }
-                )
-
-            # Total plant capacity
+            # Total plant capacity from config
             total_capacity_kwp = sum(p.capacity_kwp for p in site.plants.values())
-            performance_ratio = (total_pv_kw / total_capacity_kwp * 100) if total_capacity_kwp > 0 else 0
+            inverter_count = sum(len(p_cfg.get("inverters", [])) for p_cfg in site.config.get("plants", []))
 
-            # Derive flat fields for frontend SolarOverview compatibility
+            if snapshot:
+                # Use persisted simulation data
+                total_pv_kw = snapshot["solar_gen_kw"]
+                bess_soc = snapshot["bess_soc_pct"]
+                bess_charge = snapshot["bess_charge_kw"]
+                bess_discharge = snapshot["bess_discharge_kw"]
+                grid_import_kw = snapshot["grid_import_kw"]
+                grid_export_kw = snapshot["grid_export_kw"]
+                data_source = "supabase_snapshot"
+
+                # Derive BESS mode from charge/discharge
+                if bess_charge > 0.1:
+                    bess_mode_str = "charging"
+                elif bess_discharge > 0.1:
+                    bess_mode_str = "discharging"
+                else:
+                    bess_mode_str = "idle"
+
+                # Daily yield from today's snapshots
+                total_daily_kwh = await self._get_daily_yield(site_id, snapshot["date"])
+
+                # Inverters: assume all online if generating
+                inverters_online = inverter_count if total_pv_kw > 0 else 0
+                inverters_fault = 0
+
+                logger.debug(f"Solar overview from snapshot: {total_pv_kw:.1f} kW, SOC {bess_soc:.1f}%")
+            else:
+                # === Fallback: live connectors ===
+                for key, connector in site.connectors.items():
+                    if not connector.is_connected():
+                        try:
+                            await connector.connect()
+                        except Exception:
+                            continue
+
+                all_inverters = await self.get_inverters(site_id)
+                inverter_count = len(all_inverters)
+                inverters_online = sum(1 for i in all_inverters if i.status == "online")
+                inverters_fault = sum(1 for i in all_inverters if i.status == "fault")
+                total_pv_kw = sum(i.ac_power_kw for i in all_inverters)
+                total_daily_kwh = sum(i.daily_yield_kwh for i in all_inverters)
+
+                bess = await self.get_bess_status(site_id)
+                bess_soc = bess.soc_pct if bess else 0
+                bess_mode_str = bess.mode if bess else "idle"
+                bess_charge = bess.charge_power_kw if bess else 0
+                bess_discharge = bess.discharge_power_kw if bess else 0
+
+                meters = await self.get_meter_readings(site_id)
+                grid_import_kw = sum(m.import_kw for m in meters)
+                grid_export_kw = sum(m.export_kw for m in meters)
+                data_source = "live_connectors"
+
+            # Compute derived values
+            performance_ratio = (total_pv_kw / total_capacity_kwp * 100) if total_capacity_kwp > 0 else 0
             if performance_ratio > 1:
                 perf_ratio_frac = round(performance_ratio / 100, 3)
             else:
@@ -564,28 +579,54 @@ class SolarIngestionService:
                 self_consumption_pct = round((total_pv_kw - grid_export_kw) / total_pv_kw * 100, 1)
             else:
                 self_consumption_pct = 0
-            bess_soc = bess.soc_pct if bess else 0
-            bess_mode_str = bess.mode if bess else "idle"
 
-            # Build response: annual metrics + live connector data
+            # Plant summaries
+            plant_summaries = []
+            for plant in site.plants.values():
+                # Distribute total PV across plants proportionally
+                plant_frac = plant.capacity_kwp / total_capacity_kwp if total_capacity_kwp > 0 else 0
+                plant_kw = round(total_pv_kw * plant_frac, 1)
+                plant_inv_count = len(
+                    [
+                        inv
+                        for p_cfg in site.config.get("plants", [])
+                        if p_cfg["plant_id"] == plant.plant_id
+                        for inv in p_cfg.get("inverters", [])
+                    ]
+                )
+                plant_summaries.append(
+                    {
+                        "plant_id": plant.plant_id,
+                        "name": plant.name,
+                        "plant_name": plant.name,
+                        "capacity_kwp": plant.capacity_kwp,
+                        "current_kw": plant_kw,
+                        "current_generation_kw": plant_kw,
+                        "inverters_online": plant_inv_count if total_pv_kw > 0 else 0,
+                        "inverters_total": plant_inv_count,
+                        "inverter_count": plant_inv_count,
+                        "status": "normal",
+                    }
+                )
+
             response = {
                 "site_id": site_id,
                 "site_name": site.site_name,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "data_source": "annual_simulation + live_connectors",
+                "data_source": data_source,
                 # Flat fields (frontend SolarOverview interface)
                 "installed_capacity_kwp": round(total_capacity_kwp, 1),
                 "current_generation_kw": round(total_pv_kw, 1),
                 "daily_yield_kwh": round(total_daily_kwh, 0),
                 "expected_daily_yield_kwh": round(total_capacity_kwp * 5, 0),
                 "performance_ratio": perf_ratio_frac,
-                "bess_soc_percent": bess_soc,
+                "bess_soc_percent": round(bess_soc, 1),
                 "bess_mode": bess_mode_str,
                 "grid_import_kw": round(grid_import_kw, 1),
                 "grid_export_kw": round(grid_export_kw, 1),
                 "self_consumption_percent": self_consumption_pct,
                 "estimated_savings_today_zar": round(total_daily_kwh * 5, 0),
-                # Nested details (kept for backwards compatibility)
+                # Nested details
                 "generation": {
                     "total_pv_kw": round(total_pv_kw, 1),
                     "total_daily_kwh": round(total_daily_kwh, 0),
@@ -598,14 +639,18 @@ class SolarIngestionService:
                     "fault": inverters_fault,
                     "offline": inverter_count - inverters_online - inverters_fault,
                 },
-                "bess": bess_data,
+                "bess": {
+                    "soc_pct": round(bess_soc, 1),
+                    "mode": bess_mode_str,
+                    "charge_power_kw": round(bess_charge, 1),
+                    "discharge_power_kw": round(bess_discharge, 1),
+                },
                 "grid": {
                     "import_kw": round(grid_import_kw, 1),
                     "export_kw": round(grid_export_kw, 1),
                     "net_kw": round(grid_import_kw - grid_export_kw, 1),
                 },
                 "plants": plant_summaries,
-                # Annual simulation metrics (if available)
                 "annual_summary": annual_data,
             }
 
@@ -646,6 +691,56 @@ class SolarIngestionService:
         except Exception as e:
             logger.debug(f"Failed to fetch annual summary: {e}")
             return None
+
+    async def _get_latest_snapshot(self, site_id: str) -> Optional[Dict]:
+        """Get the most recent solar_hourly_snapshots row for a site.
+
+        Returns None if no simulation data has been persisted yet,
+        which causes the dashboard to start from 0.
+        """
+        try:
+            supabase = get_supabase_client()
+            response = (
+                supabase.table("solar_hourly_snapshots")
+                .select("*")
+                .eq("site_id", site_id)
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if response.data:
+                return response.data[0]
+            return None
+        except Exception as e:
+            logger.debug(f"Failed to fetch solar snapshot: {e}")
+            return None
+
+    async def _get_daily_yield(self, site_id: str, sim_date: Optional[str] = None) -> float:
+        """Sum solar_gen_kw from a simulated day's hourly snapshots.
+
+        Each snapshot represents 1 hour, so kW × 1h = kWh.
+        """
+        try:
+            if not sim_date:
+                latest = await self._get_latest_snapshot(site_id)
+                if not latest:
+                    return 0.0
+                sim_date = latest["date"]
+
+            supabase = get_supabase_client()
+            response = (
+                supabase.table("solar_hourly_snapshots")
+                .select("solar_gen_kw")
+                .eq("site_id", site_id)
+                .eq("date", sim_date)
+                .execute()
+            )
+            if response.data:
+                return sum(row["solar_gen_kw"] for row in response.data)
+            return 0.0
+        except Exception as e:
+            logger.debug(f"Failed to calculate daily yield: {e}")
+            return 0.0
 
     # === Inverter detail ===
 

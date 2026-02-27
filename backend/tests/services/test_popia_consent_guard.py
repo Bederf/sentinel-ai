@@ -39,15 +39,24 @@ def test_ingress_consent_flow_captures_processing_consent():
 @pytest.mark.unit
 def test_cloud_processing_requires_cross_border_consent():
     """Cloud gate must stay closed without cross-border consent."""
-    subject = f"guard-cross-border-{uuid.uuid4()}"
-    service = get_consent_service()
+    from app.config.settings import settings
 
-    assert should_allow_cloud_processing(subject) is False
+    # Ensure the consent requirement is active for this test
+    original = settings.popia_require_cross_border_consent
+    settings.popia_require_cross_border_consent = True
 
-    service.record_consent(
-        data_subject_id=subject,
-        platform="web",
-        consent_type="cross_border_transfer",
-        consent_given=True,
-    )
-    assert should_allow_cloud_processing(subject) is True
+    try:
+        subject = f"guard-cross-border-{uuid.uuid4()}"
+        service = get_consent_service()
+
+        assert should_allow_cloud_processing(subject) is False
+
+        service.record_consent(
+            data_subject_id=subject,
+            platform="web",
+            consent_type="cross_border_transfer",
+            consent_given=True,
+        )
+        assert should_allow_cloud_processing(subject) is True
+    finally:
+        settings.popia_require_cross_border_consent = original

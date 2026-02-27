@@ -659,15 +659,38 @@ async def get_energy(
     Note:
         Uses Supabase as the authoritative source. Mock fallback is disabled by default
         and can be explicitly enabled with ENERGY_ALLOW_MOCK_FALLBACK=true.
+        Fallback can be used when Supabase query fails, or when it succeeds but returns
+        no rows for the requested site/time window.
     """
     # Try Supabase first
     supabase_data, success = get_energy_from_supabase(site_id, days)
-    if success:
+    if success and supabase_data:
         logger.info("Using Supabase energy data (%s records)", len(supabase_data))
         return EnergyResponse(
             days=days,
             site_id=site_id,
             data=supabase_data,
+        )
+
+    # Query succeeded but there are no rows for this selection.
+    # Keep behavior explicit: only synthesize data if fallback is enabled.
+    if success and not supabase_data:
+        if not settings.energy_allow_mock_fallback:
+            logger.info(
+                "Supabase energy query returned 0 rows for site=%s days=%s; returning empty dataset",
+                site_id,
+                days,
+            )
+            return EnergyResponse(
+                days=days,
+                site_id=site_id,
+                data=[],
+            )
+        logger.warning(
+            "Supabase energy query returned 0 rows for site=%s days=%s; using mock generation "
+            "(ENERGY_ALLOW_MOCK_FALLBACK=true)",
+            site_id,
+            days,
         )
 
     if not settings.energy_allow_mock_fallback:

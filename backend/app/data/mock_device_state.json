@@ -1239,5 +1239,253 @@
   },
   "S002-SENSOR-B1-001": {
     "co2": 0.0
+  },
+  "S002-LTG-041": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-FCU-361": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-FCU-121": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-FCU-061": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-LTG-021": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-DALI-L1-A-MULTI": {
+    "brightness": 0.0,
+    "occupancy": false,
+    "lux": 0.0,
+    "status": false
+  },
+  "S002-FCU-L2-A": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-LTG-341": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-LTG-181": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-FCU-181": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-FCU-321": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-FCU-301": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-FCU-261": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-DALI-L2-B-MULTI": {
+    "brightness": 0.0,
+    "occupancy": false,
+    "temperature": 0.0
+  },
+  "S002-LTG-161": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-FCU-281": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-FCU-241": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-LTG-321": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-FCU-221": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-SENSOR-L2-CO2": {
+    "co2": 0.0
+  },
+  "S002-LTG-081": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-FCU-001": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-LTG-121": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-LTG-261": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-LTG-381": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-LTG-281": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-FCU-041": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-FCU-201": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-LTG-201": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-DALI-B1-CTRL": {
+    "status": false,
+    "alarm": false
+  },
+  "S002-FCU-101": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-LTG-101": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-GEN-B1-002": {
+    "status": false,
+    "level": 0.0,
+    "power": 0.0
+  },
+  "S002-LTG-301": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-FCU-205": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-LTG-241": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-LTG-061": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-VAV-105": {
+    "room_temperature": 22.5,
+    "damper_position": 50.0,
+    "temperature_setpoint": 22.0
+  },
+  "S002-LTG-001": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-VAV-205": {
+    "room_temperature": 22.5,
+    "damper_position": 50.0,
+    "temperature_setpoint": 22.0
+  },
+  "S002-FCU-105": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-FCU-081": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-FCU-021": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-LTG-361": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-LTG-221": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-FCU-141": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-FCU-161": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-FCU-341": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
+  },
+  "S002-LTG-141": {
+    "brightness": 80,
+    "on_off": true,
+    "occupancy": false
+  },
+  "S002-FCU-381": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
   }
 }

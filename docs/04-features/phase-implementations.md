@@ -21,6 +21,78 @@ Consolidated documentation of completed and in-progress phases, including implem
 
 All phases organized by number with implementation status, completion date, and key deliverables.
 
+### Phase 132: ML→Claude Context Bridge
+
+**Status:** ✅ Complete | **Date:** 2026-02-27
+
+**Achievement:** Bridged the critical gap between 20 trained ML models and Claude's AI Recommendation Engine. Previously, Claude made recommendations based on current state only. Now, ML predictions (LSTM forecasts, anomaly scores, fault classifications, health trends) are injected into Claude's optimisation prompt, enabling predictive recommendations.
+
+**Key deliverables:**
+
+- **ML Context Injection** (`ai_optimizer.py`): `_gather_ml_context()` collects outputs from all active ML services; `_format_ml_context_section()` renders them as a readable prompt section between Current Conditions and Weather Forecast
+- **Feature Engineering Service** (`feature_engineering_service.py`): Computes building-level derived features — EUI (kWh/m²), Base Load Index, Cooling Degree Days, Building Efficiency Score (0-100)
+- **Inspection Priority Scoring** (`inspection_priority_service.py`): 5-component weighted formula (days_overdue, anomaly, faults, RUL, criticality) producing 0-100 priority score per asset
+- **ML Architecture Reference** (`docs/02-architecture/ML-DATA-ARCHITECTURE.md`): Comprehensive technical reference covering Building Operations ML, Equipment Condition ML, and Unified AI Recommendation Engine
+- **Documentation updates**: system-overview.md, optimization.md, inspection.md updated with ML integration details
+
+**Remaining gaps:** Occupancy prediction (XGBoost, Phase 130-02d), building-wide EUI anomaly model, RUL prediction (stub only)
+
+---
+
+### Agent Memory + Redis Session Persistence
+
+**Status:** ✅ Complete | **Date:** 2026-02-27
+
+**Achievement:** Added persistent conversational memory (agent memory table) and Redis write-through session persistence for DiagnosisFlow and FeedbackSession, closing two critical gaps identified in the SENTINEL architecture audit.
+
+**Key deliverables:**
+- **Redis Session Store** (`RedisSessionStore`) — Generic write-through store with configurable prefix, TTL, and deserializer. Graceful degradation to in-memory when Redis unavailable.
+- **DiagnosisFlow persistence** — 1h TTL, key `bms:diagnosis:{session_id}`. Technicians don't lose diagnosis progress on backend restart.
+- **FeedbackSession persistence** — 4h TTL, key `bms:feedback:{session_id}`. Service feedback survives restarts with full template/item roundtrip.
+- **Agent Memory table** — Supabase migration with 5 context types (`building_quirk`, `equipment_note`, `operator_preference`, `seasonal`, `safety_note`), upsert on composite key `(site_id, equipment_code, key)`
+- **Agent Memory CRUD API** — 6 endpoints at `/api/agent-memory`: list, get by equipment, get by ID, create/upsert, update, delete
+- **Prompt injection** — Agent memory injected into BOTH `build_system_prompt_with_context()` and `build_system_prompt_for_tools()` (~2K chars, max 20 memories, grouped by context_type)
+- **7 seed memories** — Building quirks, equipment notes, operator preferences, seasonal patterns, safety notes for site-002
+
+**Key files:**
+- `backend/app/services/redis_session_store.py` (generic write-through store)
+- `backend/app/services/technician_chat.py` (DiagnosisFlow persistence wiring)
+- `backend/app/services/feedback_collection_service.py` (FeedbackSession persistence wiring)
+- `backend/supabase/migrations/20260227_001_agent_memory.sql` (table + indexes + RLS)
+- `backend/app/database/repositories/agent_memory_repository.py` (CRUD with JSON fallback)
+- `backend/app/api/agent_memory.py` (REST endpoints)
+- `backend/app/services/fm_context.py` (`get_agent_memory_context()`)
+- `backend/app/services/claude_service.py` (prompt injection in both builders)
+
+**Test coverage:** 581 tests passing, 2 security tests passing
+
+---
+
+### Phase 130: Lighting Telemetry Intelligence (CSV Ingestion)
+
+**Status:** 🔄 In Progress (Plan 130-02a COMPLETE) | **Date:** 2026-02-26
+
+**Achievement:** Built CSV ingestion tooling for Desigo BACnet exports with automatic lighting point classification. PointClassifier extended with 8 new lighting categories and Tridonic/net4more equipment patterns.
+
+**Key deliverables:**
+- `POST /api/niagara/discover/csv` — Upload Desigo CSV exports, auto-classify HVAC + lighting
+- 8 new lighting point categories in `haystack_tags.json`: `lighting_power`, `lighting_energy`, `driver_temperature`, `lamp_hours`, `light_output`, `emergency_battery`, `emergency_test`, `charge_status`
+- Enhanced equipment patterns: `dali_controller` (+net4more, n4m), `luminaire` (+dali-lum), `light_sensor` (+dali-sens, dali-pir), `emergency_luminaire` (new)
+- `discover_from_csv()` method parsing hierarchical Desigo names (`STC/{level}/{equip}/{point}`)
+- Classifier precision fixes: removed overly generic keywords ("amp", "level") causing false positives
+
+**Key files:**
+- `backend/app/data/niagara/haystack_tags.json` (8 lighting categories)
+- `backend/app/services/niagara/point_discovery.py` (CSV ingestion methods)
+- `backend/app/api/niagara_discovery.py` (CSV upload endpoint)
+- `backend/tests/services/test_desigo_csv_ingestion.py` (15 tests)
+
+**Test coverage:** 15 new tests (45 total lighting tests: 15 CSV + 15 sceneCOM + 15 simulation)
+
+**Remaining:** 130-01 (model extensions), 130-02b-d (real-time ingestion), 130-03 (health scoring), 130-04 (energy/compliance)
+
+---
+
 ### Phase 109C: Site-002 deterministic mode policy dry-run
 
 **Status:** ✅ Complete (dry-run scaffolding) | **Date:** 2026-02-21
@@ -343,6 +415,11 @@ All phases organized by number with implementation status, completion date, and 
 - **Phase 093**: Energy verification and calculations
 - **Phase 082**: Optimization tier router (v14.0)
 
+### AI & Session Management
+
+- **Agent Memory**: Persistent institutional knowledge (building quirks, operator preferences, safety notes) injected into Claude prompts
+- **Redis Session Persistence**: Write-through Redis store for DiagnosisFlow (1h TTL) and FeedbackSession (4h TTL)
+
 ### Autonomous Control & PARASITE
 
 - **Phase 067**: Technical debt remediation (v14.0)
@@ -385,6 +462,7 @@ All phases organized by number with implementation status, completion date, and 
 
 | Phase | Feature | Status | Date | Impact |
 |-------|---------|--------|------|--------|
+| — | Agent Memory + Redis Sessions | ✅ Complete | 2026-02-27 | Session persistence + institutional memory |
 | 067 | Tech debt remediation | ✅ Complete | 2026-02-11 | 11,321 LOC eliminated |
 | 068 | Frontend test quality | ✅ Partial | 2026-02-12 | 95.3% pass rate |
 | 080 | PARASITE gap fill | ✅ Complete | 2026-02-12 | Tier 1-3 autonomy |

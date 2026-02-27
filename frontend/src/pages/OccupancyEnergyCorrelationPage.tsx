@@ -374,7 +374,7 @@ export function OccupancyEnergyCorrelationPage() {
                     <span className="font-semibold text-green-400">{savingsData.optimized_state.hvac_kwh} kWh</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Lighting (DALI)</span>
+                    <span className="text-gray-400">Lighting</span>
                     <span className="font-semibold text-green-400">{savingsData.optimized_state.lighting_kwh} kWh</span>
                   </div>
                   <div className="border-t border-gray-700 pt-3 flex justify-between">
@@ -496,8 +496,8 @@ export function OccupancyEnergyCorrelationPage() {
           <div className="flex gap-3">
             <Lightbulb className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-1" />
             <div>
-              <h3 className="font-semibold text-gray-100">DALI Daylight Harvesting</h3>
-              <p className="text-sm text-gray-400 mt-1">Enable daylight harvesting on DALI ballasts when natural light is sufficient. Reduces artificial lighting by 5%. ROI: 12 months.</p>
+              <h3 className="font-semibold text-gray-100">Daylight Harvesting</h3>
+              <p className="text-sm text-gray-400 mt-1">Enable daylight harvesting on lighting ballasts when natural light is sufficient. Reduces artificial lighting by 5%. ROI: 12 months.</p>
             </div>
           </div>
 

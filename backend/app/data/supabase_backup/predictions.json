@@ -1,0 +1,1077 @@
+[
+  {
+    "id": "00143401-e79b-48b4-8282-dd243a0b082e",
+    "code": "pred-auto-df899034",
+    "equipment_id": "a45c3256-d610-4f24-acca-c15cf3fafed9",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "bearing_failure",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 85,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 85,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 15000.0,
+    "replacement_cost_zar": 120000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 55000.0,
+    "severity": "warning",
+    "recommended_action": "Replace bearings and check lubrication system. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.112556+00:00",
+    "updated_at": "2026-02-26T15:41:56.112556+00:00"
+  },
+  {
+    "id": "0e17dd01-98af-4833-9611-bd2b011e5705",
+    "code": "pred-auto-fbf8ca8f",
+    "equipment_id": "0804c57e-c9af-4689-a717-ab41e0d73351",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 74,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 74,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.812049+00:00",
+    "updated_at": "2026-02-26T15:41:56.812049+00:00"
+  },
+  {
+    "id": "1280f709-8d0d-4f29-85e8-e22586709242",
+    "code": "pred-auto-2e63ac4d",
+    "equipment_id": "d3fc3e21-92d2-4fb9-8bdd-030aaaa14f2f",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 88,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 88,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.606034+00:00",
+    "updated_at": "2026-02-26T15:41:56.606034+00:00"
+  },
+  {
+    "id": "1f5c9312-98b8-4b81-8ad4-8acf7d83b50e",
+    "code": "pred-auto-71437674",
+    "equipment_id": "9b36b5af-f65d-47bd-8a7e-129a566be4ea",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 88,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 88,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.520147+00:00",
+    "updated_at": "2026-02-26T15:41:56.520147+00:00"
+  },
+  {
+    "id": "2c2b5043-0a91-4de9-9200-0b8ef4d3d6ed",
+    "code": "pred-auto-03591e17",
+    "equipment_id": "0d4be987-56fb-4583-a102-d35fff23834f",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 88,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 88,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.006663+00:00",
+    "updated_at": "2026-02-26T15:41:56.006663+00:00"
+  },
+  {
+    "id": "32270c6b-d533-4951-af6e-589b4dbfbe33",
+    "code": "pred-auto-a9d33acc",
+    "equipment_id": "90b7a290-54b1-4756-b7cc-d99431ed7a4c",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 85,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 85,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.351273+00:00",
+    "updated_at": "2026-02-26T15:41:56.351273+00:00"
+  },
+  {
+    "id": "3559c0eb-02c3-4f79-97ff-97f5525b74e2",
+    "code": "pred-auto-3b45b216",
+    "equipment_id": "4289e671-e648-4fa5-afb6-0cb49b90d209",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "bearing_failure",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 85,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 85,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 15000.0,
+    "replacement_cost_zar": 120000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 55000.0,
+    "severity": "warning",
+    "recommended_action": "Replace bearings and check lubrication system. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.121200+00:00",
+    "updated_at": "2026-02-26T15:41:56.121200+00:00"
+  },
+  {
+    "id": "3a64ad56-87b8-461d-8219-ef2f125a90b4",
+    "code": "pred-auto-f05c2c4b",
+    "equipment_id": "32dfa649-3d58-4e54-aa94-201edd151210",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 85,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 85,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.880713+00:00",
+    "updated_at": "2026-02-26T15:41:56.880713+00:00"
+  },
+  {
+    "id": "4d6f22d4-0bbf-4457-b251-e463264e64b9",
+    "code": "pred-auto-ece68dca",
+    "equipment_id": "e69dbbd0-96bf-4569-9574-10dabd047f17",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 81,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 81,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.732724+00:00",
+    "updated_at": "2026-02-26T15:41:56.732724+00:00"
+  },
+  {
+    "id": "5290e51f-3ad1-4a6a-9d3a-46c4c97812c2",
+    "code": "pred-auto-de5a4bd6",
+    "equipment_id": "5fa25590-6efd-4f0d-bbe6-2ed5c5393a63",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 84,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 84,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.622578+00:00",
+    "updated_at": "2026-02-26T15:41:56.622578+00:00"
+  },
+  {
+    "id": "568ff27c-1eb2-4762-bcd8-2f2dfda71916",
+    "code": "pred-auto-ce578297",
+    "equipment_id": "5dbf1b8f-d925-450b-aa1f-4a3c24b69251",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "battery_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 88,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 88,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 35000.0,
+    "replacement_cost_zar": 650000.0,
+    "downtime_cost_per_hour_zar": 25000.0,
+    "potential_loss_zar": 235000.0,
+    "severity": "warning",
+    "recommended_action": "Test battery cells and schedule replacement. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.217290+00:00",
+    "updated_at": "2026-02-26T15:41:56.217290+00:00"
+  },
+  {
+    "id": "6321a4df-92ab-4373-acf8-707e9940139b",
+    "code": "pred-auto-ef627ad7",
+    "equipment_id": "5ec30726-0a2d-460c-bba3-4be962219a7f",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 87,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 87,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.494342+00:00",
+    "updated_at": "2026-02-26T15:41:56.494342+00:00"
+  },
+  {
+    "id": "792b4d8d-41af-47ad-afce-658e7b0b4a32",
+    "code": "pred-auto-348d4660",
+    "equipment_id": "bb613340-fc3a-4848-86e4-1390809fa966",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 76,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 76,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.685036+00:00",
+    "updated_at": "2026-02-26T15:41:56.685036+00:00"
+  },
+  {
+    "id": "7ba0d1dc-6f64-46bc-a80e-08b54560a763",
+    "code": "pred-auto-98e8b96f",
+    "equipment_id": "94f8a3ec-914d-4c63-a824-9a64fd463b6b",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 89,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 89,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.428596+00:00",
+    "updated_at": "2026-02-26T15:41:56.428596+00:00"
+  },
+  {
+    "id": "7d69cd0a-3b0c-4174-8258-323ca77562d0",
+    "code": "pred-auto-2b2efdab",
+    "equipment_id": "2c7638ba-e9c1-4f96-86dc-1a1d779bd69a",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 85,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 85,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.829128+00:00",
+    "updated_at": "2026-02-26T15:41:56.829128+00:00"
+  },
+  {
+    "id": "9e077cbb-f603-412d-b77c-453427b44c2f",
+    "code": "pred-auto-2f185195",
+    "equipment_id": "0fe99126-24ec-428b-88df-a96ec457331f",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 85,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 85,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.199956+00:00",
+    "updated_at": "2026-02-26T15:41:56.199956+00:00"
+  },
+  {
+    "id": "9f6770ff-9f65-41b0-9119-9b597762b0f7",
+    "code": "pred-auto-09561eca",
+    "equipment_id": "654562e1-e91d-46a1-8f8b-811d2d63bf74",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 77,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 77,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.796039+00:00",
+    "updated_at": "2026-02-26T15:41:56.796039+00:00"
+  },
+  {
+    "id": "b10509a4-a3a9-40ec-82bf-00032083ddee",
+    "code": "pred-auto-583b895e",
+    "equipment_id": "6ca49ccb-3bc7-42a4-bc1d-3f05fd9bf94e",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 85,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 85,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.085129+00:00",
+    "updated_at": "2026-02-26T15:41:56.085129+00:00"
+  },
+  {
+    "id": "b33f2fb1-2f14-4321-87f8-533af594f4bf",
+    "code": "pred-auto-06a6e8bb",
+    "equipment_id": "720fe06e-def7-4055-8e31-0c4723f70eda",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 79,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 79,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.633704+00:00",
+    "updated_at": "2026-02-26T15:41:56.633704+00:00"
+  },
+  {
+    "id": "bfe54d5b-ff41-47d0-b6b1-64bb9d48055b",
+    "code": "pred-auto-ab777a1c",
+    "equipment_id": "1bbd40bb-3419-4008-994a-77b38b0db42e",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "belt_wear",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 85,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 85,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 25000.0,
+    "replacement_cost_zar": 450000.0,
+    "downtime_cost_per_hour_zar": 8000.0,
+    "potential_loss_zar": 89000.0,
+    "severity": "warning",
+    "recommended_action": "Replace drive belts and check pulley alignment. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:55.791955+00:00",
+    "updated_at": "2026-02-26T15:41:55.791955+00:00"
+  },
+  {
+    "id": "c4fbad00-1184-4b9e-b6fa-5407cb56ab7b",
+    "code": "pred-auto-93d232f3",
+    "equipment_id": "787d6f98-0ee4-4268-aacc-7e19dca97ebe",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 85,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 85,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.181648+00:00",
+    "updated_at": "2026-02-26T15:41:56.181648+00:00"
+  },
+  {
+    "id": "c6239f77-3a2e-4950-84e4-fcd71473694a",
+    "code": "pred-auto-96877df7",
+    "equipment_id": "92855e8b-eb94-4ce5-b72a-953c3dcdc325",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 86,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 86,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.541665+00:00",
+    "updated_at": "2026-02-26T15:41:56.541665+00:00"
+  },
+  {
+    "id": "d9237e93-9fa5-41a4-8a71-9b1c8fd37011",
+    "code": "pred-auto-6457e9ce",
+    "equipment_id": "b7ba35c6-c7ba-4470-97eb-db6a2346f94a",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 81,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 81,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:55.904535+00:00",
+    "updated_at": "2026-02-26T15:41:55.904535+00:00"
+  },
+  {
+    "id": "dfdb1297-8df7-4138-ab26-9a53f915a760",
+    "code": "pred-auto-345b7f8d",
+    "equipment_id": "4f6600f7-03e5-42a4-920c-dba0d78704fe",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "component_degradation",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 86,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 86,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 20000.0,
+    "replacement_cost_zar": 200000.0,
+    "downtime_cost_per_hour_zar": 5000.0,
+    "potential_loss_zar": 60000.0,
+    "severity": "warning",
+    "recommended_action": "Schedule comprehensive equipment inspection. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.231271+00:00",
+    "updated_at": "2026-02-26T15:41:56.231271+00:00"
+  },
+  {
+    "id": "ef630a77-a114-481b-b9a3-acba96874e64",
+    "code": "pred-auto-ef55c477",
+    "equipment_id": "49a2f2e3-1366-48b5-a1b5-fc543443fbb0",
+    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "prediction_type": "belt_wear",
+    "probability_percent": 60,
+    "confidence": "low",
+    "predicted_failure_date": "2026-03-12",
+    "timeframe_days": 14,
+    "evidence": {
+      "data_source": "automatic_health_monitoring",
+      "health_score": 85,
+      "health_trend": "stable",
+      "last_reading": {
+        "trend": "declining",
+        "value": 85,
+        "baseline": 90,
+        "parameter": "health_score",
+        "threshold": 70
+      },
+      "formula_version": "v1.0-static"
+    },
+    "contributing_factors": [
+      {
+        "factor": "Health Monitoring",
+        "weight": 0.5,
+        "description": "Detected through automated health monitoring"
+      }
+    ],
+    "similar_failures": [],
+    "repair_cost_zar": 25000.0,
+    "replacement_cost_zar": 450000.0,
+    "downtime_cost_per_hour_zar": 8000.0,
+    "potential_loss_zar": 89000.0,
+    "severity": "warning",
+    "recommended_action": "Replace drive belts and check pulley alignment. Schedule within 7 days.",
+    "parts_required": null,
+    "urgency": "warning",
+    "status": "active",
+    "created_at": "2026-02-26T15:41:56.129588+00:00",
+    "updated_at": "2026-02-26T15:41:56.129588+00:00"
+  }
+]

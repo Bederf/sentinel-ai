@@ -291,18 +291,43 @@ async def startup_event(app: FastAPI) -> None:
             _logger.warning(f"⚠️ POPIA retention job initialization failed: {e}")
 
     # AEGIS Phase 0 — dispatch cycle (5 min) + daily evidence collector (24h)
-    # Generates proposals via arbitrage engine, collects tracker evidence automatically
+    # Gated by solar module being active (AEGIS is the Solar/BESS dispatch optimizer)
+    _aegis_enabled = False
     try:
-        scheduler_service.add_aegis_cycle_job(interval_seconds=300, site_id="site-002")
-        _logger.info("✅ AEGIS dispatch cycle job initialized (5 min interval)")
-    except Exception as e:
-        _logger.warning(f"⚠️ AEGIS cycle job initialization failed: {e}")
+        from app.services.module_registry_service import ModuleRegistryService
 
-    try:
-        scheduler_service.add_aegis_evidence_collector_job(interval_seconds=86400, site_id="site-002")
-        _logger.info("✅ AEGIS evidence collector job initialized (24h interval)")
-    except Exception as e:
-        _logger.warning(f"⚠️ AEGIS evidence collector job initialization failed: {e}")
+        _registry = ModuleRegistryService()
+        _aegis_enabled = _registry.is_module_active("site-002", "solar")
+    except Exception:
+        # Fallback: check JSON directly
+        try:
+            import json as _json
+            from pathlib import Path as _Path
+
+            _mods_path = _Path(settings.data_dir) / "modules" / "site_modules.json"
+            if _mods_path.exists():
+                _mods_data = _json.loads(_mods_path.read_text())
+                _aegis_enabled = any(
+                    m.get("module_type") == "solar" and m.get("status") == "active"
+                    for m in _mods_data.get("site-002", {}).get("active_modules", [])
+                )
+        except Exception:
+            pass
+
+    if _aegis_enabled:
+        try:
+            scheduler_service.add_aegis_cycle_job(interval_seconds=300, site_id="site-002")
+            _logger.info("✅ AEGIS dispatch cycle job initialized (5 min interval)")
+        except Exception as e:
+            _logger.warning(f"⚠️ AEGIS cycle job initialization failed: {e}")
+
+        try:
+            scheduler_service.add_aegis_evidence_collector_job(interval_seconds=86400, site_id="site-002")
+            _logger.info("✅ AEGIS evidence collector job initialized (24h interval)")
+        except Exception as e:
+            _logger.warning(f"⚠️ AEGIS evidence collector job initialization failed: {e}")
+    else:
+        _logger.info("⏸️ AEGIS dispatch cycle SKIPPED — solar module not active for site-002")
 
     # Phase 130: Occupancy-driven HVAC + lighting control loop
     if settings.occupancy_poll_enabled:
@@ -329,13 +354,10 @@ async def startup_event(app: FastAPI) -> None:
     async def recover_crashed_simulations():
         """
         Recover simulations that were running when server crashed/restarted.
-        Tasks with a valid checkpoint are re-queued for the queue processor.
-        Tasks running >48 hours wall-clock with no checkpoint are marked failed.
+        Only the newest task with a valid checkpoint is re-queued.
+        All other crashed tasks are marked stopped.
         """
         try:
-            from datetime import datetime as dt
-            from datetime import timedelta
-
             from app.services.simulation_store import get_simulation_store
 
             store = get_simulation_store("site-002")
@@ -350,46 +372,29 @@ async def startup_event(app: FastAPI) -> None:
 
             _logger.info(f"Found {len(crashed)} crashed simulation(s) to recover...")
 
-            max_age = timedelta(hours=48)
-            now = dt.utcnow()
+            # Sort by created_at descending — newest first
+            crashed.sort(key=lambda x: x[1].get("created_at", ""), reverse=True)
 
+            resumed_one = False
             for task_id, task in crashed:
                 state_snapshot = task.get("state_snapshot")
-                created_at = task.get("created_at", "")
 
-                try:
-                    task_age = now - dt.fromisoformat(created_at.replace("Z", "+00:00").replace("+00:00", ""))
-                except Exception:
-                    task_age = max_age
-
-                if not state_snapshot:
-                    if task_age > max_age:
-                        _logger.warning(f"Task {task_id} has no checkpoint and is >{max_age} old — marking failed")
-                        store.update_task_progress(
-                            task_id,
-                            {
-                                "status": "failed",
-                                "error_message": "Stale: no checkpoint after 48h",
-                            },
+                if not resumed_one and state_snapshot:
+                    # Resume the newest task that has a checkpoint
+                    try:
+                        store.update_task_progress(task_id, {"status": "queued", "error_message": None})
+                        days_simulated = state_snapshot.get("days_simulated", 0)
+                        simulated_time = state_snapshot.get("simulated_time", "unknown")
+                        _logger.info(
+                            f"Queued recovery for task {task_id}: day {days_simulated}/365, time {simulated_time}"
                         )
-                    else:
-                        _logger.warning(f"Task {task_id} has no checkpoint — marking failed")
-                        store.update_task_progress(
-                            task_id,
-                            {
-                                "status": "failed",
-                                "error_message": "No checkpoint state available for recovery",
-                            },
-                        )
-                    continue
-
-                try:
-                    store.update_task_progress(task_id, {"status": "queued", "error_message": None})
-                    days_simulated = state_snapshot.get("days_simulated", 0)
-                    simulated_time = state_snapshot.get("simulated_time", "unknown")
-                    _logger.info(f"Queued recovery for task {task_id}: day {days_simulated}/365, time {simulated_time}")
-                except Exception as e:
-                    _logger.error(f"Failed to queue recovery for task {task_id}: {e}")
+                        resumed_one = True
+                    except Exception as e:
+                        _logger.error(f"Failed to queue recovery for task {task_id}: {e}")
+                else:
+                    # Mark all others as stopped
+                    store.update_task_progress(task_id, {"status": "stopped"})
+                    _logger.info(f"Marked stale task {task_id} as stopped")
 
         except Exception as e:
             _logger.error(f"Crash recovery initialization failed: {e}")
@@ -499,11 +504,12 @@ async def startup_event(app: FastAPI) -> None:
         except Exception as e:
             _logger.error(f"Failed to auto-start sentinel_annual simulation: {e}")
 
-    # Auto-start disabled — simulation should be started manually via API
-    # try:
-    #     await auto_start_sentinel_simulation()
-    # except Exception as e:
-    #     _logger.error(f"Error during sentinel auto-start: {e}")
+    # Auto-resume: if crash recovery queued a simulation it will be picked up
+    # by the queue processor. If nothing is queued/running, auto-start fresh.
+    try:
+        await auto_start_sentinel_simulation()
+    except Exception as e:
+        _logger.error(f"Error during sentinel auto-start: {e}")
 
     # Start system health snapshot job (runs every 5 minutes)
     # Stores point-in-time health snapshots for trend analysis and historical reporting

@@ -2,12 +2,13 @@
 
 ## Overview
 
-Call log endpoints support the Sentry bot's general staff defect reporting workflow. Non-technical users (office workers, cleaners, security guards) report building issues via Telegram. The bot classifies the complaint against a fixed taxonomy and creates an inspection work order.
+Call log endpoints support the Sentry bot's general staff defect reporting workflow. Non-technical users (office workers, cleaners, security guards) report building issues via Telegram, WhatsApp, mobile app, or email. The bot classifies the complaint against a fixed taxonomy and creates an inspection work order.
 
-Two endpoints:
+Three endpoints:
 
 1. **`POST /api/sentry/call-log`** — Create an inspection work order from a classified complaint
 2. **`POST /api/sentry/call-log/escalate`** — Escalate an unclassifiable complaint to the facilities supervisor
+3. **`GET /api/sentry/call-log/location-memory`** — Lookup last confirmed location for reporter prefill
 
 ## POST /api/sentry/call-log
 
@@ -37,6 +38,8 @@ X-Sentry-API-Key: <configured API key>
   "description": "Reported by Jane via Telegram.\nDiscipline: Plumbing\nSub-category: Leaking tap\nLocation: Desk 208, L2, site-002\nPriority: medium\n\nReporter's description: dripping tap near my desk\n\nCall-logged defect — inspection required.",
   "reported_by": "Jane",
   "reporter_telegram_id": "12345678",
+  "reporter_phone": "+27721234567",
+  "channel": "whatsapp",
   "original_message": "dripping tap near my desk"
 }
 ```
@@ -56,7 +59,26 @@ X-Sentry-API-Key: <configured API key>
 | `description` | string | Yes | Full description with context |
 | `reported_by` | string | No | Reporter display name |
 | `reporter_telegram_id` | string | No | Reporter Telegram ID for audit |
+| `reporter_phone` | string | No | Reporter mobile number for location memory |
+| `channel` | string | No | Source channel (`telegram`, `whatsapp`, `mobile`, `email`) |
 | `original_message` | string | No | Raw user message (stored for context, not used for routing) |
+
+### Pre-approved location gate and memory behavior
+
+Before logging a work order, the intake flow must satisfy this gate:
+
+1. `category` / `sub_category` / `priority` resolved from fixed taxonomy
+2. Location confirmed (`desk_id` OR floor/area text)
+3. User confirmation received
+
+Location memory is used to reduce repeat questions:
+
+1. First report: user supplies desk/location manually
+2. Backend stores reporter-to-location memory after successful log
+3. Next report: client can query `GET /api/sentry/call-log/location-memory` using `reporter_phone` or `reporter_telegram_id`
+4. Bot/app pre-fills the location and asks for confirmation before creating the next WO
+
+Current limitation: location is still user-confirmed. AD profile location and access-card-based location are not integrated in the current version.
 
 **Response (200 OK):**
 
@@ -90,6 +112,7 @@ X-Sentry-API-Key: <configured API key>
 2. Assigns technician by specialty lookup in `site_technicians` table (falls back to `general` specialty)
 3. Sends Telegram notification to assigned technician (if `telegram_id` configured)
 4. Maps `critical` priority to `urgent` in WO system
+5. Stores reporter location memory (`reporter_phone`/`reporter_telegram_id` -> last confirmed desk/location)
 
 **Technician assignment logic:**
 
@@ -181,6 +204,62 @@ Escalates an unmatched complaint to the facilities supervisor. Called by the cal
 
 ---
 
+## GET /api/sentry/call-log/location-memory
+
+Lookup endpoint for reporter last-known location memory, used to prefill manual location confirmation on mobile channels.
+
+**Authentication:** Required — both `X-Sentry-Secret` and `X-Sentry-API-Key` headers.
+
+**Query parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `reporter_phone` | string | Conditional | Mobile number (recommended) |
+| `reporter_telegram_id` | string | Conditional | Telegram reporter ID |
+
+At least one of `reporter_phone` or `reporter_telegram_id` must be provided.
+
+Use the lookup as a prefill only. Always ask the user to confirm or correct the location before logging.
+
+**Response (found):**
+
+```json
+{
+  "success": true,
+  "found": true,
+  "reporter_phone": "+27721234567",
+  "reporter_telegram_id": "12345678",
+  "reporter_name": "Jane",
+  "site_id": "site-002",
+  "zone_id": "Zone-208",
+  "floor": "L2",
+  "desk_id": "208",
+  "location_text": "Desk 208, L2, Zone-208",
+  "last_confirmed_at": "2026-02-27T12:20:00",
+  "last_work_order_code": "WO-2026-0035"
+}
+```
+
+**Response (not found):**
+
+```json
+{
+  "success": true,
+  "found": false,
+  "reporter_phone": "+27721234567",
+  "reporter_telegram_id": ""
+}
+```
+
+**Error responses:**
+
+| Code | Condition |
+|------|-----------|
+| 400 | Neither reporter identifier provided |
+| 403 | Missing or invalid `X-Sentry-Secret` / `X-Sentry-API-Key` |
+
+---
+
 ## Fixed Taxonomy Reference
 
 The call log handler uses a closed set of 10 disciplines / 46 sub-categories. View the full list:
@@ -228,4 +307,6 @@ python3 $SENTRY_HOME/tools/call_log.py categories
 - CLI tool: `$SENTRY_HOME/tools/call_log.py`
 - Skill doc: `$SENTRY_HOME/skills/sentry_call_logging.md`
 - Backend endpoints: `backend/app/api/sentry_webhooks.py`
+- Reporter memory repository: `backend/app/database/repositories/reporter_location_repository.py`
+- Reporter memory fallback store: `backend/app/data/reporter_location_memory.json`
 - Escalation log: `backend/app/data/call_log_escalations.json`

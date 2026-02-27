@@ -450,6 +450,112 @@ if (result.success) {
 - **`bulk_discover_equipment`** - Fetch full metadata for discovered devices
 - **`add_building_zones`** - Create zone mappings for DALI zones
 - **`import_point_list`** - For importing HVAC/other non-DALI equipment
+- **`POST /api/niagara/discover/csv`** - Upload Desigo CSV BACnet exports with lighting point classification (see below)
+
+---
+
+## Desigo CSV Point Export Ingestion (Phase 130)
+
+### Overview
+
+When a Desigo CC system has Tridonic lighting points exposed via net4more BACnet gateway, the standard BACnet export CSV will contain both HVAC and lighting points. The CSV ingestion endpoint classifies all points automatically, identifying 8 lighting-specific categories alongside standard HVAC equipment.
+
+### API Endpoint
+
+```
+POST /api/niagara/discover/csv
+```
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `file` | File upload | Yes | CSV file from Desigo CC BACnet export |
+| `site_id` | string (query) | Yes | SENTINEL site ID (e.g., `site-002`) |
+| `source_label` | string (query) | No | Label for this export (default: `desigo-export`) |
+
+**Expected CSV format** (Desigo CC export):
+```csv
+name,object_type,instance,units,present_value,description,min_value,max_value,writable
+STC/L1/DALI-01/Lum01_DimLevel,analogOutput,3000,percent,85,Luminaire 01 dimming level,0,100,True
+STC/L1/DALI-01/Lum01_ActivePower,analogInput,3001,watt,42.5,Luminaire 01 active power,0,120,False
+STC/RF/AHU-01/SupplyAirTemp,analogInput,1000,degC,15.2,Supply air temperature,12.0,25.0,False
+```
+
+**Hierarchical name parsing:**
+- `STC/L1/DALI-01/Lum01_DimLevel` → equipment_id=`DALI-01`, point=`Lum01_DimLevel`
+- `STC/RF/AHU-01/SupplyAirTemp` → equipment_id=`AHU-01`, point=`SupplyAirTemp`
+
+### Lighting Point Categories
+
+The PointClassifier recognizes 8 lighting-specific categories from Tridonic/net4more BACnet naming:
+
+| Category | Keywords | Example Point Names |
+|----------|----------|-------------------|
+| `brightness` | dimlevel, dim_level, brightness | `Lum01_DimLevel` |
+| `lighting_power` | activepower, active_power, luminaire_power | `Lum01_ActivePower` |
+| `lighting_energy` | accumenergy, accum_energy, accumulated_energy | `Lum01_AccumEnergy` |
+| `driver_temperature` | drivertemp, driver_temp | `Lum01_DriverTemp` |
+| `lamp_hours` | lamphours, lamp_hours, operating_hours | `Lum01_LampHours` |
+| `light_output` | lightoutput, light_output, luminous_flux | `Lum01_LightOutput` |
+| `emergency_battery` | embatt, em_batt, battlevel | `Em01_BattLevel` |
+| `emergency_test` | emtest, em_test, testresult | `Em01_TestResult` |
+
+### Equipment Pattern Recognition
+
+| Pattern | Match Examples | Equipment Type |
+|---------|---------------|---------------|
+| `dali_controller` | DALI-01, DALI-CTRL, net4more, n4m | `dali_controller` |
+| `luminaire` | LUM-01, DALI-LUM, dali-l | `luminaire` |
+| `light_sensor` | PIR-01, DALI-SENS, dali-pir | `light_sensor` |
+| `emergency_luminaire` | EM-LUM, EMERG-LUM | `emergency_luminaire` |
+
+### Response Format
+
+```json
+{
+  "discovery_id": "csv-site-002-desigo-export-20260226T143000",
+  "status": "complete",
+  "total_points": 397,
+  "classified_points": 385,
+  "equipment_groups": 24,
+  "lighting_summary": {
+    "total": 19,
+    "by_category": {
+      "brightness": 2,
+      "lighting_power": 2,
+      "lighting_energy": 1,
+      "lux": 3,
+      "lamp_hours": 1,
+      "emergency_battery": 1,
+      "emergency_test": 1,
+      "lamp_status": 2
+    },
+    "by_equipment_type": {
+      "dali_controller": 19
+    }
+  }
+}
+```
+
+### Usage Example
+
+**Getting the CSV from Desigo CC:**
+1. Open Desigo CC Management Station
+2. Navigate to Project > BACnet Network
+3. Right-click > Export Objects to CSV
+4. Include: Object Name, Type, Instance, Description, Units, Value, Writable
+
+**Uploading to SENTINEL:**
+```bash
+curl -X POST "http://localhost:9095/api/niagara/discover/csv?site_id=site-002" \
+  -F "file=@point_list_site-002_siemens-desigo.csv"
+```
+
+**Notes:**
+- Handles UTF-8 BOM from Excel exports (`utf-8-sig`)
+- Falls back to `latin-1` if UTF-8 decoding fails
+- Both HVAC and lighting points are classified in a single pass
+- Discovery results are cached and can be reviewed/approved via existing mapping endpoints
 
 ## File Modifications
 

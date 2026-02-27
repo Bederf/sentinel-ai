@@ -122,6 +122,14 @@ class DiagnosisState(Enum):
     COMPLETE = "complete"
 ```
 
+**Session Persistence:** DiagnosisFlow sessions are persisted via Redis (write-through) with a 1-hour TTL. This means:
+
+- **Restart resilience:** Sessions survive backend restarts — technicians don't lose diagnosis progress mid-flow
+- **Write-through pattern:** Every state change (new checkpoint response, state transition) writes to both in-memory and Redis
+- **Graceful degradation:** If Redis is unavailable, sessions fall back to in-memory-only (lost on restart)
+- **Serialization:** `DiagnosisFlow.to_dict()`/`from_dict()` handle full roundtrip including checkpoints, collected info, and fault info
+- **Key format:** `bms:diagnosis:{session_id}`
+
 **Pre-defined Checklists:**
 
 | Fault | Checkpoints | Equipment |

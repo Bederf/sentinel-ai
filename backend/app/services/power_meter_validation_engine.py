@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Dict, Optional, Any
 from statistics import mean, stdev
 from app.database.supabase_client import get_supabase_client
+from app.services.simulation_store import get_simulation_store
 
 # Demo fixture path
 _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -50,6 +51,7 @@ class PowerMeterValidationEngine:
         """
         self.building_id = building_id
         self.client = get_supabase_client()
+        self.sim_store = get_simulation_store(building_id)
         self._baseline_cache = {}
 
     async def get_power_baseline(
@@ -280,11 +282,8 @@ class PowerMeterValidationEngine:
                 "created_at": datetime.now().isoformat(),
             }
 
-            # Try to insert validation record
-            try:
-                self.client.table("power_meter_validations").insert(record).execute()
-            except Exception as e:
-                logger.debug(f"Could not write validation record: {e}")
+            # Write to simulation store (JSON), not Supabase
+            self.sim_store.write_validation("power_meter", record)
 
         except Exception as e:
             logger.error(f"Error writing validation record: {e}")

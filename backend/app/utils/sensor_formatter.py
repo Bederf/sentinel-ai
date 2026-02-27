@@ -85,7 +85,7 @@ async def format_sensor_with_zone_and_desks(sensor_data: Dict[str, Any]) -> Dict
     and associated desks.
 
     Args:
-        sensor_data: DALI sensor dict from dali_service (with sensor_id, name, zone_id, etc.)
+        sensor_data: Sensor dict from lighting_service (with sensor_id, name, zone_id, etc.)
 
     Returns:
         Enhanced sensor data with zone_id, zone_name, and desks_in_zone information

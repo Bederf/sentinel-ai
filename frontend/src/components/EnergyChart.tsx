@@ -145,7 +145,8 @@ export function EnergyChart({
         </div>
         <div className="h-72 flex items-center justify-center">
           <span style={{ color: "var(--color-grafana-text-disabled)" }}>
-            No energy data available
+            No energy records found for the last {days} days
+            {selectedSiteId ? ` at ${selectedSiteId}` : ""}
           </span>
         </div>
       </div>

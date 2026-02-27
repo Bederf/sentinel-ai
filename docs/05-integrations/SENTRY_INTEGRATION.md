@@ -79,6 +79,9 @@ For Telegram-driven AI chat and hybrid routing:
 │ SENTINEL API     │ │ /call-log    │ │ Ollama / Cloud   │
 │ localhost:9095   │ │ /call-log/   │ │ (Hybrid AI)      │
 │                  │ │   escalate   │ │                  │
+│                  │ │ /call-log/   │ │                  │
+│                  │ │ location-    │ │                  │
+│                  │ │ memory       │ │                  │
 └──────────────────┘ └──────────────┘ └──────────────────┘
 ```
 
@@ -93,7 +96,7 @@ Located in `$SENTRY_HOME/tools/`:
 | `bms_monitor.py` | Health monitoring alerts | `/api/alerts`, `/api/equipment` |
 | `sentry_ai_bridge.py` | AI routing with BMS detection | Routes to appropriate tool |
 | `tiered_ai_router.py` | Cloud/Ollama fallback | N/A (AI routing) |
-| `call_log.py` | General staff defect reporting | `/api/sentry/call-log`, `/api/sentry/call-log/escalate` |
+| `call_log.py` | General staff defect reporting | `/api/sentry/call-log`, `/api/sentry/call-log/escalate`, `/api/sentry/call-log/location-memory` |
 
 Located in `$SENTRY_HOME/handlers/`:
 
@@ -542,6 +545,18 @@ Bot: "Logged! Ref: WO-2026-0035
       Our John Smith has been notified."
 ```
 
+### Location memory-assisted flow
+
+The backend supports reporter location memory for faster repeat logging:
+
+1. Reporter logs first issue with manual location confirmation (desk or floor/area)
+2. `POST /api/sentry/call-log` stores reporter memory (`reporter_phone` and/or `reporter_telegram_id`)
+3. On later issues, client/bot can query `GET /api/sentry/call-log/location-memory`
+4. Bot asks: "I have your last location as Desk 208, L2. Use this location?"
+5. On confirmation, create WO without asking location again
+
+If user has moved, they provide a new desk/location and memory is overwritten on the next successful call log.
+
 ### State Machine
 
 ```
@@ -577,12 +592,15 @@ When a complaint doesn't match any taxonomy entry but contains action words (`fi
 | Named area + floor | Free text | From user |
 | Named area only | Free text | Bot asks |
 
+Current limitation: AD profile location and access-card telemetry are not used for auto-location in the current implementation. Location remains user-confirmed, with memory prefill only.
+
 ### API Endpoints
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/api/sentry/call-log` | POST | Create inspection WO from classified complaint |
 | `/api/sentry/call-log/escalate` | POST | Escalate unmatched complaint to supervisor |
+| `/api/sentry/call-log/location-memory` | GET | Lookup reporter last confirmed location for prefill |
 
 See `docs/03-api-reference/call-log-api.md` for full request/response schemas.
 
@@ -594,6 +612,8 @@ See `docs/03-api-reference/call-log-api.md` for full request/response schemas.
 | `call_log.py` | `$SENTRY_HOME/tools/` | CLI tool for classify/log/categories commands |
 | `sentry_call_logging.md` | `$SENTRY_HOME/skills/` | Skill documentation for Sentry gateway |
 | `sentry_webhooks.py` | `backend/app/api/` | Backend endpoints (call-log + escalation) |
+| `reporter_location_repository.py` | `backend/app/database/repositories/` | Reporter location memory persistence |
+| `reporter_location_memory.json` | `backend/app/data/` | Fallback store for reporter location memory |
 | `call_log_escalations.json` | `backend/app/data/` | Persisted escalation records |
 
 ---

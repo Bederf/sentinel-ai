@@ -2,9 +2,9 @@
 title: "Background Recommendation Generation"
 type: "technical"
 status: "complete"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-02-11"
-updated: "2026-02-11"
+updated: "2026-02-27"
 author: "Sentinel Development Team"
 tags: ["ai", "recommendations", "background-jobs", "scheduler", "autonomous"]
 related: ["./ai-recommendation-system.md", "../04-features/lifecycle-simulation.md", "../03-api-reference/recommendations-api.md"]
@@ -31,6 +31,7 @@ The recommendation system operates as **autonomous background jobs** that:
 graph LR
     A["Background Scheduler<br/>(APScheduler)"] -->|Every 10 min| B["Recommendation<br/>Generation Job"]
     C["Real Equipment Data<br/>(Health, Alerts, Service History)"] --> B
+    M["ML Models<br/>(LSTM, Anomaly, Classifier)"] -->|Phase 132| B
     B -->|Analyze & Score| D["Maintenance Recommender<br/>Engine"]
     D -->|Generate| E["Recommendations<br/>(Supabase)"]
     E -->|Display| F["Dashboard UI<br/>(Real-time)"]
@@ -73,6 +74,19 @@ Time: 12:00:00 → Start recommendation generation
 Time: 12:10:00 → Start recommendation generation
   └─ (repeat)
 ```
+
+### 2.5 ML Context Injection (Phase 132)
+
+When the optimization analysis job runs, `_gather_ml_context()` collects outputs from active ML models and injects them into Claude's prompt. This enables predictive recommendations based on future equipment behaviour.
+
+**ML data injected:**
+- LSTM 24/48/72h temperature and load forecasts per equipment type
+- Anomaly detection scores above 0.5 threshold
+- Fault classification probabilities above 0.4 confidence
+- Health trend slopes for degrading equipment (7d slope < -0.5 pts/day)
+- Building-level features: EUI (kWh/m²), Base Load Index, CDD, Efficiency Score (0-100)
+
+See [AI Recommendation System — ML Context Injection](./ai-recommendation-system.md#ml-context-injection-phase-132) for full details.
 
 ### 3. Data Collection Phase
 

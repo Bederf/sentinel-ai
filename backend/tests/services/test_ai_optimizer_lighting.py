@@ -1,19 +1,19 @@
-"""Tests for AI optimizer with DALI lighting integration."""
+"""Tests for AI optimizer with lighting integration."""
 
 from app.services.ai_optimizer import AIOptimizerService
-from app.services.dali_service import DALIService
+from app.services.lighting_service import LightingService
 
 
-class TestDALIZoneDataGathering:
-    """Test DALI zone data gathering methods."""
+class TestLightingZoneDataGathering:
+    """Test lighting zone data gathering methods."""
 
-    def test_gather_dali_zone_data_returns_zone_info(self):
-        """Test that _gather_dali_zone_data returns zone occupancy and lighting data."""
+    def test_gather_lighting_zone_data_returns_zone_info(self):
+        """Test that _gather_lighting_zone_data returns zone occupancy and lighting data."""
         optimizer = AIOptimizerService()
-        dali_service = DALIService()
+        lighting_service = LightingService()
 
         # Get zone data for site-002 (Sandton City)
-        zone_data = optimizer._gather_dali_zone_data(dali_service, "site-002")
+        zone_data = optimizer._gather_lighting_zone_data(lighting_service, "site-002")
 
         # Should have zones from the mock data
         assert len(zone_data) > 0
@@ -28,12 +28,12 @@ class TestDALIZoneDataGathering:
         assert "has_high_daylight" in sample_zone
         assert "is_over_lit" in sample_zone
 
-    def test_gather_dali_zone_data_identifies_over_lit_zones(self):
+    def test_gather_lighting_zone_data_identifies_over_lit_zones(self):
         """Test that over-lit zones are correctly identified."""
         optimizer = AIOptimizerService()
-        dali_service = DALIService()
+        lighting_service = LightingService()
 
-        zone_data = optimizer._gather_dali_zone_data(dali_service, "site-002")
+        zone_data = optimizer._gather_lighting_zone_data(lighting_service, "site-002")
 
         # Zone-L11-S is the unoccupied wing with lights at 100%
         if "Zone-L11-S" in zone_data:
@@ -88,8 +88,8 @@ class TestLightingPromptFormatting:
 
         result = optimizer._format_lighting_section([], mock_zones)
 
-        # Should include DALI system summary
-        assert "DALI Lighting System" in result
+        # Should include lighting system summary
+        assert "Lighting System" in result
         assert "Total zones: 2" in result
         assert "Occupied zones: 1" in result
         assert "Over-lit unoccupied zones" in result

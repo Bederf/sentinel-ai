@@ -10,7 +10,7 @@ import logging
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
 from app.services.niagara.point_discovery import (
@@ -175,6 +175,110 @@ async def discover_and_classify(request: DiscoverRequest):
 
 
 # ---------------------------------------------------------------------------
+# POST /api/niagara/discover/csv
+# ---------------------------------------------------------------------------
+
+
+class CSVDiscoverResponse(BaseModel):
+    """Response from CSV-based point discovery."""
+
+    discovery_id: str = Field(..., description="Unique discovery identifier")
+    points_count: int = Field(0, description="Total points parsed from CSV")
+    equipment_count: int = Field(0, description="Number of equipment entities identified")
+    lighting_points: int = Field(0, description="Number of lighting-specific points detected")
+    status: str = Field("", description="Discovery status")
+    summary: Dict[str, Any] = Field(default_factory=dict, description="Classification summary")
+    lighting_summary: Dict[str, Any] = Field(
+        default_factory=dict, description="Lighting-specific classification breakdown"
+    )
+
+
+@router.post("/discover/csv", response_model=CSVDiscoverResponse)
+async def discover_from_csv(
+    file: UploadFile = File(..., description="BMS CSV export (Desigo, Niagara, etc.)"),
+    site_id: str = Query(..., description="SENTINEL site ID for mapping"),
+    source_label: str = Query("desigo-export", description="Label for the export source"),
+):
+    """
+    Upload a BMS point list CSV and run AI-assisted classification.
+
+    Accepts the standard Desigo/Niagara CSV format:
+        name,object_type,instance,units,present_value,description,min_value,max_value,writable
+
+    Classifies ALL points (HVAC, lighting, fire, security, meters) using
+    Haystack/Brick ontology. Returns a discovery_id for reviewing mappings.
+
+    **Lighting detection**: Identifies DALI controllers, luminaires, sensors,
+    emergency gear, and lighting-specific telemetry (power, energy, driver
+    temperature, lamp hours, emergency battery) from any manufacturer
+    (Tridonic, Schneider, Lutron, etc.).
+    """
+    if not file.filename or not file.filename.endswith(".csv"):
+        raise HTTPException(
+            status_code=400,
+            detail="File must be a CSV (.csv extension required)",
+        )
+
+    try:
+        content = await file.read()
+        csv_text = content.decode("utf-8-sig")  # Handle BOM from Excel/Desigo exports
+    except UnicodeDecodeError:
+        try:
+            csv_text = content.decode("latin-1")
+        except Exception:
+            raise HTTPException(status_code=400, detail="Could not decode CSV file")
+
+    try:
+        discovery_service = get_point_discovery_service()
+        result = discovery_service.discover_from_csv(
+            csv_content=csv_text,
+            site_id=site_id,
+            source_label=source_label,
+        )
+
+        if result.status == "error":
+            raise HTTPException(
+                status_code=500,
+                detail=f"CSV discovery failed: {result.error}",
+            )
+
+        lighting = result.summary.get("lighting_points", {})
+
+        # Auto-generate mappings
+        mapping_service = get_mapping_service()
+        classifier = get_point_classifier()
+        classified_points = classifier.classify_points(result.raw_points)
+        mappings = mapping_service.map_points_to_equipment(classified_points, site_id)
+        mapping_service.save_mappings(result.discovery_id, mappings, site_id)
+
+        # Update workflow state
+        _workflow_states[result.discovery_id] = {
+            "state": WorkflowState.PENDING_REVIEW,
+            "device_ip": f"csv:{source_label}",
+            "site_id": site_id,
+            "bms_vendor": source_label,
+            "points_count": len(result.classified_points),
+            "equipment_count": len(result.summary.get("unique_equipment", {})),
+        }
+
+        return CSVDiscoverResponse(
+            discovery_id=result.discovery_id,
+            points_count=len(result.classified_points),
+            equipment_count=len(result.summary.get("unique_equipment", {})),
+            lighting_points=lighting.get("total", 0),
+            status=WorkflowState.PENDING_REVIEW,
+            summary=result.summary,
+            lighting_summary=lighting,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("CSV discovery failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
 # GET /api/niagara/mappings/{discovery_id}
 # ---------------------------------------------------------------------------
 
@@ -311,7 +415,7 @@ def _register_dali_if_discovered(
     site_id: str,
     mappings: Dict[str, Any],
 ):
-    """Check approved mappings for DALI equipment and auto-register with DALIService."""
+    """Check approved mappings for lighting equipment and auto-register with LightingService."""
     if not site_id:
         return
 
@@ -330,9 +434,9 @@ def _register_dali_if_discovered(
         return
 
     try:
-        from app.services.dali_service import get_dali_service
+        from app.services.lighting_service import get_lighting_service
 
-        dali_service = get_dali_service()
+        lighting_service = get_lighting_service()
         site_name = site_id  # Default; could resolve from building registry
         try:
             from app.database.repositories.building_repository import BuildingRepository
@@ -344,9 +448,9 @@ def _register_dali_if_discovered(
         except Exception:
             pass
 
-        dali_service.register_niagara_site(site_id, site_name)
+        lighting_service.register_niagara_site(site_id, site_name)
         logger.info(
-            "DALI lighting system discovered and registered for %s (discovery %s)",
+            "Lighting system discovered and registered for %s (discovery %s)",
             site_name,
             discovery_id,
         )

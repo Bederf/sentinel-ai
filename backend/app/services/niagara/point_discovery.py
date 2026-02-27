@@ -8,8 +8,11 @@ Handles large point lists incrementally (1000+ points) and caches
 results to avoid repeated scanning.
 """
 
+import csv
+import io
 import json
 import logging
+import re
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -228,6 +231,237 @@ class PointDiscoveryService:
         self._save_discovery_result(result)
 
         return result
+
+    def discover_from_csv(
+        self,
+        csv_content: str,
+        site_id: str,
+        source_label: str = "desigo-export",
+    ) -> DiscoveryResult:
+        """Discover and classify points from a BMS CSV export.
+
+        Accepts the standard Desigo/Niagara CSV format:
+            name,object_type,instance,units,present_value,description,min_value,max_value,writable
+
+        Also handles the hierarchical Desigo naming convention:
+            STC/{LEVEL}/{EQUIP-ID}/{PointName}  e.g. STC/L1/DALI-01/Lum01_ActivePower
+
+        The equipment ID is extracted from the path hierarchy and passed
+        to the classifier as metadata for high-confidence classification.
+
+        Args:
+            csv_content: CSV string content (with header row)
+            site_id: SENTINEL site ID for mapping
+            source_label: Label for the export source (e.g., 'desigo-export')
+
+        Returns:
+            DiscoveryResult with classified points and summary
+        """
+        self._load_tags_via_classifier()
+
+        discovery_id = f"csv-{str(uuid.uuid4())[:8]}"
+        result = DiscoveryResult(
+            discovery_id=discovery_id,
+            device_ip=source_label,
+            site_id=site_id,
+        )
+
+        logger.info(
+            "Starting CSV discovery %s for site %s (source: %s)",
+            discovery_id,
+            site_id,
+            source_label,
+        )
+
+        try:
+            # Phase 1: Parse CSV
+            result.status = "discovering"
+            raw_points = self._parse_csv_export(csv_content)
+            result.raw_points = raw_points
+
+            logger.info(
+                "CSV discovery %s: parsed %d points from %s",
+                discovery_id,
+                len(raw_points),
+                source_label,
+            )
+
+            # Phase 2: Classify points
+            result.status = "classifying"
+            classified = self._classifier.classify_points(raw_points)
+            result.classified_points = [cp.to_dict() for cp in classified]
+
+            # Phase 3: Generate summary
+            result.summary = self._classifier.get_classification_summary(classified)
+
+            # Add lighting-specific summary
+            result.summary["lighting_points"] = self._extract_lighting_summary(classified)
+
+            result.status = "complete"
+            result.completed_at = datetime.utcnow().isoformat()
+
+            logger.info(
+                "CSV discovery %s complete: %d points classified (%d equipment types, %d lighting points)",
+                discovery_id,
+                len(classified),
+                len(result.summary.get("unique_equipment", {})),
+                result.summary["lighting_points"]["total"],
+            )
+
+        except Exception as e:
+            result.status = "error"
+            result.error = str(e)
+            logger.error("CSV discovery %s failed: %s", discovery_id, e)
+
+        # Cache and persist
+        self._discovery_cache[discovery_id] = result
+        self._save_discovery_result(result)
+
+        return result
+
+    def _parse_csv_export(self, csv_content: str) -> List[Dict[str, Any]]:
+        """Parse a Desigo/Niagara BACnet CSV export into point dicts.
+
+        Handles the standard format:
+            name,object_type,instance,units,present_value,description,min_value,max_value,writable
+
+        Extracts equipment ID from hierarchical names:
+            STC/L1/DALI-01/Lum01_ActivePower → equipment_id = DALI-01
+
+        Returns:
+            List of point dicts ready for classification
+        """
+        points = []
+        reader = csv.DictReader(io.StringIO(csv_content))
+
+        for row in reader:
+            name = row.get("name", "").strip()
+            if not name:
+                continue
+
+            # Parse writable field
+            writable_raw = row.get("writable", "False").strip()
+            writable = writable_raw.lower() in ("true", "1", "yes")
+
+            # Parse numeric fields safely
+            present_value = row.get("present_value", "")
+            try:
+                present_value = float(present_value) if present_value else None
+            except (ValueError, TypeError):
+                present_value = present_value if present_value else None
+
+            instance = 0
+            try:
+                instance = int(row.get("instance", 0))
+            except (ValueError, TypeError):
+                pass
+
+            # Extract equipment ID from hierarchical name
+            # STC/L1/DALI-01/Lum01_ActivePower → equipment_id = DALI-01
+            equipment_id, point_suffix = self._parse_hierarchical_name(name)
+
+            point = {
+                "name": name,
+                "description": row.get("description", "").strip(),
+                "object_type": row.get("object_type", "").strip(),
+                "instance": instance,
+                "units": row.get("units", "").strip(),
+                "present_value": present_value,
+                "writable": writable,
+            }
+
+            # Pass extracted equipment ID as metadata for classifier
+            if equipment_id:
+                point["_equipment_id"] = equipment_id
+
+            points.append(point)
+
+        return points
+
+    @staticmethod
+    def _parse_hierarchical_name(name: str) -> tuple:
+        """Parse a hierarchical BACnet point name.
+
+        Handles Desigo naming convention:
+            STC/{LEVEL}/{EQUIP-ID}/{PointName}
+            e.g. STC/L1/DALI-01/Lum01_ActivePower
+
+        Also handles flat names:
+            DALI-01_Lum01_ActivePower
+
+        Returns:
+            Tuple of (equipment_id, point_suffix)
+            e.g. ("DALI-01", "Lum01_ActivePower")
+        """
+        # Hierarchical path: split on /
+        parts = name.split("/")
+        if len(parts) >= 3:
+            # Last part is the point name, second-to-last is equipment ID
+            # STC/L1/DALI-01/Lum01_ActivePower → equip=DALI-01, point=Lum01_ActivePower
+            return parts[-2], parts[-1]
+
+        # Flat name: extract equipment ID prefix
+        # DALI-01_Lum01_ActivePower → equip=DALI-01, rest=Lum01_ActivePower
+        match = re.match(r"^([A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*)_(.+)$", name)
+        if match:
+            return match.group(1), match.group(2)
+
+        return "", name
+
+    @staticmethod
+    def _extract_lighting_summary(classified: list) -> Dict[str, Any]:
+        """Extract lighting-specific statistics from classified points.
+
+        Returns:
+            Dict with lighting point counts by category
+        """
+        lighting_types = {
+            "dali_controller",
+            "dali",
+            "luminaire",
+            "lum",
+            "light_sensor",
+            "emergency_luminaire",
+        }
+        lighting_categories = {
+            "brightness",
+            "lux",
+            "color_temperature",
+            "lamp_status",
+            "scene",
+            "lighting_power",
+            "lighting_energy",
+            "driver_temperature",
+            "lamp_hours",
+            "light_output",
+            "emergency_battery",
+            "emergency_test",
+            "charge_status",
+        }
+
+        by_equipment = {}
+        by_category = {}
+        total = 0
+
+        for cp in classified:
+            eq_type = cp.equipment_type if hasattr(cp, "equipment_type") else cp.get("equipment_type", "")
+            cat = cp.point_category if hasattr(cp, "point_category") else cp.get("point_category", "")
+
+            is_lighting = eq_type in lighting_types or cat in lighting_categories
+            if is_lighting:
+                total += 1
+                by_equipment[eq_type] = by_equipment.get(eq_type, 0) + 1
+                by_category[cat] = by_category.get(cat, 0) + 1
+
+        return {
+            "total": total,
+            "by_equipment_type": by_equipment,
+            "by_category": by_category,
+        }
+
+    def _load_tags_via_classifier(self) -> None:
+        """Ensure the classifier's tags are loaded."""
+        self._classifier._load_tags()
 
     async def _discover_points(
         self,

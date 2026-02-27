@@ -35,6 +35,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Device Abstraction Layer](02-architecture/device-abstraction-layer.md) - Protocol-agnostic interface
 - [Naming Conventions](02-architecture/naming-conventions.md) - Device ID and point naming
 - [Background ML Model Retraining](02-architecture/background-ml-retraining.md) - Automated background training, APScheduler integration, production deployment (Phase 45-01)
+- **[ML Data Architecture](02-architecture/ML-DATA-ARCHITECTURE.md)** - Building Operations ML, Equipment Condition ML, Unified AI Recommendation Engine, feature engineering, inspection priority scoring (Phase 132)
 
 ### 📚 API Reference
 - **[Energy Consumption API](03-api-reference/energy-consumption.md)** - Water, power validation, cost validation, AI recommendation endpoints (Phase A, v14.0)
@@ -56,7 +57,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Water Meter API](03-api-reference/water-api.md) - Water consumption monitoring, leak detection, trending, alert management (Phase 35)
 - [Contract Management API](03-api-reference/contracts-api.md) - Organizations, contracts, SLA terms, equipment assignments, budgets, condition assessments (Phase 48)
 - [Risk-Based Pricing API](03-api-reference/pricing-api.md) - Quote calculations, SLA tier pricing, risk buffers (Phase 52)
-- [Recommendations API](03-api-reference/recommendations-api.md) - Profile-based recommendations, approval workflow, outcome tracking, rejection learning (Phase 72)
+- [Recommendations API](03-api-reference/recommendations-api.md) - Profile-based recommendations, approval workflow, outcome tracking, rejection learning, ML context injection (Phases 72, 132)
 - **[Asset Health API](03-api-reference/asset-health-api.md)** - Combined equipment health scores + baseline status + deviation tracking per site/equipment (Phase 109A)
 - [System Health API](03-api-reference/system-health-api.md) - Unified health snapshots, diagnostics, and system error logs
 - **[Security API](03-api-reference/security-api.md)** - Access control events, visitor management, zone occupancy, cameras, occupancy trends, cross-module recommendations (Phases 27, 58, 69)

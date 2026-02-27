@@ -286,9 +286,20 @@ Three pre-configured scenarios in `optimization_scenarios.json`:
 | Generator fuel reduction | 15-25% |
 | Estimated monthly savings | R15,000-R25,000 per building |
 
+## ML Integration (Phase 132)
+
+Load shedding optimization benefits from the ML Context Injection pipeline:
+
+- **LSTM forecasts** provide predicted temperature trajectories, improving thermal runway accuracy
+- **Anomaly scores** flag equipment that may underperform during load shedding (e.g., degraded chiller)
+- **Fault classifications** help the AI Optimizer avoid recommending pre-cooling via equipment with active faults
+
+See [ML Data Architecture](../02-architecture/ML-DATA-ARCHITECTURE.md) and [ML Context Injection](../08-ai-ml/ai-recommendation-system.md#ml-context-injection-phase-132) for details.
+
 ## Related Documentation
 
 - [Device Control & Safety](06-device-control-safety.md)
 - [Autonomous Decision Engine](09-autonomous-decisions.md)
 - [AI Recommendation System](../08-ai-ml/ai-recommendation-system.md)
+- [ML Data Architecture](../02-architecture/ML-DATA-ARCHITECTURE.md)
 - [South Africa Context](../14-south-africa-context/load-shedding-optimization.md)

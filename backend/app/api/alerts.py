@@ -10,8 +10,8 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.middleware.rate_limiter import limiter
 from pydantic import BaseModel
 
-# Import simulation service for live alerts
-from app.api.simulation import simulation_service
+# Import orchestrator for live simulation alerts
+from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
 from app.services.sentry_integration.alert_notifier import alert_notifier
 
 router = APIRouter()
@@ -88,7 +88,7 @@ def load_alerts() -> list[dict]:
 
     # Load live alerts from simulation
     try:
-        sim_alerts = simulation_service.get_active_alerts()
+        sim_alerts = get_lifecycle_orchestrator().get_active_alerts()
         for sa in sim_alerts:
             # Convert simulation alert to standard format
             alert = {
@@ -684,7 +684,7 @@ async def acknowledge_alert(request: Request, alert_id: str, acknowledged_by: st
 
     # Handle simulation alerts (SIM-ALERT-*)
     if alert_id.startswith("SIM-ALERT-"):
-        success = simulation_service.acknowledge_alert(alert_id, acknowledged_by)
+        success = get_lifecycle_orchestrator().acknowledge_alert(alert_id)
         if success:
             return {"status": "acknowledged", "alert_id": alert_id}
         else:

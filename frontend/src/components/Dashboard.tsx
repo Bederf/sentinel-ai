@@ -136,7 +136,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     loadDashboardData();
   }, []);
 
-  // Load energy data when filters change
+  // Load energy data when filters change + auto-refresh every 30s
   useEffect(() => {
     const loadEnergyData = async () => {
       try {
@@ -152,6 +152,8 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     };
 
     loadEnergyData();
+    const interval = setInterval(loadEnergyData, 30_000);
+    return () => clearInterval(interval);
   }, [energyFilterSiteId, selectedDays]);
 
   // Calculate site status counts for KPI
@@ -185,6 +187,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
   // Handle site card click - navigate to site detail view
   const handleSiteClick = (site: Site) => {
     setSelectedSiteId(site.id);
+    window.scrollTo(0, 0);
   };
 
   // Handle back from site detail view - navigate to dashboard
@@ -263,18 +266,12 @@ export function Dashboard({ onViewChange }: DashboardProps) {
         tooltip: "AI-detected risks requiring attention. Critical risks need immediate action; warnings are monitored.",
       },
       'kpi-potential-savings': {
-        title: isSimulationRunning ? "Live Energy (Simulated)" : "Potential Savings",
-        value: isSimulationRunning
-          ? `${(displayTotalEnergy || 0).toFixed(1)} kWh`
-          : formatZAR(totalPotentialSavings),
+        title: "Potential Savings",
+        value: formatZAR(totalPotentialSavings),
         icon: <DollarSign className="h-5 w-5" />,
-        subtitle: isSimulationRunning
-          ? `Current power: ${(displayCurrentPower || 0).toFixed(2)} kW`
-          : "If all preventive actions taken",
-        accentColor: isSimulationRunning ? "blue" as const : "green" as const,
-        tooltip: isSimulationRunning
-          ? "Live energy consumption from the running simulation."
-          : "Estimated savings if all AI-recommended preventive maintenance actions are completed.",
+        subtitle: "If all preventive actions taken",
+        accentColor: "green" as const,
+        tooltip: "Estimated savings if all AI-recommended preventive maintenance actions are completed.",
       },
       'kpi-risk-predictions': {
         title: "Risk Predictions",

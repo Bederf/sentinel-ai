@@ -141,6 +141,14 @@ The `sentry_ai_bridge.py` checks call log routing after desk complaints but befo
 
 The `is_facilities_complaint()` function returns `True` if the message matches the fixed taxonomy OR contains facility action words (`fix`, `repair`, `broken`, `send someone`, etc.). IT-related messages are excluded.
 
+Location handling for call log:
+
+1. First-time reporter: user must provide desk/location manually
+2. Repeat reporter: backend can prefill last location using `GET /api/sentry/call-log/location-memory` (phone or Telegram ID)
+3. User confirmation is still mandatory before WO creation
+
+Current limitation: AD profile location and access-card telemetry are not used yet for auto-location.
+
 ---
 
 ## 5. Tools & Functions

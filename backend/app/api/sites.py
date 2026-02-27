@@ -958,20 +958,18 @@ async def is_site_processing_enabled(site_id: str) -> bool:
     Used by lifecycle orchestrator and ML feeder to gate processing.
     Returns True by default (fail-open: if we can't read state, process).
     """
-    if not settings.use_json_storage:
-        try:
-            from app.database.supabase_client import get_supabase_client
+    # Always try Supabase first — it's the source of truth for the dashboard
+    try:
+        from app.database.supabase_client import get_supabase_client
 
-            client = get_supabase_client()
-            result = (
-                client.table("buildings").select("sentinel_processing_enabled").eq("code", site_id).limit(1).execute()
-            )
-            if result.data:
-                return result.data[0].get("sentinel_processing_enabled", True) is not False
-        except Exception as e:
-            logger.warning(f"Failed to check processing state for {site_id}: {e}")
+        client = get_supabase_client()
+        result = client.table("buildings").select("sentinel_processing_enabled").eq("code", site_id).limit(1).execute()
+        if result.data:
+            return result.data[0].get("sentinel_processing_enabled", True) is not False
+    except Exception as e:
+        logger.warning(f"Failed to check processing state for {site_id}: {e}")
 
-    # JSON fallback / demo mode
+    # JSON fallback if Supabase unavailable
     state = _load_processing_state()
     return state.get(site_id, True)
 
@@ -995,23 +993,26 @@ async def toggle_site_processing(
     dashboard) continues regardless.
     """
     enabled = request.enabled
+    supabase_ok = False
 
-    if not settings.use_json_storage:
-        try:
-            from app.database.supabase_client import get_supabase_client
+    # Always try Supabase first — dashboard reads building record directly
+    try:
+        from app.database.supabase_client import get_supabase_client
 
-            client = get_supabase_client()
-            client.table("buildings").update({"sentinel_processing_enabled": enabled}).eq("code", site_id).execute()
-            logger.info(f"SENTINEL processing {'enabled' if enabled else 'disabled'} for {site_id}")
-            return ProcessingToggleResponse(site_id=site_id, sentinel_processing_enabled=enabled)
-        except Exception as e:
-            logger.warning(f"Failed to update processing state in Supabase for {site_id}: {e}")
+        client = get_supabase_client()
+        client.table("buildings").update({"sentinel_processing_enabled": enabled}).eq("code", site_id).execute()
+        supabase_ok = True
+        logger.info(f"SENTINEL processing {'enabled' if enabled else 'disabled'} for {site_id}")
+    except Exception as e:
+        logger.warning(f"Failed to update processing state in Supabase for {site_id}: {e}")
 
-    # JSON fallback / demo mode
+    # Also persist to JSON fallback for offline resilience
     state = _load_processing_state()
     state[site_id] = enabled
     _save_processing_state(state)
-    logger.info(f"SENTINEL processing {'enabled' if enabled else 'disabled'} for {site_id} (JSON fallback)")
+    if not supabase_ok:
+        logger.info(f"SENTINEL processing {'enabled' if enabled else 'disabled'} for {site_id} (JSON fallback only)")
+
     return ProcessingToggleResponse(site_id=site_id, sentinel_processing_enabled=enabled)
 
 

@@ -641,3 +641,308 @@
     -webkit-backdrop-filter: blur(var(--glass-blur-sm)) saturate(150%);
   }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════ */
+/* TEAL THEME — SENTINEL Brand Palette                            */
+/* Teal (#00A89D) + Amber (#F5A623) on charcoal (#1E2A2A)         */
+/* Fonts: Syne (headings/UI) + DM Mono (data/labels)              */
+/* Applied via .teal-theme class on <html> or data-theme="teal"   */
+/* ═══════════════════════════════════════════════════════════════ */
+
+.teal-theme,
+[data-theme="teal"] {
+  /* Base surfaces — teal-tinted charcoal */
+  --color-sentinel-bg-canvas: #1E2A2A;
+  --color-sentinel-bg-primary: #2D3D3D;
+  --color-sentinel-bg-secondary: #253333;
+  --color-sentinel-bg-panel: #2D3D3D;
+  --color-sentinel-border: rgba(0, 168, 157, 0.15);
+  --color-sentinel-border-strong: rgba(0, 168, 157, 0.3);
+
+  /* Text */
+  --color-sentinel-text-primary: #F8FAFA;
+  --color-sentinel-text-secondary: #6B8888;
+  --color-sentinel-text-disabled: #4A6666;
+  --color-sentinel-text-link: #00A89D;
+
+  /* Accent — Sentinel Teal replaces Amber */
+  --color-sentinel-amber: #00A89D;
+  --color-sentinel-amber-light: #B2E8E5;
+  --color-sentinel-amber-dark: #007A72;
+
+  /* Semantic status (keep distinct from teal accent) */
+  --color-sentinel-green: #00A89D;
+  --color-sentinel-red: #DC2626;
+  --color-sentinel-blue: #60A5FA;
+
+  /* Chart palette */
+  --color-chart-1: #00A89D;
+  --color-chart-2: #F5A623;
+  --color-chart-3: #B2E8E5;
+  --color-chart-4: #007A72;
+  --color-chart-5: #FDE8B8;
+  --color-chart-6: #3D5050;
+
+  /* Panel styling */
+  --radius-panel: 16px;
+  --shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.3), 0 1px 4px rgba(0, 0, 0, 0.2);
+
+  /* Glass overrides */
+  --glass-bg: rgba(45, 61, 61, 0.85);
+  --glass-bg-light: rgba(45, 61, 61, 0.6);
+  --glass-bg-heavy: rgba(30, 42, 42, 0.92);
+  --glass-border: rgba(0, 168, 157, 0.2);
+  --glass-border-strong: rgba(0, 168, 157, 0.35);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --radius-glass: 16px;
+
+  /* Fonts */
+  font-family: 'Syne', -apple-system, sans-serif;
+}
+
+@layer components {
+  /* Teal Panel — charcoal surface with subtle border */
+  .teal-theme .panel,
+  .teal-theme .card,
+  [data-theme="teal"] .panel,
+  [data-theme="teal"] .card {
+    background: #2D3D3D;
+    border: 1px solid rgba(0, 168, 157, 0.15);
+    border-radius: 16px;
+    box-shadow: var(--shadow-panel);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Teal corner glow — subtle teal radial */
+  .teal-theme .panel::before,
+  .teal-theme .card::before,
+  [data-theme="teal"] .panel::before,
+  [data-theme="teal"] .card::before {
+    content: '';
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: #00A89D;
+    opacity: 0.06;
+    filter: blur(40px);
+    pointer-events: none;
+  }
+
+  /* Teal sidebar active — teal accent */
+  .teal-theme .sidebar-item-active,
+  [data-theme="teal"] .sidebar-item-active {
+    background: rgba(0, 168, 157, 0.12);
+    border-left-color: #00A89D;
+  }
+
+  .teal-theme .sidebar-item-active:hover,
+  [data-theme="teal"] .sidebar-item-active:hover {
+    background: rgba(0, 168, 157, 0.18);
+  }
+
+  /* Teal tab active */
+  .teal-theme .tab-item-active,
+  [data-theme="teal"] .tab-item-active {
+    color: #00A89D;
+    border-bottom-color: #00A89D;
+  }
+
+  /* Metric values — clean, high-contrast */
+  .teal-theme .metric-value,
+  [data-theme="teal"] .metric-value {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    font-weight: 800;
+  }
+
+  /* Metric labels — DM Mono inspired, uppercase */
+  .teal-theme .metric-label,
+  [data-theme="teal"] .metric-label {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #6B8888;
+  }
+
+  /* Teal button primary — solid teal, dark text */
+  .teal-theme .btn-primary,
+  [data-theme="teal"] .btn-primary {
+    background: #00A89D;
+    color: #1E2A2A;
+    font-weight: 700;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0, 168, 157, 0.3);
+  }
+
+  .teal-theme .btn-primary:hover,
+  [data-theme="teal"] .btn-primary:hover {
+    background: #007A72;
+    box-shadow: 0 6px 20px rgba(0, 168, 157, 0.45);
+  }
+
+  /* Sentinel shield — teal border */
+  .teal-theme .sentinel-shield,
+  [data-theme="teal"] .sentinel-shield {
+    border-color: #00A89D;
+    background: linear-gradient(135deg, #1E2A2A 0%, #2D3D3D 100%);
+  }
+
+  .teal-theme .sentinel-shield-active,
+  [data-theme="teal"] .sentinel-shield-active {
+    box-shadow: 0 0 24px rgba(0, 168, 157, 0.4);
+  }
+
+  /* Status dots — teal success, amber warning */
+  .teal-theme .status-dot-success,
+  [data-theme="teal"] .status-dot-success {
+    background: #00A89D;
+    box-shadow: 0 0 8px rgba(0, 168, 157, 0.6);
+  }
+
+  .teal-theme .status-dot-warning,
+  [data-theme="teal"] .status-dot-warning {
+    background: #F5A623;
+    box-shadow: 0 0 8px rgba(245, 166, 35, 0.6);
+  }
+
+  .teal-theme .status-dot-error,
+  [data-theme="teal"] .status-dot-error {
+    box-shadow: 0 0 8px rgba(220, 38, 38, 0.6);
+  }
+
+  /* Tooltip */
+  .teal-theme .tooltip,
+  [data-theme="teal"] .tooltip {
+    background: rgba(30, 42, 42, 0.95);
+    border: 1px solid rgba(0, 168, 157, 0.25);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Chart container */
+  .teal-theme .chart-container,
+  [data-theme="teal"] .chart-container {
+    background: #1E2A2A;
+    border: 1px solid rgba(0, 168, 157, 0.15);
+    border-radius: 16px;
+  }
+
+  /* Data table */
+  .teal-theme .data-table th,
+  [data-theme="teal"] .data-table th {
+    background: rgba(0, 168, 157, 0.06);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: #00A89D;
+    border-bottom-color: rgba(0, 168, 157, 0.2);
+    text-transform: uppercase;
+  }
+
+  .teal-theme .data-table td,
+  [data-theme="teal"] .data-table td {
+    border-bottom-color: rgba(0, 168, 157, 0.1);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .teal-theme .data-table tr:hover td,
+  [data-theme="teal"] .data-table tr:hover td {
+    background: rgba(0, 168, 157, 0.04);
+  }
+
+  /* Badge — teal info */
+  .teal-theme .badge-info,
+  [data-theme="teal"] .badge-info {
+    background: rgba(0, 168, 157, 0.12);
+    color: #00A89D;
+    border: 1px solid rgba(0, 168, 157, 0.25);
+  }
+
+  /* Badge — amber alert */
+  .teal-theme .badge-warning,
+  [data-theme="teal"] .badge-warning {
+    background: rgba(245, 166, 35, 0.12);
+    color: #F5A623;
+    border: 1px solid rgba(245, 166, 35, 0.25);
+  }
+
+  /* Input */
+  .teal-theme .input-dark,
+  [data-theme="teal"] .input-dark {
+    background: #1E2A2A;
+    border-color: rgba(0, 168, 157, 0.2);
+    border-radius: 10px;
+  }
+
+  .teal-theme .input-dark:focus,
+  [data-theme="teal"] .input-dark:focus {
+    border-color: #00A89D;
+    box-shadow: 0 0 0 2px rgba(0, 168, 157, 0.15);
+  }
+
+  /* Skeleton */
+  .teal-theme .skeleton,
+  [data-theme="teal"] .skeleton {
+    background: linear-gradient(
+      90deg,
+      #2D3D3D 0%,
+      #3D5050 50%,
+      #2D3D3D 100%
+    );
+    background-size: 200% 100%;
+    border-radius: 12px;
+  }
+
+  /* Glow effects — teal and amber */
+  .teal-theme .glow-green,
+  [data-theme="teal"] .glow-green {
+    box-shadow: 0 0 16px rgba(0, 168, 157, 0.5);
+  }
+
+  .teal-theme .glow-blue,
+  [data-theme="teal"] .glow-blue {
+    box-shadow: 0 0 16px rgba(0, 168, 157, 0.4);
+  }
+
+  .teal-theme .glow-amber,
+  .teal-theme .glow-orange,
+  [data-theme="teal"] .glow-amber,
+  [data-theme="teal"] .glow-orange {
+    box-shadow: 0 0 16px rgba(245, 166, 35, 0.5);
+  }
+}
+
+/* Teal Recharts overrides */
+.teal-theme .recharts-cartesian-grid-horizontal line,
+.teal-theme .recharts-cartesian-grid-vertical line,
+[data-theme="teal"] .recharts-cartesian-grid-horizontal line,
+[data-theme="teal"] .recharts-cartesian-grid-vertical line {
+  stroke: rgba(0, 168, 157, 0.12) !important;
+}
+
+/* Teal body background — deep charcoal with subtle teal glow */
+.teal-theme body,
+[data-theme="teal"] body {
+  background: #1E2A2A;
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(0, 168, 157, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(245, 166, 35, 0.02) 0%, transparent 50%);
+}
+
+/* Teal scrollbar */
+.teal-theme ::-webkit-scrollbar-thumb,
+[data-theme="teal"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 168, 157, 0.2);
+}
+
+.teal-theme ::-webkit-scrollbar-thumb:hover,
+[data-theme="teal"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 168, 157, 0.35);
+}

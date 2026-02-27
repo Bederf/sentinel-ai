@@ -185,6 +185,67 @@ POST /api/inspections/results                  — Submit inspection result
 GET  /api/inspections/deficiencies             — List deficiencies
 ```
 
+## Inspection Priority Scoring (Phase 132)
+
+The `InspectionPriorityService` computes a priority score (0-100) per asset to rank which equipment should be inspected next. Higher score = more urgent.
+
+### Priority Formula
+
+```
+Priority = (days_overdue × 0.25) + (anomaly_score × 0.25) +
+           (fault_history × 0.20) + (rul_inverse × 0.15) +
+           (criticality × 0.15)
+```
+
+### Component Calculations
+
+| Component | Weight | Input | Scoring |
+|-----------|--------|-------|---------|
+| **Days Overdue** | 0.25 | Days since inspection vs interval | 0 = on schedule, 100 = 2× overdue. No record = 75 |
+| **Anomaly Score** | 0.25 | ML autoencoder anomaly score (0-1) | Direct mapping × 100 |
+| **Fault History** | 0.20 | Faults in last 30 days | 0=0, 1=25, 2=50, 3=75, 4+=100 |
+| **RUL Inverse** | 0.15 | Remaining Useful Life (days) | ≤0=100, <30=90, <90=60, <180=30, else=10. Unknown=20 |
+| **Criticality** | 0.15 | Equipment type criticality (0-1) | Direct mapping × 100 |
+
+### Default Inspection Intervals
+
+| Equipment Type | Interval (days) | Default Criticality |
+|----------------|----------------|---------------------|
+| Generator | 30 | 0.95 |
+| Chiller | 90 | 0.90 |
+| AHU | 90 | 0.70 |
+| UPS | 90 | 0.85 |
+| BESS | 90 | 0.80 |
+| Cooling Tower | 90 | 0.60 |
+| FCU | 180 | 0.30 |
+| VAV | 180 | 0.30 |
+| Pump | 180 | 0.50 |
+| DALI | 365 | 0.20 |
+
+### Priority Levels
+
+| Score Range | Level | Action |
+|-------------|-------|--------|
+| 80-100 | Critical | Immediate inspection required |
+| 60-79 | High | Schedule within 7 days |
+| 40-59 | Medium | Schedule within 30 days |
+| 20-39 | Low | Include in next routine cycle |
+| 0-19 | Routine | No action needed |
+
+### Fleet Priorities
+
+`compute_fleet_priorities(site_id)` returns a ranked list of all equipment at a site, sorted by priority score descending. It automatically gathers anomaly scores from the ML anomaly detection service.
+
+### Implementation
+
+- Service: `backend/app/services/inspection_priority_service.py`
+- Singleton: `get_inspection_priority_service()`
+- Key methods:
+  - `compute_priority(equipment_id, equipment_type, ...)` — Single asset
+  - `compute_fleet_priorities(site_id)` — All assets at site, ranked
+
+---
+
 ## Database Tables
 
 | Table | Purpose |

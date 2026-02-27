@@ -80,6 +80,9 @@ class EmailIntakeRequest(BaseModel):
     extraction_model: Optional[str] = None
     extraction_raw: Optional[dict[str, Any]] = None
 
+    # Email threading (RFC 822)
+    references: Optional[str] = None  # References header from inbound email
+
     # Follow-up / reference linking
     existing_reference: Optional[str] = None  # e.g. FNBFW:12345
 
@@ -107,8 +110,14 @@ class EmailIntakeResponse(BaseModel):
     concept_ref: Optional[str] = None
     bms_context: Optional[dict[str, Any]] = None
     message: str = ""
-    reply_template: Optional[str] = None  # pre-built reply body for n8n
+    reply_template: Optional[str] = None  # plain-text reply body for n8n
+    reply_html: Optional[str] = None  # branded HTML reply for n8n
     urgency: str = "normal"
+
+    # Backend SMTP reply status (Phase 131.2b)
+    reply_sent: bool = False  # True if backend sent threaded reply via SMTP
+    reply_message_id: Optional[str] = None  # Outbound Message-ID header
+    reply_error: Optional[str] = None  # Error message if backend reply failed
 
 
 # ---------------------------------------------------------------------------

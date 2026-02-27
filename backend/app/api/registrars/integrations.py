@@ -1,13 +1,13 @@
 """Integration API router registrar.
 
 Registers routers for third-party integrations: Niagara, BACnet,
-DALI lighting, SIMBIOT Concept, and energy systems.
+lighting, SIMBIOT Concept, and energy systems.
 """
 
 from fastapi import FastAPI
 
 from app.api import niagara, niagara_bacnet, niagara_discovery
-from app.api import dali, energy, generators, energy_centre
+from app.api import lighting, energy, generators, energy_centre
 from app.api import concept, integration, solar, water
 
 
@@ -18,8 +18,8 @@ def register_integrations_routers(app: FastAPI) -> None:
     app.include_router(niagara_bacnet.router, tags=["niagara-bacnet"])
     app.include_router(niagara_discovery.router, tags=["niagara-discovery"])
 
-    # DALI lighting integration
-    app.include_router(dali.router, tags=["dali-lighting"])
+    # Lighting integration
+    app.include_router(lighting.router, tags=["lighting"])
 
     # Energy systems
     app.include_router(energy.router, prefix="/api", tags=["energy"])

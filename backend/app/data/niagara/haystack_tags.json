@@ -73,7 +73,7 @@
       "point_type": "sensor"
     },
     "current": {
-      "keywords": ["current", "amp", "amps"],
+      "keywords": ["current", "amps", "ampere", "amperes"],
       "brick_class": "Current_Sensor",
       "unit": "A",
       "point_type": "sensor"
@@ -91,40 +91,88 @@
       "point_type": "sensor"
     },
     "level": {
-      "keywords": ["level", "tank", "reservoir", "fuel"],
+      "keywords": ["tank", "reservoir", "fuel", "tank_level", "water_level", "fuel_level"],
       "brick_class": "Level_Sensor",
       "unit": "%",
       "point_type": "sensor"
     },
     "brightness": {
-      "keywords": ["brightness", "dim", "dimming", "intensity", "led_level", "light_level"],
+      "keywords": ["brightness", "dim", "dimming", "intensity", "led_level", "light_level", "dimlevel", "dim_level", "arc_level"],
       "brick_class": "Brightness_Sensor",
       "unit": "%",
       "point_type": "sensor"
     },
     "lux": {
-      "keywords": ["lux", "illuminance", "daylight_level", "light_intensity"],
+      "keywords": ["lux", "illuminance", "daylight_level", "light_intensity", "ambientlux", "ambient_lux"],
       "brick_class": "Luminance_Sensor",
       "unit": "lux",
       "point_type": "sensor"
     },
     "color_temperature": {
-      "keywords": ["color_temp", "cct", "kelvin", "colour_temp"],
+      "keywords": ["color_temp", "cct", "kelvin", "colour_temp", "colortemp", "colourtemp"],
       "brick_class": "Color_Temperature_Sensor",
       "unit": "K",
       "point_type": "sensor"
     },
     "lamp_status": {
-      "keywords": ["lamp_status", "lamp_fail", "lamp_fault", "ballast_fail", "led_fault", "emergency_battery"],
+      "keywords": ["lamp_status", "lamp_fail", "lamp_fault", "ballast_fail", "led_fault", "emergency_battery", "lampfail", "driverfault", "driver_fault"],
       "brick_class": "Lamp_Status",
       "unit": "",
       "point_type": "status"
     },
     "scene": {
-      "keywords": ["scene", "scene_select", "scene_activate", "lighting_scene"],
+      "keywords": ["scene", "scene_select", "scene_activate", "lighting_scene", "scenerecall"],
       "brick_class": "Scene_Command",
       "unit": "",
       "point_type": "command"
+    },
+    "lighting_power": {
+      "keywords": ["activepower", "active_power", "luminaire_power", "lum_power", "lightingpower", "lighting_kw"],
+      "brick_class": "Luminaire_Power_Sensor",
+      "unit": "W",
+      "point_type": "sensor"
+    },
+    "lighting_energy": {
+      "keywords": ["accumenergy", "accum_energy", "accumulated_energy", "luminaire_energy", "lighting_kwh", "lumenergy", "lightenergy"],
+      "brick_class": "Luminaire_Energy_Sensor",
+      "unit": "kWh",
+      "point_type": "sensor"
+    },
+    "driver_temperature": {
+      "keywords": ["drivertemp", "driver_temp", "driver_temperature", "ballasttemp", "ballast_temp", "led_driver_temp"],
+      "brick_class": "Driver_Temperature_Sensor",
+      "unit": "degC",
+      "point_type": "sensor"
+    },
+    "lamp_hours": {
+      "keywords": ["lamphours", "lamp_hours", "operating_hours", "burninghours", "burning_hours", "luminaire_hours", "led_hours"],
+      "brick_class": "Lamp_Runtime_Sensor",
+      "unit": "hours",
+      "point_type": "sensor"
+    },
+    "light_output": {
+      "keywords": ["lightoutput", "light_output", "luminous_flux", "lumen_output", "lumen_maintenance", "lumen_depreciation"],
+      "brick_class": "Luminous_Output_Sensor",
+      "unit": "%",
+      "point_type": "sensor"
+    },
+    "emergency_battery": {
+      "keywords": ["embatt", "em_batt", "em_battery", "emergency_batt", "battlevel", "emergency_battery", "em_battlevel", "em01_batt", "em02_batt"],
+      "brick_class": "Emergency_Battery_Sensor",
+      "unit": "%",
+      "point_type": "sensor"
+    },
+    "emergency_test": {
+      "keywords": ["emtest", "em_test", "testresult", "test_result", "functiontest", "function_test", "durationtest", "duration_test"],
+      "brick_class": "Emergency_Test_Status",
+      "unit": "",
+      "point_type": "status"
+    },
+    "charge_status": {
+      "keywords": ["chargestatus", "charge_status", "charging", "chargestate", "charge_state"],
+      "brick_class": "Charge_Status",
+      "unit": "",
+      "point_type": "status"
     }
   },
   "equipment_patterns": {
@@ -179,19 +227,24 @@
       "typical_points": ["primary_voltage", "secondary_voltage", "oil_temp", "load_percent"]
     },
     "dali_controller": {
-      "regex": "dali[-_]?ctrl|dali[-_]?controller|scenecom|tridonic|dali[-_]?gw|lighting[-_]?controller",
+      "regex": "dali[-_]?ctrl|dali[-_]?controller|scenecom|tridonic|dali[-_]?gw|lighting[-_]?controller|net4more|n4m",
       "brick_class": "DALI_Controller",
-      "typical_points": ["status", "channel_count", "bus_fault", "power_state"]
+      "typical_points": ["status", "channel_count", "bus_fault", "power_state", "mqtt_connected", "gateway_status"]
     },
     "luminaire": {
-      "regex": "luminaire|lum[-_]?\\d|led[-_]?downlight|led[-_]?panel|led[-_]?strip|linear[-_]?led|light[-_]?fitting",
+      "regex": "luminaire|lum[-_]?\\d|led[-_]?downlight|led[-_]?panel|led[-_]?strip|linear[-_]?led|light[-_]?fitting|dali[-_]?lum|dali[-_]?l\\d",
       "brick_class": "Luminaire",
-      "typical_points": ["brightness", "power_state", "lamp_status", "color_temp", "emergency_battery"]
+      "typical_points": ["brightness", "power_state", "lamp_status", "color_temp", "emergency_battery", "active_power", "driver_temp", "lamp_hours"]
     },
     "light_sensor": {
-      "regex": "pir[-_]?daylight|daylight[-_]?sensor|lux[-_]?sensor|light[-_]?sensor|illuminance",
+      "regex": "pir[-_]?daylight|daylight[-_]?sensor|lux[-_]?sensor|light[-_]?sensor|illuminance|dali[-_]?sens|dali[-_]?pir",
       "brick_class": "Light_Sensor",
-      "typical_points": ["lux", "occupancy", "daylight_level"]
+      "typical_points": ["lux", "occupancy", "daylight_level", "occupancy_count"]
+    },
+    "emergency_luminaire": {
+      "regex": "em[-_]?lum|em[-_]?light|emergency[-_]?lum|emergency[-_]?light|dali[-_]?em",
+      "brick_class": "Emergency_Luminaire",
+      "typical_points": ["battery_level", "charge_status", "test_result", "lamp_status", "compliance_due"]
     },
     "meter": {
       "regex": "meter|mtr|metering|power[._-]?meter",

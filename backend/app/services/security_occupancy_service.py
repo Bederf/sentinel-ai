@@ -394,9 +394,9 @@ class SecurityOccupancyService:
     def _get_dali_occupancy_data(self) -> Optional[Dict[str, Any]]:
         """Try to get DALI PIR sensor data for combined occupancy."""
         try:
-            from app.services.dali_service import get_dali_service
+            from app.services.lighting_service import get_lighting_service
 
-            dali = get_dali_service()
+            dali = get_lighting_service()
             zones = dali.get_zones()
             if zones:
                 return {

@@ -86,9 +86,9 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
     try {
       setLoading(true);
       const maxDay = Math.max(1, daysSimulated);
-      const response = await authorizedFetch(`/api/dali/simulation?site_id=${siteId}&max_day=${maxDay}`);
+      const response = await authorizedFetch(`/api/lighting/simulation?site_id=${siteId}&max_day=${maxDay}`);
       if (!response.ok) {
-        console.error('Failed to fetch DALI simulation:', response.status, response.statusText);
+        console.error('Failed to fetch lighting simulation:', response.status, response.statusText);
         setLoading(false);
         return;
       }
@@ -96,10 +96,10 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
       if (json && json.summary) {
         setData({ ...json, data_source: 'simulation' });
       } else {
-        console.warn('DALI simulation response missing summary:', json);
+        console.warn('lighting simulation response missing summary:', json);
       }
     } catch (error) {
-      console.error('Failed to load DALI simulation:', error);
+      console.error('Failed to load lighting simulation:', error);
     } finally {
       setLoading(false);
     }
@@ -108,9 +108,9 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
   const fetchLiveData = async () => {
     try {
       setLoading(true);
-      const response = await authorizedFetch(`/api/dali/live?site_id=${siteId}`);
+      const response = await authorizedFetch(`/api/lighting/live?site_id=${siteId}`);
       if (!response.ok) {
-        console.error('Failed to fetch live DALI data:', response.status, response.statusText);
+        console.error('Failed to fetch live lighting data:', response.status, response.statusText);
         setLoading(false);
         return;
       }
@@ -118,10 +118,10 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
       if (json && json.summary) {
         setData({ ...json, data_source: 'live' });
       } else {
-        console.warn('Live DALI data response missing summary:', json);
+        console.warn('Live lighting data response missing summary:', json);
       }
     } catch (error) {
-      console.error('Failed to load live DALI data:', error);
+      console.error('Failed to load live lighting data:', error);
     } finally {
       setLoading(false);
     }
@@ -213,7 +213,7 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
     );
   };
 
-  // Calculate energy reduction percentage: SENTINEL vs Tridonic (the installed system)
+  // Calculate energy reduction percentage: SENTINEL vs smart lighting (the installed system)
   const energyReductionPct =
     summary.dali_annual_cost > 0
       ? ((summary.dali_annual_cost - summary.sentinel_annual_cost) /
@@ -286,7 +286,7 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
                 icon={<TrendingUp className="h-5 w-5" />}
                 label="Annual Savings"
                 value={fmtRK(summary.total_savings_zar || 0)}
-                subtitle="Sentinel vs Tridonic"
+                subtitle="SENTINEL vs Baseline"
                 color="#22C55E"
               />
               <MetricCard
@@ -387,7 +387,7 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
                 stroke="#6B7280"
                 fill="url(#gradBaseline)"
                 strokeWidth={2}
-                name="Baseline (No DALI)"
+                name="Baseline (No Automation)"
                 dot={false}
               />
               <Area
@@ -396,7 +396,7 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
                 stroke="#F59E0B"
                 fill="url(#gradDali)"
                 strokeWidth={2}
-                name="With Smart Lighting (Tridonic)"
+                name="Smart Lighting"
                 dot={false}
               />
               <Area
@@ -600,7 +600,7 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
                 className="text-sm font-medium mb-1"
                 style={{ color: '#22C55E' }}
               >
-                Tridonic Smart Lighting + SENTINEL AI Intelligence
+                Smart Lighting + SENTINEL AI Intelligence
               </p>
               <p
                 className="text-xs leading-relaxed"

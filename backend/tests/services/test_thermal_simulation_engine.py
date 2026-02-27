@@ -278,6 +278,126 @@ class TestIntegration:
         assert night_temp <= morning_temp + 2.0, "Night temps should not be significantly higher than morning"
 
 
+class TestCO2Simulation:
+    """Test CO2 generation and ventilation dilution."""
+
+    def test_co2_rises_with_occupancy(self, thermal_engine):
+        """CO2 should rise when zone is occupied."""
+        zone_config = {"typical_occupancy": 20}
+
+        co2 = thermal_engine._calculate_zone_co2("Z1", 80.0, 0.7, zone_config)
+        assert co2 > thermal_engine.OUTDOOR_CO2_PPM, "CO2 should rise above outdoor baseline"
+
+    def test_co2_falls_when_vacant(self, thermal_engine):
+        """CO2 should fall toward outdoor baseline when zone is vacant."""
+        zone_config = {"typical_occupancy": 20}
+
+        # First, elevate CO2
+        thermal_engine._zone_co2["Z1"] = 900.0
+        co2 = thermal_engine._calculate_zone_co2("Z1", 0.0, 0.7, zone_config)
+        assert co2 < 900.0, "CO2 should decrease when zone is vacant"
+
+    def test_co2_clamped_to_outdoor_baseline(self, thermal_engine):
+        """CO2 should never go below outdoor baseline."""
+        zone_config = {"typical_occupancy": 20}
+
+        # Start at baseline, 0 occupancy
+        thermal_engine._zone_co2["Z1"] = thermal_engine.OUTDOOR_CO2_PPM
+        co2 = thermal_engine._calculate_zone_co2("Z1", 0.0, 0.9, zone_config)
+        assert co2 >= thermal_engine.OUTDOOR_CO2_PPM, "CO2 should not go below outdoor baseline"
+
+    def test_co2_clamped_to_max(self, thermal_engine):
+        """CO2 should not exceed 2000 ppm."""
+        zone_config = {"typical_occupancy": 100}
+
+        thermal_engine._zone_co2["Z1"] = 1990.0
+        co2 = thermal_engine._calculate_zone_co2("Z1", 100.0, 0.1, zone_config)
+        assert co2 <= 2000.0, "CO2 should not exceed 2000 ppm"
+
+    def test_dcv_boost_above_threshold(self, thermal_engine):
+        """DCV should increase dilution rate above threshold, slowing CO2 rise."""
+        zone_config = {"typical_occupancy": 20}
+
+        # Below threshold: normal dilution
+        thermal_engine._zone_co2["Z_low"] = 700.0
+        co2_low = thermal_engine._calculate_zone_co2("Z_low", 80.0, 0.7, zone_config)
+
+        # Above threshold: DCV boost dilution
+        thermal_engine._zone_co2["Z_high"] = 900.0
+        co2_high = thermal_engine._calculate_zone_co2("Z_high", 80.0, 0.7, zone_config)
+
+        # The high-CO2 zone should see a bigger dilution drop relative to its level
+        rise_low = co2_low - 700.0
+        rise_high = co2_high - 900.0
+        # DCV boost means the high zone should rise less (or drop)
+        assert rise_high < rise_low, "DCV boost should slow CO2 rise above threshold"
+
+
+class TestChillerPlant:
+    """Test N+1 chiller redundancy and COP interpolation."""
+
+    def test_cop_interpolation_exact(self, thermal_engine):
+        """COP should match exact points in the curve."""
+        assert thermal_engine._interpolate_cop(0.6) == 3.5
+        assert thermal_engine._interpolate_cop(1.0) == 3.2
+
+    def test_cop_interpolation_between(self, thermal_engine):
+        """COP should interpolate between curve points."""
+        cop = thermal_engine._interpolate_cop(0.3)
+        assert 2.0 < cop < 3.0, f"COP at 30% load should be between 2.0 and 3.0, got {cop}"
+
+    def test_lead_chiller_handles_normal_load(self, thermal_engine):
+        """Lead chiller should handle load alone when within capacity."""
+        power = thermal_engine._update_chiller_plant(80.0)
+        lead = thermal_engine._chiller_states["S002-CHILLER-B1-001"]
+        lag = thermal_engine._chiller_states["S002-CHILLER-B1-002"]
+
+        assert lead["running"] is True
+        assert lag["running"] is False
+        assert power > 0
+
+    def test_cascade_on_high_demand(self, thermal_engine):
+        """Lag chiller should start when demand exceeds lead capacity."""
+        power = thermal_engine._update_chiller_plant(400.0)
+        lead = thermal_engine._chiller_states["S002-CHILLER-B1-001"]
+        lag = thermal_engine._chiller_states["S002-CHILLER-B1-002"]
+
+        assert lead["running"] is True
+        assert lag["running"] is True
+        assert lag["load_pct"] > 0
+
+    def test_cascade_on_lead_fault(self, thermal_engine):
+        """Lag should take over when lead is faulted (health < 20%)."""
+        thermal_engine._chiller_states["S002-CHILLER-B1-001"]["health"] = 10.0
+
+        power = thermal_engine._update_chiller_plant(100.0)
+        lead = thermal_engine._chiller_states["S002-CHILLER-B1-001"]
+        lag = thermal_engine._chiller_states["S002-CHILLER-B1-002"]
+
+        assert lead["running"] is False, "Faulted lead should be off"
+        assert lag["running"] is True, "Lag should take over"
+        assert power > 0
+
+    def test_minimum_power_when_running(self, thermal_engine):
+        """Chiller power should not go below minimum when running."""
+        power = thermal_engine._update_chiller_plant(1.0)  # Very low demand
+        assert power >= thermal_engine.CHILLER_MIN_POWER
+
+    def test_zero_demand_no_power(self, thermal_engine):
+        """No chiller power when there's zero cooling demand."""
+        power = thermal_engine._update_chiller_plant(0.0)
+        lead = thermal_engine._chiller_states["S002-CHILLER-B1-001"]
+        lag = thermal_engine._chiller_states["S002-CHILLER-B1-002"]
+
+        assert lead["running"] is False
+        assert lag["running"] is False
+
+    def test_health_update_propagates_to_chillers(self, thermal_engine):
+        """update_health_cache should update chiller health."""
+        thermal_engine.update_health_cache({"S002-CHILLER-B1-001": 45.0})
+        assert thermal_engine._chiller_states["S002-CHILLER-B1-001"]["health"] == 45.0
+
+
 class TestSingleton:
     """Test singleton pattern for thermal engines."""
 

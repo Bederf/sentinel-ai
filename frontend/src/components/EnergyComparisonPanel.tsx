@@ -1,9 +1,9 @@
 /**
- * EnergyComparisonPanel Component - Tridonic DALI Demo Card
+ * EnergyComparisonPanel Component - Smart Lighting Demo Card
  *
- * Shows 3-tier energy savings comparison driven by the DALI simulation engine:
+ * Shows 3-tier energy savings comparison driven by the lighting simulation engine:
  * 1. Baseline: Traditional lighting (100%)
- * 2. With DALI: Occupancy + daylight harvesting (Tridonic)
+ * 2. Smart Lighting: Occupancy + daylight harvesting
  * 3. With SENTINEL: AI optimization on top
  *
  * Data updates as the 365-day simulation progresses.
@@ -32,7 +32,7 @@ export function EnergyComparisonPanel({ siteId }: { siteId: string }) {
   const fetchData = useCallback(async () => {
     try {
       const maxDay = Math.max(1, daysSimulated || 1);
-      const response = await authorizedFetch(`/api/dali/simulation?site_id=${siteId}&max_day=${maxDay}`);
+      const response = await authorizedFetch(`/api/lighting/simulation?site_id=${siteId}&max_day=${maxDay}`);
       const json = await response.json();
       const s = json.summary;
 
@@ -47,13 +47,13 @@ export function EnergyComparisonPanel({ siteId }: { siteId: string }) {
 
       setScenarios([
         {
-          name: "Baseline (No DALI)",
+          name: "Baseline (No Automation)",
           kwh: baselineKwh,
           description: "Traditional lighting controls",
           savings_percent: 0,
         },
         {
-          name: "With DALI (Tridonic)",
+          name: "Smart Lighting",
           kwh: daliKwh,
           description: "Occupancy & daylight harvesting",
           savings_percent: daliSavingsPct,
@@ -62,7 +62,7 @@ export function EnergyComparisonPanel({ siteId }: { siteId: string }) {
         {
           name: "With SENTINEL (AI)",
           kwh: sentinelKwh,
-          description: "AI optimization on top of DALI",
+          description: "AI optimization on top of smart lighting",
           savings_percent: sentinelSavingsPct,
           savings_kwh: baselineKwh - sentinelKwh,
         },
@@ -105,7 +105,7 @@ export function EnergyComparisonPanel({ siteId }: { siteId: string }) {
           </div>
           <div>
             <h3 className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
-              Energy Impact: Tridonic DALI Integration
+              Energy Impact: Smart Lighting
             </h3>
             <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               {periodDays > 0 ? `${periodDays}-day` : 'Cumulative'} consumption comparison (kWh)
@@ -152,7 +152,7 @@ export function EnergyComparisonPanel({ siteId }: { siteId: string }) {
             <Leaf className="h-5 w-5" style={{ color: "#22C55E" }} />
             <div>
               <p className="text-sm font-medium" style={{ color: "#22C55E" }}>
-                Tridonic DALI + SENTINEL AI
+                Smart Lighting + SENTINEL AI
               </p>
               <p className="text-xs" style={{ color: "rgba(34, 197, 94, 0.8)" }}>
                 {(withSentinel.savings_kwh || 0).toLocaleString()} kWh saved &bull;

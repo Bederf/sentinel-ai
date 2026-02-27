@@ -93,6 +93,98 @@ class FeedbackSession:
     health_score_change: int = 0
     status: str = "in_progress"
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize session for Redis persistence."""
+        return {
+            "session_id": self.session_id,
+            "work_order_id": self.work_order_id,
+            "equipment_id": self.equipment_id,
+            "equipment_code": self.equipment_code,
+            "equipment_type": self.equipment_type,
+            "service_type": self.service_type,
+            "template": {
+                "equipment_type": self.template.equipment_type,
+                "service_type": self.template.service_type,
+                "required_items": self.template.required_items,
+                "optional_items": self.template.optional_items,
+                "prompts": self.template.prompts,
+                "validation_rules": self.template.validation_rules,
+                "audio_duration_seconds": self.template.audio_duration_seconds,
+            },
+            "items_collected": self.items_collected,
+            "feedback_items": [
+                {
+                    "item_type": fi.item_type.value,
+                    "item_key": fi.item_key,
+                    "value": fi.value,
+                    "unit": fi.unit,
+                    "numeric_value": fi.numeric_value,
+                    "file_path": fi.file_path,
+                    "confidence": fi.confidence,
+                    "baseline_value": fi.baseline_value,
+                    "deviation_percent": fi.deviation_percent,
+                    "health_impact": fi.health_impact.value,
+                    "notes": fi.notes,
+                }
+                for fi in self.feedback_items
+            ],
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "health_score_change": self.health_score_change,
+            "status": self.status,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "FeedbackSession":
+        """Reconstruct FeedbackSession from serialized dict (Redis/JSON)."""
+        tmpl_data = data.get("template", {})
+        template = FeedbackTemplate(
+            equipment_type=tmpl_data.get("equipment_type", ""),
+            service_type=tmpl_data.get("service_type", ""),
+            required_items=tmpl_data.get("required_items", []),
+            optional_items=tmpl_data.get("optional_items", []),
+            prompts=tmpl_data.get("prompts", {}),
+            validation_rules=tmpl_data.get("validation_rules", {}),
+            audio_duration_seconds=tmpl_data.get("audio_duration_seconds", 10),
+        )
+
+        feedback_items = []
+        for fi_data in data.get("feedback_items", []):
+            feedback_items.append(
+                FeedbackItem(
+                    item_type=FeedbackItemType(fi_data.get("item_type", "reading")),
+                    item_key=fi_data.get("item_key", ""),
+                    value=fi_data.get("value"),
+                    unit=fi_data.get("unit"),
+                    numeric_value=fi_data.get("numeric_value"),
+                    file_path=fi_data.get("file_path"),
+                    confidence=fi_data.get("confidence", 1.0),
+                    baseline_value=fi_data.get("baseline_value"),
+                    deviation_percent=fi_data.get("deviation_percent"),
+                    health_impact=HealthImpact(fi_data.get("health_impact", "neutral")),
+                    notes=fi_data.get("notes"),
+                )
+            )
+
+        session = cls(
+            session_id=data["session_id"],
+            work_order_id=data.get("work_order_id", ""),
+            equipment_id=data.get("equipment_id", ""),
+            equipment_code=data.get("equipment_code", ""),
+            equipment_type=data.get("equipment_type", ""),
+            service_type=data.get("service_type", ""),
+            template=template,
+            items_collected=data.get("items_collected", []),
+            feedback_items=feedback_items,
+            health_score_change=data.get("health_score_change", 0),
+            status=data.get("status", "in_progress"),
+        )
+        if data.get("started_at"):
+            session.started_at = datetime.fromisoformat(data["started_at"])
+        if data.get("completed_at"):
+            session.completed_at = datetime.fromisoformat(data["completed_at"])
+        return session
+
 
 class FeedbackCollectionService:
     """
@@ -107,12 +199,23 @@ class FeedbackCollectionService:
     """
 
     def __init__(self):
+        from app.services.redis_session_store import RedisSessionStore
+
         self._templates: Dict[str, Dict[str, FeedbackTemplate]] = {}
-        self._sessions: Dict[str, FeedbackSession] = {}
+        self._store = RedisSessionStore(
+            prefix="bms:feedback",
+            ttl_seconds=14400,  # 4 hours
+            deserializer=FeedbackSession.from_dict,
+        )
         self._load_templates()
         self.service_record_repo = ServiceRecordRepository()
         self.equipment_repo = EquipmentRepository()
         self.baseline_repo = BaselineRepository()
+
+    @property
+    def _sessions(self) -> Dict[str, FeedbackSession]:
+        """Backward-compat: expose in-memory dict from store."""
+        return self._store._memory
 
     def _load_templates(self) -> None:
         """Load feedback templates from JSON file."""
@@ -241,7 +344,7 @@ class FeedbackCollectionService:
             started_at=datetime.now(),
         )
 
-        self._sessions[session_id] = session
+        self._store.put(session_id, session)
 
         logger.info(
             f"Started feedback session {session_id} for {equipment_code} "
@@ -252,7 +355,7 @@ class FeedbackCollectionService:
 
     def get_session(self, session_id: str) -> Optional[FeedbackSession]:
         """Get an active feedback session."""
-        return self._sessions.get(session_id)
+        return self._store.get(session_id)
 
     def get_next_prompt(self, session_id: str) -> Optional[Tuple[str, str, bool]]:
         """
@@ -261,7 +364,7 @@ class FeedbackCollectionService:
         Returns:
             Tuple of (item_key, prompt_text, is_required) or None if complete
         """
-        session = self._sessions.get(session_id)
+        session = self._store.get(session_id)
         if not session:
             return None
 
@@ -304,7 +407,7 @@ class FeedbackCollectionService:
         Returns:
             FeedbackItem with validation and health impact calculated
         """
-        session = self._sessions.get(session_id)
+        session = self._store.get(session_id)
         if not session:
             raise ValueError(f"Session not found: {session_id}")
 
@@ -340,6 +443,9 @@ class FeedbackCollectionService:
         session.feedback_items.append(feedback_item)
         if item_key not in session.items_collected:
             session.items_collected.append(item_key)
+
+        # Persist updated session
+        self._store.put(session_id, session)
 
         logger.info(
             f"Session {session_id}: Collected {item_key} = {value} (impact: {feedback_item.health_impact.value})"
@@ -407,7 +513,7 @@ class FeedbackCollectionService:
         Returns:
             Integer change to health score (-20 to +10)
         """
-        session = self._sessions.get(session_id)
+        session = self._store.get(session_id)
         if not session:
             return 0
 
@@ -450,7 +556,7 @@ class FeedbackCollectionService:
         Returns:
             Summary including health score change and any warnings
         """
-        session = self._sessions.get(session_id)
+        session = self._store.get(session_id)
         if not session:
             raise ValueError(f"Session not found: {session_id}")
 
@@ -576,7 +682,7 @@ class FeedbackCollectionService:
 
     def get_session_status(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get current status of a feedback session."""
-        session = self._sessions.get(session_id)
+        session = self._store.get(session_id)
         if not session:
             return None
 

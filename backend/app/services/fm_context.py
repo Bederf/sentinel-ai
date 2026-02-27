@@ -1,7 +1,10 @@
 """FM Context Service for building data injection into Claude context."""
 
 import json
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Data directory
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -279,6 +282,86 @@ class FMContextService:
             lines.append("")
 
         return "\n".join(lines)
+
+    def get_agent_memory_context(self, site_id: str = "site-002") -> str:
+        """Get agent memory context for injection into Claude system prompt.
+
+        Returns a concise markdown block with up to 20 memories grouped by
+        context_type. Keeps output under ~2-3K chars.
+
+        Args:
+            site_id: Site to load memories for.
+
+        Returns:
+            Markdown-formatted agent memory section, or empty string if none.
+        """
+        try:
+            from app.database.repositories.agent_memory_repository import (
+                get_agent_memory_repository,
+            )
+
+            repo = get_agent_memory_repository()
+            memories = repo.get_by_site(site_id, limit=20)
+
+            if not memories:
+                return ""
+
+            # Filter out expired memories
+            from datetime import datetime, timezone
+
+            now = datetime.now(timezone.utc)
+            active = []
+            for m in memories:
+                expires = m.get("expires_at")
+                if expires:
+                    try:
+                        exp_dt = datetime.fromisoformat(expires.replace("Z", "+00:00"))
+                        if exp_dt < now:
+                            continue
+                    except (ValueError, TypeError):
+                        pass
+                active.append(m)
+
+            if not active:
+                return ""
+
+            # Group by context_type
+            grouped: dict[str, list] = {}
+            for m in active:
+                ct = m.get("context_type", "other")
+                grouped.setdefault(ct, []).append(m)
+
+            TYPE_LABELS = {
+                "building_quirk": "Building Quirks",
+                "equipment_note": "Equipment Notes",
+                "operator_preference": "Operator Preferences",
+                "seasonal": "Seasonal Patterns",
+                "safety_note": "Safety Notes",
+            }
+
+            lines = ["## Institutional Knowledge (Agent Memory)"]
+            lines.append(
+                "The following are verified observations from previous sessions. "
+                "Use them to inform your responses without re-discovering."
+            )
+            lines.append("")
+
+            for ctx_type, items in grouped.items():
+                label = TYPE_LABELS.get(ctx_type, ctx_type.replace("_", " ").title())
+                lines.append(f"### {label}")
+                for item in items:
+                    equip = item.get("equipment_code")
+                    prefix = f"[{equip}] " if equip else ""
+                    conf = item.get("confidence", 1.0)
+                    conf_note = f" (confidence: {conf:.0%})" if conf < 1.0 else ""
+                    lines.append(f"- {prefix}**{item['key']}**: {item['value']}{conf_note}")
+                lines.append("")
+
+            return "\n".join(lines)
+
+        except Exception as e:
+            logger.warning("Could not load agent memory context: %s", e)
+            return ""
 
     def get_full_context(self) -> str:
         """

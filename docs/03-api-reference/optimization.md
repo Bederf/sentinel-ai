@@ -81,6 +81,62 @@ When `optimization_routing_enforced=True`:
 - **Shadow mode** (default, `optimization_routing_enforced=False`): Routing decisions are computed and logged but do not change existing behavior. Auto-apply uses legacy `site_mode` logic.
 - **Enforce mode** (`optimization_routing_enforced=True`): Routing decisions control auto-apply and approval paths. Only tier3+safety-passed items are auto-applied.
 
+## ML Context Injection (Phase 132)
+
+When `POST /optimization/analyze` is called, the AI Optimizer now gathers ML model outputs before building Claude's prompt. This bridges trained ML models (20 active) with Claude's recommendation engine.
+
+### ML Context Sources
+
+| Source | Service | Data Injected |
+|--------|---------|---------------|
+| LSTM Forecasting | `ml_inference.LSTMInferenceService` | 24/48/72h temperature/load forecasts per equipment |
+| Anomaly Detection | `ml_inference.AnomalyDetectionService` | Equipment with anomaly score > 0.5 |
+| Fault Classification | `classification_service.FailureClassificationService` | Fault type probabilities > 0.4 confidence |
+| Health Trends | `health_feature_provider.HealthFeatureProvider` | Equipment with degrading health (7d slope < -0.5) |
+| Building Features | `feature_engineering_service.FeatureEngineeringService` | EUI, Base Load Index, CDD, Efficiency Score |
+
+### How It Works
+
+```
+analyze_building()
+    ├── _gather_current_conditions()     # Current state
+    ├── _gather_ml_context()             # ML predictions ← NEW
+    │   ├── LSTM forecasts (capped at 10)
+    │   ├── Anomaly alerts (score > 0.5)
+    │   ├── Fault classifications (confidence > 0.4)
+    │   ├── Health trends (degrading only)
+    │   └── Building features (EUI, BLI, CDD)
+    ├── _build_optimization_prompt()     # Includes ML section
+    └── _analyze_with_claude()           # Claude uses ML data
+```
+
+### Claude Prompt Enhancement
+
+The ML context is inserted as a dedicated section between "Current Conditions" and "Weather Forecast" in Claude's prompt. Claude is instructed to:
+
+1. Use LSTM forecasts for pre-cooling/pre-heating decisions
+2. Flag equipment with elevated anomaly scores for inspection
+3. Factor fault classification probabilities into maintenance recommendations
+4. Consider health degradation trends when loading equipment
+5. Reference building efficiency metrics (EUI, base load index) for energy recommendations
+
+### Building-Level Features
+
+| Feature | Formula | Benchmark |
+|---------|---------|-----------|
+| **EUI** | `daily_kWh / building_m²` | < 0.15 excellent, > 0.50 poor |
+| **Base Load Index** | `off_hours_kWh / total_daily_kWh` | < 0.15 excellent, > 0.40 poor |
+| **CDD** | `Σ max(0, T_hour - 18°C) / 24` | SA base temp 18°C |
+| **Efficiency Score** | Weighted composite (0-100) | EUI 35%, BLI 25%, setpoint 25%, CDD 15% |
+
+### Response Changes
+
+Recommendations generated after ML context injection include richer reasoning that references predicted future state:
+
+- "LSTM forecasts predict 3°C temperature rise in 24h — pre-cool now"
+- "Anomaly score 0.82 on AHU-L2-001 — schedule inspection"
+- "Bearing wear probability 65% — reduce loading on chiller"
+
 ## Implementation
 
 - Core optimization: `backend/app/api/ai_recommendations.py`
@@ -88,9 +144,20 @@ When `optimization_routing_enforced=True`:
 - Tier router: `backend/app/services/optimization_tier_router.py`
 - M&V service: `backend/app/services/mv_verification_service.py`
 - AI optimizer: `backend/app/services/ai_optimizer.py`
+- ML context bridge: `backend/app/services/ai_optimizer.py` (`_gather_ml_context`, `_format_ml_context_section`)
+- Feature engineering: `backend/app/services/feature_engineering_service.py`
+- ML inference: `backend/app/services/ml_inference.py`
+- Fault classification: `backend/app/services/classification_service.py`
+- Health features: `backend/app/services/health_feature_provider.py`
 
-## Key Changes (2026-02-19)
+## Key Changes
 
+**2026-02-27 (Phase 132)**
+- ML Context Injection: LSTM forecasts, anomaly scores, fault classifications, health trends, and building-level features injected into Claude's optimization prompt
+- Building-level feature engineering: EUI, Base Load Index, CDD, Building Efficiency Score
+- Claude task instructions updated to use ML predictions for proactive recommendations
+
+**2026-02-19**
 - Monthly savings now use schedule-aware projection (actual weekdays + TOU-weighted rates)
 - Recommendations include `data_quality` field showing live vs defaulted sensor data
 - M&V endpoints added for post-action verification of predicted vs actual savings

@@ -25,10 +25,11 @@ class EquipmentMetadataRepository:
         """
         # Try by UUID first, then by code
         query = self.client.table("equipment").select(
-            "id, code, name, type, manufacturer, model, serial_number, "
+            "id, code, name, type, manufacturer, model, serial_number, capacity, "
             "notes, network_info, device_info, operating_data, "
             "commissioning_date, warranty_expiry, last_discovery, "
-            "install_date, last_service, status, health_score, location"
+            "install_date, last_service, status, health_score, location, "
+            "service_provider_name"
         )
 
         # Check if it looks like a UUID

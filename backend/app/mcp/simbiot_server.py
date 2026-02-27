@@ -3161,7 +3161,7 @@ async def discover_tridonic_gateway_tool(
         - next_steps: Array of recommended next actions
         - error: Error message (only if success=False)
     """
-    from app.services.dali_discovery_service import DALIDiscoveryService
+    from app.services.lighting_discovery_service import LightingDiscoveryService
 
     result = {
         "success": False,
@@ -3192,7 +3192,7 @@ async def discover_tridonic_gateway_tool(
 
     try:
         # Initialize discovery service
-        service = DALIDiscoveryService(
+        service = LightingDiscoveryService(
             gateway_ip=gateway_ip, gateway_type=gateway_type, username=username, password=password, timeout=10.0
         )
 

@@ -1,6 +1,6 @@
 # AI Recommendation Agent (PARASITE) — Full Specification
 
-> **Version:** 1.0 | **Last Updated:** 2026-02-22 | **Phase:** 109B
+> **Version:** 1.1 | **Last Updated:** 2026-02-27 | **Phase:** 109B + 132
 
 ## 1. Goals & Success Metrics
 
@@ -39,6 +39,8 @@
 
 ```
 AI Optimizer
+    |
+ML Context Bridge (Phase 132)  ← LSTM forecasts, anomaly scores, fault classifications
     |
 Recommendation Service (create)
     |

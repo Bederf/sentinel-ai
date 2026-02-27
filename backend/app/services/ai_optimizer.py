@@ -31,7 +31,7 @@ from app.services.claude_service import claude_service
 from app.services.zai_service import zai_service
 from app.services.device_abstraction import device_manager
 from app.services.safety_interlocks import safety_engine
-from app.services.dali_service import get_dali_service
+from app.services.lighting_service import get_lighting_service
 
 logger = logging.getLogger(__name__)
 
@@ -124,8 +124,14 @@ class AIOptimizerService:
 
     def __init__(self):
         """Initialize AI optimizer service."""
-        # Route through configured cloud provider (anthropic or zai)
-        if settings.ai_cloud_provider == "zai" and zai_service.is_configured():
+        # Route through configured cloud provider
+        provider = (settings.ai_cloud_provider or "anthropic").strip().lower()
+        if provider == "openai":
+            from app.services.openai_service import openai_service
+
+            self._llm_service = openai_service
+            self._llm_provider = "openai"
+        elif provider == "zai" and zai_service.is_configured():
             self._llm_service = zai_service
             self._llm_provider = "zai"
         else:
@@ -195,8 +201,8 @@ class AIOptimizerService:
         logger.info(f"Site {site_id} equipment inventory: {self._summarize_inventory(equipment_inventory)}")
 
         # Fetch DALI lighting zone data
-        dali_service = get_dali_service()
-        dali_zones = self._gather_dali_zone_data(dali_service, site_id)
+        lighting_svc = get_lighting_service()
+        lighting_zones = self._gather_lighting_zone_data(lighting_svc, site_id)
 
         # Load active profile for this site
         profile = None
@@ -212,16 +218,26 @@ class AIOptimizerService:
         except Exception as e:
             logger.warning(f"Failed to load profile for site {site_id}: {e}")
 
+        # Gather ML model outputs for Claude context injection
+        ml_context = await self._gather_ml_context(site_id, equipment_inventory)
+
         # Build optimization prompt for Claude with ALL available equipment
         prompt = self._build_optimization_prompt(
-            site, current_conditions, weather_forecast, energy_prices, equipment_inventory, dali_zones, profile=profile
+            site,
+            current_conditions,
+            weather_forecast,
+            energy_prices,
+            equipment_inventory,
+            lighting_zones,
+            profile=profile,
+            ml_context=ml_context,
         )
 
         try:
             # Try to use Claude for analysis
             if self._llm_service.is_configured():
                 recommendation = await self._analyze_with_claude(
-                    site_id, prompt, current_conditions, equipment_inventory, dali_zones, profile
+                    site_id, prompt, current_conditions, equipment_inventory, lighting_zones, profile
                 )
             else:
                 # Fall back to rule-based optimization
@@ -231,7 +247,7 @@ class AIOptimizerService:
                     weather_forecast,
                     energy_prices,
                     equipment_inventory,
-                    dali_zones,
+                    lighting_zones,
                     profile,
                 )
 
@@ -251,7 +267,13 @@ class AIOptimizerService:
             logger.error(f"Error analyzing building {site_id}: {e}")
             # Fall back to rule-based optimization
             rec = self._analyze_with_rules(
-                site_id, current_conditions, weather_forecast, energy_prices, equipment_inventory, dali_zones, profile
+                site_id,
+                current_conditions,
+                weather_forecast,
+                energy_prices,
+                equipment_inventory,
+                lighting_zones,
+                profile,
             )
             # Apply scoring to fallback recommendations too
             if profile:
@@ -455,8 +477,8 @@ class AIOptimizerService:
 
             # Get real occupancy data from DALI service
             try:
-                dali_service = get_dali_service()
-                zones = dali_service.get_all_zones()
+                lighting_svc = get_lighting_service()
+                zones = lighting_svc.get_all_zones()
 
                 total_occupied = 0
                 total_zones = 0
@@ -466,7 +488,7 @@ class AIOptimizerService:
                     if not zone_id:
                         continue
 
-                    occupancy = dali_service.get_zone_occupancy(zone_id)
+                    occupancy = lighting_svc.get_zone_occupancy(zone_id)
                     if occupancy:
                         total_zones += 1
                         occ_pct = occupancy.occupancy_percent
@@ -618,6 +640,230 @@ class AIOptimizerService:
             "currency": "ZAR",
         }
 
+    async def _gather_ml_context(self, site_id: str, equipment_inventory: Dict[str, List[Device]]) -> Dict[str, Any]:
+        """Gather ML model outputs for injection into Claude's optimisation prompt.
+
+        Collects LSTM forecasts, anomaly scores, fault classifications, and health
+        trend slopes from all active ML models. This bridges the gap between trained
+        models and Claude's recommendation engine.
+
+        Returns:
+            Dict with keys: lstm_forecasts, anomaly_alerts, fault_classifications,
+            health_trends, feature_metrics. Each is a list of dicts or empty list
+            if the service is unavailable.
+        """
+        ml_context: Dict[str, Any] = {
+            "lstm_forecasts": [],
+            "anomaly_alerts": [],
+            "fault_classifications": [],
+            "health_trends": [],
+            "feature_metrics": {},
+        }
+
+        # Build equipment list from inventory
+        equipment_list = []
+        for devices in equipment_inventory.values():
+            for device in devices:
+                eq_type = getattr(device, "type", None)
+                if eq_type:
+                    eq_type_str = eq_type.value if hasattr(eq_type, "value") else str(eq_type)
+                else:
+                    eq_type_str = "unknown"
+                equipment_list.append(
+                    {
+                        "equipment_id": device.id,
+                        "equipment_type": eq_type_str.lower(),
+                        "equipment_name": getattr(device, "name", device.id),
+                    }
+                )
+
+        # 1. LSTM Forecasts — predicted future state per equipment
+        try:
+            from app.services.ml_inference import get_lstm_service
+
+            lstm_svc = get_lstm_service()
+            for eq in equipment_list:
+                try:
+                    prediction = lstm_svc.predict(eq["equipment_id"], eq["equipment_type"])
+                    if prediction and prediction.get("predictions"):
+                        ml_context["lstm_forecasts"].append(
+                            {
+                                "equipment_id": eq["equipment_id"],
+                                "equipment_name": eq["equipment_name"],
+                                "type": eq["equipment_type"],
+                                "forecast_24h": prediction["predictions"].get("24h"),
+                                "forecast_48h": prediction["predictions"].get("48h"),
+                                "forecast_72h": prediction["predictions"].get("72h"),
+                                "confidence": prediction.get("confidence", 0),
+                            }
+                        )
+                except Exception:
+                    pass  # Model not available for this type
+        except Exception as e:
+            logger.debug(f"LSTM service unavailable for ML context: {e}")
+
+        # 2. Anomaly Detection — equipment with elevated anomaly scores
+        try:
+            from app.services.ml_inference import get_anomaly_service
+
+            anomaly_svc = get_anomaly_service()
+            all_anomalies = anomaly_svc.check_all_equipment(
+                [{"equipment_id": eq["equipment_id"], "equipment_type": eq["equipment_type"]} for eq in equipment_list]
+            )
+            # Only include equipment with anomaly score above 0.5
+            for result in all_anomalies:
+                if result.get("anomaly_score", 0) > 0.5 or result.get("is_anomaly"):
+                    ml_context["anomaly_alerts"].append(
+                        {
+                            "equipment_id": result["equipment_id"],
+                            "type": result.get("equipment_type", ""),
+                            "anomaly_score": round(result.get("anomaly_score", 0), 3),
+                            "severity": result.get("severity", "unknown"),
+                            "is_anomaly": result.get("is_anomaly", False),
+                        }
+                    )
+        except Exception as e:
+            logger.debug(f"Anomaly service unavailable for ML context: {e}")
+
+        # 3. Fault Classification — active fault type probabilities
+        try:
+            from app.services.classification_service import get_classification_service
+
+            cls_svc = get_classification_service()
+            fleet_risks = cls_svc.get_fleet_failure_risks(min_confidence=0.4)
+            for risk in fleet_risks:
+                ml_context["fault_classifications"].append(
+                    {
+                        "equipment_id": risk.get("equipment_id", ""),
+                        "fault_type": risk.get("predicted_fault_type", ""),
+                        "probability": round(risk.get("confidence", 0), 3),
+                        "equipment_type": risk.get("equipment_type", ""),
+                    }
+                )
+        except Exception as e:
+            logger.debug(f"Classification service unavailable for ML context: {e}")
+
+        # 4. Health Trend Slopes — identify degrading equipment
+        try:
+            from app.services.health_feature_provider import HealthFeatureProvider
+
+            provider = HealthFeatureProvider()
+            for eq in equipment_list:
+                try:
+                    payload = await provider.get_health_features(eq["equipment_id"])
+                    # Only include if degrading (positive slope = declining health score)
+                    slope_7d = payload.health_trend_7d_slope
+                    if slope_7d is not None and slope_7d < -0.5:
+                        ml_context["health_trends"].append(
+                            {
+                                "equipment_id": eq["equipment_id"],
+                                "equipment_name": eq["equipment_name"],
+                                "health_score": payload.health_score_current,
+                                "health_status": payload.health_status_current,
+                                "trend_7d_slope": round(slope_7d, 3),
+                                "trend_30d_slope": round(payload.health_trend_30d_slope, 3)
+                                if payload.health_trend_30d_slope
+                                else None,
+                            }
+                        )
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.debug(f"Health feature provider unavailable for ML context: {e}")
+
+        # 5. Derived building-level features
+        try:
+            from app.services.feature_engineering_service import get_feature_engineering_service
+
+            feat_svc = get_feature_engineering_service()
+            ml_context["feature_metrics"] = await feat_svc.compute_building_features(site_id)
+        except Exception as e:
+            logger.debug(f"Feature engineering service unavailable: {e}")
+
+        # Log summary
+        counts = {k: len(v) if isinstance(v, list) else bool(v) for k, v in ml_context.items()}
+        logger.info(f"ML context gathered for {site_id}: {counts}")
+
+        return ml_context
+
+    def _format_ml_context_section(self, ml_context: Dict[str, Any]) -> str:
+        """Format ML context into a readable prompt section for Claude."""
+        if not ml_context:
+            return ""
+
+        sections = []
+
+        # LSTM Forecasts
+        forecasts = ml_context.get("lstm_forecasts", [])
+        if forecasts:
+            lines = ["**ML Predictive Forecasts (LSTM 24/48/72h):**"]
+            for f in forecasts[:10]:  # Cap at 10 to avoid prompt bloat
+                lines.append(
+                    f"- {f['equipment_name']} ({f['type']}): "
+                    f"24h={f.get('forecast_24h', 'N/A')}, "
+                    f"48h={f.get('forecast_48h', 'N/A')}, "
+                    f"72h={f.get('forecast_72h', 'N/A')} "
+                    f"(confidence: {f.get('confidence', 0):.0%})"
+                )
+            sections.append("\n".join(lines))
+
+        # Anomaly Alerts
+        anomalies = ml_context.get("anomaly_alerts", [])
+        if anomalies:
+            lines = ["**ML Anomaly Detection Alerts:**"]
+            for a in anomalies[:10]:
+                lines.append(
+                    f"- {a['equipment_id']} ({a['type']}): "
+                    f"score={a['anomaly_score']}, severity={a['severity']}"
+                    f"{' ⚠ ANOMALY' if a.get('is_anomaly') else ''}"
+                )
+            sections.append("\n".join(lines))
+
+        # Fault Classifications
+        faults = ml_context.get("fault_classifications", [])
+        if faults:
+            lines = ["**ML Fault Classification (Active Risks):**"]
+            for f in faults[:10]:
+                lines.append(
+                    f"- {f['equipment_id']} ({f['equipment_type']}): "
+                    f"{f['fault_type']} probability={f['probability']:.0%}"
+                )
+            sections.append("\n".join(lines))
+
+        # Health Trends (degrading equipment)
+        trends = ml_context.get("health_trends", [])
+        if trends:
+            lines = ["**Equipment Health Trends (Degrading):**"]
+            for t in trends:
+                lines.append(
+                    f"- {t['equipment_name']}: score={t['health_score']:.0f}/100 "
+                    f"({t['health_status']}), 7d slope={t['trend_7d_slope']} pts/day"
+                )
+            sections.append("\n".join(lines))
+
+        # Building-level features
+        features = ml_context.get("feature_metrics", {})
+        if features:
+            lines = ["**Building Performance Metrics:**"]
+            if features.get("eui"):
+                lines.append(f"- Energy Use Intensity (EUI): {features['eui']:.2f} kWh/m²")
+            if features.get("base_load_index") is not None:
+                lines.append(f"- Base Load Index: {features['base_load_index']:.2%} (off-hours / total)")
+            if features.get("cooling_degree_days") is not None:
+                lines.append(f"- Cooling Degree Days (today): {features['cooling_degree_days']:.1f}")
+            if features.get("efficiency_score") is not None:
+                lines.append(f"- Building Efficiency Score: {features['efficiency_score']:.0f}/100")
+            sections.append("\n".join(lines))
+
+        if not sections:
+            return ""
+
+        return (
+            "\n**🧠 ML MODEL INTELLIGENCE (Predictive Context):**\n"
+            "Use these ML outputs to make PREDICTIVE recommendations — "
+            "consider future equipment behaviour, not just current state.\n\n" + "\n\n".join(sections) + "\n"
+        )
+
     def _build_optimization_prompt(
         self,
         site: Dict[str, Any],
@@ -625,8 +871,9 @@ class AIOptimizerService:
         weather_forecast: Dict[str, Any],
         energy_prices: Dict[str, Any],
         equipment_inventory: Dict[str, List[Device]],
-        dali_zones: Optional[Dict[str, Any]] = None,
+        lighting_zones: Optional[Dict[str, Any]] = None,
         profile: Optional[Dict[str, Any]] = None,
+        ml_context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Build optimization prompt for Claude with ALL available equipment.
 
@@ -639,10 +886,11 @@ class AIOptimizerService:
             weather_forecast: Weather forecast
             energy_prices: Energy pricing
             equipment_inventory: Equipment by type
-            dali_zones: DALI zone data
+            lighting_zones: DALI zone data
             profile: Optimization profile with weights and thresholds
+            ml_context: ML model outputs (forecasts, anomalies, faults, health trends)
         """
-        dali_zones = dali_zones or {}
+        lighting_zones = lighting_zones or {}
 
         # Extract equipment by type for specific sections
         hvac_devices = equipment_inventory.get("hvac", [])
@@ -734,6 +982,7 @@ class AIOptimizerService:
 - Equipment status: {current_conditions.get("equipment_status", "normal")}
 
 {self._format_solar_bess_telemetry(current_conditions)}
+{self._format_ml_context_section(ml_context) if ml_context else ""}
 **Weather Forecast (next 4 hours):**
 {json.dumps(weather_forecast, indent=2)}
 
@@ -786,14 +1035,20 @@ BESS (Battery Storage):
 - Load shedding: BESS discharge to critical loads before generator start
 - Mode changes: idle→discharge allowed, charging→discharge needs 60s transition
 
-{self._format_lighting_section(lighting_devices, dali_zones)}
+{self._format_lighting_section(lighting_devices, lighting_zones)}
 
 **Your Task:**
 1. Review the equipment inventory - ONLY recommend changes for equipment that EXISTS at this site
 2. Analyze current conditions vs outdoor weather and occupancy
 3. Consider energy pricing (higher rates = more aggressive optimization)
 4. Apply zone-aware rules based on zone_type and exposure
-5. Recommend setpoint changes for ALL relevant equipment types:
+5. USE ML MODEL INTELLIGENCE above to make PREDICTIVE recommendations:
+   - If LSTM forecasts predict rising temperatures, pre-cool NOW
+   - If anomaly scores are elevated, flag equipment for inspection
+   - If fault classification shows bearing wear risk, recommend maintenance
+   - If health trends show degradation, factor into equipment loading decisions
+   - If base load index is high, recommend after-hours equipment audit
+6. Recommend setpoint changes for ALL relevant equipment types:
    - HVAC: temperature setpoints, fan speeds, damper positions
    - Lighting: DO NOT recommend dim levels or occupancy dimming
 (Tridonic handles natively via DALI-2 + net4more). Only recommend
@@ -802,10 +1057,10 @@ tariff-based demand response overrides or predictive pre-conditioning.
    - Solar: performance alerts, curtailment if export limit reached
    - BESS: dispatch mode (charge/discharge/idle), SOC targets, load shedding response
    - Meters: no direct control, but use readings for context
-6. CRITICAL: Use EXACT point_name from "All Available Control Points" above
-7. Project energy savings in ZAR per hour (breakdown by system)
-8. Ensure all recommendations are within safety limits
-9. Prioritize coordination:
+7. CRITICAL: Use EXACT point_name from "All Available Control Points" above
+8. Project energy savings in ZAR per hour (breakdown by system)
+9. Ensure all recommendations are within safety limits
+10. Prioritize coordination:
    - Tridonic handles occupancy-based HVAC setback and lighting dimming natively
    - Peak solar: charge BESS
    - Load shedding: BESS before generator
@@ -894,7 +1149,7 @@ Provide ONLY the JSON response, no additional text."""
         prompt: str,
         current_conditions: Dict[str, Any],
         equipment_inventory: Dict[str, List[Device]],
-        dali_zones: Optional[Dict[str, Any]] = None,
+        lighting_zones: Optional[Dict[str, Any]] = None,
         profile: Optional[Dict[str, Any]] = None,
     ) -> OptimizationRecommendation:
         """Analyze using Claude AI with full equipment inventory.
@@ -904,7 +1159,7 @@ Provide ONLY the JSON response, no additional text."""
             prompt: Optimization prompt with profile information
             current_conditions: Current building conditions
             equipment_inventory: Equipment by type
-            dali_zones: DALI zone data
+            lighting_zones: DALI zone data
             profile: Active optimization profile (if any)
         """
         try:
@@ -1382,11 +1637,11 @@ Provide ONLY the JSON response, no additional text."""
 
     # DALI Lighting Optimization Helper Methods
 
-    def _gather_dali_zone_data(self, dali_service, site_id: str) -> Dict[str, Any]:
+    def _gather_lighting_zone_data(self, lighting_svc, site_id: str) -> Dict[str, Any]:
         """Gather DALI zone occupancy and lighting data for optimization.
 
         Args:
-            dali_service: DALI service instance
+            lighting_svc: DALI service instance
             site_id: Site to gather data for
 
         Returns:
@@ -1396,7 +1651,7 @@ Provide ONLY the JSON response, no additional text."""
 
         try:
             # Get all zones from DALI service
-            zones = dali_service.get_all_zones()
+            zones = lighting_svc.get_all_zones()
 
             for zone in zones:
                 zone_id = zone.get("zone_id")
@@ -1404,9 +1659,9 @@ Provide ONLY the JSON response, no additional text."""
                     continue
 
                 # Get occupancy data
-                occupancy = dali_service.get_zone_occupancy(zone_id)
+                occupancy = lighting_svc.get_zone_occupancy(zone_id)
                 # Get lighting data
-                lighting = dali_service.get_zone_lighting(zone_id)
+                lighting = lighting_svc.get_zone_lighting(zone_id)
 
                 zone_data[zone_id] = {
                     "zone_id": zone_id,
@@ -1472,27 +1727,27 @@ Provide ONLY the JSON response, no additional text."""
     def _format_lighting_section(
         self,
         lighting_devices: List[Device],
-        dali_zones: Dict[str, Any],
+        lighting_zones: Dict[str, Any],
     ) -> str:
         """Format DALI lighting section for Claude prompt.
 
         Args:
             lighting_devices: List of lighting device objects
-            dali_zones: DALI zone data from _gather_dali_zone_data
+            lighting_zones: DALI zone data from _gather_lighting_zone_data
 
         Returns:
             Formatted string for Claude prompt
         """
-        if not dali_zones:
+        if not lighting_zones:
             return ""
 
         lines = []
 
-        # DALI Lighting System Summary
-        lines.append("**DALI Lighting System:**")
-        total_zones = len(dali_zones)
-        occupied_zones = sum(1 for z in dali_zones.values() if z.get("is_occupied"))
-        over_lit_zones = [z for z in dali_zones.values() if z.get("is_over_lit")]
+        # Lighting System Summary
+        lines.append("**Lighting System:**")
+        total_zones = len(lighting_zones)
+        occupied_zones = sum(1 for z in lighting_zones.values() if z.get("is_occupied"))
+        over_lit_zones = [z for z in lighting_zones.values() if z.get("is_over_lit")]
 
         lines.append(f"- Total zones: {total_zones}")
         lines.append(f"- Occupied zones: {occupied_zones}")
@@ -1512,7 +1767,7 @@ Provide ONLY the JSON response, no additional text."""
 
         # Lighting Telemetry by Zone
         lines.append("\n**Lighting Telemetry by Zone:**")
-        for zone_id, zone in dali_zones.items():
+        for zone_id, zone in lighting_zones.items():
             occ = zone.get("occupancy", {})
             light = zone.get("lighting", {})
 
@@ -1637,7 +1892,7 @@ Provide ONLY the JSON response, no additional text."""
         weather_forecast: Dict[str, Any],
         energy_prices: Dict[str, Any],
         equipment_inventory: Dict[str, List[Device]],
-        dali_zones: Optional[Dict[str, Any]] = None,
+        lighting_zones: Optional[Dict[str, Any]] = None,
         profile: Optional[Dict[str, Any]] = None,
     ) -> OptimizationRecommendation:
         """Fallback rule-based optimization for ALL equipment types.
@@ -1650,7 +1905,7 @@ Provide ONLY the JSON response, no additional text."""
             profile: Active optimization profile (if any)
         """
         logger.info(f"Using rule-based optimization for site {site_id}")
-        dali_zones = dali_zones or {}
+        lighting_zones = lighting_zones or {}
         if not isinstance(equipment_inventory, dict):
             equipment_inventory = {
                 "hvac": list(equipment_inventory) if equipment_inventory else [],
@@ -2048,8 +2303,8 @@ Provide ONLY the JSON response, no additional text."""
         cross_system_recommendations = []
         lighting_savings_kw = 0.0
 
-        if dali_zones:
-            for zone_id, zone in dali_zones.items():
+        if lighting_zones:
+            for zone_id, zone in lighting_zones.items():
                 lighting = zone.get("lighting", {})
                 is_occupied = zone.get("is_occupied", True)
 
@@ -2069,8 +2324,7 @@ Provide ONLY the JSON response, no additional text."""
                             "lighting_action": "Managed by Tridonic controller (occupancy-based dimming)",
                             "sentinel_action": "Monitor for predictive pre-conditioning and tariff optimization",
                             "reason": (
-                                "Zone unoccupied - native Tridonic control active, "
-                                "SENTINEL monitoring for optimization"
+                                "Zone unoccupied - native Tridonic control active, SENTINEL monitoring for optimization"
                             ),
                             "combined_savings_kw": round(0.5, 2),
                         }
@@ -2376,10 +2630,10 @@ Provide ONLY the JSON response, no additional text."""
 
         # Build lighting summary
         lighting_summary = None
-        if dali_zones:
-            total_zones = len(dali_zones)
-            occupied_zones = sum(1 for z in dali_zones.values() if z.get("is_occupied"))
-            over_lit_count = sum(1 for z in dali_zones.values() if z.get("is_over_lit"))
+        if lighting_zones:
+            total_zones = len(lighting_zones)
+            occupied_zones = sum(1 for z in lighting_zones.values() if z.get("is_occupied"))
+            over_lit_count = sum(1 for z in lighting_zones.values() if z.get("is_over_lit"))
             lighting_summary = {
                 "total_zones": total_zones,
                 "occupied_zones": occupied_zones,

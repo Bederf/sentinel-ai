@@ -1,0 +1,270 @@
+[
+  {
+    "id": "750cea15-8ca0-400d-9cc7-210d7e0d8af4",
+    "template_name": "Chiller Monthly Inspection",
+    "equipment_type": "chiller",
+    "inspection_type": "routine",
+    "frequency_type": "monthly",
+    "estimated_duration_minutes": 120,
+    "is_active": true,
+    "version": 1,
+    "checklist_items": [
+      {
+        "method": "bms_sensor_reading",
+        "item_id": "ch_001",
+        "critical": true,
+        "description": "Check suction and discharge pressures",
+        "recording_required": [
+          "suction_pressure",
+          "discharge_pressure"
+        ],
+        "acceptance_criteria": "Within normal range per baseline, no significant deviation"
+      },
+      {
+        "method": "gauge_measurement",
+        "item_id": "ch_002",
+        "critical": true,
+        "description": "Measure superheat and subcooling",
+        "recording_required": [
+          "superheat",
+          "subcooling",
+          "photo"
+        ],
+        "acceptance_criteria": "Superheat 4-8K, Subcooling 3-7K"
+      },
+      {
+        "method": "electronic_leak_detector",
+        "item_id": "ch_003",
+        "critical": true,
+        "description": "Check for refrigerant leaks",
+        "recording_required": [
+          "leak_test_result",
+          "photo"
+        ],
+        "acceptance_criteria": "No leaks detected"
+      },
+      {
+        "method": "clamp_meter",
+        "item_id": "ch_004",
+        "critical": false,
+        "description": "Measure compressor motor current",
+        "recording_required": [
+          "current_l1",
+          "current_l2",
+          "current_l3"
+        ],
+        "acceptance_criteria": "Within rated value, balanced across phases"
+      },
+      {
+        "method": "visual_inspection_and_gauge",
+        "item_id": "ch_005",
+        "critical": true,
+        "description": "Check oil level and pressure",
+        "recording_required": [
+          "oil_level",
+          "oil_pressure",
+          "photo"
+        ],
+        "acceptance_criteria": "Level in sight glass, pressure > 2.5 bar"
+      },
+      {
+        "method": "visual_inspection",
+        "item_id": "ch_006",
+        "critical": false,
+        "description": "Inspect condenser coils",
+        "recording_required": [
+          "cleanliness_rating",
+          "photo"
+        ],
+        "acceptance_criteria": "Clean, no damage, proper airflow"
+      },
+      {
+        "method": "vibration_analyzer",
+        "item_id": "ch_007",
+        "critical": true,
+        "description": "Measure compressor vibration",
+        "recording_required": [
+          "vibration_rms",
+          "spectrum",
+          "photo"
+        ],
+        "acceptance_criteria": "RMS < 1.8 mm/s, no unusual frequencies"
+      },
+      {
+        "method": "control_panel_review",
+        "item_id": "ch_008",
+        "critical": false,
+        "description": "Check control panel alarms and status",
+        "recording_required": [
+          "alarm_status",
+          "photo_of_display"
+        ],
+        "acceptance_criteria": "No active alarms, all safeties functional"
+      }
+    ],
+    "required_tools": [
+      "pressure_gauges",
+      "thermal_gun",
+      "clamp_meter",
+      "leak_detector",
+      "vibration_analyzer"
+    ],
+    "required_skills": [
+      "chiller_maintenance",
+      "refrigeration",
+      "vibration_analysis"
+    ],
+    "safety_requirements": [
+      "lockout_tagout",
+      "refrigerant_handling_cert",
+      "confined_space"
+    ],
+    "ppe_required": [
+      "safety_glasses",
+      "gloves",
+      "refrigerant_gloves",
+      "face_shield"
+    ],
+    "created_by": "system",
+    "created_at": "2026-02-25T09:26:45.082244+00:00",
+    "updated_at": "2026-02-25T09:26:45.082244+00:00"
+  },
+  {
+    "id": "9250e00c-34c2-48b2-86fb-914ffd14ca49",
+    "template_name": "Generator Monthly Inspection",
+    "equipment_type": "generator",
+    "inspection_type": "routine",
+    "frequency_type": "monthly",
+    "estimated_duration_minutes": 90,
+    "is_active": true,
+    "version": 1,
+    "checklist_items": [
+      {
+        "method": "visual_inspection",
+        "item_id": "gen_001",
+        "critical": false,
+        "description": "Check engine oil level and condition",
+        "recording_required": [
+          "oil_level",
+          "condition",
+          "photo"
+        ],
+        "acceptance_criteria": "Oil level between MIN and MAX marks, no contamination"
+      },
+      {
+        "method": "visual_inspection",
+        "item_id": "gen_002",
+        "critical": true,
+        "description": "Inspect for oil leaks",
+        "baseline_reference": "oil_system_leak",
+        "recording_required": [
+          "leak_status",
+          "photo",
+          "drip_rate_if_leaking"
+        ],
+        "acceptance_criteria": "No active leaks, no oil accumulation"
+      },
+      {
+        "method": "thermal_gun_measurement",
+        "item_id": "gen_003",
+        "critical": false,
+        "description": "Measure exhaust gas temperature at full load",
+        "baseline_reference": "exhaust_temperature",
+        "recording_required": [
+          "temperature",
+          "load_percent",
+          "photo"
+        ],
+        "acceptance_criteria": "Temperature < 450\u00b0C, within 15% of baseline"
+      },
+      {
+        "method": "visual_inspection",
+        "item_id": "gen_004",
+        "critical": false,
+        "description": "Check coolant level and condition",
+        "recording_required": [
+          "level",
+          "condition",
+          "photo"
+        ],
+        "acceptance_criteria": "Level between MIN and MAX, no discoloration"
+      },
+      {
+        "method": "vibration_analyzer",
+        "item_id": "gen_005",
+        "critical": true,
+        "description": "Measure vibration on engine block",
+        "baseline_reference": "vibration_signature",
+        "recording_required": [
+          "vibration_rms",
+          "vibration_peak",
+          "spectrum",
+          "photo"
+        ],
+        "acceptance_criteria": "RMS vibration < 4.5 mm/s, no significant change from baseline"
+      },
+      {
+        "method": "multimeter_measurement",
+        "item_id": "gen_006",
+        "critical": false,
+        "description": "Check battery voltage and connections",
+        "recording_required": [
+          "voltage",
+          "connection_condition",
+          "photo"
+        ],
+        "acceptance_criteria": "Voltage > 12.6V, connections clean and tight"
+      },
+      {
+        "method": "visual_inspection",
+        "item_id": "gen_007",
+        "critical": true,
+        "description": "Check fuel system for leaks",
+        "recording_required": [
+          "leak_status",
+          "photo"
+        ],
+        "acceptance_criteria": "No fuel leaks, no odor"
+      },
+      {
+        "method": "load_bank_test",
+        "item_id": "gen_008",
+        "critical": false,
+        "description": "Test generator under load",
+        "recording_required": [
+          "load_percent",
+          "runtime",
+          "voltage_output",
+          "frequency"
+        ],
+        "acceptance_criteria": "Generator runs smoothly at 50% and 100% load"
+      }
+    ],
+    "required_tools": [
+      "flashlight",
+      "thermal_gun",
+      "vibration_analyzer",
+      "multimeter",
+      "load_bank"
+    ],
+    "required_skills": [
+      "generator_maintenance",
+      "vibration_analysis",
+      "thermal_imaging"
+    ],
+    "safety_requirements": [
+      "lockout_tagout",
+      "fire_extinguisher_nearby",
+      "ventilation_check"
+    ],
+    "ppe_required": [
+      "safety_glasses",
+      "gloves",
+      "hearing_protection",
+      "face_shield"
+    ],
+    "created_by": "system",
+    "created_at": "2026-02-25T09:26:45.082244+00:00",
+    "updated_at": "2026-02-25T09:26:45.082244+00:00"
+  }
+]

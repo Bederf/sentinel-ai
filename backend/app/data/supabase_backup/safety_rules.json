@@ -1,0 +1,154 @@
+[
+  {
+    "id": "0e3fce58-8229-4dad-a994-e033df8f1abe",
+    "code": "temp_zone_safe_range",
+    "name": "Zone Temperature Safe Range",
+    "rule_type": "temperature_range",
+    "severity": "block",
+    "description": "Zone temperature setpoints must be within 16-28\u00b0C for occupant comfort",
+    "device_type": "hvac",
+    "device_id": null,
+    "point_name": "cooling_setpoint",
+    "enabled": true,
+    "parameters": {
+      "unit": "\u00b0C",
+      "max_temp": 28.0,
+      "min_temp": 16.0
+    },
+    "created_at": "2026-02-25T09:26:44.228632+00:00",
+    "updated_at": "2026-02-25T09:26:44.228632+00:00"
+  },
+  {
+    "id": "332b5123-c0c4-40da-bcfb-72759077907d",
+    "code": "humidity_safe_range",
+    "name": "Humidity Safe Range",
+    "rule_type": "custom",
+    "severity": "warning",
+    "description": "Humidity setpoint should be within 30-65% for comfort",
+    "device_type": "hvac",
+    "device_id": null,
+    "point_name": "humidity_setpoint",
+    "enabled": true,
+    "parameters": {
+      "unit": "%",
+      "max_value": 65.0,
+      "min_value": 30.0,
+      "validation_logic": "value >= 30.0 AND value <= 65.0"
+    },
+    "created_at": "2026-02-25T09:26:44.228632+00:00",
+    "updated_at": "2026-02-25T09:26:44.228632+00:00"
+  },
+  {
+    "id": "6efe7ad8-e31c-432d-82e1-e3cee2944602",
+    "code": "temp_chiller_min",
+    "name": "Chiller Minimum Temperature",
+    "rule_type": "temperature_range",
+    "severity": "block",
+    "description": "Chiller supply temperature must be above 5\u00b0C to prevent freeze damage",
+    "device_type": "hvac",
+    "device_id": null,
+    "point_name": "setpoint",
+    "enabled": true,
+    "parameters": {
+      "unit": "\u00b0C",
+      "max_temp": 15.0,
+      "min_temp": 5.0
+    },
+    "created_at": "2026-02-25T09:26:44.228632+00:00",
+    "updated_at": "2026-02-25T09:26:44.228632+00:00"
+  },
+  {
+    "id": "6fc5547c-f357-469e-99b4-c785cf0abb8d",
+    "code": "chiller_runtime_limit",
+    "name": "Chiller Minimum Runtime",
+    "rule_type": "runtime_limit",
+    "severity": "block",
+    "description": "Chiller must run for at least 5 minutes before restart to protect compressor",
+    "device_type": "hvac",
+    "device_id": null,
+    "point_name": "chiller_status",
+    "enabled": true,
+    "parameters": {
+      "max_starts_per_hour": 4,
+      "min_runtime_minutes": 5
+    },
+    "created_at": "2026-02-25T09:26:44.228632+00:00",
+    "updated_at": "2026-02-25T09:26:44.228632+00:00"
+  },
+  {
+    "id": "742e0a5f-6833-4705-a6c9-7c90ce708485",
+    "code": "lighting_brightness_max",
+    "name": "Maximum Brightness Limit",
+    "rule_type": "brightness_limit",
+    "severity": "warning",
+    "description": "Lighting brightness should not exceed 90% to save energy",
+    "device_type": "lighting",
+    "device_id": null,
+    "point_name": null,
+    "enabled": true,
+    "parameters": {
+      "max_brightness": 90,
+      "min_brightness": 0
+    },
+    "created_at": "2026-02-25T09:26:44.228632+00:00",
+    "updated_at": "2026-02-25T09:26:44.228632+00:00"
+  },
+  {
+    "id": "9f7a3370-7d86-4744-a383-a38216c22d40",
+    "code": "temp_chw_supply_range",
+    "name": "CHW Supply Temperature Range",
+    "rule_type": "temperature_range",
+    "severity": "block",
+    "description": "Chilled water supply temperature must be within 5-12\u00b0C",
+    "device_type": "hvac",
+    "device_id": null,
+    "point_name": "supply_temp_setpoint",
+    "enabled": true,
+    "parameters": {
+      "unit": "\u00b0C",
+      "max_temp": 12.0,
+      "min_temp": 5.0
+    },
+    "created_at": "2026-02-25T09:26:44.228632+00:00",
+    "updated_at": "2026-02-25T09:26:44.228632+00:00"
+  },
+  {
+    "id": "d8dc02b7-f6ed-42eb-a198-1576d04fc9bc",
+    "code": "chiller_pressure_max",
+    "name": "Chiller Maximum Pressure",
+    "rule_type": "pressure_limit",
+    "severity": "block",
+    "description": "Chiller compressor pressure must not exceed 20 bar for safety",
+    "device_type": "hvac",
+    "device_id": null,
+    "point_name": "compressor_pressure",
+    "enabled": true,
+    "parameters": {
+      "unit": "bar",
+      "max_pressure": 20.0,
+      "min_pressure": 0.0
+    },
+    "created_at": "2026-02-25T09:26:44.228632+00:00",
+    "updated_at": "2026-02-25T09:26:44.228632+00:00"
+  },
+  {
+    "id": "ebcdc87e-40c2-4fa0-953a-819059194455",
+    "code": "fire_alarm_hvac_interlock",
+    "name": "Fire Alarm HVAC Interlock",
+    "rule_type": "interlock",
+    "severity": "block",
+    "description": "When fire alarm is active, disable HVAC to prevent smoke spread",
+    "device_type": "hvac",
+    "device_id": null,
+    "point_name": null,
+    "enabled": true,
+    "parameters": {
+      "action": "disable",
+      "trigger_point": "pump_status",
+      "trigger_value": 1,
+      "trigger_device_type": "fire_safety"
+    },
+    "created_at": "2026-02-25T09:26:44.228632+00:00",
+    "updated_at": "2026-02-25T09:26:44.228632+00:00"
+  }
+]

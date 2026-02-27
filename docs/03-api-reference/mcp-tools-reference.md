@@ -946,6 +946,41 @@ Returns: 24 simulated devices (12 per DALI line), properly formatted equipment c
 
 ---
 
+### Desigo CSV Point Export Upload (Phase 130)
+
+#### `POST /api/niagara/discover/csv`
+**Upload a Desigo CC BACnet CSV export for automatic HVAC + lighting point classification.**
+
+This is a REST API endpoint (not an MCP tool) that accepts a CSV file upload and classifies all points — both HVAC and lighting — in a single pass. Particularly useful for buildings with Tridonic net4more exposing DALI lighting as BACnet objects on the Desigo network.
+
+**Parameters:**
+- `file` (File upload, required): CSV file from Desigo CC BACnet export
+- `site_id` (query string, required): SENTINEL site ID (e.g., "site-002")
+- `source_label` (query string, optional, default: "desigo-export"): Label for this export
+
+**Lighting Point Categories Recognized (8):**
+
+| Category | Example Keywords | Example Point |
+|----------|-----------------|---------------|
+| `brightness` | dimlevel, dim_level | `Lum01_DimLevel` |
+| `lighting_power` | activepower, active_power | `Lum01_ActivePower` |
+| `lighting_energy` | accumenergy | `Lum01_AccumEnergy` |
+| `driver_temperature` | drivertemp | `Lum01_DriverTemp` |
+| `lamp_hours` | lamphours, operating_hours | `Lum01_LampHours` |
+| `light_output` | lightoutput | `Lum01_LightOutput` |
+| `emergency_battery` | embatt, battlevel | `Em01_BattLevel` |
+| `emergency_test` | emtest, testresult | `Em01_TestResult` |
+
+**Usage:**
+```bash
+curl -X POST "http://localhost:9095/api/niagara/discover/csv?site_id=site-002" \
+  -F "file=@point_list_siemens-desigo.csv"
+```
+
+**See also:** [Tridonic DALI Discovery — CSV Ingestion](../05-integrations/tridonic-dali-discovery.md#desigo-csv-point-export-ingestion-phase-130)
+
+---
+
 ## AI/ML Predictive Maintenance Tools (2)
 
 ### Asset Metrics Templates

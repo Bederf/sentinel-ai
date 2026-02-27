@@ -1,0 +1,167 @@
+[
+  {
+    "id": "0a55cf50-7ddd-4ec9-b1d7-2679756b3aa5",
+    "equipment_type": "ups",
+    "tier2_confidence_min": 0.7,
+    "tier3_confidence_min": 0.85,
+    "status": "active",
+    "reason": "UPS model available (R\u00b2=0.670 avg)",
+    "updated_at": "2026-02-25T09:26:45.841579",
+    "updated_by": "system",
+    "notes": "Standard thresholds"
+  },
+  {
+    "id": "19c21627-66ec-477c-b791-a9eb96dfee13",
+    "equipment_type": "acc",
+    "tier2_confidence_min": 1.0,
+    "tier3_confidence_min": 1.0,
+    "status": "disabled",
+    "reason": "ACC (Access Control) model not trained (no ML model available)",
+    "updated_at": "2026-02-25T09:26:45.841579",
+    "updated_by": "system",
+    "notes": "Security system. Will use rule-based predictions until model trained."
+  },
+  {
+    "id": "26909f2c-b7cd-4bb4-883f-f8365ba0dab0",
+    "equipment_type": "chiller",
+    "tier2_confidence_min": 0.7,
+    "tier3_confidence_min": 0.85,
+    "status": "active",
+    "reason": "CHILLER model performing well (R\u00b2=0.654 avg)",
+    "updated_at": "2026-02-25T09:26:45.841579",
+    "updated_by": "system",
+    "notes": "Standard thresholds for reliable model"
+  },
+  {
+    "id": "34d2cc99-7bde-4306-8056-97d0b5000dcb",
+    "equipment_type": "dali",
+    "tier2_confidence_min": 0.7,
+    "tier3_confidence_min": 0.85,
+    "status": "active",
+    "reason": "DALI lighting control model (placeholder for future training)",
+    "updated_at": "2026-02-25T09:26:45.841579",
+    "updated_by": "system",
+    "notes": "5 DALI units at S002. Ready for recommendations once model trained."
+  },
+  {
+    "id": "3f2238fa-fb70-438d-a692-a459b3fe4def",
+    "equipment_type": "fire",
+    "tier2_confidence_min": 1.0,
+    "tier3_confidence_min": 1.0,
+    "status": "disabled",
+    "reason": "FIRE (Fire Safety) model not trained (no ML model available)",
+    "updated_at": "2026-02-25T09:26:45.841579",
+    "updated_by": "system",
+    "notes": "Fire safety system. Will use rule-based predictions until model trained."
+  },
+  {
+    "id": "61f165e9-5ab0-44f2-8e34-20d9e954b41f",
+    "equipment_type": "generator",
+    "tier2_confidence_min": 0.85,
+    "tier3_confidence_min": 0.95,
+    "status": "active",
+    "reason": "GENERATOR model with variable performance (R\u00b2=0.631 avg), elevated threshold applied",
+    "updated_at": "2026-02-25T09:26:45.841579",
+    "updated_by": "system",
+    "notes": "Higher confidence required due to model variability"
+  },
+  {
+    "id": "622b26cf-bcff-47b2-a6cd-7595cfada458",
+    "equipment_type": "bess",
+    "tier2_confidence_min": 1.0,
+    "tier3_confidence_min": 1.0,
+    "status": "disabled",
+    "reason": "BESS (Battery Energy Storage) model not trained (no ML model available)",
+    "updated_at": "2026-02-25T09:26:45.841579",
+    "updated_by": "system",
+    "notes": "1 BESS unit at S002. Will use rule-based predictions until model trained."
+  },
+  {
+    "id": "638e8d94-bd95-46d0-b068-e43356fc772a",
+    "equipment_type": "meter",
+    "tier2_confidence_min": 1.0,
+    "tier3_confidence_min": 1.0,
+    "status": "disabled",
+    "reason": "METER model not trained (no ML model available)",
+    "updated_at": "2026-02-25T09:26:45.841579",
+    "updated_by": "system",
+    "notes": "3 METER units at S002. Will use rule-based predictions until model trained."
+  },
+  {
+    "id": "6c50b283-c5de-47db-844b-2020013f23dd",
+    "equipment_type": "inv",
+    "tier2_confidence_min": 1.0,
+    "tier3_confidence_min": 1.0,
+    "status": "disabled",
+    "reason": "INV (Solar Inverter) model not trained (no ML model available)",
+    "updated_at": "2026-02-25T09:26:45.841579",
+    "updated_by": "system",
+    "notes": "Solar inverters detected. Will use rule-based predictions until model trained."
+  },
+  {
+    "id": "89d57ba6-4245-45ef-b169-9fdc72af69a7",
+    "equipment_type": "pump",
+    "tier2_confidence_min": 1.0,
+    "tier3_confidence_min": 1.0,
+    "status": "disabled",
+    "reason": "PUMP model not trained (no ML model available)",
+    "updated_at": "2026-02-25T09:26:45.841579",
+    "updated_by": "system",
+    "notes": "2 PUMP units at S002. Will use rule-based predictions until model trained."
+  },
+  {
+    "id": "a4da55d1-4eb9-443a-b330-6fda31c76889",
+    "equipment_type": "cctv",
+    "tier2_confidence_min": 1.0,
+    "tier3_confidence_min": 1.0,
+    "status": "disabled",
+    "reason": "CCTV (Camera) model not trained (no ML model available)",
+    "updated_at": "2026-02-25T09:26:45.841579",
+    "updated_by": "system",
+    "notes": "Security cameras. Will use rule-based predictions until model trained."
+  },
+  {
+    "id": "c8fc0e91-a7e2-48b3-b4ff-46da61d08c58",
+    "equipment_type": "ahu",
+    "tier2_confidence_min": 0.7,
+    "tier3_confidence_min": 0.85,
+    "status": "active",
+    "reason": "AHU model performing adequately (R\u00b2=0.550 avg)",
+    "updated_at": "2026-02-25T09:26:45.841579",
+    "updated_by": "system",
+    "notes": "Standard thresholds"
+  },
+  {
+    "id": "ebf8adad-8a37-41f6-98e0-519d7467ccfd",
+    "equipment_type": "fcu",
+    "tier2_confidence_min": 0.7,
+    "tier3_confidence_min": 0.85,
+    "status": "active",
+    "reason": "FCU model performing well (R\u00b2=0.628 avg)",
+    "updated_at": "2026-02-25T09:26:45.841579",
+    "updated_by": "system",
+    "notes": "Standard thresholds"
+  },
+  {
+    "id": "eda11b64-8c3d-4b1b-83c7-d627458079a8",
+    "equipment_type": "vav",
+    "tier2_confidence_min": 1.0,
+    "tier3_confidence_min": 1.0,
+    "status": "disabled",
+    "reason": "VAV model disabled (R\u00b2=0.317 - too poor for reliable predictions)",
+    "updated_at": "2026-02-25T09:26:45.841579",
+    "updated_by": "system",
+    "notes": "Defer retraining to Phase 69 when additional data available. 6 VAV units at S002 will not get ML recommendations until retrained."
+  },
+  {
+    "id": "ff7edae0-97be-4f79-b537-9f4181e6a812",
+    "equipment_type": "ct",
+    "tier2_confidence_min": 1.0,
+    "tier3_confidence_min": 1.0,
+    "status": "disabled",
+    "reason": "CT (Cooling Tower) model not trained (no ML model available)",
+    "updated_at": "2026-02-25T09:26:45.841579",
+    "updated_by": "system",
+    "notes": "Cooling towers detected. Will use rule-based predictions until model trained."
+  }
+]

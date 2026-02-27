@@ -55,9 +55,10 @@ Each profile prioritizes different business objectives with configurable weights
 
 #### 2. Profile-Aware AI Optimizer
 - **Dynamic prompt injection:** Profile constraints added to Claude AI prompts
+- **ML context injection (Phase 132):** LSTM forecasts, anomaly scores, fault classifications, health trends, and building-level features (EUI, Base Load Index, CDD, Efficiency Score) are now injected alongside profile constraints. Claude reasons over both ML predictions and profile priorities.
 - **Parameter substitution:** Temperature bands, comfort thresholds from active profile
 - **Integration updates:** Security/Occupancy Service uses profile-driven thresholds instead of hard-coded values
-- **Result:** Same building state produces different recommendations under different profiles
+- **Result:** Same building state produces different recommendations under different profiles, informed by ML-predicted future state
 
 #### 3. Multi-Objective Scoring (`RecommendationScorer`)
 - **5-factor weighting:** runtime, comfort, cost, maintenance, energy (profile weights applied)

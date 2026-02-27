@@ -36,17 +36,13 @@ class MockEvent:
 
 
 # ============================================================================
-# Supabase Mock Setup
+# Simulation Store Mock Setup
 # ============================================================================
 
 
 @pytest.fixture(autouse=True)
 def mock_supabase_for_lifecycle():
-    """Mock Supabase client for all lifecycle simulation tests."""
-    # Create mock insert response
-    mock_insert_response = Mock()
-    mock_insert_response.data = [{"task_id": "test-task-123"}]
-
+    """Mock simulation store and orchestrator for all lifecycle simulation tests."""
     # Create comprehensive daily events with all 8 hours + multiple seasons
     daily_events = [
         {
@@ -118,60 +114,24 @@ def mock_supabase_for_lifecycle():
         },
     ]
 
-    # Create mock select response with enhanced data
-    mock_select_response = Mock()
-    mock_select_response.data = [
-        {
-            "task_id": "test-task-123",
-            "scenario": "sentinel_annual",
-            "status": "running",
-            "progress_pct": 95,
-            "days_elapsed": 365,
-            "checkpoint_count": 1440,
-            "is_raining": False,
-            "cloud_cover": 40,
-            "ambient_temp": 22,
-            "solar_efficiency": 0.85,
-            "current_season": "Winter",
-            "state_snapshot": {
-                "simulated_time": datetime.now().isoformat(),
-                "recent_events": daily_events,
-                "active_faults": {},
-                "pending_repairs": {},
-                "total_events": 2920,
-                "total_recommendations": 1095,
-            },
-        }
+    # Mock simulation store that tracks task state in memory
+    task_store = {}
+
+    mock_store = Mock()
+    mock_store.update_task_progress = lambda tid, updates: task_store.setdefault(tid, {}).update(updates)
+    mock_store.get_task_progress = lambda tid: task_store.get(tid, {})
+    mock_store.get_all_tasks = lambda: dict(task_store)
+    mock_store.find_queued_tasks = lambda simulation_type="lifecycle": [
+        {**v, "task_id": k}
+        for k, v in task_store.items()
+        if v.get("status") == "queued" and v.get("simulation_type", "lifecycle") == simulation_type
     ]
-
-    # Create mock table with pause/resume support
-    mock_table = Mock()
-    mock_table.insert.return_value.execute.return_value = mock_insert_response
-
-    # Make select().eq().execute() return mock_select_response for any task_id
-    def mock_select_fn(*args, **kwargs):
-        return Mock(eq=lambda *args, **kwargs: Mock(execute=lambda: mock_select_response))
-
-    mock_table.select.side_effect = mock_select_fn
-    mock_table.update.return_value.eq.return_value.execute.return_value = Mock(
-        data=[
-            {
-                "task_id": "test-task-123",
-                "status": "paused",
-            }
-        ]
-    )
-
-    # Mock Supabase instance
-    mock_supabase = Mock()
-    mock_supabase.table.return_value = mock_table
 
     # Mock the orchestrator for pause/resume operations
     mock_orchestrator = Mock()
-    mock_orchestrator.running = True  # True for pause/resume, False fallback via database for status
+    mock_orchestrator.running = True
     mock_orchestrator.paused = False
 
-    # Make pause() and resume() methods update the paused state
     def make_pause_fn():
         def pause_fn():
             mock_orchestrator.paused = True
@@ -186,27 +146,23 @@ def mock_supabase_for_lifecycle():
 
     mock_orchestrator.pause = make_pause_fn()
     mock_orchestrator.resume = make_resume_fn()
-    # Set simulated_time to late in day (23:30) to simulate high progress
 
     now = datetime.now()
     mock_orchestrator.simulated_time = now.replace(hour=23, minute=30, second=0, microsecond=0)
     mock_orchestrator.real_start_time = now
-    mock_orchestrator.events = [MockEvent(event) for event in daily_events]  # Convert to MockEvent objects
+    mock_orchestrator.days_simulated = 365
+    mock_orchestrator.events = [MockEvent(event) for event in daily_events]
     mock_orchestrator.active_faults = {}
     mock_orchestrator.pending_repairs = {}
-    # Speed control attributes required by SimulationStatusResponse
     mock_orchestrator.speed_multiplier = 60.0
     mock_orchestrator.seconds_per_simulated_hour = 60.0
-    # Prevent Mock auto-chaining from producing invalid Pydantic values
     mock_orchestrator.building_schedule = None
     mock_orchestrator._get_sentinel_status = lambda: {"tier1_auto": 0, "tier2_logged": 0, "tier3_escalated": 0}
 
-    # Mock the scenario
     mock_scenario = Mock()
     mock_scenario.name = "sentinel_annual"
     mock_orchestrator.current_scenario = mock_scenario
 
-    # Make get_status return paused state that changes dynamically
     def make_get_status_fn():
         def get_status_fn():
             return {
@@ -222,11 +178,11 @@ def mock_supabase_for_lifecycle():
 
     mock_orchestrator.get_status = make_get_status_fn()
 
-    with patch("app.api.lifecycle_simulation.Supabase") as mock_supabase_class:
-        mock_supabase_class.instance.return_value = mock_supabase
+    with patch("app.api.lifecycle_simulation.get_simulation_store") as mock_get_store:
+        mock_get_store.return_value = mock_store
         with patch("app.api.lifecycle_simulation.get_simulation_by_task_id") as mock_get_sim:
             mock_get_sim.return_value = mock_orchestrator
-            yield mock_supabase
+            yield mock_store
 
 
 # ============================================================================

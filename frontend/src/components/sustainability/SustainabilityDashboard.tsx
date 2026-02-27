@@ -18,7 +18,6 @@ import {
   Flex,
   BarChart,
   DonutChart,
-  ProgressBar,
   Metric,
   BarList,
   Select,
@@ -444,25 +443,66 @@ export function SustainabilityDashboard({
             const pct = cat.max_points > 0
               ? Math.round((cat.achieved_points / cat.max_points) * 100)
               : 0;
-            const color = pct >= 75 ? 'emerald' : pct >= 50 ? 'amber' : 'red';
+            const barColor = pct >= 75 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
+            const targetPct = cat.max_points > 0 && cat.target_points > 0
+              ? Math.round((cat.target_points / cat.max_points) * 100)
+              : 0;
 
             return (
               <Card key={cat.category_id} className="glass-panel p-3" style={{ border: "1px solid var(--glass-border)" }}>
-                <Flex justifyContent="between" alignItems="center">
-                  <div>
-                    <Text className="font-semibold text-sm">{cat.name}</Text>
-                    <Text className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>{cat.category_id}</Text>
-                  </div>
-                  <Badge color={color} size="xs">
-                    {cat.achieved_points}/{cat.max_points}
-                  </Badge>
+                {/* Header: category name + code */}
+                <Flex justifyContent="between" alignItems="center" className="mb-2">
+                  <Text className="font-semibold text-sm">{cat.name}</Text>
+                  <Text className="text-xs font-mono" style={{ color: "var(--color-sentinel-text-disabled)" }}>{cat.category_id}</Text>
                 </Flex>
-                <ProgressBar value={pct} color={color} className="mt-2" />
-                {cat.target_points > 0 && (
-                  <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    Target: {cat.target_points} pts
+
+                {/* Grafana-style stat: large achieved / max */}
+                <div className="text-center my-2">
+                  <span style={{ fontSize: '1.75rem', fontWeight: 700, color: barColor, lineHeight: 1 }}>
+                    {cat.achieved_points}
+                  </span>
+                  <span style={{ fontSize: '1rem', fontWeight: 400, color: 'var(--color-sentinel-text-disabled)' }}>
+                    {' '}/ {cat.max_points}
+                  </span>
+                </div>
+
+                {/* Gauge bar with target marker */}
+                <div className="relative mt-1" style={{ height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.08)' }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${pct}%`,
+                      borderRadius: 4,
+                      background: barColor,
+                      transition: 'width 0.6s ease',
+                    }}
+                  />
+                  {targetPct > 0 && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: `${targetPct}%`,
+                        top: -2,
+                        bottom: -2,
+                        width: 2,
+                        background: 'rgba(255,255,255,0.5)',
+                        borderRadius: 1,
+                      }}
+                      title={`Target: ${cat.target_points} pts`}
+                    />
+                  )}
+                </div>
+
+                {/* Footer: target + percentage */}
+                <Flex justifyContent="between" className="mt-1.5">
+                  <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    {cat.target_points > 0 ? `Target: ${cat.target_points} pts` : '\u00A0'}
                   </Text>
-                )}
+                  <Text className="text-xs font-mono" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                    {pct}%
+                  </Text>
+                </Flex>
+
                 {cat.notes && (
                   <Text className="text-xs mt-1 line-clamp-2" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                     {cat.notes}
@@ -474,14 +514,19 @@ export function SustainabilityDashboard({
         </Grid>
 
         {greenStar && (
-          <Flex justifyContent="end" className="mt-4">
-            <Text className="text-sm">
-              Total: <span className="font-bold">{greenStar.total_achieved}</span>
-              /{greenStar.total_max} pts
-              {greenStar.total_target > 0 && (
-                <span style={{ color: "var(--color-sentinel-text-secondary)" }}> (target: {greenStar.total_target})</span>
-              )}
-            </Text>
+          <Flex justifyContent="end" alignItems="baseline" className="mt-4 gap-2">
+            <Text className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Total:</Text>
+            <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-sentinel-text-primary)' }}>
+              {greenStar.total_achieved}
+            </span>
+            <span style={{ fontSize: '0.875rem', color: 'var(--color-sentinel-text-disabled)' }}>
+              / {greenStar.total_max} pts
+            </span>
+            {greenStar.total_target > 0 && (
+              <Text className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                (target: {greenStar.total_target})
+              </Text>
+            )}
           </Flex>
         )}
       </Card>

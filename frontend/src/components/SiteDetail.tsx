@@ -10,7 +10,7 @@
  * - AI predictions for this site
  */
 
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import {
   ArrowLeft,
   Building2,
@@ -141,6 +141,7 @@ interface SiteDetailData {
   alert_count?: number;
   status?: "normal" | "warning" | "critical";
   optimization_enabled?: boolean;
+  sentinel_processing_enabled?: boolean;
 }
 
 // Extended equipment interface for local state (combines API response with local fields)
@@ -188,18 +189,27 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null);
   const [isPredictionDetailOpen, setIsPredictionDetailOpen] = useState(false);
 
+  // Scroll container ref — reset to top on mount
+  const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    containerRef.current?.scrollTo(0, 0);
+  }, [siteId]);
+
   // Health thresholds
   const { thresholds } = useHealthThresholds();
 
   // Module gating for site-specific intelligence panels
   const { isModuleActive, activeModules } = useModules();
 
+  // SENTINEL processing state — gates all intelligence panels
+  const sentinelEnabled = site?.sentinel_processing_enabled !== false;
+
   useEffect(() => {
     const loadSiteData = async () => {
       try {
         setLoading(true);
 
-        // Fetch site details using API client
+        // Fetch site details using API client (always — need sentinel_processing_enabled)
         const siteData = await api.getSite(siteId);
         // Map the response to SiteDetailData format
         setSite({
@@ -207,6 +217,17 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           address: siteData.address || siteData.location || "",
           location: siteData.location,
         } as SiteDetailData);
+
+        // When SENTINEL is off, don't pull any BMS data
+        if (siteData.sentinel_processing_enabled === false) {
+          setEquipment([]);
+          setEquipmentCategories({});
+          setAlerts([]);
+          setPredictions([]);
+          setEnergyData([]);
+          setError(null);
+          return;
+        }
 
         // Determine building_id from site_id (mapping sites.json to building folders)
         // site-002 -> sandton
@@ -542,6 +563,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
 
   return (
     <div
+      ref={containerRef}
       className="h-full overflow-y-auto p-4 md:p-6"
       style={{ background: "var(--color-sentinel-bg-canvas)" }}
     >
@@ -659,25 +681,25 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPICard
           title="Equipment"
-          value={site.equipment_count}
+          value={sentinelEnabled ? site.equipment_count : "—"}
           icon={<Cpu className="h-5 w-5" />}
           accentColor="blue"
         />
         <KPICard
           title="Active Alerts"
-          value={alerts.length}
+          value={sentinelEnabled ? alerts.length : "—"}
           icon={<AlertTriangle className="h-5 w-5" />}
           accentColor="orange"
         />
         <KPICard
           title="Avg Health"
-          value={`${avgHealth}%`}
+          value={sentinelEnabled ? `${avgHealth}%` : "—"}
           icon={<TrendingUp className="h-5 w-5" />}
-          accentColor={avgHealth >= thresholds.healthy ? "green" : avgHealth >= thresholds.warning ? "orange" : "red"}
+          accentColor={sentinelEnabled && avgHealth >= thresholds.healthy ? "green" : sentinelEnabled && avgHealth >= thresholds.warning ? "orange" : sentinelEnabled ? "red" : "blue"}
         />
         <KPICard
           title="Predictions"
-          value={predictions.length}
+          value={sentinelEnabled ? predictions.length : "—"}
           icon={<TrendingUp className="h-5 w-5" />}
           accentColor="purple"
         />
@@ -1367,17 +1389,47 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
       {/* ═══════════════════════════════════════════════════════════
           Site Intelligence Panels (moved from main dashboard)
           These are site-specific and belong in the building detail view.
+          Gated on sentinel_processing_enabled — when SENTINEL is off,
+          show a clean offline state instead of stale/empty panels.
           ═══════════════════════════════════════════════════════════ */}
 
+      {!sentinelEnabled ? (
+        <div
+          className="mb-6 rounded-lg border p-8 text-center"
+          style={{
+            borderColor: "var(--color-sentinel-border)",
+            background: "var(--color-sentinel-bg-secondary)",
+          }}
+        >
+          <XCircle
+            className="h-10 w-10 mx-auto mb-3"
+            style={{ color: "var(--color-sentinel-text-secondary)" }}
+          />
+          <h3
+            className="text-lg font-medium mb-1"
+            style={{ color: "var(--color-sentinel-text-primary)" }}
+          >
+            SENTINEL Processing Offline
+          </h3>
+          <p
+            className="text-sm"
+            style={{ color: "var(--color-sentinel-text-secondary)" }}
+          >
+            Intelligence panels are disabled while SENTINEL is not processing this site.
+            Enable processing from the building card toggle to activate AI insights.
+          </p>
+        </div>
+      ) : (
+      <>
       {/* Lighting Intelligence */}
-      {(activeModules.length === 0 || isModuleActive('lighting')) && (
+      {isModuleActive('lighting') && (
         <div className="mb-6">
           <LightingIntelligencePanel siteId={siteId} />
         </div>
       )}
 
       {/* Solar & BESS */}
-      {(activeModules.length === 0 || isModuleActive('solar')) && (
+      {isModuleActive('solar') && (
         <div className="mb-6 space-y-4">
           <div className="flex items-center gap-3 mb-2">
             <div
@@ -1420,7 +1472,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
       )}
 
       {/* Solar Annual Summary */}
-      {(activeModules.length === 0 || isModuleActive('solar')) && (
+      {isModuleActive('solar') && (
         <div className="mb-6 space-y-4">
           <div className="flex items-center gap-3 mb-2">
             <div
@@ -1452,18 +1504,23 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
       )}
 
       {/* Energy Comparison */}
+      {isModuleActive('energy') && (
       <div className="mb-6">
         <EnergyComparisonPanel siteId={siteId} />
       </div>
+      )}
 
       {/* Actual vs SENTINEL Energy */}
+      {isModuleActive('energy') && (
       <div className="mb-6">
         <div className="glass-panel rounded-md overflow-hidden">
           <ActualVsSentinelEnergyCard siteId={siteId} />
         </div>
       </div>
+      )}
 
       {/* Power Meter Validation */}
+      {isModuleActive('energy') && (
       <div className="mb-6 space-y-4">
         <div className="flex items-center gap-3 mb-2">
           <div
@@ -1492,8 +1549,10 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
         </div>
         <PowerMeterValidationCard buildingId={siteId} />
       </div>
+      )}
 
       {/* Cost Validation */}
+      {isModuleActive('energy') && (
       <div className="mb-6 space-y-4">
         <div className="flex items-center gap-3 mb-2">
           <div
@@ -1522,6 +1581,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
         </div>
         <CostValidationCard buildingId={siteId} />
       </div>
+      )}
 
       {/* ROI Summary */}
       {predictions.length > 0 && (
@@ -1556,19 +1616,48 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
       )}
 
       {/* Comfort Assistant */}
-      {(activeModules.length === 0 || isModuleActive('hvac')) && (
+      {isModuleActive('hvac') && (
         <div className="mb-6">
           <ComfortComplaintPanel compact={true} />
         </div>
       )}
 
       {/* Occupancy */}
-      {(activeModules.length === 0 || isModuleActive('lighting')) && (
+      {isModuleActive('lighting') && (
         <div className="mb-6">
           <OccupancyPanel compact={true} />
         </div>
       )}
       </>
+      )}
+      </>
+      ) : !sentinelEnabled ? (
+      /* When SENTINEL is off, all non-overview tabs show offline banner */
+      <div
+        className="rounded-lg border p-12 text-center"
+        style={{
+          borderColor: "var(--color-sentinel-border)",
+          background: "var(--color-sentinel-bg-secondary)",
+        }}
+      >
+        <XCircle
+          className="h-12 w-12 mx-auto mb-4"
+          style={{ color: "var(--color-sentinel-text-secondary)" }}
+        />
+        <h3
+          className="text-lg font-medium mb-2"
+          style={{ color: "var(--color-sentinel-text-primary)" }}
+        >
+          SENTINEL Processing Offline
+        </h3>
+        <p
+          className="text-sm max-w-md mx-auto"
+          style={{ color: "var(--color-sentinel-text-secondary)" }}
+        >
+          This tab requires active SENTINEL processing.
+          Enable processing from the building card toggle to access system health, operations, and analytics.
+        </p>
+      </div>
       ) : (
       /* ═══════════════════════════════════════════════════════════
          Non-overview tabs — consolidated with sub-tab pills

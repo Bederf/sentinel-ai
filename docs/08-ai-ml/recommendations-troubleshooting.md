@@ -350,6 +350,44 @@ curl http://localhost:9095/api/work-orders \
 5. **Create alerts:** Manually trigger health degradation
 6. **Run simulation:** Demo quick-cycle to test full workflow
 
+### Issue 7: "Recommendations don't reference ML predictions"
+
+**Symptom:** Recommendations are generated but don't mention LSTM forecasts, anomaly scores, or fault classifications
+
+**Root Cause:** ML Context Injection (Phase 132) requires trained models and recent telemetry
+
+**Solution:**
+
+1. **Verify ML models are registered:**
+   ```bash
+   curl http://localhost:9095/api/ml-retraining/status | jq '.total_models_checked'
+   # Should return: 14+ (7 LSTM + 7 Autoencoder minimum)
+   ```
+
+2. **Check if ML context is being gathered:**
+   ```bash
+   # Look for ML context gathering in logs
+   journalctl -u sentinel-backend.service | grep -i "ml_context\|gather_ml"
+   ```
+
+3. **Verify individual ML services:**
+   ```bash
+   # LSTM forecasts
+   curl http://localhost:9095/api/ml/predictions/lstm/S002-CHILLER-B1-001?equipment_type=chiller
+
+   # Anomaly scores
+   curl http://localhost:9095/api/ml/anomalies/equipment/S002-CHILLER-B1-001
+   ```
+
+4. **If ML models exist but context is empty:**
+   - Ensure `_gather_ml_context()` in `ai_optimizer.py` can reach all ML services
+   - Each ML service call is wrapped in try/except — check debug logs for suppressed errors
+   - Verify equipment types match ML model registry entries
+
+**Related:** See [ML Context Injection](ai-recommendation-system.md#ml-context-injection-phase-132) and [ML Data Architecture](../02-architecture/ML-DATA-ARCHITECTURE.md)
+
+---
+
 ## Summary
 
 ✅ **Recommendations run automatically every 10 minutes**
@@ -357,6 +395,7 @@ curl http://localhost:9095/api/work-orders \
 ✅ **Requires at-risk equipment (health < 90%)**
 ✅ **Full audit trail in Supabase**
 ✅ **Integrated with work orders and service feedback**
+✅ **ML context injection enriches Claude's reasoning (Phase 132)**
 
 Most issues resolved by:
 1. Restarting backend service

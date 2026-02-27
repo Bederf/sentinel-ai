@@ -14,26 +14,27 @@ Manager control additions:
 """
 
 import base64
+from datetime import datetime
 import hmac
+import httpx
 import logging
 import os
-import httpx
-from fastapi import APIRouter, HTTPException, status, Header, Request, Query
+from typing import Any, Dict, Optional
 
+from fastapi import APIRouter, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional
 
 from app.config.settings import settings
-from app.services.sentry_integration.work_order_notifier import work_order_notifier
-from app.services.sentry_integration.config import get_sentry_webhook_secret
-from app.services.ocr_service import get_ocr_service
-from app.services.sentry_integration.ocr_correction_handler import get_ocr_correction_handler
 from app.database.repositories.service_record_repository import ServiceRecordRepository
-from app.services.sentry_auth_service import get_sentry_jwt_headers
+from app.services.ocr_service import get_ocr_service
 from app.services.popia_consent_guard import (
     evaluate_ingress_processing_consent,
     enforce_active_processing_consent,
 )
+from app.services.sentry_auth_service import get_sentry_jwt_headers
+from app.services.sentry_integration.config import get_sentry_webhook_secret
+from app.services.sentry_integration.ocr_correction_handler import get_ocr_correction_handler
+from app.services.sentry_integration.work_order_notifier import work_order_notifier
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sentry", tags=["sentry"])
@@ -974,6 +975,8 @@ class CallLogRequest(BaseModel):
     description: str = Field(..., description="Full description with context")
     reported_by: str = Field("", description="Reporter display name")
     reporter_telegram_id: str = Field("", description="Reporter Telegram ID")
+    reporter_phone: str = Field("", description="Reporter mobile number (WhatsApp/SMS)")
+    channel: str = Field("telegram", description="Source channel (telegram|whatsapp|mobile|email)")
     original_message: str = Field("", description="Raw message from user")
 
 
@@ -986,6 +989,23 @@ class CallLogEscalationRequest(BaseModel):
     reason: str = Field("", description="Why it was escalated")
     site_id: str = Field("site-002", description="Site identifier")
     timestamp: str = Field("", description="ISO timestamp of the complaint")
+
+
+class CallLogLocationMemoryLookupResponse(BaseModel):
+    """Response payload for call-log location memory lookup."""
+
+    success: bool
+    found: bool
+    reporter_phone: str = ""
+    reporter_telegram_id: str = ""
+    reporter_name: str = ""
+    site_id: str = ""
+    zone_id: str = ""
+    floor: str = ""
+    desk_id: str = ""
+    location_text: str = ""
+    last_confirmed_at: str = ""
+    last_work_order_code: str = ""
 
 
 @router.post("/call-log", status_code=status.HTTP_200_OK)
@@ -1109,6 +1129,35 @@ async def sentry_call_log(
             except Exception as e:
                 logger.warning(f"Telegram notification failed for call-log WO: {e}")
 
+        # Persist reporter -> last confirmed location memory for next mobile report.
+        location_memory_saved = False
+        if req.desk_id or req.location_text or req.floor or req.zone_id:
+            try:
+                from app.database.repositories.reporter_location_repository import (
+                    get_reporter_location_repository,
+                )
+
+                location_repo = get_reporter_location_repository()
+                saved = location_repo.upsert(
+                    {
+                        "reporter_phone": req.reporter_phone,
+                        "reporter_telegram_id": req.reporter_telegram_id,
+                        "reporter_name": req.reported_by,
+                        "site_id": req.site_id,
+                        "zone_id": req.zone_id,
+                        "floor": req.floor,
+                        "desk_id": req.desk_id,
+                        "location_text": location,
+                        "last_work_order_code": wo_code,
+                        "last_confirmed_at": datetime.utcnow().isoformat(),
+                        "channel": req.channel,
+                        "source": "call_log",
+                    }
+                )
+                location_memory_saved = bool(saved)
+            except Exception as e:
+                logger.warning(f"Failed to persist call-log location memory: {e}")
+
         return {
             "success": True,
             "work_order_code": wo_code,
@@ -1119,12 +1168,71 @@ async def sentry_call_log(
             "assigned_to": assigned_name,
             "technician_telegram_id": tech.get("telegram_id", "") if tech else "",
             "technician_notified": notify_sent,
+            "location_memory_saved": location_memory_saved,
         }
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Call log creation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/call-log/location-memory", response_model=CallLogLocationMemoryLookupResponse)
+async def lookup_call_log_location_memory(
+    reporter_phone: str = Query("", description="Reporter mobile number"),
+    reporter_telegram_id: str = Query("", description="Reporter Telegram user ID"),
+    x_sentry_secret: Optional[str] = Header(None),
+):
+    """Lookup the reporter's last confirmed location for call logging.
+
+    The gateway can use this to prefill location and ask:
+    \"Use Desk 208 again?\" before creating a new call/WO.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="call_log_location_memory")
+
+    if not reporter_phone and not reporter_telegram_id:
+        raise HTTPException(status_code=400, detail="Provide reporter_phone or reporter_telegram_id")
+
+    try:
+        from app.database.repositories.reporter_location_repository import (
+            ReporterLocationRepository,
+            get_reporter_location_repository,
+        )
+
+        repo = get_reporter_location_repository()
+        memory = repo.get_latest(
+            reporter_phone=reporter_phone,
+            reporter_telegram_id=reporter_telegram_id,
+        )
+
+        normalized_phone = ReporterLocationRepository.normalize_phone(reporter_phone)
+        if not memory:
+            return CallLogLocationMemoryLookupResponse(
+                success=True,
+                found=False,
+                reporter_phone=normalized_phone or "",
+                reporter_telegram_id=reporter_telegram_id or "",
+            )
+
+        return CallLogLocationMemoryLookupResponse(
+            success=True,
+            found=True,
+            reporter_phone=memory.get("reporter_phone") or normalized_phone or "",
+            reporter_telegram_id=memory.get("reporter_telegram_id") or reporter_telegram_id or "",
+            reporter_name=memory.get("reporter_name") or "",
+            site_id=memory.get("site_id") or "",
+            zone_id=memory.get("zone_id") or "",
+            floor=memory.get("floor") or "",
+            desk_id=memory.get("desk_id") or "",
+            location_text=memory.get("location_text") or "",
+            last_confirmed_at=memory.get("last_confirmed_at") or "",
+            last_work_order_code=memory.get("last_work_order_code") or "",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Call-log location memory lookup failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

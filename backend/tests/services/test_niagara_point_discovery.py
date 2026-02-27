@@ -273,7 +273,7 @@ class TestPointDiscoveryService:
         result = await discovery_service.discover_and_classify(
             device_ip="192.168.1.100",
             site_id="site-002",
-            use_demo=True,
+            # auto-detects demo/JSON fallback when BACnet unavailable
         )
 
         assert result.status == "complete"
@@ -288,7 +288,7 @@ class TestPointDiscoveryService:
         result = await discovery_service.discover_and_classify(
             device_ip="192.168.1.100",
             site_id="site-002",
-            use_demo=True,
+            # auto-detects demo/JSON fallback when BACnet unavailable
         )
 
         cached = discovery_service.get_discovery_result(result.discovery_id)
@@ -301,7 +301,7 @@ class TestPointDiscoveryService:
         result = await discovery_service.discover_and_classify(
             device_ip="192.168.1.100",
             site_id="site-002",
-            use_demo=True,
+            # auto-detects demo/JSON fallback when BACnet unavailable
         )
 
         summary = result.summary
@@ -317,7 +317,7 @@ class TestPointDiscoveryService:
         await discovery_service.discover_and_classify(
             device_ip="192.168.1.100",
             site_id="site-002",
-            use_demo=True,
+            # auto-detects demo/JSON fallback when BACnet unavailable
         )
 
         discoveries = discovery_service.list_discoveries()
@@ -346,7 +346,7 @@ class TestPointDiscoveryService:
         result = await discovery_service.discover_and_classify(
             device_ip="192.168.1.100",
             site_id="site-002",
-            use_demo=True,
+            # auto-detects demo/JSON fallback when BACnet unavailable
         )
 
         total = result.summary.get("total_points", 0)

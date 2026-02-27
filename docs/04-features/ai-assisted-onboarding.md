@@ -28,6 +28,7 @@ SENTINEL uses 8 SIMBIOT MCP tools to onboard a building in a structured workflow
 ```
 Step 1: create_building         → Create building config and folder structure
 Step 2: import_point_list       → AI parses BMS point export, generates devices/zones
+    OR: POST /api/niagara/discover/csv → Upload Desigo CSV with auto lighting classification
 Step 3: add_building_devices    → Save parsed devices to system
 Step 4: add_building_zones      → Save HVAC zones with equipment mappings
 Step 5: add_building_desks      → Map desks to zones for comfort diagnosis (optional)
@@ -37,6 +38,19 @@ Step 8: configure_asset_metrics → Customize thresholds for predictive maintena
 ```
 
 **Time to onboard:** Typically 30-60 minutes for a standard office building with the AI assistant.
+
+### Alternative Step 2: CSV Upload with Lighting Discovery (Phase 130)
+
+For buildings with Desigo CC + Tridonic net4more (or any BMS exposing lighting as BACnet), you can upload the raw CSV export directly:
+
+```bash
+curl -X POST "http://localhost:9095/api/niagara/discover/csv?site_id=site-002" \
+  -F "file=@point_list_siemens-desigo.csv"
+```
+
+This auto-classifies both HVAC and lighting points in a single pass, recognizing 8 lighting-specific categories (brightness, lighting_power, lighting_energy, driver_temperature, lamp_hours, light_output, emergency_battery, emergency_test) alongside standard HVAC equipment types.
+
+See [Tridonic DALI Discovery — CSV Ingestion](../05-integrations/tridonic-dali-discovery.md#desigo-csv-point-export-ingestion-phase-130) for full details.
 
 ## Step-by-Step: Onboarding a Siemens Desigo CC Building
 

@@ -740,6 +740,8 @@ Background retraining doesn't affect AI optimization:
 - Once new model ready, optimization gets more accurate predictions
 - Better predictions = better recommendations
 
+**Phase 132 enhancement:** The AI Optimizer now actively consumes ML model outputs via `_gather_ml_context()` in `ai_optimizer.py`. When models are retrained and improve, Claude's recommendations automatically benefit from higher-quality LSTM forecasts, anomaly scores, and fault classifications. See [ML Data Architecture](ML-DATA-ARCHITECTURE.md) for the full context injection pipeline.
+
 ### Device Control
 
 Background retraining never blocks device control:

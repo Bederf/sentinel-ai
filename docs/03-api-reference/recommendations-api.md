@@ -2,9 +2,9 @@
 title: "Recommendations API Reference"
 type: "api-reference"
 status: "complete"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-02-09"
-updated: "2026-02-11"
+updated: "2026-02-27"
 author: "SENTINEL Development Team"
 tags: ["api", "recommendations", "optimization", "approval-workflow", "background-jobs"]
 domain: "optimization"
@@ -454,6 +454,15 @@ Get detailed information about a specific recommendation, including execution ou
 
 #### POST /optimization/analyze
 Run AI optimizer to generate recommendations for a site with current profile.
+
+**ML Context Injection (Phase 132):** Before building Claude's prompt, this endpoint gathers outputs from all active ML models via `_gather_ml_context()`:
+- LSTM 24/48/72h forecasts per equipment type
+- Anomaly detection scores above 0.5 threshold
+- Fault classification probabilities above 0.4 confidence
+- Health trend slopes for degrading equipment
+- Building-level features (EUI, Base Load Index, CDD, Efficiency Score)
+
+This enables predictive recommendations based on future equipment behaviour. See [ML Context Injection](../08-ai-ml/ai-recommendation-system.md#ml-context-injection-phase-132) for details.
 
 **Parameters:** None (all in request body)
 

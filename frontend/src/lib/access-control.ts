@@ -48,7 +48,7 @@ export const USER_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
 export const COMPANY_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
   'grantdemo.co.za': {
     companyName: 'Grant Demo',
-    demoFocus: 'dali-lighting',
+    demoFocus: 'lighting',
     allowedViews: [
       'dashboard',           // Base: always visible
       'ai-chat',             // Base: AI Chat assistant
@@ -62,7 +62,7 @@ export const COMPANY_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
     ],
     defaultView: 'occupancy',
     viewMode: 'operator',
-    description: 'DALI Lighting & Occupancy Control Demo',
+    description: 'Lighting & Occupancy Control Demo',
   },
 };
 

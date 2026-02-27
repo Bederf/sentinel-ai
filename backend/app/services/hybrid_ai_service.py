@@ -1,4 +1,14 @@
-"""Hybrid AI service routing between local Ollama and cloud providers."""
+"""Hybrid AI service routing between cloud providers.
+
+Provider hierarchy (configured via AI_CLOUD_PROVIDER):
+  - anthropic: Claude (tool support via native API)
+  - openai:    GPT-4.1 (tool support, tiered: nano for Tier 1, mini for Tier 2)
+  - zai:       Z.ai GLM (NO tool support — advisory only)
+
+Fallback chain: primary → next available cloud provider.
+Ollama local inference retained but disabled on CPU-only VPS.
+Set USE_OLLAMA=true to re-enable (requires GPU hardware).
+"""
 
 import logging
 import os
@@ -11,6 +21,7 @@ from anthropic import RateLimitError
 
 from app.config.settings import settings
 from app.services.claude_service import claude_service
+from app.services.openai_service import openai_service
 from app.services.zai_service import zai_service
 from app.services.popia_consent_guard import should_allow_cloud_processing
 
@@ -21,10 +32,10 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
-# SAFETY-CRITICAL LOCK: Control Actions Must Use Claude Only
+# SAFETY-CRITICAL LOCK: Control Actions Require Tool-Capable Provider
 # ============================================================================
 # Building management systems must FAIL SAFE, not FAIL OPEN.
-# Tool-based control actions are only enabled on Anthropic/Claude flow.
+# Tool-based control actions require Anthropic or OpenAI (NOT Z.ai).
 
 SAFETY_CRITICAL_INTENTS = {
     "control_action",
@@ -37,6 +48,9 @@ SAFETY_CRITICAL_INTENTS = {
     "damper_adjustment",
 }
 
+# Providers that support function/tool calling
+TOOL_CAPABLE_PROVIDERS = {"anthropic", "openai"}
+
 
 def is_safety_critical_intent(intent: str) -> bool:
     """Check if intent involves equipment control."""
@@ -46,12 +60,17 @@ def is_safety_critical_intent(intent: str) -> bool:
 
 class HybridAIService:
     """
-    Routes AI requests to Anthropic Claude (primary) with Z.ai fallback.
+    Routes AI requests through cloud providers with automatic fallback.
 
-    Originally routed Tier 1→Ollama, Tier 2+→Cloud. On CPU-only VPS,
-    Ollama generates ~0.1 tok/s — unusable. All tiers now route through
-    cloud providers.  Set USE_OLLAMA=true to re-enable local routing
-    (requires GPU hardware).
+    Provider support:
+      - anthropic: Full tool calling via native Anthropic SDK
+      - openai: Full tool calling via OpenAI API (tiered: nano/mini)
+      - zai: Advisory only — no tool support
+
+    Fallback chains:
+      - anthropic primary → openai → zai
+      - openai primary → anthropic → zai
+      - zai primary → openai → anthropic
     """
 
     def __init__(self):
@@ -76,20 +95,32 @@ class HybridAIService:
     def get_active_cloud_provider(self) -> str:
         """Return configured cloud provider."""
         provider = (settings.ai_cloud_provider or "anthropic").strip().lower()
-        return provider if provider in {"anthropic", "zai"} else "anthropic"
+        return provider if provider in {"anthropic", "openai", "zai"} else "anthropic"
 
-    def get_active_cloud_model(self) -> str:
-        """Return configured cloud model for active provider."""
-        if self.get_active_cloud_provider() == "zai":
+    def get_active_cloud_model(self, tier: int = 2) -> str:
+        """Return configured cloud model for active provider.
+
+        For OpenAI, returns tiered model (nano for Tier 1, mini for Tier 2).
+        """
+        provider = self.get_active_cloud_provider()
+        if provider == "openai":
+            return openai_service.get_model_for_tier(tier)
+        if provider == "zai":
             return settings.zai_model
         return settings.claude_model
 
     def is_cloud_configured(self) -> bool:
         """Check whether active cloud provider credentials are configured."""
         provider = self.get_active_cloud_provider()
+        if provider == "openai":
+            return openai_service.is_configured()
         if provider == "zai":
             return zai_service.is_configured()
         return claude_service.is_configured()
+
+    def provider_supports_tools(self, provider: str | None = None) -> bool:
+        """Check if provider supports function/tool calling."""
+        return (provider or self.get_active_cloud_provider()) in TOOL_CAPABLE_PROVIDERS
 
     def is_local_ai_only_mode(self) -> bool:
         """Public helper for endpoints to check local-only effective mode."""
@@ -104,25 +135,34 @@ class HybridAIService:
         """POPIA cross-border gate for cloud provider usage."""
         return should_allow_cloud_processing(data_subject_id)
 
+    def _get_fallback_providers(self, primary: str) -> list[str]:
+        """Return ordered fallback providers (excluding the primary)."""
+        # Prefer tool-capable providers first, then advisory-only
+        all_providers = ["openai", "anthropic", "zai"]
+        return [p for p in all_providers if p != primary]
+
     def classify_task(self, message: str) -> dict[str, Any]:
         """Classify task complexity and route to cloud provider.
 
-        All tiers now route through Anthropic/Z.ai — Ollama disabled on
-        CPU-only VPS.  Tier classification is preserved for logging/cost
-        tracking.
+        All tiers route through cloud providers. Tier classification
+        is preserved for model selection (OpenAI nano vs mini) and
+        cost tracking.
         """
         message_lower = message.lower()
         cloud_provider = self.get_active_cloud_provider()
-        cloud_model = self.get_active_cloud_model()
-        cloud_cost = 0.0105 if cloud_provider == "anthropic" else 0.0035
+
+        # Cost estimates per provider per request
+        cost_map = {"anthropic": 0.0105, "openai": 0.002, "zai": 0.0035}
+        cloud_cost = cost_map.get(cloud_provider, 0.005)
 
         if "equipment health" in message_lower:
+            tier = 2
             return {
                 "provider": cloud_provider,
-                "model": cloud_model,
+                "model": self.get_active_cloud_model(tier),
                 "reason": "Equipment health analysis",
                 "estimated_cost": cloud_cost,
-                "tier": 2,
+                "tier": tier,
             }
 
         simple_patterns = [
@@ -136,12 +176,13 @@ class HybridAIService:
             r"^(all|every) equipment",
         ]
         if any(re.match(pattern, message_lower) for pattern in simple_patterns):
+            tier = 1
             return {
                 "provider": cloud_provider,
-                "model": cloud_model,
+                "model": self.get_active_cloud_model(tier),
                 "reason": "Simple lookup/retrieval",
                 "estimated_cost": cloud_cost,
-                "tier": 1,
+                "tier": tier,
             }
 
         data_patterns = [
@@ -155,12 +196,13 @@ class HybridAIService:
             r"^alarm",
         ]
         if any(re.search(pattern, message_lower) for pattern in data_patterns):
+            tier = 1
             return {
                 "provider": cloud_provider,
-                "model": cloud_model,
+                "model": self.get_active_cloud_model(tier),
                 "reason": "Data query/retrieval",
                 "estimated_cost": cloud_cost,
-                "tier": 1,
+                "tier": tier,
             }
 
         complex_patterns = [
@@ -180,12 +222,13 @@ class HybridAIService:
             r"occupancy",
         ]
         if any(re.search(pattern, message_lower) for pattern in complex_patterns):
+            tier = 2
             return {
                 "provider": cloud_provider,
-                "model": cloud_model,
+                "model": self.get_active_cloud_model(tier),
                 "reason": "Complex reasoning required",
                 "estimated_cost": cloud_cost,
-                "tier": 2,
+                "tier": tier,
             }
 
         control_patterns = [
@@ -199,20 +242,22 @@ class HybridAIService:
             r"^raise",
         ]
         if any(re.search(pattern, message_lower) for pattern in control_patterns):
+            tier = 2
             return {
                 "provider": cloud_provider,
-                "model": cloud_model,
+                "model": self.get_active_cloud_model(tier),
                 "reason": "Control action (safety critical)",
                 "estimated_cost": cloud_cost,
-                "tier": 2,
+                "tier": tier,
             }
 
+        tier = 2
         return {
             "provider": cloud_provider,
-            "model": cloud_model,
+            "model": self.get_active_cloud_model(tier),
             "reason": "Default to cloud provider for ambiguous queries",
             "estimated_cost": cloud_cost,
-            "tier": 2,
+            "tier": tier,
         }
 
     def _should_use_claude(self) -> tuple[bool, str]:
@@ -276,91 +321,118 @@ class HybridAIService:
         provider = self.get_active_cloud_provider()
         try:
             chunks: list[str] = []
-            if provider == "zai":
-                async for chunk in zai_service.stream_response(
-                    [{"role": "user", "content": message}],
-                    include_building_context=False,
-                ):
-                    chunks.append(chunk)
-            else:
-                async for chunk in claude_service.stream_response(
-                    [{"role": "user", "content": message}],
-                    include_building_context=False,
-                ):
-                    chunks.append(chunk)
+            async for chunk in self._stream_from_provider(
+                provider,
+                [{"role": "user", "content": message}],
+                include_building_context=False,
+            ):
+                chunks.append(chunk)
             return "".join(chunks)
         except Exception as e:
             logger.error("Cloud fallback also failed (%s): %s", provider, e)
             return "I'm sorry, I'm having trouble processing your request right now. Please try again."
+
+    async def _stream_from_provider(
+        self,
+        provider: str,
+        messages: list[dict],
+        include_building_context: bool = True,
+        tier: int = 2,
+    ) -> AsyncGenerator[str, None]:
+        """Stream response from a specific provider."""
+        if provider == "openai":
+            async for chunk in openai_service.stream_response(
+                messages,
+                include_building_context=include_building_context,
+                tier=tier,
+            ):
+                yield chunk
+        elif provider == "zai":
+            async for chunk in zai_service.stream_response(
+                messages,
+                include_building_context=include_building_context,
+            ):
+                yield chunk
+        else:  # anthropic
+            async for chunk in claude_service.stream_response(
+                messages,
+                include_building_context=include_building_context,
+            ):
+                yield chunk
 
     async def _try_cloud_with_fallback(
         self,
         message: str,
         include_building_context: bool = True,
         data_subject_id: str | None = None,
+        tier: int = 2,
     ) -> AsyncGenerator[str, None]:
-        """Try Anthropic Claude, fallback to Z.ai on failure."""
+        """Try primary provider, fallback to alternatives on failure."""
         provider = self.get_active_cloud_provider()
+        messages = [{"role": "user", "content": message}]
 
-        # --- Anthropic (primary) ---
-        if provider == "anthropic":
-            try:
-                if self.rate_tracker:
-                    self.rate_tracker.record_request()
-                async for chunk in claude_service.stream_response(
-                    [{"role": "user", "content": message}],
-                    include_building_context=include_building_context,
-                ):
-                    yield chunk
-                return
-            except RateLimitError as e:
-                logger.warning("Claude rate limited: %s — falling back to Z.ai", e)
+        # Try primary
+        try:
+            if provider == "anthropic" and self.rate_tracker:
+                self.rate_tracker.record_request()
+            async for chunk in self._stream_from_provider(
+                provider,
+                messages,
+                include_building_context,
+                tier,
+            ):
+                yield chunk
+            return
+        except RateLimitError as e:
+            logger.warning("%s rate limited: %s — trying fallback", provider, e)
+            if provider == "anthropic":
                 if self.rate_tracker:
                     self.rate_tracker.record_rate_limit_hit()
                 else:
                     self.claude_rate_limited = True
                     self.rate_limit_time = time.time()
-            except Exception as e:
-                logger.error("Claude error (%s): %s — falling back to Z.ai", type(e).__name__, e)
-
-            # --- Z.ai fallback ---
-            if zai_service.is_configured():
-                try:
-                    async for chunk in zai_service.stream_response(
-                        [{"role": "user", "content": message}],
-                        include_building_context=include_building_context,
-                    ):
-                        yield chunk
-                    return
-                except Exception as zai_err:
-                    logger.error("Z.ai fallback also failed: %s", zai_err)
-
-            yield "I'm having trouble with the AI service. Please try again in a moment."
-            return
-
-        # --- Z.ai primary ---
-        try:
-            async for chunk in zai_service.stream_response(
-                [{"role": "user", "content": message}],
-                include_building_context=include_building_context,
-            ):
-                yield chunk
-            return
         except Exception as e:
-            logger.error("Z.ai error (%s): %s — trying Claude fallback", type(e).__name__, e)
+            logger.error("%s error (%s): %s — trying fallback", provider, type(e).__name__, e)
 
-        # --- Claude fallback ---
-        try:
-            async for chunk in claude_service.stream_response(
-                [{"role": "user", "content": message}],
-                include_building_context=include_building_context,
+        # Try fallbacks in order
+        for fallback in self._get_fallback_providers(provider):
+            try:
+                async for chunk in self._stream_from_provider(
+                    fallback,
+                    messages,
+                    include_building_context,
+                    tier,
+                ):
+                    yield chunk
+                return
+            except Exception as fb_err:
+                logger.error("%s fallback also failed: %s", fallback, fb_err)
+
+        yield "I'm having trouble with all AI services. Please try again in a moment."
+
+    async def _stream_tools_from_provider(
+        self,
+        provider: str,
+        messages: list[dict],
+    ) -> AsyncGenerator[str, None]:
+        """Stream tool-calling response from a tool-capable provider."""
+        if provider == "openai":
+            from app.services.chat_tools import execute_tool, get_chat_tools
+
+            tools = get_chat_tools()
+
+            async def _executor(name: str, args: dict) -> Any:
+                return await execute_tool(name, args)
+
+            async for chunk in openai_service.stream_response_with_tools(
+                messages,
+                tools=tools,
+                tool_executor=_executor,
             ):
                 yield chunk
-            return
-        except Exception as claude_err:
-            logger.error("Claude fallback also failed: %s", claude_err)
-            yield "I'm having trouble with both AI services. Please try again in a moment."
-            return
+        else:  # anthropic
+            async for chunk in claude_service.stream_response_with_tools(messages):
+                yield chunk
 
     async def stream_response(
         self,
@@ -368,15 +440,38 @@ class HybridAIService:
         use_tools: bool = False,
         data_subject_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
-        """Stream response from Anthropic (primary) with Z.ai fallback."""
+        """Stream response from configured cloud provider with fallback.
+
+        For tool-calling requests, routes to a tool-capable provider
+        (anthropic or openai). Z.ai does not support tools.
+        """
         provider = self.get_active_cloud_provider()
 
-        if use_tools and provider != "anthropic":
-            yield (
-                f"[{provider} cloud mode] Tool-based actions currently require Claude. "
-                "Please use advisory queries only."
+        # Tool requests need a tool-capable provider
+        if use_tools and not self.provider_supports_tools(provider):
+            # Try to find a tool-capable fallback
+            tool_provider = None
+            for p in TOOL_CAPABLE_PROVIDERS:
+                if p == "openai" and openai_service.is_configured():
+                    tool_provider = p
+                    break
+                if p == "anthropic" and claude_service.is_configured():
+                    tool_provider = p
+                    break
+
+            if not tool_provider:
+                yield (
+                    f"[{provider} cloud mode] Tool-based actions require a tool-capable "
+                    "provider (OpenAI or Claude). Please configure one or use advisory queries only."
+                )
+                return
+
+            logger.info(
+                "Primary provider %s lacks tool support, routing tools to %s",
+                provider,
+                tool_provider,
             )
-            return
+            provider = tool_provider
 
         routing = self.classify_task(message)
 
@@ -389,50 +484,87 @@ class HybridAIService:
         )
 
         if use_tools:
-            can_use_claude, reason = self._should_use_claude()
-            if not can_use_claude:
-                logger.warning("Tool calling requested but Claude unavailable: %s", reason)
-                yield (
-                    f"[Claude unavailable: {reason}] Tool-based actions are "
-                    "not available right now. Please try again in a moment."
-                )
-                return
+            # For Claude, check rate limit cooldown
+            if provider == "anthropic":
+                can_use_claude, reason = self._should_use_claude()
+                if not can_use_claude:
+                    # Try OpenAI as tool-capable fallback
+                    if openai_service.is_configured():
+                        logger.info("Claude unavailable (%s), using OpenAI for tools", reason)
+                        provider = "openai"
+                    else:
+                        yield (
+                            f"[Claude unavailable: {reason}] Tool-based actions are "
+                            "not available right now. Please try again in a moment."
+                        )
+                        return
 
-            logger.info("Tool calling enabled, using Claude")
+            logger.info("Tool calling enabled, using %s", provider)
             try:
-                if self.rate_tracker:
+                if provider == "anthropic" and self.rate_tracker:
                     self.rate_tracker.record_request()
-                async for chunk in claude_service.stream_response_with_tools([{"role": "user", "content": message}]):
+                async for chunk in self._stream_tools_from_provider(
+                    provider,
+                    [{"role": "user", "content": message}],
+                ):
                     yield chunk
                 return
             except RateLimitError as e:
-                logger.warning("Claude rate limit hit during tool calling: %s", e)
-                if self.rate_tracker:
-                    self.rate_tracker.record_rate_limit_hit()
-                else:
-                    self.claude_rate_limited = True
-                    self.rate_limit_time = time.time()
-                yield "[Claude rate limited] Cannot perform tool-based actions right now. Please try a simpler query."
+                logger.warning("Rate limit hit during tool calling: %s", e)
+                if provider == "anthropic":
+                    if self.rate_tracker:
+                        self.rate_tracker.record_rate_limit_hit()
+                    else:
+                        self.claude_rate_limited = True
+                        self.rate_limit_time = time.time()
+                    # Try OpenAI as fallback for tools
+                    if openai_service.is_configured():
+                        try:
+                            async for chunk in self._stream_tools_from_provider(
+                                "openai",
+                                [{"role": "user", "content": message}],
+                            ):
+                                yield chunk
+                            return
+                        except Exception as oai_err:
+                            logger.error("OpenAI tool fallback also failed: %s", oai_err)
+                yield "[Rate limited] Cannot perform tool-based actions right now. Please try a simpler query."
                 return
             except Exception as e:
                 from anthropic import APIConnectionError, APIError, APITimeoutError
 
                 error_type = type(e).__name__
-                logger.error("Claude API error during tool calling (%s): %s", error_type, e)
+                logger.error("API error during tool calling (%s): %s", error_type, e)
                 if isinstance(e, (APIError, APIConnectionError, APITimeoutError)):
+                    # Try other tool-capable provider
+                    alt_provider = "openai" if provider == "anthropic" else "anthropic"
+                    alt_configured = (
+                        openai_service.is_configured() if alt_provider == "openai" else claude_service.is_configured()
+                    )
+                    if alt_configured:
+                        try:
+                            async for chunk in self._stream_tools_from_provider(
+                                alt_provider,
+                                [{"role": "user", "content": message}],
+                            ):
+                                yield chunk
+                            return
+                        except Exception as alt_err:
+                            logger.error("%s tool fallback also failed: %s", alt_provider, alt_err)
                     yield (
-                        f"[Claude unavailable ({error_type})] Tool-based actions "
+                        f"[AI unavailable ({error_type})] Tool-based actions "
                         "are temporarily unavailable. Please try again in a moment."
                     )
                     return
                 raise
 
-        # Non-tool path: Anthropic → Z.ai fallback
+        # Non-tool path: primary → fallback chain
         logger.info("Using cloud provider with fallback: %s", routing["provider"])
         async for chunk in self._try_cloud_with_fallback(
             message,
             include_building_context=True,
             data_subject_id=data_subject_id,
+            tier=routing.get("tier", 2),
         ):
             yield chunk
 

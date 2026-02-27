@@ -89,12 +89,14 @@ class DiagnosisFlow:
         return [cp for cp in self.checkpoints if cp.response is not None]
 
     def to_dict(self) -> Dict:
-        """Serialize flow state for API response"""
+        """Serialize flow state for API response and Redis persistence"""
         return {
             "session_id": self.session_id,
             "state": self.state.value,
             "equipment": self.equipment,
             "fault_code": self.fault_code,
+            "fault_info": self.fault_info,
+            "collected_info": self.collected_info,
             "current_step_index": self.current_step_index,
             "checkpoints": [
                 {
@@ -110,6 +112,30 @@ class DiagnosisFlow:
             "updated_at": self.updated_at.isoformat(),
         }
 
+    @classmethod
+    def from_dict(cls, data: Dict) -> "DiagnosisFlow":
+        """Reconstruct DiagnosisFlow from serialized dict (Redis/JSON)."""
+        flow = cls(session_id=data["session_id"])
+        flow.state = DiagnosisState(data.get("state", "identifying"))
+        flow.equipment = data.get("equipment", {})
+        flow.fault_code = data.get("fault_code")
+        flow.fault_info = data.get("fault_info")
+        flow.collected_info = data.get("collected_info", {})
+        flow.current_step_index = data.get("current_step_index", 0)
+        flow.created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now()
+        flow.updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now()
+        flow.checkpoints = [
+            Checkpoint(
+                step_id=cp["step_id"],
+                question=cp["question"],
+                response=cp.get("response"),
+                timestamp=datetime.fromisoformat(cp["timestamp"]) if cp.get("timestamp") else datetime.now(),
+                state=DiagnosisState(cp.get("state", "identifying")),
+            )
+            for cp in data.get("checkpoints", [])
+        ]
+        return flow
+
 
 class DiagnosisFlowEngine:
     """
@@ -120,6 +146,8 @@ class DiagnosisFlowEngine:
     - Fault code-specific diagnostic questions
     - Checkpoint tracking
     - Resolution recommendations
+
+    Sessions are persisted via Redis (write-through) so they survive restarts.
     """
 
     # Pre-defined diagnostic checklists for common faults
@@ -249,9 +277,20 @@ class DiagnosisFlowEngine:
     ]
 
     def __init__(self):
-        """Initialize the diagnosis flow engine"""
-        self.flows: Dict[str, DiagnosisFlow] = {}
+        """Initialize the diagnosis flow engine with Redis-backed session store."""
+        from app.services.redis_session_store import RedisSessionStore
+
+        self._store = RedisSessionStore(
+            prefix="bms:diagnosis",
+            ttl_seconds=3600,  # 1 hour
+            deserializer=DiagnosisFlow.from_dict,
+        )
         self.equipment_lookup = EquipmentLookup()
+
+    @property
+    def flows(self) -> Dict[str, DiagnosisFlow]:
+        """Backward-compat: expose in-memory dict from store."""
+        return self._store._memory
 
     def start_diagnosis(self, session_id: str, initial_query: str) -> Dict:
         """
@@ -266,7 +305,7 @@ class DiagnosisFlowEngine:
         """
         # Create new flow
         flow = DiagnosisFlow(session_id=session_id)
-        self.flows[session_id] = flow
+        self._store.put(session_id, flow)
 
         # Parse the initial query to extract equipment info
         equipment_info = self._parse_equipment_query(initial_query)
@@ -294,7 +333,10 @@ class DiagnosisFlowEngine:
                 logger.warning(f"Fault code lookup failed: {e}")
 
         # Generate first questions
-        return self._get_next_step(flow)
+        result = self._get_next_step(flow)
+        # Persist after generating first step (state may have advanced)
+        self._store.put(session_id, flow)
+        return result
 
     def process_response(self, session_id: str, step_id: str, response: str) -> Dict:
         """
@@ -308,7 +350,7 @@ class DiagnosisFlowEngine:
         Returns:
             Dict with next step or resolution
         """
-        flow = self.flows.get(session_id)
+        flow = self._store.get(session_id)
         if not flow:
             return {
                 "error": True,
@@ -331,19 +373,22 @@ class DiagnosisFlowEngine:
         # Check if we should advance state
         self._evaluate_state_transition(flow)
 
+        # Persist updated flow
+        self._store.put(session_id, flow)
+
         # Get next step
         return self._get_next_step(flow)
 
     def get_flow_state(self, session_id: str) -> Optional[Dict]:
         """Get current state of a diagnosis flow"""
-        flow = self.flows.get(session_id)
+        flow = self._store.get(session_id)
         if flow:
             return flow.to_dict()
         return None
 
     def end_diagnosis(self, session_id: str) -> Dict:
         """End a diagnosis session and return summary"""
-        flow = self.flows.get(session_id)
+        flow = self._store.get(session_id)
         if not flow:
             return {"error": True, "message": "Session not found"}
 
@@ -357,8 +402,8 @@ class DiagnosisFlowEngine:
             "duration_seconds": (flow.updated_at - flow.created_at).total_seconds(),
         }
 
-        # Clean up
-        del self.flows[session_id]
+        # Clean up from both memory and Redis
+        self._store.delete(session_id)
 
         return summary
 

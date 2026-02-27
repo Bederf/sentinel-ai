@@ -2,9 +2,9 @@
 title: "AI Operations & Day-to-Day Monitoring"
 type: "guide"
 status: "approved"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-02-01"
-updated: "2026-02-01"
+updated: "2026-02-27"
 author: "Sentinel Development Team"
 tags: ["ai", "monitoring", "recommendations", "day-to-day", "operations"]
 domain: "bms"
@@ -48,12 +48,15 @@ graph TB
         Thermal[Thermal Model]
         EnergyAI[Energy Optimization AI]
         Anomaly[Anomaly Detection]
+        Classifier[Fault Classification<br/>Random Forest]
     end
 
     subgraph Intelligence Layer
         Health[Equipment Health Scoring]
         Forecast[Failure Prediction]
         Optimize[Optimization Engine]
+        MLContext[ML Context Bridge<br/>Phase 132]
+        Features[Feature Engineering<br/>EUI, BLI, CDD]
         Recommend[Recommendation Generator]
     end
 
@@ -72,10 +75,15 @@ graph TB
 
     ML --> Health
     ML --> Forecast
+    ML --> MLContext
+    Anomaly --> MLContext
+    Classifier --> MLContext
+    Features --> MLContext
     EnergyAI --> Optimize
     Thermal --> Optimize
     Anomaly --> Health
 
+    MLContext --> Recommend
     Health --> Recommend
     Forecast --> Recommend
     Optimize --> Recommend

@@ -18,6 +18,7 @@ from app.api import recommendations, simulation_analytics, optimization_quality
 from app.api import system_health, solar, solar_grid, solar_performance, solar_arbitrage
 from app.api import solar_config, peak_demand, solar_annual
 from app.api import load_forecast, dispatch_optimizer
+from app.api import agent_memory
 
 
 def register_analytics_routers(app: FastAPI) -> None:
@@ -83,6 +84,9 @@ def register_analytics_routers(app: FastAPI) -> None:
     app.include_router(mcp_sse.router, tags=["mcp-sse"])
     app.include_router(mcp_openai.router, tags=["mcp-openai"])
     app.include_router(mcp_openai.wellknown_router, tags=["mcp-discovery"])
+
+    # Agent Memory (persistent conversational memory for AI agents)
+    app.include_router(agent_memory.router, tags=["agent-memory"])
 
     # RLM Runner orchestration (Phase 113 — feature-gated)
     if settings.rlm_runner_enabled:
