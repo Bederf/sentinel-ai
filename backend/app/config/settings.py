@@ -60,10 +60,14 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     claude_model: str = "claude-sonnet-4-20250514"
     claude_max_tokens: int = 1536
-    ai_cloud_provider: str = "anthropic"  # anthropic|zai
+    ai_cloud_provider: str = "anthropic"  # anthropic|openai|zai
     zai_api_key: str = ""
     zai_model: str = "glm-4.7-flash"
     zai_base_url: str = "https://api.z.ai/api/paas/v4"
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4.1-nano"  # Tier 1: fast/cheap for routine queries
+    openai_model_heavy: str = "gpt-4.1-mini"  # Tier 2: complex reasoning & diagnostics
+    openai_base_url: str = "https://api.openai.com/v1"
     local_ai_only: bool = False  # Force local-only AI mode (no Anthropic/Claude calls)
     popia_require_cross_border_consent: bool = True  # Block cloud LLM without explicit cross-border consent
     popia_dsr_sla_days: int = 30  # POPIA response SLA for data subject requests
@@ -244,6 +248,23 @@ class Settings(BaseSettings):
     jwt_issuer: str = "sentinel.bms"  # JWT iss claim
     jwt_audience: str = "sentinel.bms"  # JWT aud claim
 
+    # Occupancy-driven control loop (Phase 130)
+    occupancy_poll_enabled: bool = False  # Enable occupancy→HVAC/lighting control loop
+    occupancy_poll_interval_seconds: int = 60  # Poll cycle interval
+    occupancy_hvac_setback_c: float = 2.0  # Setpoint relaxation for empty zones (°C)
+    occupancy_hvac_partial_setback_c: float = 1.0  # Setpoint relaxation for low zones (°C)
+    occupancy_lighting_empty_pct: int = 20  # Brightness % for empty zones
+    occupancy_lighting_low_pct: int = 50  # Brightness % for low-occupancy zones
+    occupancy_empty_threshold: int = 0  # Occupancy count below which zone is "empty"
+    occupancy_low_threshold: int = 3  # Occupancy count below which zone is "low"
+    occupancy_restore_hysteresis_pct: float = 10.0  # % above threshold before restoring (anti-flap)
+
+    # Email intake pipeline (Phase 131)
+    email_intake_enabled: bool = False  # Master switch for email intake pipeline
+    email_intake_auto_wo_enabled: bool = False  # Auto-create Concept WOs (stub in v1)
+    email_intake_auto_wo_max_priority: int = 2  # Max urgency level for auto-WO (1=low, 4=critical)
+    email_intake_duplicate_window_hours: int = 24  # Heuristic dedup window
+
     @property
     def resolved_ingestion_mode(self) -> IngestionMode:
         """Resolve ingestion mode with DEMO override and safe fallback."""
@@ -277,11 +298,20 @@ class Settings(BaseSettings):
     def _validate_list_fields(cls, value):
         return _parse_csv_list(value)
 
+    @field_validator("debug", mode="before")
+    @classmethod
+    def _validate_debug(cls, value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in ("true", "1", "yes")
+        return False
+
     @field_validator("ai_cloud_provider", mode="before")
     @classmethod
     def _validate_ai_cloud_provider(cls, value):
         provider = (value or "anthropic").strip().lower()
-        if provider not in {"anthropic", "zai"}:
+        if provider not in {"anthropic", "openai", "zai"}:
             return "anthropic"
         return provider
 

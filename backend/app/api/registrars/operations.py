@@ -21,6 +21,7 @@ from app.api import asset_health
 from app.api import health_rating
 from app.api import cafm_integration
 from app.api import capex
+from app.api import sentry_email
 
 
 def register_operations_routers(app: FastAPI) -> None:
@@ -112,3 +113,6 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # CapEx planning engine (Phase 128)
     app.include_router(capex.router, prefix="/api", tags=["capex"])
+
+    # Email intake pipeline (Phase 131)
+    app.include_router(sentry_email.router, tags=["sentry-email"])

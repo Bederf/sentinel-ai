@@ -166,11 +166,11 @@ async def startup_event(app: FastAPI) -> None:
     # Capture the main event loop for cross-thread scheduling (simulation tasks)
     scheduler_service.set_main_loop(asyncio.get_event_loop())
 
-    # Start background scheduler for demo data generation
+    # Start background scheduler
     scheduler_service.start()
 
-    # Generate initial demo data and schedule periodic updates (60 seconds)
-    scheduler_service.add_demo_data_job(interval_seconds=60)
+    # NOTE: Fake audit data generator removed — audit trail must only contain
+    # real control actions, not synthetic noise.
 
     # Start AI optimization analysis job (runs every 15 minutes)
     # Scans all sites with optimization_enabled=true and generates recommendations
@@ -304,7 +304,27 @@ async def startup_event(app: FastAPI) -> None:
     except Exception as e:
         _logger.warning(f"⚠️ AEGIS evidence collector job initialization failed: {e}")
 
-    # Phase 083: Recover crashed simulations from database
+    # Phase 130: Occupancy-driven HVAC + lighting control loop
+    if settings.occupancy_poll_enabled:
+        try:
+            scheduler_service.add_occupancy_control_job(
+                interval_seconds=settings.occupancy_poll_interval_seconds,
+                site_id="site-002",
+            )
+            _logger.info(
+                "✅ Occupancy control loop initialized (%ds interval)",
+                settings.occupancy_poll_interval_seconds,
+            )
+        except Exception as e:
+            _logger.warning(f"⚠️ Occupancy control loop initialization failed: {e}")
+
+    # Phase 131: Email intake pipeline status
+    if settings.email_intake_enabled:
+        _logger.info("✅ Email intake pipeline ENABLED (Phase 131)")
+    else:
+        _logger.info("ℹ Email intake pipeline disabled (set EMAIL_INTAKE_ENABLED=true to activate)")
+
+    # Phase 083: Recover crashed simulations from JSON store
     # Queries for any tasks marked as 'running' and resumes from checkpoint
     async def recover_crashed_simulations():
         """
@@ -316,59 +336,55 @@ async def startup_event(app: FastAPI) -> None:
             from datetime import datetime as dt
             from datetime import timedelta
 
-            from app.database.supabase_client import Supabase
+            from app.services.simulation_store import get_simulation_store
 
-            client = Supabase.instance()
+            store = get_simulation_store("site-002")
+            all_tasks = store.get_all_tasks()
 
-            # Query for any crashed tasks (status='running')
-            response = client.table("lifecycle_simulation_tasks").select("*").eq("status", "running").execute()
+            # Find tasks with status='running' (crashed)
+            crashed = [(tid, tdata) for tid, tdata in all_tasks.items() if tdata.get("status") == "running"]
 
-            if not response.data:
+            if not crashed:
                 _logger.info("No crashed simulations to recover")
                 return
 
-            _logger.info(f"Found {len(response.data)} crashed simulation(s) to recover...")
+            _logger.info(f"Found {len(crashed)} crashed simulation(s) to recover...")
 
-            # Age guard: tasks running >48 hours with no checkpoint are stale
             max_age = timedelta(hours=48)
             now = dt.utcnow()
 
-            for task in response.data:
-                task_id = str(task["task_id"])
+            for task_id, task in crashed:
                 state_snapshot = task.get("state_snapshot")
                 created_at = task.get("created_at", "")
 
-                # Parse created_at for age check
                 try:
                     task_age = now - dt.fromisoformat(created_at.replace("Z", "+00:00").replace("+00:00", ""))
                 except Exception:
-                    task_age = max_age  # If we can't parse, treat as old
+                    task_age = max_age
 
                 if not state_snapshot:
                     if task_age > max_age:
                         _logger.warning(f"Task {task_id} has no checkpoint and is >{max_age} old — marking failed")
-                        try:
-                            client.table("lifecycle_simulation_tasks").update(
-                                {"status": "failed", "error_message": "Stale: no checkpoint after 48h"}
-                            ).eq("task_id", task_id).execute()
-                        except Exception as e:
-                            _logger.error(f"Failed to mark stale task {task_id}: {e}")
+                        store.update_task_progress(
+                            task_id,
+                            {
+                                "status": "failed",
+                                "error_message": "Stale: no checkpoint after 48h",
+                            },
+                        )
                     else:
                         _logger.warning(f"Task {task_id} has no checkpoint — marking failed")
-                        try:
-                            client.table("lifecycle_simulation_tasks").update(
-                                {"status": "failed", "error_message": "No checkpoint state available for recovery"}
-                            ).eq("task_id", task_id).execute()
-                        except Exception as e:
-                            _logger.error(f"Failed to mark task {task_id}: {e}")
+                        store.update_task_progress(
+                            task_id,
+                            {
+                                "status": "failed",
+                                "error_message": "No checkpoint state available for recovery",
+                            },
+                        )
                     continue
 
                 try:
-                    # Re-queue for the queue processor to resume from checkpoint
-                    client.table("lifecycle_simulation_tasks").update({"status": "queued", "error_message": None}).eq(
-                        "task_id", task_id
-                    ).execute()
-
+                    store.update_task_progress(task_id, {"status": "queued", "error_message": None})
                     days_simulated = state_snapshot.get("days_simulated", 0)
                     simulated_time = state_snapshot.get("simulated_time", "unknown")
                     _logger.info(f"Queued recovery for task {task_id}: day {days_simulated}/365, time {simulated_time}")
@@ -380,66 +396,44 @@ async def startup_event(app: FastAPI) -> None:
 
     # DEACTIVATE ALL SIMULATIONS ON STARTUP
     # Ensures clean state: no simulations auto-running after restart
-    # Explicitly stop any running simulations and mark queued ones as inactive
     async def deactivate_all_simulations():
         """
         Deactivate all running and queued simulations on startup.
         This ensures clean state and prevents auto-resuming of simulations.
         """
         try:
-            from app.database.supabase_client import Supabase
-
-            client = Supabase.instance()
-
-            # Stop any running simulations (set status to 'stopped')
-            running_tasks = (
-                client.table("lifecycle_simulation_tasks").select("task_id").eq("status", "running").execute()
-            )
-
-            if running_tasks.data:
-                _logger.info(f"🛑 Stopping {len(running_tasks.data)} running simulation(s)...")
-                for task in running_tasks.data:
-                    try:
-                        client.table("lifecycle_simulation_tasks").update({"status": "stopped"}).eq(
-                            "task_id", task["task_id"]
-                        ).execute()
-                    except Exception as update_err:
-                        _logger.warning(f"Could not update task {task['task_id']}: {update_err}")
-                _logger.info(f"✅ Stopped {len(running_tasks.data)} running simulation(s)")
-
-            # Mark any queued simulations as 'inactive' (don't auto-start)
-            # Only deactivate tasks from BEFORE this startup (older than 5 seconds)
-            # This prevents deactivating tasks created during the current startup
             from datetime import datetime, timedelta
+            from app.services.simulation_store import get_simulation_store
 
+            store = get_simulation_store("site-002")
+            all_tasks = store.get_all_tasks()
             cutoff_time = (datetime.utcnow() - timedelta(seconds=5)).isoformat()
 
-            queued_tasks = (
-                client.table("lifecycle_simulation_tasks")
-                .select("task_id, created_at")
-                .eq("status", "queued")
-                .lt("created_at", cutoff_time)
-                .execute()
-            )
+            stopped_count = 0
+            deactivated_count = 0
 
-            if queued_tasks.data:
-                _logger.info(f"⏸️  Deactivating {len(queued_tasks.data)} queued simulation(s) from before startup...")
-                for task in queued_tasks.data:
-                    try:
-                        client.table("lifecycle_simulation_tasks").update({"status": "inactive"}).eq(
-                            "task_id", task["task_id"]
-                        ).execute()
-                    except Exception as update_err:
-                        _logger.warning(f"Could not deactivate task {task['task_id']}: {update_err}")
-                _logger.info(f"✅ Deactivated {len(queued_tasks.data)} queued simulation(s)")
-            else:
-                _logger.info("✅ No old queued simulations to deactivate")
+            for task_id, task_data in all_tasks.items():
+                status = task_data.get("status")
 
-            if not running_tasks.data and not queued_tasks.data:
-                _logger.info("✅ No active simulations to deactivate")
+                if status == "running":
+                    store.update_task_progress(task_id, {"status": "stopped"})
+                    stopped_count += 1
+
+                elif status == "queued":
+                    created_at = task_data.get("created_at", "")
+                    if created_at < cutoff_time:
+                        store.update_task_progress(task_id, {"status": "inactive"})
+                        deactivated_count += 1
+
+            if stopped_count:
+                _logger.info(f"Stopped {stopped_count} running simulation(s)")
+            if deactivated_count:
+                _logger.info(f"Deactivated {deactivated_count} queued simulation(s) from before startup")
+            if not stopped_count and not deactivated_count:
+                _logger.info("No active simulations to deactivate")
 
         except Exception as e:
-            _logger.error(f"⚠️ Failed to deactivate simulations on startup: {e}")
+            _logger.error(f"Failed to deactivate simulations on startup: {e}")
 
     # Run crash recovery on startup (replaces old deactivate_all_simulations)
     # Re-queues simulations that have valid checkpoints, fails those without
@@ -454,47 +448,40 @@ async def startup_event(app: FastAPI) -> None:
             except Exception as e2:
                 _logger.error(f"Fallback deactivation also failed: {e2}")
 
-    # Start simulation queue processor job - Phase 094 ENABLED
-    # Phase 083: Process queued lifecycle simulations from database
-    # Enables concurrent simulations and crash recovery via task queue
-    _logger.info("[DEBUG] About to initialize simulation queue processor...")
+    # Start simulation queue processor job
+    # Polls JSON store for queued lifecycle simulations every 10s
     try:
-        _logger.info("[DEBUG] Calling add_simulation_queue_processor_job()...")
         scheduler_service.add_simulation_queue_processor_job(interval_seconds=10)
-        _logger.info("✅ Simulation queue processor initialized - checks every 10s for queued simulations")
-        _logger.info(f"[DEBUG] Scheduler status - running: {scheduler_service.scheduler.running}")
-        _logger.info(f"[DEBUG] Total jobs in scheduler: {len(scheduler_service.scheduler.get_jobs())}")
+        _logger.info("Simulation queue processor initialized (10s interval, JSON store)")
     except Exception as e:
-        _logger.error(f"❌ Simulation queue processor initialization failed: {e}", exc_info=True)
-        _logger.warning("⚠️ Simulations will not be auto-processed. Manual intervention required.")
+        _logger.error(f"Simulation queue processor initialization failed: {e}", exc_info=True)
 
     # Auto-start sentinel_annual simulation for site-002 if none is active
     async def auto_start_sentinel_simulation():
         """Auto-queue sentinel_annual for site-002 if no active simulation exists."""
         try:
             import uuid
+            from datetime import datetime
 
-            from app.database.supabase_client import Supabase
+            from app.services.simulation_store import get_simulation_store
 
-            client = Supabase.instance()
+            store = get_simulation_store("site-002")
+            all_tasks = store.get_all_tasks()
 
             # Check for any active simulation (running or queued)
-            active = (
-                client.table("lifecycle_simulation_tasks")
-                .select("task_id")
-                .in_("status", ["running", "queued"])
-                .eq("simulation_type", "lifecycle")
-                .limit(1)
-                .execute()
+            active = any(
+                t.get("status") in ("running", "queued") and t.get("simulation_type", "lifecycle") == "lifecycle"
+                for t in all_tasks.values()
             )
 
-            if active.data:
-                _logger.info("✅ Active simulation already exists, skipping auto-start")
+            if active:
+                _logger.info("Active simulation already exists, skipping auto-start")
                 return
 
             # Queue sentinel_annual for site-002
             task_id = str(uuid.uuid4())
-            client.table("lifecycle_simulation_tasks").insert(
+            store.update_task_progress(
+                task_id,
                 {
                     "task_id": task_id,
                     "site_id": "site-002",
@@ -504,12 +491,13 @@ async def startup_event(app: FastAPI) -> None:
                     "progress_pct": 0,
                     "days_completed": 0,
                     "duration_minutes": 3650.0,
-                }
-            ).execute()
+                    "created_at": datetime.utcnow().isoformat() + "Z",
+                },
+            )
 
-            _logger.info(f"🚀 Auto-queued sentinel_annual simulation: {task_id}")
+            _logger.info(f"Auto-queued sentinel_annual simulation: {task_id}")
         except Exception as e:
-            _logger.error(f"⚠️ Failed to auto-start sentinel_annual simulation: {e}")
+            _logger.error(f"Failed to auto-start sentinel_annual simulation: {e}")
 
     # Auto-start disabled — simulation should be started manually via API
     # try:

@@ -14,16 +14,24 @@ from app.database.repositories.generator_repository import GeneratorRepository
 from app.database.repositories.energy_centre_repository import EnergyCentreRepository
 from app.database.repositories.service_record_repository import ServiceRecordRepository
 from app.database.repositories.device_repository import DeviceRepository
-from app.database.repositories.dali_repository import (
-    DALIControllerRepository,
-    DALILuminaireRepository,
-    DALISensorRepository,
-    DALIGroupRepository,
+from app.database.repositories.lighting_repository import (
+    LightingControllerRepository,
+    LightingLuminaireRepository,
+    LightingSensorRepository,
+    LightingGroupRepository,
 )
 from app.database.repositories.sla_repository import SLARepository, get_sla_repository
 from app.database.repositories.recommendation_repository import (
     RecommendationRepository,
     get_recommendation_repository,
+)
+from app.database.repositories.agent_memory_repository import (
+    AgentMemoryRepository,
+    get_agent_memory_repository,
+)
+from app.database.repositories.email_intake_repository import (
+    EmailIntakeRepository,
+    get_email_intake_repository,
 )
 
 __all__ = [
@@ -41,12 +49,16 @@ __all__ = [
     "EnergyCentreRepository",
     "ServiceRecordRepository",
     "DeviceRepository",
-    "DALIControllerRepository",
-    "DALILuminaireRepository",
-    "DALISensorRepository",
-    "DALIGroupRepository",
+    "LightingControllerRepository",
+    "LightingLuminaireRepository",
+    "LightingSensorRepository",
+    "LightingGroupRepository",
     "SLARepository",
     "get_sla_repository",
     "RecommendationRepository",
     "get_recommendation_repository",
+    "AgentMemoryRepository",
+    "get_agent_memory_repository",
+    "EmailIntakeRepository",
+    "get_email_intake_repository",
 ]
