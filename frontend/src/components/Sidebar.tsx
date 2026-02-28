@@ -19,6 +19,8 @@ import { useModules } from "../contexts/ModuleHooks";
 import {
   type View,
   BASE_NAV_ITEMS,
+  ADMIN_NAV_ITEMS,
+  ADDON_NAV_ITEMS,
 } from "../lib/navigation";
 import type { NavItem } from "../lib/navigation";
 import { getAllowedViews, isRestrictedDemoUser } from "../lib/access-control";
@@ -50,22 +52,37 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Filter base items by role and access control
-  const allowedBaseItems = useMemo(() => {
-    const isDemoUser = userEmail && isRestrictedDemoUser(userEmail);
+  const isAdmin = userRole === 'admin';
+  const isDemoUser = userEmail ? isRestrictedDemoUser(userEmail) : false;
 
-    // Settings requires admin or demo user
-    const roleFiltered = BASE_NAV_ITEMS.filter((item) => {
-      if (item.id === 'settings') {
-        return userRole === 'admin' || isDemoUser;
+  // Build the full nav item list: base + admin (if admin/demo) + conditional add-ons
+  const allNavItems = useMemo(() => {
+    const items: NavItem[] = [...BASE_NAV_ITEMS];
+
+    // Admin-only items (SIMBIOT, Settings)
+    if (isAdmin || isDemoUser) {
+      items.push(...ADMIN_NAV_ITEMS);
+    }
+
+    // Conditional add-on items (only if their module is active)
+    for (const item of ADDON_NAV_ITEMS) {
+      if (item.requiredModule) {
+        const moduleActive = activeModules.some(
+          m => m.module_type === item.requiredModule && m.status === 'active'
+        );
+        if (moduleActive) {
+          items.push(item);
+        }
+      } else {
+        items.push(item);
       }
-      return true;
-    });
+    }
 
-    if (!userEmail) return roleFiltered;
-    const allowed = getAllowedViews(userEmail, roleFiltered.map(i => i.id));
-    return roleFiltered.filter(item => allowed.includes(item.id));
-  }, [userEmail, userRole]);
+    // Apply access control filtering
+    if (!userEmail) return items;
+    const allowed = getAllowedViews(userEmail, items.map(i => i.id));
+    return items.filter(item => allowed.includes(item.id));
+  }, [userEmail, userRole, isAdmin, isDemoUser, activeModules]);
 
   const handleNavClick = (view: View) => {
     onViewChange(view);
@@ -147,21 +164,33 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
 
   // Module emoji mapping for About section
   const moduleEmojis: Record<string, string> = {
-    control: "\uD83D\uDEE1\uFE0F",
-    assets: "\uD83D\uDD27",
-    simbiot: "\uD83D\uDD0C",
-    integrations: "\uD83D\uDCE1",
+    kpi: "\uD83D\uDCCA",
+    ml: "\uD83E\uDDE0",
     notifications: "\uD83D\uDD14",
-    contracts: "\uD83D\uDCC4",
+    integrations: "\uD83D\uDCE1",
+    simbiot: "\uD83D\uDD0C",
+    logging: "\uD83D\uDCDD",
+    assets: "\uD83D\uDD27",
     hvac: "\u2744",
     energy: "\u26A1",
-    security: "\uD83D\uDD12",
     lighting: "\uD83D\uDCA1",
-    fire: "\uD83D\uDD25",
-    access: "\uD83D\uDD11",
     solar: "\u2600\uFE0F",
-    ml: "\uD83E\uDDE0",
-    sustainability: "\uD83C\uDF3F",
+    water: "\uD83D\uDCA7",
+    fire: "\uD83D\uDD25",
+    security: "\uD83D\uDD12",
+    digital_twin: "\uD83D\uDDBC",
+    hvac_control: "\u2744",
+    energy_control: "\u26A1",
+    lighting_control: "\uD83D\uDCA1",
+    solar_control: "\u2600\uFE0F",
+    water_control: "\uD83D\uDCA7",
+    security_control: "\uD83D\uDD12",
+    digital_twin_control: "\uD83D\uDDBC",
+    maintenance: "\uD83D\uDD27",
+    financial: "\uD83D\uDCB0",
+    compliance: "\uD83C\uDF3F",
+    simulation: "\u25B6\uFE0F",
+    fleet_ml: "\uD83E\uDDE0",
   };
 
   return (
@@ -267,7 +296,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
             </span>
           </div>
 
-          {allowedBaseItems.map((item) =>
+          {allNavItems.map((item) =>
             renderNavItem(item, currentView === item.id)
           )}
 

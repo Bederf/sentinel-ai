@@ -2,9 +2,9 @@
 title: "Bolt-on Module Registry"
 type: "architecture"
 status: "approved"
-version: "1.2.0"
+version: "2.0.0"
 created: "2026-01-31"
-updated: "2026-02-22"
+updated: "2026-02-28"
 author: "Sentinel Development Team"
 tags: ["modules", "architecture", "integration", "ai"]
 domain: "general"
@@ -58,19 +58,54 @@ graph TB
     DR --> HVAC
 ```
 
-## Available Modules
+## Available Modules (27 Types)
 
-| Module | ID | Description | Key Capabilities |
-|--------|-----|-------------|------------------|
-| **HVAC** | `hvac` | Heating, ventilation, air conditioning | Zone control, AHU monitoring, chiller control, comfort analysis |
-| **Energy** | `energy` | Energy centre & power distribution | Generator SCADA, ATS monitoring, power metering, UPS monitoring, SLD visualization |
-| **Security** | `security` | Access control, CCTV & occupancy | Door access, CCTV with stream URLs, zone-level occupancy, access rules, occupancy trends, cross-module HVAC/Lighting triggers. **Sellable: $500/month** |
-| **Lighting** | `lighting` | DALI lighting control | Luminaire control, scene management, daylight harvesting, emergency lighting |
-| **Fire** | `fire` | Fire & life safety (read-only) | Alarm monitoring, damper positions, HVAC shutdown |
-| **Access** | `access` | Access control standalone | Door status, badge events, after-hours scheduling |
-| **Maintenance** | `maintenance` | Work order lifecycle & service tracking | Work orders, preventive scheduling, service tracking |
-| **Digital Twin** | `digital_twin` | 3D/2D spatial visualization | Floor plan view, 3D model, telemetry overlays |
-| **KPI Dashboard** | `kpi` | Portfolio & site-level KPI scorecards | Site KPIs, portfolio KPIs, trend analysis |
+### Base Platform (7, always on)
+
+| Module | ID | Description |
+|--------|-----|-------------|
+| **KPI Dashboard** | `kpi` | Portfolio & site-level KPI scorecards |
+| **ML Intelligence** | `ml` | LSTM forecasting, anomaly detection, fault classification |
+| **Notifications** | `notifications` | Alert delivery (Telegram, email, SMS) |
+| **Integrations** | `integrations` | BMS connectivity & health monitoring |
+| **SIMBIOT** | `simbiot` | BMS onboarding, auto-discovery, point mapping |
+| **Logging** | `logging` | Audit trail, equipment diagnostics, event logs |
+| **Assets** | `assets` | Asset lifecycle management |
+
+### Base Building Systems (8, always on — tabs driven by SIMBIOT data)
+
+| Module | ID | Description |
+|--------|-----|-------------|
+| **HVAC** | `hvac` | Zone control, AHU monitoring, chiller control, comfort analysis |
+| **Energy** | `energy` | Generator SCADA, ATS, power metering, UPS, SLD visualization |
+| **Lighting** | `lighting` | DALI-2 luminaire monitoring, occupancy data, emergency lighting |
+| **Solar** | `solar` | PV monitoring, BESS state of charge, generation tracking |
+| **Water** | `water` | Consumption monitoring, leak detection, trending |
+| **Fire** | `fire` | Fire & life safety (always read-only) |
+| **Security** | `security` | Access control, CCTV, zone occupancy, occupancy trends |
+| **Digital Twin** | `digital_twin` | 3D/2D spatial visualization, telemetry overlays |
+
+### Control Add-ons (7, toggleable — gate write features within building tabs)
+
+| Module | ID | Gates |
+|--------|-----|-------|
+| **HVAC Control** | `hvac_control` | Setpoints, scheduling, automation rules |
+| **Energy Control** | `energy_control` | Peak shaving, load shedding, generator management |
+| **Lighting Control** | `lighting_control` | DALI scenes, daylight harvesting, occupancy automation |
+| **Solar Control** | `solar_control` | AEGIS dispatch, BESS arbitrage, load shifting |
+| **Water Control** | `water_control` | Valve automation, leak response |
+| **Security Control** | `security_control` | Door lock commands, access schedules |
+| **Digital Twin Control** | `digital_twin_control` | Write actions from twin interface |
+
+### Standalone Add-ons (5, toggleable)
+
+| Module | ID | Description |
+|--------|-----|-------------|
+| **Maintenance** | `maintenance` | Work orders, preventive scheduling, tech chat |
+| **Financial** | `financial` | Contracts, profitability, budget, SLA, tenant sub-billing |
+| **Compliance** | `compliance` | Carbon Tax, Green Star, SANS certification, ESG |
+| **Simulation** | `simulation` | What-if scenarios, ROI modelling (building tab) |
+| **Fleet ML** | `fleet_ml` | Cross-portfolio analytics, multi-site benchmarking |
 
 ## Cross-Module Integrations
 

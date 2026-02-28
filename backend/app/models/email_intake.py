@@ -1,6 +1,8 @@
-"""Pydantic models for SENTINEL Email Intake Pipeline (Phase 131).
+"""Pydantic models for SENTINEL Email Intake Pipeline (Phase 134).
 
 EmailIntakeRequest matches the n8n merge-node output.
+Fields that were previously classified by n8n are now optional (backward compat)
+since Phase 134 moves classification to the backend AI agent.
 EmailIntakeResponse is returned to n8n for auto-reply templating.
 """
 
@@ -69,14 +71,14 @@ class EmailIntakeRequest(BaseModel):
     in_reply_to: Optional[str] = None
     received_at: Optional[str] = None  # ISO timestamp
 
-    # AI extraction (from n8n GPT-4.1 step)
+    # AI extraction (optional — Phase 134 moves classification to backend agent)
     site_id: Optional[str] = None
     zone_hint: Optional[str] = None
     floor_hint: Optional[str] = None
-    issue_category: Optional[str] = None
+    issue_category: Optional[str] = "general"
     issue_summary: Optional[str] = None
     urgency: str = "normal"
-    extraction_confidence: float = 0.0
+    extraction_confidence: float = 0.70
     extraction_model: Optional[str] = None
     extraction_raw: Optional[dict[str, Any]] = None
 
@@ -86,7 +88,7 @@ class EmailIntakeRequest(BaseModel):
     # Follow-up / reference linking
     existing_reference: Optional[str] = None  # e.g. FNBFW:12345
 
-    # Urgency signals from n8n parser
+    # Urgency signals from n8n parser (optional — Phase 134)
     urgency_boost: bool = False
     cc_count: int = 0
     has_manager_cc: bool = False
@@ -119,6 +121,9 @@ class EmailIntakeResponse(BaseModel):
     reply_message_id: Optional[str] = None  # Outbound Message-ID header
     reply_error: Optional[str] = None  # Error message if backend reply failed
 
+    # Phase 134: AI agent metadata
+    agent_model: Optional[str] = None  # e.g. "gpt-4.1-nano", "claude", "keyword_fallback"
+
 
 # ---------------------------------------------------------------------------
 # Health check
@@ -130,4 +135,4 @@ class EmailIntakeHealthResponse(BaseModel):
 
     status: str = "ok"
     enabled: bool = False
-    pipeline_version: str = "131.1"
+    pipeline_version: str = "134.0"

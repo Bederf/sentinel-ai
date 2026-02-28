@@ -25,35 +25,50 @@ interface FeatureToggleCard {
   moduleType: ModuleType;
   description: string;
   note?: string;
+  /** If true, this is a control toggle inside a building system card */
+  isControlToggle?: boolean;
 }
 
 const BASE_PACK_LOCKED_MODULES: ModuleType[] = MANDATORY_MODULES;
 
-const FEATURE_TOGGLE_CARDS: FeatureToggleCard[] = [
-  { id: "kpi-dashboard", label: "KPI Dashboard", moduleType: "kpi", description: "Portfolio and site KPI scorecards.", note: "Base pack module (always on)" },
-  { id: "hvac-monitoring", label: "HVAC Monitoring", moduleType: "hvac", description: "HVAC telemetry, comfort analytics, and equipment status.", note: "Base pack module (always on)" },
-  { id: "integration-health", label: "Integration Health", moduleType: "integrations", description: "Data quality, ingestion status, and integration diagnostics.", note: "Base pack module (always on)" },
-  { id: "building-controls", label: "Building Controls", moduleType: "control", description: "Core control dashboard and automation orchestration." },
-  { id: "ai-recommendations", label: "AI Recommendations", moduleType: "energy", description: "Core AI recommendation feed used across base dashboards.", note: "Base pack module (linked to Energy Centre)" },
-  { id: "asset-workflow", label: "Asset Workflow", moduleType: "assets", description: "Lifecycle, maintenance workflows, and asset tracking." },
-  { id: "simbiot", label: "SIMBIOT", moduleType: "simbiot", description: "Integration setup and onboarding tools, including Solar setup flow." },
-  { id: "tech-chat", label: "Tech Chat", moduleType: "notifications", description: "Technician chat workflows and messaging-assisted diagnostics." },
-  { id: "maintenance", label: "Maintenance", moduleType: "maintenance", description: "Preventive schedules, work orders, and service execution tracking." },
-  { id: "digital-twin", label: "Digital Twin", moduleType: "digital_twin", description: "3D/2D spatial context for assets and telemetry overlays." },
-  { id: "loadshedding", label: "Loadshedding", moduleType: "solar", description: "Loadshedding planning and response workflows.", note: "Linked to Solar & BESS module" },
-  { id: "occupancy", label: "Occupancy", moduleType: "lighting", description: "Occupancy and lighting behavior controls." },
-  { id: "fire-safety", label: "Fire Safety", moduleType: "fire", description: "Fire alarm and life-safety status monitoring." },
-  { id: "access-control", label: "Access Control", moduleType: "access", description: "Door events, badge activity, and access anomaly views." },
-  { id: "security", label: "Security", moduleType: "security", description: "Access and security monitoring pages." },
-  { id: "solar-bess", label: "Solar & BESS", moduleType: "solar", description: "Solar PV and battery storage monitoring." },
-  { id: "water", label: "Water", moduleType: "water", description: "Water usage analytics and anomaly monitoring." },
-  { id: "esg", label: "ESG", moduleType: "sustainability", description: "Sustainability and ESG dashboards." },
-  { id: "contract", label: "Contract", moduleType: "contracts", description: "Contract management features and lifecycle." },
-  { id: "profitability", label: "Profitability", moduleType: "contracts", description: "Profitability analytics views.", note: "Linked to Contract module" },
-  { id: "budget-reports", label: "Budget Reports", moduleType: "contracts", description: "Budget and forecasting report views.", note: "Linked to Contract module" },
-  { id: "fleet-ml", label: "Fleet ML", moduleType: "ml", description: "Cross-site ML insights and fleet analytics." },
-  { id: "ml-metrics", label: "ML Metrics", moduleType: "ml", description: "MLOps and model monitoring metrics.", note: "Linked to ML module" },
-  { id: "simulation", label: "Simulation", moduleType: "ml", description: "Simulation view for admin users.", note: "Linked to ML module" },
+/** Platform base modules — status indicators only, no toggles */
+const PLATFORM_STATUS_CARDS: FeatureToggleCard[] = [
+  { id: "kpi", label: "KPI Dashboard", moduleType: "kpi", description: "Portfolio and site KPI scorecards.", note: "Always on" },
+  { id: "ml", label: "ML Intelligence", moduleType: "ml", description: "Anomaly detection and predictive maintenance.", note: "Always on" },
+  { id: "notifications", label: "Notifications", moduleType: "notifications", description: "Alert routing and acknowledgement.", note: "Always on" },
+  { id: "integrations", label: "System Health", moduleType: "integrations", description: "Integration health and data quality.", note: "Always on" },
+  { id: "simbiot", label: "SIMBIOT", moduleType: "simbiot", description: "BMS connection wizard and data discovery.", note: "Always on" },
+  { id: "logging", label: "Logging", moduleType: "logging", description: "Audit trail and event logs.", note: "Always on" },
+  { id: "assets", label: "Assets", moduleType: "assets", description: "Asset registry and lifecycle.", note: "Always on" },
+];
+
+/** Building system cards — base always on, with optional control toggle inside */
+interface BuildingSystemCard {
+  id: string;
+  label: string;
+  baseModule: ModuleType;
+  controlModule?: ModuleType;
+  description: string;
+}
+
+const BUILDING_SYSTEM_CARDS: BuildingSystemCard[] = [
+  { id: "hvac-system", label: "HVAC", baseModule: "hvac", controlModule: "hvac_control", description: "Heating, ventilation, and air conditioning." },
+  { id: "energy-system", label: "Energy", baseModule: "energy", controlModule: "energy_control", description: "Power metering, generators, UPS." },
+  { id: "lighting-system", label: "Lighting", baseModule: "lighting", controlModule: "lighting_control", description: "DALI lighting and occupancy." },
+  { id: "solar-system", label: "Solar & BESS", baseModule: "solar", controlModule: "solar_control", description: "Solar PV and battery storage." },
+  { id: "water-system", label: "Water", baseModule: "water", controlModule: "water_control", description: "Water monitoring and leak detection." },
+  { id: "security-system", label: "Security", baseModule: "security", controlModule: "security_control", description: "Access control and CCTV." },
+  { id: "fire-system", label: "Fire", baseModule: "fire", description: "Fire alarm monitoring (always read-only)." },
+  { id: "twin-system", label: "Digital Twin", baseModule: "digital_twin", controlModule: "digital_twin_control", description: "3D/2D building visualization." },
+];
+
+/** Standalone add-on toggles */
+const ADDON_TOGGLE_CARDS: FeatureToggleCard[] = [
+  { id: "maintenance-addon", label: "Maintenance", moduleType: "maintenance", description: "Work orders, scheduling, technician dispatch." },
+  { id: "financial-addon", label: "Financial", moduleType: "financial", description: "Contracts, profitability, budget, SLA." },
+  { id: "compliance-addon", label: "Compliance", moduleType: "compliance", description: "Carbon Tax, Green Star, SANS, ESG." },
+  { id: "simulation-addon", label: "Simulation", moduleType: "simulation", description: "What-if scenarios and ROI modelling." },
+  { id: "fleet-ml-addon", label: "Fleet ML", moduleType: "fleet_ml", description: "Cross-portfolio analytics and benchmarking." },
 ];
 
 export function Settings({ onError }: SettingsProps) {
@@ -346,116 +361,156 @@ export function Settings({ onError }: SettingsProps) {
           }}
         />
 
-        {/* Module Management */}
-        <div
-          className="glass-panel overflow-hidden"
-          style={{
-            background: "var(--glass-bg)",
-            border: "1px solid var(--glass-border)",
-          }}
-        >
+        {/* Section 1: Platform Base (status indicators, no toggles) */}
+        <div className="glass-panel overflow-hidden">
           <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
             <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded-lg"
-                style={{
-                  background: "rgba(245, 158, 11, 0.15)",
-                  color: "var(--color-sentinel-amber)",
-                }}
-              >
+              <div className="p-2 rounded-lg" style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--color-sentinel-blue)" }}>
                 <Zap className="h-5 w-5" />
               </div>
               <div>
-                <h2
-                  className="text-lg font-semibold"
-                  style={{ color: "var(--color-sentinel-text-primary)" }}
-                >
-                  Feature Access
-                </h2>
-                <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Toggle these pages and capabilities for this site
-                </p>
+                <h2 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Platform</h2>
+                <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Core platform modules (always active)</p>
               </div>
             </div>
           </div>
-
           <div className="p-6">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {FEATURE_TOGGLE_CARDS.map((card) => {
+              {PLATFORM_STATUS_CARDS.map((card) => (
+                <div key={card.id} className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>{card.label}</h3>
+                      <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>{card.description}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-medium" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--color-sentinel-green)" }}>Active</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2: Building Systems (base always on + control toggles inside) */}
+        <div className="glass-panel overflow-hidden">
+          <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--color-sentinel-amber)" }}>
+                <Gauge className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Building Systems</h2>
+                <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Monitoring always on. Toggle control features per discipline.</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {BUILDING_SYSTEM_CARDS.map((card) => {
+                const controlActive = card.controlModule ? isModuleActive(card.controlModule) : false;
+                const loadingCard = togglingCardId === card.id;
+                const canToggle = canManageFeatureAccess || (isDemoUser && settingsPageUnlocked);
+                return (
+                  <div key={card.id} className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)", opacity: loadingCard ? 0.75 : 1 }}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>{card.label}</h3>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--color-sentinel-green)" }}>Monitoring</span>
+                        </div>
+                        <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>{card.description}</p>
+                        {card.controlModule && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>Control:</span>
+                            <button
+                              onClick={() => {
+                                if (!canToggle) return;
+                                const controlCard: FeatureToggleCard = { id: card.id, label: `${card.label} Control`, moduleType: card.controlModule!, description: "" };
+                                void handleFeatureToggle(controlCard);
+                              }}
+                              disabled={loadingCard || !canToggle}
+                              className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
+                              style={{
+                                background: controlActive ? "var(--color-sentinel-green)" : "var(--color-sentinel-bg-hover)",
+                                border: `1px solid ${controlActive ? "var(--color-sentinel-green)" : "var(--glass-border)"}`,
+                                cursor: !canToggle ? "not-allowed" : "pointer",
+                                opacity: !canToggle ? 0.6 : 1,
+                              }}
+                              aria-label={`Toggle ${card.label} control`}
+                              type="button"
+                            >
+                              <span className="inline-block h-3 w-3 rounded-full bg-white transition-transform" style={{ transform: controlActive ? "translateX(17px)" : "translateX(2px)" }} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3: Add-ons (on/off toggles) */}
+        <div className="glass-panel overflow-hidden" style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}>
+          <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg" style={{ background: "rgba(168, 85, 247, 0.15)", color: "rgb(168, 85, 247)" }}>
+                <Zap className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Add-ons</h2>
+                <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Standalone features you can enable or disable</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {ADDON_TOGGLE_CARDS.map((card) => {
                 const active = isModuleActive(card.moduleType);
                 const loadingCard = togglingCardId === card.id;
-                const locked = active && BASE_PACK_LOCKED_MODULES.includes(card.moduleType);
+                const canToggle = canManageFeatureAccess || (isDemoUser && settingsPageUnlocked);
                 return (
-                  <div
-                    key={card.id}
-                    className="rounded-lg p-4"
-                    style={{
-                      background: "var(--color-sentinel-bg-secondary)",
-                      border: "1px solid var(--glass-border)",
-                      opacity: loadingCard ? 0.75 : 1,
-                    }}
-                  >
+                  <div key={card.id} className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)", opacity: loadingCard ? 0.75 : 1 }}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h3 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                          {card.label}
-                        </h3>
-                        <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                          {card.description}
-                        </p>
-                        {card.note && (
-                          <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-blue)" }}>
-                            {card.note}
-                          </p>
-                        )}
+                        <h3 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>{card.label}</h3>
+                        <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>{card.description}</p>
                       </div>
                       <button
                         onClick={() => void handleFeatureToggle(card)}
-                        disabled={loadingCard || locked || (!canManageFeatureAccess && !(isDemoUser && settingsPageUnlocked))}
+                        disabled={loadingCard || !canToggle}
                         className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
                         style={{
                           background: active ? "var(--color-sentinel-green)" : "var(--color-sentinel-bg-hover)",
                           border: `1px solid ${active ? "var(--color-sentinel-green)" : "var(--glass-border)"}`,
-                          cursor: loadingCard || locked || (!canManageFeatureAccess && !(isDemoUser && settingsPageUnlocked)) ? "not-allowed" : "pointer",
-                          opacity: loadingCard || locked || (!canManageFeatureAccess && !(isDemoUser && settingsPageUnlocked)) ? 0.6 : 1,
+                          cursor: !canToggle ? "not-allowed" : "pointer",
+                          opacity: !canToggle ? 0.6 : 1,
                         }}
                         aria-label={`Toggle ${card.label}`}
                         type="button"
                       >
-                        <span
-                          className="inline-block h-4 w-4 rounded-full bg-white transition-transform"
-                          style={{ transform: active ? "translateX(22px)" : "translateX(2px)" }}
-                        />
+                        <span className="inline-block h-4 w-4 rounded-full bg-white transition-transform" style={{ transform: active ? "translateX(22px)" : "translateX(2px)" }} />
                       </button>
                     </div>
                   </div>
                 );
               })}
             </div>
-            <div
-              className="mt-4 rounded-lg p-3"
-              style={{
-                background: "rgba(59, 130, 246, 0.08)",
-                border: "1px solid rgba(59, 130, 246, 0.25)",
-              }}
-            >
-              <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Solar Setup is managed in the SIMBIOT flow. Module management is handled on this Settings page.
-              </p>
-              {!canManageFeatureAccess && !(isDemoUser && settingsPageUnlocked) && (
-                <p className="text-xs mt-2" style={{ color: "var(--color-sentinel-amber)" }}>
-                  {isDemoUser
-                    ? "Unlock settings at the top of the page to toggle modules."
-                    : "You have read-only access. Contact an administrator to request module changes."}
+            {!canManageFeatureAccess && !(isDemoUser && settingsPageUnlocked) && (
+              <div className="mt-4 rounded-lg p-3" style={{ background: "rgba(59, 130, 246, 0.08)", border: "1px solid rgba(59, 130, 246, 0.25)" }}>
+                <p className="text-xs" style={{ color: "var(--color-sentinel-amber)" }}>
+                  {isDemoUser ? "Unlock settings at the top of the page to toggle modules." : "You have read-only access. Contact an administrator to request module changes."}
                 </p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Display Settings - Glass Theme Customization */}
-        <div className="glass-panel overflow-hidden">
-          <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+        <div className="glass-panel overflow-visible">
+          <div className="p-4 border-b rounded-t-lg" style={{ borderColor: "var(--color-sentinel-border)" }}>
             <div className="flex items-center gap-3">
               <div
                 className="p-2 rounded"

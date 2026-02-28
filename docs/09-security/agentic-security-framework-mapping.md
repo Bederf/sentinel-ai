@@ -258,7 +258,7 @@ SecureClaw (by Adversa AI) markets itself as the first MCP security product mapp
 | Capability | SENTINEL | SecureClaw |
 |-----------|----------|------------|
 | **Integrated security pipeline** | 8 layers enforced inline in `call_tool()` — zero-latency between auth and execution | External proxy / middleware pattern — adds network hop |
-| **Domain-specific RBAC** | Per-tool role + module + site scoping. Registry knows that `write_device_point` requires `operator` role + `control` module for site `S002` | Generic role-based policies, no domain-aware tool classification |
+| **Domain-specific RBAC** | Per-tool role + module + site scoping. Registry knows that `write_device_point` requires `operator` role + `hvac_control` module for site `S002` | Generic role-based policies, no domain-aware tool classification |
 | **Approval token flow** | Single-use, tool-scoped, 60s TTL tokens with structured audit trail | Unclear public documentation on human-in-the-loop implementation |
 | **Manifest integrity** | SHA-256 hash of tool definitions computed at startup, with optional pinned hash for production | Framework mapping only; no documented manifest verification |
 | **BMS-specific safety** | SafetyEngine + ApprovalService + site-scoped access for building control tools | Generic AI security; no vertical-specific safety controls |

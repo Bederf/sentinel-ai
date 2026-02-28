@@ -96,7 +96,7 @@ class TestModuleGating:
 
         with patch.object(module_registry, "deactivate_module", new_callable=AsyncMock) as mock_deactivate:
             mock_deactivate.return_value = True
-            result = await module_registry.deactivate_module(site_id, ModuleType.CONTROL)
+            result = await module_registry.deactivate_module(site_id, ModuleType.HVAC_CONTROL)
             assert result is True
             mock_deactivate.assert_called_once()
 
@@ -168,9 +168,9 @@ class TestDependencyCascade:
 
         with patch.object(module_registry, "activate_module", new_callable=AsyncMock) as mock_activate:
             mock_activate.return_value = True
-            result = await module_registry.activate_module(site_id, ModuleType.CONTROL)
+            result = await module_registry.activate_module(site_id, ModuleType.HVAC_CONTROL)
             assert result is True
-            mock_activate.assert_called_once_with(site_id, ModuleType.CONTROL)
+            mock_activate.assert_called_once_with(site_id, ModuleType.HVAC_CONTROL)
 
 
 if __name__ == "__main__":

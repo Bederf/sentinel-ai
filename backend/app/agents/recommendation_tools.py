@@ -49,14 +49,21 @@ def _site_id_from_equipment_code(equipment_code: str) -> str:
 
 
 def _is_control_module_active(site_id: str) -> bool:
-    """Check control-module activation across known site-id variants."""
+    """Check if any control add-on is active across known site-id variants."""
     try:
         from app.models.module_registry import ModuleType
         from app.services.module_registry_service import module_registry
 
+        control_types = [
+            ModuleType.HVAC_CONTROL,
+            ModuleType.ENERGY_CONTROL,
+            ModuleType.LIGHTING_CONTROL,
+            ModuleType.SOLAR_CONTROL,
+        ]
         for candidate in _candidate_site_ids(site_id):
-            if module_registry.is_module_active(candidate, ModuleType.CONTROL):
-                return True
+            for ct in control_types:
+                if module_registry.is_module_active(candidate, ct):
+                    return True
     except Exception as e:
         logger.debug("Control-module check failed for %s: %s", site_id, e)
     return False

@@ -142,7 +142,7 @@ async def upload_invoice(
                     title="Reduce Maximum Demand Exposure",
                     description="Peak demand is high for this billing period. Consider staggering non-critical loads.",
                     confidence=0.7,
-                    related_modules=[ModuleType.CONTRACTS],
+                    related_modules=[ModuleType.FINANCIAL],
                     telemetry_context={
                         "site_id": site_id,
                         "peak_demand_kw": peak_kw,
@@ -161,7 +161,7 @@ async def upload_invoice(
                 ai_rec = AIRecommendation(
                     recommendation_id=f"municipal-tariff-{created['id']}",
                     timestamp=datetime.utcnow().isoformat(),
-                    source_module=ModuleType.CONTRACTS,
+                    source_module=ModuleType.FINANCIAL,
                     recommendation_type=RecommendationType.OPTIMIZATION,
                     priority=RecommendationPriority.LOW,
                     title="Tariff Optimization Opportunity",

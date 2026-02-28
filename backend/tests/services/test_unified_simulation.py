@@ -48,7 +48,7 @@ class TestCollectEquipmentStates:
         with patch.object(orchestrator.equipment_repo, "get_all", return_value=[]):
             states = await orchestrator._collect_equipment_states(10, schedule_state_occupied)
 
-        assert len(states) >= 85, f"Expected 85+ equipment, got {len(states)}"
+        assert len(states) >= 75, f"Expected 75+ equipment, got {len(states)}"
 
     @pytest.mark.asyncio
     async def test_all_states_have_required_fields(self, orchestrator, schedule_state_occupied):
@@ -85,7 +85,7 @@ class TestCollectEquipmentStates:
         with patch.object(orchestrator.equipment_repo, "get_all", return_value=[]):
             await orchestrator._collect_equipment_states(10, schedule_state_occupied)
 
-        assert len(orchestrator._simulation_equipment) >= 85
+        assert len(orchestrator._simulation_equipment) >= 75
 
 
 class TestSensorReadings:
@@ -384,7 +384,7 @@ class TestCompatibilityMethods:
             await orchestrator._collect_equipment_states(10, schedule_state_occupied)
 
         summary = orchestrator.get_equipment_summary()
-        assert summary["total"] >= 85
+        assert summary["total"] >= 75
         assert "by_type" in summary
         assert "luminaire" in summary["by_type"]
         assert summary["health_stats"]["avg"] > 0

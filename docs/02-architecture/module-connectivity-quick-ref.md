@@ -71,12 +71,13 @@ See [Profile-Based Optimization Architecture](profile-based-optimization.md) for
 
 | Metric | Value |
 |--------|-------|
-| **Total Modules** | 17 |
+| **Total Module Types** | 27 (15 base + 7 control + 5 standalone) |
+| **Non-deactivatable (Base)** | 15 (7 platform + 8 building systems) |
 | **Cross-Module Integrations** | 12 |
 | **Optimization Profiles** | 3 |
 | **Control Tiers** | 3 (Monitor, Approve, Auto-Execute) |
 | **API Endpoints** | 70+ (including 17 recommendation endpoints) |
-| **Site-002 Active Modules** | 14 of 14 |
+| **Site-002 Active Modules** | 27 (all base + most add-ons) |
 | **Site-002 Active Integrations** | 12 of 12 |
 | **Profile Recommendation Accuracy** | >85% |
 | **Energy Savings (Full Stack, Cost Profile)** | 50-60% |

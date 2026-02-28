@@ -403,8 +403,8 @@ class ToggleRequest(BaseModel):
 
 
 def _controls_module_active(site_id: str) -> bool:
-    """Return whether control automation add-on is active for a site."""
-    return module_registry.is_module_active(site_id, ModuleType.CONTROL)
+    """Return whether energy control add-on is active for a site."""
+    return module_registry.is_module_active(site_id, ModuleType.ENERGY_CONTROL)
 
 
 def _raise_controls_module_required(site_id: str) -> None:

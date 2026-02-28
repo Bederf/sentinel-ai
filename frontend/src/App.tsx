@@ -79,11 +79,7 @@ function ViewGuard({
         onRedirect("dashboard");
       }
     }
-    // Check internal views (simulation requires admin)
-    if (currentView === "simulation" && userRole !== "admin") {
-      toast.info("Simulation is only available to administrators.");
-      onRedirect("dashboard");
-    }
+    // Simulation is now a building tab, not a sidebar view
   }, [currentView, isModuleActive, userRole, onRedirect]);
 
   return <>{children}</>;
@@ -763,93 +759,40 @@ function App() {
               key={viewRefreshKey}
               onViewChange={handleViewChange}
             />
-          ) : currentView === "digital-twin" ? (
-            <div className="h-full overflow-hidden">
-              <DigitalTwin />
-            </div>
-          ) : currentView === "control" ? (
-            <ControlDashboard onError={(error) => setError(error)} />
-          ) : currentView === "control-audit" ? (
-            <ControlAuditTrail
-              onError={(error) => setError(error)}
-              onViewDevice={(deviceId) => {
-                sessionStorage.setItem("sentinel_selected_equipment", deviceId);
-                sessionStorage.setItem("sentinel_selected_site", "site-002");
-                handleViewChange("control");
-              }}
-            />
-          ) : currentView === "optimization" ? (
-            <OptimizationPage onError={(error) => setError(error)} />
-          ) : currentView === "settings" ? (
-            <Settings onError={(error) => setError(error)} />
           ) : currentView === "ai-chat" ? (
             <div className="h-full">
               <Chat />
-            </div>
-          ) : currentView === "technician" ? (
-            <div className="h-full">
-              <TechnicianPortalGated />
             </div>
           ) : currentView === "integrations" ? (
             <div className="h-full overflow-y-auto">
               <SystemHealthPage />
             </div>
-          ) : currentView === "occupancy" ? (
-            <div className="h-full overflow-y-auto p-4 md:p-6">
-              <OccupancyPanel compact={false} />
-            </div>
-          ) : currentView === "occupancy-analytics" ? (
-            <div className="h-full overflow-y-auto">
-              <OccupancyAnalyticsPage />
-            </div>
-          ) : currentView === "occupancy-energy-correlation" ? (
-            <div className="h-full overflow-y-auto">
-              <OccupancyEnergyCorrelationPage />
-            </div>
-          ) : currentView === "lighting" ? (
-            <LightingPage />
-          ) : currentView === "workflow" ? (
+          ) : currentView === "logs" ? (
+            <ControlAuditTrail
+              onError={(error) => setError(error)}
+              onViewDevice={(deviceId) => {
+                sessionStorage.setItem("sentinel_selected_equipment", deviceId);
+                sessionStorage.setItem("sentinel_selected_site", "site-002");
+                handleViewChange("dashboard");
+              }}
+            />
+          ) : currentView === "simbiot" ? (
+            <SimbiotPage />
+          ) : currentView === "settings" ? (
+            <Settings onError={(error) => setError(error)} />
+          ) : currentView === "maintenance" ? (
             <div className="h-full overflow-y-auto">
               <AssetWorkflowDashboard />
             </div>
-          ) : currentView === "security" ? (
-            <SecurityDashboard />
-          ) : currentView === "simbiot" ? (
-            <SimbiotPage />
-          ) : currentView === "simulation" ? (
-            <div className="h-full overflow-y-auto">
-              <SimulationDashboard />
-            </div>
-          ) : currentView === "aegis" ? (
-            <div className="h-full overflow-y-auto">
-              <AegisConsolePage />
-            </div>
-          ) : currentView === "sustainability" ? (
+          ) : currentView === "financial" ? (
+            <ContractManagementPage />
+          ) : currentView === "compliance" ? (
             <div className="h-full overflow-y-auto">
               <ESGPage selectedBuilding={undefined} />
             </div>
-          ) : currentView === "fleet" ? (
+          ) : currentView === "fleet-ml" ? (
             <FleetInsights />
-          ) : currentView === "mlops" ? (
-            <MLMetrics />
-          ) : currentView === "solar" ? (
-            <SolarDashboard />
-          ) : currentView === "water" ? (
-            <WaterPanel />
-          ) : currentView === "contracts" ? (
-            <ContractManagementPage />
-          ) : currentView === "profitability" ? (
-            <ProfitabilityDashboardPage />
-          ) : currentView === "budget-report" ? (
-            <BudgetReportPage />
-          ) : currentView === "solar-config" ? (
-            <div className="h-full overflow-y-auto p-4 md:p-6">
-              <SolarConfigWizard />
-            </div>
-          ) : currentView === "modules" ? (
-            <ModularDashboard />
           ) : (
-            // Fallback: should never reach here due to View type constraints
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
                 <p className="text-gray-400">View not found</p>

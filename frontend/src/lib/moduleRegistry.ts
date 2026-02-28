@@ -13,12 +13,15 @@ const RECOMMENDATIONS_CACHE_PREFIX = "sentinel_module_recommendations_";
 // ==================== Types ====================
 
 export type ModuleType =
-  // Core infrastructure (non-deactivatable)
-  | 'kpi' | 'ml' | 'hvac' | 'energy' | 'assets' | 'simbiot' | 'integrations' | 'notifications'
-  // Paid add-ons
-  | 'control' | 'maintenance' | 'digital_twin'
-  // Building system add-ons
-  | 'lighting' | 'fire' | 'access' | 'security' | 'solar' | 'sustainability' | 'water' | 'contracts';
+  // Base Platform (7, always on)
+  | 'kpi' | 'ml' | 'notifications' | 'integrations' | 'simbiot' | 'logging' | 'assets'
+  // Base Building Systems (8, always on)
+  | 'hvac' | 'energy' | 'lighting' | 'solar' | 'water' | 'fire' | 'security' | 'digital_twin'
+  // Control Add-ons (7, toggleable)
+  | 'hvac_control' | 'energy_control' | 'lighting_control' | 'solar_control'
+  | 'water_control' | 'security_control' | 'digital_twin_control'
+  // Standalone Add-ons (5, toggleable)
+  | 'maintenance' | 'financial' | 'compliance' | 'simulation' | 'fleet_ml';
 export type ModuleStatus = 'active' | 'inactive' | 'error' | 'maintenance';
 export type RecommendationType = 'optimization' | 'maintenance' | 'alert' | 'cross_system' | 'predictive';
 export type RecommendationPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -370,47 +373,71 @@ export const moduleRegistryApi = {
 // ==================== Module Metadata ====================
 
 export const MODULE_ICONS: Record<ModuleType, string> = {
+  // Base Platform
   kpi: 'grid',
-  control: 'shield',
-  assets: 'git-branch',
-  simbiot: 'plug',
-  integrations: 'activity',
+  ml: 'bar-chart',
   notifications: 'bell',
+  integrations: 'activity',
+  simbiot: 'plug',
+  logging: 'file-text',
+  assets: 'git-branch',
+  // Base Building Systems
   hvac: 'thermometer',
   energy: 'zap',
-  security: 'shield-check',
   lighting: 'sun',
-  fire: 'flame',
-  access: 'key-round',
   solar: 'sun',
   water: 'droplets',
-  ml: 'bar-chart',
-  sustainability: 'leaf',
-  contracts: 'file-text',
+  fire: 'flame',
+  security: 'shield-check',
   digital_twin: 'cube',
+  // Control Add-ons
+  hvac_control: 'thermometer',
+  energy_control: 'zap',
+  lighting_control: 'sun',
+  solar_control: 'sun',
+  water_control: 'droplets',
+  security_control: 'shield-check',
+  digital_twin_control: 'cube',
+  // Standalone Add-ons
   maintenance: 'wrench',
+  financial: 'dollar-sign',
+  compliance: 'leaf',
+  simulation: 'play',
+  fleet_ml: 'brain',
 };
 
 export const MODULE_COLORS: Record<ModuleType, string> = {
+  // Base Platform
   kpi: 'slate',
-  control: 'slate',
-  assets: 'indigo',
-  simbiot: 'teal',
-  integrations: 'sky',
+  ml: 'cyan',
   notifications: 'rose',
+  integrations: 'sky',
+  simbiot: 'teal',
+  logging: 'slate',
+  assets: 'indigo',
+  // Base Building Systems
   hvac: 'blue',
   energy: 'amber',
-  security: 'purple',
   lighting: 'yellow',
-  fire: 'red',
-  access: 'violet',
   solar: 'yellow',
   water: 'blue',
-  ml: 'cyan',
-  sustainability: 'emerald',
-  contracts: 'orange',
+  fire: 'red',
+  security: 'purple',
   digital_twin: 'violet',
+  // Control Add-ons
+  hvac_control: 'blue',
+  energy_control: 'amber',
+  lighting_control: 'yellow',
+  solar_control: 'yellow',
+  water_control: 'blue',
+  security_control: 'purple',
+  digital_twin_control: 'violet',
+  // Standalone Add-ons
   maintenance: 'orange',
+  financial: 'orange',
+  compliance: 'emerald',
+  simulation: 'cyan',
+  fleet_ml: 'cyan',
 };
 
 export const PRIORITY_COLORS: Record<RecommendationPriority, string> = {

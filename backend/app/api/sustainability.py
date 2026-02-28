@@ -32,7 +32,7 @@ router = APIRouter(
     dependencies=[
         Depends(
             require_active_module(
-                ModuleType.SUSTAINABILITY,
+                ModuleType.COMPLIANCE,
                 site_keys=("site_id", "site", "building_id"),
                 default_site_id="site-002",
             )

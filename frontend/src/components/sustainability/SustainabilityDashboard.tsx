@@ -54,7 +54,7 @@ interface SustainabilityDashboardProps {
 
 export function SustainabilityDashboard({
   siteId: _externalSiteId,
-  enabledModules: _enabledModules = ['sustainability'],
+  enabledModules: _enabledModules = ['compliance'],
 }: SustainabilityDashboardProps) {
   // Get simulation context for live carbon metrics
   const { running: isSimulationRunning, daysSimulated, simulatedHour, occupancyPercent } = useSimulation();

@@ -10,6 +10,7 @@ Phase: Demo Flow - Equipment Warning State with Notifications
 """
 
 import logging
+import re
 import uuid
 from typing import Any
 
@@ -96,8 +97,8 @@ class EquipmentAlertService:
             sentry_alert = {
                 "id": alert_id,
                 "building_name": building_name,
-                "zone_name": equipment.get("zone_name", "Building"),
-                "equipment_name": equipment.get("name", "Unknown"),
+                "zone_name": equipment.get("zone_name", "Unknown"),
+                "equipment_name": equipment.get("display_name", equipment.get("name", "Unknown")),
                 "equipment_code": equipment.get("code", ""),
                 "equipment_type": equipment.get("type", "equipment"),
                 "type": severity.title(),  # "Warning" or "Critical"
@@ -138,24 +139,46 @@ class EquipmentAlertService:
             if not response.data:
                 return None
             equipment = response.data[0]
-            # Parse zone from equipment name (e.g., "Zone-L12-C" → "Level 12 Zone C")
-            equipment["zone_name"] = self._parse_zone_from_name(equipment.get("name", ""))
+
+            # Look up zone name from hvac_zones (FCU/VAV codes 1:1 with zone codes)
+            equipment["zone_name"] = self._lookup_zone_name(equipment.get("code", ""))
+
+            # Clean equipment name for display (strip code in parentheses — code shown separately)
+            name = equipment.get("name", "")
+            equipment["display_name"] = re.sub(r"\s*\([^)]*\)\s*$", "", name).strip() or name
+
             return equipment
         except Exception as e:
             logger.error(f"Failed to get equipment: {e}")
             return None
 
-    def _parse_zone_from_name(self, name: str) -> str:
-        """Parse zone name from equipment name pattern like 'Zone-L12-C'."""
-        import re
+    def _lookup_zone_name(self, equipment_code: str) -> str:
+        """Look up zone name from hvac_zones using equipment code.
 
-        # Match patterns like "Zone-L12-C" or "S001-Zone-L1-A"
-        match = re.search(r"Zone-L(\d+)-([A-Z])", name)
-        if match:
-            level = match.group(1)
-            zone_letter = match.group(2)
-            return f"Level {level} Zone {zone_letter}"
-        return "Building"
+        Equipment codes map 1:1 to zones after v34.0:
+        S002-FCU-001 → Zone-001, S002-VAV-101 → Zone-101
+        """
+        try:
+            # Try by fcu_id first, then vav_id
+            response = (
+                self.supabase.table("hvac_zones").select("zone_id, zone_name").eq("fcu_id", equipment_code).execute()
+            )
+            if not response.data:
+                response = (
+                    self.supabase.table("hvac_zones")
+                    .select("zone_id, zone_name")
+                    .eq("vav_id", equipment_code)
+                    .execute()
+                )
+            if response.data:
+                zone = response.data[0]
+                return f"{zone['zone_name']} ({zone['zone_id']})"
+
+            # For non-zone equipment (chillers, generators, etc.), derive from name
+            return "Plant Room"
+        except Exception as e:
+            logger.warning(f"Zone lookup failed for {equipment_code}: {e}")
+            return "Unknown"
 
     def _get_building(self, building_id: str) -> dict[str, Any] | None:
         """Get building by UUID or building/site code."""

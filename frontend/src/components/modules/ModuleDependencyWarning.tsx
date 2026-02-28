@@ -9,53 +9,45 @@ import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import type { ModuleType } from '../../lib/moduleRegistry';
 
-// Dependencies: modules that cannot function without other modules
-const DEPENDENT_MODULES: Record<ModuleType, ModuleType[]> = {
-  // Core infrastructure
-  kpi: [],
-  ml: [],
-  hvac: [],
-  energy: [],
-  assets: [],
-  simbiot: [],
-  integrations: [],
-  notifications: [],
-  // Paid add-ons
-  control: ['solar', 'lighting'] as ModuleType[],
-  maintenance: [],
-  digital_twin: [],
-  // Building system add-ons
-  lighting: [],
-  fire: [],
-  access: [],
-  security: [],
-  solar: [],
-  sustainability: [],
-  water: [],
-  contracts: [],
+// Dependencies: per-discipline control add-ons have no cascading deps
+const DEPENDENT_MODULES: Partial<Record<ModuleType, ModuleType[]>> = {
+  // No cascading dependencies in the new architecture.
+  // Each control add-on is independent of other modules.
 };
 
 // User-friendly module names
 const MODULE_NAMES: Record<string, string> = {
-  control: 'Building Controls',
-  solar: 'Solar & BESS',
-  lighting: 'Lighting & Occupancy',
-  hvac: 'HVAC Monitoring',
-  energy: 'Energy Monitoring',
+  // Base Platform
+  kpi: 'KPI Dashboard',
   ml: 'AI & ML',
   notifications: 'Notifications',
   integrations: 'System Integrations',
-  security: 'Security',
-  fire: 'Fire Safety',
-  water: 'Water Management',
-  sustainability: 'Sustainability & ESG',
-  contracts: 'Contracts & SLA',
-  maintenance: 'Maintenance & Work Orders',
-  digital_twin: 'Digital Twin',
-  assets: 'Asset Management',
   simbiot: 'SIMBIOT Integration',
-  access: 'Access Control',
-  kpi: 'KPI Dashboard',
+  logging: 'Logging & Diagnostics',
+  assets: 'Asset Management',
+  // Base Building Systems
+  hvac: 'HVAC Monitoring',
+  energy: 'Energy Monitoring',
+  lighting: 'Lighting & Occupancy',
+  solar: 'Solar & BESS',
+  water: 'Water Management',
+  fire: 'Fire Safety',
+  security: 'Security',
+  digital_twin: 'Digital Twin',
+  // Control Add-ons
+  hvac_control: 'HVAC Control',
+  energy_control: 'Energy Control',
+  lighting_control: 'Lighting Control',
+  solar_control: 'Solar Control',
+  water_control: 'Water Control',
+  security_control: 'Security Control',
+  digital_twin_control: 'Digital Twin Control',
+  // Standalone Add-ons
+  maintenance: 'Maintenance & Work Orders',
+  financial: 'Financial & Contracts',
+  compliance: 'Compliance & ESG',
+  simulation: 'Simulation',
+  fleet_ml: 'Fleet ML Analytics',
 };
 
 interface ModuleDependencyWarningProps {

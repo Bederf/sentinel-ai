@@ -101,11 +101,10 @@
     "chiller_status": 1,
     "compressor_amps": 145
   },
-  "S002-FCU-L1-001": {
-    "room_temp": 22.8,
-    "room_temp_setpoint": 23.0,
-    "fan_speed": 2,
-    "valve_position": 45
+  "S002-FCU-101": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
   },
   "S002-BMS-L2-001": {
     "zone_temp": 22.5,
@@ -174,14 +173,12 @@
     "fan_speed": 3,
     "valve_position": 75
   },
-  "S002-FCU-L2-C": {
-    "room_temp": 22.5,
-    "room_temp_setpoint": 22.0,
-    "fan_speed": 2,
-    "valve_position": 65,
-    "fcu_status": 1
+  "S002-FCU-203": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
   },
-  "S002-VAV-L2-C": {
+  "S002-VAV-203": {
     "damper_position": 50,
     "airflow_setpoint": 350,
     "airflow_actual": 340,
@@ -189,14 +186,12 @@
     "discharge_air_temp": 14.5,
     "heating_valve": 0
   },
-  "S002-FCU-L2-D": {
-    "room_temp": 23.0,
-    "room_temp_setpoint": 22.0,
-    "fan_speed": 2,
-    "valve_position": 65,
-    "fcu_status": 1
+  "S002-FCU-204": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
   },
-  "S002-VAV-L2-D": {
+  "S002-VAV-204": {
     "damper_position": 70,
     "airflow_setpoint": 350,
     "airflow_actual": 340,
@@ -204,14 +199,7 @@
     "discharge_air_temp": 14.5,
     "heating_valve": 0
   },
-  "S002-FCU-L1-A": {
-    "room_temp": 21.5,
-    "room_temp_setpoint": 19.0,
-    "fan_speed": 2,
-    "valve_position": 65,
-    "fcu_status": 1
-  },
-  "S002-VAV-L1-A": {
+  "S002-VAV-101": {
     "damper_position": 70,
     "airflow_setpoint": 350,
     "airflow_actual": 340,
@@ -219,14 +207,12 @@
     "discharge_air_temp": 14.5,
     "heating_valve": 0
   },
-  "S002-FCU-L1-B": {
-    "room_temp": 24.0,
-    "room_temp_setpoint": 19.0,
-    "fan_speed": 2,
-    "valve_position": 65,
-    "fcu_status": 1
+  "S002-FCU-102": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
   },
-  "S002-VAV-L1-B": {
+  "S002-VAV-102": {
     "damper_position": 70,
     "airflow_setpoint": 350,
     "airflow_actual": 340,
@@ -234,14 +220,12 @@
     "discharge_air_temp": 14.5,
     "heating_valve": 0
   },
-  "S002-FCU-L0-A": {
-    "room_temp": 22.0,
-    "room_temp_setpoint": 22.0,
-    "fan_speed": 2,
-    "valve_position": 65,
-    "fcu_status": 1
+  "S002-FCU-001": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
   },
-  "S002-VAV-L0-A": {
+  "S002-VAV-001": {
     "damper_position": 70,
     "airflow_setpoint": 350,
     "airflow_actual": 340,
@@ -276,70 +260,66 @@
     "outside_air_damper": 25,
     "chw_valve": 60
   },
-  "S002-VAV-L2-A": {
+  "S002-VAV-201": {
     "damper_position": 40,
     "airflow_actual": 200,
     "airflow_setpoint": 85.0,
     "discharge_air_temp": 14.5,
     "heating_valve": 0
   },
-  "S002-VAV-L2-B": {
+  "S002-VAV-202": {
     "damper_position": 50,
     "airflow_actual": 250,
     "airflow_setpoint": 85.0,
     "discharge_air_temp": 14.5,
     "heating_valve": 0
   },
-  "S002-VAV-L2-E": {
-    "damper_position": 49,
-    "airflow_actual": 245,
-    "airflow_setpoint": 85.0,
-    "discharge_air_temp": 14.5,
-    "heating_valve": 0
+  "S002-VAV-205": {
+    "room_temperature": 22.5,
+    "damper_position": 50.0,
+    "temperature_setpoint": 22.0
   },
-  "S002-VAV-L1-C": {
+  "S002-VAV-103": {
     "damper_position": 52,
     "airflow_actual": 260,
     "airflow_setpoint": 250,
     "discharge_air_temp": 14.5,
     "heating_valve": 0
   },
-  "S002-VAV-L1-D": {
+  "S002-VAV-104": {
     "damper_position": 40,
     "airflow_actual": 200,
     "airflow_setpoint": 250,
     "discharge_air_temp": 14.5,
     "heating_valve": 0
   },
-  "S002-VAV-L1-E": {
-    "damper_position": 46,
-    "airflow_actual": 230,
-    "airflow_setpoint": 250,
-    "discharge_air_temp": 14.5,
-    "heating_valve": 0
+  "S002-VAV-105": {
+    "room_temperature": 22.5,
+    "damper_position": 50.0,
+    "temperature_setpoint": 22.0
   },
-  "S002-VAV-L0-B": {
+  "S002-VAV-002": {
     "damper_position": 40,
     "airflow_actual": 200,
     "airflow_setpoint": 250,
     "discharge_air_temp": 14.5,
     "heating_valve": 0
   },
-  "S002-VAV-L0-C": {
+  "S002-VAV-003": {
     "damper_position": 95,
     "airflow_actual": 475,
     "airflow_setpoint": 250,
     "discharge_air_temp": 14.5,
     "heating_valve": 0
   },
-  "S002-VAV-L0-D": {
+  "S002-VAV-004": {
     "damper_position": 50,
     "airflow_actual": 250,
     "airflow_setpoint": 250,
     "discharge_air_temp": 14.5,
     "heating_valve": 0
   },
-  "S002-VAV-L0-E": {
+  "S002-VAV-005": {
     "damper_position": 45,
     "airflow_actual": 225,
     "airflow_setpoint": 250,
@@ -555,7 +535,7 @@
     "speed": 0.0,
     "temperature": 0.0
   },
-  "site-002-S002-VAV-L2-A": {
+  "site-002-S002-VAV-201": {
     "temperature": 0.0,
     "setpoint": 0.0
   },
@@ -578,7 +558,7 @@
   "S002-UNKNOWN-B1-001": {
     "co2": 0.0
   },
-  "site-002-S002-VAV-L1-A": {
+  "site-002-S002-VAV-101": {
     "room_temperature": 22.5,
     "damper_position": 50.0,
     "temperature_setpoint": 22.0
@@ -621,7 +601,7 @@
     "pressure": false,
     "unknown": 0.0
   },
-  "site-002-S002-FCU-L2-B": {
+  "site-002-S002-FCU-201": {
     "room_temperature": 23.0,
     "fan_speed": 2
   },
@@ -635,7 +615,7 @@
     "chilled_water_temperature": 7.0,
     "chilled_water_setpoint": 7.0
   },
-  "site-002-S002-VAV-L1-B": {
+  "site-002-S002-VAV-102": {
     "temperature": 0.0,
     "valve_position": 0.0
   },
@@ -705,16 +685,17 @@
   "S002-ZONE-L2-001": {
     "co2": 0.0
   },
-  "S002-FCU-L2-B": {
-    "room_temperature": 23.0,
-    "fan_speed": 2
+  "S002-FCU-201": {
+    "temperature": 0.0,
+    "speed": 0.0,
+    "valve_position": 0.0
   },
   "site-002-CH-1": {
     "temperature": 6.5,
     "temperature_sensor": 12.3,
     "status": 1
   },
-  "site-002-S002-FCU-L1-A": {
+  "site-002-S002-FCU-101": {
     "temperature": 0.0,
     "speed": 0.0,
     "valve_position": 0.0
@@ -1245,17 +1226,12 @@
     "on_off": true,
     "occupancy": false
   },
-  "S002-FCU-361": {
+  "S002-FCU-304": {
     "temperature": 0.0,
     "speed": 0.0,
     "valve_position": 0.0
   },
-  "S002-FCU-121": {
-    "temperature": 0.0,
-    "speed": 0.0,
-    "valve_position": 0.0
-  },
-  "S002-FCU-061": {
+  "S002-FCU-004": {
     "temperature": 0.0,
     "speed": 0.0,
     "valve_position": 0.0
@@ -1271,11 +1247,6 @@
     "lux": 0.0,
     "status": false
   },
-  "S002-FCU-L2-A": {
-    "temperature": 0.0,
-    "speed": 0.0,
-    "valve_position": 0.0
-  },
   "S002-LTG-341": {
     "brightness": 80,
     "on_off": true,
@@ -1286,22 +1257,17 @@
     "on_off": true,
     "occupancy": false
   },
-  "S002-FCU-181": {
+  "S002-FCU-105": {
     "temperature": 0.0,
     "speed": 0.0,
     "valve_position": 0.0
   },
-  "S002-FCU-321": {
+  "S002-FCU-302": {
     "temperature": 0.0,
     "speed": 0.0,
     "valve_position": 0.0
   },
   "S002-FCU-301": {
-    "temperature": 0.0,
-    "speed": 0.0,
-    "valve_position": 0.0
-  },
-  "S002-FCU-261": {
     "temperature": 0.0,
     "speed": 0.0,
     "valve_position": 0.0
@@ -1316,12 +1282,7 @@
     "on_off": true,
     "occupancy": false
   },
-  "S002-FCU-281": {
-    "temperature": 0.0,
-    "speed": 0.0,
-    "valve_position": 0.0
-  },
-  "S002-FCU-241": {
+  "S002-FCU-205": {
     "temperature": 0.0,
     "speed": 0.0,
     "valve_position": 0.0
@@ -1331,7 +1292,7 @@
     "on_off": true,
     "occupancy": false
   },
-  "S002-FCU-221": {
+  "S002-FCU-202": {
     "temperature": 0.0,
     "speed": 0.0,
     "valve_position": 0.0
@@ -1343,11 +1304,6 @@
     "brightness": 80,
     "on_off": true,
     "occupancy": false
-  },
-  "S002-FCU-001": {
-    "temperature": 0.0,
-    "speed": 0.0,
-    "valve_position": 0.0
   },
   "S002-LTG-121": {
     "brightness": 80,
@@ -1369,12 +1325,7 @@
     "on_off": true,
     "occupancy": false
   },
-  "S002-FCU-041": {
-    "temperature": 0.0,
-    "speed": 0.0,
-    "valve_position": 0.0
-  },
-  "S002-FCU-201": {
+  "S002-FCU-003": {
     "temperature": 0.0,
     "speed": 0.0,
     "valve_position": 0.0
@@ -1387,11 +1338,6 @@
   "S002-DALI-B1-CTRL": {
     "status": false,
     "alarm": false
-  },
-  "S002-FCU-101": {
-    "temperature": 0.0,
-    "speed": 0.0,
-    "valve_position": 0.0
   },
   "S002-LTG-101": {
     "brightness": 80,
@@ -1408,11 +1354,6 @@
     "on_off": true,
     "occupancy": false
   },
-  "S002-FCU-205": {
-    "temperature": 0.0,
-    "speed": 0.0,
-    "valve_position": 0.0
-  },
   "S002-LTG-241": {
     "brightness": 80,
     "on_off": true,
@@ -1423,32 +1364,17 @@
     "on_off": true,
     "occupancy": false
   },
-  "S002-VAV-105": {
-    "room_temperature": 22.5,
-    "damper_position": 50.0,
-    "temperature_setpoint": 22.0
-  },
   "S002-LTG-001": {
     "brightness": 80,
     "on_off": true,
     "occupancy": false
   },
-  "S002-VAV-205": {
-    "room_temperature": 22.5,
-    "damper_position": 50.0,
-    "temperature_setpoint": 22.0
-  },
-  "S002-FCU-105": {
+  "S002-FCU-005": {
     "temperature": 0.0,
     "speed": 0.0,
     "valve_position": 0.0
   },
-  "S002-FCU-081": {
-    "temperature": 0.0,
-    "speed": 0.0,
-    "valve_position": 0.0
-  },
-  "S002-FCU-021": {
+  "S002-FCU-002": {
     "temperature": 0.0,
     "speed": 0.0,
     "valve_position": 0.0
@@ -1463,17 +1389,17 @@
     "on_off": true,
     "occupancy": false
   },
-  "S002-FCU-141": {
+  "S002-FCU-103": {
     "temperature": 0.0,
     "speed": 0.0,
     "valve_position": 0.0
   },
-  "S002-FCU-161": {
+  "S002-FCU-104": {
     "temperature": 0.0,
     "speed": 0.0,
     "valve_position": 0.0
   },
-  "S002-FCU-341": {
+  "S002-FCU-303": {
     "temperature": 0.0,
     "speed": 0.0,
     "valve_position": 0.0
@@ -1483,7 +1409,7 @@
     "on_off": true,
     "occupancy": false
   },
-  "S002-FCU-381": {
+  "S002-FCU-305": {
     "temperature": 0.0,
     "speed": 0.0,
     "valve_position": 0.0

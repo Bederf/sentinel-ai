@@ -4246,7 +4246,7 @@
   },
   "3c34a72a-b0ef-4737-8c4e-c079a9ed087c": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L0-A",
+    "equipment_code": "S002-VAV-001",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -4264,7 +4264,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L0-A",
+      "target_equipment": "S002-VAV-001",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -4277,7 +4277,7 @@
   },
   "b45e6735-e776-44fd-97b7-83a09b528cb9": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-A",
+    "equipment_code": "S002-VAV-101",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -4295,7 +4295,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-A",
+      "target_equipment": "S002-VAV-101",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -4308,7 +4308,7 @@
   },
   "daa2e1e3-60c0-4f73-97bb-922d58886b96": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-B",
+    "equipment_code": "S002-VAV-102",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -4326,7 +4326,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-B",
+      "target_equipment": "S002-VAV-102",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -4339,7 +4339,7 @@
   },
   "596f931a-3e8d-4dd0-8c5e-9e0455373356": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-A",
+    "equipment_code": "S002-VAV-201",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -4357,7 +4357,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-A",
+      "target_equipment": "S002-VAV-201",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -4370,7 +4370,7 @@
   },
   "792decab-1c26-456b-9085-42aede768307": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-C",
+    "equipment_code": "S002-VAV-203",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -4388,7 +4388,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-C",
+      "target_equipment": "S002-VAV-203",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -4401,7 +4401,7 @@
   },
   "09c7af23-4c09-410c-b366-cbc0f83f2faa": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-D",
+    "equipment_code": "S002-VAV-204",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -4419,7 +4419,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-D",
+      "target_equipment": "S002-VAV-204",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -5579,7 +5579,7 @@
   },
   "7dbc966d-4874-466c-9cd4-164ac2e2aa6c": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-A",
+    "equipment_code": "S002-VAV-101",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -5597,7 +5597,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-A",
+      "target_equipment": "S002-VAV-101",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "40",
@@ -5641,7 +5641,7 @@
   },
   "7cc35c94-49ee-4604-8022-86596435bb58": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-A",
+    "equipment_code": "S002-VAV-201",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -5659,7 +5659,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-A",
+      "target_equipment": "S002-VAV-201",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "40",
@@ -6974,7 +6974,7 @@
   },
   "2c9a5181-245a-4f50-9e89-b62c1e2846a1": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L0-A",
+    "equipment_code": "S002-VAV-001",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -6992,7 +6992,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L0-A",
+      "target_equipment": "S002-VAV-001",
       "action_type": "ai_optimization",
       "control_point": "zone_temperature_setpoint",
       "target_value": "24",
@@ -7005,7 +7005,7 @@
   },
   "8d5397ad-2c18-4ff3-82a7-0f3d8728772e": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-A",
+    "equipment_code": "S002-VAV-101",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -7023,7 +7023,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-A",
+      "target_equipment": "S002-VAV-101",
       "action_type": "ai_optimization",
       "control_point": "zone_temperature_setpoint",
       "target_value": "24",
@@ -7036,7 +7036,7 @@
   },
   "3d7a9296-8465-4630-b45e-5ad2b0f9baf7": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-B",
+    "equipment_code": "S002-VAV-102",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -7054,7 +7054,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-B",
+      "target_equipment": "S002-VAV-102",
       "action_type": "ai_optimization",
       "control_point": "zone_temperature_setpoint",
       "target_value": "24",
@@ -7067,7 +7067,7 @@
   },
   "89b99171-eb50-466c-8f9e-af59f72665ad": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-A",
+    "equipment_code": "S002-VAV-201",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -7085,7 +7085,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-A",
+      "target_equipment": "S002-VAV-201",
       "action_type": "ai_optimization",
       "control_point": "zone_temperature_setpoint",
       "target_value": "24",
@@ -7098,7 +7098,7 @@
   },
   "d0e79751-99fa-45d3-8797-221277f8d693": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-C",
+    "equipment_code": "S002-VAV-203",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -7116,7 +7116,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-C",
+      "target_equipment": "S002-VAV-203",
       "action_type": "ai_optimization",
       "control_point": "zone_temperature_setpoint",
       "target_value": "24",
@@ -7129,7 +7129,7 @@
   },
   "61227e64-9e4d-4069-96a2-c97a831d5842": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-D",
+    "equipment_code": "S002-VAV-204",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -7147,7 +7147,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-D",
+      "target_equipment": "S002-VAV-204",
       "action_type": "ai_optimization",
       "control_point": "zone_temperature_setpoint",
       "target_value": "24",
@@ -7749,7 +7749,7 @@
   },
   "08052c65-ec54-4e77-adee-1daf779efe00": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L0-A",
+    "equipment_code": "S002-VAV-001",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -7767,7 +7767,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L0-A",
+      "target_equipment": "S002-VAV-001",
       "action_type": "ai_optimization",
       "control_point": "damper_position_percent",
       "target_value": "60",
@@ -7780,7 +7780,7 @@
   },
   "5a929415-9573-423f-ad76-610cd3f67ac8": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-A",
+    "equipment_code": "S002-VAV-101",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -7798,7 +7798,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-A",
+      "target_equipment": "S002-VAV-101",
       "action_type": "ai_optimization",
       "control_point": "damper_position_percent",
       "target_value": "65",
@@ -7811,7 +7811,7 @@
   },
   "86e481dd-988d-4664-9bf9-c8345429fe0f": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-A",
+    "equipment_code": "S002-VAV-201",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -7829,7 +7829,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-A",
+      "target_equipment": "S002-VAV-201",
       "action_type": "ai_optimization",
       "control_point": "damper_position_percent",
       "target_value": "65",
@@ -9516,7 +9516,7 @@
   },
   "0c7bc274-b105-4dad-a95d-091b0dd7d791": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L0-A",
+    "equipment_code": "S002-VAV-001",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -9534,7 +9534,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L0-A",
+      "target_equipment": "S002-VAV-001",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -9578,7 +9578,7 @@
   },
   "01231843-b3b3-4091-ae61-3bc08318ded9": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-A",
+    "equipment_code": "S002-VAV-101",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -9596,7 +9596,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-A",
+      "target_equipment": "S002-VAV-101",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -9640,7 +9640,7 @@
   },
   "a77a2f5d-9cbe-4c9c-b118-b2a815c9cbdb": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-B",
+    "equipment_code": "S002-VAV-102",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -9658,7 +9658,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-B",
+      "target_equipment": "S002-VAV-102",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -9671,7 +9671,7 @@
   },
   "c4882d5e-afbb-46e3-945f-ddbe63c574a7": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-A",
+    "equipment_code": "S002-VAV-201",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -9689,7 +9689,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-A",
+      "target_equipment": "S002-VAV-201",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -9702,7 +9702,7 @@
   },
   "aff8663c-425f-4c0b-a6f3-99cb93fa3e2a": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-C",
+    "equipment_code": "S002-VAV-203",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -9720,7 +9720,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-C",
+      "target_equipment": "S002-VAV-203",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -9733,7 +9733,7 @@
   },
   "35f91916-c7e9-4950-96e2-c10bc454f8d6": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-D",
+    "equipment_code": "S002-VAV-204",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -9751,7 +9751,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-D",
+      "target_equipment": "S002-VAV-204",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -11190,7 +11190,7 @@
   },
   "6d34512e-e5e1-42f2-9774-c8382d190295": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L0-A",
+    "equipment_code": "S002-VAV-001",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -11208,7 +11208,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L0-A",
+      "target_equipment": "S002-VAV-001",
       "action_type": "ai_optimization",
       "control_point": "zone_temp_setpoint",
       "target_value": "24",
@@ -11221,7 +11221,7 @@
   },
   "5c25ab32-7a71-445e-930c-40fce5538944": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-A",
+    "equipment_code": "S002-VAV-101",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -11239,7 +11239,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-A",
+      "target_equipment": "S002-VAV-101",
       "action_type": "ai_optimization",
       "control_point": "zone_temp_setpoint",
       "target_value": "24",
@@ -11252,7 +11252,7 @@
   },
   "6b2d132b-6ace-415d-869e-d2eb98bdca9c": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-B",
+    "equipment_code": "S002-VAV-102",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -11270,7 +11270,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-B",
+      "target_equipment": "S002-VAV-102",
       "action_type": "ai_optimization",
       "control_point": "zone_temp_setpoint",
       "target_value": "24",
@@ -11283,7 +11283,7 @@
   },
   "578b007c-b83d-4c8a-b424-e1e949d33cd1": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-A",
+    "equipment_code": "S002-VAV-201",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -11301,7 +11301,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-A",
+      "target_equipment": "S002-VAV-201",
       "action_type": "ai_optimization",
       "control_point": "zone_temp_setpoint",
       "target_value": "24",
@@ -11314,7 +11314,7 @@
   },
   "91e49887-3220-48d3-93c8-1542146b0ccc": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-C",
+    "equipment_code": "S002-VAV-203",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -11332,7 +11332,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-C",
+      "target_equipment": "S002-VAV-203",
       "action_type": "ai_optimization",
       "control_point": "zone_temp_setpoint",
       "target_value": "24",
@@ -11345,7 +11345,7 @@
   },
   "f433ab48-933d-4dbf-9019-4cffc86ef1a1": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-D",
+    "equipment_code": "S002-VAV-204",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -11363,7 +11363,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-D",
+      "target_equipment": "S002-VAV-204",
       "action_type": "ai_optimization",
       "control_point": "zone_temp_setpoint",
       "target_value": "24",
@@ -12461,7 +12461,7 @@
   },
   "e8af682a-b37f-47fe-879f-662907d81a41": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L0-A",
+    "equipment_code": "S002-VAV-001",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -12479,7 +12479,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L0-A",
+      "target_equipment": "S002-VAV-001",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -12492,7 +12492,7 @@
   },
   "aded1005-24ec-4ad0-86e4-6a209928bd1a": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-A",
+    "equipment_code": "S002-VAV-101",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -12510,7 +12510,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-A",
+      "target_equipment": "S002-VAV-101",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -12523,7 +12523,7 @@
   },
   "4675c035-045b-465a-afc9-06dfea79cee2": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-A",
+    "equipment_code": "S002-VAV-201",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -12541,7 +12541,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-A",
+      "target_equipment": "S002-VAV-201",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -12647,7 +12647,7 @@
   },
   "1fa1e6c8-0505-492e-8b84-26f0f385b76a": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L0-A",
+    "equipment_code": "S002-VAV-001",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -12665,7 +12665,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L0-A",
+      "target_equipment": "S002-VAV-001",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -12678,7 +12678,7 @@
   },
   "7ca398b1-9286-4f60-91e0-580b00685277": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-A",
+    "equipment_code": "S002-VAV-101",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -12696,7 +12696,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-A",
+      "target_equipment": "S002-VAV-101",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -12709,7 +12709,7 @@
   },
   "953d604e-15d0-4329-ab19-11efbca088bd": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-B",
+    "equipment_code": "S002-VAV-102",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -12727,7 +12727,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-B",
+      "target_equipment": "S002-VAV-102",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -12740,7 +12740,7 @@
   },
   "e1835d22-4dba-4378-b028-cfae86fb8b3f": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-A",
+    "equipment_code": "S002-VAV-201",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -12758,7 +12758,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-A",
+      "target_equipment": "S002-VAV-201",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -12771,7 +12771,7 @@
   },
   "174c3fd8-c4bc-431d-aa90-6571a4ba9903": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-C",
+    "equipment_code": "S002-VAV-203",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -12789,7 +12789,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-C",
+      "target_equipment": "S002-VAV-203",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -12802,7 +12802,7 @@
   },
   "860dcfe4-fb50-4f86-9984-3cdad0b4d650": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-D",
+    "equipment_code": "S002-VAV-204",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -12820,7 +12820,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-D",
+      "target_equipment": "S002-VAV-204",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -13453,7 +13453,7 @@
   },
   "73b25b45-cdfb-4f75-91d0-8fbc2df43429": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L0-A",
+    "equipment_code": "S002-VAV-001",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -13471,7 +13471,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L0-A",
+      "target_equipment": "S002-VAV-001",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -13515,7 +13515,7 @@
   },
   "25e5014c-9ab4-4268-bfb2-723528f39b49": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-A",
+    "equipment_code": "S002-VAV-101",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -13533,7 +13533,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-A",
+      "target_equipment": "S002-VAV-101",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -13577,7 +13577,7 @@
   },
   "391cdb3f-2a2c-4d41-bcea-26e5c3e156fe": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-B",
+    "equipment_code": "S002-VAV-102",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -13595,7 +13595,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-B",
+      "target_equipment": "S002-VAV-102",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -13608,7 +13608,7 @@
   },
   "78d88d8f-b59d-4230-a40c-10f8f1dd26f8": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-A",
+    "equipment_code": "S002-VAV-201",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -13626,7 +13626,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-A",
+      "target_equipment": "S002-VAV-201",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -13639,7 +13639,7 @@
   },
   "1e8a5809-049c-4c97-bf25-056046881d7e": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-C",
+    "equipment_code": "S002-VAV-203",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -13657,7 +13657,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-C",
+      "target_equipment": "S002-VAV-203",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -13670,7 +13670,7 @@
   },
   "2b030592-e4f8-4b1b-922c-028ebb8ac9a1": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-D",
+    "equipment_code": "S002-VAV-204",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -13688,7 +13688,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-D",
+      "target_equipment": "S002-VAV-204",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "20",
@@ -14693,7 +14693,7 @@
   },
   "71b4e525-fde6-4ec4-a4e8-eacf74e124c3": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L0-A",
+    "equipment_code": "S002-VAV-001",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -14711,7 +14711,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L0-A",
+      "target_equipment": "S002-VAV-001",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "45",
@@ -14724,7 +14724,7 @@
   },
   "a9356e1e-60b2-4674-aa13-24efca83b165": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L0-A",
+    "equipment_code": "S002-VAV-001",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -14742,7 +14742,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L0-A",
+      "target_equipment": "S002-VAV-001",
       "action_type": "ai_optimization",
       "control_point": "zone_temp_setpoint",
       "target_value": "24",
@@ -14755,7 +14755,7 @@
   },
   "080f7752-f4a9-4813-840d-27b4d11b156a": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-A",
+    "equipment_code": "S002-VAV-101",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -14773,7 +14773,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-A",
+      "target_equipment": "S002-VAV-101",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "50",
@@ -14786,7 +14786,7 @@
   },
   "973a0087-8ae1-4b72-8cec-26fa481e1bea": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-A",
+    "equipment_code": "S002-VAV-101",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -14804,7 +14804,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-A",
+      "target_equipment": "S002-VAV-101",
       "action_type": "ai_optimization",
       "control_point": "zone_temp_setpoint",
       "target_value": "24",
@@ -14817,7 +14817,7 @@
   },
   "c116de39-9fea-41c0-bae5-22e2698770c0": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-A",
+    "equipment_code": "S002-VAV-201",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -14835,7 +14835,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-A",
+      "target_equipment": "S002-VAV-201",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "50",
@@ -14848,7 +14848,7 @@
   },
   "a5dcf0fc-9c2b-4db0-a1fb-633985ed05e4": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-A",
+    "equipment_code": "S002-VAV-201",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -14866,7 +14866,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-A",
+      "target_equipment": "S002-VAV-201",
       "action_type": "ai_optimization",
       "control_point": "zone_temp_setpoint",
       "target_value": "24",
@@ -16181,7 +16181,7 @@
   },
   "2f65b13b-4b7d-419b-a46a-f976ba35950b": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L0-A",
+    "equipment_code": "S002-VAV-001",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -16199,7 +16199,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L0-A",
+      "target_equipment": "S002-VAV-001",
       "action_type": "ai_optimization",
       "control_point": "minimum_airflow_setpoint",
       "target_value": "0.15",
@@ -16212,7 +16212,7 @@
   },
   "b068e253-ecb6-4a84-8d03-7e923b7b9aeb": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-A",
+    "equipment_code": "S002-VAV-101",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -16230,7 +16230,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-A",
+      "target_equipment": "S002-VAV-101",
       "action_type": "ai_optimization",
       "control_point": "minimum_airflow_setpoint",
       "target_value": "0.15",
@@ -16243,7 +16243,7 @@
   },
   "bd0cd388-3b18-4e70-8749-9756c79e220a": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-B",
+    "equipment_code": "S002-VAV-102",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -16261,7 +16261,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-B",
+      "target_equipment": "S002-VAV-102",
       "action_type": "ai_optimization",
       "control_point": "minimum_airflow_setpoint",
       "target_value": "0.15",
@@ -16274,7 +16274,7 @@
   },
   "df074f35-c6d1-4d30-a0ef-39604fa78611": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-A",
+    "equipment_code": "S002-VAV-201",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -16292,7 +16292,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-A",
+      "target_equipment": "S002-VAV-201",
       "action_type": "ai_optimization",
       "control_point": "minimum_airflow_setpoint",
       "target_value": "0.15",
@@ -16305,7 +16305,7 @@
   },
   "b1347f5d-607d-44c8-ac44-b071cb40ab80": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-C",
+    "equipment_code": "S002-VAV-203",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -16323,7 +16323,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-C",
+      "target_equipment": "S002-VAV-203",
       "action_type": "ai_optimization",
       "control_point": "minimum_airflow_setpoint",
       "target_value": "0.15",
@@ -16336,7 +16336,7 @@
   },
   "ca620122-9258-4932-bb1d-c37e6abb68c1": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-D",
+    "equipment_code": "S002-VAV-204",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -16354,7 +16354,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-D",
+      "target_equipment": "S002-VAV-204",
       "action_type": "ai_optimization",
       "control_point": "minimum_airflow_setpoint",
       "target_value": "0.15",
@@ -16522,7 +16522,7 @@
   },
   "2cc64785-e44c-4cac-9a49-a82d52b89876": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L0-A",
+    "equipment_code": "S002-VAV-001",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -16540,7 +16540,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L0-A",
+      "target_equipment": "S002-VAV-001",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "65",
@@ -16553,7 +16553,7 @@
   },
   "ab16ec18-5966-4bfe-b185-6c56776d72a3": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L1-A",
+    "equipment_code": "S002-VAV-101",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -16571,7 +16571,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L1-A",
+      "target_equipment": "S002-VAV-101",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "65",
@@ -16584,7 +16584,7 @@
   },
   "fad851f0-a08b-4edb-8e80-b4fbbb0508c8": {
     "site_id": "S002",
-    "equipment_code": "S002-VAV-L2-A",
+    "equipment_code": "S002-VAV-201",
     "correlation_id": "",
     "decision_type": "tier2_require_approval",
     "tier": "tier2",
@@ -16602,7 +16602,7 @@
       "tier3_threshold": 999.0
     },
     "decision_details": {
-      "target_equipment": "S002-VAV-L2-A",
+      "target_equipment": "S002-VAV-201",
       "action_type": "ai_optimization",
       "control_point": "damper_position",
       "target_value": "65",

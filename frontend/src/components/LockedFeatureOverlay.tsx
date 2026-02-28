@@ -165,11 +165,13 @@ function generateUpgradeMessage(
  */
 function getActionVerb(module: string): string {
   const verbs: Record<string, string> = {
-    control: 'automatically adjust',
+    hvac_control: 'automatically adjust',
+    energy_control: 'optimize and manage',
+    lighting_control: 'control scenes and schedules',
+    solar_control: 'optimize dispatch',
     maintenance: 'manage and schedule',
     solar: 'optimize',
     lighting: 'control',
-    dali: 'schedule',
     ml: 'AI-predict',
     energy: 'optimize',
     security: 'manage',

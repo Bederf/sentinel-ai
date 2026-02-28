@@ -1,17 +1,15 @@
 """
-SENTINEL Persistence Layer — writes data to Supabase and feeds ML pipeline.
+Simulation BMS Data Store — writes building state to JSON.
 
-Called every simulation hour by LifecycleOrchestrator._process_hour().
-SENTINEL is data-agnostic: it receives equipment readings from whatever
-source is active (real BMS via SIMBIOT, or simulation engine) and:
-  1. Persists to JSON simulation store (local fast store)
-  2. Syncs to Supabase equipment.operating_data (dashboard/API)
-  3. Feeds ML pipeline after successful Supabase write
+The simulation engine acts as the BMS for site-002, producing equipment
+readings, sensor data, and energy consumption. This module persists that
+data to the local JSON simulation store only.
+
+SENTINEL (via sentinel_data_sync.py) is responsible for syncing to
+Supabase and feeding the ML pipeline — not the simulation layer.
 """
 
-import json
 import logging
-import os
 from datetime import datetime
 from typing import Any, Dict, Optional
 
@@ -21,16 +19,11 @@ logger = logging.getLogger(__name__)
 
 
 class SimulationPersistence:
-    """SENTINEL persistence: writes to Supabase, feeds ML pipeline."""
+    """BMS simulation persistence: JSON store only."""
 
     def __init__(self, site_id: str = "site-002"):
         self.site_id = site_id
         self.store = get_simulation_store(site_id)
-
-        # ML feeder — accumulates sensor data and triggers training
-        from app.services.sentinel_ml_feeder import SentinelMLFeeder
-
-        self.ml_feeder = SentinelMLFeeder()
 
     async def persist_hourly_state(
         self,
@@ -42,7 +35,7 @@ class SimulationPersistence:
         humidity: float,
     ) -> Dict[str, Any]:
         """
-        Persist all simulation state for the current hour.
+        Persist all simulation state for the current hour to JSON.
 
         Args:
             simulated_time: Current simulation timestamp
@@ -90,33 +83,13 @@ class SimulationPersistence:
         except Exception as e:
             results["errors"].append(f"zone_history: {e}")
 
-        # 5. Sync to Supabase equipment.operating_data
-        try:
-            supabase_count = self._sync_to_supabase(simulated_time, equipment_states)
-            results["supabase_synced"] = supabase_count
-        except Exception as e:
-            results["errors"].append(f"supabase_sync: {e}")
-
-        # 6. Feed ML pipeline (after Supabase write — SENTINEL feeds ML)
-        try:
-            self.ml_feeder.ingest(equipment_states, simulated_time)
-            ml_results = self.ml_feeder.train_if_ready()
-            if ml_results:
-                successful = [r for r in ml_results if "error" not in r]
-                logger.info(f"[ML FEEDER] Trained {len(successful)} models from SENTINEL data")
-                results["ml_models_trained"] = len(successful)
-            results["ml_hours_ingested"] = self.ml_feeder.hours_ingested
-        except Exception as e:
-            results["errors"].append(f"ml_feeder: {e}")
-
         if results["errors"]:
             logger.warning(f"Persistence errors: {results['errors']}")
         else:
             logger.info(
-                f"Persisted: {results['equipment_updated']} equipment, "
+                f"Persisted JSON: {results['equipment_updated']} equipment, "
                 f"{results['readings_written']} readings, "
-                f"{results.get('zones_written', 0)} zones, "
-                f"{results.get('supabase_synced', 0)} supabase, {energy_kw:.1f} kW"
+                f"{results.get('zones_written', 0)} zones, {energy_kw:.1f} kW"
             )
 
         return results
@@ -142,85 +115,6 @@ class SimulationPersistence:
                 "updated_at": datetime.utcnow().isoformat(),
             },
         )
-
-    def _sync_to_supabase(
-        self,
-        simulated_time: datetime,
-        equipment_states: Dict[str, Dict[str, Any]],
-    ) -> int:
-        """Sync equipment operating_data, health_score, and status to Supabase.
-
-        Uses batch SQL via psycopg2 for efficiency — one round-trip for all equipment.
-        """
-        import psycopg2
-        import psycopg2.extras
-
-        database_url = os.getenv(
-            "DATABASE_URL",
-            "postgresql://postgres:postgres@127.0.0.1:55322/postgres",
-        )
-
-        # Supabase status constraint: normal, warning, critical, offline, maintenance
-        def health_to_status(score: float) -> str:
-            if score >= 70:
-                return "normal"
-            elif score >= 40:
-                return "warning"
-            else:
-                return "critical"
-
-        updates = []
-        for code, state in equipment_states.items():
-            health_score = state.get("health_score")
-            sensor_readings = state.get("sensor_readings", {})
-            if not sensor_readings and health_score is None:
-                continue
-
-            # Build operating_data: {point_name: {value, timestamp, source}}
-            operating_data = {}
-            ts = simulated_time.isoformat()
-            for point_name, value in sensor_readings.items():
-                operating_data[point_name] = {
-                    "value": value,
-                    "timestamp": ts,
-                    "source": "sentinel",
-                }
-
-            status = health_to_status(health_score) if health_score is not None else "normal"
-            h = int(round(health_score)) if health_score is not None else 100
-
-            updates.append((code, json.dumps(operating_data), h, status))
-
-        if not updates:
-            return 0
-
-        try:
-            conn = psycopg2.connect(database_url)
-            conn.autocommit = True
-            cur = conn.cursor()
-
-            # Batch update using a VALUES list
-            values_sql = ",".join(cur.mogrify("(%s, %s::jsonb, %s::int, %s)", row).decode() for row in updates)
-
-            cur.execute(f"""
-                UPDATE equipment AS e SET
-                    operating_data = v.operating_data,
-                    health_score = v.health_score,
-                    status = v.status,
-                    updated_at = now()
-                FROM (VALUES {values_sql})
-                    AS v(code, operating_data, health_score, status)
-                WHERE e.code = v.code
-            """)
-
-            updated = cur.rowcount
-            cur.close()
-            conn.close()
-            return updated
-
-        except Exception as e:
-            logger.error(f"Supabase sync failed: {e}")
-            raise
 
     def _write_sensor_readings(
         self,

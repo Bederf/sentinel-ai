@@ -249,7 +249,7 @@ _r(
         high_risk=True,
         rate_class="mutate",
         min_role=SentinelRole.OPERATOR,
-        required_module=ModuleType.CONTROL,
+        required_module=ModuleType.HVAC_CONTROL,
         audit_fields=frozenset({"device_id", "point_name", "priority"}),
     )
 )
@@ -385,7 +385,7 @@ _r(
         mutating=True,
         rate_class="mutate",
         min_role=SentinelRole.ADMIN,
-        required_module=ModuleType.CONTRACTS,
+        required_module=ModuleType.FINANCIAL,
         audit_fields=frozenset({"building_code", "contract_type"}),
     )
 )

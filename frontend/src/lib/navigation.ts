@@ -13,7 +13,10 @@ import {
   Settings as SettingsIcon,
   Activity,
   Plug,
-  Leaf,
+  FileText,
+  Wrench,
+  DollarSign,
+  Brain,
   Sun,
   Droplets,
   Lightbulb,
@@ -23,35 +26,16 @@ import type { ModuleType } from "./moduleRegistry";
 export type View =
   | "dashboard"
   | "ai-chat"
-  | "digital-twin"
-  | "aegis"
-  | "technician"
-  | "control"
-  | "control-audit"
-  | "optimization"
-  | "settings"
   | "integrations"
-  | "occupancy"
-  | "occupancy-analytics"
-  | "occupancy-energy-correlation"
-  | "lighting"
-  | "workflow"
-  | "security"
+  | "logs"
   | "simbiot"
-  | "simulation"
-  | "sustainability"
-  | "solar"
-  | "solar-config"
-  | "water"
-  | "fleet"
-  | "mlops"
-  | "contracts"
-  | "profitability"
-  | "budget-report"
-  | "modules"
-  | "audit-logs";
+  | "settings"
+  | "maintenance"
+  | "financial"
+  | "compliance"
+  | "fleet-ml";
 
-export type NavCategory = "base" | "addon" | "internal";
+export type NavCategory = "base" | "addon" | "admin";
 
 export interface NavItem {
   id: View;
@@ -68,115 +52,114 @@ export interface NavItem {
 export const VIEW_TITLES: Record<View, string> = {
   dashboard: "Dashboard",
   "ai-chat": "AI Chat",
-  "digital-twin": "Digital Twin",
-  aegis: "AEGIS Ops",
-  technician: "Technician Chat",
-  control: "Control Dashboard",
-  "control-audit": "Control Audit Trail",
-  "audit-logs": "Audit Logs",
-  optimization: "Loadshedding",
-  settings: "Settings",
   integrations: "System Health",
-  occupancy: "Occupancy",
-  "occupancy-analytics": "Occupancy Analytics",
-  "occupancy-energy-correlation": "Energy Correlation",
-  lighting: "Lighting",
-  workflow: "Asset Workflow",
-  security: "Security",
+  logs: "Logs",
   simbiot: "SIMBIOT",
-  simulation: "Simulation",
-  sustainability: "Sustainability & ESG",
-  solar: "Solar & BESS",
-  "solar-config": "Solar Setup Wizard",
-  water: "Water Consumption",
-  fleet: "Fleet ML Insights",
-  mlops: "ML Metrics",
-  contracts: "Contract Management",
-  profitability: "Profitability Dashboard",
-  "budget-report": "Budget Reports",
-  modules: "Module Manager",
+  settings: "Settings",
+  maintenance: "Maintenance",
+  financial: "Financial",
+  compliance: "Compliance & ESG",
+  "fleet-ml": "Fleet ML",
 };
 
 /**
- * Base sidebar items — always visible.
- * Dashboard, AI Chat, SIMBIOT (moved from addon), Settings (moved from internal).
- * Settings requires admin or demo user (checked in Sidebar component).
+ * Base sidebar items — always visible (4 items).
  */
 export const BASE_NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Overview and AI recommendations", category: "base" },
   { id: "ai-chat", label: "AI Chat", icon: MessageSquare, description: "SENTINEL AI Assistant", category: "base" },
-  { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard", category: "base" },
-  { id: "settings", label: "Settings", icon: SettingsIcon, description: "Admin settings", category: "base", requiredRole: "admin" },
+  { id: "integrations", label: "System Health", icon: Activity, description: "Integration monitoring", category: "base" },
+  { id: "logs", label: "Logs", icon: FileText, description: "Audit trail and event logs", category: "base" },
 ];
 
 /**
- * Addon items — EMPTY. All moved to building detail tabs.
- * Kept for backward compatibility with ViewGuard and access-control.
+ * Admin-only sidebar items (2 items).
  */
-export const ADDON_NAV_ITEMS: NavItem[] = [];
+export const ADMIN_NAV_ITEMS: NavItem[] = [
+  { id: "simbiot", label: "SIMBIOT", icon: Plug, description: "BMS Connection Wizard", category: "admin", requiredRole: "admin" },
+  { id: "settings", label: "Settings", icon: SettingsIcon, description: "Admin settings", category: "admin", requiredRole: "admin" },
+];
 
 /**
- * Internal items — EMPTY. Settings moved to base.
- * Kept for backward compatibility with ViewGuard and access-control.
+ * Conditional add-on sidebar items (4 items).
+ * Only visible when the respective add-on module is active.
  */
-export const INTERNAL_NAV_ITEMS: NavItem[] = [];
+export const ADDON_NAV_ITEMS: NavItem[] = [
+  { id: "maintenance", label: "Maintenance", icon: Wrench, description: "Work orders and scheduling", category: "addon", requiredModule: "maintenance" },
+  { id: "financial", label: "Financial", icon: DollarSign, description: "Contracts and billing", category: "addon", requiredModule: "financial" },
+  { id: "compliance", label: "Compliance", icon: Shield, description: "ESG and certification", category: "addon", requiredModule: "compliance" },
+  { id: "fleet-ml", label: "Fleet ML", icon: Brain, description: "Cross-site analytics", category: "addon", requiredModule: "fleet_ml" },
+];
 
 /** All nav items combined (for lookup) */
 export const ALL_NAV_ITEMS: NavItem[] = [
   ...BASE_NAV_ITEMS,
+  ...ADMIN_NAV_ITEMS,
   ...ADDON_NAV_ITEMS,
-  ...INTERNAL_NAV_ITEMS,
 ];
 
-// ─── Building Detail Tabs (Consolidated: 7 tabs) ────────────────────
+// ─── Building Detail Tabs (10 tabs, SIMBIOT-data-driven) ────────────────────
 
 export type BuildingTabId =
   | "overview"
-  | "system-health"
-  | "operations"
-  | "lighting-occupancy"
-  | "solar-bess"
+  | "hvac"
   | "energy"
-  | "water";
+  | "lighting"
+  | "solar-bess"
+  | "water"
+  | "fire"
+  | "security"
+  | "digital-twin"
+  | "simulation";
 
 export interface BuildingTabItem {
   id: BuildingTabId;
   label: string;
   icon: LucideIcon;
+  /** Module that gates the control features within this tab (not tab visibility) */
+  controlModule?: ModuleType;
+  /** If set, tab only shows when this add-on module is active */
+  requiredModule?: ModuleType;
 }
 
 /**
- * Building detail tab definitions — 7 consolidated tabs.
- * Rendered as a single-row tab bar inside SiteDetail (no scrolling needed).
- * Merged tabs use internal sub-tab pills for their child views.
+ * Building detail tab definitions — 10 discipline-specific tabs.
+ * Tabs show based on SIMBIOT data availability, not module toggles.
+ * Control features within each tab are gated by the respective {x}_control add-on.
+ * Fire tab has no control toggle (always read-only).
+ * Simulation tab only shows if simulation add-on is active.
  */
 export const BUILDING_TAB_ITEMS: BuildingTabItem[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "system-health", label: "System Health", icon: Activity },
-  { id: "operations", label: "Operations", icon: Shield },
-  { id: "lighting-occupancy", label: "Lighting & Occupancy", icon: Lightbulb },
-  { id: "solar-bess", label: "Solar & BESS", icon: Sun },
-  { id: "energy", label: "Energy", icon: Leaf },
-  { id: "water", label: "Water", icon: Droplets },
+  { id: "hvac", label: "HVAC", icon: Activity, controlModule: "hvac_control" },
+  { id: "energy", label: "Energy", icon: Activity, controlModule: "energy_control" },
+  { id: "lighting", label: "Lighting", icon: Lightbulb, controlModule: "lighting_control" },
+  { id: "solar-bess", label: "Solar & BESS", icon: Sun, controlModule: "solar_control" },
+  { id: "water", label: "Water", icon: Droplets, controlModule: "water_control" },
+  { id: "fire", label: "Fire", icon: Activity },
+  { id: "security", label: "Security", icon: Shield, controlModule: "security_control" },
+  { id: "digital-twin", label: "Digital Twin", icon: Activity, controlModule: "digital_twin_control" },
+  { id: "simulation", label: "Simulation", icon: Activity, requiredModule: "simulation" },
 ];
 
-// ─── Legacy helpers (kept for ViewGuard / access-control compatibility) ──
+// ─── Helpers ──
 
-/** localStorage key for persisted addon ordering (no longer used, kept for cleanup) */
+/** localStorage key for persisted addon ordering */
 export const SIDEBAR_ORDER_KEY = "sentinel_sidebar_order";
 
 /**
  * Check if a view requires an active module to be accessible.
- * Consolidated tabs no longer have module gates — all 7 are always visible.
+ * Only add-on sidebar items have module gates.
  */
-export function isModuleGatedView(_view: View): boolean {
-  return false;
+export function isModuleGatedView(view: View): boolean {
+  const item = ADDON_NAV_ITEMS.find(i => i.id === view);
+  return !!item?.requiredModule;
 }
 
 /**
  * Get the required module for a gated view, if any.
- * Consolidated tabs have no module gates.
  */
-export function getRequiredModule(_view: View): ModuleType | undefined {
-  return undefined;
+export function getRequiredModule(view: View): ModuleType | undefined {
+  const item = ADDON_NAV_ITEMS.find(i => i.id === view);
+  return item?.requiredModule;
 }

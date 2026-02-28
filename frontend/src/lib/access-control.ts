@@ -26,13 +26,10 @@ export const USER_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
     allowedViews: [
       'dashboard',           // Base: always visible
       'ai-chat',             // Base: AI Chat assistant
-      'digital-twin',        // Base: 3D/2D visualization
       'integrations',        // Base: System Health
-      'control-audit',       // Base: Audit Logs (part of base package for all users)
-      'solar',               // Add-on: Solar & BESS (their focus module)
-      'aegis',               // Add-on: AEGIS BESS ops console
-      'control',             // Add-on: Building Controls (needed for solar control)
-      'settings',            // Internal: password-protected module management
+      'logs',                // Base: Audit logs
+      'simbiot',             // Admin: SIMBIOT
+      'settings',            // Admin: Settings
     ],
     defaultView: 'dashboard',
     viewMode: 'operator',
@@ -52,15 +49,12 @@ export const COMPANY_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
     allowedViews: [
       'dashboard',           // Base: always visible
       'ai-chat',             // Base: AI Chat assistant
-      'digital-twin',        // Base: 3D/2D visualization
       'integrations',        // Base: System Health
-      'control-audit',       // Base: Audit Logs (part of base package for all users)
-      'occupancy',           // Add-on: Occupancy monitoring (lighting module)
-      'lighting',            // Add-on: Lighting control (lighting module)
-      'control',             // Add-on: Building Controls (needed for lighting control)
-      'settings',            // Internal: password-protected module management
+      'logs',                // Base: Audit logs
+      'simbiot',             // Admin: SIMBIOT
+      'settings',            // Admin: Settings
     ],
-    defaultView: 'occupancy',
+    defaultView: 'dashboard',
     viewMode: 'operator',
     description: 'Lighting & Occupancy Control Demo',
   },

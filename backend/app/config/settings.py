@@ -264,6 +264,8 @@ class Settings(BaseSettings):
     email_intake_auto_wo_enabled: bool = False  # Auto-create local WO-... work orders for high-confidence intakes
     email_intake_auto_wo_max_priority: int = 2  # Max urgency level for auto-WO (1=low, 4=critical)
     email_intake_duplicate_window_hours: int = 24  # Heuristic dedup window
+    email_intake_agent_enabled: bool = True  # Phase 134: Use AI agent for classification + reply
+    email_intake_agent_timeout_seconds: int = 30  # LLM call timeout
 
     # Email reply service (Phase 131.2b — backend SMTP threading)
     email_reply_enabled: bool = False  # Send threaded replies from backend instead of n8n

@@ -50,6 +50,7 @@ from app.services.seasonal_modeler import SeasonalModeler
 from app.services.equipment_json_loader import load_site_equipment
 from app.services.sentinel_alert_engine import SentinelAlertEngine, AlertContext
 from app.services.simulation_persistence import get_simulation_persistence
+from app.services.sentinel_data_sync import get_sentinel_data_sync
 from app.services.sustainability_metrics_collector import SustainabilityMetricsCollector
 from app.services.thermal_simulation_engine import update_simulation_temperatures
 
@@ -351,8 +352,11 @@ class LifecycleOrchestrator:
         self._zone_temp_status_cache: dict[str, str] = {}  # zone_id -> "normal"|"warning"|"critical"
         self._zone_temp_last_alert: dict[str, int] = {}  # zone_id -> absolute_hour of last alert
 
-        # SENTINEL persistence layer: writes to Supabase + feeds ML pipeline
+        # BMS simulation persistence: writes JSON only
         self.persistence = get_simulation_persistence(site_id=site_id)
+
+        # SENTINEL data sync: Supabase updates + ML pipeline
+        self.sentinel_sync = get_sentinel_data_sync(site_id=site_id)
 
         # BESS state of charge tracking across hours
         self.bess_soc: float = 50.0  # Start at 50% SoC
@@ -1032,8 +1036,8 @@ class LifecycleOrchestrator:
                 }
                 for e in self.events[-10:]
             ],
-            "ml_feeder": self.persistence.ml_feeder.get_buffer_stats()
-            if hasattr(self.persistence, "ml_feeder")
+            "ml_feeder": self.sentinel_sync.ml_feeder.get_buffer_stats()
+            if hasattr(self, "sentinel_sync")
             else {"error": "ml_feeder not initialized"},
         }
 
@@ -1508,9 +1512,8 @@ class LifecycleOrchestrator:
         if schedule_state.hvac_mode != HVACMode.OFF:
             await self._ai_optimization(f"hour_{hour}")
 
-        # === PERSIST STATE TO SUPABASE (104-02) ===
-        # Write equipment health, sensor readings, and energy to Supabase
-        # so existing dashboards show live building operation
+        # === STEP 1: BMS persists to JSON ===
+        # Simulation store writes equipment health, sensor readings, energy
         equipment_states = {}
         try:
             equipment_states = await self._collect_equipment_states(hour, schedule_state)
@@ -1524,6 +1527,15 @@ class LifecycleOrchestrator:
             )
         except Exception as e:
             logger.warning(f"[PERSISTENCE] Failed to persist hourly state: {e}")
+
+        # === STEP 2: SENTINEL syncs to Supabase + ML ===
+        # After BMS JSON persist, SENTINEL updates equipment operating_data,
+        # zone temperatures, and feeds ML pipeline
+        if equipment_states:
+            try:
+                await self.sentinel_sync.ingest_equipment_states(equipment_states, self.simulated_time)
+            except Exception as e:
+                logger.warning(f"[SENTINEL SYNC] Failed: {e}")
 
         # === PERSIST SOLAR SNAPSHOT TO SUPABASE ===
         # Write solar/BESS state to solar_hourly_snapshots for dashboard

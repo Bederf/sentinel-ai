@@ -1,10 +1,10 @@
 ---
-title: "Sustainability & ESG Module"
+title: "Compliance & ESG Module (formerly Sustainability)"
 type: "guide"
 status: "approved"
-version: "2.0.0"
+version: "2.1.0"
 created: "2026-02-06"
-updated: "2026-02-22"
+updated: "2026-02-28"
 author: "Sentinel Development Team"
 tags: ["sustainability", "esg", "carbon", "emissions", "green-star", "energy-efficiency"]
 domain: "general"
@@ -66,9 +66,9 @@ Energy Module (existing)         Generator Service (existing)
 ### Module Integration
 
 Registered in the bolt-on module system:
-- **Module type:** `sustainability`
+- **Module type:** `compliance` (renamed from `sustainability` in v2.0)
 - **Integrates with:** Energy, HVAC, Lighting
-- **Cross-module link:** `energy_sustainability_emissions` — recalculates emissions when energy data updates
+- **Cross-module link:** `compliance_energy_carbon` — recalculates emissions when energy data updates
 
 ## API Endpoints
 

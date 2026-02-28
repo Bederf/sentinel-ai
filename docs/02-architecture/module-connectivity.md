@@ -2,9 +2,9 @@
 title: "Module Connectivity & Cross-System Integration"
 type: "architecture"
 status: "approved"
-version: "1.0.0"
+version: "2.0.0"
 created: "2026-02-09"
-updated: "2026-02-09"
+updated: "2026-02-28"
 author: "Sentinel Development Team"
 tags: ["modules", "integration", "architecture", "multi-module", "coordination"]
 domain: "general"
@@ -34,27 +34,35 @@ The system's capabilities **exponentially increase** as modules are added. A sin
 
 ## Module Catalog
 
-### 17 Total Modules Across 5 Categories
+### 27 Total Modules Across 4 Categories
 
-| Module | Category | Description | Capabilities | Cost |
-|--------|----------|-------------|--------------|------|
-| **control** | Core | Device & scene control | Remote command execution, safety validation | Included |
-| **assets** | Core | Asset lifecycle management | Baseline assessment, inspection scheduling, repair tracking | Included |
-| **simbiot** | Core | BMS onboarding & integration | Wizard-driven setup, auto-discovery, point mapping | Included |
-| **integrations** | Core | BMS connectivity | Niagara, BACnet, Modbus, data quality monitoring | Included |
-| **notifications** | Core | Alert delivery | Telegram, email, SMS dispatch with cooldown | Included |
-| **hvac** | Building Systems | HVAC control & monitoring | Zone temperature control, setpoint management, comfort optimization | Paid Add-on |
-| **energy** | Building Systems | Power & load management | Generator/UPS/ATS monitoring, load shedding, demand response | Paid Add-on |
-| **lighting** | Building Systems | DALI lighting control | Scene management, daylight harvesting, occupancy-based dimming | Paid Add-on |
-| **security** | Building Systems | Access & occupancy | Badge event tracking, zone occupancy, occupancy-based automation | Paid Add-on |
-| **solar** | Building Systems | Solar PV & BESS | Generation monitoring, dispatch optimization, NRS 097 compliance | Paid Add-on |
-| **fire** | Building Systems | Fire safety systems | Detection, notification, zone segregation | Paid Add-on |
-| **access** | Building Systems | Access control | Door locks, reader integration, audit trail | Paid Add-on |
-| **water** | Operations | Water metering | Consumption monitoring, leak detection, trending | Paid Add-on |
-| **sustainability** | Operations | ESG & carbon tracking | Carbon emissions, energy efficiency, green certifications | Paid Add-on |
-| **contracts** | Operations | Commercial management | SLA tracking, budget management, profitability analysis | Paid Add-on |
-| **ml** | Intelligence | Fleet machine learning | LSTM forecasting, anomaly detection, cross-site patterns | Paid Add-on |
-| **{future}** | Intelligence | Custom integrations | Template for partner integrations | Paid Add-on |
+**Base Platform (7, always on):** `kpi`, `ml`, `notifications`, `integrations`, `simbiot`, `logging`, `assets`
+
+**Base Building Systems (8, always on):** `hvac`, `energy`, `lighting`, `solar`, `water`, `fire`, `security`, `digital_twin`
+
+**Control Add-ons (7, toggleable — gate write features within building tabs):**
+
+| Module | Gates | Description |
+|--------|-------|-------------|
+| `hvac_control` | HVAC tab control features | Setpoints, scheduling, automation rules |
+| `energy_control` | Energy tab control features | Peak shaving, load shedding, generator management |
+| `lighting_control` | Lighting tab control features | DALI scenes, daylight harvesting, occupancy automation |
+| `solar_control` | Solar tab control features + AEGIS | AEGIS dispatch, BESS arbitrage, load shifting |
+| `water_control` | Water tab control features | Valve automation, leak response |
+| `security_control` | Security tab control features | Door lock commands, access schedules |
+| `digital_twin_control` | Digital Twin write actions | Write actions from twin interface |
+
+**Standalone Add-ons (5, toggleable):**
+
+| Module | Description |
+|--------|-------------|
+| `maintenance` | Work orders, preventive scheduling, tech chat |
+| `financial` | Contracts, profitability, budget, SLA |
+| `compliance` | Carbon Tax, Green Star, SANS certification, ESG |
+| `simulation` | What-if scenarios, ROI modelling |
+| `fleet_ml` | Cross-portfolio analytics, multi-site benchmarking |
+
+> **Note:** The old monolithic `control` module has been replaced by 7 per-discipline `{x}_control` add-ons. `contracts` → `financial`, `sustainability` → `compliance`, `access` merged into `security`/`security_control`.
 
 ---
 
@@ -75,9 +83,9 @@ When both source and target modules are active, the system automatically creates
 | **solar_generator_coordination** | Solar → Energy | Generator start requested | Check if solar+BESS can serve load | Avoid expensive generator start when renewable generation available |
 | **ml_hvac_predictive** | ML → HVAC | Failure prediction | Generate maintenance alert + auto-schedule inspection | Prevent HVAC failures before they occur |
 | **ml_energy_anomaly** | ML → Energy | Anomaly detected | Alert + anomaly details | Detect equipment degradation, energy waste, demand anomalies |
-| **sustainability_energy_carbon** | Sustainability → Energy | Carbon tracking enabled | Include carbon intensity in recommendations | Optimize for emissions (shift loads to low-carbon hours) |
-| **sustainability_solar_green** | Sustainability → Solar | ESG reporting enabled | Attribute generation to green energy targets | Track renewable contribution to sustainability goals |
-| **sustainability_water_monitoring** | Sustainability → Water | ESG enabled | Include water metrics in carbon footprint | Comprehensive environmental impact reporting |
+| **compliance_energy_carbon** | Compliance → Energy | Carbon tracking enabled | Include carbon intensity in recommendations | Optimize for emissions (shift loads to low-carbon hours) |
+| **compliance_solar_green** | Compliance → Solar | ESG reporting enabled | Attribute generation to green energy targets | Track renewable contribution to sustainability goals |
+| **compliance_water_monitoring** | Compliance → Water | ESG enabled | Include water metrics in carbon footprint | Comprehensive environmental impact reporting |
 
 ### Auto-Integration Mechanism
 
@@ -261,8 +269,8 @@ This section shows how platform capabilities **evolve** as modules are added, us
 
 ### Scenario 6: Full Site Deployment (Sandton Data Centre Example)
 
-**Active Modules:** All 14 (Control, Assets, SIMBIOT, Integrations, Notifications, HVAC, Energy, Lighting, Security, Solar, Water, ML, Sustainability, Contracts)  
-**Active Cross-Module Links:** All 12 integrations + ML coordination  
+**Active Modules:** All 27 (15 base always on + all 12 add-ons enabled)
+**Active Cross-Module Links:** All 12 integrations + ML coordination
 **Real Configuration:** `/backend/app/data/modules/site_modules.json` (site-002)
 
 #### Site Profile
@@ -295,7 +303,7 @@ This section shows how platform capabilities **evolve** as modules are added, us
   - Lighting: Daylight harvesting active (lux 800+)
   - Solar: BESS charging (store excess generation)
   - ML: Predicts afternoon peak demand → Alerts if chiller trending to failure state
-  - Sustainability: Carbon: Zero (all renewable)
+  - Compliance: Carbon: Zero (all renewable)
 
 **Example 2: Evening Load Shedding Event**
 - **5:00 PM:** Load shedding stage 4, occupancy 40%, solar ending (2.1 kW)
@@ -306,7 +314,7 @@ This section shows how platform capabilities **evolve** as modules are added, us
   4. Security: Occupancy tracking optimizes per-zone
   5. Solar: BESS discharge at 3 kW (cover load during peak shed)
   6. ML: Anomaly detection flags if chiller load unusual
-  7. Sustainability: Carbon tracking (monitors generator carbon)
+  7. Compliance: Carbon tracking (monitors generator carbon)
   8. Water: Cooling tower flow optimized based on pre-cooling
 
 **Example 3: Predictive Maintenance Trigger**
@@ -318,8 +326,8 @@ This section shows how platform capabilities **evolve** as modules are added, us
   4. Contracts: SLA check - warranty coverage confirmed
   5. Notifications: Telegram alert to facilities team
   6. Security: Track technician badges during repair
-  7. Sustainability: Log repair impact on carbon
-  8. Sustainability: Update asset lifecycle costs
+  7. Compliance: Log repair impact on carbon
+  8. Compliance: Update asset lifecycle costs
 
 #### Upsell Opportunities at This Site
 | Adding Module | New Value | Cost Justification |
@@ -692,7 +700,7 @@ T-30 min (before load shed):
   3. Lighting: Begin occupancy-based reductions (empty zones already at 20%)
   4. Solar: Store remaining generation in BESS (4 kW remaining → battery)
   5. ML: Flag if any equipment trending to failure (avoid during shed)
-  6. Sustainability: Log planned carbon offset (BESS discharge = 0 carbon)
+  6. Compliance: Log planned carbon offset (BESS discharge = 0 carbon)
 
 T-5 min:
   1. HVAC: Reduce to full +2°C setpoint (24°C)
@@ -715,7 +723,7 @@ T+120 min (Shed ends):
   3. Lighting: Restore to normal
   4. Solar: BESS charging (if still daylight)
   5. ML: Resume full analysis
-  6. Sustainability: Log shed duration impact on carbon
+  6. Compliance: Log shed duration impact on carbon
 ```
 
 **Measurable Outcomes:**

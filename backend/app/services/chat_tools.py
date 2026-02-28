@@ -3277,9 +3277,9 @@ CHAT_TOOLS = [
 
 # Tool-level module requirements for site-aware access control.
 TOOL_MODULE_REQUIREMENTS: dict[str, ModuleType] = {
-    # Control/automation tools (require CONTROL module)
-    "control_device": ModuleType.CONTROL,
-    # Maintenance/work order tools (require MAINTENANCE module)
+    # Control/automation tools (per-discipline control modules)
+    "control_device": ModuleType.HVAC_CONTROL,
+    # Maintenance/work order tools
     "create_work_order": ModuleType.MAINTENANCE,
     # SIMBIOT / onboarding workflows
     "discover_niagara_points": ModuleType.SIMBIOT,
@@ -3295,11 +3295,11 @@ TOOL_MODULE_REQUIREMENTS: dict[str, ModuleType] = {
     "get_solar_savings": ModuleType.SOLAR,
     "get_solar_diagnostics": ModuleType.SOLAR,
     "get_solar_forecast": ModuleType.SOLAR,
-    # Write/action tools — module gating
-    "adjust_setpoint": ModuleType.CONTROL,
-    "approve_recommendation": ModuleType.CONTROL,
-    "reject_recommendation": ModuleType.CONTROL,
-    "reset_equipment_fault": ModuleType.CONTROL,
+    # Write/action tools — per-discipline control gating
+    "adjust_setpoint": ModuleType.HVAC_CONTROL,
+    "approve_recommendation": ModuleType.ENERGY_CONTROL,
+    "reject_recommendation": ModuleType.ENERGY_CONTROL,
+    "reset_equipment_fault": ModuleType.HVAC_CONTROL,
 }
 
 

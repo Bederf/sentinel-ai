@@ -543,9 +543,9 @@ async def get_simulation_status(task_id: str):
                 sentinel_status=orchestrator._get_sentinel_status()
                 if hasattr(orchestrator, "_get_sentinel_status")
                 else None,
-                # ML feeder stats from SENTINEL persistence layer
-                ml_feeder=orchestrator.persistence.ml_feeder.get_buffer_stats()
-                if hasattr(orchestrator.persistence, "ml_feeder")
+                # ML feeder stats from SENTINEL data sync layer
+                ml_feeder=orchestrator.sentinel_sync.ml_feeder.get_buffer_stats()
+                if hasattr(orchestrator, "sentinel_sync")
                 else None,
             )
         else:

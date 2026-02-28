@@ -467,7 +467,7 @@ export function createMockModuleContext(overrides?: Partial<ModuleContextValue>)
       { module_type: 'solar', name: 'Solar', description: 'Solar management', integrates_with: [] },
       { module_type: 'water', name: 'Water', description: 'Water management', integrates_with: [] },
       { module_type: 'fire', name: 'Fire', description: 'Fire safety', integrates_with: [] },
-      { module_type: 'access', name: 'Access', description: 'Access control', integrates_with: [] },
+      { module_type: 'digital_twin', name: 'Digital Twin', description: 'Building visualization', integrates_with: [] },
     ],
     recommendations: [],
     integrationSummary: null,

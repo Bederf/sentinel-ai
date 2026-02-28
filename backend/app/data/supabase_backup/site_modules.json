@@ -1,357 +1,308 @@
-[
-  {
-    "instance_id": "S002-solar-d0e8b15e",
-    "site_id": "S002",
-    "module_type": "solar",
-    "status": "active",
-    "activated_at": "2026-02-12T17:18:01.876776+00:00",
-    "config": {},
-    "health_score": 100.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "sandton-assets-001",
+{
+  "site-002": {
     "site_id": "site-002",
-    "module_type": "assets",
-    "status": "active",
-    "activated_at": "2025-01-15T08:00:00+00:00",
-    "config": {
-      "baseline_assessment": true,
-      "lifecycle_management": true,
-      "inspection_scheduling": true
-    },
-    "health_score": 100.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "sandton-contracts-001",
-    "site_id": "site-002",
-    "module_type": "contracts",
-    "status": "active",
-    "activated_at": "2026-02-06T12:00:00+00:00",
-    "config": {
-      "sla_tracking": true,
-      "budget_management": true,
-      "profitability_analysis": true
-    },
-    "health_score": 98.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "sandton-control-001",
-    "site_id": "site-002",
-    "module_type": "control",
-    "status": "active",
-    "activated_at": "2025-01-15T08:00:00+00:00",
-    "config": {
-      "audit_logging": true,
-      "remote_control": true,
-      "safety_interlocks": true
-    },
-    "health_score": 100.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "sandton-energy-001",
-    "site_id": "site-002",
-    "module_type": "energy",
-    "status": "active",
-    "activated_at": "2025-01-15T08:00:00+00:00",
-    "config": {
-      "ats_monitoring": true,
-      "power_metering": true,
-      "ups_monitoring": true,
-      "generator_scada": true,
-      "predictive_maintenance": true
-    },
-    "health_score": 95.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "sandton-hvac-76e04af6",
-    "site_id": "site-002",
-    "module_type": "hvac",
-    "status": "active",
-    "activated_at": "2026-01-31T10:34:37.244925+00:00",
-    "config": {},
-    "health_score": 100.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "sandton-integrations-001",
-    "site_id": "site-002",
-    "module_type": "integrations",
-    "status": "active",
-    "activated_at": "2025-01-15T08:00:00+00:00",
-    "config": {
-      "data_quality": true,
-      "sync_tracking": true,
-      "bms_health_monitoring": true
-    },
-    "health_score": 100.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "sandton-lighting-001",
-    "site_id": "site-002",
-    "module_type": "lighting",
-    "status": "active",
-    "activated_at": "2025-01-15T08:00:00+00:00",
-    "config": {
-      "dali_control": true,
-      "scene_management": true,
-      "daylight_harvesting": true
-    },
-    "health_score": 98.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "sandton-ml-001",
-    "site_id": "site-002",
-    "module_type": "ml",
-    "status": "active",
-    "activated_at": "2026-02-06T12:00:00+00:00",
-    "config": {
-      "fleet_analytics": true,
-      "lstm_predictions": true,
-      "model_monitoring": true,
-      "anomaly_detection": true
-    },
-    "health_score": 97.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "sandton-notifications-001",
-    "site_id": "site-002",
-    "module_type": "notifications",
-    "status": "active",
-    "activated_at": "2025-01-15T08:00:00+00:00",
-    "config": {
-      "sms": false,
-      "email": false,
-      "telegram": true,
-      "alert_cooldown_minutes": 5
-    },
-    "health_score": 100.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "sandton-security-001",
-    "site_id": "site-002",
-    "module_type": "security",
-    "status": "active",
-    "activated_at": "2026-02-06T12:00:00+00:00",
-    "config": {
-      "icon": "Shield",
-      "includes": [
-        "Access control monitoring",
-        "Real-time occupancy tracking",
-        "CCTV integration",
-        "Breach alerts",
-        "Occupancy-based automation triggers"
-      ],
-      "sellable": true,
-      "price_usd": 500,
-      "api_prefix": "/api/security",
-      "display_name": "Security & Access Control",
-      "integrations": [
-        {
-          "feature": "Occupancy-based HVAC optimization",
-          "provides": "occupancy_data",
-          "requires": [
-            "hvac"
-          ]
-        },
-        {
-          "feature": "Occupancy-based lighting control",
-          "provides": "occupancy_data",
-          "requires": [
-            "lighting"
-          ]
-        }
-      ],
-      "access_control": true,
-      "dashboard_route": "/security",
-      "zone_management": true,
-      "cctv_integration": true,
-      "billing_frequency": "monthly",
-      "occupancy_tracking": true
-    },
-    "health_score": 96.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "sandton-simbiot-001",
-    "site_id": "site-002",
-    "module_type": "simbiot",
-    "status": "active",
-    "activated_at": "2025-01-15T08:00:00+00:00",
-    "config": {
-      "point_mapping": true,
-      "auto_discovery": true,
-      "onboarding_wizard": true
-    },
-    "health_score": 100.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "sandton-solar-001",
-    "site_id": "site-002",
-    "module_type": "solar",
-    "status": "active",
-    "activated_at": "2026-02-06T10:00:00+00:00",
-    "config": {
-      "tariff_type": "tou",
-      "bess_enabled": true,
-      "manufacturers": [
-        "huawei",
-        "schneider"
-      ],
-      "ingestion_mode": "standalone",
-      "compliance_monitoring": true
-    },
-    "health_score": 92.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "sandton-sustainability-001",
-    "site_id": "site-002",
-    "module_type": "sustainability",
-    "status": "active",
-    "activated_at": "2026-02-06T12:00:00+00:00",
-    "config": {
-      "esg_reporting": true,
-      "carbon_tracking": true,
-      "waste_management": true,
-      "water_monitoring": true,
-      "green_building_certification": true
-    },
-    "health_score": 94.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "sandton-water-001",
-    "site_id": "site-002",
-    "module_type": "water",
-    "status": "active",
-    "activated_at": "2026-02-07T10:00:00+00:00",
-    "config": {
-      "leak_detection": true,
-      "trending_analysis": true,
-      "consumption_monitoring": true,
-      "polling_interval_seconds": 60
-    },
-    "health_score": 100.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "site-002-access-f579727d",
-    "site_id": "site-002",
-    "module_type": "access",
-    "status": "active",
-    "activated_at": "2026-02-13T12:30:30.133675+00:00",
-    "config": {},
-    "health_score": 100.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "site-002-digital_twin-b58ec3a1",
-    "site_id": "site-002",
-    "module_type": "digital_twin",
-    "status": "active",
-    "activated_at": "2026-02-22T06:12:24.646186+00:00",
-    "config": {},
-    "health_score": 100.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "site-002-fire-bff0cc50",
-    "site_id": "site-002",
-    "module_type": "fire",
-    "status": "active",
-    "activated_at": "2026-02-13T12:30:24.242686+00:00",
-    "config": {},
-    "health_score": 100.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "site-002-kpi-24299fc1",
-    "site_id": "site-002",
-    "module_type": "kpi",
-    "status": "active",
-    "activated_at": "2026-02-22T06:11:46.394177+00:00",
-    "config": {},
-    "health_score": 100.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
-  },
-  {
-    "instance_id": "site-002-maintenance-b3fe1d5b",
-    "site_id": "site-002",
-    "module_type": "maintenance",
-    "status": "active",
-    "activated_at": "2026-02-22T06:11:59.790086+00:00",
-    "config": {},
-    "health_score": 100.0,
-    "last_telemetry": null,
-    "error_message": null,
-    "created_at": "2026-02-25T09:26:46.395695+00:00",
-    "updated_at": "2026-02-25T09:26:46.395695+00:00"
+    "site_name": "Sandton Data Centre",
+    "active_modules": [
+      {
+        "instance_id": "site-002-kpi-base",
+        "site_id": "site-002",
+        "module_type": "kpi",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-ml-base",
+        "site_id": "site-002",
+        "module_type": "ml",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {"anomaly_detection": true, "lstm_predictions": true},
+        "health_score": 97,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-notifications-base",
+        "site_id": "site-002",
+        "module_type": "notifications",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-integrations-base",
+        "site_id": "site-002",
+        "module_type": "integrations",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-simbiot-base",
+        "site_id": "site-002",
+        "module_type": "simbiot",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-logging-base",
+        "site_id": "site-002",
+        "module_type": "logging",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-assets-base",
+        "site_id": "site-002",
+        "module_type": "assets",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-hvac-base",
+        "site_id": "site-002",
+        "module_type": "hvac",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 95,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-energy-base",
+        "site_id": "site-002",
+        "module_type": "energy",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 98,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-lighting-base",
+        "site_id": "site-002",
+        "module_type": "lighting",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 96,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-solar-base",
+        "site_id": "site-002",
+        "module_type": "solar",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 99,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-water-base",
+        "site_id": "site-002",
+        "module_type": "water",
+        "status": "active",
+        "activated_at": "2026-02-07T10:00:00+00:00",
+        "config": {"leak_detection": true, "trending_analysis": true},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-fire-base",
+        "site_id": "site-002",
+        "module_type": "fire",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-security-base",
+        "site_id": "site-002",
+        "module_type": "security",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-digital_twin-base",
+        "site_id": "site-002",
+        "module_type": "digital_twin",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-hvac_control-addon",
+        "site_id": "site-002",
+        "module_type": "hvac_control",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-energy_control-addon",
+        "site_id": "site-002",
+        "module_type": "energy_control",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-lighting_control-addon",
+        "site_id": "site-002",
+        "module_type": "lighting_control",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-solar_control-addon",
+        "site_id": "site-002",
+        "module_type": "solar_control",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-water_control-addon",
+        "site_id": "site-002",
+        "module_type": "water_control",
+        "status": "inactive",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-security_control-addon",
+        "site_id": "site-002",
+        "module_type": "security_control",
+        "status": "inactive",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-digital_twin_control-addon",
+        "site_id": "site-002",
+        "module_type": "digital_twin_control",
+        "status": "inactive",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-maintenance-addon",
+        "site_id": "site-002",
+        "module_type": "maintenance",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-financial-addon",
+        "site_id": "site-002",
+        "module_type": "financial",
+        "status": "inactive",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-compliance-addon",
+        "site_id": "site-002",
+        "module_type": "compliance",
+        "status": "inactive",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-simulation-addon",
+        "site_id": "site-002",
+        "module_type": "simulation",
+        "status": "active",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      },
+      {
+        "instance_id": "site-002-fleet_ml-addon",
+        "site_id": "site-002",
+        "module_type": "fleet_ml",
+        "status": "inactive",
+        "activated_at": "2026-02-06T12:00:00+00:00",
+        "config": {},
+        "health_score": 100,
+        "last_telemetry": null,
+        "error_message": null
+      }
+    ],
+    "cross_module_links": [],
+    "ai_enabled": true,
+    "auto_integration": true
   }
-]
+}

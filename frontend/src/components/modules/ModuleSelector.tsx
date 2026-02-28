@@ -38,33 +38,9 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
   const [showWarning, setShowWarning] = useState<ModuleType | null>(null);
   const [isDeactivating, setIsDeactivating] = useState(false);
 
-  // Determine which modules will be disabled if this module is deactivated
-  const getDependentsToDisable = (moduleType: ModuleType): ModuleType[] => {
-    const DEPENDENT_MODULES: Record<ModuleType, ModuleType[]> = {
-      // Core infrastructure
-      kpi: [],
-      ml: [],
-      hvac: [],
-      energy: [],
-      assets: [],
-      simbiot: [],
-      integrations: [],
-      notifications: [],
-      // Paid add-ons
-      control: ['solar', 'lighting'],
-      maintenance: [],
-      digital_twin: [],
-      // Building system add-ons
-      lighting: [],
-      fire: [],
-      access: [],
-      security: [],
-      solar: [],
-      sustainability: [],
-      water: [],
-      contracts: [],
-    };
-    return DEPENDENT_MODULES[moduleType] || [];
+  // No cascading dependencies in the new architecture — each add-on is independent
+  const getDependentsToDisable = (_moduleType: ModuleType): ModuleType[] => {
+    return [];
   };
 
   async function handleToggle(moduleType: ModuleType, currentlyActive: boolean) {
@@ -234,26 +210,38 @@ export function ModuleSelector({ onModuleActivated, onModuleDeactivated }: Modul
 }
 
 // Map module types to icons
-const MODULE_ICONS: Record<ModuleType, React.ComponentType<any>> = {
+const MODULE_ICONS: Partial<Record<ModuleType, React.ComponentType<any>>> = {
+  // Base Platform
   kpi: Package,
+  ml: Brain,
+  notifications: Bell,
+  integrations: Link2,
+  simbiot: Plug,
+  logging: FileText,
+  assets: Package,
+  // Base Building Systems
   hvac: Wind,
   energy: Zap,
-  security: Lock,
   lighting: Lightbulb,
   solar: Sun,
   water: Droplets,
   fire: Flame,
-  access: KeyRound,
-  ml: Brain,
-  sustainability: Leaf,
-  contracts: FileText,
-  control: Gamepad2,
-  assets: Package,
-  simbiot: Plug,
-  integrations: Link2,
-  notifications: Bell,
+  security: Lock,
   digital_twin: Package,
+  // Control Add-ons
+  hvac_control: Gamepad2,
+  energy_control: Gamepad2,
+  lighting_control: Gamepad2,
+  solar_control: Gamepad2,
+  water_control: Gamepad2,
+  security_control: Gamepad2,
+  digital_twin_control: Gamepad2,
+  // Standalone Add-ons
   maintenance: Package,
+  financial: FileText,
+  compliance: Leaf,
+  simulation: Package,
+  fleet_ml: Brain,
 };
 
 interface ModuleCardProps {

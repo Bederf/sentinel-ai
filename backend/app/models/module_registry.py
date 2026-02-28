@@ -15,32 +15,42 @@ from enum import Enum
 
 
 class ModuleType(str, Enum):
-    """Available module types."""
+    """Available module types (27 total)."""
 
-    # Core infrastructure (non-deactivatable)
+    # Base Platform (7, always on)
     KPI = "kpi"
     ML = "ml"
+    NOTIFICATIONS = "notifications"
+    INTEGRATIONS = "integrations"
+    SIMBIOT = "simbiot"
+    LOGGING = "logging"
+    ASSETS = "assets"
+
+    # Base Building Systems (8, always on, tabs driven by SIMBIOT data)
     HVAC = "hvac"
     ENERGY = "energy"
-    ASSETS = "assets"
-    SIMBIOT = "simbiot"
-    INTEGRATIONS = "integrations"
-    NOTIFICATIONS = "notifications"
-
-    # Paid add-ons
-    CONTROL = "control"  # Gateway add-on — unlocks all automation
-    MAINTENANCE = "maintenance"  # Work order and asset lifecycle management
-    DIGITAL_TWIN = "digital_twin"  # 3D/2D building visualization
-
-    # Building system add-ons (require CONTROL for automation)
-    LIGHTING = "lighting"  # DALI lighting + occupancy-driven automation
-    FIRE = "fire"
-    ACCESS = "access"  # Access control integration
-    SECURITY = "security"  # Includes access control data
+    LIGHTING = "lighting"
     SOLAR = "solar"
-    SUSTAINABILITY = "sustainability"
     WATER = "water"
-    CONTRACTS = "contracts"
+    FIRE = "fire"
+    SECURITY = "security"
+    DIGITAL_TWIN = "digital_twin"
+
+    # Control Add-ons (7, toggleable per building system)
+    HVAC_CONTROL = "hvac_control"
+    ENERGY_CONTROL = "energy_control"
+    LIGHTING_CONTROL = "lighting_control"
+    SOLAR_CONTROL = "solar_control"
+    WATER_CONTROL = "water_control"
+    SECURITY_CONTROL = "security_control"
+    DIGITAL_TWIN_CONTROL = "digital_twin_control"
+
+    # Standalone Add-ons (5, toggleable)
+    MAINTENANCE = "maintenance"
+    FINANCIAL = "financial"
+    COMPLIANCE = "compliance"
+    SIMULATION = "simulation"
+    FLEET_ML = "fleet_ml"
 
 
 class ModuleStatus(str, Enum):
@@ -169,18 +179,18 @@ class SiteModuleConfig:
 
 # Pre-defined module definitions
 MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
-    ModuleType.CONTROL: ModuleDefinition(
-        module_type=ModuleType.CONTROL,
-        name="Control & Automation",
+    ModuleType.LOGGING: ModuleDefinition(
+        module_type=ModuleType.LOGGING,
+        name="Logging",
         version="1.0.0",
-        description="Core control system orchestration and automation rules",
+        description="Audit trail, equipment diagnostics, and event logs",
         capabilities=[
-            ModuleCapability("control_rules", "Control Rules", "Rule-based control logic for systems"),
-            ModuleCapability("control_audit", "Control Audit Trail", "Audit log for control actions"),
+            ModuleCapability("audit_trail", "Audit Trail", "Full audit log for all system events"),
+            ModuleCapability("diagnostics", "Equipment Diagnostics", "Diagnostic event logging"),
         ],
-        integrates_with=[ModuleType.HVAC, ModuleType.ENERGY, ModuleType.LIGHTING, ModuleType.SECURITY],
-        telemetry_points=["control_events", "rules_active"],
-        ai_features=["control_optimization"],
+        integrates_with=[ModuleType.INTEGRATIONS],
+        telemetry_points=["log_events"],
+        ai_features=["log_analysis"],
     ),
     ModuleType.ASSETS: ModuleDefinition(
         module_type=ModuleType.ASSETS,
@@ -217,7 +227,7 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
             ModuleCapability("health_monitoring", "Integration Health", "Monitor integration uptime and latency"),
             ModuleCapability("data_quality", "Data Quality", "Detect data gaps and anomalies"),
         ],
-        integrates_with=[ModuleType.CONTROL, ModuleType.ASSETS, ModuleType.HVAC, ModuleType.ENERGY],
+        integrates_with=[ModuleType.ASSETS, ModuleType.HVAC, ModuleType.ENERGY],
         telemetry_points=["integration_health", "data_quality_score"],
         ai_features=["anomaly_detection"],
     ),
@@ -348,39 +358,23 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
             ModuleCapability("trending_analysis", "Trending Analysis", "Period-over-period consumption comparison"),
             ModuleCapability("alert_management", "Alert Management", "Leak alert creation, resolution, and tracking"),
         ],
-        integrates_with=[ModuleType.SUSTAINABILITY, ModuleType.ENERGY],
+        integrates_with=[ModuleType.COMPLIANCE, ModuleType.ENERGY],
         telemetry_points=["flow_rate_lpm", "volume_liters", "pulse_count", "leak_alerts"],
         ai_features=["leak_detection", "consumption_forecasting", "pattern_anomaly_detection"],
     ),
     ModuleType.ML: ModuleDefinition(
         module_type=ModuleType.ML,
-        name="Fleet ML",
+        name="ML Intelligence",
         version="1.0.0",
-        description="Cross-site machine learning insights, anomaly detection, and predictive maintenance",
+        description="Anomaly detection, predictive maintenance, and health scoring",
         capabilities=[
-            ModuleCapability("fleet_insights", "Fleet Insights", "Cross-site pattern recognition and benchmarking"),
             ModuleCapability("anomaly_detection", "Anomaly Detection", "LSTM/Autoencoder-based anomaly detection"),
             ModuleCapability("predictive_maintenance", "Predictive Maintenance", "Failure probability forecasting"),
-            ModuleCapability("mlops_monitoring", "MLOps Monitoring", "Model performance tracking and drift detection"),
+            ModuleCapability("health_scoring", "Health Scoring", "Equipment health scoring"),
         ],
         integrates_with=[ModuleType.HVAC, ModuleType.ENERGY, ModuleType.SOLAR],
-        telemetry_points=["model_accuracy", "inference_latency", "anomaly_score", "drift_metric"],
-        ai_features=["cross_site_benchmarking", "model_retraining", "explainable_predictions", "fleet_health_scoring"],
-    ),
-    ModuleType.SUSTAINABILITY: ModuleDefinition(
-        module_type=ModuleType.SUSTAINABILITY,
-        name="Sustainability & ESG",
-        version="1.0.0",
-        description="Carbon tracking, ESG reporting, and sustainability compliance",
-        capabilities=[
-            ModuleCapability("carbon_tracking", "Carbon Tracking", "Scope 1/2/3 emissions monitoring"),
-            ModuleCapability("esg_reporting", "ESG Reporting", "Automated sustainability report generation"),
-            ModuleCapability("compliance_monitoring", "Compliance Monitoring", "Regulatory compliance tracking"),
-            ModuleCapability("green_certification", "Green Certification", "GBCSA/LEED/WELL certification support"),
-        ],
-        integrates_with=[ModuleType.ENERGY, ModuleType.SOLAR, ModuleType.HVAC],
-        telemetry_points=["carbon_emissions_kg", "energy_intensity", "water_usage", "waste_diversion_rate"],
-        ai_features=["emissions_forecasting", "reduction_recommendations", "benchmark_comparison", "report_generation"],
+        telemetry_points=["model_accuracy", "inference_latency", "anomaly_score"],
+        ai_features=["explainable_predictions", "health_scoring"],
     ),
     ModuleType.FIRE: ModuleDefinition(
         module_type=ModuleType.FIRE,
@@ -395,31 +389,151 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         telemetry_points=["fire_alarm_status"],
         ai_features=["alarm_correlation"],
     ),
-    ModuleType.ACCESS: ModuleDefinition(
-        module_type=ModuleType.ACCESS,
-        name="Access Control",
+    ModuleType.HVAC_CONTROL: ModuleDefinition(
+        module_type=ModuleType.HVAC_CONTROL,
+        name="HVAC Control",
         version="1.0.0",
-        description="Access control integration and badge management",
+        description="Setpoints, scheduling, and HVAC automation rules",
         capabilities=[
-            ModuleCapability("door_access", "Door Access", "Monitor and control door access"),
-            ModuleCapability("badge_events", "Badge Events", "Track badge use and anomalies"),
+            ModuleCapability("setpoint_control", "Setpoint Control", "Adjust zone setpoints"),
+            ModuleCapability("scheduling", "Scheduling", "HVAC schedule management"),
+        ],
+        integrates_with=[ModuleType.HVAC],
+        telemetry_points=["control_events"],
+        ai_features=["setpoint_tuning"],
+    ),
+    ModuleType.ENERGY_CONTROL: ModuleDefinition(
+        module_type=ModuleType.ENERGY_CONTROL,
+        name="Energy Control",
+        version="1.0.0",
+        description="Peak shaving, load shedding, and generator management",
+        capabilities=[
+            ModuleCapability("load_shedding", "Load Shedding", "Automated load shedding"),
+            ModuleCapability("peak_shaving", "Peak Shaving", "Demand management automation"),
+        ],
+        integrates_with=[ModuleType.ENERGY],
+        telemetry_points=["control_events"],
+        ai_features=["load_optimization"],
+    ),
+    ModuleType.LIGHTING_CONTROL: ModuleDefinition(
+        module_type=ModuleType.LIGHTING_CONTROL,
+        name="Lighting Control",
+        version="1.0.0",
+        description="DALI scenes, daylight harvesting, and occupancy automation",
+        capabilities=[
+            ModuleCapability("scene_control", "Scene Control", "DALI scene management"),
+            ModuleCapability("daylight_harvesting", "Daylight Harvesting", "Automatic dimming"),
+        ],
+        integrates_with=[ModuleType.LIGHTING],
+        telemetry_points=["control_events"],
+        ai_features=["occupancy_based_control"],
+    ),
+    ModuleType.SOLAR_CONTROL: ModuleDefinition(
+        module_type=ModuleType.SOLAR_CONTROL,
+        name="Solar Control",
+        version="1.0.0",
+        description="AEGIS dispatch, BESS arbitrage, and load shifting",
+        capabilities=[
+            ModuleCapability("aegis_dispatch", "AEGIS Dispatch", "Solar/BESS dispatch optimization"),
+            ModuleCapability("arbitrage", "Energy Arbitrage", "TOU tariff-based charge/discharge"),
+        ],
+        integrates_with=[ModuleType.SOLAR],
+        telemetry_points=["dispatch_events"],
+        ai_features=["arbitrage_optimisation"],
+    ),
+    ModuleType.WATER_CONTROL: ModuleDefinition(
+        module_type=ModuleType.WATER_CONTROL,
+        name="Water Control",
+        version="1.0.0",
+        description="Valve automation and leak response",
+        capabilities=[
+            ModuleCapability("valve_control", "Valve Control", "Automated valve management"),
+            ModuleCapability("leak_response", "Leak Response", "Automated leak response actions"),
+        ],
+        integrates_with=[ModuleType.WATER],
+        telemetry_points=["control_events"],
+        ai_features=["leak_response_automation"],
+    ),
+    ModuleType.SECURITY_CONTROL: ModuleDefinition(
+        module_type=ModuleType.SECURITY_CONTROL,
+        name="Security Control",
+        version="1.0.0",
+        description="Door lock commands and access schedules",
+        capabilities=[
+            ModuleCapability("door_commands", "Door Commands", "Remote door lock/unlock"),
+            ModuleCapability("access_schedules", "Access Schedules", "Automated access schedules"),
         ],
         integrates_with=[ModuleType.SECURITY],
-        telemetry_points=["badge_events", "door_status"],
+        telemetry_points=["control_events"],
         ai_features=["access_anomaly_detection"],
     ),
-    ModuleType.CONTRACTS: ModuleDefinition(
-        module_type=ModuleType.CONTRACTS,
-        name="Contracts",
+    ModuleType.DIGITAL_TWIN_CONTROL: ModuleDefinition(
+        module_type=ModuleType.DIGITAL_TWIN_CONTROL,
+        name="Digital Twin Control",
         version="1.0.0",
-        description="Contract and SLA management",
+        description="Write actions from digital twin interface",
+        capabilities=[
+            ModuleCapability("twin_write", "Twin Write Actions", "Execute actions from twin view"),
+        ],
+        integrates_with=[ModuleType.DIGITAL_TWIN],
+        telemetry_points=["control_events"],
+        ai_features=["spatial_control"],
+    ),
+    ModuleType.FINANCIAL: ModuleDefinition(
+        module_type=ModuleType.FINANCIAL,
+        name="Financial",
+        version="1.0.0",
+        description="Contracts, profitability, budget, SLA, and tenant sub-billing",
         capabilities=[
             ModuleCapability("sla_tracking", "SLA Tracking", "Track SLA compliance"),
             ModuleCapability("contract_reporting", "Contract Reporting", "Summarize contract performance"),
+            ModuleCapability("profitability", "Profitability", "Profitability analytics"),
+            ModuleCapability("budget", "Budget Reports", "Budget and forecasting"),
         ],
         integrates_with=[ModuleType.ASSETS, ModuleType.ENERGY],
         telemetry_points=["sla_status", "contract_margin"],
         ai_features=["risk_scoring"],
+    ),
+    ModuleType.COMPLIANCE: ModuleDefinition(
+        module_type=ModuleType.COMPLIANCE,
+        name="Compliance",
+        version="1.0.0",
+        description="Carbon Tax, Green Star, SANS certification, and ESG reporting",
+        capabilities=[
+            ModuleCapability("carbon_tracking", "Carbon Tracking", "Scope 1/2/3 emissions monitoring"),
+            ModuleCapability("esg_reporting", "ESG Reporting", "Automated sustainability report generation"),
+            ModuleCapability("compliance_monitoring", "Compliance Monitoring", "Regulatory compliance tracking"),
+            ModuleCapability("green_certification", "Green Certification", "GBCSA/LEED/WELL certification support"),
+        ],
+        integrates_with=[ModuleType.ENERGY, ModuleType.SOLAR, ModuleType.HVAC],
+        telemetry_points=["carbon_emissions_kg", "energy_intensity"],
+        ai_features=["emissions_forecasting", "reduction_recommendations"],
+    ),
+    ModuleType.SIMULATION: ModuleDefinition(
+        module_type=ModuleType.SIMULATION,
+        name="Simulation",
+        version="1.0.0",
+        description="What-if scenarios and ROI modelling",
+        capabilities=[
+            ModuleCapability("lifecycle_sim", "Lifecycle Simulation", "365-day equipment lifecycle simulation"),
+            ModuleCapability("roi_modelling", "ROI Modelling", "Return on investment modelling"),
+        ],
+        integrates_with=[ModuleType.ENERGY, ModuleType.HVAC],
+        telemetry_points=["simulation_results"],
+        ai_features=["scenario_analysis"],
+    ),
+    ModuleType.FLEET_ML: ModuleDefinition(
+        module_type=ModuleType.FLEET_ML,
+        name="Fleet ML",
+        version="1.0.0",
+        description="Cross-portfolio analytics and multi-site benchmarking",
+        capabilities=[
+            ModuleCapability("fleet_insights", "Fleet Insights", "Cross-site pattern recognition and benchmarking"),
+            ModuleCapability("mlops_monitoring", "MLOps Monitoring", "Model performance tracking and drift detection"),
+        ],
+        integrates_with=[ModuleType.ML, ModuleType.ENERGY, ModuleType.HVAC],
+        telemetry_points=["fleet_scores", "model_accuracy"],
+        ai_features=["cross_site_benchmarking", "model_retraining"],
     ),
     ModuleType.MAINTENANCE: ModuleDefinition(
         module_type=ModuleType.MAINTENANCE,
@@ -522,11 +636,11 @@ INTEGRATION_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "trigger": "generator_start_request",
         "action": "check_solar_bess_capacity",
     },
-    "sustainability_water_monitoring": {
-        "name": "Water Consumption for Sustainability",
-        "description": "Track water consumption for sustainability reporting",
+    "compliance_water_monitoring": {
+        "name": "Water Consumption for Compliance",
+        "description": "Track water consumption for compliance reporting",
         "source": ModuleType.WATER,
-        "target": ModuleType.SUSTAINABILITY,
+        "target": ModuleType.COMPLIANCE,
         "trigger": "water_consumption_update",
         "action": "update_water_metrics",
     },

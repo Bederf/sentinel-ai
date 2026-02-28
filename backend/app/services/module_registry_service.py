@@ -34,25 +34,25 @@ from app.services.health_threshold_service import get_health_thresholds
 
 logger = logging.getLogger(__name__)
 
-# Core infrastructure modules (non-deactivatable base features)
-# These are always active and provide the foundation for all monitoring and automation
+# Base modules (non-deactivatable) — 15 total: 7 platform + 8 building systems
 NON_DEACTIVATABLE_MODULES = {
-    ModuleType.KPI,  # Dashboard KPI metrics
-    ModuleType.ML,  # Risk intelligence and predictions
-    ModuleType.HVAC,  # HVAC monitoring (read-only in base, control via CONTROL module)
-    ModuleType.ENERGY,  # Energy monitoring (read-only in base, control via CONTROL module)
-    ModuleType.ASSETS,  # Asset visibility and lifecycle
-    ModuleType.SIMBIOT,  # BMS connection and SIMBIOT wizard
-    ModuleType.INTEGRATIONS,  # System health and integration monitoring
-    ModuleType.NOTIFICATIONS,  # Notification management
-}
-
-# Module dependency map: modules that require other modules to be active
-# Format: {dependent_module: required_module}
-# E.g., SOLAR requires CONTROL to be active to function
-MODULE_DEPENDENCIES = {
-    ModuleType.SOLAR: ModuleType.CONTROL,  # BESS arbitrage needs control authority
-    ModuleType.LIGHTING: ModuleType.CONTROL,  # Occupancy automation needs HVAC/DALI control
+    # Base Platform (7)
+    ModuleType.KPI,
+    ModuleType.ML,
+    ModuleType.NOTIFICATIONS,
+    ModuleType.INTEGRATIONS,
+    ModuleType.SIMBIOT,
+    ModuleType.LOGGING,
+    ModuleType.ASSETS,
+    # Base Building Systems (8)
+    ModuleType.HVAC,
+    ModuleType.ENERGY,
+    ModuleType.LIGHTING,
+    ModuleType.SOLAR,
+    ModuleType.WATER,
+    ModuleType.FIRE,
+    ModuleType.SECURITY,
+    ModuleType.DIGITAL_TWIN,
 }
 
 
@@ -367,10 +367,6 @@ class ModuleRegistryService:
         """
         Activate a module for a site.
 
-        Validates dependency chain:
-        - SOLAR and LIGHTING require CONTROL module to be active
-        - If dependencies not met, raises ValueError
-
         Creates cross-module links automatically if auto_integration is enabled.
         """
         # Get or create site config
@@ -378,18 +374,6 @@ class ModuleRegistryService:
             self._site_configs[site_id] = SiteModuleConfig(site_id=site_id, site_name=site_name)
 
         site_config = self._site_configs[site_id]
-
-        # DEPENDENCY VALIDATION: Check if required modules are active
-        if module_type in MODULE_DEPENDENCIES:
-            required_module = MODULE_DEPENDENCIES[module_type]
-            is_required_active = any(
-                m.module_type == required_module and m.status == ModuleStatus.ACTIVE for m in site_config.active_modules
-            )
-            if not is_required_active:
-                raise ValueError(
-                    f"{module_type.value} module requires {required_module.value} module "
-                    f"to be active first. Enable {required_module.value} to use {module_type.value}."
-                )
 
         # Check if module already active
         existing = next((m for m in site_config.active_modules if m.module_type == module_type), None)
@@ -424,10 +408,6 @@ class ModuleRegistryService:
         """
         Deactivate a module for a site (idempotent operation).
 
-        CASCADE LOGIC: If a module that others depend on is deactivated,
-        automatically deactivates dependent modules.
-        - Deactivating CONTROL → also deactivates SOLAR and LIGHTING
-
         Returns True even if module not found (idempotent behavior for safety).
         """
         if module_type in NON_DEACTIVATABLE_MODULES:
@@ -435,7 +415,6 @@ class ModuleRegistryService:
 
         config = self._site_configs.get(site_id)
         if not config:
-            # Idempotent: if site has no config, deactivation is already complete
             logger.debug(f"Site {site_id} has no module config, deactivation is no-op")
             return True
 
@@ -455,36 +434,10 @@ class ModuleRegistryService:
                 break
 
         if not module_found:
-            # Idempotent: if module not in list, it's already deactivated
             logger.debug(f"Module {module_type.value} not in active list for {site_id}, deactivation is no-op")
-            # Note: Changed from 'return False' to 'pass' to continue cascade logic
-            pass
-        else:
-            # CASCADE: Deactivate dependent modules
-            # Find all modules that depend on the deactivated module
-            dependent_modules = [
-                dep_module
-                for dep_module, required_module in MODULE_DEPENDENCIES.items()
-                if required_module == module_type
-            ]
-
-            for dependent in dependent_modules:
-                for module in config.active_modules:
-                    if module.module_type == dependent and module.status == ModuleStatus.ACTIVE:
-                        module.status = ModuleStatus.INACTIVE
-
-                        # Disable cross-module links for cascaded deactivation
-                        for link in config.cross_module_links:
-                            if link.source_module == dependent or link.target_module == dependent:
-                                link.enabled = False
-
-                        logger.info(
-                            f"Cascaded deactivation: {dependent.value} deactivated because "
-                            f"required module {module_type.value} was deactivated (site: {site_id})"
-                        )
 
         self._save_configs()
-        return True  # Changed: Always return True (idempotent)
+        return True
 
     def apply_preset(self, site_id: str, preset_name: str) -> Dict[str, Any]:
         """
@@ -533,19 +486,10 @@ class ModuleRegistryService:
             except Exception as e:
                 result["errors"].append(f"Failed to deactivate {module_name}: {str(e)}")
 
-        # Activate modules (respecting dependency order: CONTROL must come before SOLAR/LIGHTING)
+        # Activate modules
         to_activate = preset.get("activate", [])
 
-        # Sort to activate CONTROL first if present
-        activation_order = []
-        if "control" in to_activate:
-            activation_order.append("control")
-
         for module_name in to_activate:
-            if module_name not in activation_order:
-                activation_order.append(module_name)
-
-        for module_name in activation_order:
             try:
                 module_type = ModuleType(module_name)
                 self.activate_module(site_id, site_name, module_type)

@@ -208,24 +208,30 @@ ERROR      → Device write failed (COV mismatch)
 
 **Purpose:** Admin can enable/disable features per building without code changes
 
-### 16 Available Modules
+### 27 Module Types (4 Categories)
 
+**Base Platform (7, always on):** `kpi`, `ml`, `notifications`, `integrations`, `simbiot`, `logging`, `assets`
+
+**Base Building Systems (8, always on):** `hvac`, `energy`, `lighting`, `solar`, `water`, `fire`, `security`, `digital_twin`
+
+**Control Add-ons (7, toggleable — gate write features within building tabs):**
 ```
-Energy (amber)          → Solar + energy management
-HVAC (blue)             → Heating/cooling control
-Security (purple)       → Access control, CCTV
-Lighting (yellow)       → DALI control
-Water (blue)            → Consumption monitoring
-Fire (red)              → Safety systems
-Sustainability (emerald) → ESG metrics, carbon tracking
-Contracts (orange)      → Maintenance contracts
-ML (cyan)               → ML model deployment
-Notifications (rose)    → Alerts, escalations
-Integrations (sky)      → APIs, webhooks
-Control (slate)         → Device control
-Assets (indigo)         → Asset register
-SIMBIOT (teal)          → External connectors
-Access (green)          → Door locks
+hvac_control     → Setpoints, scheduling, automation rules
+energy_control   → Peak shaving, load shedding, generator management
+lighting_control → DALI scenes, daylight harvesting, occupancy automation
+solar_control    → AEGIS dispatch, BESS arbitrage, load shifting
+water_control    → Valve automation, leak response
+security_control → Door lock commands, access schedules
+digital_twin_control → Write actions from twin interface
+```
+
+**Standalone Add-ons (5, toggleable):**
+```
+maintenance → Work orders, preventive scheduling, tech chat
+financial   → Contracts, profitability, budget, SLA
+compliance  → Carbon Tax, Green Star, SANS certification
+simulation  → What-if scenarios, ROI modelling
+fleet_ml    → Cross-portfolio analytics, multi-site benchmarking
 ```
 
 ### API Workflow

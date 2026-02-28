@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 MCP_TOOL_MODULE_REQUIREMENTS: dict[str, ModuleType] = {
-    "write_device_point": ModuleType.CONTROL,
+    "write_device_point": ModuleType.HVAC_CONTROL,
     "create_work_order": ModuleType.MAINTENANCE,
     "create_building": ModuleType.SIMBIOT,
     "activate_building": ModuleType.SIMBIOT,
@@ -36,7 +36,7 @@ MCP_TOOL_MODULE_REQUIREMENTS: dict[str, ModuleType] = {
     "control_dali_device": ModuleType.SIMBIOT,
     "discover_tridonic_gateway": ModuleType.SIMBIOT,
     "configure_asset_metrics": ModuleType.ASSETS,
-    "add_building_contract": ModuleType.CONTRACTS,
+    "add_building_contract": ModuleType.FINANCIAL,
     "process_municipal_bill": ModuleType.ENERGY,
 }
 

@@ -34,11 +34,14 @@ def _setup_auth_and_clean_json():
     original_secret = settings.sentry_webhook_secret
     original_enabled = settings.email_intake_enabled
     original_auto_wo = settings.email_intake_auto_wo_enabled
+    original_agent = settings.email_intake_agent_enabled
 
     settings.sentry_bot_api_key = _TEST_API_KEY
     settings.sentry_webhook_secret = _TEST_SECRET
     settings.email_intake_enabled = True
     settings.email_intake_auto_wo_enabled = False
+    # Disable AI agent for these tests — they test the keyword pipeline
+    settings.email_intake_agent_enabled = False
 
     # Reset JSON fallback to empty before each test
     _JSON_PATH.write_text("[]")
@@ -54,6 +57,7 @@ def _setup_auth_and_clean_json():
     settings.sentry_webhook_secret = original_secret
     settings.email_intake_enabled = original_enabled
     settings.email_intake_auto_wo_enabled = original_auto_wo
+    settings.email_intake_agent_enabled = original_agent
 
     # Clean up after tests
     _JSON_PATH.write_text("[]")
@@ -265,13 +269,15 @@ class TestEmailIntakeRecentWindow:
         """Second email from same sender/site/category → linked."""
         unique_email = f"recent-{uuid.uuid4().hex[:6]}@example.com"
 
+        # Use subject that matches hvac category (default _make_payload subject
+        # triggers hvac taxonomy override, so use hvac as issue_category)
         # First
         resp1 = client.post(
             "/api/sentry/email/intake",
             json=_make_payload(
                 from_email=unique_email,
                 site_id="site-002",
-                issue_category="electrical",
+                issue_category="hvac",
             ),
             headers=VALID_HEADERS,
         )
@@ -283,7 +289,7 @@ class TestEmailIntakeRecentWindow:
             json=_make_payload(
                 from_email=unique_email,
                 site_id="site-002",
-                issue_category="electrical",
+                issue_category="hvac",
                 message_id=f"<{uuid.uuid4()}@example.com>",
             ),
             headers=VALID_HEADERS,
@@ -339,7 +345,7 @@ class TestEmailIntakeRouting:
     """Confidence-based routing: auto_submit / request_info / manual_review."""
 
     def test_high_confidence_routes_auto(self):
-        """extraction_confidence >= 0.85 → auto_submit (or new_intake if auto-WO off)."""
+        """extraction_confidence >= 0.85 → auto_submit."""
         resp = client.post(
             "/api/sentry/email/intake",
             json=_make_payload(extraction_confidence=0.92),
@@ -347,18 +353,16 @@ class TestEmailIntakeRouting:
         )
         assert resp.status_code == 200
         data = resp.json()
-        # auto_submit if auto-WO enabled, else new_intake
-        assert data["action_taken"] in ("auto_submit", "new_intake")
+        assert data["action_taken"] == "auto_submit"
 
     def test_medium_confidence_routes_request_info(self):
         """extraction_confidence in request_info range → request_info."""
-        # 0.60 base + site_id boost (0.05) + category boost (0.05) = 0.70
-        # Without site and with general category: stays at base
-        # Need 0.60 exactly or above but below 0.85
+        # Base 0.50 + site_id boost (0.05) + category boost (0.05) + name (0.03)
+        # + taxonomy boost (0.10) = 0.73 → request_info range [0.60, 0.85)
         resp = client.post(
             "/api/sentry/email/intake",
             json=_make_payload(
-                extraction_confidence=0.65,
+                extraction_confidence=0.50,
                 site_id="site-002",
                 zone_hint=None,
                 issue_category="hvac",

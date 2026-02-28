@@ -4,7 +4,6 @@ import pytest
 
 from app.models.module_registry import ModuleType
 from app.services.module_registry_service import (
-    MODULE_DEPENDENCIES,
     NON_DEACTIVATABLE_MODULES,
     ModuleRegistryService,
 )
@@ -21,29 +20,34 @@ def _new_registry_service(monkeypatch) -> ModuleRegistryService:
 
 
 def test_base_pack_modules_are_non_deactivatable():
-    """Core modules should remain protected and control should remain optional."""
-    assert ModuleType.HVAC in NON_DEACTIVATABLE_MODULES
+    """15 base modules should be non-deactivatable; add-ons should be optional."""
+    assert len(NON_DEACTIVATABLE_MODULES) == 15
+    # Platform base
+    assert ModuleType.KPI in NON_DEACTIVATABLE_MODULES
     assert ModuleType.ML in NON_DEACTIVATABLE_MODULES
     assert ModuleType.SIMBIOT in NON_DEACTIVATABLE_MODULES
-    assert ModuleType.CONTROL not in NON_DEACTIVATABLE_MODULES
+    assert ModuleType.LOGGING in NON_DEACTIVATABLE_MODULES
+    # Building system base
+    assert ModuleType.HVAC in NON_DEACTIVATABLE_MODULES
+    assert ModuleType.ENERGY in NON_DEACTIVATABLE_MODULES
+    assert ModuleType.LIGHTING in NON_DEACTIVATABLE_MODULES
+    assert ModuleType.SOLAR in NON_DEACTIVATABLE_MODULES
+    assert ModuleType.WATER in NON_DEACTIVATABLE_MODULES
+    assert ModuleType.FIRE in NON_DEACTIVATABLE_MODULES
+    assert ModuleType.SECURITY in NON_DEACTIVATABLE_MODULES
+    assert ModuleType.DIGITAL_TWIN in NON_DEACTIVATABLE_MODULES
+    # Control add-ons should NOT be in base
+    assert ModuleType.HVAC_CONTROL not in NON_DEACTIVATABLE_MODULES
+    assert ModuleType.ENERGY_CONTROL not in NON_DEACTIVATABLE_MODULES
+    assert ModuleType.SOLAR_CONTROL not in NON_DEACTIVATABLE_MODULES
 
 
-def test_addon_dependencies_require_control():
-    """Automation add-ons should depend on CONTROL."""
-    assert MODULE_DEPENDENCIES[ModuleType.SOLAR] == ModuleType.CONTROL
-    assert MODULE_DEPENDENCIES[ModuleType.LIGHTING] == ModuleType.CONTROL
-
-
-def test_activate_solar_requires_control(monkeypatch):
-    """SOLAR activation must fail until CONTROL is active."""
+def test_activate_control_addon(monkeypatch):
+    """Control add-ons can be activated without dependencies."""
     service = _new_registry_service(monkeypatch)
 
-    with pytest.raises(ValueError):
-        service.activate_module("site-test", "Test Site", ModuleType.SOLAR)
-
-    service.activate_module("site-test", "Test Site", ModuleType.CONTROL)
-    solar = service.activate_module("site-test", "Test Site", ModuleType.SOLAR)
-    assert solar.module_type == ModuleType.SOLAR
+    result = service.activate_module("site-test", "Test Site", ModuleType.HVAC_CONTROL)
+    assert result.module_type == ModuleType.HVAC_CONTROL
 
 
 def test_deactivate_base_module_blocked(monkeypatch):
@@ -52,3 +56,17 @@ def test_deactivate_base_module_blocked(monkeypatch):
 
     with pytest.raises(ValueError):
         service.deactivate_module("site-test", ModuleType.HVAC)
+
+
+def test_deactivate_addon_succeeds(monkeypatch):
+    """Add-on modules can be deactivated."""
+    service = _new_registry_service(monkeypatch)
+
+    service.activate_module("site-test", "Test Site", ModuleType.MAINTENANCE)
+    result = service.deactivate_module("site-test", ModuleType.MAINTENANCE)
+    assert result is True
+
+
+def test_module_type_count():
+    """There should be exactly 27 module types."""
+    assert len(ModuleType.__members__) == 27

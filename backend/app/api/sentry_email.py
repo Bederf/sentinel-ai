@@ -1,7 +1,8 @@
-"""Sentry Email Intake API — Phase 131.
+"""Sentry Email Intake API — Phase 134.
 
-Receives AI-classified FM emails from n8n, enriches with BMS context,
-detects duplicates/follow-ups, and returns auto-reply templates.
+Receives FM emails from n8n, enriches with BMS context, detects
+duplicates/follow-ups, and uses an AI agent (Phase 134) for classification
++ natural reply generation.  Falls back to keyword pipeline if agent fails.
 
 Auth chain:
   1. Middleware: ``X-Sentry-API-Key`` (required, matches ``sentry_bot_api_key``)
@@ -120,6 +121,11 @@ def _verify_webhook_secret(provided: Optional[str]) -> None:
         raise HTTPException(status_code=401, detail="Invalid webhook secret")
 
 
+def _article(word: str) -> str:
+    """Return 'an' for vowel-starting words, 'a' otherwise."""
+    return "an" if word and word[0].lower() in "aeiou" else "a"
+
+
 def _build_reply_template(action: str, intake: dict[str, Any]) -> str:
     """Build a plain-text auto-reply body for n8n to send."""
     ref = intake.get("concept_ref") or intake.get("id", "")[:8]
@@ -151,7 +157,7 @@ def _build_reply_template(action: str, intake: dict[str, Any]) -> str:
     elif action == "request_info":
         body = (
             f"{greeting}\n\n"
-            f"Thank you for reporting a {category} issue.\n\n"
+            f"Thank you for reporting {_article(category)} {category} issue.\n\n"
             f"Reference: {ref}\n\n"
             "To help us route this efficiently, could you please reply with:\n"
             "- The specific location (floor/wing/room number)\n"
@@ -238,7 +244,7 @@ def _build_reply_html(action: str, intake: dict[str, Any]) -> str:
         )
     elif action == "request_info":
         body_section = (
-            f"<p>Thank you for reporting a <strong>{_esc(category)}</strong> issue.</p>"
+            f"<p>Thank you for reporting {_article(category)} <strong>{_esc(category)}</strong> issue.</p>"
             "<p>To help us route this efficiently, could you please reply with:</p>"
             "<ul>"
             "<li>The specific location (floor / wing / room number)</li>"
@@ -488,9 +494,13 @@ def _score_completeness(req: EmailIntakeRequest) -> float:
     if req.site_id:
         score = min(1.0, score + 0.05)
     if req.zone_hint or req.floor_hint:
-        score = min(1.0, score + 0.05)
+        # Desk number is more specific than a vague zone/floor hint
+        has_desk = req.zone_hint and req.zone_hint.lower().startswith("desk")
+        score = min(1.0, score + (0.10 if has_desk else 0.05))
     if req.issue_category and req.issue_category != "general":
         score = min(1.0, score + 0.05)
+    if req.from_name:
+        score = min(1.0, score + 0.03)
     return round(score, 3)
 
 
@@ -700,8 +710,13 @@ async def _send_reply_and_respond(
     If disabled or sending fails, ``reply_sent=False`` and n8n falls back to
     its own emailSend node (without threading).
     """
-    reply_template = _build_reply_template(action_taken, record)
-    reply_html = _build_reply_html(action_taken, record)
+    # Phase 134: Use agent-generated reply if available, else template
+    if record.get("_agent_reply_text"):
+        reply_template = record["_agent_reply_text"]
+        reply_html = record["_agent_reply_html"]
+    else:
+        reply_template = _build_reply_template(action_taken, record)
+        reply_html = _build_reply_html(action_taken, record)
 
     reply_sent = False
     reply_message_id: Optional[str] = None
@@ -762,6 +777,7 @@ async def _send_reply_and_respond(
         reply_sent=reply_sent,
         reply_message_id=reply_message_id,
         reply_error=reply_error,
+        agent_model=record.get("extraction_model"),
     )
 
 
@@ -930,59 +946,135 @@ async def email_intake(
         )
 
     # ------------------------------------------------------------------
-    # 3d. Taxonomy pre-classification (shared with Telegram call-log)
+    # 3d. BMS enrichment (moved before agent — feeds into agent prompt)
     # ------------------------------------------------------------------
-    taxonomy_result = classify_email_subject(req.subject or "", req.body_plain or "")
-    if taxonomy_result:
-        # Override n8n's coarse category with taxonomy discipline
-        req_category = DISCIPLINE_TO_CATEGORY.get(taxonomy_result["discipline"], req.issue_category)
-        if req_category != req.issue_category:
-            logger.info(
-                "Taxonomy override: %s -> %s (sub: %s)",
-                req.issue_category,
-                req_category,
-                taxonomy_result["sub_category"],
-            )
-    else:
-        req_category = req.issue_category  # keep n8n's classification
-
-    # Location extraction from email text (fills gaps n8n missed)
-    if not req.zone_hint and (req.subject or req.body_plain):
-        combined = f"{req.subject or ''} {req.body_plain or ''}"
-        desk = extract_desk_from_message(combined)
-        if desk:
-            req.zone_hint = f"Desk {desk}"
-        floor = extract_floor_from_message(combined)
-        if floor and not req.floor_hint:
-            req.floor_hint = floor
-
-    # ------------------------------------------------------------------
-    # 4. BMS enrichment
-    # ------------------------------------------------------------------
+    req_category = req.issue_category or "general"
     bms_context = await _enrich_with_bms(req.site_id, req_category)
 
+    # ------------------------------------------------------------------
+    # 4. AI Agent classification + reply (Phase 134)
+    # ------------------------------------------------------------------
+    agent_result = None
+    taxonomy_result = None
+
+    if settings.email_intake_agent_enabled:
+        try:
+            from app.services.email_intake_agent import get_email_intake_agent
+
+            agent = get_email_intake_agent()
+            agent_result = await agent.classify_and_reply(
+                from_name=req.from_name,
+                from_email=req.from_email,
+                subject=req.subject or "",
+                body_plain=req.body_plain,
+                site_id=req.site_id,
+                bms_context=bms_context,
+            )
+            logger.info(
+                "Agent result: %s/%s, action=%s, model=%s, latency=%dms",
+                agent_result.discipline,
+                agent_result.sub_category,
+                agent_result.action,
+                agent_result.agent_model,
+                agent_result.agent_latency_ms,
+            )
+
+            # Map agent result to request fields
+            req_category = DISCIPLINE_TO_CATEGORY.get(agent_result.discipline, req_category)
+            req.issue_category = req_category
+            req.zone_hint = req.zone_hint or (
+                f"Desk {agent_result.location_desk}" if agent_result.location_desk else None
+            )
+            req.floor_hint = req.floor_hint or agent_result.location_floor
+            req.from_phone = req.from_phone or agent_result.phone
+
+            # Use agent's classification as taxonomy result
+            taxonomy_result = {
+                "discipline": agent_result.discipline,
+                "sub_category": agent_result.sub_category,
+                "specialty": agent_result.specialty,
+                "priority": agent_result.priority,
+            }
+
+        except Exception as exc:
+            logger.warning("Agent call failed, falling back to keyword pipeline: %s", exc)
+            agent_result = None
+
+    # ------------------------------------------------------------------
+    # 4b. Keyword fallback (if agent disabled or failed)
+    # ------------------------------------------------------------------
+    if agent_result is None:
+        taxonomy_result = classify_email_subject(req.subject or "", req.body_plain or "")
+        if taxonomy_result:
+            req_category = DISCIPLINE_TO_CATEGORY.get(taxonomy_result["discipline"], req.issue_category)
+            if req_category != req.issue_category:
+                logger.info(
+                    "Taxonomy override: %s -> %s (sub: %s)",
+                    req.issue_category,
+                    req_category,
+                    taxonomy_result["sub_category"],
+                )
+                req.issue_category = req_category
+        else:
+            req_category = req.issue_category  # keep n8n's classification
+
+        # Location extraction from email text (fills gaps n8n missed)
+        if not req.zone_hint and (req.subject or req.body_plain):
+            combined = f"{req.subject or ''} {req.body_plain or ''}"
+            desk = extract_desk_from_message(combined)
+            if desk:
+                req.zone_hint = f"Desk {desk}"
+            floor = extract_floor_from_message(combined)
+            if floor and not req.floor_hint:
+                req.floor_hint = floor
+
+        # Phone number extraction from email body (SA mobile format)
+        if not req.from_phone and req.body_plain:
+            phone_match = re.search(r"\b(0\d{9})\b", req.body_plain)
+            if not phone_match:
+                phone_match = re.search(r"\b(\+27\d{9})\b", req.body_plain)
+            if phone_match:
+                req.from_phone = phone_match.group(1)
+
+    # ------------------------------------------------------------------
     # 5. Urgency escalation
-    final_urgency = _apply_urgency_escalation(req, bms_context)
+    # ------------------------------------------------------------------
+    if agent_result is not None:
+        # Use agent priority, but still apply BMS alert escalation
+        _PRIORITY_TO_URGENCY = {"critical": "critical", "high": "high", "medium": "normal", "low": "low"}
+        final_urgency = _PRIORITY_TO_URGENCY.get(agent_result.priority, "normal")
+        # BMS alert escalation on top
+        active_alerts = bms_context.get("active_alerts", [])
+        if active_alerts:
+            critical_alerts = [a for a in active_alerts if a.get("severity") in ("critical", "emergency")]
+            if critical_alerts and URGENCY_RANK.get(final_urgency, 2) < 4:
+                final_urgency = "critical"
+            elif active_alerts and URGENCY_RANK.get(final_urgency, 2) < 3:
+                final_urgency = "high"
+    else:
+        final_urgency = _apply_urgency_escalation(req, bms_context)
+        if taxonomy_result:
+            _TAX_TO_URGENCY = {"critical": "critical", "high": "high", "medium": "normal", "low": "low"}
+            tax_urgency = _TAX_TO_URGENCY.get(taxonomy_result["priority"], "normal")
+            if URGENCY_RANK.get(tax_urgency, 2) > URGENCY_RANK.get(final_urgency, 2):
+                logger.info("Taxonomy priority escalation: %s -> %s", final_urgency, tax_urgency)
+                final_urgency = tax_urgency
 
-    # Taxonomy priority can further escalate urgency
-    if taxonomy_result:
-        _TAX_TO_URGENCY = {"critical": "critical", "high": "high", "medium": "normal", "low": "low"}
-        tax_urgency = _TAX_TO_URGENCY.get(taxonomy_result["priority"], "normal")
-        if URGENCY_RANK.get(tax_urgency, 2) > URGENCY_RANK.get(final_urgency, 2):
-            logger.info("Taxonomy priority escalation: %s -> %s", final_urgency, tax_urgency)
-            final_urgency = tax_urgency
-
+    # ------------------------------------------------------------------
     # 6. Completeness scoring + route
-    completeness = _score_completeness(req)
-    if taxonomy_result:
-        completeness = min(1.0, completeness + 0.10)  # taxonomy match = high confidence in category
-        completeness = round(completeness, 3)
-    route = _determine_route(completeness)
+    # ------------------------------------------------------------------
+    if agent_result is not None:
+        completeness = agent_result.completeness
+        route = agent_result.action
+    else:
+        completeness = _score_completeness(req)
+        if taxonomy_result:
+            completeness = min(1.0, completeness + 0.10)
+            completeness = round(completeness, 3)
+        route = _determine_route(completeness)
 
-    # Map route to action_taken
+    # Map route to action_taken (WO always created, action reflects routing)
     action_taken = route  # auto_submit | request_info | manual_review
-    if route == "auto_submit" and not settings.email_intake_auto_wo_enabled:
-        action_taken = "new_intake"  # downgrade if auto-WO is off
 
     # ------------------------------------------------------------------
     # 7. Persist record
@@ -1002,20 +1094,23 @@ async def email_intake(
         "zone_hint": req.zone_hint,
         "floor_hint": req.floor_hint,
         "issue_category": req_category,
-        "issue_summary": req.issue_summary,
+        "issue_summary": (agent_result.issue_summary if agent_result else None) or req.issue_summary,
         "urgency": final_urgency,
         "taxonomy_discipline": taxonomy_result["discipline"] if taxonomy_result else None,
         "taxonomy_sub_category": taxonomy_result["sub_category"] if taxonomy_result else None,
         "taxonomy_specialty": taxonomy_result["specialty"] if taxonomy_result else None,
         "taxonomy_priority": taxonomy_result["priority"] if taxonomy_result else None,
-        "extraction_confidence": req.extraction_confidence,
-        "extraction_model": req.extraction_model,
+        "extraction_confidence": completeness,
+        "extraction_model": (agent_result.agent_model if agent_result else None) or req.extraction_model,
         "extraction_raw": req.extraction_raw,
         "bms_context": bms_context if bms_context else None,
         "enrichment_ts": now_iso if bms_context else None,
         "pipeline_status": "routed",
         "action_taken": action_taken,
-        "routing_reason": f"completeness={completeness}, route={route}",
+        "routing_reason": (
+            f"completeness={completeness}, route={route}, "
+            f"agent={agent_result.agent_model if agent_result else 'keyword'}"
+        ),
         "existing_reference": req.existing_reference,
         "attachment_count": req.attachment_count,
         "attachment_refs": req.attachment_refs,
@@ -1025,13 +1120,23 @@ async def email_intake(
     repo.create(record)
 
     # ------------------------------------------------------------------
-    # 7b. Work order creation (inline for auto_submit so code is in reply)
+    # 7b. Work order creation — always create so WO number is in reply
     # ------------------------------------------------------------------
     concept_ref: Optional[str] = None
-    if action_taken == "auto_submit":
-        concept_ref = await _create_concept_work_order(record)
-        if concept_ref:
-            record["concept_ref"] = concept_ref
+    concept_ref = await _create_concept_work_order(record)
+    if concept_ref:
+        record["concept_ref"] = concept_ref
+
+    # ------------------------------------------------------------------
+    # 7c. Replace {ref} placeholder in agent reply with actual WO code
+    # ------------------------------------------------------------------
+    if agent_result is not None:
+        ref_value = concept_ref or record.get("id", "")[:8]
+        agent_reply_text = agent_result.reply_text.replace("{ref}", ref_value)
+        agent_reply_html = agent_result.reply_html.replace("{ref}", ref_value)
+        # Override the template reply functions with agent-generated reply
+        record["_agent_reply_text"] = agent_reply_text
+        record["_agent_reply_html"] = agent_reply_html
 
     # 8. Store inbound references header for thread chain tracking
     if req.references:

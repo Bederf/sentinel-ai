@@ -900,10 +900,10 @@ def require_module(*required_modules: "ModuleType"):
         @router.post(\"/api/hvac/zones/{id}/control\")
         async def control_hvac(
             zone_id: str,
-            auth: AuthContext = Depends(require_module(ModuleType.CONTROL)),
+            auth: AuthContext = Depends(require_module(ModuleType.HVAC_CONTROL)),
             request: Request
         ):
-            # CONTROL module is guaranteed to be active here
+            # HVAC_CONTROL module is guaranteed to be active here
             ...
 
     Args:

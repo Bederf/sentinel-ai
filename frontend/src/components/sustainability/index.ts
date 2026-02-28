@@ -23,8 +23,8 @@ export { sustainabilityApi } from '../../lib/sustainabilityApi';
 
 // Module metadata
 export const moduleInfo = {
-  id: 'sustainability',
-  name: 'Sustainability & ESG',
+  id: 'compliance',
+  name: 'Compliance & ESG',
   version: '1.0.0',
   description: 'Carbon emissions tracking, efficiency benchmarks, and Green Star SA certification',
   dependencies: ['energy'],
