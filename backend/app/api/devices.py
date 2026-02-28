@@ -12,11 +12,13 @@ import os
 from pathlib import Path
 from typing import List, Optional, Union
 
-from fastapi import APIRouter, HTTPException, Query, Body, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Body, Request
 from pydantic import BaseModel, Field, field_validator
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.models.auth import AuthContext
+from app.security.pipeline import require_role
 from app.services.device_abstraction import device_manager
 
 limiter = Limiter(key_func=get_remote_address)
@@ -414,6 +416,7 @@ async def control_device(
     request: Request,
     device_id: str,
     body: DeviceControlRequest = Body(...),
+    auth: AuthContext = Depends(require_role(2)),
 ) -> dict:
     """Write a value to a device point (control command).
 
@@ -496,8 +499,8 @@ async def get_device_safety_status(request: Request, device_id: str) -> dict:
 
 
 @router.post("/devices/{device_id}/scan", response_model=dict)
-async def scan_device_points(device_id: str) -> dict:
-    """Scan device for available points."""
+async def scan_device_points(device_id: str, auth: AuthContext = Depends(require_role(2))) -> dict:
+    """Scan device for available points. Requires OPERATOR (level 2)."""
     try:
         device = await device_manager.get_device(device_id)
         if not device:
@@ -518,8 +521,8 @@ async def scan_device_points(device_id: str) -> dict:
 
 
 @router.post("/devices/{device_id}/connect", response_model=dict)
-async def connect_device(device_id: str) -> dict:
-    """Connect to a device."""
+async def connect_device(device_id: str, auth: AuthContext = Depends(require_role(2))) -> dict:
+    """Connect to a device. Requires OPERATOR (level 2)."""
     try:
         device = await device_manager.get_device(device_id)
         if not device:
@@ -538,8 +541,8 @@ async def connect_device(device_id: str) -> dict:
 
 
 @router.post("/devices/{device_id}/disconnect", response_model=dict)
-async def disconnect_device(device_id: str) -> dict:
-    """Disconnect from a device."""
+async def disconnect_device(device_id: str, auth: AuthContext = Depends(require_role(2))) -> dict:
+    """Disconnect from a device. Requires OPERATOR (level 2)."""
     try:
         device = await device_manager.get_device(device_id)
         if not device:

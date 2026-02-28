@@ -1,10 +1,17 @@
-"""RAG API endpoints for documentation search and LLM explanations."""
+"""RAG API endpoints for documentation search and LLM explanations.
 
-from fastapi import APIRouter, HTTPException, Query
+Security: All endpoints require authentication. Read operations require
+AUDITOR (level 1), write operations require OPERATOR (level 2).
+Health check endpoint is unauthenticated.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 import logging
 
+from app.models.auth import AuthContext
+from app.security.pipeline import require_role
 from app.services.rag_service import get_rag_service
 from app.services.vector_db import get_vector_db_service
 from app.services.ollama_client import get_ollama_client
@@ -69,8 +76,8 @@ class KnowledgeRequest(BaseModel):
 
 
 @router.post("/query")
-async def query_rag(request: QueryRequest):
-    """Query the RAG system with natural language."""
+async def query_rag(request: QueryRequest, auth: AuthContext = Depends(require_role(1))):
+    """Query the RAG system with natural language. Requires AUDITOR (level 1)."""
     client = get_supabase_client()
     rag_service = get_rag_service(client)
 
@@ -94,8 +101,9 @@ async def search_documents(
     document_type: Optional[str] = Query(None, description="Filter by document type"),
     n_results: int = Query(5, ge=1, le=20, description="Number of results"),
     similarity_threshold: float = Query(0.5, ge=0.0, le=1.0, description="Minimum similarity score"),
+    auth: AuthContext = Depends(require_role(1)),
 ):
-    """Search documents by semantic similarity."""
+    """Search documents by semantic similarity. Requires AUDITOR (level 1)."""
     client = get_supabase_client()
     vector_db = get_vector_db_service(client)
 
@@ -116,8 +124,9 @@ async def search_knowledge(
     equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
     knowledge_type: Optional[str] = Query(None, description="Filter by knowledge type"),
     n_results: int = Query(5, ge=1, le=20, description="Number of results"),
+    auth: AuthContext = Depends(require_role(1)),
 ):
-    """Search equipment knowledge base."""
+    """Search equipment knowledge base. Requires AUDITOR (level 1)."""
     client = get_supabase_client()
     vector_db = get_vector_db_service(client)
 
@@ -135,8 +144,9 @@ async def hybrid_search(
     n_results: int = Query(5, ge=1, le=20, description="Number of results"),
     keyword_weight: float = Query(0.3, ge=0.0, le=1.0, description="Weight for keyword matching"),
     semantic_weight: float = Query(0.7, ge=0.0, le=1.0, description="Weight for semantic matching"),
+    auth: AuthContext = Depends(require_role(1)),
 ):
-    """Hybrid search combining keyword and semantic matching."""
+    """Hybrid search combining keyword and semantic matching. Requires AUDITOR (level 1)."""
     client = get_supabase_client()
     vector_db = get_vector_db_service(client)
 
@@ -153,9 +163,11 @@ async def hybrid_search(
 
 @router.get("/explain/{equipment_id}")
 async def explain_equipment_risk(
-    equipment_id: str, include_context: bool = Query(True, description="Include RAG context in response")
+    equipment_id: str,
+    include_context: bool = Query(True, description="Include RAG context in response"),
+    auth: AuthContext = Depends(require_role(1)),
 ):
-    """Get natural language explanation for equipment risk prediction."""
+    """Get natural language explanation for equipment risk prediction. Requires AUDITOR (level 1)."""
     client = get_supabase_client()
     rag_service = get_rag_service(client)
 
@@ -208,8 +220,8 @@ async def explain_equipment_risk(
 
 
 @router.post("/documents")
-async def add_document(request: DocumentRequest):
-    """Add a new document to the RAG system."""
+async def add_document(request: DocumentRequest, auth: AuthContext = Depends(require_role(2))):
+    """Add a new document to the RAG system. Requires OPERATOR (level 2)."""
     client = get_supabase_client()
     vector_db = get_vector_db_service(client)
 
@@ -244,8 +256,8 @@ async def add_document(request: DocumentRequest):
 
 
 @router.post("/knowledge")
-async def add_knowledge(request: KnowledgeRequest):
-    """Add a new knowledge entry to the RAG system."""
+async def add_knowledge(request: KnowledgeRequest, auth: AuthContext = Depends(require_role(2))):
+    """Add a new knowledge entry to the RAG system. Requires OPERATOR (level 2)."""
     client = get_supabase_client()
     vector_db = get_vector_db_service(client)
 
@@ -284,8 +296,9 @@ async def list_documents(
     equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
     document_type: Optional[str] = Query(None, description="Filter by document type"),
     limit: int = Query(50, ge=1, le=200, description="Maximum number of results"),
+    auth: AuthContext = Depends(require_role(1)),
 ):
-    """List documents in the RAG system."""
+    """List documents in the RAG system. Requires AUDITOR (level 1)."""
     client = get_supabase_client()
     vector_db = get_vector_db_service(client)
 
@@ -295,8 +308,8 @@ async def list_documents(
 
 
 @router.get("/documents/{document_id}")
-async def get_document(document_id: str):
-    """Get a specific document."""
+async def get_document(document_id: str, auth: AuthContext = Depends(require_role(1))):
+    """Get a specific document. Requires AUDITOR (level 1)."""
     client = get_supabase_client()
     vector_db = get_vector_db_service(client)
 
@@ -308,8 +321,8 @@ async def get_document(document_id: str):
 
 
 @router.post("/documents/{document_id}/reindex")
-async def reindex_document(document_id: str):
-    """Re-chunk and re-embed a document."""
+async def reindex_document(document_id: str, auth: AuthContext = Depends(require_role(2))):
+    """Re-chunk and re-embed a document. Requires OPERATOR (level 2)."""
     client = get_supabase_client()
     vector_db = get_vector_db_service(client)
 

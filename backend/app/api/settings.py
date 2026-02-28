@@ -1,10 +1,16 @@
-"""Settings API - Global system configuration."""
+"""Settings API - Global system configuration.
+
+Security: GET endpoints require AUDITOR (level 1), PUT endpoints require ADMIN (level 4).
+"""
 
 import json
 from pathlib import Path
 from typing import Any, Dict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.models.auth import AuthContext
+from app.security.pipeline import require_role
 
 router = APIRouter()
 
@@ -43,14 +49,17 @@ def save_settings(settings_data: Dict[str, Any]) -> None:
 
 
 @router.get("/settings")
-async def get_all_settings() -> Dict[str, Any]:
-    """Get all settings."""
+async def get_all_settings(auth: AuthContext = Depends(require_role(1))) -> Dict[str, Any]:
+    """Get all settings. Requires AUDITOR (level 1)."""
     return load_settings()
 
 
 @router.put("/settings")
-async def update_all_settings(settings_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Update all settings."""
+async def update_all_settings(
+    settings_data: Dict[str, Any],
+    auth: AuthContext = Depends(require_role(4)),
+) -> Dict[str, Any]:
+    """Update all settings. Requires ADMIN (level 4)."""
     # Validate settings structure
     if "healthThresholds" in settings_data:
         thresholds = settings_data["healthThresholds"]
@@ -103,15 +112,18 @@ VALID_ALERT_COMMANDS = {"reset", "info", "note", "wo"}
 
 
 @router.get("/settings/notifications")
-async def get_notification_settings() -> Dict[str, Any]:
-    """Get notification settings including alert command config."""
+async def get_notification_settings(auth: AuthContext = Depends(require_role(1))) -> Dict[str, Any]:
+    """Get notification settings including alert command config. Requires AUDITOR (level 1)."""
     settings_data = load_settings()
     return settings_data.get("notifications", DEFAULT_NOTIFICATION_SETTINGS)
 
 
 @router.put("/settings/notifications")
-async def update_notification_settings(notifications: Dict[str, Any]) -> Dict[str, Any]:
-    """Update notification settings.
+async def update_notification_settings(
+    notifications: Dict[str, Any],
+    auth: AuthContext = Depends(require_role(4)),
+) -> Dict[str, Any]:
+    """Update notification settings. Requires ADMIN (level 4).
 
     Validates alertCommands structure: each command must have 'enabled' (bool)
     and 'label' (str). Only known command keys are accepted.
@@ -168,15 +180,18 @@ async def update_notification_settings(notifications: Dict[str, Any]) -> Dict[st
 
 
 @router.get("/settings/health-thresholds")
-async def get_health_thresholds() -> Dict[str, int]:
-    """Get health score thresholds."""
+async def get_health_thresholds(auth: AuthContext = Depends(require_role(1))) -> Dict[str, int]:
+    """Get health score thresholds. Requires AUDITOR (level 1)."""
     settings_data = load_settings()
     return settings_data.get("healthThresholds", {"healthy": 90, "warning": 70, "critical": 0})
 
 
 @router.put("/settings/health-thresholds")
-async def update_health_thresholds(thresholds: Dict[str, int]) -> Dict[str, int]:
-    """Update health score thresholds."""
+async def update_health_thresholds(
+    thresholds: Dict[str, int],
+    auth: AuthContext = Depends(require_role(4)),
+) -> Dict[str, int]:
+    """Update health score thresholds. Requires ADMIN (level 4)."""
     # Validate required fields
     required_fields = ["healthy", "warning", "critical"]
     for field in required_fields:

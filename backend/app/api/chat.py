@@ -4,7 +4,7 @@ import logging
 import os
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException, Request as FastAPIRequest
+from fastapi import APIRouter, Depends, HTTPException, Request as FastAPIRequest
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 from slowapi import Limiter
@@ -18,6 +18,8 @@ from app.services.prompt_injection_guard import check_query_safety
 from app.services.hybrid_ai_service import hybrid_ai_service
 from app.services.zai_service import zai_service
 from app.middleware.auth_middleware import get_current_auth
+from app.models.auth import AuthContext
+from app.security.pipeline import require_role
 from app.utils.ai_provenance import get_cloud_llm_provenance, get_local_llm_provenance, provenance_headers
 from app.services.popia_consent_guard import should_allow_cloud_processing
 
@@ -265,7 +267,11 @@ async def generate_static_sse(message: str) -> AsyncGenerator[str, None]:
 
 @router.post("/chat")
 @limiter.limit("20/minute")
-async def chat(request: FastAPIRequest, chat_request: ChatRequest) -> StreamingResponse:
+async def chat(
+    request: FastAPIRequest,
+    chat_request: ChatRequest,
+    auth: AuthContext = Depends(require_role(1)),
+) -> StreamingResponse:
     """
     Chat with Claude AI using Server-Sent Events streaming.
 
