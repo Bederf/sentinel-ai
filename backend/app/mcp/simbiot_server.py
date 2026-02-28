@@ -5721,6 +5721,13 @@ class SIMBIOTMCPServer:
 
         is_sse = transport == "sse"
 
+        # Admin-only tool check (137-07: code_search, code_fetch, code_structure)
+        from app.security.tool_policy import check_mcp_admin_tool_access
+
+        admin_ok, admin_reason = check_mcp_admin_tool_access(tool_name, auth_ctx)
+        if not admin_ok:
+            return {"error": admin_reason, "code": "FORBIDDEN"}
+
         # SSE auth gating — all tools require auth over SSE (except PUBLIC)
         if is_sse and tool_name not in PUBLIC_TOOLS and auth_ctx is None:
             return {"error": "Authentication required for SSE transport", "code": "UNAUTHORIZED"}
@@ -5746,11 +5753,14 @@ class SIMBIOTMCPServer:
                 }
             try:
                 from app.mcp.approval_store import validate_approval_token
-
-                if not validate_approval_token(tool_name, approval_token):
-                    return {"error": "Invalid or expired approval token", "code": "FORBIDDEN"}
             except ImportError:
-                pass  # approval_store not fully implemented
+                logger.critical("approval_store import failed — high-risk tools BLOCKED")
+                validate_approval_token = None  # type: ignore[assignment]
+
+            if validate_approval_token is None:
+                return {"error": "Approval system unavailable", "code": "SERVICE_UNAVAILABLE"}
+            if not validate_approval_token(tool_name, approval_token):
+                return {"error": "Invalid or expired approval token", "code": "FORBIDDEN"}
 
         # Injection scanning (SSE only)
         if is_sse:

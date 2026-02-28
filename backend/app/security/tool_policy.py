@@ -14,8 +14,10 @@ and auth_middleware.py.
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
+import os
 import uuid
 from typing import Any
 
@@ -259,6 +261,119 @@ def sanitize_tool_result(
     if injection_flagged:
         sanitized["_injection_flagged"] = True
     return sanitized
+
+
+# ---------------------------------------------------------------------------
+# SSRF Protection — BMS IP Validation
+# ---------------------------------------------------------------------------
+
+# Known BMS subnets (configurable via env var, comma-separated CIDR)
+# Default: common BMS LAN subnets
+_KNOWN_BMS_SUBNETS_RAW = os.getenv(
+    "KNOWN_BMS_SUBNETS",
+    "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16",
+)
+KNOWN_BMS_SUBNETS: list[ipaddress.IPv4Network] = []
+for _cidr in _KNOWN_BMS_SUBNETS_RAW.split(","):
+    _cidr = _cidr.strip()
+    if _cidr:
+        try:
+            KNOWN_BMS_SUBNETS.append(ipaddress.IPv4Network(_cidr, strict=False))
+        except ValueError:
+            logger.warning("Invalid CIDR in KNOWN_BMS_SUBNETS: %s", _cidr)
+
+
+def validate_bms_ip(ip_str: str) -> tuple[bool, str]:
+    """Validate an IP address for BMS device discovery (SSRF protection).
+
+    Blocks:
+        - Invalid IP addresses
+        - Loopback addresses (127.x.x.x)
+        - Link-local addresses (169.254.x.x)
+        - Multicast addresses (224.0.0.0/4)
+        - Broadcast (255.255.255.255)
+        - RFC1918 addresses outside allowed subnets (if KNOWN_BMS_SUBNETS is restrictive)
+        - Public IPs (non-private) are always blocked for BMS discovery
+
+    Returns:
+        (True, "") if valid, (False, reason) if blocked.
+    """
+    try:
+        addr = ipaddress.IPv4Address(ip_str)
+    except (ipaddress.AddressValueError, ValueError):
+        return False, f"Invalid IP address: {ip_str}"
+
+    # Block loopback
+    if addr.is_loopback:
+        return False, "Loopback addresses are not allowed for BMS discovery"
+
+    # Block link-local
+    if addr.is_link_local:
+        return False, "Link-local addresses are not allowed for BMS discovery"
+
+    # Block multicast
+    if addr.is_multicast:
+        return False, "Multicast addresses are not allowed for BMS discovery"
+
+    # Block reserved/unspecified
+    if addr.is_reserved or addr.is_unspecified:
+        return False, "Reserved/unspecified addresses are not allowed for BMS discovery"
+
+    # Block public IPs — BMS devices should only be on private networks
+    if not addr.is_private:
+        return False, "Public IP addresses are not allowed for BMS discovery"
+
+    # Validate against known BMS subnets
+    if KNOWN_BMS_SUBNETS:
+        in_allowed_subnet = any(addr in subnet for subnet in KNOWN_BMS_SUBNETS)
+        if not in_allowed_subnet:
+            return False, f"IP {ip_str} is not in any known BMS subnet"
+
+    return True, ""
+
+
+# ---------------------------------------------------------------------------
+# MCP Code Tools — Admin-Only Gate
+# ---------------------------------------------------------------------------
+
+# Tool names that require ADMIN role in MCP context
+MCP_ADMIN_ONLY_TOOLS: frozenset[str] = frozenset(
+    {
+        "code_search",
+        "code_fetch",
+        "code_structure",
+    }
+)
+
+
+def check_mcp_admin_tool_access(tool_name: str, auth_ctx: Any) -> tuple[bool, str]:
+    """Check if an MCP tool requires ADMIN role and whether the user has it.
+
+    Args:
+        tool_name: The MCP tool being invoked.
+        auth_ctx: AuthContext with .role attribute.
+
+    Returns:
+        (True, "") if allowed, (False, reason) if blocked.
+    """
+    if tool_name not in MCP_ADMIN_ONLY_TOOLS:
+        return True, ""
+
+    if auth_ctx is None:
+        return False, f"Tool '{tool_name}' requires ADMIN role"
+
+    try:
+        from app.models.auth import SentinelRole
+
+        if not auth_ctx.has_role(SentinelRole.ADMIN):
+            return (
+                False,
+                f"Tool '{tool_name}' requires ADMIN role (current: {auth_ctx.role.value})",
+            )
+    except (ImportError, AttributeError):
+        return False, f"Tool '{tool_name}' requires ADMIN role (role check unavailable)"
+
+    return True, ""
 
 
 # ---------------------------------------------------------------------------

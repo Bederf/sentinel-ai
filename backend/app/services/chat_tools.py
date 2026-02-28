@@ -157,23 +157,31 @@ async def get_device_details(device_id: str) -> dict[str, Any]:
 
 
 async def control_device(
-    device_id: str, point: str, value: Any, reason: str = "AI assistant control"
+    device_id: str,
+    point: str,
+    value: Any,
+    reason: str = "AI assistant control",
+    _user_email: str | None = None,
 ) -> dict[str, Any]:
     """
     Execute a control action on a device.
 
     All control actions go through safety validation and are logged
-    to the audit trail with user="ai-assistant".
+    to the audit trail with the authenticated user's identity.
 
     Args:
         device_id: The device ID to control
         point: The point name to write (e.g., "setpoint", "state")
         value: The value to write
         reason: Reason for the control action (for audit log)
+        _user_email: Authenticated user email (injected by execute_tool)
 
     Returns:
         Dictionary with success/failure and details
     """
+    # User attribution: use real user identity, not generic label
+    audit_user = _user_email or "ai-assistant"
+
     try:
         device = await device_manager.get_device(device_id)
         if not device:
@@ -206,10 +214,9 @@ async def control_device(
         except Exception:
             pass  # Continue even if we can't read current value
 
-        # Execute control with safety validation (uses user="ai-assistant")
-        # The write_device_value method handles safety validation and audit logging
+        # Execute control with safety validation — audit with real user identity
         success = await device_manager.write_device_value(
-            device_id=device_id, point_name=point, value=value, user="ai-assistant"
+            device_id=device_id, point_name=point, value=value, user=audit_user
         )
 
         if success:
@@ -1808,6 +1815,9 @@ async def discover_niagara_points(
     Scans a BACnet device for all points, classifies them using
     Haystack/Brick ontology, and groups into equipment entities.
 
+    SSRF protection: validates IP against known BMS subnets and blocks
+    loopback, link-local, and multicast addresses (137-07).
+
     Args:
         device_ip: IP address of the BACnet device (JACE/Supervisor)
         site_id: SENTINEL site ID for mapping
@@ -1815,6 +1825,14 @@ async def discover_niagara_points(
     Returns:
         Discovery summary with equipment counts and confidence breakdown
     """
+    # --- SSRF Protection (137-07) ---
+    from app.security.tool_policy import validate_bms_ip
+
+    ip_ok, ip_reason = validate_bms_ip(device_ip)
+    if not ip_ok:
+        logger.warning("SSRF blocked: discover_niagara_points(%s) — %s", device_ip, ip_reason)
+        return {"success": False, "error": ip_reason}
+
     try:
         from app.services.niagara.point_discovery import get_point_discovery_service
         from app.services.niagara.point_classifier import get_point_classifier
@@ -3296,6 +3314,8 @@ TOOL_ROLE_REQUIREMENTS: dict[str, SentinelRole] = {
     "reset_equipment_fault": SentinelRole.OPERATOR,
     # Methodology access gated by role instead of password (Phase 137-02)
     "get_system_methodology": SentinelRole.DEVELOPER,
+    # Niagara discovery SSRF-sensitive — restrict to DEVELOPER+ (137-07)
+    "discover_niagara_points": SentinelRole.DEVELOPER,
 }
 
 
@@ -4112,8 +4132,8 @@ async def execute_tool(
     if not handler:
         return {"error": f"Unknown tool: {tool_name}"}
 
-    # Inject user context into tools that accept it
-    if tool_name == "create_work_order" and user_email:
+    # Inject user context into tools that accept it (137-07: real user attribution)
+    if user_email and tool_name in ("create_work_order", "control_device"):
         tool_input["_user_email"] = user_email
 
     import time as _time
