@@ -1,41 +1,43 @@
 """
-Security Pipeline — RBAC & Site Authorization Dependencies.
+Security Pipeline — RBAC, Site Authorization & Prompt Guard Dependencies.
 
-Provides FastAPI dependency functions for role-based access control (RBAC)
-and site-level authorization. These complement the existing auth_middleware.py
-require_auth/require_role by adding:
+Provides FastAPI dependency functions for role-based access control (RBAC),
+site-level authorization, and prompt injection defence. These complement
+the existing auth_middleware.py require_auth/require_role by adding:
 
     1. require_role(min_level) — Numeric level-based role check using ROLE_LEVELS
     2. require_site_access(site_id_param) — Site-scoped authorization
+    3. prompt_guard(field, source) — Prompt injection scoring & rewrite
+    4. validate_llm_routes(app) — Startup route integrity check
 
 Usage:
-    from app.security.pipeline import require_role, require_site_access
+    from app.security.pipeline import require_role, require_site_access, prompt_guard
 
-    @router.get("/api/admin/config")
-    async def get_config(
-        auth: AuthContext = Depends(require_role(4))  # ADMIN only
+    @router.post("/chat", tags=["llm_touching"])
+    async def chat(
+        request: Request,
+        chat_request: ChatRequest,
+        auth: AuthContext = Depends(require_role(1)),
+        guarded_text: str = Depends(prompt_guard(field="message", source="direct")),
     ):
-        ...
-
-    @router.get("/api/sites/{site_id}/equipment")
-    async def get_equipment(
-        site_id: str,
-        auth: AuthContext = Depends(require_site_access("site_id"))
-    ):
+        # guarded_text is either original or rewritten
         ...
 """
 
+from __future__ import annotations
+
+import hashlib
 import json
 import logging
 from pathlib import Path
 from typing import Optional
 
-from fastapi import HTTPException, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
 
 from app.config.settings import settings
 from app.middleware.auth_middleware import _authenticate_request, _extract_ip_address
 from app.models.auth import AuthContext, SentinelRole
-from app.security.constants import ROLE_LEVELS
+from app.security.constants import ROLE_LEVELS, SITE_ID_PATTERN
 
 logger = logging.getLogger(__name__)
 
@@ -317,3 +319,180 @@ def _check_site_access(auth_ctx: AuthContext, site_id: str) -> bool:
         return site_id in authorized_sites
 
     return False
+
+
+# ---------------------------------------------------------------------------
+# prompt_guard — Prompt injection scoring dependency
+# ---------------------------------------------------------------------------
+
+
+def prompt_guard(field: str = "message", source: str = "direct"):
+    """FastAPI dependency that scores a request body field for injection risk.
+
+    Reads the JSON request body, extracts the text from ``field``, runs
+    :func:`score_prompt`, and:
+      - **block** (score >= source threshold): raises HTTP 400 + audit event
+      - **rewrite**: returns sanitised text
+      - **allow**: returns original text
+
+    Also validates ``site_id`` format (``SITE_ID_PATTERN``) if present.
+
+    Args:
+        field: Name of the JSON body field containing the text to guard.
+        source: One of ``"direct"``, ``"indirect"``, ``"webhook"``.
+
+    Returns:
+        FastAPI dependency yielding the (possibly rewritten) text string.
+
+    Usage::
+
+        @router.post("/chat", tags=["llm_touching"])
+        async def chat(
+            guarded_text: str = Depends(prompt_guard("message", "direct")),
+        ):
+            ...
+    """
+
+    async def _dependency(request: Request) -> str:
+        from app.security.prompt_guard import audit_snippet, score_prompt
+
+        # --- Parse body once and cache on request.state ---
+        body: dict = {}
+        if not hasattr(request.state, "_parsed_body"):
+            try:
+                raw = await request.body()
+                body = json.loads(raw) if raw else {}
+                request.state._parsed_body = body
+            except Exception:
+                body = {}
+                request.state._parsed_body = body
+        else:
+            body = request.state._parsed_body
+
+        text = body.get(field, "")
+        if isinstance(text, dict):
+            # Some payloads nest the text (e.g., WhatsApp text.body)
+            text = text.get("body", str(text))
+        if not isinstance(text, str):
+            text = str(text) if text else ""
+
+        # --- site_id format validation (if present) ---
+        site_id = body.get("site_id")
+        if site_id and not SITE_ID_PATTERN.match(site_id):
+            logger.warning(
+                "prompt_guard: invalid site_id format: %s path=%s",
+                site_id,
+                request.url.path,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid site_id format. Expected: site-NNN",
+            )
+
+        # --- Score the prompt ---
+        result = score_prompt(text, source)
+
+        # --- Audit logging (hash, not raw text) ---
+        text_hash = hashlib.sha256(text.encode()).hexdigest()[:16]
+        snippet = audit_snippet(text)
+
+        if result.action == "block":
+            logger.warning(
+                "prompt_guard BLOCKED: source=%s score=%.2f hash=%s snippet=%s path=%s reasons=%s",
+                source,
+                result.score,
+                text_hash,
+                snippet[:80],
+                request.url.path,
+                result.reasons[:3],
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "Prompt injection detected",
+                    "code": "PROMPT_GUARD_BLOCK",
+                },
+            )
+
+        if result.action == "rewrite":
+            logger.info(
+                "prompt_guard REWRITE: source=%s score=%.2f hash=%s path=%s",
+                source,
+                result.score,
+                text_hash,
+                request.url.path,
+            )
+            return result.rewritten_text or text
+
+        return text
+
+    return _dependency
+
+
+# ---------------------------------------------------------------------------
+# validate_llm_routes — Startup integrity check
+# ---------------------------------------------------------------------------
+
+# Expected dependency function names on every llm_touching route
+_REQUIRED_DEPS = {"require_role", "prompt_guard"}
+
+
+def validate_llm_routes(app: FastAPI) -> None:
+    """Scan all routes tagged ``llm_touching`` and verify security deps.
+
+    In production (``settings.environment == "production"``): raises
+    ``RuntimeError`` for any route missing required dependencies.
+    In dev/demo: logs a CRITICAL warning.
+
+    Call this during ``app.on_event("startup")`` or in a lifespan handler.
+    """
+    issues: list[str] = []
+
+    for route in app.routes:
+        tags = getattr(route, "tags", []) or []
+        if "llm_touching" not in tags:
+            continue
+
+        path = getattr(route, "path", "unknown")
+        dep_names: set[str] = set()
+
+        # Walk the dependency tree
+        for dep in getattr(route, "dependencies", []) or []:
+            dep_func = getattr(dep, "dependency", None)
+            if dep_func:
+                name = getattr(dep_func, "__name__", "")
+                # prompt_guard and require_role are closures named _dependency
+                # so we check __qualname__ for the outer function name
+                qualname = getattr(dep_func, "__qualname__", "")
+                for req_dep in _REQUIRED_DEPS:
+                    if req_dep in name or req_dep in qualname:
+                        dep_names.add(req_dep)
+
+        # Also check the endpoint's own Depends() params
+        endpoint = getattr(route, "endpoint", None)
+        if endpoint:
+            import inspect
+
+            sig = inspect.signature(endpoint)
+            for param in sig.parameters.values():
+                if param.default and hasattr(param.default, "dependency"):
+                    dep_func = param.default.dependency
+                    qualname = getattr(dep_func, "__qualname__", "")
+                    for req_dep in _REQUIRED_DEPS:
+                        if req_dep in qualname:
+                            dep_names.add(req_dep)
+
+        missing = _REQUIRED_DEPS - dep_names
+        if missing:
+            issues.append(f"  {path}: missing {missing}")
+
+    if not issues:
+        logger.info("validate_llm_routes: all llm_touching routes have required deps")
+        return
+
+    msg = "LLM route security gaps:\n" + "\n".join(issues)
+
+    if getattr(settings, "environment", "development") == "production":
+        raise RuntimeError(msg)
+    else:
+        logger.critical(msg)

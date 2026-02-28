@@ -27,7 +27,7 @@ from app.security.constants import (
     ROLE_LEVELS,
     TRUST_LEVELS,
 )
-from app.security.pipeline import require_role, require_site_access
+from app.security.pipeline import prompt_guard, require_role, require_site_access, validate_llm_routes
 
 __all__ = [
     "DIRECT_BLOCK_THRESHOLD",
@@ -36,6 +36,8 @@ __all__ = [
     "MAX_UPLOAD_SIZE",
     "ROLE_LEVELS",
     "TRUST_LEVELS",
+    "prompt_guard",
     "require_role",
     "require_site_access",
+    "validate_llm_routes",
 ]

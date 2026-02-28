@@ -9,10 +9,12 @@ import json
 import logging
 from typing import AsyncGenerator
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from app.security.output_filter import run_output_filter_pipeline
+from app.security.pipeline import prompt_guard
 from app.services.query_handler import get_query_handler
 
 logger = logging.getLogger(__name__)
@@ -39,8 +41,11 @@ class LocalChatResponse(BaseModel):
     llm_available: bool
 
 
-@router.post("/chat/local", response_model=LocalChatResponse)
-async def local_chat(request: LocalChatRequest):
+@router.post("/chat/local", response_model=LocalChatResponse, tags=["llm_touching"])
+async def local_chat(
+    request: LocalChatRequest,
+    guarded_message: str = Depends(prompt_guard(field="message", source="direct")),
+):
     """Query ML predictions and equipment data using natural language.
 
     Routes queries through intent classification to the appropriate service
@@ -56,7 +61,7 @@ async def local_chat(request: LocalChatRequest):
     - "What's the status of S002-AHU-L2-001?" (equipment status)
     """
     handler = get_query_handler()
-    result = await handler.handle_query(request.message)
+    result = await handler.handle_query(guarded_message or request.message)
 
     return LocalChatResponse(
         response=result["response"],
@@ -69,17 +74,21 @@ async def local_chat(request: LocalChatRequest):
     )
 
 
-@router.post("/chat/local/stream")
-async def local_chat_stream(request: LocalChatRequest):
+@router.post("/chat/local/stream", tags=["llm_touching"])
+async def local_chat_stream(
+    request: LocalChatRequest,
+    guarded_message: str = Depends(prompt_guard(field="message", source="direct")),
+):
     """Stream local chat response via Server-Sent Events.
 
     Same as /chat/local but with SSE streaming for real-time UI updates.
     """
     handler = get_query_handler()
+    safe_message = guarded_message or request.message
 
     async def generate() -> AsyncGenerator[str, None]:
         try:
-            result = await handler.handle_query(request.message)
+            result = await handler.handle_query(safe_message)
 
             # Send metadata first
             metadata = {
@@ -91,17 +100,25 @@ async def local_chat_stream(request: LocalChatRequest):
             }
             yield f"data: {json.dumps(metadata)}\n\n"
 
-            # Stream response in chunks for smoother UI
+            # Filter response through output pipeline before streaming
             response_text = result["response"]
+            filter_result = run_output_filter_pipeline(response_text)
+            if filter_result.kill_response:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Response blocked by security filter.'})}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+            filtered_text = filter_result.text
+
+            # Stream response in chunks for smoother UI
             chunk_size = 50
-            for i in range(0, len(response_text), chunk_size):
-                chunk = response_text[i : i + chunk_size]
+            for i in range(0, len(filtered_text), chunk_size):
+                chunk = filtered_text[i : i + chunk_size]
                 yield f"data: {json.dumps({'type': 'content', 'text': chunk})}\n\n"
 
             yield "data: [DONE]\n\n"
         except Exception as e:
-            logger.error("Local chat stream error: %s", e)
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            logger.error("Local chat stream error: %s", e, exc_info=True)
+            yield f"data: {json.dumps({'type': 'error', 'message': 'An error occurred processing your request.'})}\n\n"
             yield "data: [DONE]\n\n"
 
     return StreamingResponse(

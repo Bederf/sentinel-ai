@@ -11,12 +11,13 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 
+from app.security.prompt_guard import score_prompt
 from app.services.complaint_handler import get_complaint_handler, reload_complaint_handler
 
 router = APIRouter(prefix="/api/complaints", tags=["Comfort Complaints"])
 
 
-@router.post("/submit")
+@router.post("/submit", tags=["llm_touching"])
 async def submit_complaint(
     desk_id: str,
     complaint_type: str = "too_hot",
@@ -44,8 +45,17 @@ async def submit_complaint(
         - auto_action_taken: Any automatic action taken
         - needs_dispatch: Whether technician dispatch is needed
     """
+    # Guard description if provided (user-supplied text flows to AI diagnosis)
+    guarded_description = description
+    if description:
+        guard_result = score_prompt(description, "direct")
+        if not guard_result.allow:
+            raise HTTPException(status_code=400, detail="Prompt injection detected in description")
+        if guard_result.rewritten_text:
+            guarded_description = guard_result.rewritten_text
+
     handler = get_complaint_handler()
-    diagnosis = handler.handle_complaint(desk_id, complaint_type, user_name, description)
+    diagnosis = handler.handle_complaint(desk_id, complaint_type, user_name, guarded_description)
     return {
         "complaint_id": diagnosis.complaint_id,
         "desk": diagnosis.desk.to_dict(),

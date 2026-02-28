@@ -13,8 +13,9 @@ import logging
 from typing import Optional
 from pydantic import BaseModel, Field
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.security.pipeline import prompt_guard
 from app.services.technician_chat import get_diagnosis_engine
 
 logger = logging.getLogger(__name__)
@@ -67,8 +68,11 @@ class FlowStateResponse(BaseModel):
 # API Endpoints
 
 
-@router.post("/start", response_model=dict)
-async def start_diagnosis(request: StartDiagnosisRequest):
+@router.post("/start", response_model=dict, tags=["llm_touching"])
+async def start_diagnosis(
+    request: StartDiagnosisRequest,
+    guarded_query: str = Depends(prompt_guard(field="query", source="direct")),
+):
     """
     Start a new guided diagnosis session.
 
@@ -87,15 +91,18 @@ async def start_diagnosis(request: StartDiagnosisRequest):
     session_id = request.session_id or f"diag-{uuid.uuid4().hex[:8]}"
 
     try:
-        result = engine.start_diagnosis(session_id, request.query)
+        result = engine.start_diagnosis(session_id, guarded_query or request.query)
         return result
     except Exception as e:
         logger.error(f"Failed to start diagnosis: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/respond", response_model=dict)
-async def process_response(request: RespondRequest):
+@router.post("/respond", response_model=dict, tags=["llm_touching"])
+async def process_response(
+    request: RespondRequest,
+    guarded_response: str = Depends(prompt_guard(field="response", source="direct")),
+):
     """
     Process technician's response to a checkpoint question.
 
@@ -112,7 +119,9 @@ async def process_response(request: RespondRequest):
 
     try:
         result = engine.process_response(
-            session_id=request.session_id, step_id=request.step_id, response=request.response
+            session_id=request.session_id,
+            step_id=request.step_id,
+            response=guarded_response or request.response,
         )
 
         if result.get("error"):

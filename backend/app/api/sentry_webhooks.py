@@ -31,6 +31,7 @@ from app.services.popia_consent_guard import (
     evaluate_ingress_processing_consent,
     enforce_active_processing_consent,
 )
+from app.security.prompt_guard import score_prompt
 from app.services.sentry_auth_service import get_sentry_jwt_headers
 from app.services.sentry_integration.config import get_sentry_webhook_secret
 from app.services.sentry_integration.ocr_correction_handler import get_ocr_correction_handler
@@ -91,7 +92,7 @@ class EquipmentResetRequest(BaseModel):
     reason: Optional[str] = Field(None, description="Reason for reset")
 
 
-@router.post("/work-order/response", status_code=status.HTTP_200_OK)
+@router.post("/work-order/response", status_code=status.HTTP_200_OK, tags=["llm_touching"])
 async def handle_work_order_response(
     data: Dict[str, Any],
     x_sentry_secret: Optional[str] = Header(None),
@@ -120,6 +121,23 @@ async def handle_work_order_response(
             raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
 
     reply_text = _extract_reply_text(data.get("content"))
+
+    # --- Prompt guard: score technician reply as webhook source ---
+    if reply_text:
+        guard_result = score_prompt(reply_text, "webhook")
+        if not guard_result.allow:
+            logger.warning(
+                "Sentry WO response prompt guard BLOCKED: user=%s score=%.2f",
+                data.get("telegram_user_id"),
+                guard_result.score,
+            )
+            return {
+                "success": False,
+                "error": "Message blocked by security filter",
+                "collected_items": [],
+                "is_complete": False,
+            }
+
     consent_decision = evaluate_ingress_processing_consent(
         data_subject_id=data["telegram_user_id"],
         platform="telegram",

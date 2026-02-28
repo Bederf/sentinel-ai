@@ -6,6 +6,7 @@ Integrates with FastAPI for webhook verification and message handling.
 from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from app.handlers.whatsapp_handler import get_whatsapp_handler
 from app.integrations.whatsapp_service import get_whatsapp_service
+from app.security.prompt_guard import score_prompt
 from app.security.webhook_auth import verify_whatsapp_webhook as verify_whatsapp_signature
 from app.services.popia_consent_guard import evaluate_ingress_processing_consent
 import logging
@@ -93,7 +94,7 @@ async def verify_whatsapp_webhook(
     return int(hub_challenge)
 
 
-@router.post("/webhooks")
+@router.post("/webhooks", tags=["llm_touching"])
 async def handle_whatsapp_message(
     request: Request,
     verified_body: bytes = Depends(verify_whatsapp_signature),
@@ -147,6 +148,19 @@ async def handle_whatsapp_message(
         if not content:
             logger.debug("Message received but no extractable content")
             return {"status": "ok"}
+
+        # --- Prompt guard: score extracted content as webhook source ---
+        guard_result = score_prompt(content, "webhook")
+        if not guard_result.allow:
+            logger.warning(
+                "[WhatsApp] Prompt guard BLOCKED: from=%s score=%.2f reasons=%s",
+                from_number,
+                guard_result.score,
+                guard_result.reasons[:3],
+            )
+            return {"status": "ok"}
+        if guard_result.rewritten_text:
+            content = guard_result.rewritten_text
 
         consent_decision = evaluate_ingress_processing_consent(
             data_subject_id=from_number,

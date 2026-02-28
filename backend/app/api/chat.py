@@ -6,7 +6,7 @@ from typing import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException, Request as FastAPIRequest
 from fastapi.responses import Response, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -14,14 +14,15 @@ from app.services.claude_service import claude_service
 from app.services.demo_cache import DemoCache
 from app.services.work_order_service import work_order_service
 from app.services.feature_request_logger import log_chat_query
-from app.services.prompt_injection_guard import check_query_safety
 from app.services.hybrid_ai_service import hybrid_ai_service
 from app.services.zai_service import zai_service
 from app.middleware.auth_middleware import get_current_auth
 from app.models.auth import AuthContext
-from app.security.pipeline import require_role
+from app.security.constants import MAX_CHAT_MESSAGE_LENGTH
+from app.security.pipeline import prompt_guard, require_role
 from app.utils.ai_provenance import get_cloud_llm_provenance, get_local_llm_provenance, provenance_headers
 from app.services.popia_consent_guard import should_allow_cloud_processing
+from app.security.sse_buffer import SecureSSEBuffer
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -33,10 +34,10 @@ router = APIRouter()
 class ChatRequest(BaseModel):
     """Request model for chat endpoint."""
 
-    message: str
+    message: str = Field(..., max_length=MAX_CHAT_MESSAGE_LENGTH)
     conversation_id: str | None = None
     search_docs: bool = False  # Deprecated: doc search is now a tool, not a mode
-    site_id: str | None = None  # Selected building/site for context
+    site_id: str | None = Field(None, pattern=r"^site-\d{3}$")  # Selected building/site
 
 
 class ChatMetadata(BaseModel):
@@ -205,6 +206,9 @@ async def generate_sse_stream(
         data_subject_id
     )
 
+    # Secure SSE buffer: filters output through the 5-stage pipeline
+    buffer = SecureSSEBuffer(user_role=user_role)
+
     try:
         if use_local_fallback:
             async for chunk in hybrid_ai_service.stream_response(
@@ -212,7 +216,11 @@ async def generate_sse_stream(
                 use_tools=False,
                 data_subject_id=data_subject_id,
             ):
-                yield format_sse_chunk(chunk)
+                safe_text = buffer.add_token(chunk)
+                if safe_text is not None:
+                    yield format_sse_chunk(safe_text)
+                if buffer.killed:
+                    break
         elif use_tools:
             # Use tool-enabled streaming for device control capabilities
             async for chunk in claude_service.stream_response_with_tools(
@@ -221,32 +229,47 @@ async def generate_sse_stream(
                 user_email=user_email,
                 user_role=user_role,
             ):
-                # Format as SSE data with proper newline handling
-                yield format_sse_chunk(chunk)
+                safe_text = buffer.add_token(chunk)
+                if safe_text is not None:
+                    yield format_sse_chunk(safe_text)
+                if buffer.killed:
+                    break
         else:
             # Use regular streaming without tools
             provider = hybrid_ai_service.get_active_cloud_provider()
             if provider == "zai":
                 async for chunk in zai_service.stream_response(messages):
-                    yield format_sse_chunk(chunk)
+                    safe_text = buffer.add_token(chunk)
+                    if safe_text is not None:
+                        yield format_sse_chunk(safe_text)
+                    if buffer.killed:
+                        break
             else:
                 async for chunk in claude_service.stream_response(messages):
-                    # Format as SSE data with proper newline handling
-                    yield format_sse_chunk(chunk)
+                    safe_text = buffer.add_token(chunk)
+                    if safe_text is not None:
+                        yield format_sse_chunk(safe_text)
+                    if buffer.killed:
+                        break
+
+        # Flush remaining buffer content
+        final = buffer.finalize()
+        if final:
+            yield format_sse_chunk(final)
 
         # Send completion sentinel
         yield "data: [DONE]\n\n"
 
     except ValueError as e:
-        # Configuration error (API key missing)
-        logger.error(f"Configuration error: {e}")
-        yield f"data: Error: {str(e)}\n\n"
+        # Configuration error (API key missing) — log details, send generic message
+        logger.error("Configuration error in chat stream: %s", e, exc_info=True)
+        yield format_sse_chunk("An error occurred processing your request.")
         yield "data: [DONE]\n\n"
 
     except Exception as e:
-        # API or unexpected errors
-        logger.error(f"Chat error: {e}")
-        yield f"data: Error: {str(e)}\n\n"
+        # API or unexpected errors — never expose str(e) to client
+        logger.error("Chat stream error: %s", e, exc_info=True)
+        yield format_sse_chunk("An error occurred processing your request.")
         yield "data: [DONE]\n\n"
 
 
@@ -265,12 +288,13 @@ async def generate_static_sse(message: str) -> AsyncGenerator[str, None]:
     yield "data: [DONE]\n\n"
 
 
-@router.post("/chat")
+@router.post("/chat", tags=["llm_touching"])
 @limiter.limit("20/minute")
 async def chat(
     request: FastAPIRequest,
     chat_request: ChatRequest,
     auth: AuthContext = Depends(require_role(1)),
+    guarded_message: str = Depends(prompt_guard(field="message", source="direct")),
 ) -> StreamingResponse:
     """
     Chat with Claude AI using Server-Sent Events streaming.
@@ -294,17 +318,9 @@ async def chat(
     if not chat_request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    user_message = chat_request.message.strip()
-
-    # Security: Check for prompt injection attempts
-    is_safe, rejection_reason, injections = check_query_safety(user_message)
-    if not is_safe:
-        logger.warning(f"Prompt injection blocked: {injections[0].pattern} - {injections[0].description}")
-        logger.warning(f"Query: {user_message[:100]}...")
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "Security concern", "message": rejection_reason, "code": "PROMPT_INJECTION_DETECTED"},
-        )
+    # Use guarded (possibly rewritten) message from prompt_guard dependency.
+    # The old check_query_safety call is superseded by the new scoring engine.
+    user_message = guarded_message.strip() if guarded_message else chat_request.message.strip()
 
     logger.info(
         f"Chat request: conversation_id={chat_request.conversation_id}, "

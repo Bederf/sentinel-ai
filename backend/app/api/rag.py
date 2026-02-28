@@ -11,7 +11,7 @@ from typing import Optional, List, Dict
 import logging
 
 from app.models.auth import AuthContext
-from app.security.pipeline import require_role
+from app.security.pipeline import prompt_guard, require_role
 from app.services.rag_service import get_rag_service
 from app.services.vector_db import get_vector_db_service
 from app.services.ollama_client import get_ollama_client
@@ -75,14 +75,18 @@ class KnowledgeRequest(BaseModel):
 # Endpoints
 
 
-@router.post("/query")
-async def query_rag(request: QueryRequest, auth: AuthContext = Depends(require_role(1))):
+@router.post("/query", tags=["llm_touching"])
+async def query_rag(
+    request: QueryRequest,
+    auth: AuthContext = Depends(require_role(1)),
+    guarded_query: str = Depends(prompt_guard(field="query", source="direct")),
+):
     """Query the RAG system with natural language. Requires AUDITOR (level 1)."""
     client = get_supabase_client()
     rag_service = get_rag_service(client)
 
     result = await rag_service.query(
-        query=request.query,
+        query=guarded_query or request.query,
         equipment_type=request.equipment_type,
         use_hybrid=request.use_hybrid,
         use_local_llm=request.use_local_llm,

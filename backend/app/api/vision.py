@@ -13,8 +13,9 @@ import logging
 from typing import Optional
 from pydantic import BaseModel, Field
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 
+from app.security.pipeline import prompt_guard
 from app.services.vision_service import get_vision_service
 
 logger = logging.getLogger(__name__)
@@ -83,8 +84,11 @@ def _decode_base64_image(image_b64: str) -> bytes:
         raise HTTPException(status_code=400, detail=f"Invalid base64 image: {e}")
 
 
-@router.post("/analyze", response_model=dict)
-async def analyze_image(request: AnalyzeRequest):
+@router.post("/analyze", response_model=dict, tags=["llm_touching"])
+async def analyze_image(
+    request: AnalyzeRequest,
+    guarded_prompt: str = Depends(prompt_guard(field="prompt", source="direct")),
+):
     """
     General image analysis.
 
@@ -107,15 +111,18 @@ async def analyze_image(request: AnalyzeRequest):
         raise HTTPException(status_code=400, detail="Image exceeds 5MB limit")
 
     try:
-        result = vision.analyze_image(image_data, media_type, request.prompt)
+        result = vision.analyze_image(image_data, media_type, guarded_prompt or request.prompt)
         return result
     except Exception as e:
         logger.error(f"Vision analysis error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/component", response_model=dict)
-async def identify_component(request: ComponentRequest):
+@router.post("/component", response_model=dict, tags=["llm_touching"])
+async def identify_component(
+    request: ComponentRequest,
+    guarded_context: str = Depends(prompt_guard(field="context", source="direct")),
+):
     """
     Identify equipment component from image.
 
@@ -138,7 +145,7 @@ async def identify_component(request: ComponentRequest):
         raise HTTPException(status_code=400, detail="Image exceeds 5MB limit")
 
     try:
-        result = vision.identify_component(image_data, media_type, request.context)
+        result = vision.identify_component(image_data, media_type, guarded_context or request.context)
         return result
     except Exception as e:
         logger.error(f"Component identification error: {e}")
@@ -173,8 +180,11 @@ async def read_model_plate(request: AnalyzeRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/diagnose", response_model=dict)
-async def diagnose_damage(request: DiagnoseRequest):
+@router.post("/diagnose", response_model=dict, tags=["llm_touching"])
+async def diagnose_damage(
+    request: DiagnoseRequest,
+    guarded_context: str = Depends(prompt_guard(field="equipment_context", source="direct")),
+):
     """
     Assess visible damage or wear in equipment image.
 
@@ -197,15 +207,18 @@ async def diagnose_damage(request: DiagnoseRequest):
         raise HTTPException(status_code=400, detail="Image exceeds 5MB limit")
 
     try:
-        result = vision.diagnose_damage(image_data, media_type, request.equipment_context)
+        result = vision.diagnose_damage(image_data, media_type, guarded_context or request.equipment_context)
         return result
     except Exception as e:
         logger.error(f"Damage diagnosis error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/error-display", response_model=dict)
-async def read_error_display(request: ErrorDisplayRequest):
+@router.post("/error-display", response_model=dict, tags=["llm_touching"])
+async def read_error_display(
+    request: ErrorDisplayRequest,
+    guarded_manufacturer: str = Depends(prompt_guard(field="manufacturer", source="direct")),
+):
     """
     Extract fault codes from equipment error display.
 
@@ -228,7 +241,7 @@ async def read_error_display(request: ErrorDisplayRequest):
         raise HTTPException(status_code=400, detail="Image exceeds 5MB limit")
 
     try:
-        result = vision.read_error_display(image_data, media_type, request.manufacturer)
+        result = vision.read_error_display(image_data, media_type, guarded_manufacturer or request.manufacturer)
         return result
     except Exception as e:
         logger.error(f"Error display reading error: {e}")

@@ -35,6 +35,7 @@ from app.models.email_intake import (
     EmailIntakeRequest,
     EmailIntakeResponse,
 )
+from app.security.prompt_guard import score_prompt
 from app.services.email_reply_service import get_email_reply_service
 from app.services.issue_classifier import (
     classify_email_subject,
@@ -801,7 +802,7 @@ async def email_intake_health():
     )
 
 
-@router.post("/intake", response_model=EmailIntakeResponse)
+@router.post("/intake", response_model=EmailIntakeResponse, tags=["llm_touching"])
 async def email_intake(
     req: EmailIntakeRequest,
     background_tasks: BackgroundTasks,
@@ -881,6 +882,20 @@ async def email_intake(
             reply_template="Your message has been received and is pending review by an administrator.",
             reply_html="",
             message="Unknown sender — quarantined for admin review",
+        )
+
+    # --- Prompt guard: score email body as webhook source ---
+    email_text = f"{req.subject or ''}\n{req.body_plain or ''}"
+    guard_result = score_prompt(email_text, "webhook")
+    if not guard_result.allow:
+        logger.warning(
+            "Email intake prompt guard BLOCKED: sender=%s score=%.2f",
+            req.from_email,
+            guard_result.score,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Email content blocked by prompt injection guard",
         )
 
     repo = get_email_intake_repository()
