@@ -24,6 +24,12 @@ from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 
 from app.config.settings import settings
 from app.database.repositories.email_intake_repository import get_email_intake_repository
+from app.security.webhook_auth import (
+    check_attachment_type_allowed,
+    check_email_domain_allowed,
+    check_email_sender_rate_limit,
+    is_known_sender,
+)
 from app.models.email_intake import (
     EmailIntakeHealthResponse,
     EmailIntakeRequest,
@@ -818,6 +824,64 @@ async def email_intake(
 
     # 2. Webhook secret
     _verify_webhook_secret(x_sentry_secret)
+
+    # 2a. Phase 137-04: Email intake hardening
+    # Domain allowlist
+    if not check_email_domain_allowed(req.from_email):
+        logger.warning(
+            "Email intake blocked: domain not allowed sender=%s",
+            req.from_email,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Sender domain not in allowlist",
+        )
+
+    # Per-sender rate limit
+    if not check_email_sender_rate_limit(req.from_email):
+        logger.warning(
+            "Email intake rate limited: sender=%s",
+            req.from_email,
+        )
+        raise HTTPException(
+            status_code=429,
+            detail="Sender rate limit exceeded. Try again later.",
+        )
+
+    # Attachment file type allowlist
+    if hasattr(req, "attachments") and req.attachments:
+        for attachment in req.attachments:
+            filename = (
+                attachment.get("filename", "") if isinstance(attachment, dict) else getattr(attachment, "filename", "")
+            )
+            if filename and not check_attachment_type_allowed(filename):
+                logger.warning(
+                    "Email intake blocked attachment: filename=%s sender=%s",
+                    filename,
+                    req.from_email,
+                )
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Attachment type not allowed: {filename}. Allowed: .pdf, .jpg, .jpeg, .png",
+                )
+
+    # Unknown sender quarantine
+    if not is_known_sender(req.from_email):
+        logger.info(
+            "Email intake quarantined: unknown sender=%s subject=%s",
+            req.from_email,
+            req.subject,
+        )
+        # Return a quarantine response instead of processing via LLM
+        return EmailIntakeResponse(
+            success=True,
+            intake_id=str(uuid.uuid4()),
+            action_taken="quarantined",
+            concept_ref=None,
+            reply_template="Your message has been received and is pending review by an administrator.",
+            reply_html="",
+            message="Unknown sender — quarantined for admin review",
+        )
 
     repo = get_email_intake_repository()
     intake_id = str(uuid.uuid4())

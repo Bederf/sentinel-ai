@@ -3,9 +3,10 @@ WhatsApp webhook endpoint for receiving incoming messages.
 Integrates with FastAPI for webhook verification and message handling.
 """
 
-from fastapi import APIRouter, Request, HTTPException, Query
+from fastapi import APIRouter, Depends, Request, HTTPException, Query
 from app.handlers.whatsapp_handler import get_whatsapp_handler
 from app.integrations.whatsapp_service import get_whatsapp_service
+from app.security.webhook_auth import verify_whatsapp_webhook as verify_whatsapp_signature
 from app.services.popia_consent_guard import evaluate_ingress_processing_consent
 import logging
 from typing import Any, Dict
@@ -93,14 +94,18 @@ async def verify_whatsapp_webhook(
 
 
 @router.post("/webhooks")
-async def handle_whatsapp_message(request: Request) -> Dict[str, str]:
+async def handle_whatsapp_message(
+    request: Request,
+    verified_body: bytes = Depends(verify_whatsapp_signature),
+) -> Dict[str, str]:
     """
     Handle incoming WhatsApp messages (POST).
 
     This endpoint receives all WhatsApp events (messages, status updates, etc).
+    Phase 137-04: HMAC signature verification + replay protection via dependency.
     """
     try:
-        body = await request.json()
+        body = json.loads(verified_body)
         logger.debug(f"Received WhatsApp webhook: {str(body)[:200]}...")
 
         # Extract message from webhook structure
