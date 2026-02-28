@@ -1,16 +1,21 @@
 """Settings API - Global system configuration.
 
 Security: GET endpoints require AUDITOR (level 1), PUT endpoints require ADMIN (level 4).
+Phase 137-09: CONFIG_CHANGE audit events on all PUT endpoints.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.models.auth import AuthContext
+from app.security.audit_events import audit_config_change
 from app.security.pipeline import require_role
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -57,6 +62,7 @@ async def get_all_settings(auth: AuthContext = Depends(require_role(1))) -> Dict
 @router.put("/settings")
 async def update_all_settings(
     settings_data: Dict[str, Any],
+    request: Request,
     auth: AuthContext = Depends(require_role(4)),
 ) -> Dict[str, Any]:
     """Update all settings. Requires ADMIN (level 4)."""
@@ -93,6 +99,10 @@ async def update_all_settings(
     # Save to file
     save_settings(current_settings)
 
+    # Audit: CONFIG_CHANGE
+    source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+    audit_config_change("settings.all", user=auth.user_id, source_ip=source_ip)
+
     return current_settings
 
 
@@ -121,6 +131,7 @@ async def get_notification_settings(auth: AuthContext = Depends(require_role(1))
 @router.put("/settings/notifications")
 async def update_notification_settings(
     notifications: Dict[str, Any],
+    request: Request,
     auth: AuthContext = Depends(require_role(4)),
 ) -> Dict[str, Any]:
     """Update notification settings. Requires ADMIN (level 4).
@@ -176,6 +187,10 @@ async def update_notification_settings(
     current_settings["notifications"] = current_notifications
     save_settings(current_settings)
 
+    # Audit: CONFIG_CHANGE
+    source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+    audit_config_change("settings.notifications", user=auth.user_id, source_ip=source_ip)
+
     return current_notifications
 
 
@@ -189,6 +204,7 @@ async def get_health_thresholds(auth: AuthContext = Depends(require_role(1))) ->
 @router.put("/settings/health-thresholds")
 async def update_health_thresholds(
     thresholds: Dict[str, int],
+    request: Request,
     auth: AuthContext = Depends(require_role(4)),
 ) -> Dict[str, int]:
     """Update health score thresholds. Requires ADMIN (level 4)."""
@@ -222,5 +238,9 @@ async def update_health_thresholds(
 
     # Save to file
     save_settings(current_settings)
+
+    # Audit: CONFIG_CHANGE
+    source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+    audit_config_change("settings.health-thresholds", user=auth.user_id, source_ip=source_ip)
 
     return thresholds

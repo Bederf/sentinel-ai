@@ -182,6 +182,14 @@ async def verify_whatsapp_webhook(request: Request) -> bytes:
             "WhatsApp webhook signature verification failed: path=%s",
             request.url.path,
         )
+        # Audit: WEBHOOK_SUSPICIOUS (Phase 137-09)
+        try:
+            from app.security.audit_events import audit_webhook_suspicious
+
+            _source_ip = request.client.host if request.client else None
+            audit_webhook_suspicious("whatsapp", "signature_verification_failed", source_ip=_source_ip)
+        except Exception:
+            pass
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid webhook signature",
@@ -288,6 +296,14 @@ async def verify_telegram_webhook(request: Request) -> bytes:
     secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
     if not _verify_telegram_secret(secret):
         logger.warning("Telegram webhook secret verification failed")
+        # Audit: WEBHOOK_SUSPICIOUS (Phase 137-09)
+        try:
+            from app.security.audit_events import audit_webhook_suspicious
+
+            _source_ip = request.client.host if request.client else None
+            audit_webhook_suspicious("telegram", "secret_verification_failed", source_ip=_source_ip)
+        except Exception:
+            pass
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid webhook secret",

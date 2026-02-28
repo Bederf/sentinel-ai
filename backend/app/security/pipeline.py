@@ -406,6 +406,15 @@ def prompt_guard(field: str = "message", source: str = "direct"):
                 request.url.path,
                 result.reasons[:3],
             )
+            # Audit: PROMPT_GUARD_BLOCK (Phase 137-09)
+            try:
+                from app.security.audit_events import audit_prompt_guard_block
+
+                _source_ip = _extract_ip_address(request)
+                _user = getattr(getattr(request.state, "auth", None), "user_id", "unknown")
+                audit_prompt_guard_block(text, result.score, source, user=_user, source_ip=_source_ip)
+            except Exception:
+                pass  # Audit failure must not block the security response
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
@@ -422,6 +431,15 @@ def prompt_guard(field: str = "message", source: str = "direct"):
                 text_hash,
                 request.url.path,
             )
+            # Audit: PROMPT_GUARD_REWRITE (Phase 137-09)
+            try:
+                from app.security.audit_events import audit_prompt_guard_rewrite
+
+                _source_ip = _extract_ip_address(request)
+                _user = getattr(getattr(request.state, "auth", None), "user_id", "unknown")
+                audit_prompt_guard_rewrite(text, result.score, source, user=_user, source_ip=_source_ip)
+            except Exception:
+                pass
             return result.rewritten_text or text
 
         return text

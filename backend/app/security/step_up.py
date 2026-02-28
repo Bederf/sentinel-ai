@@ -136,6 +136,13 @@ def create_step_up_session(user_id: str, device_id: str, pin: str) -> bool:
                 user_id,
                 device_id,
             )
+            # Audit: STEP_UP_FAILED (Phase 137-09)
+            try:
+                from app.security.audit_events import audit_step_up_failed
+
+                audit_step_up_failed(user=user_id, device_id=device_id)
+            except Exception:
+                pass
             return False
     except ValueError as e:
         logger.error("Invalid ADMIN_PIN_HASH format: %s", e)

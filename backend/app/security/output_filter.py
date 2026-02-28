@@ -214,6 +214,13 @@ def run_output_filter_pipeline(
     # Stage 2: System prompt leak detection — kill the entire response
     if _stage_2_system_prompt_leak(text):
         logger.warning("OUTPUT_FILTER: System prompt leak detected — killing response")
+        # Audit: OUTPUT_FILTER_BLOCK (Phase 137-09)
+        try:
+            from app.security.audit_events import audit_output_filter_block
+
+            audit_output_filter_block(redactions=["system_prompt_leak"])
+        except Exception:
+            pass
         return FilterResult(
             text="[Response blocked by security filter]",
             kill_response=True,
@@ -235,5 +242,14 @@ def run_output_filter_pipeline(
             len(redactions),
             ", ".join(redactions[:10]),
         )
+        # Audit: SECRET_DETECTED for secret-type redactions (Phase 137-09)
+        secret_redactions = [r for r in redactions if r.startswith("secret:")]
+        if secret_redactions:
+            try:
+                from app.security.audit_events import audit_secret_detected
+
+                audit_secret_detected(redaction_type=", ".join(secret_redactions[:5]))
+            except Exception:
+                pass
 
     return FilterResult(text=text, redactions=redactions)

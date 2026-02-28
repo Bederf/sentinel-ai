@@ -514,6 +514,17 @@ async def validate_and_scan_upload(
                 injection_score=injection_score,
                 reasons=guard_result.reasons,
             )
+            # Audit: DOCUMENT_QUARANTINED (Phase 137-09)
+            try:
+                from app.security.audit_events import audit_document_quarantined
+
+                audit_document_quarantined(
+                    file_hash=file_hash,
+                    reason=f"injection_score={injection_score:.2f}",
+                    user=user_id,
+                )
+            except Exception:
+                pass
 
     # ---- Step 8: Trust level assignment ----
     if trust_level != "QUARANTINED":

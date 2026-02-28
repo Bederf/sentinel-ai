@@ -132,6 +132,15 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(RateLimitExceeded)
     async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         """Return 429 with Retry-After header when rate limit exceeded."""
+        # Audit: RATE_LIMIT_EXCEEDED (Phase 137-09)
+        try:
+            from app.security.audit_events import audit_rate_limit_exceeded
+
+            source_ip = _extract_ip_address(request)
+            audit_rate_limit_exceeded(path=str(request.url.path), source_ip=source_ip)
+        except Exception:
+            pass  # Audit failure must not block the 429 response
+
         headers = {"Retry-After": str(exc.retry_after)}
         headers.update(_get_cors_headers(request))
         return JSONResponse(

@@ -46,7 +46,13 @@ class AuditLogger:
             return
 
         self.log_file = Path(__file__).parent.parent / "data" / "audit_log.json"
-        self.max_entries = 1000  # Rotate oldest entries out
+        # Import from security constants — increased from 1000 to 10_000 (Phase 137-09)
+        try:
+            from app.security.constants import LOG_MAX_ENTRIES
+
+            self.max_entries = LOG_MAX_ENTRIES
+        except ImportError:
+            self.max_entries = 10_000
         self.buffer: List[AuditLogEntry] = []
         self.buffer_size = 10  # Flush after 10 entries
         self.encryption_service = get_encryption_service()

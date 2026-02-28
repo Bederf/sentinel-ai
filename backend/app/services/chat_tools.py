@@ -4096,6 +4096,13 @@ async def execute_tool(
     # --- Default deny: reject unregistered tools ---
     if tool_name not in REGISTERED_TOOLS:
         logger.warning("TOOL_POLICY: unregistered tool requested: %s", tool_name)
+        # Audit: TOOL_DENIED (Phase 137-09)
+        try:
+            from app.security.audit_events import audit_tool_denied
+
+            audit_tool_denied(tool_name, reason="unregistered_tool")
+        except Exception:
+            pass
         return {"error": "Unknown tool", "tool": tool_name}
 
     # --- Tier enforcement ---
