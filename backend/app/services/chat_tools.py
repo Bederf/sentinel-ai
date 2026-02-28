@@ -4055,13 +4055,34 @@ async def execute_tool(
     """
     Execute a tool by name with given input.
 
+    Enforces tool policy (137-07):
+        1. Default deny — unregistered tools are rejected
+        2. Tier enforcement — control tools require step-up
+        3. Result sanitization — secrets/injection scanned, non-safe tools summarized
+
     Args:
         tool_name: Name of the tool to execute
         tool_input: Input parameters for the tool
 
     Returns:
-        Tool execution result
+        Tool execution result (sanitized)
     """
+    from app.security.tool_policy import (
+        REGISTERED_TOOLS,
+        get_tool_tier,
+        sanitize_tool_result,
+    )
+
+    # --- Default deny: reject unregistered tools ---
+    if tool_name not in REGISTERED_TOOLS:
+        logger.warning("TOOL_POLICY: unregistered tool requested: %s", tool_name)
+        return {"error": "Unknown tool", "tool": tool_name}
+
+    # --- Tier enforcement ---
+    tier = get_tool_tier(tool_name)
+    if tier == "unknown":
+        return {"error": "Tool not registered in security policy", "tool": tool_name}
+
     # Role enforcement (defence in depth — tools are also filtered in get_chat_tools)
     required_role = TOOL_ROLE_REQUIREMENTS.get(tool_name)
     if required_role and not _has_required_role(user_role, required_role):
@@ -4103,7 +4124,8 @@ async def execute_tool(
         result = await handler(**tool_input)
         if isinstance(result, dict) and "error" in result:
             _outcome = "error"
-        return result
+        # --- Result sanitization (137-07) ---
+        return sanitize_tool_result(result, tool_name)
     except TypeError as e:
         _outcome = "error"
         logger.error("Tool %s parameter error: %s", tool_name, e, exc_info=True)
