@@ -63,7 +63,7 @@ class TestJWTIssuerAudience:
         """Token with wrong issuer is rejected."""
         import jwt as pyjwt
 
-        secret = settings.jwt_secret_key or settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
+        secret = settings.jwt_secret_key or settings.supabase_key or "test-only-jwt-secret"
         payload = {
             "sub": "user-1",
             "email": "test@example.com",
@@ -86,7 +86,7 @@ class TestJWTIssuerAudience:
         """Token with wrong audience is rejected."""
         import jwt as pyjwt
 
-        secret = settings.jwt_secret_key or settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
+        secret = settings.jwt_secret_key or settings.supabase_key or "test-only-jwt-secret"
         payload = {
             "sub": "user-1",
             "email": "test@example.com",
@@ -109,7 +109,7 @@ class TestJWTIssuerAudience:
         """Token missing aud claim is rejected."""
         import jwt as pyjwt
 
-        secret = settings.jwt_secret_key or settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
+        secret = settings.jwt_secret_key or settings.supabase_key or "test-only-jwt-secret"
         payload = {
             "sub": "user-1",
             "email": "test@example.com",
@@ -132,7 +132,7 @@ class TestJWTIssuerAudience:
         """Expired token is rejected."""
         import jwt as pyjwt
 
-        secret = settings.jwt_secret_key or settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
+        secret = settings.jwt_secret_key or settings.supabase_key or "test-only-jwt-secret"
         payload = {
             "sub": "user-1",
             "email": "test@example.com",

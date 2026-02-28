@@ -10,9 +10,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Shield, Delete, Lock } from "lucide-react";
-
-// Default PIN code - can be changed or made configurable
-const VALID_PIN = "27921";
+import { fetchApi } from "../lib/api/client";
 
 interface PinEntryProps {
   onSuccess: () => void;
@@ -24,31 +22,41 @@ export function PinEntry({ onSuccess }: PinEntryProps) {
   const [shake, setShake] = useState(false);
 
 
+  const [isValidating, setIsValidating] = useState(false);
+
   const handleDigitPress = useCallback((digit: string) => {
-    if (pin.length < 5) {
+    if (pin.length < 5 && !isValidating) {
       const newPin = pin + digit;
       setPin(newPin);
       setError(false);
 
-      // Auto-verify when 5 digits entered
+      // Auto-verify when 5 digits entered — server-side validation (Phase 137-02)
       if (newPin.length === 5) {
-        setTimeout(() => {
-          if (newPin === VALID_PIN) {
-            // Store auth in sessionStorage
+        setIsValidating(true);
+        fetchApi("/api/auth/verify-admin-pin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pin: newPin }),
+        })
+          .then(() => {
+            // 200 response means valid
             sessionStorage.setItem("sentinel_authenticated", "true");
             onSuccess();
-          } else {
+          })
+          .catch(() => {
             setError(true);
             setShake(true);
             setTimeout(() => {
               setPin("");
               setShake(false);
             }, 500);
-          }
-        }, 150);
+          })
+          .finally(() => {
+            setIsValidating(false);
+          });
       }
     }
-  }, [pin, onSuccess]);
+  }, [pin, onSuccess, isValidating]);
 
   const handleBackspace = useCallback(() => {
     setPin(pin.slice(0, -1));

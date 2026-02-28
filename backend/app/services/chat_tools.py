@@ -2062,9 +2062,8 @@ async def correct_point_classification(
         return {"success": False, "error": str(e)}
 
 
-# Password for accessing proprietary system methodology
-# Uses the same PIN as frontend splash screen for consistency
-METHODOLOGY_PASSWORD = "27921"
+# Methodology access is now gated by DEVELOPER role (Phase 137-02)
+# No hardcoded password — role check happens via TOOL_ROLE_REQUIREMENTS
 
 # System methodology documentation (proprietary)
 SYSTEM_METHODOLOGY = """
@@ -2131,32 +2130,19 @@ SENTINEL integrates data from:
 """
 
 
-async def get_system_methodology(password: str, topic: str | None = None) -> dict[str, Any]:
+async def get_system_methodology(topic: str | None = None, **kwargs: Any) -> dict[str, Any]:
     """
     Get proprietary SENTINEL system methodology documentation.
 
-    Requires admin password to access.
+    Access is gated by DEVELOPER role via TOOL_ROLE_REQUIREMENTS (Phase 137-02).
+    The password parameter was removed — role check replaces it.
 
     Args:
-        password: Admin password to access methodology
         topic: Optional specific topic (health_score, predictions, optimization, safety)
 
     Returns:
-        System methodology documentation or access denied message
+        System methodology documentation
     """
-    if password != METHODOLOGY_PASSWORD:
-        logger.warning(f"Failed methodology access attempt with password: {password[:3]}***")
-        return {
-            "success": False,
-            "access_denied": True,
-            "message": (
-                "Access denied. Incorrect password."
-                " Please contact your system administrator"
-                " for access to proprietary methodology"
-                " documentation."
-            ),
-        }
-
     logger.info(f"Methodology access granted for topic: {topic or 'all'}")
 
     # Return full or topic-specific documentation
@@ -2712,18 +2698,11 @@ CHAT_TOOLS = [
             " documentation explaining how health scores"
             " are calculated, how failure predictions work,"
             " optimization algorithms, and safety"
-            " validation. REQUIRES ADMIN PASSWORD. If user"
-            " asks about methodology without providing"
-            " password, tell them this is proprietary"
-            " information and ask for the admin password."
+            " validation. Requires DEVELOPER role or higher."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "password": {
-                    "type": "string",
-                    "description": "Admin password required to access proprietary methodology documentation",
-                },
                 "topic": {
                     "type": "string",
                     "description": (
@@ -2735,7 +2714,6 @@ CHAT_TOOLS = [
                     "enum": ["health_score", "predictions", "optimization", "safety"],
                 },
             },
-            "required": ["password"],
         },
     },
     {
@@ -3316,6 +3294,8 @@ TOOL_ROLE_REQUIREMENTS: dict[str, SentinelRole] = {
     "approve_recommendation": SentinelRole.OPERATOR,
     "reject_recommendation": SentinelRole.OPERATOR,
     "reset_equipment_fault": SentinelRole.OPERATOR,
+    # Methodology access gated by role instead of password (Phase 137-02)
+    "get_system_methodology": SentinelRole.DEVELOPER,
 }
 
 

@@ -9,10 +9,12 @@ FSR Domain: 4.7 - Logical Access Control
 """
 
 import logging
+import os
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
 
+import bcrypt
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 
@@ -110,20 +112,27 @@ def _record_failed_attempt(identifier: str) -> None:
     _login_attempts[identifier].append(datetime.utcnow())
 
 
+# ---------------------------------------------------------------------------
+# Admin emails from environment (Phase 137-02)
+# Comma-separated list of admin emails. Falls back to sentinel default.
+# ---------------------------------------------------------------------------
+_ADMIN_EMAILS: list[str] = [
+    e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "admin@sentinel.bms").split(",") if e.strip()
+]
+
+# Admin PIN hash from environment (Phase 137-02)
+# Generate with: python -c "import bcrypt; print(bcrypt.hashpw(b'YOUR_PIN', bcrypt.gensalt()).decode())"
+_ADMIN_PIN_HASH: str = os.environ.get("ADMIN_PIN_HASH", "")
+
+
 # Demo users store - in production this would be in Supabase
 # Email -> User mapping
-_DEMO_USERS = {
-    # Admin users
+_DEMO_USERS: dict[str, dict] = {
+    # Default admin user (always present)
     "admin@sentinel.bms": {
         "user_id": "admin-001",
         "email": "admin@sentinel.bms",
         "full_name": "SENTINEL Administrator",
-        "role": SentinelRole.ADMIN,
-    },
-    "bederf@gmail.com": {
-        "user_id": "user-001",
-        "email": "bederf@gmail.com",
-        "full_name": "System Owner",
         "role": SentinelRole.ADMIN,
     },
     # Operator users (can control devices)
@@ -162,6 +171,19 @@ _DEMO_USERS = {
         "role": SentinelRole.OPERATOR,  # Operator access for production demo
     },
 }
+
+# Register admin emails from env var as ADMIN users
+for _admin_email in _ADMIN_EMAILS:
+    if _admin_email not in _DEMO_USERS:
+        _DEMO_USERS[_admin_email] = {
+            "user_id": f"admin-{_admin_email[:8]}",
+            "email": _admin_email,
+            "full_name": "Admin User",
+            "role": SentinelRole.ADMIN,
+        }
+    else:
+        # Ensure env-listed emails always have ADMIN role
+        _DEMO_USERS[_admin_email]["role"] = SentinelRole.ADMIN
 
 
 def _create_jwt_token(user_data: dict, token_type: str = "access") -> str:
@@ -370,6 +392,58 @@ async def login_with_email(request: Request, email: str):
     except Exception as e:
         logger.error(f"Login failed for {email}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
+
+
+class VerifyPinRequest(BaseModel):
+    """Request body for PIN verification."""
+
+    pin: str = Field(..., description="PIN code to verify")
+
+
+@router.post("/verify-admin-pin")
+@limiter.limit("5/15minutes")
+async def verify_admin_pin(request: Request, body: VerifyPinRequest):
+    """Verify an admin PIN against the server-side bcrypt hash.
+
+    Phase 137-02: Server-side PIN validation replaces client-side comparison.
+    The PIN hash is stored in the ADMIN_PIN_HASH environment variable.
+
+    Args:
+        request: FastAPI request
+        body: Request body containing the PIN
+
+    Returns:
+        200 with {"valid": true} if PIN matches
+        403 with {"valid": false} if PIN does not match
+        503 if ADMIN_PIN_HASH is not configured
+    """
+    source_ip = _extract_ip_address(request)
+
+    # Brute-force protection
+    _check_brute_force(f"pin:{source_ip}")
+
+    if not _ADMIN_PIN_HASH:
+        logger.error("ADMIN_PIN_HASH environment variable is not configured")
+        raise HTTPException(
+            status_code=503,
+            detail="PIN verification is not configured. Set ADMIN_PIN_HASH env var.",
+        )
+
+    pin_bytes = body.pin.encode("utf-8")
+    hash_bytes = _ADMIN_PIN_HASH.encode("utf-8")
+
+    try:
+        if bcrypt.checkpw(pin_bytes, hash_bytes):
+            logger.info(f"PIN verification success from ip={source_ip}")
+            return {"valid": True}
+        else:
+            _record_failed_attempt(f"pin:{source_ip}")
+            logger.warning(f"PIN verification failed from ip={source_ip}")
+            raise HTTPException(status_code=403, detail="Invalid PIN")
+    except ValueError as e:
+        # Invalid hash format
+        logger.error(f"Invalid ADMIN_PIN_HASH format: {e}")
+        raise HTTPException(status_code=503, detail="PIN verification misconfigured")
 
 
 @router.post("/access-request")

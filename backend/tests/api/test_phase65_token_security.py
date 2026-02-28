@@ -26,7 +26,7 @@ def _make_request(path: str = "/api/auth/refresh") -> Request:
 
 
 def test_validate_jwt_token_rejects_missing_jti():
-    secret = settings.jwt_secret_key or settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
+    secret = settings.jwt_secret_key or settings.supabase_key or "test-only-jwt-secret"
     payload = {
         "sub": "user-1",
         "email": "user@example.com",

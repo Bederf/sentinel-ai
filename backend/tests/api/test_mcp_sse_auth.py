@@ -70,7 +70,7 @@ def _make_jwt(
     expired: bool = False,
 ) -> str:
     """Create a valid JWT token for testing."""
-    secret = settings.jwt_secret_key or settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
+    secret = settings.jwt_secret_key or settings.supabase_key or "test-only-jwt-secret"
     delta = timedelta(minutes=-5) if expired else timedelta(minutes=15)
     payload = {
         "sub": user_id,

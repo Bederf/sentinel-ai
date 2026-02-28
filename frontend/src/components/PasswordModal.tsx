@@ -13,6 +13,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { fetchApi } from "../lib/api/client";
 
 interface PasswordModalProps {
   isOpen: boolean;
@@ -21,9 +22,6 @@ interface PasswordModalProps {
   title?: string;
   description?: string;
 }
-
-// Admin password - in production this would be validated server-side
-const ADMIN_PASSWORD = "sentinel2024";
 
 export function PasswordModal({
   isOpen,
@@ -51,7 +49,7 @@ export function PasswordModal({
     }
   }, [isOpen]);
 
-  // Handle password submission
+  // Handle password submission - validates server-side (Phase 137-02)
   const handleSubmit = useCallback(async () => {
     if (!password.trim()) {
       setError("Please enter a password");
@@ -61,14 +59,24 @@ export function PasswordModal({
     setIsValidating(true);
     setError(null);
 
-    // Simulate validation delay for UX
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    if (password === ADMIN_PASSWORD) {
+    try {
+      await fetchApi("/api/auth/verify-admin-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: password }),
+      });
+      // 200 response means valid
       onSuccess();
       onClose();
-    } else {
-      setError("Incorrect password. Please try again.");
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number; message?: string };
+      if (apiErr.status === 403) {
+        setError("Incorrect password. Please try again.");
+      } else if (apiErr.status === 429) {
+        setError("Too many attempts. Please wait and try again.");
+      } else {
+        setError("Verification failed. Please try again later.");
+      }
       setPassword("");
       inputRef.current?.focus();
     }

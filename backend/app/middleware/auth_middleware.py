@@ -169,7 +169,9 @@ def create_jwt_token(
     Returns:
         Encoded JWT token string
     """
-    secret = settings.jwt_secret_key or settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
+    secret = settings.jwt_secret_key or settings.supabase_key
+    if not secret:
+        raise RuntimeError("JWT_SECRET environment variable is required")
 
     # Determine TTL based on token type
     if token_type == "refresh":
@@ -226,7 +228,10 @@ def validate_jwt_token(token: str, required_token_type: Optional[str] = None) ->
         Token payload dict or None if invalid
     """
     try:
-        secret = settings.jwt_secret_key or settings.supabase_key or "sentinel-demo-jwt-secret-change-in-production"
+        secret = settings.jwt_secret_key or settings.supabase_key
+        if not secret:
+            logger.error("JWT_SECRET environment variable is required for token validation")
+            return None
 
         payload = pyjwt.decode(
             token,
