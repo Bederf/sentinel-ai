@@ -13,6 +13,7 @@ from typing import Optional
 
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext
+from app.security.step_up import require_step_up
 from app.models.approval import ApprovalRequest, RejectionRequest, ApprovalResponse, ApprovalStatus
 from app.services.approval_service import get_approval_service
 from app.database.repositories.recommendation_repository import RecommendationRepository
@@ -32,6 +33,7 @@ async def approve_recommendation(
     recommendation_id: str = Path(..., description="ID of recommendation to approve"),
     request: ApprovalRequest = None,
     auth: AuthContext = Depends(require_auth),
+    _step_up: None = Depends(require_step_up()),
 ) -> ApprovalResponse:
     """Approve a pending recommendation.
 
@@ -107,6 +109,7 @@ async def reject_recommendation(
     recommendation_id: str = Path(..., description="ID of recommendation to reject"),
     request: RejectionRequest = None,
     auth: AuthContext = Depends(require_auth),
+    _step_up: None = Depends(require_step_up()),
 ) -> ApprovalResponse:
     """Reject a pending recommendation.
 
@@ -209,6 +212,7 @@ async def rollback_approval(
     recommendation_id: str = Path(..., description="ID of recommendation to rollback"),
     rollback_reason: Optional[str] = None,
     auth: AuthContext = Depends(require_auth),
+    _step_up: None = Depends(require_step_up()),
 ) -> ApprovalResponse:
     """Rollback an executed approval to its original state.
 

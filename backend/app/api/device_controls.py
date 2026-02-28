@@ -22,6 +22,9 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, Depends
 
+from app.middleware.auth_middleware import require_auth
+from app.models.auth import AuthContext, AuthLevel
+from app.security.step_up import require_step_up
 from app.services.device_control_service import (
     get_device_control_service,
 )
@@ -318,6 +321,8 @@ async def execute_control(
     target_value: Any,
     reason: str,
     operator_id: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
+    _step_up: None = Depends(require_step_up()),
     rec_repo: RecommendationRepository = Depends(lambda: get_recommendation_repository()),
 ) -> Dict[str, Any]:
     """

@@ -28,6 +28,10 @@ from app.services.session_service import session_service
 from app.services.token_blacklist_service import token_blacklist
 from app.database.repositories.module_access_repository import get_module_access_repository
 from app.models.module_registry import ModuleType
+from app.security.step_up import (
+    create_step_up_session,
+    _extract_device_id,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -444,6 +448,70 @@ async def verify_admin_pin(request: Request, body: VerifyPinRequest):
         # Invalid hash format
         logger.error(f"Invalid ADMIN_PIN_HASH format: {e}")
         raise HTTPException(status_code=503, detail="PIN verification misconfigured")
+
+
+class StepUpRequest(BaseModel):
+    """Request body for step-up authentication."""
+
+    pin: str = Field(..., description="PIN code for step-up re-authentication")
+
+
+@router.post("/step-up")
+@limiter.limit("5/15minutes")
+async def step_up_auth(request: Request, body: StepUpRequest):
+    """Create a step-up authentication session for sensitive operations.
+
+    Phase 137-04: Step-up auth requires re-authentication before control actions.
+    The session is keyed by (user_id, device_id) and lasts STEP_UP_VALIDITY_SECONDS (15min).
+
+    The user must be authenticated (Bearer token) before calling this endpoint.
+
+    Args:
+        request: FastAPI request (must have Authorization header)
+        body: Request body containing the PIN
+
+    Returns:
+        200 with session info if PIN valid
+        401 if not authenticated
+        403 if PIN invalid
+        429 if rate limited
+        503 if ADMIN_PIN_HASH not configured
+    """
+    # Get authenticated user
+    user = _get_current_user_from_request(request)
+    user_id = user["id"]
+    device_id = _extract_device_id(request)
+    source_ip = _extract_ip_address(request)
+
+    valid = create_step_up_session(
+        user_id=user_id,
+        device_id=device_id,
+        pin=body.pin,
+    )
+
+    if not valid:
+        logger.warning(
+            "Step-up auth failed: user=%s device=%s ip=%s",
+            user_id,
+            device_id,
+            source_ip,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid PIN",
+        )
+
+    logger.info(
+        "Step-up auth success: user=%s device=%s ip=%s",
+        user_id,
+        device_id,
+        source_ip,
+    )
+    return {
+        "success": True,
+        "message": "Step-up authentication granted",
+        "validity_seconds": 900,
+    }
 
 
 @router.post("/access-request")
