@@ -28,7 +28,7 @@ const MODULE_NAMES: Record<string, string> = {
   // Base Building Systems
   hvac: 'HVAC Monitoring',
   energy: 'Energy Monitoring',
-  lighting: 'Lighting & Occupancy',
+  lighting: 'Lighting',
   solar: 'Solar & BESS',
   water: 'Water Management',
   fire: 'Fire Safety',

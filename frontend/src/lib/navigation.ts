@@ -20,6 +20,7 @@ import {
   Sun,
   Droplets,
   Lightbulb,
+  Sliders,
 } from "lucide-react";
 import type { ModuleType } from "./moduleRegistry";
 
@@ -110,6 +111,7 @@ export type BuildingTabId =
   | "fire"
   | "security"
   | "digital-twin"
+  | "controls"
   | "simulation";
 
 export interface BuildingTabItem {
@@ -139,6 +141,7 @@ export const BUILDING_TAB_ITEMS: BuildingTabItem[] = [
   { id: "fire", label: "Fire", icon: Activity },
   { id: "security", label: "Security", icon: Shield, controlModule: "security_control" },
   { id: "digital-twin", label: "Digital Twin", icon: Activity, controlModule: "digital_twin_control" },
+  { id: "controls", label: "Controls", icon: Sliders },
   { id: "simulation", label: "Simulation", icon: Activity, requiredModule: "simulation" },
 ];
 

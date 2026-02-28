@@ -25,6 +25,8 @@ import {
   XCircle,
 } from "lucide-react";
 import type { Device, DevicePoint } from '@/lib/api';
+import type { ModuleType } from '@/lib/moduleRegistry';
+import { useModules } from '@/contexts/ModuleHooks';
 import { TemperatureControl } from "./TemperatureControl";
 import { SwitchControl } from "./SwitchControl";
 import { SelectorControl } from "./SelectorControl";
@@ -129,6 +131,22 @@ function getDeviceTypeLabel(deviceType: string): string {
   }
 }
 
+/**
+ * Map a device to its controlling module based on device type/code.
+ * Returns null if no control module applies.
+ */
+function getControlModuleForDevice(device: Device): ModuleType | null {
+  const type = (device.device_type || '').toLowerCase();
+  const code = (device.id || device.name || '').toLowerCase();
+  if (/hvac|ahu|fcu|chiller|cooling|vav|crac/i.test(type) || /ahu|fcu|chiller|vav|ct-/i.test(code)) return 'hvac_control';
+  if (/dali|lighting|luminaire|lum/i.test(type) || /dali|lum/i.test(code)) return 'lighting_control';
+  if (/solar|inverter|bess|battery/i.test(type) || /inv-|bess/i.test(code)) return 'solar_control';
+  if (/generator|ups|ats|meter/i.test(type) || /gen-|ups|ats|mtr/i.test(code)) return 'energy_control';
+  if (/water|pump|tank|valve/i.test(type) || /pump|tank/i.test(code)) return 'water_control';
+  if (/door|cctv|access|security/i.test(type) || /acc-|cctv/i.test(code)) return 'security_control';
+  return null;
+}
+
 export function ControlPanel({
   device,
   onControl,
@@ -138,6 +156,11 @@ export function ControlPanel({
   const [expanded, setExpanded] = useState(true);
   const [pointValues, setPointValues] = useState<Record<string, number | boolean>>({});
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const { isModuleActive } = useModules();
+
+  // Check if write controls are allowed for this device's discipline
+  const controlModule = getControlModuleForDevice(device);
+  const writeEnabled = controlModule ? isModuleActive(controlModule) : false;
 
   // Use the control action hook
   const {
@@ -461,8 +484,8 @@ export function ControlPanel({
                 </div>
               )}
 
-              {/* Control widgets */}
-              {writablePoints.length > 0 && (
+              {/* Control widgets — gated by discipline control module */}
+              {writeEnabled && writablePoints.length > 0 && (
                 <div className="mb-6">
                   <h4
                     className="font-medium text-xs mb-3 uppercase tracking-wider"

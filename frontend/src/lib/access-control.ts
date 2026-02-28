@@ -56,7 +56,7 @@ export const COMPANY_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
     ],
     defaultView: 'dashboard',
     viewMode: 'operator',
-    description: 'Lighting & Occupancy Control Demo',
+    description: 'Lighting Control Demo',
   },
 };
 

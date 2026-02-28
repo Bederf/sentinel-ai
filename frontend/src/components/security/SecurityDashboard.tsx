@@ -278,33 +278,41 @@ export function SecurityDashboard({ siteId = "site-002" }: SecurityDashboardProp
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {zoneOccupancies.map((zone) => {
               const pct = zone.percent_full || 0;
-              const barColor = pct > 80 ? "bg-red-500" : pct > 50 ? "bg-amber-500" : "bg-green-500";
+              const barColor = pct > 80 ? "var(--color-sentinel-red)" : pct > 50 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)";
+              const badgeBg = pct > 80 ? "rgba(220, 38, 38, 0.15)" : pct > 50 ? "rgba(245, 158, 11, 0.15)" : "rgba(16, 185, 129, 0.15)";
               return (
                 <div
                   key={zone.zone_id}
-                  className="p-3 rounded-lg border border-gray-200 dark:border-gray-700"
+                  className="p-3 rounded-lg"
+                  style={{
+                    background: "var(--color-sentinel-bg-secondary)",
+                    border: "1px solid var(--color-sentinel-border)",
+                  }}
                 >
                   <div className="flex justify-between items-center mb-1">
-                    <Text className="font-medium text-sm">{zone.zone_name}</Text>
-                    <Badge color={pct > 80 ? "red" : pct > 50 ? "amber" : "green"} size="xs">
+                    <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{zone.zone_name}</span>
+                    <span
+                      className="text-xs font-medium px-2 py-0.5 rounded"
+                      style={{ background: badgeBg, color: barColor }}
+                    >
                       {Math.round(pct)}%
-                    </Badge>
+                    </span>
                   </div>
-                  <div className="text-2xl font-bold">
+                  <div className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
                     {zone.occupancy_count}
-                    <span className="text-sm font-normal text-gray-400">/{zone.max_capacity}</span>
+                    <span className="text-sm font-normal" style={{ color: "var(--color-sentinel-text-secondary)" }}>/{zone.max_capacity}</span>
                   </div>
                   {/* Progress bar */}
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
-                    <div className={`${barColor} h-2 rounded-full transition-all`} style={{ width: `${Math.min(100, pct)}%` }} />
+                  <div className="w-full rounded-full h-2 mt-2" style={{ background: "var(--color-sentinel-bg-panel)" }}>
+                    <div className="h-2 rounded-full transition-all" style={{ width: `${Math.min(100, pct)}%`, background: barColor }} />
                   </div>
                   <div className="flex justify-between mt-1">
-                    <Text className="text-xs text-gray-400">
+                    <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                       <ArrowUpRight className="w-3 h-3 inline" /> {zone.badge_entries}
-                    </Text>
-                    <Text className="text-xs text-gray-400">
+                    </span>
+                    <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                       <ArrowDownLeft className="w-3 h-3 inline" /> {zone.badge_exits}
-                    </Text>
+                    </span>
                   </div>
                 </div>
               );
@@ -544,7 +552,7 @@ export function SecurityDashboard({ siteId = "site-002" }: SecurityDashboardProp
         <Flex alignItems="center" className="gap-3">
           <Shield className="w-6 h-6 text-blue-400" />
           <div>
-            <Title>Security & Access Control</Title>
+            <Title>Security</Title>
             <Text className="text-xs text-gray-400">
               Real-time occupancy, access monitoring, and cross-module automation
             </Text>

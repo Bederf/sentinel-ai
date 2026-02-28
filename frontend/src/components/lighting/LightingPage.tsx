@@ -13,6 +13,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Lightbulb, Sun, Users } from 'lucide-react';
 import { useSimulation } from '@/contexts/SimulationContext';
+import { useModules } from '@/contexts/ModuleHooks';
 import { BuildingSelector } from '../BuildingSelector';
 import { api, isExpectedApiError } from '@/lib/api';
 import { hvacApi } from '@/lib/hvacApi';
@@ -236,6 +237,8 @@ export function LightingPage() {
 // Lighting Zone Card Component
 function LightingZoneCard({ zone }: { zone: LightingZone }) {
   const [brightness, setBrightness] = useState(zone.brightness);
+  const { isModuleActive } = useModules();
+  const controlEnabled = isModuleActive('lighting_control');
 
   // Sync when simulation updates zone brightness
   useEffect(() => {
@@ -299,7 +302,8 @@ function LightingZoneCard({ zone }: { zone: LightingZone }) {
         />
       </div>
 
-      {/* Brightness Slider */}
+      {/* Brightness Slider — only when lighting_control is active */}
+      {controlEnabled && (
       <div className="space-y-2">
         <label className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
           Manual Override
@@ -321,6 +325,7 @@ function LightingZoneCard({ zone }: { zone: LightingZone }) {
           <span>100%</span>
         </div>
       </div>
+      )}
     </div>
   );
 }

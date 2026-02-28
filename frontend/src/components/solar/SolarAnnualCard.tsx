@@ -1,12 +1,12 @@
 // @ts-nocheck
 /**
- * Solar Annual Simulation Card Component
+ * Solar Annual Performance Summary Card
  *
- * Displays cumulative 365-day simulation progress on dashboard.
- * Reactive to simulation context — values grow as daysSimulated increases.
+ * Displays cumulative 365-day performance data on dashboard.
+ * Reactive to data context — values grow as days of data increase.
  *
  * Shows:
- * - Annual savings (projected from simulated days)
+ * - Annual savings (projected from collected days)
  * - Solar generation (accumulated kWh)
  * - Self-consumption ratio
  * - Grid import reduction
@@ -144,7 +144,7 @@ export function SolarAnnualCard({ siteId }: SolarAnnualCardProps) {
       >
         <Zap className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--color-sentinel-text-disabled)' }} />
         <Text className="text-sm" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-          Start a simulation to see annual projections
+          Connect a data source to see annual projections
         </Text>
       </div>
     )
@@ -185,7 +185,7 @@ export function SolarAnnualCard({ siteId }: SolarAnnualCardProps) {
         <Flex alignItems="center" justifyContent="start" className="gap-3">
           <Zap className="w-5 h-5" style={{ color: 'var(--color-sentinel-amber)' }} />
           <Text className="font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>
-            Annual Simulation Results
+            Annual Performance Summary
           </Text>
         </Flex>
         <span
@@ -304,7 +304,7 @@ export function SolarAnnualCard({ siteId }: SolarAnnualCardProps) {
                 {season.days > 0 ? formatKWh(season.total_solar_kwh) : '—'}
               </Text>
               <Text className="text-xs" style={subLabelStyle}>
-                {season.days > 0 ? `${season.avg_savings_pct.toFixed(1)}% savings` : 'Not yet simulated'}
+                {season.days > 0 ? `${season.avg_savings_pct.toFixed(1)}% savings` : 'Awaiting data'}
               </Text>
             </div>
           ))}

@@ -147,7 +147,7 @@ export function SolarDashboard() {
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               {isSimulationRunning
-                ? `Real-time generation from simulation • Hour ${simulatedHour}:00 (Day ${daysSimulated}/365) • ${cloudCover?.toFixed(0)}% cloud cover`
+                ? `Live generation data • Hour ${simulatedHour}:00 (Day ${daysSimulated}/365) • ${cloudCover?.toFixed(0)}% cloud cover`
                 : 'Generation, storage, dispatch, and financial performance'
               }
             </p>
@@ -250,7 +250,7 @@ export function SolarDashboard() {
         </div>
       </div>
 
-      {/* Row 4: Annual Simulation Results (365 days) */}
+      {/* Row 4: Annual Performance Summary (365 days) */}
       <div className="mb-4">
         <div
           className="glass-panel overflow-hidden"

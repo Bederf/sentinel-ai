@@ -10,6 +10,7 @@
  */
 
 import { useState } from "react";
+import { useModules } from "@/contexts/ModuleHooks";
 import {
   Card,
   Text,
@@ -41,6 +42,7 @@ type FilterStatus = (typeof FILTER_OPTIONS)[number];
 export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
   buildingId,
 }) => {
+  const { isModuleActive } = useModules();
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
   const [acknowledgedAlerts, setAcknowledgedAlerts] = useState<Set<string>>(
     new Set()
@@ -364,6 +366,7 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
                         </Button>
                       ) : null}
 
+                      {isModuleActive('maintenance') && (
                       <Button
                         size="xs"
                         color={alert.severity === "critical" ? "red" : "blue"}
@@ -371,6 +374,7 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
                       >
                         Create Work Order
                       </Button>
+                      )}
                     </div>
                   </div>
                 );

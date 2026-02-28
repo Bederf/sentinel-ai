@@ -372,15 +372,12 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
           <Tab>Overview</Tab>
           <Tab>Zones</Tab>
           <Tab>Costs & Forecast</Tab>
-          <Tab>Alerts & Work Orders</Tab>
+          <Tab>Alerts</Tab>
         </TabList>
 
         <TabPanels>
           <TabPanel className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <WaterAnomalyChart zoneId={selectedSiteId} days={7} />
-              <WaterAlertPanel buildingId={selectedSiteId} />
-            </div>
+            <WaterAnomalyChart zoneId={selectedSiteId} days={7} />
           </TabPanel>
 
           <TabPanel className="space-y-6">

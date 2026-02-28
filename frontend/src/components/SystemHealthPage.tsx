@@ -1,10 +1,11 @@
 /**
  * System Health & Diagnostics Dashboard
  *
- * Real-time system health monitoring with three-tab interface:
- * 1. Realtime Status - Current health overview and component status
+ * Real-time system health monitoring with four-tab interface:
+ * 1. Health - Current health overview and component status
  * 2. Historical Insights - Uptime trends and health trends
- * 3. Diagnostics - SIMBIOT diagnostic tools and error logs
+ * 3. AI Performance - Optimization run analytics and profile scores
+ * 4. Model Health - ML model freshness, accuracy, and A/B tests
  */
 
 import { useState, useEffect } from 'react';
@@ -36,6 +37,8 @@ import type { IntegrationHealthSummary } from '@/lib/api';
 import { monitoringApi } from '@/lib/api';
 import { authorizedFetch } from '../lib/api/client';
 import { PageLoading } from './PageLoading';
+import { AIPerformanceTab } from './system/AIPerformanceTab';
+import { ModelHealthTab } from './system/ModelHealthTab';
 
 interface HealthComponent {
   name: string;
@@ -203,9 +206,10 @@ export default function SystemHealthPage() {
       {/* Tab Interface */}
       <TabGroup defaultIndex={selectedTab} onIndexChange={setSelectedTab}>
         <TabList className="glass-subtle rounded-md p-1" style={{ border: "1px solid var(--glass-border)" }}>
-          <Tab>Realtime Status</Tab>
+          <Tab>Health</Tab>
           <Tab>Historical Insights</Tab>
-          <Tab>Diagnostics</Tab>
+          <Tab>AI Performance</Tab>
+          <Tab>Model Health</Tab>
         </TabList>
 
         <TabPanels>
@@ -423,18 +427,14 @@ export default function SystemHealthPage() {
             )}
           </TabPanel>
 
-          {/* TAB 3: DIAGNOSTICS */}
+          {/* TAB 3: AI PERFORMANCE */}
           <TabPanel className="space-y-6">
-            <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
-              <div className="text-center py-8">
-                <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Diagnostics tools coming soon
-                </Text>
-                <p className="text-sm mt-2" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-                  Run SIMBIOT diagnostics to analyze system components
-                </p>
-              </div>
-            </Card>
+            <AIPerformanceTab />
+          </TabPanel>
+
+          {/* TAB 4: MODEL HEALTH */}
+          <TabPanel className="space-y-6">
+            <ModelHealthTab />
           </TabPanel>
         </TabPanels>
       </TabGroup>

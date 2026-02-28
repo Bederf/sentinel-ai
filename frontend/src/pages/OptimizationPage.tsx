@@ -21,10 +21,9 @@ import {
   BarChart,
   Clock,
   CheckCircle,
-  Building2,
-  ChevronDown,
 } from "lucide-react";
 import { useSimulation } from "@/contexts/SimulationContext";
+import { useModules } from "@/contexts/ModuleHooks";
 import { Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Button, TabGroup, TabList, Tab, TabPanels, TabPanel, Title, Text } from "@tremor/react";
 import api from '@/lib/api';
 import type { OptimizationScenario, OptimizationStatusResponse, Site } from '@/lib/api';
@@ -118,6 +117,7 @@ interface OptimizationPageProps {
 export function OptimizationPage({ onError }: OptimizationPageProps) {
   // Get simulation context for live HVAC metrics
   const { running: isSimulationRunning, hvacLoadPercent, ambientTemp, simulatedHour, daysSimulated } = useSimulation();
+  const { isModuleActive } = useModules();
 
   // State
   const [sites, setSites] = useState<Site[]>([]);
@@ -301,104 +301,43 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
 
         <TabPanels>
           <TabPanel>
-      {/* Main Optimization Panel - Hero Section */}
-      <div className="mb-6">
+      {/* Load Shedding Optimization */}
+      <div className="glass-card overflow-hidden mb-6">
         <div
-          className="glass-panel overflow-hidden"
+          className="p-4 flex items-center justify-between"
+          style={{ borderBottom: "1px solid var(--glass-border)" }}
         >
-          {/* Panel Header */}
-          <div
-            className="p-4 flex items-center justify-between"
-            style={{ borderBottom: "1px solid var(--glass-border)" }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded"
-                style={{ background: "rgba(59, 130, 246, 0.15)" }}
+          <div className="flex items-center gap-3">
+            <div
+              className="p-2 rounded"
+              style={{ background: "rgba(59, 130, 246, 0.15)" }}
+            >
+              <Zap className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
+            </div>
+            <div>
+              <h3
+                className="font-medium text-sm"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                <Zap className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3
-                    className="font-medium text-sm"
-                    style={{ color: "var(--color-sentinel-text-primary)" }}
-                  >
-                    Load Shedding Optimization
-                  </h3>
-                  {isSimulationRunning && (
-                    <div className="px-2 py-0.5 rounded text-xs font-medium"
-                      style={{
-                        background: 'rgba(59, 130, 246, 0.15)',
-                        color: 'var(--color-sentinel-blue)',
-                      }}
-                    >
-                      🔧 Live • {hvacLoadPercent?.toFixed(0)}% load
-                    </div>
-                  )}
-                </div>
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--color-sentinel-text-secondary)" }}
-                >
-                  {isSimulationRunning
-                    ? `Real-time HVAC from simulation • Hour ${simulatedHour}:00 (Day ${daysSimulated}/365) • ${ambientTemp?.toFixed(1)}°C`
-                    : 'Optimize building comfort and energy use during outages'
-                  }
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {/* Building Selector */}
-              <div className="relative">
-                <Building2
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
-                  style={{ color: "var(--color-sentinel-text-secondary)" }}
-                />
-                <ChevronDown
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-3 w-3 pointer-events-none"
-                  style={{ color: "var(--color-sentinel-text-secondary)" }}
-                />
-                <select
-                  value={selectedSiteId}
-                  onChange={(e) => setSelectedSiteId(e.target.value)}
-                  className="pl-9 pr-7 py-1.5 text-sm rounded appearance-none cursor-pointer"
-                  style={{
-                    background: "var(--color-sentinel-bg-secondary)",
-                    border: "1px solid var(--color-sentinel-border)",
-                    color: "var(--color-sentinel-text-primary)",
-                    outline: "none",
-                    minWidth: "200px",
-                  }}
-                >
-                  {sites.length > 0 ? (
-                    sites.map((site) => (
-                      <option key={site.id} value={site.id}>
-                        {site.name}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="site-002">Sandton City Office Tower</option>
-                  )}
-                </select>
-              </div>
-
-              <SentinelBadge variant="success" size="lg">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="h-2 w-2 rounded-full"
-                    style={{ background: "var(--color-sentinel-green)", animation: "pulse 2s infinite" }}
-                  />
-                  <span>Active Monitoring</span>
-                </div>
-              </SentinelBadge>
+                Load Shedding Optimization
+              </h3>
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                {isSimulationRunning
+                  ? `Live HVAC ${hvacLoadPercent?.toFixed(0)}% load • Hour ${simulatedHour}:00 (Day ${daysSimulated}/365) • ${ambientTemp?.toFixed(1)}°C`
+                  : 'Optimize building comfort and energy use during outages'
+                }
+              </span>
             </div>
           </div>
-
-          {/* Panel Content - Three Column Layout */}
-          <div className="p-4">
-            <OptimizationPanelGated compact={false} />
-          </div>
+          <SentinelBadge variant={isSimulationRunning ? "info" : "success"} size="sm">
+            {isSimulationRunning ? "Live" : "Monitoring"}
+          </SentinelBadge>
+        </div>
+        <div className="p-4">
+          <OptimizationPanelGated compact={false} />
         </div>
       </div>
 
@@ -545,13 +484,13 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
         </div>
       </div>
 
-      {/* Scenario Comparison and Action History */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Scenario Comparison */}
+      {/* Scenario Comparison (Fleet ML) and Action History */}
+      <div className={`grid grid-cols-1 ${isModuleActive('fleet_ml') ? 'lg:grid-cols-2' : ''} gap-6 pb-6`}>
+        {/* Scenario Comparison — cross-building comparison, requires Fleet ML */}
+        {isModuleActive('fleet_ml') && (
         <div
-          className="glass-panel overflow-hidden"
+          className="glass-card overflow-hidden"
         >
-          {/* Panel Header */}
           <div
             className="p-4 flex items-center justify-between"
             style={{ borderBottom: "1px solid var(--glass-border)" }}
@@ -574,13 +513,12 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                   className="text-xs"
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                 >
-                  Compare optimization strategies
+                  Compare optimization strategies across sites
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Panel Content */}
           <div className="p-4">
             <Table>
               <TableHead>
@@ -654,10 +592,11 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
             </Table>
           </div>
         </div>
+        )}
 
         {/* Action History */}
         <div
-          className="glass-panel overflow-hidden"
+          className="glass-card overflow-hidden"
         >
           {/* Panel Header */}
           <div

@@ -76,10 +76,12 @@ import type { BuildingTabId } from "../lib/navigation";
 
 // ─── Lazy-loaded tab components ─────────────────────────────────────
 // HVAC
+const HVACDashboard = lazy(() => import("./hvac/HVACDashboard"));
+// Controls (all-device control panel)
 const ControlDashboard = lazy(() => import("./ControlDashboard").then(m => ({ default: m.ControlDashboard })));
 // Energy
 const OptimizationPage = lazy(() => import("../pages/OptimizationPage").then(m => ({ default: m.OptimizationPage })));
-// Lighting & Occupancy
+// Lighting
 const LightingPage = lazy(() => import("./lighting/LightingPage").then(m => ({ default: m.LightingPage })));
 const OccupancyFullPanel = lazy(() => import("./OccupancyPanel").then(m => ({ default: m.OccupancyPanel })));
 const OccupancyAnalyticsPage = lazy(() => import("../pages/OccupancyAnalyticsPage").then(m => ({ default: m.OccupancyAnalyticsPage })));
@@ -823,20 +825,29 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           Main Tab Bar — 10 discipline tabs (SIMBIOT-data-driven)
           ═══════════════════════════════════════════════════════════ */}
       <div
-        className="mb-6 rounded-md overflow-hidden"
+        className="mb-6 rounded-md"
         style={{
           background: "var(--color-sentinel-bg-panel)",
           border: "1px solid var(--color-sentinel-border)",
         }}
       >
         <div
-          className="flex border-b"
+          className="flex overflow-x-auto border-b scrollbar-hide"
           style={{ borderColor: "var(--color-sentinel-border)" }}
         >
           {BUILDING_TAB_ITEMS
             .filter((tab) => {
               // Hide tabs that require a module add-on (e.g., simulation)
               if (tab.requiredModule && !isModuleActive(tab.requiredModule)) return false;
+              // Controls tab: only show if ANY control add-on is active
+              if (tab.id === "controls") {
+                const CONTROL_MODULES = [
+                  'hvac_control', 'energy_control', 'lighting_control',
+                  'solar_control', 'water_control', 'security_control',
+                  'digital_twin_control',
+                ] as const;
+                return CONTROL_MODULES.some(mod => isModuleActive(mod));
+              }
               return true;
             })
             .map((tab) => {
@@ -846,7 +857,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                 <button
                   key={tab.id}
                   onClick={() => setActiveMainTab(tab.id)}
-                  className="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap"
+                  className="flex-shrink-0 flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap"
                   style={{
                     color: isActive
                       ? "var(--color-sentinel-amber)"
@@ -883,7 +894,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
       >
         {/* Sub-Tab Navigation (Equipment/Alerts/Energy/Predictions) */}
         <div
-          className="flex border-b"
+          className="flex overflow-x-auto border-b scrollbar-hide"
           style={{ borderColor: "var(--color-sentinel-border)" }}
         >
           {[
@@ -898,7 +909,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative"
+                className="flex-shrink-0 flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap"
                 style={{
                   color: isActive
                     ? "var(--color-sentinel-text-primary)"
@@ -1669,9 +1680,9 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
          ═══════════════════════════════════════════════════════════ */
       <Suspense fallback={<TabLoading />}>
         <div className="min-h-[400px]">
-          {/* HVAC — Control Dashboard (control features gated by hvac_control) */}
+          {/* HVAC — Zone temps, equipment status, optimization */}
           {activeMainTab === "hvac" && (
-            <ControlDashboard onError={() => {}} />
+            <HVACDashboard siteId={siteId} />
           )}
 
           {/* Energy — Optimization (control features gated by energy_control) */}
@@ -1682,12 +1693,12 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           {/* Lighting — Lighting | Occupancy | Analytics | Correlation */}
           {activeMainTab === "lighting" && (
             <>
-              <div className="flex gap-2 mb-4">
+              <div className="flex overflow-x-auto gap-2 mb-4 scrollbar-hide">
                 {(["Lighting", "Occupancy", "Analytics", "Correlation"] as LightingSub[]).map(sub => (
                   <button
                     key={sub}
                     onClick={() => setLightingSub(sub)}
-                    className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                    className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap"
                     style={{
                       background: lightingSub === sub ? "var(--color-sentinel-amber)" : "var(--color-sentinel-bg-secondary)",
                       color: lightingSub === sub ? "white" : "var(--color-sentinel-text-secondary)",
@@ -1709,12 +1720,12 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           {/* Solar & BESS — Dashboard | AEGIS (AEGIS gated by solar_control) */}
           {activeMainTab === "solar-bess" && (
             <>
-              <div className="flex gap-2 mb-4">
+              <div className="flex overflow-x-auto gap-2 mb-4 scrollbar-hide">
                 {(["Dashboard", ...(isModuleActive('solar_control') ? ["AEGIS"] : [])] as SolarBessSub[]).map(sub => (
                   <button
                     key={sub}
                     onClick={() => setSolarBessSub(sub)}
-                    className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+                    className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap"
                     style={{
                       background: solarBessSub === sub ? "var(--color-sentinel-amber)" : "var(--color-sentinel-bg-secondary)",
                       color: solarBessSub === sub ? "white" : "var(--color-sentinel-text-secondary)",
@@ -1741,6 +1752,11 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           {/* Digital Twin (write actions gated by digital_twin_control) */}
           {activeMainTab === "digital-twin" && (
             <div className="h-[calc(100vh-300px)]"><DigitalTwin /></div>
+          )}
+
+          {/* Controls — all-device control panel (visible when any control add-on active) */}
+          {activeMainTab === "controls" && (
+            <ControlDashboard onError={() => {}} />
           )}
 
           {/* Simulation — only visible when simulation add-on is active */}
