@@ -1,7 +1,7 @@
 """Device Abstraction Service.
 
 Protocol-agnostic interface for building automation devices.
-Provides a clean abstraction layer over different protocols (BACnet, Modbus, mock, etc.)
+Provides a clean abstraction layer over different protocols (BACnet, Modbus, simulated, etc.)
 with consistent API for device discovery, reading, and writing.
 """
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class DeviceInterface(ABC):
     """Protocol-agnostic device interface.
 
-    All device implementations (BACnet, Modbus, mock, etc.) must implement
+    All device implementations (BACnet, Modbus, simulated, etc.) must implement
     this interface to ensure consistent behavior across protocols.
     """
 
@@ -332,27 +332,27 @@ class DeviceManager:
 
     async def _create_adapter(self, device: Device) -> None:
         """Create appropriate adapter for device protocol."""
-        from app.services.mock_devices import MockDeviceAdapter
+        from app.services.bms_simulator.adapters.simulated_adapter import SimulatedDeviceAdapter
         from app.services.niagara.bacnet_adapter import NiagaraBACnetAdapter
         from app.config.settings import settings
 
         # Map protocol to adapter class
         adapter_map = {
-            "mock": MockDeviceAdapter,
+            "mock": SimulatedDeviceAdapter,
             "bacnet": NiagaraBACnetAdapter,
             # Future: "modbus": ModbusDeviceAdapter,
         }
 
         adapter_class = adapter_map.get(device.protocol.value)
         if not adapter_class:
-            logger.warning(f"No adapter for protocol {device.protocol.value}, using mock")
-            adapter_class = MockDeviceAdapter
+            logger.warning(f"No adapter for protocol {device.protocol.value}, using simulated adapter")
+            adapter_class = SimulatedDeviceAdapter
         elif adapter_class is NiagaraBACnetAdapter and settings.demo_mode:
             logger.info(
-                "Demo mode enabled: using mock adapter for BACnet device %s",
+                "Demo mode enabled: using simulated adapter for BACnet device %s",
                 device.id,
             )
-            adapter_class = MockDeviceAdapter
+            adapter_class = SimulatedDeviceAdapter
 
         adapter = adapter_class(device)
         self._adapters[device.id] = adapter

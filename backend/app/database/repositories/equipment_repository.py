@@ -229,7 +229,7 @@ class EquipmentRepository:
         """Update equipment operating_data with new point values.
 
         Merges new point values into existing operating_data JSONB column.
-        Used by MockDeviceAdapter to sync demo controls to database for realistic demos.
+        Used by device adapters to sync control state to database.
 
         Args:
             equipment_id: Equipment UUID or code
