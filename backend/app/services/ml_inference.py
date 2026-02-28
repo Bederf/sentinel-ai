@@ -38,9 +38,20 @@ class LSTMInferenceService:
         self.registry = _get_registry()
         self._loaded_models: Dict[str, Any] = {}
         self._loaded_scalers: Dict[str, Any] = {}
+        self._registry_generation: int = self.registry._generation
 
     def _load_model(self, equipment_type: str):
-        """Load model for equipment type (cached)."""
+        """Load model for equipment type (cached, invalidated on registry update)."""
+        # Check if registry has activated new models since last load
+        if self.registry._generation != self._registry_generation:
+            logger.info(
+                f"Registry generation changed ({self._registry_generation} → {self.registry._generation}), "
+                f"clearing LSTM model cache ({len(self._loaded_models)} models)"
+            )
+            self._loaded_models.clear()
+            self._loaded_scalers.clear()
+            self._registry_generation = self.registry._generation
+
         if equipment_type in self._loaded_models:
             return self._loaded_models[equipment_type]
 
@@ -187,9 +198,20 @@ class AnomalyDetectionService:
         self.registry = _get_registry()
         self._loaded_models: Dict[str, Any] = {}
         self._loaded_scalers: Dict[str, Any] = {}
+        self._registry_generation: int = self.registry._generation
 
     def _load_model(self, equipment_type: str):
-        """Load autoencoder for equipment type (cached)."""
+        """Load autoencoder for equipment type (cached, invalidated on registry update)."""
+        # Check if registry has activated new models since last load
+        if self.registry._generation != self._registry_generation:
+            logger.info(
+                f"Registry generation changed ({self._registry_generation} → {self.registry._generation}), "
+                f"clearing anomaly model cache ({len(self._loaded_models)} models)"
+            )
+            self._loaded_models.clear()
+            self._loaded_scalers.clear()
+            self._registry_generation = self.registry._generation
+
         if equipment_type in self._loaded_models:
             return self._loaded_models[equipment_type]
 

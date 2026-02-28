@@ -10,7 +10,7 @@ from typing import Dict, List
 
 import pandas as pd
 from ml.classifier.model import FailureClassifier
-from ml.registry import ModelRegistry
+from ml.registry import get_model_registry
 from app.services.feature_service import FeatureComputeService
 from app.database.repositories.equipment_repository import EquipmentRepository
 
@@ -43,13 +43,14 @@ class FailureClassificationService:
 
     def __init__(self):
         """Initialize the classification service."""
-        self.registry = ModelRegistry()
+        self.registry = get_model_registry()
         self._models: Dict[str, FailureClassifier] = {}
+        self._registry_generation: int = self.registry._generation
         self.feature_service = FeatureComputeService()
         self.equipment_repo = EquipmentRepository()
 
     def _load_model(self, equipment_type: str) -> FailureClassifier:
-        """Load classifier for equipment type.
+        """Load classifier for equipment type (cached, invalidated on registry update).
 
         Args:
             equipment_type: Type of equipment
@@ -60,6 +61,15 @@ class FailureClassificationService:
         Raises:
             ValueError: If no classifier available for equipment type
         """
+        # Check if registry has activated new models since last load
+        if self.registry._generation != self._registry_generation:
+            logger.info(
+                f"Registry generation changed ({self._registry_generation} → {self.registry._generation}), "
+                f"clearing classifier cache ({len(self._models)} models)"
+            )
+            self._models.clear()
+            self._registry_generation = self.registry._generation
+
         if equipment_type not in self._models:
             model_info = self.registry.get_active_model("classifier", equipment_type)
 

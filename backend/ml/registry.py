@@ -21,6 +21,7 @@ class ModelRegistry:
             registry_path = Path(__file__).parent / "models" / "registry.json"
         self.registry_path = Path(registry_path)
         self.registry = self._load_registry()
+        self._generation: int = 0
 
     def _load_registry(self) -> dict:
         """Load registry from disk."""
@@ -100,9 +101,10 @@ class ModelRegistry:
         # Activate new model
         self.registry["active"][key] = model_id
         self.registry["models"][model_id]["status"] = "active"
+        self._generation += 1
         self._save_registry()
 
-        logger.info(f"Activated model: {model_id}")
+        logger.info(f"Activated model: {model_id} (registry generation {self._generation})")
 
     def get_active_model(self, model_type: str, equipment_type: str) -> Optional[dict]:
         """Get the currently active model for inference."""
