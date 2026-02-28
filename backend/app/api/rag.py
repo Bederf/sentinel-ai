@@ -90,6 +90,7 @@ async def query_rag(
         equipment_type=request.equipment_type,
         use_hybrid=request.use_hybrid,
         use_local_llm=request.use_local_llm,
+        user_role=auth.role.value if auth else None,
     )
 
     response = QueryResponse(**result)

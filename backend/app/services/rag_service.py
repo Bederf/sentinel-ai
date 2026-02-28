@@ -1,10 +1,11 @@
 """RAG (Retrieval-Augmented Generation) service combining vector search with LLM."""
 
-from typing import Optional, Dict, Any
 import logging
+from typing import Any, Dict, List, Optional
 
-from app.services.vector_db import get_vector_db_service
+from app.security.trust_levels import get_allowed_trust_levels, wrap_rag_chunk
 from app.services.ollama_client import get_ollama_client
+from app.services.vector_db import get_vector_db_service
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +60,27 @@ Keep the language practical and technical but accessible to field technicians.""
         self._supabase_client = supabase_client
 
     async def get_context(
-        self, query: str, equipment_type: Optional[str] = None, n_results: int = 5, use_hybrid: bool = True
+        self,
+        query: str,
+        equipment_type: Optional[str] = None,
+        n_results: int = 5,
+        use_hybrid: bool = True,
+        user_role: Optional[str] = None,
+        endpoint_type: str = "chat",
     ) -> str:
-        """Retrieve relevant context for a query."""
+        """Retrieve relevant context for a query with trust-level filtering.
+
+        Args:
+            query: The search query.
+            equipment_type: Optional equipment type filter.
+            n_results: Max number of results.
+            use_hybrid: Use hybrid search (keyword + semantic).
+            user_role: User role for trust-level filtering (None = no filter).
+            endpoint_type: Endpoint type for trust-level rules.
+
+        Returns:
+            Formatted context string with wrapped chunks.
+        """
         if use_hybrid:
             results = self.vector_db.hybrid_search(query=query, n_results=n_results, equipment_type=equipment_type)
         else:
@@ -70,22 +89,53 @@ Keep the language practical and technical but accessible to field technicians.""
         if not results:
             return "No relevant documentation found."
 
-        # Format context
+        # Apply trust level filtering if user_role is provided
+        allowed_levels: Optional[List[str]] = None
+        if user_role:
+            allowed_levels = get_allowed_trust_levels(user_role, endpoint_type)
+
+        # Format context with untrusted content wrappers
         context_parts = []
         for r in results:
-            source = f"[{r.get('document_title', 'Unknown')}]"
+            trust_level = r.get("trust_level", "STANDARD")
+
+            # Filter by trust level if restrictions apply
+            if allowed_levels and trust_level not in allowed_levels:
+                continue
+
             content = r.get("content", "")
-            score = r.get("similarity", r.get("hybrid_score", 0))
-            context_parts.append(f"{source} (relevance: {score:.2f})\n{content}")
+            doc_id = r.get("document_id", r.get("id", "unknown"))
+            chunk_id = r.get("chunk_id", r.get("id", "unknown"))
+            page = r.get("page", r.get("chunk_index", 0))
+            source_type = r.get("source", r.get("document_type", "unknown"))
+
+            # Wrap every chunk as untrusted content with citation metadata
+            wrapped = wrap_rag_chunk(
+                chunk_text=content,
+                doc_id=doc_id,
+                page=page,
+                chunk_id=chunk_id,
+                source_type=source_type,
+                trust_level=trust_level,
+            )
+            context_parts.append(wrapped)
+
+        if not context_parts:
+            return "No documentation available at the required trust level."
 
         return "\n\n---\n\n".join(context_parts)
 
     async def query(
-        self, query: str, equipment_type: Optional[str] = None, use_hybrid: bool = True, use_local_llm: bool = True
+        self,
+        query: str,
+        equipment_type: Optional[str] = None,
+        use_hybrid: bool = True,
+        use_local_llm: bool = True,
+        user_role: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Query the RAG system and generate response."""
-        # Get relevant context
-        context = await self.get_context(query, equipment_type, use_hybrid=use_hybrid)
+        # Get relevant context (with trust-level filtering if user_role provided)
+        context = await self.get_context(query, equipment_type, use_hybrid=use_hybrid, user_role=user_role)
 
         # Build prompt
         prompt = self.CONTEXT_TEMPLATE.format(context=context, query=query)

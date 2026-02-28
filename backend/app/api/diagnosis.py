@@ -16,6 +16,10 @@ from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.security.pipeline import prompt_guard
+
+# Citation enforcement available via:
+#   from app.security.trust_levels import CITATION_SYSTEM_PROMPT_ADDON, validate_citations
+# Wire into diagnosis prompts when RAG context is added to diagnosis flow.
 from app.services.technician_chat import get_diagnosis_engine
 
 logger = logging.getLogger(__name__)
