@@ -309,3 +309,54 @@ class TestSSEBuffer:
         buf.add_token("My system prompt is revealed here. ")
         assert buf.killed is True
         assert buf.finalize() is None
+
+
+# =====================================================================
+# SSE Error Handler Verification
+# =====================================================================
+
+
+class TestSSEErrorHandlers:
+    """Verify that SSE error handlers never expose stack traces."""
+
+    def test_sse_errors_never_contain_stack_traces(self):
+        """SSE error yield statements use generic messages, not str(e).
+
+        This is a static verification test: we check the source files
+        for patterns that would leak exception details in SSE streams.
+        """
+        import re
+        from pathlib import Path
+
+        api_dir = Path(__file__).parent.parent.parent / "api"
+        sse_files = ["chat.py", "local_chat.py", "hybrid_chat.py"]
+
+        for filename in sse_files:
+            filepath = api_dir / filename
+            if not filepath.exists():
+                continue
+            content = filepath.read_text()
+            # Find yield lines containing str(e)
+            matches = re.findall(r"yield.*str\(e\)", content)
+            assert matches == [], f"{filename} contains str(e) in yield statement: {matches}"
+
+    def test_tool_errors_generic(self):
+        """execute_tool() returns generic error messages, not str(e)."""
+        import re
+        from pathlib import Path
+
+        chat_tools_path = Path(__file__).parent.parent.parent / "services" / "chat_tools.py"
+        content = chat_tools_path.read_text()
+
+        # Find the execute_tool function body
+        match = re.search(
+            r"async def execute_tool\(.*?\n(?=\nasync def |\nclass |\Z)",
+            content,
+            re.DOTALL,
+        )
+        assert match is not None, "execute_tool function not found"
+        func_body = match.group(0)
+
+        # The top-level except blocks should NOT have str(e) in return
+        # They should use generic messages
+        assert '"error": str(e)' not in func_body, "execute_tool top-level handler still exposes str(e)"

@@ -4106,11 +4106,12 @@ async def execute_tool(
         return result
     except TypeError as e:
         _outcome = "error"
-        return {"error": f"Invalid parameters for {tool_name}: {e}"}
+        logger.error("Tool %s parameter error: %s", tool_name, e, exc_info=True)
+        return {"error": f"Invalid parameters for {tool_name}.", "tool": tool_name}
     except Exception as e:
         _outcome = "error"
-        logger.error(f"Error executing tool {tool_name}: {e}")
-        return {"error": str(e)}
+        logger.error("Tool %s execution error: %s", tool_name, e, exc_info=True)
+        return {"error": "This operation could not be completed.", "tool": tool_name}
     finally:
         _duration = _time.perf_counter() - _t0
         try:

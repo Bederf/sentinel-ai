@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.services.hybrid_ai_service import hybrid_ai_service
 from app.middleware.auth_middleware import get_current_auth
+from app.security.sse_buffer import SecureSSEBuffer
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ async def generate_hybrid_sse_stream(
     user_message: str,
     use_tools: bool = False,
     data_subject_id: str | None = None,
+    user_role: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """
     Generate SSE-formatted stream from Hybrid AI (Ollama or Claude).
@@ -44,10 +46,13 @@ async def generate_hybrid_sse_stream(
     Args:
         user_message: The user's message
         use_tools: Whether to enable tool calling (forces Claude)
+        user_role: Current user role (passed to output filter for PII gating)
 
     Yields:
         SSE-formatted data chunks
     """
+    buffer = SecureSSEBuffer(user_role=user_role)
+
     try:
         # Route and stream from appropriate model
         async for chunk in hybrid_ai_service.stream_response(
@@ -55,12 +60,20 @@ async def generate_hybrid_sse_stream(
             use_tools,
             data_subject_id=data_subject_id,
         ):
-            # Format as SSE data
-            yield f"data: {chunk}\n\n"
+            safe_text = buffer.add_token(chunk)
+            if safe_text is not None:
+                yield f"data: {safe_text}\n\n"
+            if buffer.killed:
+                break
+
+        # Flush remaining buffer content
+        final = buffer.finalize()
+        if final:
+            yield f"data: {final}\n\n"
 
     except Exception as e:
-        logger.error(f"Hybrid chat error: {e}")
-        yield f"data: Error: {str(e)}\n\n"
+        logger.error("Hybrid chat stream error: %s", e, exc_info=True)
+        yield "data: An error occurred processing your request.\n\n"
 
 
 @router.post("/api/hybrid-chat")
@@ -81,10 +94,12 @@ async def hybrid_chat(request: HybridChatRequest, http_request: Request):
     async def stream():
         auth_ctx = get_current_auth(http_request)
         data_subject_id = getattr(auth_ctx, "email", None) or getattr(auth_ctx, "user_id", None)
+        user_role = getattr(auth_ctx, "role", None)
         async for chunk in generate_hybrid_sse_stream(
             request.message,
             request.use_tools,
             data_subject_id=data_subject_id,
+            user_role=user_role,
         ):
             yield chunk
 
