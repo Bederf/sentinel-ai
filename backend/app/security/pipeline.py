@@ -129,14 +129,14 @@ async def _get_auth_context(request: Request) -> AuthContext:
             request.state.auth = auth_ctx
             return auth_ctx
 
-        # Demo fallback — ADMIN for full access in dev
+        # Phase 137-02: Demo fallback — OPERATOR (level 2), not ADMIN (level 4)
         demo_ctx = AuthContext(
             user_id="demo-user",
-            role=SentinelRole.ADMIN,
+            role=SentinelRole.OPERATOR,
             auth_method="demo_mode",
             source_ip=source_ip,
             email="demo@sentinel.local",
-            scopes=["admin:all"],
+            scopes=["operator:all"],
             metadata={"demo_mode": True},
         )
         request.state.auth = demo_ctx

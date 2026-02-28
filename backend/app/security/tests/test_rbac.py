@@ -200,16 +200,29 @@ class TestRequireRole:
         assert response.json()["role"] == "operator"
 
     @patch("app.security.pipeline.settings")
-    def test_require_role_demo_mode_bypasses(self, mock_settings):
-        """Demo mode creates admin context, bypassing role check."""
+    def test_require_role_demo_mode_grants_operator(self, mock_settings):
+        """Demo mode creates OPERATOR context (Phase 137-02) — blocked from ADMIN endpoints."""
         mock_settings.demo_mode = True
         mock_settings.environment = "development"
 
+        # ADMIN-level endpoint (level 4) should be blocked — demo gets OPERATOR (level 2)
         app = _create_test_app_with_role(min_level=4)
         client = TestClient(app)
         response = client.get("/protected")
+        assert response.status_code == 403
 
+    @patch("app.security.pipeline.settings")
+    def test_require_role_demo_mode_allows_operator_endpoints(self, mock_settings):
+        """Demo mode OPERATOR context can access operator-level endpoints."""
+        mock_settings.demo_mode = True
+        mock_settings.environment = "development"
+
+        # OPERATOR-level endpoint (level 2) should pass
+        app = _create_test_app_with_role(min_level=2)
+        client = TestClient(app)
+        response = client.get("/protected")
         assert response.status_code == 200
+        assert response.json()["role"] == "operator"
 
 
 # ---------------------------------------------------------------------------

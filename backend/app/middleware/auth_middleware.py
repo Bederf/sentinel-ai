@@ -691,14 +691,16 @@ def require_auth(level: AuthLevel = AuthLevel.AUTHENTICATED):
                     is_bot_agent=True,
                 )
             else:
-                # Create demo context with ADMIN role so Supabase queries return all buildings
+                # Phase 137-02: Demo mode grants OPERATOR (level 2), not ADMIN (level 4)
+                # OPERATOR can read all data and control devices but cannot
+                # access admin-only endpoints (user management, config changes).
                 demo_ctx = AuthContext(
                     user_id="demo-user",
-                    role=SentinelRole.ADMIN,
+                    role=SentinelRole.OPERATOR,
                     auth_method="demo_mode",
                     source_ip=source_ip,
                     email="demo@sentinel.local",
-                    scopes=["admin:all"],
+                    scopes=["operator:all"],
                     metadata={"demo_mode": True},
                 )
             request.state.auth = demo_ctx
@@ -822,9 +824,12 @@ def require_role(*roles: SentinelRole):
                     is_bot_agent=True,
                 )
             else:
-                # Create demo context - request the highest required role (avoids 30/min admin limit if possible)
-                # If ADMIN is required, use ADMIN, otherwise use highest required role
+                # Phase 137-02: Demo mode grants at most OPERATOR (level 2).
+                # Cap the role so demo sessions never get ADMIN or DEVELOPER.
                 demo_role = max(roles, key=lambda r: ROLE_HIERARCHY.get(r, 0))
+                max_demo_level = ROLE_HIERARCHY.get(SentinelRole.OPERATOR, 2)
+                if ROLE_HIERARCHY.get(demo_role, 0) > max_demo_level:
+                    demo_role = SentinelRole.OPERATOR
                 demo_ctx = AuthContext(
                     user_id="demo-user",
                     role=demo_role,

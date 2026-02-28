@@ -53,9 +53,7 @@ async def startup_event(app: FastAPI) -> None:
 
     # Warn about DEMO_MODE
     if settings.demo_mode:
-        _logger.warning(
-            "DEMO_MODE is enabled - authentication is bypassed, all requests get ADMIN role. Do NOT use in production."
-        )
+        _logger.warning("DEMO_MODE is enabled - auth bypassed, requests get OPERATOR role. Do NOT use in production.")
 
     # Warn about missing methodology password
     if not settings.demo_mode and not settings.jwt_secret_key:
