@@ -12,6 +12,7 @@ from app.database.repositories.municipal_invoice_repository import MunicipalInvo
 from app.services.municipal_reconciliation_service import MunicipalReconciliationService
 from app.services.tariff_schedule_service import TariffScheduleService
 from app.services.municipal_tariff_ingestion_service import MunicipalTariffIngestionService
+from app.security.document_scanner import build_safe_path, sanitize_filename
 from app.services.module_registry_service import ModuleRegistryService
 from app.models.module_registry import AIRecommendation, ModuleType, RecommendationType, RecommendationPriority
 
@@ -431,11 +432,10 @@ async def analyze_maximum_demand(
 
 
 def _store_invoice_pdf(site_id: str, file: UploadFile) -> Path:
-    storage_root = Path("backend/app/data/municipal_invoices") / site_id
-    storage_root.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    filename = f"{timestamp}_{file.filename}"
-    path = storage_root / filename
+    storage_root = Path("backend/app/data/municipal_invoices")
+    # Sanitize filename and build safe path (prevents path traversal)
+    safe_name = sanitize_filename(file.filename or "invoice.pdf")
+    path = build_safe_path(site_id, safe_name, storage_root=storage_root)
     content = file.file.read()
     with open(path, "wb") as f:
         f.write(content)

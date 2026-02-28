@@ -9,10 +9,10 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.database.supabase_client import get_supabase_client
+from app.security.document_scanner import validate_and_scan_upload
 from app.services.document_extractor import extract_text
 from app.services.storage_service import get_storage_service
 from app.services.vector_db import get_vector_db_service
-from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -92,33 +92,56 @@ async def upload_document(
         logger.error(f"Failed to verify building: {e}")
         raise HTTPException(status_code=404, detail="Building not found")
 
-    # 2. Validate file
+    # 2. Security scan — validate file with the document scanner pipeline
     if not file.filename:
         raise HTTPException(status_code=400, detail="File must have a name")
 
-    file_ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if f".{file_ext}" not in settings.allowed_document_types:
+    file_content = await file.read()
+    # Reset file position for downstream consumers
+    await file.seek(0)
+
+    # Extract user info from request state (set by auth middleware)
+    user_id = getattr(request.state, "user_id", "anonymous")
+    user_role = getattr(request.state, "user_role", "operator")
+
+    scan_result = await validate_and_scan_upload(
+        file_content=file_content,
+        filename=file.filename,
+        user_id=user_id,
+        user_role=user_role,
+        site_id=building_id,
+    )
+
+    if not scan_result.allowed:
+        raise HTTPException(status_code=400, detail=f"Upload rejected: {scan_result.rejection_reason}")
+
+    if scan_result.trust_level == "QUARANTINED":
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid file type. Supported: {', '.join(settings.allowed_document_types)}",
+            detail="Upload quarantined: potential injection patterns detected in document",
         )
 
-    # 3. Extract text
-    try:
-        extracted_text, metadata = await extract_text(file)
+    # Use scanner-extracted text for PDFs, fall back to extractor for other types
+    if scan_result.detected_type == "PDF" and scan_result.extracted_text.strip():
+        extracted_text = scan_result.extracted_text
+        metadata = {"size_bytes": len(file_content)}
+    else:
+        # 3. Extract text (for non-PDF types or when scanner text is empty)
+        try:
+            extracted_text, metadata = await extract_text(file)
 
-        # Validate extracted text is not empty
-        if not extracted_text.strip():
-            raise HTTPException(status_code=400, detail="File appears to be empty or unreadable")
+            # Validate extracted text is not empty
+            if not extracted_text.strip():
+                raise HTTPException(status_code=400, detail="File appears to be empty or unreadable")
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except ImportError as e:
-        logger.error(f"Missing dependency: {e}")
-        raise HTTPException(status_code=500, detail="File extraction not available")
-    except Exception as e:
-        logger.error(f"Error extracting text: {e}")
-        raise HTTPException(status_code=400, detail="Failed to extract text from file")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except ImportError as e:
+            logger.error(f"Missing dependency: {e}")
+            raise HTTPException(status_code=500, detail="File extraction not available")
+        except Exception as e:
+            logger.error(f"Error extracting text: {e}")
+            raise HTTPException(status_code=400, detail="Failed to extract text from file")
 
     # 4. Upload to storage
     storage_service = get_storage_service(client)
