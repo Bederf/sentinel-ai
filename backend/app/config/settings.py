@@ -91,6 +91,11 @@ class Settings(BaseSettings):
     demo_allowed_origins: list[str] = []
     ingestion_mode: str = "simulation"  # env: INGESTION_MODE
 
+    # Site-002 data source — enables the simulation engine as a BMS data source
+    # When False: SENTINEL starts clean with zero telemetry (SBC deployment ready)
+    # When True: Loads reference devices and auto-starts lifecycle simulation
+    site002_source_enabled: bool = False  # env: ENABLE_SITE002_SOURCE
+
     # Encryption at rest (Phase 1b FSR Compliance - Cryptography)
     encryption_enabled: bool = True
     encryption_key: str = ""  # Base64-encoded Fernet key from cryptography.fernet.Fernet.generate_key()
@@ -274,8 +279,8 @@ class Settings(BaseSettings):
 
     @property
     def resolved_ingestion_mode(self) -> IngestionMode:
-        """Resolve ingestion mode with DEMO override and safe fallback."""
-        if self.demo_mode:
+        """Resolve ingestion mode based on data source config and safe fallback."""
+        if self.site002_source_enabled:
             return IngestionMode.SIMULATION
         try:
             return IngestionMode(self.ingestion_mode)

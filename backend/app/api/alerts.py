@@ -177,7 +177,7 @@ class AlertResponse(BaseModel):
     # Enriched fields
     equipment_name: Optional[str] = None
     site_name: Optional[str] = None
-    device_id: Optional[str] = None  # Maps to mock_devices.json for control navigation
+    device_id: Optional[str] = None  # Maps to device manager for control navigation
     recommended_action: Optional[str] = None
     operational_context: Optional[dict] = None
 

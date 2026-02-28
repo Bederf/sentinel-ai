@@ -36,7 +36,7 @@ However, this creates tight coupling and makes refactoring difficult.
 
 ```
 device_abstraction.py
-  └─> mock_devices.MockDeviceAdapter
+  └─> SimulatedDeviceAdapter (lazy import, try/except)
   └─> bacnet_adapter.NiagaraBACnetAdapter
        └─> device_abstraction.DeviceAdapter
             └─> (CIRCULAR - back to device_abstraction)
@@ -45,12 +45,13 @@ device_abstraction.py
 **Impact:** Base class and implementations are tightly coupled
 
 **Root Cause:**
-- `device_abstraction.py` imports concrete implementations: `MockDeviceAdapter`, `NiagaraBACnetAdapter`
-- `mock_devices.py` imports base class: `DeviceAdapter` from `device_abstraction`
+- `device_abstraction.py` lazy-imports `SimulatedDeviceAdapter` and imports `NiagaraBACnetAdapter`
+- `bms_simulator/adapters/simulated_adapter.py` imports base class: `DeviceAdapter` from `device_abstraction`
 - `bacnet_adapter.py` imports base class: `DeviceAdapter` from `device_abstraction`
 
 **Why it doesn't fail immediately:**
-Similar to above - Python's module cache prevents immediate failure, but the architecture violates dependency inversion principle.
+`SimulatedDeviceAdapter` is imported lazily in `_create_adapter()` (try/except ImportError).
+Python's module cache handles the remaining cycle gracefully.
 
 ---
 
@@ -74,18 +75,16 @@ print('✓ All AI services import successfully')
 ```
 Result: ✅ PASSES - No circular import errors
 
-### For Chain 2 (Device Abstraction): ✅ WORKING
-- Device abstraction uses Python's module caching effectively
-- `mock_devices.py` and `bacnet_adapter.py` import base class from `device_abstraction`
-- `device_abstraction.py` imports concrete implementations for factory pattern
-- This works because imports are at module level and Python caches modules
+### For Chain 2 (Device Abstraction): ✅ FIXED (Phase 2 Decoupling)
+- `SimulatedDeviceAdapter` is now lazy-imported in `_create_adapter()` via try/except
+- `bms_simulator/` package is fully removable — SENTINEL core starts cleanly without it
+- `bacnet_adapter.py` imports base class from `device_abstraction` (Python module cache)
 
 **Verification:**
 ```bash
 cd backend
 python -c "
 from app.services.device_abstraction import *
-from app.services.mock_devices import *
 from app.services.niagara.bacnet_adapter import *
 print('✓ All device abstraction modules import successfully')
 "
@@ -102,9 +101,9 @@ Result: ✅ PASSES - No circular import errors
 - `backend/app/services/claude_service.py` - Already properly structured
 - `backend/app/services/ai_interfaces.py` - Already exists with documentation
 
-**Chain 2:** ✅ NO CHANGES NEEDED
-- `backend/app/services/device_abstraction.py` - Already properly structured
-- `backend/app/services/mock_devices.py` - Already properly structured
+**Chain 2:** ✅ FIXED (Phase 2 Decoupling)
+- `backend/app/services/device_abstraction.py` - Lazy import for SimulatedDeviceAdapter
+- `backend/app/services/bms_simulator/adapters/simulated_adapter.py` - Imports base class
 - `backend/app/services/niagara/bacnet_adapter.py` - Already properly structured
 
 ---

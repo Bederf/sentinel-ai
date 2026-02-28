@@ -1,8 +1,11 @@
 """Device Abstraction Service.
 
 Protocol-agnostic interface for building automation devices.
-Provides a clean abstraction layer over different protocols (BACnet, Modbus, simulated, etc.)
+Provides a clean abstraction layer over different protocols (BACnet, Modbus, site002, etc.)
 with consistent API for device discovery, reading, and writing.
+
+The simulator adapter (SimulatedDeviceAdapter) is loaded lazily so that the
+bms_simulator package can be removed without breaking SENTINEL core.
 """
 
 import logging
@@ -331,28 +334,59 @@ class DeviceManager:
         return device
 
     async def _create_adapter(self, device: Device) -> None:
-        """Create appropriate adapter for device protocol."""
-        from app.services.bms_simulator.adapters.simulated_adapter import SimulatedDeviceAdapter
+        """Create appropriate adapter for device protocol.
+
+        SimulatedDeviceAdapter is imported lazily so the bms_simulator package
+        can be removed without impacting SENTINEL core.
+        """
         from app.services.niagara.bacnet_adapter import NiagaraBACnetAdapter
         from app.config.settings import settings
 
+        # Lazy-load SimulatedDeviceAdapter (removable with bms_simulator/)
+        SimulatedDeviceAdapter = None
+        try:
+            from app.services.bms_simulator.adapters.simulated_adapter import (
+                SimulatedDeviceAdapter as _SimAdapter,
+            )
+
+            SimulatedDeviceAdapter = _SimAdapter
+        except ImportError:
+            pass
+
         # Map protocol to adapter class
-        adapter_map = {
-            "mock": SimulatedDeviceAdapter,
+        adapter_map: dict = {
             "bacnet": NiagaraBACnetAdapter,
             # Future: "modbus": ModbusDeviceAdapter,
         }
+        if SimulatedDeviceAdapter is not None:
+            adapter_map["mock"] = SimulatedDeviceAdapter
+            adapter_map["site002"] = SimulatedDeviceAdapter
 
         adapter_class = adapter_map.get(device.protocol.value)
         if not adapter_class:
-            logger.warning(f"No adapter for protocol {device.protocol.value}, using simulated adapter")
-            adapter_class = SimulatedDeviceAdapter
-        elif adapter_class is NiagaraBACnetAdapter and settings.demo_mode:
-            logger.info(
-                "Demo mode enabled: using simulated adapter for BACnet device %s",
-                device.id,
-            )
-            adapter_class = SimulatedDeviceAdapter
+            if SimulatedDeviceAdapter is not None:
+                logger.warning(f"No adapter for protocol {device.protocol.value}, using simulated adapter")
+                adapter_class = SimulatedDeviceAdapter
+            else:
+                logger.warning(
+                    "No adapter for protocol %s and simulator unavailable — skipping device %s",
+                    device.protocol.value,
+                    device.id,
+                )
+                return
+        elif adapter_class is NiagaraBACnetAdapter and settings.site002_source_enabled:
+            if SimulatedDeviceAdapter is not None:
+                logger.info(
+                    "Site-002 source enabled: using simulated adapter for BACnet device %s",
+                    device.id,
+                )
+                adapter_class = SimulatedDeviceAdapter
+            else:
+                logger.warning(
+                    "Site-002 source enabled but simulator unavailable — skipping BACnet device %s",
+                    device.id,
+                )
+                return
 
         adapter = adapter_class(device)
         self._adapters[device.id] = adapter

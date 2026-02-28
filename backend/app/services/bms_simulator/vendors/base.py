@@ -71,7 +71,7 @@ class VendorAdapter(ABC):
         Format a point for CSV export.
 
         Args:
-            device: Device definition from mock_devices.json
+            device: Device definition from reference_devices.json
             point_name: Point name
             point_def: Point definition
             instance_base: Base instance number for this device

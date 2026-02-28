@@ -6,7 +6,7 @@ and Deep Research with strict JSON-encoded text content responses.
 
 Data Sources (in order of preference):
 1. Supabase (primary) - buildings, equipment, alerts, predictions, work_orders, documents
-2. JSON files (fallback) - mock_devices.json, equipment.json, alerts.json
+2. JSON files (fallback) - reference_devices.json, equipment.json, alerts.json
 
 Ref: https://platform.openai.com/docs/mcp
 
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 # Data paths (fallback)
 DATA_DIR = Path(__file__).parent.parent / "data"
-DEVICES_FILE = DATA_DIR / "mock_devices.json"
+DEVICES_FILE = Path(__file__).parent.parent / "services" / "bms_simulator" / "data" / "reference_devices.json"
 EQUIPMENT_FILE = DATA_DIR / "equipment.json"
 ALERTS_FILE = DATA_DIR / "alerts.json"
 BUILDINGS_DIR = DATA_DIR / "buildings"

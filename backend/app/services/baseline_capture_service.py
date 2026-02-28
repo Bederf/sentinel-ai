@@ -326,14 +326,17 @@ class BaselineCaptureService:
         except Exception as e:
             logger.debug(f"Could not fetch equipment from repository: {e}")
 
-        # Try JSON fallback
+        # Try JSON fallback (reference devices in bms_simulator/data/)
         try:
-            from app.data.load_json import load_json
+            import json as _json
+            from pathlib import Path as _Path
 
-            devices = load_json("mock_devices.json")
-            for device in devices:
-                if device.get("device_id") == equipment_id or device.get("id") == equipment_id:
-                    return True
+            _ref_path = _Path(__file__).parent / "bms_simulator" / "data" / "reference_devices.json"
+            if _ref_path.exists():
+                devices = _json.loads(_ref_path.read_text())
+                for device in devices:
+                    if device.get("device_id") == equipment_id or device.get("id") == equipment_id:
+                        return True
         except Exception as e:
             logger.debug(f"Could not fetch equipment from JSON: {e}")
 
@@ -660,15 +663,18 @@ class BaselineCaptureService:
         except Exception as e:
             logger.debug(f"Could not get equipment type from repository: {e}")
 
-        # Try JSON fallback
+        # Try JSON fallback (reference devices in bms_simulator/data/)
         try:
-            from app.data.load_json import load_json
+            import json as _json
+            from pathlib import Path as _Path
 
-            devices = load_json("mock_devices.json")
-            for device in devices:
-                if device.get("device_id") == equipment_id or device.get("id") == equipment_id:
-                    device_type = device.get("type", "")
-                    return self._map_device_type_to_equipment_type(device_type)
+            _ref_path = _Path(__file__).parent / "bms_simulator" / "data" / "reference_devices.json"
+            if _ref_path.exists():
+                devices = _json.loads(_ref_path.read_text())
+                for device in devices:
+                    if device.get("device_id") == equipment_id or device.get("id") == equipment_id:
+                        device_type = device.get("type", "")
+                        return self._map_device_type_to_equipment_type(device_type)
         except Exception as e:
             logger.debug(f"Could not get equipment type from JSON: {e}")
 

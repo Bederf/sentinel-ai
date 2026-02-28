@@ -673,8 +673,10 @@ class ServiceOptimizer:
                                 equipment_ids.append(eq_id)
 
             if not equipment_ids:
-                # Fallback: try mock devices
-                devices_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "mock_devices.json")
+                # Fallback: try reference devices
+                devices_path = os.path.join(
+                    os.path.dirname(__file__), "bms_simulator", "data", "reference_devices.json"
+                )
                 if os.path.exists(devices_path):
                     with open(devices_path, "r") as f:
                         devices = json.load(f)

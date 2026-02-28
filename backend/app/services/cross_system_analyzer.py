@@ -43,7 +43,7 @@ class ComfortDiagnosis:
     hvac_status: str  # 'running', 'off', 'fault'
     hvac_analysis: str
 
-    # VAV device data (from Desigo via mock_devices)
+    # VAV device data (from Desigo via device manager)
     vav_id: Optional[str] = None
     vav_damper_position: Optional[float] = None
     vav_airflow_actual: Optional[float] = None

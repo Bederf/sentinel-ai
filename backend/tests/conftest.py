@@ -157,10 +157,12 @@ async def async_client() -> AsyncGenerator[AsyncClient, None]:
 
 @pytest.fixture
 def mock_devices_data() -> list[dict]:
-    """Load mock devices data from JSON file."""
-    mock_devices_file = TEST_DATA_DIR / "mock_devices.json"
-    if mock_devices_file.exists():
-        with open(mock_devices_file) as f:
+    """Load reference devices data from JSON file."""
+    ref_devices_file = (
+        Path(__file__).parent.parent / "app" / "services" / "bms_simulator" / "data" / "reference_devices.json"
+    )
+    if ref_devices_file.exists():
+        with open(ref_devices_file) as f:
             return json.load(f)
     return []
 

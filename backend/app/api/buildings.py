@@ -92,7 +92,7 @@ def _is_device_controllable(device_id: str, equipment_points: dict) -> bool:
     if any(p.get("writable", False) for p in equipment_points.values()):
         return True
 
-    # Fall back to device_manager (which includes mock_devices.json)
+    # Fall back to device_manager (which includes reference devices)
     # Access the internal _devices dict directly since this is a sync function
     try:
         # Try original ID first

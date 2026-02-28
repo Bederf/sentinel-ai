@@ -40,24 +40,26 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 
 
 async def ensure_device_manager_initialized() -> None:
-    """Ensure device manager is initialized with mock + building devices if not already."""
+    """Ensure device manager is initialized with reference + building devices if not already."""
     if not device_manager._initialized:
         logger.info("Device manager not initialized, loading devices...")
         try:
-            # Load mock devices
+            # Load Site-002 reference devices (only when data source is enabled)
             devices_data = []
-            mock_devices_path = DATA_DIR / "mock_devices.json"
-            if mock_devices_path.exists():
-                with open(mock_devices_path) as f:
-                    devices_data = json.load(f)
-            mock_count = len(devices_data)
+            ref_count = 0
+            if settings.site002_source_enabled:
+                ref_devices_path = Path(__file__).parent / "bms_simulator" / "data" / "reference_devices.json"
+                if ref_devices_path.exists():
+                    with open(ref_devices_path) as f:
+                        devices_data = json.load(f)
+                ref_count = len(devices_data)
 
             # Load all building equipment (including monitoring-only solar/meters)
             from app.api.devices import load_equipment_from_buildings
 
             building_devices = await load_equipment_from_buildings()
 
-            # Merge building devices with mock devices (dedup by ID)
+            # Merge building devices with reference devices (dedup by ID)
             existing_ids = {d["id"] for d in devices_data}
             added_count = 0
             for device in building_devices:
@@ -68,7 +70,7 @@ async def ensure_device_manager_initialized() -> None:
 
             await device_manager.initialize(devices_data)
             logger.info(
-                f"Device manager initialized with {mock_count} mock + "
+                f"Device manager initialized with {ref_count} reference + "
                 f"{added_count} building = {len(devices_data)} total devices"
             )
         except Exception as e:

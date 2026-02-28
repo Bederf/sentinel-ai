@@ -143,7 +143,7 @@ async def startup_event(app: FastAPI) -> None:
 
     threading.Thread(target=_warm_embedding_model, daemon=True).start()
 
-    # Initialize device manager with mock devices + building equipment
+    # Initialize device manager with reference devices + building equipment
     from app.api.devices import startup_event as devices_startup
 
     try:
@@ -440,76 +440,80 @@ async def startup_event(app: FastAPI) -> None:
         except Exception as e:
             _logger.error(f"Failed to deactivate simulations on startup: {e}")
 
-    # Run crash recovery on startup (replaces old deactivate_all_simulations)
-    # Re-queues simulations that have valid checkpoints, fails those without
-    if not testing_mode:
-        try:
-            await recover_crashed_simulations()
-        except Exception as e:
-            _logger.error(f"Error during crash recovery: {e}")
-            # Fallback: deactivate everything if recovery itself fails
+    # === Site-002 Simulation Engine (gated by ENABLE_SITE002_SOURCE) ===
+    if settings.site002_source_enabled:
+        # Run crash recovery on startup (replaces old deactivate_all_simulations)
+        # Re-queues simulations that have valid checkpoints, fails those without
+        if not testing_mode:
             try:
-                await deactivate_all_simulations()
-            except Exception as e2:
-                _logger.error(f"Fallback deactivation also failed: {e2}")
+                await recover_crashed_simulations()
+            except Exception as e:
+                _logger.error(f"Error during crash recovery: {e}")
+                # Fallback: deactivate everything if recovery itself fails
+                try:
+                    await deactivate_all_simulations()
+                except Exception as e2:
+                    _logger.error(f"Fallback deactivation also failed: {e2}")
 
-    # Start simulation queue processor job
-    # Polls JSON store for queued lifecycle simulations every 10s
-    try:
-        scheduler_service.add_simulation_queue_processor_job(interval_seconds=10)
-        _logger.info("Simulation queue processor initialized (10s interval, JSON store)")
-    except Exception as e:
-        _logger.error(f"Simulation queue processor initialization failed: {e}", exc_info=True)
-
-    # Auto-start sentinel_annual simulation for site-002 if none is active
-    async def auto_start_sentinel_simulation():
-        """Auto-queue sentinel_annual for site-002 if no active simulation exists."""
+        # Start simulation queue processor job
+        # Polls JSON store for queued lifecycle simulations every 10s
         try:
-            import uuid
-            from datetime import datetime
-
-            from app.services.simulation_store import get_simulation_store
-
-            store = get_simulation_store("site-002")
-            all_tasks = store.get_all_tasks()
-
-            # Check for any active simulation (running or queued)
-            active = any(
-                t.get("status") in ("running", "queued") and t.get("simulation_type", "lifecycle") == "lifecycle"
-                for t in all_tasks.values()
-            )
-
-            if active:
-                _logger.info("Active simulation already exists, skipping auto-start")
-                return
-
-            # Queue sentinel_annual for site-002
-            task_id = str(uuid.uuid4())
-            store.update_task_progress(
-                task_id,
-                {
-                    "task_id": task_id,
-                    "site_id": "site-002",
-                    "scenario": "sentinel_annual",
-                    "simulation_type": "lifecycle",
-                    "status": "queued",
-                    "progress_pct": 0,
-                    "days_completed": 0,
-                    "duration_minutes": 3650.0,
-                    "created_at": datetime.utcnow().isoformat() + "Z",
-                },
-            )
-
-            _logger.info(f"Auto-queued sentinel_annual simulation: {task_id}")
+            scheduler_service.add_simulation_queue_processor_job(interval_seconds=10)
+            _logger.info("Simulation queue processor initialized (10s interval, JSON store)")
         except Exception as e:
-            _logger.error(f"Failed to auto-start sentinel_annual simulation: {e}")
+            _logger.error(f"Simulation queue processor initialization failed: {e}", exc_info=True)
 
-    # Auto-resume: if crash recovery queued a simulation it will be picked up
-    # by the queue processor. If nothing is queued/running, auto-start fresh.
-    try:
-        await auto_start_sentinel_simulation()
-    except Exception as e:
-        _logger.error(f"Error during sentinel auto-start: {e}")
+        # Auto-start sentinel_annual simulation for site-002 if none is active
+        async def auto_start_sentinel_simulation():
+            """Auto-queue sentinel_annual for site-002 if no active simulation exists."""
+            try:
+                import uuid
+                from datetime import datetime
+
+                from app.services.simulation_store import get_simulation_store
+
+                store = get_simulation_store("site-002")
+                all_tasks = store.get_all_tasks()
+
+                # Check for any active simulation (running or queued)
+                active = any(
+                    t.get("status") in ("running", "queued") and t.get("simulation_type", "lifecycle") == "lifecycle"
+                    for t in all_tasks.values()
+                )
+
+                if active:
+                    _logger.info("Active simulation already exists, skipping auto-start")
+                    return
+
+                # Queue sentinel_annual for site-002
+                task_id = str(uuid.uuid4())
+                store.update_task_progress(
+                    task_id,
+                    {
+                        "task_id": task_id,
+                        "site_id": "site-002",
+                        "scenario": "sentinel_annual",
+                        "simulation_type": "lifecycle",
+                        "status": "queued",
+                        "progress_pct": 0,
+                        "days_completed": 0,
+                        "duration_minutes": 3650.0,
+                        "created_at": datetime.utcnow().isoformat() + "Z",
+                    },
+                )
+
+                _logger.info(f"Auto-queued sentinel_annual simulation: {task_id}")
+            except Exception as e:
+                _logger.error(f"Failed to auto-start sentinel_annual simulation: {e}")
+
+        # Auto-resume: if crash recovery queued a simulation it will be picked up
+        # by the queue processor. If nothing is queued/running, auto-start fresh.
+        try:
+            await auto_start_sentinel_simulation()
+        except Exception as e:
+            _logger.error(f"Error during sentinel auto-start: {e}")
+    else:
+        _logger.info("Site 002 data source disabled — simulation engine inactive")
 
     # Start system health snapshot job (runs every 5 minutes)
     # Stores point-in-time health snapshots for trend analysis and historical reporting

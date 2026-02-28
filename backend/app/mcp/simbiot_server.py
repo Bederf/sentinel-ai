@@ -47,7 +47,7 @@ def _live_mode_guard(tool_name: str) -> Optional[Dict[str, Any]]:
 # Data paths
 DATA_DIR = Path(__file__).parent.parent / "data"
 SITES_FILE = DATA_DIR / "sites.json"
-DEVICES_FILE = DATA_DIR / "mock_devices.json"
+DEVICES_FILE = Path(__file__).parent.parent / "services" / "bms_simulator" / "data" / "reference_devices.json"
 ALERTS_FILE = DATA_DIR / "alerts.json"
 
 
@@ -2534,7 +2534,7 @@ async def add_building_devices_tool(
     from pathlib import Path
 
     data_path = Path(__file__).parent.parent / "data"
-    devices_file = data_path / "mock_devices.json"
+    devices_file = Path(__file__).parent.parent / "services" / "bms_simulator" / "data" / "reference_devices.json"
 
     # Load existing devices
     existing_devices = []
@@ -4267,7 +4267,7 @@ async def get_asset_metrics_template_tool(
                                 equipment_types.add("vav")
 
         # Check devices file
-        devices_file = Path(__file__).parent.parent / "data" / "mock_devices.json"
+        devices_file = Path(__file__).parent.parent / "services" / "bms_simulator" / "data" / "reference_devices.json"
         if devices_file.exists():
             with open(devices_file) as f:
                 devices = json.load(f)

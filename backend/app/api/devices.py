@@ -98,16 +98,18 @@ class DeviceControlRequest(BaseModel):
         return v
 
 
-# Data directory for mock devices
+# Data directory
 DATA_DIR = Path(__file__).parent.parent / "data"
 BUILDINGS_DIR = DATA_DIR / "buildings"
 
+# Reference devices for Site-002 simulation (inside bms_simulator package)
+REFERENCE_DEVICES_PATH = Path(__file__).parent.parent / "services" / "bms_simulator" / "data" / "reference_devices.json"
 
-async def load_mock_devices() -> List[dict]:
-    """Load mock devices from JSON file."""
-    filepath = DATA_DIR / "mock_devices.json"
-    if filepath.exists():
-        with open(filepath) as f:
+
+async def load_reference_devices() -> List[dict]:
+    """Load Site-002 reference devices from JSON file."""
+    if REFERENCE_DEVICES_PATH.exists():
+        with open(REFERENCE_DEVICES_PATH) as f:
             return json.load(f)
     return []
 
@@ -224,16 +226,23 @@ async def startup_event():
     """Initialize device manager on startup.
 
     Called from main.py startup event.
-    Loads mock devices + controllable equipment from building directories.
+    Loads reference devices (if site002 enabled) + building equipment.
     """
+    from app.config.settings import settings as _settings
+
     try:
         testing_mode = os.getenv("TESTING", "").lower() == "true"
         print("[DEVICES] Starting device manager initialization...")
 
-        # Load mock devices for demo
-        devices_data = await load_mock_devices()
-        mock_count = len(devices_data)
-        print(f"[DEVICES] Loaded {mock_count} mock devices")
+        # Load Site-002 reference devices (only when data source is enabled)
+        devices_data = []
+        ref_count = 0
+        if _settings.site002_source_enabled:
+            devices_data = await load_reference_devices()
+            ref_count = len(devices_data)
+            print(f"[DEVICES] Loaded {ref_count} reference devices (Site-002)")
+        else:
+            print("[DEVICES] Site-002 data source disabled — skipping reference devices")
 
         building_devices = []
         if not testing_mode:
@@ -242,14 +251,14 @@ async def startup_event():
             print(f"[DEVICES] Loaded {len(building_devices)} building equipment")
         else:
             print("[DEVICES] TESTING mode: skipping building equipment load")
-            # Keep startup fast by limiting mock devices
+            # Keep startup fast by limiting reference devices
             devices_data = devices_data[:5]
-            mock_count = len(devices_data)
+            ref_count = len(devices_data)
 
         # Get existing device IDs to avoid duplicates
         existing_ids = {d["id"] for d in devices_data}
 
-        # Add building devices that don't already exist in mock_devices
+        # Add building devices that don't already exist in reference devices
         added_count = 0
         for device in building_devices:
             if device["id"] not in existing_ids:
@@ -262,7 +271,7 @@ async def startup_event():
         await device_manager.initialize(devices_data)
         print(f"[DEVICES] Device manager initialized with {len(devices_data)} total devices")
         logger.info(
-            f"Device manager initialized with {mock_count} mock devices + "
+            f"Device manager initialized with {ref_count} reference devices + "
             f"{added_count} building equipment = {len(devices_data)} total"
         )
     except Exception as e:

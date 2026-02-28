@@ -104,7 +104,7 @@ class DiffuserConfig(BaseModel):
     gateway: str = "MCU2"  # MCU2 gateway for BACnet output
 
 
-# Value ranges by point type (extrapolated from mock_devices.json point definitions)
+# Value ranges by point type (extrapolated from reference_devices.json point definitions)
 POINT_VALUE_RANGES: Dict[str, Tuple[float, float]] = {
     # Temperature points
     "supply_air_temp": (12.0, 18.0),

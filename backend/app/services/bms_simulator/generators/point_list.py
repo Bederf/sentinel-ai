@@ -1,7 +1,7 @@
 """
 Point List Exporter
 
-Reads equipment from mock_devices.json and exports point lists
+Reads equipment from reference_devices.json and exports point lists
 in vendor-specific CSV formats for BMS onboarding.
 """
 
@@ -25,11 +25,11 @@ from ..vendors.rickard import RickardAdapter
 
 
 class PointListExporter:
-    """Exports point lists from mock devices to vendor CSV formats."""
+    """Exports point lists from reference devices to vendor CSV formats."""
 
     # Base paths
     DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
-    MOCK_DEVICES_PATH = DATA_DIR / "mock_devices.json"
+    REFERENCE_DEVICES_PATH = Path(__file__).parent.parent / "data" / "reference_devices.json"
     OUTPUT_DIR = DATA_DIR / "bms_simulator" / "exports"
 
     # Vendor adapter mapping
@@ -80,10 +80,10 @@ class PointListExporter:
 
     def load_devices(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        Load devices from mock_devices.json and/or buildings directory.
+        Load devices from reference_devices.json and/or buildings directory.
 
         First checks the buildings/{site_id}/equipment/ directory for equipment files.
-        Falls back to mock_devices.json for sites not in buildings directory.
+        Falls back to reference_devices.json for sites not in buildings directory.
 
         Args:
             site_id: Filter to specific site (e.g., "site-002", "site-004")
@@ -102,8 +102,8 @@ class PointListExporter:
                 if devices:
                     return devices
 
-        # Fall back to mock_devices.json
-        with open(self.MOCK_DEVICES_PATH, "r") as f:
+        # Fall back to reference_devices.json
+        with open(self.REFERENCE_DEVICES_PATH, "r") as f:
             all_devices = json.load(f)
 
         if site_id:

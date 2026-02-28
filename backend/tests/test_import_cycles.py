@@ -106,11 +106,11 @@ def test_device_abstraction_import_order():
     """Test that device abstraction modules can be imported in any order.
 
     This specifically tests the device abstraction chain:
-    - device_abstraction → mock_devices/bacnet_adapter → device_abstraction
+    - device_abstraction → simulated_adapter/bacnet_adapter → device_abstraction
     """
     device_modules = [
         "app.services.device_abstraction",
-        "app.services.mock_devices",
+        "app.services.bms_simulator.adapters.simulated_adapter",
         "app.services.niagara.bacnet_adapter",
     ]
 

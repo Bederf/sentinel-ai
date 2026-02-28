@@ -114,11 +114,11 @@ class TestDeviceInterface:
 class TestMockDeviceAdapter:
     """Test mock device adapter."""
 
-    def test_mock_adapter_exists(self):
-        """Test MockDeviceAdapter exists."""
-        from app.services.mock_devices import MockDeviceAdapter
+    def test_simulated_adapter_exists(self):
+        """Test SimulatedDeviceAdapter exists."""
+        from app.services.bms_simulator.adapters.simulated_adapter import SimulatedDeviceAdapter
 
-        assert MockDeviceAdapter is not None
+        assert SimulatedDeviceAdapter is not None
 
 
 @pytest.mark.unit
