@@ -36,6 +36,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Naming Conventions](02-architecture/naming-conventions.md) - Device ID and point naming
 - [Background ML Model Retraining](02-architecture/background-ml-retraining.md) - Automated background training, APScheduler integration, production deployment (Phase 45-01)
 - **[ML Data Architecture](02-architecture/ML-DATA-ARCHITECTURE.md)** - Building Operations ML, Equipment Condition ML, Unified AI Recommendation Engine, feature engineering, inspection priority scoring (Phase 132)
+- **[Event Bus Architecture](02-architecture/event-bus-architecture.md)** - Async pub/sub event bus with importance scoring, middleware pipeline, event chaining, 7 default subscribers (Phase 139)
 
 ### 📚 API Reference
 - **[Energy Consumption API](03-api-reference/energy-consumption.md)** - Water, power validation, cost validation, AI recommendation endpoints (Phase A, v14.0)
@@ -64,6 +65,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Privacy & Consent API](03-api-reference/privacy-api.md)** - POPIA consent, cross-border gating, data subject requests (DSR), and retention automation endpoints
 - **[RLM Runner & Orchestration API](03-api-reference/rlm-api.md)** - Evidence analysis submission, result polling, audit trace, health check — runner direct and backend orchestration (Phase 113)
 - **[ServiceNow API](03-api-reference/servicenow-api.md)** - Read-only ITSM endpoints for incidents, work orders, table queries, schema, history, and aggregates (Phase 138)
+- **[Event Bus Monitoring API](03-api-reference/event-bus-api.md)** - Metrics, history, event chain lookup, subscription listing for the async event bus (Phase 139)
 
 ### ✨ Features
 
