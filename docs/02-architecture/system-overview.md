@@ -2,9 +2,9 @@
 title: "System Architecture Overview"
 type: "architecture"
 status: "approved"
-version: "1.1.0"
+version: "1.2.0"
 created: "2026-01-30"
-updated: "2026-02-27"
+updated: "2026-03-01"
 author: "Sentinel Development Team"
 tags: ["architecture", "system-design", "components"]
 related: ["device-abstraction-layer.md", "database-schema.md", "../03-api-reference/rest-api-endpoints.md"]
@@ -212,6 +212,12 @@ backend/app/
   - Formula: `days_overdue×0.25 + anomaly×0.25 + fault_history×0.20 + rul_inverse×0.15 + criticality×0.15`
   - Levels: critical (80+), high (60+), medium (40+), low (20+), routine (<20)
   - Feeds work order prioritisation and maintenance scheduling
+- **Auto-Dashboard Generator** (Phase 141) - Equipment-driven dashboard configuration
+  - Classifies equipment into 25 categories from ID prefix (37 mappings, longest-first)
+  - Generates tailored dashboard cards (15 templates), monitoring rules (21 defaults), health weights, module suggestions (7 add-ons with savings hints), and AI chat context
+  - Event-driven: auto-triggers on `system.site_onboarded` and `system.equipment_discovered` events
+  - 3-tier equipment loading: Supabase, JSON files, graceful empty fallback
+  - See: [Auto-Dashboard Generator](../04-features/141-auto-dashboard-generator.md)
 
 ## Frontend Architecture
 
@@ -222,15 +228,27 @@ frontend/src/
 ├── App.tsx                # View routing
 ├── lib/
 │   ├── api.ts            # Centralized API client (1000+ lines)
-│   └── cardDefinitions.tsx
+│   ├── api/              # Domain-specific API modules (solar, security, energy, compliance)
+│   ├── cardDefinitions.tsx  # KPI + intelligence card section definitions
+│   ├── hvacApi.ts        # HVAC API client
+│   └── waterApi.ts       # Water API client
 ├── components/            # React components by feature
-│   ├── Control system
-│   ├── Dashboard
-│   ├── AI Chat
-│   ├── Integration
-│   └── UI components
+│   ├── intelligence/     # Discipline intelligence cards (HVAC, Energy, Solar, Water, Fire, Security)
+│   ├── solar/            # Solar & BESS dashboard components
+│   ├── hvac/             # HVAC dashboard
+│   ├── water/            # Water monitoring
+│   ├── fire/             # Fire safety
+│   ├── security/         # Security dashboard
+│   ├── lighting/         # Lighting control
+│   ├── digital-twin/     # Digital twin
+│   ├── optimization/     # Energy optimization
+│   ├── validation/       # Power/cost validation cards
+│   ├── CardLibrary.tsx   # Inline card visibility toggle
+│   ├── SiteDetail.tsx    # Building detail page (10-tab)
+│   └── ...               # Dashboard, AI Chat, Integration, UI components
 ├── hooks/                 # Custom React hooks
-└── pages/                 # Full-page components
+├── contexts/              # React contexts (auth, simulation, modules)
+└── pages/                 # Full-page components (OptimizationPage, OccupancyAnalytics, etc.)
 ```
 
 ### Key Components
@@ -242,8 +260,9 @@ frontend/src/
 - SSE streaming support
 
 **Component Organization**
+- **Intelligence Cards:** `intelligence/` — HVACIntelligenceCard, EnergyIntelligenceCard, SolarIntelligenceCard, WaterIntelligenceCard, FireIntelligenceCard, SecurityIntelligenceCard (compact overview cards, one per discipline)
 - **Control System:** ControlPanel, DeviceControl, SafetyStatus
-- **Dashboard:** KPICard, SiteCard, AlertFeed, ExpandableRiskList, RiskDetailModal
+- **Dashboard:** KPICard, SiteCard, AlertFeed, ExpandableRiskList, RiskDetailModal, CardLibrary (inline toggle)
 - **AI Chat:** Chat, TechnicianChat, DiagnosisFlow
 - **Integration:** IntegrationWizard, GoLiveChecklist
 
@@ -658,3 +677,5 @@ flowchart TB
 - [ML Equipment Support](ml-equipment-support.md) - Per-equipment ML capabilities
 - [Optimization API](../03-api-reference/optimization.md) - AI optimisation endpoints with ML context injection
 - [Inspection API](../03-api-reference/inspection.md) - Inspection workflows and priority scoring
+- [Dashboard Generator API](../03-api-reference/dashboard-generator-api.md) - Auto-dashboard generation from discovered equipment
+- [Auto-Dashboard Generator](../04-features/141-auto-dashboard-generator.md) - Equipment classification, card templates, monitoring rules

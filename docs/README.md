@@ -2,9 +2,9 @@
 title: "SENTINEL Documentation"
 type: "guide"
 status: "approved"
-version: "1.1.0"
+version: "1.2.0"
 created: "2026-01-30"
-updated: "2026-02-23"
+updated: "2026-03-01"
 author: "Sentinel Development Team"
 tags: ["documentation", "overview"]
 domain: "general"
@@ -66,6 +66,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[RLM Runner & Orchestration API](03-api-reference/rlm-api.md)** - Evidence analysis submission, result polling, audit trace, health check — runner direct and backend orchestration (Phase 113)
 - **[ServiceNow API](03-api-reference/servicenow-api.md)** - Read-only ITSM endpoints for incidents, work orders, table queries, schema, history, and aggregates (Phase 138)
 - **[Event Bus Monitoring API](03-api-reference/event-bus-api.md)** - Metrics, history, event chain lookup, subscription listing for the async event bus (Phase 139)
+- **[Dashboard Generator API](03-api-reference/dashboard-generator-api.md)** - Auto-generate dashboard cards, monitoring rules, health weights, and module suggestions from discovered equipment (Phase 141)
 
 ### ✨ Features
 
@@ -105,6 +106,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 #### Onboarding & Integration
 - **[Niagara BMS Connection Wizard](04-features/niagara-connection-wizard.md)** - 4-step wizard: connect to Niagara supervisor, discover BACnet points, AI-classify, approve
+- **[141: Auto-Dashboard Generator](04-features/141-auto-dashboard-generator.md)** - Equipment classification (25 categories), tailored dashboard cards (15 templates), monitoring rules (21 defaults), health weights, module suggestions with savings hints, event-driven auto-trigger (Phase 141)
 
 #### Simulation & Demo
 - **[24-Hour Lifecycle Simulation](04-features/lifecycle-simulation.md)** - Full building day simulation for testing AI optimization, faults, alerts, repairs
