@@ -25,7 +25,6 @@ router = APIRouter(
             require_active_module(
                 ModuleType.FIRE,
                 site_keys=("site_id", "site"),
-                default_site_id="site-002",
             )
         )
     ],

@@ -7,6 +7,7 @@ from typing import Callable, Awaitable
 
 from fastapi import HTTPException, Request
 
+from app.core.site_resolver import get_primary_site
 from app.database.repositories.module_access_repository import get_module_access_repository
 from app.models.auth import SentinelRole
 from app.models.module_registry import ModuleType
@@ -48,6 +49,8 @@ def require_active_module(
 
         if not site_id and default_site_id:
             site_id = default_site_id
+        elif not site_id:
+            site_id = get_primary_site()
 
         if not site_id:
             return

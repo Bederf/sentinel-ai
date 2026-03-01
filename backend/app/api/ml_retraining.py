@@ -109,7 +109,7 @@ async def get_retrain_history(request: Request):
 async def evaluate_performance(
     request: Request,
     days_back: int = Query(7, description="Number of days to evaluate"),
-    building_code: str = Query("site-002", description="Building to evaluate"),
+    building_code: str = Query(..., description="Building to evaluate"),
 ):
     """Evaluate prediction accuracy against actual outcomes.
 

@@ -24,7 +24,6 @@ router = APIRouter(
             require_active_module(
                 ModuleType.SOLAR,
                 site_keys=("site_id", "site"),
-                default_site_id="site-002",
             )
         )
     ]

@@ -980,7 +980,7 @@ async def sentry_create_work_order(
 class CallLogRequest(BaseModel):
     """Facilities defect report from general staff via Sentry bot."""
 
-    site_id: str = Field("site-002", description="Site identifier")
+    site_id: str = Field(..., description="Site identifier")
     zone_id: str = Field("", description="Zone from desk mapping")
     floor: str = Field("", description="Floor level (L0, L1, L2)")
     desk_id: str = Field("", description="Desk number (e.g., 120)")
@@ -1005,7 +1005,7 @@ class CallLogEscalationRequest(BaseModel):
     reporter_telegram_id: str = Field("", description="Reporter Telegram ID")
     original_message: str = Field(..., description="The complaint text that couldn't be classified")
     reason: str = Field("", description="Why it was escalated")
-    site_id: str = Field("site-002", description="Site identifier")
+    site_id: str = Field(..., description="Site identifier")
     timestamp: str = Field("", description="ISO timestamp of the complaint")
 
 

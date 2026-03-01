@@ -7,7 +7,7 @@ Supports sanitized image input (Tier 1) and DXF parsing (Tier 2).
 import logging
 from typing import Dict, Optional
 
-from fastapi import APIRouter, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, HTTPException, Query, status, File, UploadFile
 from pydantic import BaseModel, Field
 
 from app.services.digital_twin_service import get_digital_twin_service
@@ -192,7 +192,7 @@ async def extract_from_image(
     summary="Get demo building configuration",
 )
 async def get_demo_config(
-    building_code: str = "site-002",
+    building_code: str = Query(..., description="Building code"),
     building_name: str = "Demo Building",
     floors_count: int = 5,
 ) -> BuildingConfigResponse:

@@ -62,8 +62,8 @@ class StartSimulationRequest(BaseModel):
         description="Speed factor: 1x=real-time, 10x=10x faster, 100x=100x faster",
     )
     site_id: str = Field(
-        default="site-002",
-        description="Target site identifier (e.g. 'site-002', 'site-005')",
+        ...,
+        description="Target site identifier",
     )
     start_date: Optional[str] = Field(
         default=None,

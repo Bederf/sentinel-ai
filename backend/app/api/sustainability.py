@@ -34,7 +34,6 @@ router = APIRouter(
             require_active_module(
                 ModuleType.COMPLIANCE,
                 site_keys=("site_id", "site", "building_id"),
-                default_site_id="site-002",
             )
         )
     ],

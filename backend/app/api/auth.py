@@ -66,7 +66,7 @@ class AccessRequestCreateRequest(BaseModel):
     full_name: Optional[str] = None
     company: Optional[str] = None
     phone: Optional[str] = None
-    site_code: str = Field(default="site-002")
+    site_code: str = Field(..., description="Site code for access request")
     requested_modules: list[str] = Field(default_factory=list)
     notes: Optional[str] = None
 

@@ -853,7 +853,7 @@ async def seed_energy_data(
 
 @router.get("/energy/actual", response_model=EnergyActual)
 async def get_energy_actual(
-    site_id: str = Query("site-002", description="Site ID to analyze"),
+    site_id: str = Query(..., description="Site ID to analyze"),
     days: int = Query(30, ge=1, le=365, description="Number of days"),
 ) -> EnergyActual:
     """
@@ -926,7 +926,7 @@ async def get_energy_actual(
 
 @router.get("/energy/prediction", response_model=EnergyPrediction)
 async def get_energy_prediction(
-    site_id: str = Query("site-002", description="Site ID to analyze"),
+    site_id: str = Query(..., description="Site ID to analyze"),
     scenario: str = Query("sentinel_optimized", description="Scenario: sentinel_optimized, standard_ems, or baseline"),
     days: int = Query(30, ge=1, le=365, description="Number of days"),
 ) -> EnergyPrediction:
@@ -1017,7 +1017,7 @@ async def get_energy_prediction(
 
 @router.get("/energy/comparison-summary", response_model=ComparisonSummary)
 async def get_energy_comparison_summary(
-    site_id: str = Query("site-002", description="Site ID to analyze"),
+    site_id: str = Query(..., description="Site ID to analyze"),
     method: str = Query("rules_based", description="rules_based | hardcoded"),
 ) -> ComparisonSummary:
     """
@@ -1128,7 +1128,7 @@ async def get_energy_comparison_summary(
 
 @router.get("/energy/comparison")
 async def get_energy_comparison(
-    site_id: str = Query("site-002", description="Site ID to analyze"),
+    site_id: str = Query(..., description="Site ID to analyze"),
     days: int = Query(30, ge=1, le=365, description="Number of days"),
 ):
     """
@@ -1247,7 +1247,7 @@ async def get_energy_comparison(
 
 @router.get("/energy/simulated")
 async def get_energy_simulated(
-    site_id: str = Query("site-002", description="Site ID"),
+    site_id: str = Query(..., description="Site ID"),
 ) -> dict:
     """
     Get simulated energy consumption during an active simulation.
@@ -1394,7 +1394,7 @@ async def get_energy_simulated(
 
 @router.get("/energy/simulated-costs")
 async def get_simulated_energy_costs(
-    site_id: str = Query("site-002", description="Site ID"),
+    site_id: str = Query(..., description="Site ID"),
     days: int = Query(7, ge=1, le=365, description="Number of days"),
 ) -> dict:
     """
@@ -1506,7 +1506,7 @@ async def get_simulated_energy_costs(
 
 @router.get("/energy/simulated-costs/monthly")
 async def get_simulated_monthly_costs(
-    site_id: str = Query("site-002", description="Site ID"),
+    site_id: str = Query(..., description="Site ID"),
     year: int = Query(None, description="Year (default: current year)"),
     month: int = Query(None, description="Month (1-12, default: current month)"),
 ) -> dict:
@@ -1564,7 +1564,7 @@ async def get_simulated_monthly_costs(
 
 @router.get("/energy/tariff-info")
 async def get_tariff_info(
-    site_id: str = Query("site-002", description="Site ID"),
+    site_id: str = Query(..., description="Site ID"),
 ) -> dict:
     """
     Get current tariff information for site.
@@ -1626,7 +1626,7 @@ async def get_tariff_info(
 
 @router.get("/water/simulated-consumption")
 async def get_simulated_water_consumption(
-    site_id: str = "site-002",
+    site_id: str = Query(..., description="Site ID"),
     days: int = 7,
 ) -> Dict[str, Any]:
     """Get daily water consumption trends for dashboard visualization.
@@ -1648,7 +1648,7 @@ async def get_simulated_water_consumption(
 
     Example Response:
         {
-            "site_id": "site-002",
+            "site_id": "<site-id>",
             "period_days": 7,
             "total_liters": 45000.0,
             "total_cost_r": 1250.50,
@@ -1785,7 +1785,7 @@ async def get_simulated_water_consumption(
 
 
 @router.get("/water/tariff-info")
-async def get_water_tariff_info(site_id: str = "site-002") -> Dict[str, Any]:
+async def get_water_tariff_info(site_id: str = Query(..., description="Site ID")) -> Dict[str, Any]:
     """Get water tariff structure for transparency.
 
     Returns municipal water tariff rates including tiered pricing,
@@ -1857,7 +1857,7 @@ async def get_water_tariff_info(site_id: str = "site-002") -> Dict[str, Any]:
 
 @router.post("/validation/power-meter")
 async def validate_power_meter(
-    site_id: str = "site-002",
+    site_id: str = Query(..., description="Site ID"),
     meter_id: str = "S002-MTR-B1-HVAC",
     simulated_power_kw: float = 28.5,
     real_power_kw: Optional[float] = None,
@@ -1920,7 +1920,7 @@ async def validate_power_meter(
 
 @router.get("/validation/power-meter/baseline")
 async def get_power_baseline(
-    site_id: str = "site-002",
+    site_id: str = Query(..., description="Site ID"),
     meter_id: str = "S002-MTR-B1-HVAC",
     lookback_days: int = 7,
 ) -> Dict[str, Any]:
@@ -1971,7 +1971,7 @@ async def get_power_baseline(
 
 @router.get("/validation/power-meter/cop-adjustment")
 async def get_cop_adjustment_recommendation(
-    site_id: str = "site-002",
+    site_id: str = Query(..., description="Site ID"),
     meter_id: str = "S002-MTR-B1-HVAC",
     lookback_days: int = 30,
 ) -> Dict[str, Any]:
@@ -2024,7 +2024,7 @@ async def get_cop_adjustment_recommendation(
 
 @router.post("/validation/cost")
 async def validate_monthly_cost(
-    site_id: str = "site-002",
+    site_id: str = Query(..., description="Site ID"),
     month: int = 2,
     year: int = 2026,
     real_invoice_cost_r: float = 18500.00,
@@ -2087,7 +2087,7 @@ async def validate_monthly_cost(
 
 @router.get("/validation/cost/daily")
 async def get_daily_simulated_cost(
-    site_id: str = "site-002",
+    site_id: str = Query(..., description="Site ID"),
     energy_kwh: float = 315.0,
     water_liters: float = 6847.0,
     cost_date: Optional[str] = None,
@@ -2146,7 +2146,7 @@ async def get_daily_simulated_cost(
 
 @router.get("/validation/cost/tariff-adjustment")
 async def get_tariff_adjustment_recommendation(
-    site_id: str = "site-002",
+    site_id: str = Query(..., description="Site ID"),
     months_analyzed: int = 3,
 ) -> Dict[str, Any]:
     """Get tariff adjustment recommendation based on historical validation.
@@ -2213,7 +2213,7 @@ async def get_tariff_adjustment_recommendation(
 
 @router.post("/recommendations/ai")
 async def get_ai_recommendations(
-    site_id: str = "site-002",
+    site_id: str = Query(..., description="Site ID"),
     lighting_kwh_current: float = 185.0,
     water_liters_current: float = 6847.0,
     hvac_cop_current: float = 3.5,
@@ -2245,7 +2245,7 @@ async def get_ai_recommendations(
 
     Example Response:
         {
-            "building_id": "site-002",
+            "building_id": "<building-id>",
             "recommendation_count": 4,
             "total_annual_savings_r": 60250.00,
             "total_investment_r": 135000.00,
@@ -2291,7 +2291,7 @@ async def get_ai_recommendations(
 
 @router.get("/recommendations/dashboard")
 async def get_recommendations_dashboard(
-    site_id: str = "site-002",
+    site_id: str = Query(..., description="Site ID"),
 ) -> Dict[str, Any]:
     """Get dashboard-ready recommendation summary (simplified).
 
@@ -2381,7 +2381,7 @@ def _get_button_text(rec_type: str) -> str:
 
 @router.get("/recommendations/by-type")
 async def get_recommendations_by_type(
-    site_id: str = "site-002",
+    site_id: str = Query(..., description="Site ID"),
     recommendation_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Get detailed recommendation by type with full implementation guide.

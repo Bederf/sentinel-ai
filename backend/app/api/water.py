@@ -33,7 +33,6 @@ router = APIRouter(
             require_active_module(
                 ModuleType.WATER,
                 site_keys=("site", "site_id"),
-                default_site_id="site-002",
             )
         )
     ]

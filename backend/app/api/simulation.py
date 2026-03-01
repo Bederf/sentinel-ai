@@ -567,7 +567,7 @@ from app.models.module_registry import AIRecommendation, ModuleType, Recommendat
 
 @router.post("/demo/trigger-warnings")
 async def trigger_demo_warnings(
-    site_code: str = Query("site-002", description="Site code to trigger warnings for"),
+    site_code: str = Query(..., description="Site code to trigger warnings for"),
     count: int = Query(3, description="Number of equipment to set to warning state", ge=1, le=10),
 ):
     """
@@ -765,7 +765,7 @@ async def trigger_demo_warnings(
 
 @router.post("/demo/reset-to-healthy")
 async def reset_demo_to_healthy(
-    site_code: str = Query("site-002", description="Site code to reset to healthy state"),
+    site_code: str = Query(..., description="Site code to reset to healthy state"),
 ):
     """
     Demo endpoint: Reset all equipment to healthy state.

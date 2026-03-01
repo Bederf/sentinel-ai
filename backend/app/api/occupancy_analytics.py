@@ -23,7 +23,7 @@ control_router = APIRouter(prefix="/occupancy/control", tags=["occupancy-control
 
 @router.get("/hourly-trend")
 async def get_hourly_occupancy_trend(
-    building_id: str = Query("site-002"),
+    building_id: str = Query(..., description="Building ID"),
     days: int = Query(1, ge=1, le=30, description="Number of days to return (1-30)"),
 ):
     """
@@ -33,12 +33,12 @@ async def get_hourly_occupancy_trend(
     Data is generated based on time-of-day heuristics (Phase 4).
 
     Args:
-        building_id: Building ID (e.g., 'site-002')
+        building_id: Building ID (e.g., 'site-002' or registered building code)
         days: Number of days of historical data (1, 7, 30)
 
     Returns:
         {
-            "building_id": "site-002",
+            "building_id": "<building-id>",
             "days": 7,
             "hours": [0, 1, 2, ..., 23],
             "zones": {
@@ -106,7 +106,7 @@ async def get_hourly_occupancy_trend(
 
 
 @router.get("/zone-utilization")
-async def get_zone_utilization(building_id: str = Query("site-002")):
+async def get_zone_utilization(building_id: str = Query(..., description="Building ID")):
     """
     Get current zone utilization metrics.
 
@@ -117,7 +117,7 @@ async def get_zone_utilization(building_id: str = Query("site-002")):
 
     Returns:
         {
-            "building_id": "site-002",
+            "building_id": "<building-id>",
             "timestamp": "2026-02-16T14:30:00Z",
             "zones": [
                 {
@@ -193,7 +193,7 @@ async def get_zone_utilization(building_id: str = Query("site-002")):
 
 
 @router.get("/peak-hours")
-async def get_peak_hours(building_id: str = Query("site-002")):
+async def get_peak_hours(building_id: str = Query(..., description="Building ID")):
     """
     Get peak hour analysis for the building.
 
@@ -201,7 +201,7 @@ async def get_peak_hours(building_id: str = Query("site-002")):
 
     Returns:
         {
-            "building_id": "site-002",
+            "building_id": "<building-id>",
             "peak_hours": [9, 10, 11, 14, 15, 16],
             "offpeak_hours": [0-8, 17-23],
             "peak_occupancy_avg": 82,
@@ -256,7 +256,7 @@ async def get_peak_hours(building_id: str = Query("site-002")):
 
 @control_router.post("/trigger")
 async def trigger_occupancy_control(
-    site_id: str = Query("site-002", description="Site to run control cycle for"),
+    site_id: str = Query(..., description="Site to run control cycle for"),
 ):
     """Manually trigger one occupancy control cycle.
 
@@ -313,7 +313,7 @@ async def get_occupancy_control_status():
 
 @control_router.get("/history")
 async def get_occupancy_control_history(
-    site_id: str = Query("site-002"),
+    site_id: str = Query(..., description="Site ID"),
     zone_id: Optional[str] = Query(None, description="Filter by zone"),
     module: Optional[str] = Query(None, description="Filter: 'hvac' or 'lighting'"),
     limit: int = Query(50, ge=1, le=500),

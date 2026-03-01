@@ -34,7 +34,6 @@ router = APIRouter(
             require_active_module(
                 ModuleType.SOLAR,
                 site_keys=("site_id", "site"),
-                default_site_id="site-002",
             )
         )
     ]
@@ -583,7 +582,7 @@ async def get_bess_health_impact(
 @router.post("/solar/arbitrage/dispatch/proposal")
 async def create_dispatch_proposal(
     request: Request,
-    site_id: str = Query("site-002", description="Site ID"),
+    site_id: str = Query(..., description="Site ID"),
 ):
     """Create AEGIS dispatch proposal routed through approval pipeline.
 
@@ -607,7 +606,7 @@ async def create_dispatch_proposal(
 @router.get("/solar/arbitrage/dispatch/history")
 async def get_dispatch_history(
     request: Request,
-    site_id: str = Query("site-002", description="Site ID"),
+    site_id: str = Query(..., description="Site ID"),
     hours: int = Query(24, ge=1, le=168, description="Hours of history (1-168)"),
     include_decisions: bool = Query(False, description="Include linked parasite_decisions"),
 ):
