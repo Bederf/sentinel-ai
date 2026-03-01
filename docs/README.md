@@ -63,6 +63,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Security API](03-api-reference/security-api.md)** - Access control events, visitor management, zone occupancy, cameras, occupancy trends, cross-module recommendations (Phases 27, 58, 69)
 - **[Privacy & Consent API](03-api-reference/privacy-api.md)** - POPIA consent, cross-border gating, data subject requests (DSR), and retention automation endpoints
 - **[RLM Runner & Orchestration API](03-api-reference/rlm-api.md)** - Evidence analysis submission, result polling, audit trace, health check — runner direct and backend orchestration (Phase 113)
+- **[ServiceNow API](03-api-reference/servicenow-api.md)** - Read-only ITSM endpoints for incidents, work orders, table queries, schema, history, and aggregates (Phase 138)
 
 ### ✨ Features
 
@@ -171,6 +172,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Asset Lifecycle State Machine](05-integrations/asset-lifecycle-state-machine.md)** - 13 states from onboarding to monitoring (Phase 53-01)
 - **[Workflow Triggers & Automation](05-integrations/workflow-triggers.md)** - 5 automated triggers for ML → Inspection → Repair → Validation (Phase 53-02)
 - [AEGIS Site-002 Discovery](05-integrations/aegis-site-002-discovery.md) - Site-level BESS control boundaries, interfaces, and pre-live confirmation points
+- **[ServiceNow Integration](05-integrations/servicenow-integration.md)** - Read-only ITSM client with auto-discovery, 10 API endpoints, 4 chat tools, config-ready (Phase 138)
 
 ### 📦 Modules
 - [Module Registry](13-modules/module-registry.md) - Bolt-on module system architecture
