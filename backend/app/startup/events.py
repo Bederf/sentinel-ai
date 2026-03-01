@@ -177,6 +177,12 @@ async def startup_event(app: FastAPI) -> None:
 
     register_sentry_subscribers()
 
+    # Dashboard generator subscriber — auto-generate on site onboard (Phase 141)
+    from app.services.dashboard_gen_subscriber import register_dashboard_gen_subscribers
+
+    register_dashboard_gen_subscribers()
+    _logger.info("Dashboard generator subscribers registered")
+
     # Background notification tasks (escalation checker, digest scheduler)
     from app.services.notification_tasks import start_notification_tasks
 

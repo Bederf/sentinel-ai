@@ -1063,7 +1063,11 @@ class DashboardGenerator:
         return "\n".join(lines)
 
     def _load_equipment(self, site_id: str) -> List[Dict[str, Any]]:
-        """Load equipment list from repository.
+        """Load equipment list with 3-tier fallback.
+
+        Tier 1: Supabase via equipment repository
+        Tier 2: JSON building data files
+        Tier 3: Empty list (graceful degradation)
 
         Args:
             site_id: Site code (e.g., "site-002")
@@ -1071,11 +1075,46 @@ class DashboardGenerator:
         Returns:
             List of equipment dicts.
         """
+        # Tier 1: Supabase via equipment repository
         try:
-            return self.equipment_repo.get_by_building_code(site_id)
+            from app.database.repositories.equipment_repository import get_equipment_repository
+
+            repo = get_equipment_repository()
+            equipment = repo.get_by_building_code(site_id)
+            if equipment:
+                logger.debug("Loaded %d equipment from repository for %s", len(equipment), site_id)
+                return equipment
         except Exception as e:
-            logger.warning("Failed to load equipment for %s: %s", site_id, e)
-            return []
+            logger.warning("Equipment repository unavailable for %s: %s", site_id, e)
+
+        # Tier 2: JSON building data files
+        try:
+            from pathlib import Path
+            import json
+
+            equipment_dir = Path(__file__).parent.parent / "data" / "buildings" / site_id / "equipment"
+            if equipment_dir.is_dir():
+                equipment = []
+                for json_file in sorted(equipment_dir.glob("*.json")):
+                    try:
+                        data = json.loads(json_file.read_text())
+                        # Normalise: ensure 'code' key exists (some files use 'id')
+                        if "code" not in data and "id" in data:
+                            data["code"] = data["id"]
+                        if "type" not in data and "equipment_type" in data:
+                            data["type"] = data["equipment_type"]
+                        equipment.append(data)
+                    except Exception as file_err:
+                        logger.debug("Skipping %s: %s", json_file.name, file_err)
+                if equipment:
+                    logger.info("Loaded %d equipment from JSON for %s", len(equipment), site_id)
+                    return equipment
+        except Exception as e:
+            logger.warning("JSON equipment loading failed for %s: %s", site_id, e)
+
+        # Tier 3: Empty list
+        logger.warning("No equipment found for %s (all sources exhausted)", site_id)
+        return []
 
 
 # =============================================================================
