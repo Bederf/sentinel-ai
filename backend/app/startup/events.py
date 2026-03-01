@@ -161,6 +161,12 @@ async def startup_event(app: FastAPI) -> None:
     # Sentry will attempt login on first use via get_token_or_refresh()
     _logger.info("ℹ Sentry bot JWT authentication deferred to first use")
 
+    # Event bus subscribers (Phase 139)
+    from app.services.event_subscribers import register_default_subscribers
+
+    register_default_subscribers()
+    _logger.info("Event bus subscribers registered")
+
     # Capture the main event loop for cross-thread scheduling (simulation tasks)
     scheduler_service.set_main_loop(asyncio.get_event_loop())
 
@@ -629,6 +635,11 @@ async def shutdown_event(app: FastAPI) -> None:
     from app.services.servicenow_service import shutdown_servicenow_service
 
     await shutdown_servicenow_service()
+
+    # Event bus cleanup (Phase 139)
+    from app.services.event_bus import reset_event_bus
+
+    reset_event_bus()
 
     scheduler_service.stop()
     await health_simulation_service.stop()
