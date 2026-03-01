@@ -102,36 +102,44 @@ class BackgroundSchedulerService:
 
             logger.debug("Generating periodic demo audit data...")
 
-            # Get real equipment IDs from site-002
+            # Get real equipment IDs from registered sites
+            from app.core.site_resolver import get_registered_site_ids
+
             demo_devices = []
             try:
                 equipment_repo = EquipmentRepository()
-                equipment_list = equipment_repo.get_by_building_code("site-002")
-                if equipment_list:
-                    # Sample controllable equipment types for realistic audit logs
-                    controllable_types = [
-                        "fcu",
-                        "ahu",
-                        "vav",
-                        "chiller",
-                        "pump",
-                        "dali_controller",
-                        "luminaire",
-                        "luminaire_group",
-                        "generator",
-                        "ups",
-                        "ats",
-                        "transformer",
-                        "lv_switchboard",
-                        "power_meter",
-                    ]
-                    demo_devices = [
-                        eq.get("code") or eq.get("equipment_id") or eq.get("id")
-                        for eq in equipment_list
-                        if any(t in (eq.get("type", "") or "").lower() for t in controllable_types)
-                    ][:20]  # Limit to 20 devices
+                site_ids = get_registered_site_ids()
+                for site_id in site_ids:
+                    equipment_list = equipment_repo.get_by_building_code(site_id)
+                    if equipment_list:
+                        # Sample controllable equipment types for realistic audit logs
+                        controllable_types = [
+                            "fcu",
+                            "ahu",
+                            "vav",
+                            "chiller",
+                            "pump",
+                            "dali_controller",
+                            "luminaire",
+                            "luminaire_group",
+                            "generator",
+                            "ups",
+                            "ats",
+                            "transformer",
+                            "lv_switchboard",
+                            "power_meter",
+                        ]
+                        demo_devices.extend(
+                            [
+                                eq.get("code") or eq.get("equipment_id") or eq.get("id")
+                                for eq in equipment_list
+                                if any(t in (eq.get("type", "") or "").lower() for t in controllable_types)
+                            ][:20]  # Limit to 20 devices per site
+                        )
+                    if demo_devices:
+                        break  # Enough devices for demo data
             except Exception as e:
-                logger.warning(f"Could not fetch site-002 equipment: {e}")
+                logger.warning(f"Could not fetch equipment for registered sites: {e}")
 
             # Fallback to real Sandton City equipment codes if Supabase unavailable
             if not demo_devices:
@@ -939,6 +947,7 @@ class BackgroundSchedulerService:
             # Update Prometheus drift gauge (Phase 127)
             try:
                 from app.api.metrics import sentinel_model_drift_alerts
+                from app.core.site_resolver import get_registered_site_ids
 
                 # Count triggers per model_type
                 drift_counts: dict[str, int] = {}
@@ -946,11 +955,12 @@ class BackgroundSchedulerService:
                     mt = t.get("model_type", "unknown").upper()
                     drift_counts[mt] = drift_counts.get(mt, 0) + 1
 
-                # Set gauge for each model type (0 = no drift, N = active alerts)
-                for model_type in ["LSTM", "AUTOENCODER", "CLASSIFIER"]:
-                    sentinel_model_drift_alerts.labels(site_id="site-002", model_type=model_type).set(
-                        drift_counts.get(model_type, 0)
-                    )
+                # Set gauge for each registered site and model type
+                for site_id in get_registered_site_ids():
+                    for model_type in ["LSTM", "AUTOENCODER", "CLASSIFIER"]:
+                        sentinel_model_drift_alerts.labels(site_id=site_id, model_type=model_type).set(
+                            drift_counts.get(model_type, 0)
+                        )
             except Exception as metrics_err:
                 logger.debug(f"Drift metrics update skipped: {metrics_err}")
 
@@ -1344,10 +1354,20 @@ class BackgroundSchedulerService:
                 get_simulation_by_task_id,
             )
 
-            # Check all known building stores for queued tasks
-            # Default to site-002; in future could scan data/simulation/ dirs
-            store = get_simulation_store("site-002")
-            queued_tasks = store.find_queued_tasks(simulation_type="lifecycle")
+            # Check all registered building stores for queued tasks
+            from app.core.site_resolver import get_registered_site_ids
+
+            site_ids = get_registered_site_ids()
+            if not site_ids:
+                return  # No registered buildings — silent return
+
+            queued_tasks = []
+            store = None
+            for _sid in site_ids:
+                store = get_simulation_store(_sid)
+                queued_tasks = store.find_queued_tasks(simulation_type="lifecycle")
+                if queued_tasks:
+                    break
 
             if not queued_tasks:
                 return  # No queued tasks — silent return
@@ -1363,11 +1383,11 @@ class BackgroundSchedulerService:
 
             # Mark as running in JSON store
             store.update_task_progress(task_id, {"status": "running"})
-            logger.info(f"✅ Starting lifecycle simulation task {task_id}")
+            logger.info(f"Starting lifecycle simulation task {task_id}")
 
             # Create orchestrator and register — use the global singleton
             # so /api/simulation/* endpoints see the recovered simulation
-            site_id = task.get("site_id", "site-002")
+            site_id = task.get("site_id", site_ids[0] if site_ids else "unknown")
             from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
 
             orchestrator = get_lifecycle_orchestrator(site_id=site_id)
@@ -1401,7 +1421,17 @@ class BackgroundSchedulerService:
         from app.services.lifecycle_orchestrator import ALL_SCENARIOS
         from datetime import datetime
 
-        store = get_simulation_store(orchestrator.building_id if hasattr(orchestrator, "building_id") else "site-002")
+        _fallback_site = "unknown"
+        try:
+            from app.core.site_resolver import get_registered_site_ids as _get_sids
+
+            _sids = _get_sids()
+            if _sids:
+                _fallback_site = _sids[0]
+        except Exception:
+            pass
+        _orch_site = orchestrator.building_id if hasattr(orchestrator, "building_id") else _fallback_site
+        store = get_simulation_store(_orch_site)
         is_recovery = False
 
         try:
@@ -1653,46 +1683,57 @@ class BackgroundSchedulerService:
         logger.info(f"Added MIP dispatch optimize job with {interval_seconds}s interval")
 
     def _run_mip_dispatch_optimize(self):
-        """Run MIP dispatch optimization for site-002."""
+        """Run MIP dispatch optimization for all registered sites."""
         try:
             from app.services.mip_dispatch_optimizer import get_mip_dispatch_optimizer
             from app.services.load_forecast_service import get_load_forecast_service
+            from app.core.site_resolver import get_registered_site_ids
+
+            site_ids = get_registered_site_ids()
+            if not site_ids:
+                logger.debug("No registered buildings — skipping MIP dispatch optimization")
+                return
 
             optimizer = get_mip_dispatch_optimizer()
             load_svc = get_load_forecast_service()
 
-            # Get current load forecast
-            load_forecast = load_svc.get_forecast("site-002", intervals_ahead=96)
-            load_values = [i.demand_kw for i in load_forecast.intervals]
+            for site_id in site_ids:
+                try:
+                    # Get current load forecast
+                    load_forecast = load_svc.get_forecast(site_id, intervals_ahead=96)
+                    load_values = [i.demand_kw for i in load_forecast.intervals]
 
-            # Get solar forecast (optional)
-            solar_values = None
-            try:
-                from app.services.solar_forecast_service import get_solar_forecast_service
+                    # Get solar forecast (optional)
+                    solar_values = None
+                    try:
+                        from app.services.solar_forecast_service import get_solar_forecast_service
 
-                solar_svc = get_solar_forecast_service()
-                solar_obj = solar_svc.get_forecast("site-002", hours_ahead=24)
-                solar_values = []
-                for h in solar_obj.hourly:
-                    solar_values.extend([h.generation_kw] * 4)
-                solar_values = solar_values[:96]
-            except Exception:
-                pass
+                        solar_svc = get_solar_forecast_service()
+                        solar_obj = solar_svc.get_forecast(site_id, hours_ahead=24)
+                        solar_values = []
+                        for h in solar_obj.hourly:
+                            solar_values.extend([h.generation_kw] * 4)
+                        solar_values = solar_values[:96]
+                    except Exception:
+                        pass
 
-            schedule = optimizer.optimize(
-                "site-002",
-                load_forecast=load_values,
-                solar_forecast=solar_values,
-            )
+                    schedule = optimizer.optimize(
+                        site_id,
+                        load_forecast=load_values,
+                        solar_forecast=solar_values,
+                    )
 
-            logger.info(
-                "MIP dispatch optimized: status=%s cost=R%.2f peak=%.0f kW cycles=%.2f solve=%.0f ms",
-                schedule.solver_status,
-                schedule.total_cost_zar,
-                schedule.peak_grid_import_kw,
-                schedule.cycles,
-                schedule.solve_time_ms,
-            )
+                    logger.info(
+                        "MIP dispatch optimized: site=%s status=%s cost=R%.2f peak=%.0f kW cycles=%.2f solve=%.0f ms",
+                        site_id,
+                        schedule.solver_status,
+                        schedule.total_cost_zar,
+                        schedule.peak_grid_import_kw,
+                        schedule.cycles,
+                        schedule.solve_time_ms,
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to run MIP dispatch optimization for {site_id}: {e}", exc_info=True)
         except Exception as e:
             logger.error(f"Failed to run MIP dispatch optimization: {e}", exc_info=True)
 
@@ -1720,22 +1761,33 @@ class BackgroundSchedulerService:
         logger.info(f"Added load forecast job with {interval_seconds}s interval")
 
     def _run_load_forecast(self):
-        """Refresh 15-min load forecast for all solar sites."""
+        """Refresh 15-min load forecast for all registered sites."""
         try:
             from app.services.load_forecast_service import get_load_forecast_service
+            from app.core.site_resolver import get_registered_site_ids
 
             service = get_load_forecast_service()
-            forecast = service.get_forecast("site-002")
-            logger.info(
-                "Load forecast refreshed: site=site-002 intervals=%d peak=%.0f kW avg=%.0f kW",
-                len(forecast.intervals),
-                forecast.peak_demand_kw,
-                forecast.avg_demand_kw,
-            )
+            site_ids = get_registered_site_ids()
+            if not site_ids:
+                logger.debug("No registered buildings — skipping load forecast refresh")
+                return
+
+            for site_id in site_ids:
+                try:
+                    forecast = service.get_forecast(site_id)
+                    logger.info(
+                        "Load forecast refreshed: site=%s intervals=%d peak=%.0f kW avg=%.0f kW",
+                        site_id,
+                        len(forecast.intervals),
+                        forecast.peak_demand_kw,
+                        forecast.avg_demand_kw,
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to refresh load forecast for {site_id}: {e}", exc_info=True)
         except Exception as e:
             logger.error(f"Failed to refresh load forecast: {e}", exc_info=True)
 
-    def add_site_mode_policy_dry_run_job(self, interval_seconds: int = 300, site_id: str = "site-002"):
+    def add_site_mode_policy_dry_run_job(self, interval_seconds: int = 300, site_id: str = ""):
         """Add periodic dry-run evaluation for deterministic site onboarding policy."""
         job_id = f"site_mode_policy_dry_run_{site_id}"
         if self.scheduler.get_job(job_id):
@@ -1799,7 +1851,7 @@ class BackgroundSchedulerService:
     # AEGIS Phase 0 — dispatch cycle + daily evidence collector
     # -----------------------------------------------------------------------
 
-    def add_aegis_cycle_job(self, interval_seconds: int = 300, site_id: str = "site-002"):
+    def add_aegis_cycle_job(self, interval_seconds: int = 300, site_id: str = ""):
         """Add a job to run one AEGIS dispatch cycle periodically.
 
         Creates proposals via the arbitrage engine, validates through BESS
@@ -1808,7 +1860,7 @@ class BackgroundSchedulerService:
 
         Args:
             interval_seconds: How often to run (default: 300 = 5 min)
-            site_id: Target site (default: site-002)
+            site_id: Target site ID (e.g. site-002)
         """
         job_id = f"aegis_cycle_{site_id}"
         if self.scheduler.get_job(job_id):
@@ -1852,7 +1904,7 @@ class BackgroundSchedulerService:
                 site_id,
             )
 
-    def add_aegis_evidence_collector_job(self, interval_seconds: int = 86400, site_id: str = "site-002"):
+    def add_aegis_evidence_collector_job(self, interval_seconds: int = 86400, site_id: str = ""):
         """Add a daily job to collect AEGIS Phase 0 evidence into the tracker CSV.
 
         Runs once per day. Queries the AEGIS dashboard for 24h KPIs,
@@ -1861,7 +1913,7 @@ class BackgroundSchedulerService:
 
         Args:
             interval_seconds: How often to run (default: 86400 = 24h)
-            site_id: Target site (default: site-002)
+            site_id: Target site ID (e.g. site-002)
         """
         job_id = f"aegis_evidence_{site_id}"
         if self.scheduler.get_job(job_id):
@@ -2123,7 +2175,7 @@ class BackgroundSchedulerService:
     # Phase 130 — Occupancy-driven HVAC + lighting control loop
     # -----------------------------------------------------------------------
 
-    def add_occupancy_control_job(self, interval_seconds: int = 60, site_id: str = "site-002"):
+    def add_occupancy_control_job(self, interval_seconds: int = 60, site_id: str = ""):
         """Add a periodic job to poll occupancy and adjust HVAC/lighting.
 
         Reads DALI PIR sensors and badge readers, evaluates zone occupancy,
@@ -2132,7 +2184,7 @@ class BackgroundSchedulerService:
 
         Args:
             interval_seconds: How often to poll (default: 60s)
-            site_id: Target site (default: site-002)
+            site_id: Target site ID (e.g. site-002)
         """
         job_id = f"occupancy_control_{site_id}"
         if self.scheduler.get_job(job_id):
