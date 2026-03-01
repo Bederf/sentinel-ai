@@ -45,6 +45,19 @@ export function ModuleProvider({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Sync prop changes into state — initialSiteId arrives async after buildings load
+  useEffect(() => {
+    if (initialSiteId && initialSiteId !== siteId) {
+      setSiteIdState(initialSiteId);
+    }
+  }, [initialSiteId]);
+
+  useEffect(() => {
+    if (initialSiteName && initialSiteName !== siteName) {
+      setSiteNameState(initialSiteName);
+    }
+  }, [initialSiteName]);
+
   // Define loaders as useCallback to satisfy exhaustive-deps
   const loadAvailableModules = useCallback(async () => {
     try {
