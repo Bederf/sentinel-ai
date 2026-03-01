@@ -3268,6 +3268,105 @@ CHAT_TOOLS = [
             "required": ["equipment_code"],
         },
     },
+    # ---------------------------------------------------------------------------
+    # ServiceNow Integration Tools (Phase 138-02)
+    # ---------------------------------------------------------------------------
+    {
+        "name": "check_servicenow_status",
+        "description": (
+            "Check the ServiceNow integration status. Returns whether "
+            "ServiceNow is configured, connected, and what data tables "
+            "are available. Use this to verify integration health."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "query_servicenow_incidents",
+        "description": (
+            "Query open incidents from ServiceNow. Returns a list of "
+            "active incidents with their priority, state, description, "
+            "and assignment details. Filter by location, assignment group, "
+            "or priority level."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "Filter by location or building name",
+                },
+                "assignment_group": {
+                    "type": "string",
+                    "description": "Filter by assignment group name",
+                },
+                "priority_max": {
+                    "type": "integer",
+                    "description": (
+                        "Maximum priority level to include (1=critical, 2=high, 3=medium, 4=low). Default: 4"
+                    ),
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of incidents to return (default: 10, max: 50)",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "query_servicenow_work_orders",
+        "description": (
+            "Query work orders from ServiceNow. Returns a list of "
+            "work orders with their state, priority, assigned technician, "
+            "and task details. Requires MAINTENANCE module. Filter by "
+            "location, state, or assigned technician."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "Filter by location or building name",
+                },
+                "state": {
+                    "type": "string",
+                    "description": "Filter by work order state (e.g., 'open', 'in_progress', 'closed')",
+                },
+                "assigned_to": {
+                    "type": "string",
+                    "description": "Filter by assigned technician name",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of work orders to return (default: 10, max: 50)",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "get_servicenow_incident_summary",
+        "description": (
+            "Get a summary breakdown of ServiceNow incidents by priority "
+            "and state. Returns counts of open, in-progress, and resolved "
+            "incidents at each priority level. Useful for dashboard views "
+            "and operational overview."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "Filter summary by location or building name",
+                },
+            },
+            "required": [],
+        },
+    },
 ]
 
 
@@ -3296,6 +3395,8 @@ TOOL_MODULE_REQUIREMENTS: dict[str, ModuleType] = {
     "approve_recommendation": ModuleType.ENERGY_CONTROL,
     "reject_recommendation": ModuleType.ENERGY_CONTROL,
     "reset_equipment_fault": ModuleType.HVAC_CONTROL,
+    # ServiceNow work orders gated by MAINTENANCE module (138-02)
+    "query_servicenow_work_orders": ModuleType.MAINTENANCE,
 }
 
 
@@ -4027,6 +4128,183 @@ async def search_documents(
         return {"success": False, "error": str(e), "results": []}
 
 
+# ---------------------------------------------------------------------------
+# ServiceNow Integration Tools (Phase 138-02)
+# ---------------------------------------------------------------------------
+
+
+async def check_servicenow_status(site_id: str | None = None) -> dict[str, Any]:
+    """Check ServiceNow connection status and available data.
+
+    Args:
+        site_id: Site identifier (unused, for consistency)
+
+    Returns:
+        Dictionary with connection status and discovered tables
+    """
+    try:
+        from app.services.servicenow_service import get_servicenow_service
+
+        service = get_servicenow_service()
+        if not service.is_configured:
+            return {
+                "success": True,
+                "configured": False,
+                "message": (
+                    "ServiceNow integration is not configured. "
+                    "Set SERVICENOW_INSTANCE, SERVICENOW_USERNAME, "
+                    "and SERVICENOW_PASSWORD environment variables."
+                ),
+            }
+        status = service.status
+        return {"success": True, "configured": True, **status.to_dict()}
+    except ImportError:
+        return {
+            "success": False,
+            "error": "ServiceNow service module not available",
+        }
+    except Exception as e:
+        logger.error(f"check_servicenow_status error: {e}")
+        return {"success": False, "error": "Failed to check ServiceNow status"}
+
+
+async def query_servicenow_incidents(
+    location: str | None = None,
+    assignment_group: str | None = None,
+    priority_max: int = 4,
+    limit: int = 10,
+) -> dict[str, Any]:
+    """Query open incidents from ServiceNow.
+
+    Args:
+        location: Filter by location/building
+        assignment_group: Filter by assignment group
+        priority_max: Maximum priority level (1=critical, 4=low)
+        limit: Maximum number of results
+
+    Returns:
+        Dictionary with incident list
+    """
+    try:
+        from app.services.servicenow_service import get_servicenow_service
+
+        service = get_servicenow_service()
+        if not service.is_configured:
+            return {
+                "success": True,
+                "configured": False,
+                "message": "ServiceNow not configured",
+                "incidents": [],
+            }
+        incidents = await service.query_incidents(
+            location=location,
+            assignment_group=assignment_group,
+            priority_max=priority_max,
+            limit=min(limit, 50),
+        )
+        return {
+            "success": True,
+            "incidents": incidents,
+            "count": len(incidents),
+        }
+    except ImportError:
+        return {
+            "success": False,
+            "error": "ServiceNow service module not available",
+            "incidents": [],
+        }
+    except Exception as e:
+        logger.error(f"query_servicenow_incidents error: {e}")
+        return {"success": False, "error": "Failed to query incidents", "incidents": []}
+
+
+async def query_servicenow_work_orders(
+    location: str | None = None,
+    state: str | None = None,
+    assigned_to: str | None = None,
+    limit: int = 10,
+) -> dict[str, Any]:
+    """Query work orders from ServiceNow.
+
+    Args:
+        location: Filter by location/building
+        state: Filter by work order state (e.g., 'open', 'in_progress', 'closed')
+        assigned_to: Filter by assigned technician
+        limit: Maximum number of results
+
+    Returns:
+        Dictionary with work order list
+    """
+    try:
+        from app.services.servicenow_service import get_servicenow_service
+
+        service = get_servicenow_service()
+        if not service.is_configured:
+            return {
+                "success": True,
+                "configured": False,
+                "message": "ServiceNow not configured",
+                "work_orders": [],
+            }
+        work_orders = await service.query_work_orders(
+            location=location,
+            state=state,
+            assigned_to=assigned_to,
+            limit=min(limit, 50),
+        )
+        return {
+            "success": True,
+            "work_orders": work_orders,
+            "count": len(work_orders),
+        }
+    except ImportError:
+        return {
+            "success": False,
+            "error": "ServiceNow service module not available",
+            "work_orders": [],
+        }
+    except Exception as e:
+        logger.error(f"query_servicenow_work_orders error: {e}")
+        return {
+            "success": False,
+            "error": "Failed to query work orders",
+            "work_orders": [],
+        }
+
+
+async def get_servicenow_incident_summary(
+    location: str | None = None,
+) -> dict[str, Any]:
+    """Get incident count breakdown by priority and state.
+
+    Args:
+        location: Filter by location/building
+
+    Returns:
+        Dictionary with incident summary breakdown
+    """
+    try:
+        from app.services.servicenow_service import get_servicenow_service
+
+        service = get_servicenow_service()
+        if not service.is_configured:
+            return {
+                "success": True,
+                "configured": False,
+                "message": "ServiceNow not configured",
+            }
+        summary = await service.get_incident_summary(location=location)
+        return {"success": True, **summary}
+    except ImportError:
+        return {
+            "success": False,
+            "error": "ServiceNow service module not available",
+        }
+    except Exception as e:
+        logger.error(f"get_servicenow_incident_summary error: {e}")
+        return {"success": False, "error": "Failed to get incident summary"}
+
+
 # Tool handler dispatch
 TOOL_HANDLERS = {
     "list_devices": list_devices,
@@ -4062,6 +4340,11 @@ TOOL_HANDLERS = {
     "reject_recommendation": reject_recommendation_chat,
     "reset_equipment_fault": reset_equipment_fault_chat,
     "search_documents": search_documents,
+    # ServiceNow integration tools (Phase 138-02)
+    "check_servicenow_status": check_servicenow_status,
+    "query_servicenow_incidents": query_servicenow_incidents,
+    "query_servicenow_work_orders": query_servicenow_work_orders,
+    "get_servicenow_incident_summary": get_servicenow_incident_summary,
 }
 
 
