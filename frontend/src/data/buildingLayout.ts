@@ -48,7 +48,7 @@ export interface BuildingLayout {
 }
 
 /**
- * Default building layout for site-002
+ * Default building layout for the primary registered building
  *
  * Physical layout:
  * - Ground floor (L0): Reception, Workspace, Common, Utility, Corridor

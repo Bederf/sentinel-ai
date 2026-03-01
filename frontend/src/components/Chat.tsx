@@ -74,7 +74,7 @@ export function Chat() {
       try {
         const sitesData = await api.getSites();
         setSites(sitesData.sort((a, b) => a.name.localeCompare(b.name)));
-        // Default to Sandton City (site-002) or first site
+        // Default to first available site
         const defaultSite = sitesData[0];
         if (defaultSite) {
           setSelectedSiteId(defaultSite.id);

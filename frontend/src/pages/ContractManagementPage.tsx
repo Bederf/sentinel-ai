@@ -7,7 +7,7 @@
  * 3. SLA Tracking - SLA term cards with traffic-light indicators
  * 4. Budget Overview - Budget vs actual breakdown with variance
  *
- * Falls back to demo data from site-002/contract.json when API is unavailable.
+ * Falls back to demo data when API is unavailable.
  * Follows SENTINEL dark theme design patterns.
  */
 
@@ -54,13 +54,13 @@ import { PageLoading } from "../components/PageLoading";
 
 const DEMO_CONTRACT: Contract = {
   id: "demo-contract-001",
-  contract_code: "CON-SITE-002-2024",
+  contract_code: "CON-DEMO-2024",
   organization: {
-    code: "ORG-SITE-002",
-    name: "Site-002 Operations",
+    code: "ORG-DEMO",
+    name: "Demo Operations",
     tier: "enterprise",
     primary_contact_name: "Site Operations",
-    primary_contact_email: "ops@site-002.local",
+    primary_contact_email: "ops@demo.local",
     primary_contact_phone: "+27 11 555 0102",
   },
   contract: {

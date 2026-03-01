@@ -20,7 +20,7 @@ export function DiagnosticsControls({ onDiagnosticsStart }: DiagnosticsControlsP
 
   const targets = [
     { value: 'full_system', label: 'Full System' },
-    { value: 'building:site-002', label: 'Sandton Building' },
+    { value: 'building:primary', label: 'Primary Building' },
     { value: 'component:device_manager', label: 'Device Manager' },
     { value: 'component:api_health', label: 'API Health' },
   ];

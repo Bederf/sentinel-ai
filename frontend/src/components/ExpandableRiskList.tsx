@@ -47,7 +47,7 @@ export function ExpandableRiskList({
       const loadEquipment = async () => {
         setLoading(true);
         try {
-          // Map site ID to building ID (site-002 -> sandton)
+          // Use site ID directly as building ID
           const buildingId = siteId;
           const response = await api.getBuildingEquipment(buildingId);
 

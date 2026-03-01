@@ -118,7 +118,7 @@ export function RecommendationCard({
       setIsControlActive(controlActive ?? true);
       return;
     }
-    fetch('/api/modules/status/site-002')
+    fetch('/api/modules/status/' + (sessionStorage.getItem('sentinel_selected_site') || ''))
       .then(r => r.json())
       .then((modules: Array<{ module_type: string; status: string }>) => {
         const mod = modules.find((m) => m.module_type === controlModule);

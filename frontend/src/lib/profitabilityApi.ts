@@ -259,11 +259,11 @@ const demoLossLeaders: LossLeaderAnalysis[] = [
 ];
 
 const demoTrendsByContract: Record<string, ProfitabilityTrend[]> = {
-  "demo-site-002": [
-    { contract_id: "demo-site-002", period: "2025-11", revenue_zar: 285000, cost_zar: 170000, margin_zar: 115000, margin_pct: 40.4, trend: "stable" },
-    { contract_id: "demo-site-002", period: "2025-12", revenue_zar: 285000, cost_zar: 166000, margin_zar: 119000, margin_pct: 41.8, trend: "improving" },
-    { contract_id: "demo-site-002", period: "2026-01", revenue_zar: 285000, cost_zar: 167000, margin_zar: 118000, margin_pct: 41.4, trend: "stable" },
-    { contract_id: "demo-site-002", period: "2026-02", revenue_zar: 285000, cost_zar: 172000, margin_zar: 113000, margin_pct: 39.6, trend: "declining" },
+  "demo-contract-001": [
+    { contract_id: "demo-contract-001", period: "2025-11", revenue_zar: 285000, cost_zar: 170000, margin_zar: 115000, margin_pct: 40.4, trend: "stable" },
+    { contract_id: "demo-contract-001", period: "2025-12", revenue_zar: 285000, cost_zar: 166000, margin_zar: 119000, margin_pct: 41.8, trend: "improving" },
+    { contract_id: "demo-contract-001", period: "2026-01", revenue_zar: 285000, cost_zar: 167000, margin_zar: 118000, margin_pct: 41.4, trend: "stable" },
+    { contract_id: "demo-contract-001", period: "2026-02", revenue_zar: 285000, cost_zar: 172000, margin_zar: 113000, margin_pct: 39.6, trend: "declining" },
   ],
   "demo-uch-s004": [
     { contract_id: "demo-uch-s004", period: "2025-11", revenue_zar: 185000, cost_zar: 215000, margin_zar: -30000, margin_pct: -16.2, trend: "declining" },

@@ -312,7 +312,7 @@ export function MLMetrics() {
         }
         setSites(fetchedSites);
         if (fetchedSites.length > 0 && !selectedSiteId) {
-          // Default to site-002 if available, otherwise use first site
+          // Default to first available site
           setSelectedSiteId(fetchedSites[0].id);
         }
       })
