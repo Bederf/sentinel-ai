@@ -482,7 +482,7 @@ class PointDiscoveryService:
         # Tier 1: Try BACnet discovery first (if device_bacnet_id provided)
         if device_bacnet_id is not None:
             client = self._get_bacnet_client()
-            if not client.is_running:
+            if not client.is_running and not client._bac0_unavailable:
                 try:
                     logger.info("Auto-starting BACnet client for discovery...")
                     await client.start()

@@ -540,51 +540,11 @@ async def startup_event(app: FastAPI) -> None:
     else:
         _logger.info("Site 002 data source disabled — simulation engine inactive")
 
-    # Start system health snapshot job (runs every 5 minutes)
-    # Stores point-in-time health snapshots for trend analysis and historical reporting
-    from app.services.system_health_service import SystemHealthService
+    # System health snapshot job (every 5 minutes)
+    scheduler_service.add_health_snapshot_job(interval_seconds=300)
 
-    health_service = SystemHealthService()
-
-    async def store_health_snapshot():
-        """Store current health snapshot to database."""
-        try:
-            snapshot = await health_service.get_current_health()
-            await health_service.store_health_snapshot(snapshot)
-            _logger.debug("Health snapshot stored successfully")
-        except Exception as e:
-            _logger.error(f"Failed to store health snapshot: {e}")
-
-    # Wrap in try-except as add_job method may not be available
-    try:
-        scheduler_service.add_job(
-            store_health_snapshot,
-            interval_seconds=300,  # 5 minutes
-            job_name="system_health_snapshot",
-        )
-    except (AttributeError, TypeError) as e:
-        _logger.warning(f"Could not schedule health snapshot job: {e}")
-
-    # Start error auto-resolution job (runs daily)
-    # Auto-resolves errors if component is now healthy for 24+ hours
-    async def auto_resolve_errors():
-        """Auto-resolve errors if component is now healthy."""
-        try:
-            resolved_count = await health_service.auto_resolve_stale_errors()
-            if resolved_count > 0:
-                _logger.info(f"Auto-resolved {resolved_count} stale errors")
-        except Exception as e:
-            _logger.error(f"Failed to auto-resolve errors: {e}")
-
-    # Wrap in try-except as add_job method may not be available
-    try:
-        scheduler_service.add_job(
-            auto_resolve_errors,
-            interval_seconds=86400,  # 24 hours
-            job_name="system_error_auto_resolve",
-        )
-    except (AttributeError, TypeError) as e:
-        _logger.warning(f"Could not schedule error auto-resolve job: {e}")
+    # Error auto-resolution job (daily) - resolves errors if component healthy for 24+ hours
+    scheduler_service.add_error_auto_resolve_job(interval_seconds=86400)
 
     # BMS simulation service - DISABLED for demo stability
     # try:

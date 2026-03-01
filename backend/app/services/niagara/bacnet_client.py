@@ -256,6 +256,7 @@ class NiagaraBACnetClient:
         self._port = port
         self._bacnet = None
         self._started = False
+        self._bac0_unavailable = False
         self._subscriptions: Dict[str, COVSubscription] = {}
         self._point_cache: Dict[int, List[DiscoveredPoint]] = {}
 
@@ -274,7 +275,9 @@ class NiagaraBACnetClient:
             return
 
         if _BAC0 is None:
-            logger.error("BAC0 library not installed. Install with: pip install BAC0")
+            if not self._bac0_unavailable:
+                logger.info("BAC0 library not installed — BACnet client disabled. Install with: pip install BAC0")
+                self._bac0_unavailable = True
             raise BACnetException("BAC0 library not installed")
 
         try:

@@ -322,9 +322,9 @@ class InterlockRule(SafetyRule):
             metadata=data.get("metadata", {}),
             created_at=data.get("created_at", ""),
             updated_at=data.get("updated_at", ""),
-            trigger_device_id=data["trigger_device_id"],
-            trigger_point=data["trigger_point"],
-            trigger_value=data["trigger_value"],
+            trigger_device_id=data.get("trigger_device_id", ""),
+            trigger_point=data.get("trigger_point", ""),
+            trigger_value=data.get("trigger_value"),
             action=data.get("action", "disable"),
             action_value=data.get("action_value"),
         )

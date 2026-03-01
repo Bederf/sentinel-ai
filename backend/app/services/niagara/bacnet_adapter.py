@@ -131,6 +131,8 @@ class NiagaraBACnetAdapter(DeviceAdapter):
         """
         try:
             if not self._client.is_running:
+                if self._client._bac0_unavailable:
+                    return False
                 await self._client.start()
 
             # Verify device is reachable by reading its objectName
@@ -164,7 +166,10 @@ class NiagaraBACnetAdapter(DeviceAdapter):
                 return True
 
         except BACnetException as e:
-            logger.error("Failed to start BACnet client: %s", e)
+            # Only log if this is NOT the expected missing-library case
+            # (the client itself logs the missing-library message once)
+            if not self._client._bac0_unavailable:
+                logger.error("Failed to start BACnet client: %s", e)
             return False
 
     async def _protocol_disconnect(self) -> None:

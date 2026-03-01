@@ -2179,6 +2179,98 @@ class BackgroundSchedulerService:
                 len(result.get("errors", [])),
             )
 
+    # ── System Health jobs ──────────────────────────────────────────────
+
+    def add_health_snapshot_job(self, interval_seconds: int = 300):
+        """
+        Add a job to store system health snapshots periodically.
+
+        Args:
+            interval_seconds: How often to store snapshots (default: 300 = 5 minutes)
+        """
+        job_id = "system_health_snapshot"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing health snapshot job")
+
+        self.scheduler.add_job(
+            func=self._run_health_snapshot,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="System Health Snapshot",
+            replace_existing=True,
+        )
+        logger.info(f"Added health snapshot job with {interval_seconds}s interval")
+
+    def _run_health_snapshot(self):
+        """Sync wrapper for async health snapshot storage."""
+        try:
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._run_health_snapshot_async(),
+                    self._main_loop,
+                )
+                future.result(timeout=30)
+            else:
+                asyncio.run(self._run_health_snapshot_async())
+        except Exception as e:
+            logger.error(f"Failed to store health snapshot: {e}", exc_info=True)
+
+    async def _run_health_snapshot_async(self):
+        """Store current health snapshot to database."""
+        from app.services.system_health_service import SystemHealthService
+
+        health_service = SystemHealthService()
+        snapshot = await health_service.get_current_health()
+        await health_service.store_health_snapshot(snapshot)
+        logger.debug("Health snapshot stored successfully")
+
+    def add_error_auto_resolve_job(self, interval_seconds: int = 86400):
+        """
+        Add a job to auto-resolve stale errors if component is now healthy.
+
+        Runs daily to clean up errors where the component has been healthy for 24+ hours.
+
+        Args:
+            interval_seconds: How often to check for stale errors (default: 86400 = 24 hours)
+        """
+        job_id = "system_error_auto_resolve"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing error auto-resolve job")
+
+        self.scheduler.add_job(
+            func=self._run_error_auto_resolve,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="System Error Auto-Resolve",
+            replace_existing=True,
+        )
+        logger.info(f"Added error auto-resolve job with {interval_seconds}s interval")
+
+    def _run_error_auto_resolve(self):
+        """Sync wrapper for async error auto-resolution."""
+        try:
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._run_error_auto_resolve_async(),
+                    self._main_loop,
+                )
+                future.result(timeout=60)
+            else:
+                asyncio.run(self._run_error_auto_resolve_async())
+        except Exception as e:
+            logger.error(f"Failed to auto-resolve errors: {e}", exc_info=True)
+
+    async def _run_error_auto_resolve_async(self):
+        """Auto-resolve errors if component is now healthy for 24+ hours."""
+        from app.services.system_health_service import SystemHealthService
+
+        health_service = SystemHealthService()
+        resolved_count = await health_service.auto_resolve_stale_errors()
+        if resolved_count > 0:
+            logger.info(f"Auto-resolved {resolved_count} stale errors")
+
 
 # Global scheduler instance
 scheduler_service = BackgroundSchedulerService()

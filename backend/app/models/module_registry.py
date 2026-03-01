@@ -15,7 +15,7 @@ from enum import Enum
 
 
 class ModuleType(str, Enum):
-    """Available module types (27 total)."""
+    """Available module types (31 total)."""
 
     # Base Platform (7, always on)
     KPI = "kpi"
@@ -36,7 +36,7 @@ class ModuleType(str, Enum):
     SECURITY = "security"
     DIGITAL_TWIN = "digital_twin"
 
-    # Control Add-ons (7, toggleable per building system)
+    # Control Add-ons (8, toggleable per building system)
     HVAC_CONTROL = "hvac_control"
     ENERGY_CONTROL = "energy_control"
     LIGHTING_CONTROL = "lighting_control"
@@ -44,11 +44,15 @@ class ModuleType(str, Enum):
     WATER_CONTROL = "water_control"
     SECURITY_CONTROL = "security_control"
     DIGITAL_TWIN_CONTROL = "digital_twin_control"
+    CONTROL = "control"  # Generic control (gates all write operations)
 
-    # Standalone Add-ons (5, toggleable)
+    # Standalone Add-ons (8, toggleable)
     MAINTENANCE = "maintenance"
     FINANCIAL = "financial"
     COMPLIANCE = "compliance"
+    SUSTAINABILITY = "sustainability"
+    CONTRACTS = "contracts"  # FM contract management
+    ACCESS = "access"  # Building access control / badge readers
     SIMULATION = "simulation"
     FLEET_ML = "fleet_ml"
 
@@ -508,6 +512,60 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         integrates_with=[ModuleType.ENERGY, ModuleType.SOLAR, ModuleType.HVAC],
         telemetry_points=["carbon_emissions_kg", "energy_intensity"],
         ai_features=["emissions_forecasting", "reduction_recommendations"],
+    ),
+    ModuleType.SUSTAINABILITY: ModuleDefinition(
+        module_type=ModuleType.SUSTAINABILITY,
+        name="Sustainability & ESG",
+        version="1.0.0",
+        description="Carbon tracking, ESG reporting, and sustainability metrics",
+        capabilities=[
+            ModuleCapability("carbon_tracking", "Carbon Tracking", "Scope 1/2/3 emissions monitoring"),
+            ModuleCapability("esg_dashboard", "ESG Dashboard", "Environmental, social, governance metrics"),
+            ModuleCapability("sustainability_metrics", "Sustainability Metrics", "Daily sustainability KPI collection"),
+        ],
+        integrates_with=[ModuleType.ENERGY, ModuleType.SOLAR, ModuleType.COMPLIANCE],
+        telemetry_points=["carbon_emissions_kg", "energy_intensity", "water_intensity"],
+        ai_features=["emissions_forecasting", "sustainability_scoring"],
+    ),
+    ModuleType.CONTRACTS: ModuleDefinition(
+        module_type=ModuleType.CONTRACTS,
+        name="FM Contracts",
+        version="1.0.0",
+        description="Facility management contract tracking and SLA monitoring",
+        capabilities=[
+            ModuleCapability("contract_tracking", "Contract Tracking", "FM service contract lifecycle management"),
+            ModuleCapability("sla_monitoring", "SLA Monitoring", "Service level agreement compliance tracking"),
+        ],
+        integrates_with=[ModuleType.MAINTENANCE, ModuleType.FINANCIAL],
+        telemetry_points=[],
+        ai_features=["sla_breach_prediction"],
+    ),
+    ModuleType.ACCESS: ModuleDefinition(
+        module_type=ModuleType.ACCESS,
+        name="Access Control",
+        version="1.0.0",
+        description="Building access control, badge readers, and occupancy from access events",
+        capabilities=[
+            ModuleCapability("badge_readers", "Badge Readers", "Access event ingestion from badge/card readers"),
+            ModuleCapability(
+                "occupancy_from_access", "Occupancy from Access", "Zone occupancy derived from access events"
+            ),
+        ],
+        integrates_with=[ModuleType.SECURITY, ModuleType.LIGHTING],
+        telemetry_points=["access_events", "zone_occupancy_count"],
+        ai_features=["occupancy_prediction"],
+    ),
+    ModuleType.CONTROL: ModuleDefinition(
+        module_type=ModuleType.CONTROL,
+        name="Generic Control",
+        version="1.0.0",
+        description="Master control gate for all write operations across building systems",
+        capabilities=[
+            ModuleCapability("write_gate", "Write Gate", "Gates all device write operations"),
+        ],
+        integrates_with=[ModuleType.HVAC_CONTROL, ModuleType.ENERGY_CONTROL, ModuleType.LIGHTING_CONTROL],
+        telemetry_points=[],
+        ai_features=[],
     ),
     ModuleType.SIMULATION: ModuleDefinition(
         module_type=ModuleType.SIMULATION,
