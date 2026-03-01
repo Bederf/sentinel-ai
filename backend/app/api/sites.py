@@ -421,7 +421,9 @@ def get_sites_from_supabase(
         repo = BuildingRepository()
 
         # Filter by user access if auth context provided
-        if user_email and user_role:
+        # Demo-mode users get full access (no user_building_access grants exist for them)
+        is_demo = user_email and user_email.startswith("demo@")
+        if user_email and user_role and not is_demo:
             buildings = repo.get_all_for_user(
                 user_email=user_email, user_role=user_role, region=region, site_type=site_type
             )
