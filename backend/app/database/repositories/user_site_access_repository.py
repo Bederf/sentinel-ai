@@ -300,34 +300,45 @@ class UserSiteAccessRepository:
 
     def grant_default_access(self, user_email: str, granted_by: str = "system") -> bool:
         """
-        Grant default building access to a new user (site-002 Sandton City).
+        Grant building access to a new user for ALL registered sites.
 
         Called when a new user logs in for the first time.
+        Queries registered buildings dynamically — no hardcoded site IDs.
 
         Args:
             user_email: User's email address
             granted_by: Who granted the access (default: 'system')
 
         Returns:
-            True if access was granted
+            True if access was granted to at least one building
         """
         if not self.client:
             logger.warning("Supabase client not available")
             return False
 
         try:
-            # Get default building (site-002)
-            building_result = self.client.table("buildings").select("id").eq("code", "site-002").execute()
+            from app.core.site_resolver import get_registered_sites
 
-            if not building_result.data:
-                logger.warning("Default building site-002 not found")
+            sites = get_registered_sites()
+
+            if not sites:
+                logger.info("No registered buildings — skipping default access grant for %s", user_email)
                 return False
 
-            building_id = building_result.data[0]["id"]
+            granted_any = False
+            for site in sites:
+                building_id = site.get("id")
+                if not building_id:
+                    continue
+                result = self.grant_access(user_email, building_id, granted_by)
+                if result is not None:
+                    granted_any = True
 
-            # Grant access
-            result = self.grant_access(user_email, building_id, granted_by)
-            return result is not None
+            if granted_any:
+                site_codes = [s.get("code", "?") for s in sites]
+                logger.info("Granted %s default access to %d building(s): %s", user_email, len(sites), site_codes)
+
+            return granted_any
 
         except Exception as e:
             logger.error(f"Error granting default access to {user_email}: {e}")

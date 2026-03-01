@@ -217,13 +217,20 @@ async def startup_event(app: FastAPI) -> None:
     # Updates last_sync_at on all active log sources so System Health dashboard stays fresh
     scheduler_service.add_integration_sync_job(interval_seconds=900)  # 15 minutes
 
-    # Site-002 deterministic mode policy dry-run (runs every 5 minutes)
+    # Deterministic mode policy dry-run (runs every 5 minutes per site)
     # Observability only: evaluates stage thresholds and logs would-promote/demote actions
-    try:
-        scheduler_service.add_site_mode_policy_dry_run_job(interval_seconds=300, site_id="site-002")
-        _logger.info("✅ Site mode policy dry-run initialized for site-002")
-    except Exception as e:
-        _logger.warning(f"⚠️ Site mode policy dry-run initialization failed: {e}")
+    from app.core.site_resolver import get_registered_site_ids as _get_site_ids
+
+    _policy_site_ids = _get_site_ids()
+    if _policy_site_ids:
+        for _site_id in _policy_site_ids:
+            try:
+                scheduler_service.add_site_mode_policy_dry_run_job(interval_seconds=300, site_id=_site_id)
+                _logger.info("Site mode policy dry-run initialized for %s", _site_id)
+            except Exception as e:
+                _logger.warning(f"Site mode policy dry-run initialization failed for {_site_id}: {e}")
+    else:
+        _logger.info("No registered buildings — skipping site mode policy dry-run")
 
     # Start demand-aware coordinator (runs every 5 minutes)
     # Phase 081: Cross-module peak demand management
@@ -328,57 +335,68 @@ async def startup_event(app: FastAPI) -> None:
         _logger.warning(f"⚠️ Base module auto-seed failed: {e}")
 
     # AEGIS Phase 0 — dispatch cycle (5 min) + daily evidence collector (24h)
-    # Gated by solar module being active (AEGIS is the Solar/BESS dispatch optimizer)
-    _aegis_enabled = False
-    try:
-        from app.services.module_registry_service import ModuleRegistryService
-
-        _registry = ModuleRegistryService()
-        _aegis_enabled = _registry.is_module_active("site-002", "solar")
-    except Exception:
-        # Fallback: check JSON directly
+    # Gated by solar module being active per site (AEGIS is the Solar/BESS dispatch optimizer)
+    _aegis_site_ids = _get_site_ids()
+    _aegis_any_started = False
+    for _site_id in _aegis_site_ids:
+        _aegis_enabled = False
         try:
-            import json as _json
-            from pathlib import Path as _Path
+            from app.services.module_registry_service import ModuleRegistryService
 
-            _mods_path = _Path(settings.data_dir) / "modules" / "site_modules.json"
-            if _mods_path.exists():
-                _mods_data = _json.loads(_mods_path.read_text())
-                _aegis_enabled = any(
-                    m.get("module_type") == "solar" and m.get("status") == "active"
-                    for m in _mods_data.get("site-002", {}).get("active_modules", [])
-                )
+            _registry = ModuleRegistryService()
+            _aegis_enabled = _registry.is_module_active(_site_id, "solar")
         except Exception:
-            pass
+            # Fallback: check JSON directly
+            try:
+                import json as _json
+                from pathlib import Path as _Path
 
-    if _aegis_enabled:
-        try:
-            scheduler_service.add_aegis_cycle_job(interval_seconds=300, site_id="site-002")
-            _logger.info("✅ AEGIS dispatch cycle job initialized (5 min interval)")
-        except Exception as e:
-            _logger.warning(f"⚠️ AEGIS cycle job initialization failed: {e}")
+                _mods_path = _Path(settings.data_dir) / "modules" / "site_modules.json"
+                if _mods_path.exists():
+                    _mods_data = _json.loads(_mods_path.read_text())
+                    _aegis_enabled = any(
+                        m.get("module_type") == "solar" and m.get("status") == "active"
+                        for m in _mods_data.get(_site_id, {}).get("active_modules", [])
+                    )
+            except Exception:
+                pass
 
-        try:
-            scheduler_service.add_aegis_evidence_collector_job(interval_seconds=86400, site_id="site-002")
-            _logger.info("✅ AEGIS evidence collector job initialized (24h interval)")
-        except Exception as e:
-            _logger.warning(f"⚠️ AEGIS evidence collector job initialization failed: {e}")
-    else:
-        _logger.info("⏸️ AEGIS dispatch cycle SKIPPED — solar module not active for site-002")
+        if _aegis_enabled:
+            try:
+                scheduler_service.add_aegis_cycle_job(interval_seconds=300, site_id=_site_id)
+                _logger.info("AEGIS dispatch cycle job initialized for %s (5 min interval)", _site_id)
+            except Exception as e:
+                _logger.warning(f"AEGIS cycle job initialization failed for {_site_id}: {e}")
+
+            try:
+                scheduler_service.add_aegis_evidence_collector_job(interval_seconds=86400, site_id=_site_id)
+                _logger.info("AEGIS evidence collector job initialized for %s (24h interval)", _site_id)
+            except Exception as e:
+                _logger.warning(f"AEGIS evidence collector job initialization failed for {_site_id}: {e}")
+            _aegis_any_started = True
+
+    if not _aegis_any_started:
+        _logger.info("AEGIS dispatch cycle SKIPPED — no sites with active solar module")
 
     # Phase 130: Occupancy-driven HVAC + lighting control loop
     if settings.occupancy_poll_enabled:
-        try:
-            scheduler_service.add_occupancy_control_job(
-                interval_seconds=settings.occupancy_poll_interval_seconds,
-                site_id="site-002",
-            )
-            _logger.info(
-                "✅ Occupancy control loop initialized (%ds interval)",
-                settings.occupancy_poll_interval_seconds,
-            )
-        except Exception as e:
-            _logger.warning(f"⚠️ Occupancy control loop initialization failed: {e}")
+        _occ_site_ids = _get_site_ids()
+        if _occ_site_ids:
+            for _site_id in _occ_site_ids:
+                try:
+                    scheduler_service.add_occupancy_control_job(
+                        interval_seconds=settings.occupancy_poll_interval_seconds,
+                        site_id=_site_id,
+                    )
+                    _logger.info(
+                        "Occupancy control loop initialized for %s (%ds interval)",
+                        _site_id,
+                        settings.occupancy_poll_interval_seconds,
+                    )
+                except Exception as e:
+                    _logger.warning(f"Occupancy control loop initialization failed for {_site_id}: {e}")
+        else:
+            _logger.info("No registered buildings — skipping occupancy control loop")
 
     # Phase 131: Email intake pipeline status
     if settings.email_intake_enabled:
@@ -391,47 +409,50 @@ async def startup_event(app: FastAPI) -> None:
     async def recover_crashed_simulations():
         """
         Recover simulations that were running when server crashed/restarted.
-        Only the newest task with a valid checkpoint is re-queued.
+        Only the newest task with a valid checkpoint is re-queued per site.
         All other crashed tasks are marked stopped.
         """
         try:
             from app.services.simulation_store import get_simulation_store
 
-            store = get_simulation_store("site-002")
-            all_tasks = store.get_all_tasks()
+            for _sim_site_id in _get_site_ids():
+                store = get_simulation_store(_sim_site_id)
+                all_tasks = store.get_all_tasks()
 
-            # Find tasks with status='running' (crashed)
-            crashed = [(tid, tdata) for tid, tdata in all_tasks.items() if tdata.get("status") == "running"]
+                # Find tasks with status='running' (crashed)
+                crashed = [(tid, tdata) for tid, tdata in all_tasks.items() if tdata.get("status") == "running"]
 
-            if not crashed:
-                _logger.info("No crashed simulations to recover")
-                return
+                if not crashed:
+                    continue
 
-            _logger.info(f"Found {len(crashed)} crashed simulation(s) to recover...")
+                _logger.info("Found %d crashed simulation(s) to recover for %s", len(crashed), _sim_site_id)
 
-            # Sort by created_at descending — newest first
-            crashed.sort(key=lambda x: x[1].get("created_at", ""), reverse=True)
+                # Sort by created_at descending — newest first
+                crashed.sort(key=lambda x: x[1].get("created_at", ""), reverse=True)
 
-            resumed_one = False
-            for task_id, task in crashed:
-                state_snapshot = task.get("state_snapshot")
+                resumed_one = False
+                for task_id, task in crashed:
+                    state_snapshot = task.get("state_snapshot")
 
-                if not resumed_one and state_snapshot:
-                    # Resume the newest task that has a checkpoint
-                    try:
-                        store.update_task_progress(task_id, {"status": "queued", "error_message": None})
-                        days_simulated = state_snapshot.get("days_simulated", 0)
-                        simulated_time = state_snapshot.get("simulated_time", "unknown")
-                        _logger.info(
-                            f"Queued recovery for task {task_id}: day {days_simulated}/365, time {simulated_time}"
-                        )
-                        resumed_one = True
-                    except Exception as e:
-                        _logger.error(f"Failed to queue recovery for task {task_id}: {e}")
-                else:
-                    # Mark all others as stopped
-                    store.update_task_progress(task_id, {"status": "stopped"})
-                    _logger.info(f"Marked stale task {task_id} as stopped")
+                    if not resumed_one and state_snapshot:
+                        # Resume the newest task that has a checkpoint
+                        try:
+                            store.update_task_progress(task_id, {"status": "queued", "error_message": None})
+                            days_simulated = state_snapshot.get("days_simulated", 0)
+                            simulated_time = state_snapshot.get("simulated_time", "unknown")
+                            _logger.info(
+                                f"Queued recovery for task {task_id}: day {days_simulated}/365, time {simulated_time}"
+                            )
+                            resumed_one = True
+                        except Exception as e:
+                            _logger.error(f"Failed to queue recovery for task {task_id}: {e}")
+                    else:
+                        # Mark all others as stopped
+                        store.update_task_progress(task_id, {"status": "stopped"})
+                        _logger.info(f"Marked stale task {task_id} as stopped")
+
+            if not _get_site_ids():
+                _logger.info("No registered buildings — skipping crash recovery")
 
         except Exception as e:
             _logger.error(f"Crash recovery initialization failed: {e}")
@@ -447,37 +468,43 @@ async def startup_event(app: FastAPI) -> None:
             from datetime import datetime, timedelta
             from app.services.simulation_store import get_simulation_store
 
-            store = get_simulation_store("site-002")
-            all_tasks = store.get_all_tasks()
-            cutoff_time = (datetime.utcnow() - timedelta(seconds=5)).isoformat()
+            for _sim_site_id in _get_site_ids():
+                store = get_simulation_store(_sim_site_id)
+                all_tasks = store.get_all_tasks()
+                cutoff_time = (datetime.utcnow() - timedelta(seconds=5)).isoformat()
 
-            stopped_count = 0
-            deactivated_count = 0
+                stopped_count = 0
+                deactivated_count = 0
 
-            for task_id, task_data in all_tasks.items():
-                status = task_data.get("status")
+                for task_id, task_data in all_tasks.items():
+                    status = task_data.get("status")
 
-                if status == "running":
-                    store.update_task_progress(task_id, {"status": "stopped"})
-                    stopped_count += 1
+                    if status == "running":
+                        store.update_task_progress(task_id, {"status": "stopped"})
+                        stopped_count += 1
 
-                elif status == "queued":
-                    created_at = task_data.get("created_at", "")
-                    if created_at < cutoff_time:
-                        store.update_task_progress(task_id, {"status": "inactive"})
-                        deactivated_count += 1
+                    elif status == "queued":
+                        created_at = task_data.get("created_at", "")
+                        if created_at < cutoff_time:
+                            store.update_task_progress(task_id, {"status": "inactive"})
+                            deactivated_count += 1
 
-            if stopped_count:
-                _logger.info(f"Stopped {stopped_count} running simulation(s)")
-            if deactivated_count:
-                _logger.info(f"Deactivated {deactivated_count} queued simulation(s) from before startup")
-            if not stopped_count and not deactivated_count:
-                _logger.info("No active simulations to deactivate")
+                if stopped_count:
+                    _logger.info("Stopped %d running simulation(s) for %s", stopped_count, _sim_site_id)
+                if deactivated_count:
+                    _logger.info(
+                        "Deactivated %d queued simulation(s) from before startup for %s",
+                        deactivated_count,
+                        _sim_site_id,
+                    )
+
+            if not _get_site_ids():
+                _logger.info("No registered buildings — skipping simulation deactivation")
 
         except Exception as e:
             _logger.error(f"Failed to deactivate simulations on startup: {e}")
 
-    # === Site-002 Simulation Engine (gated by ENABLE_SITE002_SOURCE) ===
+    # === Simulation Engine (gated by ENABLE_SITE002_SOURCE) ===
     if settings.site002_source_enabled:
         # Run crash recovery on startup (replaces old deactivate_all_simulations)
         # Re-queues simulations that have valid checkpoints, fails those without
@@ -500,46 +527,53 @@ async def startup_event(app: FastAPI) -> None:
         except Exception as e:
             _logger.error(f"Simulation queue processor initialization failed: {e}", exc_info=True)
 
-        # Auto-start sentinel_annual simulation for site-002 if none is active
+        # Auto-start sentinel_annual simulation for each registered site if none is active
         async def auto_start_sentinel_simulation():
-            """Auto-queue sentinel_annual for site-002 if no active simulation exists."""
+            """Auto-queue sentinel_annual for registered sites if no active simulation exists."""
             try:
                 import uuid
                 from datetime import datetime
 
                 from app.services.simulation_store import get_simulation_store
 
-                store = get_simulation_store("site-002")
-                all_tasks = store.get_all_tasks()
-
-                # Check for any active simulation (running or queued)
-                active = any(
-                    t.get("status") in ("running", "queued") and t.get("simulation_type", "lifecycle") == "lifecycle"
-                    for t in all_tasks.values()
-                )
-
-                if active:
-                    _logger.info("Active simulation already exists, skipping auto-start")
+                _sim_site_ids = _get_site_ids()
+                if not _sim_site_ids:
+                    _logger.info("No registered buildings — skipping simulation auto-start")
                     return
 
-                # Queue sentinel_annual for site-002
-                task_id = str(uuid.uuid4())
-                store.update_task_progress(
-                    task_id,
-                    {
-                        "task_id": task_id,
-                        "site_id": "site-002",
-                        "scenario": "sentinel_annual",
-                        "simulation_type": "lifecycle",
-                        "status": "queued",
-                        "progress_pct": 0,
-                        "days_completed": 0,
-                        "duration_minutes": 3650.0,
-                        "created_at": datetime.utcnow().isoformat() + "Z",
-                    },
-                )
+                for _sim_site_id in _sim_site_ids:
+                    store = get_simulation_store(_sim_site_id)
+                    all_tasks = store.get_all_tasks()
 
-                _logger.info(f"Auto-queued sentinel_annual simulation: {task_id}")
+                    # Check for any active simulation (running or queued)
+                    active = any(
+                        t.get("status") in ("running", "queued")
+                        and t.get("simulation_type", "lifecycle") == "lifecycle"
+                        for t in all_tasks.values()
+                    )
+
+                    if active:
+                        _logger.info("Active simulation already exists for %s, skipping auto-start", _sim_site_id)
+                        continue
+
+                    # Queue sentinel_annual for this site
+                    task_id = str(uuid.uuid4())
+                    store.update_task_progress(
+                        task_id,
+                        {
+                            "task_id": task_id,
+                            "site_id": _sim_site_id,
+                            "scenario": "sentinel_annual",
+                            "simulation_type": "lifecycle",
+                            "status": "queued",
+                            "progress_pct": 0,
+                            "days_completed": 0,
+                            "duration_minutes": 3650.0,
+                            "created_at": datetime.utcnow().isoformat() + "Z",
+                        },
+                    )
+
+                    _logger.info("Auto-queued sentinel_annual simulation for %s: %s", _sim_site_id, task_id)
             except Exception as e:
                 _logger.error(f"Failed to auto-start sentinel_annual simulation: {e}")
 
