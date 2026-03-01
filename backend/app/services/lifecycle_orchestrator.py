@@ -2180,6 +2180,35 @@ class LifecycleOrchestrator:
                 )
                 recommendations_created = sentinel_recs
                 hvac_recs = [r.get("equipment", "") for r in sentinel_recs]
+                # Persist sentinel recommendations so frontend can display them
+                # Site 002 is in supervised mode — requires human approval
+                for s_rec in sentinel_recs:
+                    try:
+                        rec = Recommendation(
+                            site_id=self.site_prefix,
+                            timestamp=datetime.utcnow(),
+                            action_type="ai_optimization",
+                            risk_level=ActionRiskLevel.LOW,
+                            target_equipment=s_rec.get("equipment", ""),
+                            action={
+                                "point": s_rec.get("control_point", ""),
+                                "value": s_rec.get("target_value"),
+                            },
+                            reason=s_rec.get("reason", ""),
+                            expected_impact={
+                                "description": s_rec.get("reason", ""),
+                                "energy_savings_percent": s_rec.get("energy_savings_percent", 5),
+                                "source": s_rec.get("source", "sentinel"),
+                                "quality_gate": s_rec.get("quality_gate_status"),
+                            },
+                            confidence=str(s_rec.get("confidence", 0.75)),
+                            profile=context,
+                            status=RecommendationStatus.PENDING,
+                            requires_approval=True,
+                        )
+                        await self.recommendation_repo.create(rec)
+                    except Exception as e:
+                        logger.warning(f"Failed to persist sentinel recommendation: {e}")
             elif self._optimization_mode == "hybrid":
                 sentinel_recs = await self._sentinel_optimization(
                     controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
