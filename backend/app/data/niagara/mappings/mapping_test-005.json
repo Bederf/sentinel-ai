@@ -1,7 +1,7 @@
 {
   "discovery_id": "test-005",
   "site_id": "site-002",
-  "created_at": "2026-02-27T15:09:10.111341",
+  "created_at": "2026-02-28T15:03:21.637221",
   "equipment_count": 3,
   "total_points": 6,
   "equipment": {
@@ -64,7 +64,7 @@
           "building_id": "site-002"
         }
       },
-      "created_at": "2026-02-27T15:09:10.111048",
+      "created_at": "2026-02-28T15:03:21.636950",
       "approved": false,
       "approved_at": null,
       "approved_by": null
@@ -116,7 +116,7 @@
           "building_id": "site-002"
         }
       },
-      "created_at": "2026-02-27T15:09:10.111202",
+      "created_at": "2026-02-28T15:03:21.637074",
       "approved": false,
       "approved_at": null,
       "approved_by": null
@@ -146,7 +146,7 @@
         "type_vote_counts": {},
         "avg_confidence_score": 0.0
       },
-      "created_at": "2026-02-27T15:09:10.111230",
+      "created_at": "2026-02-28T15:03:21.637094",
       "approved": false,
       "approved_at": null,
       "approved_by": null

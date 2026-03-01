@@ -1920,6 +1920,56 @@
       "max_retries": 3,
       "created_at": "2026-02-28T08:24:07.215304",
       "updated_at": "2026-02-28T08:24:07.215306"
+    },
+    {
+      "id": "fa15432d-ee39-45b7-b43f-b603d17b5ad8",
+      "work_order_id": null,
+      "technician_id": "00000000-0000-0000-0000-000000000001",
+      "notification_type": "alert",
+      "title": "WARNING ALERT - S002-AHU-L2-001",
+      "body": "\u26a0\ufe0f WARNING ALERT - Sandton City Office Tower\n\n\ud83c\udfe2 Zone: Plant Room\n\ud83d\udd27 Equipment: Air Handling Unit\n\ud83d\udccb Type: AHU\n\ud83c\udd94 Code: S002-AHU-L2-001\n\n\ud83d\udcdd Fault detected on S002-AHU-L2-001: Temperature deviation\n\n\u23f0 Time: 12:10:47\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n/info_S002_AHU_L2_001 - More info\n/reset_S002_AHU_L2_001 - Remote reset\n/inspect_S002_AHU_L2_001 - Send technician\n/WO_S002_AHU_L2_001 - Create work order\n/note_S002_AHU_L2_001 - Add note",
+      "channel_type": "telegram",
+      "recipient_identifier": "8359288792",
+      "status": "sent",
+      "error_message": null,
+      "error_code": null,
+      "external_message_id": null,
+      "sent_at": "2026-02-28T10:10:53.910072",
+      "delivered_at": null,
+      "provider": "sentry",
+      "provider_response": {
+        "stdout": "[telegram] autoSelectFamily=true (default-node22)\n[telegram] global undici dispatcher autoSelectFamily=true\n[telegram] dnsResultOrder=ipv4first (default-node22)\n\u2705 Sent via Telegram. Message ID: 833\n"
+      },
+      "retry_count": 0,
+      "last_retry_at": null,
+      "max_retries": 3,
+      "created_at": "2026-02-28T10:10:53.910185",
+      "updated_at": "2026-02-28T10:10:53.910192"
+    },
+    {
+      "id": "e6af0a43-ddd8-4c45-88c3-a3dcbcf5c27c",
+      "work_order_id": null,
+      "technician_id": "00000000-0000-0000-0000-000000000001",
+      "notification_type": "alert",
+      "title": "WARNING ALERT - S002-FCU-104",
+      "body": "\u26a0\ufe0f WARNING ALERT - Sandton City Office Tower\n\n\ud83c\udfe2 Zone: L1 West (Zone-104)\n\ud83d\udd27 Equipment: L1 West FCU\n\ud83d\udccb Type: FCU\n\ud83c\udd94 Code: S002-FCU-104\n\n\ud83d\udcdd Fault detected on S002-FCU-104: Filter differential high\n\n\u23f0 Time: 12:14:23\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n/info_S002_FCU_104 - More info\n/reset_S002_FCU_104 - Remote reset\n/inspect_S002_FCU_104 - Send technician\n/WO_S002_FCU_104 - Create work order\n/note_S002_FCU_104 - Add note",
+      "channel_type": "telegram",
+      "recipient_identifier": "8359288792",
+      "status": "sent",
+      "error_message": null,
+      "error_code": null,
+      "external_message_id": null,
+      "sent_at": "2026-02-28T10:14:30.049345",
+      "delivered_at": null,
+      "provider": "sentry",
+      "provider_response": {
+        "stdout": "[telegram] autoSelectFamily=true (default-node22)\n[telegram] global undici dispatcher autoSelectFamily=true\n[telegram] dnsResultOrder=ipv4first (default-node22)\n\u2705 Sent via Telegram. Message ID: 834\n"
+      },
+      "retry_count": 0,
+      "last_retry_at": null,
+      "max_retries": 3,
+      "created_at": "2026-02-28T10:14:30.049427",
+      "updated_at": "2026-02-28T10:14:30.049428"
     }
   ]
 }
