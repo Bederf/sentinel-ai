@@ -26,6 +26,7 @@ from app.api import security_health
 from app.api import servicenow
 from app.api import event_bus_monitor
 from app.api import n8n
+from app.api import notification_router
 
 
 def register_operations_routers(app: FastAPI) -> None:
@@ -132,3 +133,6 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # n8n workflow automation (Phase 140)
     app.include_router(n8n.router, tags=["n8n"])
+
+    # Sentry notification router — importance-based delivery (Phase 140)
+    app.include_router(notification_router.router, tags=["notification-router"])

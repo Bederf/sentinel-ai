@@ -172,6 +172,16 @@ async def startup_event(app: FastAPI) -> None:
 
     register_n8n_subscribers()
 
+    # Sentry notification router — importance-based delivery (Phase 140)
+    from app.services.sentry_event_subscriber import register_sentry_subscribers
+
+    register_sentry_subscribers()
+
+    # Background notification tasks (escalation checker, digest scheduler)
+    from app.services.notification_tasks import start_notification_tasks
+
+    await start_notification_tasks()
+
     # Capture the main event loop for cross-thread scheduling (simulation tasks)
     scheduler_service.set_main_loop(asyncio.get_event_loop())
 
@@ -635,6 +645,11 @@ async def shutdown_event(app: FastAPI) -> None:
                     _logger.error(f"Failed to save checkpoint for {task_id}: {cp_err}")
     except Exception as e:
         _logger.error(f"Error saving simulation checkpoints on shutdown: {e}")
+
+    # Notification tasks cleanup (Phase 140)
+    from app.services.notification_tasks import stop_notification_tasks
+
+    await stop_notification_tasks()
 
     # n8n client cleanup (Phase 140)
     from app.services.n8n_service import shutdown_n8n_service

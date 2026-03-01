@@ -7,8 +7,7 @@ with detailed TODO markers showing exactly where to wire real services.
 
 Subscriber list:
 1. audit_log_all_events       — logs every event for compliance
-2. route_high_importance_to_sentry — immediate push for HIGH/CRITICAL
-3. collect_medium_for_digest  — batches MEDIUM events for daily digest
+2-3. REMOVED — replaced by sentry_notification_router.py (Phase 140)
 4. trigger_ai_diagnosis       — AI diagnosis on anomaly detection
 5. auto_create_work_order     — creates WO on completed diagnosis
 6. watch_for_acknowledgement  — escalation watcher for unacked notifications
@@ -62,78 +61,11 @@ def register_default_subscribers() -> None:
         )
 
     # ------------------------------------------------------------------
-    # 2. Sentry Push Router — immediate push for HIGH/CRITICAL events
+    # 2-3. Sentry Push & Digest — REPLACED by sentry_notification_router.py
+    #      (Phase 140). The SentryNotificationRouter handles both push and
+    #      digest routing via a single '*' subscriber with importance-based
+    #      delivery decisions, escalation tracking, and scheduled digests.
     # ------------------------------------------------------------------
-    @bus.on("*", min_importance=Importance.HIGH)
-    async def route_high_importance_to_sentry(event: SentinelEvent) -> None:
-        """Push HIGH/CRITICAL events to Sentry bot for immediate notification.
-
-        Creates a chain event ``sentry.notification_sent`` appended directly
-        to the bus history (not emitted) to avoid infinite recursion.
-
-        TODO: Wire to Sentry bot WhatsApp/Telegram push:
-                  from app.services.sentry_notification_service import sentry_notification_service
-                  await sentry_notification_service.push_alert(
-                      message=f"[{event.importance.name}] {event.event_type}: {event.payload}",
-                      site_id=event.site_id,
-                      equipment_id=event.equipment_id,
-                      priority="urgent" if event.importance >= Importance.CRITICAL else "high",
-                  )
-        """
-        logger.warning(
-            "SENTRY PUSH | %s | importance=%s | site=%s | equip=%s",
-            event.event_type,
-            event.importance.name,
-            event.site_id or "-",
-            event.equipment_id or "-",
-        )
-
-        # Create chain event for escalation tracking (append directly to
-        # avoid recursion — do NOT call bus.emit() here).
-        chain_event = event.chain(
-            event_type="sentry.notification_sent",
-            source="event_subscribers.route_high_importance_to_sentry",
-            payload={
-                "original_event_type": event.event_type,
-                "original_importance": event.importance.name,
-                "channel": "logging_stub",  # TODO: change to "telegram" / "whatsapp"
-                "acknowledged": False,
-            },
-        )
-        # Append directly to history for the escalation watcher to see
-        bus._history.append(chain_event)
-
-    # ------------------------------------------------------------------
-    # 3. Sentry Digest Collector — batches MEDIUM events for daily digest
-    # ------------------------------------------------------------------
-    @bus.on("*", min_importance=Importance.MEDIUM)
-    async def collect_medium_for_digest(event: SentinelEvent) -> None:
-        """Collect MEDIUM-importance events for the daily digest.
-
-        Only collects MEDIUM events. HIGH and CRITICAL are handled by the
-        push router (subscriber 2) and should NOT appear in the digest.
-
-        TODO: Wire to digest service:
-                  from app.services.digest_service import digest_service
-                  if event.importance == Importance.MEDIUM:
-                      await digest_service.add_to_digest(
-                          event_type=event.event_type,
-                          summary=str(event.payload),
-                          site_id=event.site_id,
-                          equipment_id=event.equipment_id,
-                          timestamp=event.timestamp,
-                      )
-        """
-        # Only collect MEDIUM — HIGH/CRITICAL are pushed immediately
-        if event.importance != Importance.MEDIUM:
-            return
-
-        logger.info(
-            "DIGEST COLLECT | %s | site=%s | equip=%s",
-            event.event_type,
-            event.site_id or "-",
-            event.equipment_id or "-",
-        )
 
     # ------------------------------------------------------------------
     # 4. AI Diagnosis Trigger — triggers AI diagnosis on anomaly detection
