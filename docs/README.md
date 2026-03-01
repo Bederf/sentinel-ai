@@ -37,6 +37,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Background ML Model Retraining](02-architecture/background-ml-retraining.md) - Automated background training, APScheduler integration, production deployment (Phase 45-01)
 - **[ML Data Architecture](02-architecture/ML-DATA-ARCHITECTURE.md)** - Building Operations ML, Equipment Condition ML, Unified AI Recommendation Engine, feature engineering, inspection priority scoring (Phase 132)
 - **[Event Bus Architecture](02-architecture/event-bus-architecture.md)** - Async pub/sub event bus with importance scoring, middleware pipeline, event chaining, 7 default subscribers (Phase 139)
+- **[Site Resolver & Multi-Site Architecture](02-architecture/site-resolver.md)** - Centralized building resolution, dynamic site discovery, no hardcoded site IDs, fresh instance support (Phase 143)
 
 ### 📚 API Reference
 - **[Energy Consumption API](03-api-reference/energy-consumption.md)** - Water, power validation, cost validation, AI recommendation endpoints (Phase A, v14.0)
