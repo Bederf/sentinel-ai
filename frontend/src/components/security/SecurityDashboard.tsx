@@ -29,6 +29,7 @@ import {
 } from "@tremor/react";
 import {
   Shield,
+  ShieldCheck,
   Users,
   Camera,
   TrendingUp,
@@ -45,6 +46,7 @@ import {
   Thermometer,
   RefreshCw,
 } from "lucide-react";
+import { SentinelValueCard } from "../SentinelValueCard";
 import { securityApi } from "@/lib/api";
 import type { SecurityOccupancy } from "@/lib/api";
 import { AccessEventsPanel } from "../AccessEventsPanel";
@@ -229,6 +231,17 @@ export function SecurityDashboard({ siteId = "site-002" }: SecurityDashboardProp
     // ===== Tab 1: Overview =====
     <TabPanel key="overview">
       <div className="space-y-4 mt-4">
+        {/* SENTINEL Value Card */}
+        <SentinelValueCard
+          title="Security Intelligence Impact"
+          icon={ShieldCheck}
+          baseline={{ label: "", value: 0, unit: "incidents" }}
+          sentinel={{ label: "", value: 0, unit: "incidents" }}
+          savingsPercent={0}
+          period="Monthly"
+          collecting
+        />
+
         {/* KPI Cards */}
         <Grid className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card decoration="top" decorationColor="blue">

@@ -21,6 +21,7 @@ import {
   type WorkflowState,
   type Site,
 } from '@/lib/api';
+import { useModules } from '@/contexts/ModuleHooks';
 import { PageLoading } from "./PageLoading";
 import { BuildingSelector } from "./BuildingSelector";
 
@@ -64,6 +65,8 @@ function getStateIcon(state: string) {
 }
 
 export function AssetWorkflowDashboard() {
+  const { isModuleActive } = useModules();
+  const maintenanceActive = isModuleActive('maintenance');
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [workflowStates, setWorkflowStates] = useState<Record<string, WorkflowState>>({});
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
@@ -384,6 +387,7 @@ export function AssetWorkflowDashboard() {
         <EquipmentWorkflowDetail
           workflowState={workflowState}
           onBack={() => setSelectedEquipment(null)}
+          maintenanceActive={maintenanceActive}
         />
       )}
     </div>
@@ -393,9 +397,11 @@ export function AssetWorkflowDashboard() {
 function EquipmentWorkflowDetail({
   workflowState,
   onBack,
+  maintenanceActive,
 }: {
   workflowState: WorkflowState;
   onBack: () => void;
+  maintenanceActive: boolean;
 }) {
   // Get icon component and render it - must use useMemo to avoid creating component during render
   const stateIconElement = useMemo(() => {
@@ -460,12 +466,14 @@ function EquipmentWorkflowDetail({
           icon={<TrendingUp className="h-5 w-5" />}
           accentColor="var(--color-sentinel-blue)"
         />
-        <StatCard
-          label="Last Inspection"
-          value={workflowState.inspection_status.status}
-          icon={<Calendar className="h-5 w-5" />}
-          accentColor="var(--color-sentinel-green)"
-        />
+        {maintenanceActive && (
+          <StatCard
+            label="Last Inspection"
+            value={workflowState.inspection_status.status}
+            icon={<Calendar className="h-5 w-5" />}
+            accentColor="var(--color-sentinel-green)"
+          />
+        )}
         {workflowState.ml_prediction && (
           <StatCard
             label="Failure Risk"
@@ -480,15 +488,18 @@ function EquipmentWorkflowDetail({
             }
           />
         )}
-        <StatCard
-          label="Active Repairs"
-          value={String(workflowState.active_repairs.length)}
-          icon={<Wrench className="h-5 w-5" />}
-          accentColor="var(--color-sentinel-amber)"
-        />
+        {maintenanceActive && (
+          <StatCard
+            label="Active Repairs"
+            value={String(workflowState.active_repairs.length)}
+            icon={<Wrench className="h-5 w-5" />}
+            accentColor="var(--color-sentinel-amber)"
+          />
+        )}
       </div>
 
-      {/* Workflow Timeline */}
+      {/* Workflow Timeline — maintenance only */}
+      {maintenanceActive && (
       <div
         className="rounded-md overflow-hidden"
         style={{
@@ -561,6 +572,7 @@ function EquipmentWorkflowDetail({
           })}
         </div>
       </div>
+      )}
 
       {/* ML Prediction */}
       {workflowState.ml_prediction && workflowState.ml_prediction.failure_probability > 0.1 && (
@@ -651,8 +663,8 @@ function EquipmentWorkflowDetail({
         </div>
       )}
 
-      {/* Recent Inspection */}
-      {workflowState.inspection_status && (
+      {/* Recent Inspection — maintenance only */}
+      {maintenanceActive && workflowState.inspection_status && (
         <div
           className="rounded-md overflow-hidden"
           style={{
@@ -741,8 +753,8 @@ function EquipmentWorkflowDetail({
         </div>
       )}
 
-      {/* Active Repairs - Service Feedback */}
-      {workflowState.active_repairs && workflowState.active_repairs.length > 0 && (
+      {/* Active Repairs - Service Feedback — maintenance only */}
+      {maintenanceActive && workflowState.active_repairs && workflowState.active_repairs.length > 0 && (
         <div
           className="rounded-md overflow-hidden"
           style={{

@@ -26,13 +26,19 @@ import { useSimulation } from "@/contexts/SimulationContext";
 import { useModules } from "@/contexts/ModuleHooks";
 import { Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Button, TabGroup, TabList, Tab, TabPanels, TabPanel, Title, Text } from "@tremor/react";
 import api from '@/lib/api';
-import type { OptimizationScenario, OptimizationStatusResponse, Site } from '@/lib/api';
+import type { OptimizationScenario, OptimizationStatusResponse, Site, Prediction } from '@/lib/api';
+import { fetchEnergyComparisonSummary, calculateCarbonOffset } from '@/lib/api/energy';
+import type { ComparisonSummary } from '@/lib/api/energy';
+import { SentinelValueCard } from '../components/SentinelValueCard';
 import { OptimizationPanelGated } from "../components/OptimizationPanelGated";
 import { PageLoading } from "../components/PageLoading";
 import { ProfileSettings } from "../components/optimization/ProfileSettings";
 import { RecommendationsDashboard } from "../components/optimization/RecommendationsDashboard";
 import { RecommendationHistory } from "../components/optimization/RecommendationHistory";
 import { PowerMeterValidationCard, CostValidationCard } from "../components/validation";
+import { EnergyComparisonPanel } from "../components/EnergyComparisonPanel";
+import { ActualVsSentinelEnergyCard } from "../components/ActualVsSentinelEnergyCard";
+import { ROISummaryCard } from "../components/ROISummaryCard";
 
 // Sentinel-styled Badge component
 interface SentinelBadgeProps {
@@ -130,6 +136,8 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [comparison, setComparison] = useState<ComparisonSummary | null>(null);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
 
   // Confirmation modal
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -143,6 +151,20 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
       if (defaultSite) setSelectedSiteId(defaultSite.id);
     }).catch(() => {});
   }, []);
+
+  // Fetch energy comparison for value card
+  useEffect(() => {
+    fetchEnergyComparisonSummary(selectedSiteId)
+      .then(setComparison)
+      .catch(() => {});
+  }, [selectedSiteId]);
+
+  // Fetch predictions for ROI card
+  useEffect(() => {
+    api.getPredictions(selectedSiteId)
+      .then((data) => setPredictions(data.predictions || []))
+      .catch(() => setPredictions([]));
+  }, [selectedSiteId]);
 
   useEffect(() => {
     const loadOptimizationData = async () => {
@@ -301,6 +323,41 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
 
         <TabPanels>
           <TabPanel>
+      {/* Energy Value Card */}
+      <div className="mb-6">
+        {comparison ? (
+          <SentinelValueCard
+            title="Energy Optimization Impact"
+            icon={Zap}
+            baseline={{
+              label: "Without SENTINEL",
+              value: Math.round(comparison.actual.total_kwh),
+              unit: "kWh",
+              costZar: Math.round(comparison.actual.total_cost_zar),
+            }}
+            sentinel={{
+              label: "With SENTINEL AI",
+              value: Math.round(comparison.sentinel.total_kwh),
+              unit: "kWh",
+              costZar: Math.round(comparison.sentinel.total_cost_zar),
+            }}
+            savingsPercent={comparison.daily_savings_percent}
+            carbonSavedKg={calculateCarbonOffset(comparison.actual.total_kwh - comparison.sentinel.total_kwh)}
+            period="Monthly"
+          />
+        ) : (
+          <SentinelValueCard
+            title="Energy Optimization Impact"
+            icon={Zap}
+            baseline={{ label: "", value: 0, unit: "kWh" }}
+            sentinel={{ label: "", value: 0, unit: "kWh" }}
+            savingsPercent={0}
+            period="Monthly"
+            collecting
+          />
+        )}
+      </div>
+
       {/* Load Shedding Optimization */}
       <div className="glass-card overflow-hidden mb-6">
         <div
@@ -742,8 +799,17 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
 
           <TabPanel>
             <div className="space-y-6">
+              {/* Energy Impact Comparison */}
+              <EnergyComparisonPanel siteId={selectedSiteId} />
+
+              {/* Actual vs SENTINEL Energy */}
+              <div className="glass-panel rounded-md overflow-hidden">
+                <ActualVsSentinelEnergyCard siteId={selectedSiteId} />
+              </div>
+
+              {/* Validation Metrics */}
               <div>
-                <Title className="mb-4">Energy & Cost Validation</Title>
+                <Title className="mb-4">Energy &amp; Cost Validation</Title>
                 <Text className="text-gray-400 mb-4">
                   Real-time validation of simulated energy consumption and costs against meter readings and invoices.
                 </Text>
@@ -752,6 +818,11 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                 <PowerMeterValidationCard buildingId={selectedSiteId} />
                 <CostValidationCard buildingId={selectedSiteId} />
               </div>
+
+              {/* ROI Summary */}
+              {predictions.length > 0 && (
+                <ROISummaryCard predictions={predictions} />
+              )}
             </div>
           </TabPanel>
         </TabPanels>

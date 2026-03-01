@@ -5,7 +5,7 @@ import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { X, Snowflake, Wind, Zap, BarChart3, Lightbulb, Flame, Droplet, Video, Lock, Radio, Circle, Wrench, Gauge, Thermometer, ChevronDown, Users } from 'lucide-react';
 import { OccupancySimulation, type Person } from '@/lib/occupancySimulation';
 import { BuildingSelector } from '@/components/BuildingSelector';
-import type { ZoneCentroid, Site } from '@/lib/api/sites';
+import type { Site } from '@/lib/api/sites';
 import { BuildingModel } from './BuildingModel';
 import { EquipmentMarkers } from './EquipmentMarkers';
 import { EquipmentDetailPanel } from './EquipmentDetailPanel';
@@ -19,7 +19,7 @@ import { useOccupancySync } from '@/hooks/useOccupancySync';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useEquipmentData } from '@/hooks/useEquipmentData';
 import { useSitesList } from '@/hooks/useSitesList';
-import { useZoneCentroids } from '@/hooks/useZoneCentroids';
+
 import { useZoneBounds } from '@/hooks/useZoneBounds';
 import {
   distributeEquipmentInZone,
@@ -207,9 +207,6 @@ export function DigitalTwin() {
     simulationRef,
     enabled: occupancyEnabled,
   });
-
-  // Load zone centroids via React Query hook (auto-caching, deduplication)
-  const { data: zoneCentroids = {} } = useZoneCentroids(buildingId);
 
   // Load zone bounds for adaptive equipment positioning
   const zoneBounds = useZoneBounds(buildingId);
@@ -551,7 +548,7 @@ export function DigitalTwin() {
               equipment={filteredEquipment}
               selectedFloors={selectedFloors}
               onEquipmentClick={(id) => setSelectedEquipment(id)}
-              zoneCentroids={Object.keys(zoneCentroids).length > 0 ? zoneCentroids : undefined}
+              equipmentPositions={equipmentPositions}
             />
 
             {/* Occupancy Markers - Phase 3: 3D people visualization */}

@@ -1,24 +1,26 @@
 /* eslint-disable react-refresh/only-export-components */
 /**
- * Dashboard Card Definitions
+ * Building Page Section Definitions
  *
- * Centralized definitions for all dashboard cards with metadata.
- * Used by CardLibrary and Dashboard components.
+ * Centralized definitions for all toggleable sections on the building detail page.
+ * Used by CardLibrary to show/hide sections via on/off toggles.
+ *
+ * Section IDs match the intelligence cards rendered in the overview tab.
  */
 
+import type { ReactNode } from 'react';
 import {
-  Building2,
+  Brain,
   Cpu,
-  Bell,
-  DollarSign,
-  Shield,
-  BarChart3,
-  Activity,
   Sun,
-  Leaf,
+  Activity,
   Lightbulb,
-  AlertCircle,
   Users,
+  Zap,
+  Thermometer,
+  Droplets,
+  Flame,
+  Shield,
 } from 'lucide-react';
 
 // Card definition with metadata
@@ -26,126 +28,103 @@ export interface CardDefinition {
   id: string;
   name: string;
   description: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   category: 'kpi' | 'section';
   defaultVisible: boolean;
 }
 
-// KPI Card definitions
+// KPI Card definitions (top row — 4 metric cards)
 export const KPI_CARDS: CardDefinition[] = [
   {
-    id: 'kpi-protected-sites',
-    name: 'Protected Sites',
-    description: 'Total sites under SENTINEL protection',
-    icon: <Building2 className="w-4 h-4" />,
-    category: 'kpi',
-    defaultVisible: true
-  },
-  {
-    id: 'kpi-monitored-assets',
-    name: 'Monitored Assets',
-    description: 'Total equipment being monitored',
+    id: 'kpi-equipment',
+    name: 'Equipment',
+    description: 'Total equipment count',
     icon: <Cpu className="w-4 h-4" />,
     category: 'kpi',
     defaultVisible: true
   },
   {
-    id: 'kpi-active-risks',
-    name: 'Active Risks',
+    id: 'kpi-alerts',
+    name: 'Active Alerts',
     description: 'Current alerts and warnings',
-    icon: <Bell className="w-4 h-4" />,
+    icon: <Activity className="w-4 h-4" />,
     category: 'kpi',
     defaultVisible: true
   },
   {
-    id: 'kpi-potential-savings',
-    name: 'Potential Savings',
-    description: 'Estimated savings from preventive actions',
-    icon: <DollarSign className="w-4 h-4" />,
+    id: 'kpi-health',
+    name: 'Avg Health',
+    description: 'Average equipment health score',
+    icon: <Activity className="w-4 h-4" />,
     category: 'kpi',
     defaultVisible: true
   },
   {
-    id: 'kpi-risk-predictions',
-    name: 'Risk Predictions',
-    description: 'AI-detected risk events count',
+    id: 'kpi-predictions',
+    name: 'Predictions',
+    description: 'AI-detected risk predictions',
     icon: <Shield className="w-4 h-4" />,
     category: 'kpi',
     defaultVisible: true
   }
 ];
 
-// Section definitions
+// Section definitions — building overview intelligence cards
+// Order matches render order on the building page
 export const SECTION_CARDS: CardDefinition[] = [
   {
-    id: 'kpi-row',
-    name: 'KPI Overview',
-    description: 'Top-level metrics and statistics',
-    icon: <Activity className="w-4 h-4" />,
+    id: 'ai-optimization',
+    name: 'AI Optimization',
+    description: 'Optimization status, mode toggle, and pending recommendations',
+    icon: <Brain className="w-4 h-4" />,
     category: 'section',
     defaultVisible: true
   },
   {
-    id: 'site-protection',
-    name: 'Site Protection',
-    description: 'Site status grid with protection levels',
-    icon: <Building2 className="w-4 h-4" />,
+    id: 'hvac-intelligence',
+    name: 'HVAC Intelligence',
+    description: 'Climate control health, thermal runway, and zone status',
+    icon: <Thermometer className="w-4 h-4" />,
     category: 'section',
     defaultVisible: true
   },
   {
-    id: 'energy-analytics',
-    name: 'Energy Analytics',
-    description: 'Energy consumption charts and trends',
-    icon: <BarChart3 className="w-4 h-4" />,
+    id: 'energy-intelligence',
+    name: 'Energy Intelligence',
+    description: 'Optimisation savings, mode, and applied recommendations',
+    icon: <Zap className="w-4 h-4" />,
     category: 'section',
     defaultVisible: true
   },
   {
-    id: 'risk-predictions',
-    name: 'Risk Intelligence',
-    description: 'AI predictions and ROI analysis',
+    id: 'solar-intelligence',
+    name: 'Solar & BESS Intelligence',
+    description: 'Generation, self-consumption, and performance ratio',
+    icon: <Sun className="w-4 h-4" />,
+    category: 'section',
+    defaultVisible: true
+  },
+  {
+    id: 'water-intelligence',
+    name: 'Water Intelligence',
+    description: 'Consumption vs baseline, leak alerts, and peak flow',
+    icon: <Droplets className="w-4 h-4" />,
+    category: 'section',
+    defaultVisible: true
+  },
+  {
+    id: 'fire-intelligence',
+    name: 'Fire Safety Intelligence',
+    description: 'Equipment compliance, system status, and overdue items',
+    icon: <Flame className="w-4 h-4" />,
+    category: 'section',
+    defaultVisible: true
+  },
+  {
+    id: 'security-intelligence',
+    name: 'Security Intelligence',
+    description: 'Access control zones, cameras, and occupancy',
     icon: <Shield className="w-4 h-4" />,
-    category: 'section',
-    defaultVisible: true
-  },
-  {
-    id: 'solar-bess',
-    name: 'Solar & BESS',
-    description: 'Solar generation, battery storage, inverter fleet, and energy flow',
-    icon: <Sun className="w-4 h-4" />,
-    category: 'section',
-    defaultVisible: true
-  },
-  {
-    id: 'energy-comparison',
-    name: 'Energy Impact Comparison',
-    description: 'Multi-tier energy savings comparison (Baseline vs Lighting vs SENTINEL)',
-    icon: <Leaf className="w-4 h-4" />,
-    category: 'section',
-    defaultVisible: true
-  },
-  {
-    id: 'energy-comparison-actual-vs-sentinel',
-    name: 'Actual vs SENTINEL Energy',
-    description: 'Side-by-side real energy consumption vs AI-optimized predictions',
-    icon: <BarChart3 className="w-4 h-4" />,
-    category: 'section',
-    defaultVisible: true
-  },
-  {
-    id: 'solar-annual',
-    name: 'Solar Annual Summary',
-    description: '365-day annual simulation with AI savings progression (2%-18%)',
-    icon: <Sun className="w-4 h-4" />,
-    category: 'section',
-    defaultVisible: true
-  },
-  {
-    id: 'comfort-assistant',
-    name: 'Comfort Assistant',
-    description: 'AI-powered comfort recommendations and occupancy insights',
-    icon: <Users className="w-4 h-4" />,
     category: 'section',
     defaultVisible: true
   },
@@ -164,7 +143,7 @@ export const SECTION_CARDS: CardDefinition[] = [
     icon: <Lightbulb className="w-4 h-4" />,
     category: 'section',
     defaultVisible: true
-  }
+  },
 ];
 
 // All cards combined

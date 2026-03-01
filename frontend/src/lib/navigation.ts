@@ -12,6 +12,7 @@ import {
   Shield,
   Settings as SettingsIcon,
   Activity,
+  Package,
   Plug,
   FileText,
   Wrench,
@@ -29,6 +30,7 @@ export type View =
   | "ai-chat"
   | "integrations"
   | "logs"
+  | "assets"
   | "simbiot"
   | "settings"
   | "maintenance"
@@ -55,6 +57,7 @@ export const VIEW_TITLES: Record<View, string> = {
   "ai-chat": "AI Chat",
   integrations: "System Health",
   logs: "Logs",
+  assets: "Assets",
   simbiot: "SIMBIOT",
   settings: "Settings",
   maintenance: "Maintenance",
@@ -71,6 +74,7 @@ export const BASE_NAV_ITEMS: NavItem[] = [
   { id: "ai-chat", label: "AI Chat", icon: MessageSquare, description: "SENTINEL AI Assistant", category: "base" },
   { id: "integrations", label: "System Health", icon: Activity, description: "Integration monitoring", category: "base" },
   { id: "logs", label: "Logs", icon: FileText, description: "Audit trail and event logs", category: "base" },
+  { id: "assets", label: "Assets", icon: Package, description: "Equipment registry and condition", category: "base" },
 ];
 
 /**

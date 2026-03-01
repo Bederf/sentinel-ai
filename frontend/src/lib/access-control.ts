@@ -28,6 +28,7 @@ export const USER_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
       'ai-chat',             // Base: AI Chat assistant
       'integrations',        // Base: System Health
       'logs',                // Base: Audit logs
+      'assets',              // Base: Equipment registry
       'simbiot',             // Admin: SIMBIOT
       'settings',            // Admin: Settings
     ],
@@ -51,6 +52,7 @@ export const COMPANY_DEMO_CONFIGS: Record<string, CompanyDemoConfig> = {
       'ai-chat',             // Base: AI Chat assistant
       'integrations',        // Base: System Health
       'logs',                // Base: Audit logs
+      'assets',              // Base: Equipment registry
       'simbiot',             // Admin: SIMBIOT
       'settings',            // Admin: Settings
     ],

@@ -24,6 +24,7 @@ import {
   Text,
 } from "@tremor/react";
 import { Droplets, Building2, ChevronDown, AlertTriangle } from "lucide-react";
+import { SentinelValueCard } from "../SentinelValueCard";
 import { waterApi } from "../../lib/waterApi";
 import type {
   WaterAlert,
@@ -302,6 +303,38 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
             </select>
           </div>
         </div>
+      </div>
+
+      {/* SENTINEL Value Card */}
+      <div className="mb-6">
+        {trending && trending.baseline_comparison_percent !== 0 ? (
+          <SentinelValueCard
+            title="Water Intelligence Impact"
+            icon={Droplets}
+            baseline={{
+              label: "Without SENTINEL",
+              value: Math.round(trending.total_volume_liters * (1 + Math.abs(trending.baseline_comparison_percent) / 100)),
+              unit: "L",
+            }}
+            sentinel={{
+              label: "With SENTINEL AI",
+              value: Math.round(trending.total_volume_liters),
+              unit: "L",
+            }}
+            savingsPercent={Math.abs(trending.baseline_comparison_percent)}
+            period="7-day"
+          />
+        ) : (
+          <SentinelValueCard
+            title="Water Intelligence Impact"
+            icon={Droplets}
+            baseline={{ label: "", value: 0, unit: "L" }}
+            sentinel={{ label: "", value: 0, unit: "L" }}
+            savingsPercent={0}
+            period="7-day"
+            collecting
+          />
+        )}
       </div>
 
       {/* Quick Stats KPI Cards */}

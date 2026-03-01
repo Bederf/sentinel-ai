@@ -34,9 +34,6 @@ import {
   Info,
   Wifi,
   Server,
-  Sun,
-  DollarSign,
-  Shield,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
@@ -59,18 +56,16 @@ import { OptimizationInfoCard } from "./OptimizationInfoCard";
 import { ControlPanel } from "./ControlPanel";
 import { useHealthThresholds } from "../hooks/useHealthThresholds";
 import { useModules } from "@/contexts/ModuleHooks";
-import { ROISummaryCard } from "./ROISummaryCard";
 import { LightingIntelligencePanel } from "./LightingIntelligencePanel";
-import { SolarOverviewPanel } from "./solar/SolarOverviewPanel";
-import { BESSStatusPanel } from "./solar/BESSStatusPanel";
-import { InverterStatusMatrix } from "./solar/InverterStatusMatrix";
-import { EnergyFlowDiagram } from "./solar/EnergyFlowDiagram";
-import { SolarAnnualCard } from "./solar/SolarAnnualCard";
-import { EnergyComparisonPanel } from "./EnergyComparisonPanel";
-import { ActualVsSentinelEnergyCard } from "./ActualVsSentinelEnergyCard";
-import { PowerMeterValidationCard, CostValidationCard } from "./validation";
-import ComfortComplaintPanel from "./ComfortComplaintPanel";
 import { OccupancyPanel } from "./OccupancyPanel";
+import { HVACIntelligenceCard } from "./intelligence/HVACIntelligenceCard";
+import { EnergyIntelligenceCard } from "./intelligence/EnergyIntelligenceCard";
+import { SolarIntelligenceCard } from "./intelligence/SolarIntelligenceCard";
+import { WaterIntelligenceCard } from "./intelligence/WaterIntelligenceCard";
+import { FireIntelligenceCard } from "./intelligence/FireIntelligenceCard";
+import { SecurityIntelligenceCard } from "./intelligence/SecurityIntelligenceCard";
+import CardLibrary from "./CardLibrary";
+import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS } from "../lib/cardDefinitions";
 import { BUILDING_TAB_ITEMS } from "../lib/navigation";
 import type { BuildingTabId } from "../lib/navigation";
 
@@ -189,6 +184,10 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   // Prediction detail modal
   const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null);
   const [isPredictionDetailOpen, setIsPredictionDetailOpen] = useState(false);
+
+  // Card visibility (CardLibrary toggle)
+  const [visibleKpiCards, setVisibleKpiCards] = useState<string[]>(DEFAULT_KPI_CARDS);
+  const [visibleSections, setVisibleSections] = useState<string[]>(DEFAULT_SECTIONS);
 
   // Scroll container ref — reset to top on mount
   const containerRef = useRef<HTMLDivElement>(null);
@@ -673,37 +672,47 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
       </div>
 
       {/* AI Optimization Info Card */}
-      <OptimizationInfoCard
-        siteId={siteId}
-        optimizationEnabled={site.optimization_enabled || false}
-      />
+      {visibleSections.includes('ai-optimization') && (
+        <OptimizationInfoCard
+          siteId={siteId}
+          optimizationEnabled={site.optimization_enabled || false}
+        />
+      )}
 
       {/* KPI Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KPICard
-          title="Equipment"
-          value={sentinelEnabled ? site.equipment_count : "—"}
-          icon={<Cpu className="h-5 w-5" />}
-          accentColor="blue"
-        />
-        <KPICard
-          title="Active Alerts"
-          value={sentinelEnabled ? alerts.length : "—"}
-          icon={<AlertTriangle className="h-5 w-5" />}
-          accentColor="orange"
-        />
-        <KPICard
-          title="Avg Health"
-          value={sentinelEnabled ? `${avgHealth}%` : "—"}
-          icon={<TrendingUp className="h-5 w-5" />}
-          accentColor={sentinelEnabled && avgHealth >= thresholds.healthy ? "green" : sentinelEnabled && avgHealth >= thresholds.warning ? "orange" : sentinelEnabled ? "red" : "blue"}
-        />
-        <KPICard
-          title="Predictions"
-          value={sentinelEnabled ? predictions.length : "—"}
-          icon={<TrendingUp className="h-5 w-5" />}
-          accentColor="purple"
-        />
+        {visibleKpiCards.includes('kpi-equipment') && (
+          <KPICard
+            title="Equipment"
+            value={sentinelEnabled ? site.equipment_count : "—"}
+            icon={<Cpu className="h-5 w-5" />}
+            accentColor="blue"
+          />
+        )}
+        {visibleKpiCards.includes('kpi-alerts') && (
+          <KPICard
+            title="Active Alerts"
+            value={sentinelEnabled ? alerts.length : "—"}
+            icon={<AlertTriangle className="h-5 w-5" />}
+            accentColor="orange"
+          />
+        )}
+        {visibleKpiCards.includes('kpi-health') && (
+          <KPICard
+            title="Avg Health"
+            value={sentinelEnabled ? `${avgHealth}%` : "—"}
+            icon={<TrendingUp className="h-5 w-5" />}
+            accentColor={sentinelEnabled && avgHealth >= thresholds.healthy ? "green" : sentinelEnabled && avgHealth >= thresholds.warning ? "orange" : sentinelEnabled ? "red" : "blue"}
+          />
+        )}
+        {visibleKpiCards.includes('kpi-predictions') && (
+          <KPICard
+            title="Predictions"
+            value={sentinelEnabled ? predictions.length : "—"}
+            icon={<TrendingUp className="h-5 w-5" />}
+            accentColor="purple"
+          />
+        )}
       </div>
 
       {/* Site Info Cards */}
@@ -1437,213 +1446,51 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
         </div>
       ) : (
       <>
-      {/* Lighting Intelligence */}
-      {isModuleActive('lighting') && (
-        <div className="mb-6">
-          <LightingIntelligencePanel siteId={siteId} />
-        </div>
-      )}
+      {/* CardLibrary inline toggle */}
+      <CardLibrary
+        visibleKpiCards={visibleKpiCards}
+        visibleSections={visibleSections}
+        onKpiVisibilityChange={(id, visible) => {
+          setVisibleKpiCards(prev => visible ? [...prev, id] : prev.filter(c => c !== id));
+        }}
+        onSectionVisibilityChange={(id, visible) => {
+          setVisibleSections(prev => visible ? [...prev, id] : prev.filter(c => c !== id));
+        }}
+        onResetToDefaults={() => {
+          setVisibleKpiCards(DEFAULT_KPI_CARDS);
+          setVisibleSections(DEFAULT_SECTIONS);
+        }}
+      />
 
-      {/* Solar & BESS */}
-      {isModuleActive('solar') && (
-        <div className="mb-6 space-y-4">
-          <div className="flex items-center gap-3 mb-2">
-            <div
-              className="p-2 rounded"
-              style={{ background: "rgba(250, 204, 21, 0.15)" }}
-            >
-              <Sun
-                className="h-5 w-5"
-                style={{ color: "#FACC15" }}
-              />
-            </div>
-            <div>
-              <h3
-                className="font-medium text-sm"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
-                Solar &amp; BESS
-              </h3>
-              <span
-                className="text-xs"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
-              >
-                Solar generation &amp; battery storage
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <SolarOverviewPanel siteId={siteId} />
-            <div className="min-w-0">
-              <EnergyFlowDiagram siteId={siteId} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <BESSStatusPanel siteId={siteId} />
-            <InverterStatusMatrix siteId={siteId} />
-          </div>
-        </div>
-      )}
-
-      {/* Solar Annual Summary */}
-      {isModuleActive('solar') && (
-        <div className="mb-6 space-y-4">
-          <div className="flex items-center gap-3 mb-2">
-            <div
-              className="p-2 rounded"
-              style={{ background: "rgba(250, 204, 21, 0.15)" }}
-            >
-              <Sun
-                className="h-5 w-5"
-                style={{ color: "#FACC15" }}
-              />
-            </div>
-            <div>
-              <h3
-                className="font-medium text-sm"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
-                Solar Annual Summary
-              </h3>
-              <span
-                className="text-xs"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
-              >
-                365-day simulation with AI savings progression
-              </span>
-            </div>
-          </div>
-          <SolarAnnualCard siteId={siteId} />
-        </div>
-      )}
-
-      {/* Energy Comparison */}
-      {isModuleActive('energy') && (
-      <div className="mb-6">
-        <EnergyComparisonPanel siteId={siteId} />
-      </div>
-      )}
-
-      {/* Actual vs SENTINEL Energy */}
-      {isModuleActive('energy') && (
-      <div className="mb-6">
-        <div className="glass-panel rounded-md overflow-hidden">
-          <ActualVsSentinelEnergyCard siteId={siteId} />
-        </div>
-      </div>
-      )}
-
-      {/* Power Meter Validation */}
-      {isModuleActive('energy') && (
-      <div className="mb-6 space-y-4">
-        <div className="flex items-center gap-3 mb-2">
-          <div
-            className="p-2 rounded"
-            style={{ background: "rgba(59, 130, 246, 0.15)" }}
-          >
-            <Cpu
-              className="h-5 w-5"
-              style={{ color: "#3B82F6" }}
-            />
-          </div>
-          <div>
-            <h3
-              className="font-medium text-sm"
-              style={{ color: "var(--color-sentinel-text-primary)" }}
-            >
-              Power Meter Validation
-            </h3>
-            <span
-              className="text-xs"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
-            >
-              Real-time HVAC anomaly detection and COP tracking
-            </span>
-          </div>
-        </div>
-        <PowerMeterValidationCard buildingId={siteId} />
-      </div>
-      )}
-
-      {/* Cost Validation */}
-      {isModuleActive('energy') && (
-      <div className="mb-6 space-y-4">
-        <div className="flex items-center gap-3 mb-2">
-          <div
-            className="p-2 rounded"
-            style={{ background: "rgba(34, 197, 94, 0.15)" }}
-          >
-            <DollarSign
-              className="h-5 w-5"
-              style={{ color: "#22C55E" }}
-            />
-          </div>
-          <div>
-            <h3
-              className="font-medium text-sm"
-              style={{ color: "var(--color-sentinel-text-primary)" }}
-            >
-              Cost Validation
-            </h3>
-            <span
-              className="text-xs"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
-            >
-              Monthly cost reconciliation and tariff optimization
-            </span>
-          </div>
-        </div>
-        <CostValidationCard buildingId={siteId} />
-      </div>
-      )}
-
-      {/* ROI Summary */}
-      {predictions.length > 0 && (
-        <div className="mb-6 space-y-4">
-          <div className="flex items-center gap-3 mb-2">
-            <div
-              className="p-2 rounded"
-              style={{ background: "rgba(245, 158, 11, 0.15)" }}
-            >
-              <Shield
-                className="h-5 w-5"
-                style={{ color: "var(--color-sentinel-amber)" }}
-              />
-            </div>
-            <div>
-              <h3
-                className="font-medium text-sm"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
-                Risk Intelligence Summary
-              </h3>
-              <span
-                className="text-xs"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
-              >
-                AI-powered ROI from predictive maintenance
-              </span>
-            </div>
-          </div>
-          <ROISummaryCard predictions={predictions} />
-        </div>
-      )}
-
-      {/* Comfort Assistant */}
-      {isModuleActive('hvac') && (
-        <div className="mb-6">
-          <ComfortComplaintPanel compact={true} />
-        </div>
-      )}
-
-      {/* Occupancy */}
-      {isModuleActive('lighting') && (
-        <div className="mb-6">
+      {/* ── Discipline Intelligence Cards ── */}
+      <div className="space-y-4">
+        {isModuleActive('hvac') && visibleSections.includes('hvac-intelligence') && (
+          <HVACIntelligenceCard siteId={siteId} onNavigate={() => setActiveMainTab('hvac')} />
+        )}
+        {isModuleActive('energy') && visibleSections.includes('energy-intelligence') && (
+          <EnergyIntelligenceCard siteId={siteId} onNavigate={() => setActiveMainTab('energy')} />
+        )}
+        {isModuleActive('solar') && visibleSections.includes('solar-intelligence') && (
+          <SolarIntelligenceCard siteId={siteId} onNavigate={() => setActiveMainTab('solar-bess')} />
+        )}
+        {isModuleActive('water') && visibleSections.includes('water-intelligence') && (
+          <WaterIntelligenceCard siteId={siteId} onNavigate={() => setActiveMainTab('water')} />
+        )}
+        {isModuleActive('fire') && visibleSections.includes('fire-intelligence') && (
+          <FireIntelligenceCard siteId={siteId} onNavigate={() => setActiveMainTab('fire')} />
+        )}
+        {isModuleActive('security') && visibleSections.includes('security-intelligence') && (
+          <SecurityIntelligenceCard siteId={siteId} onNavigate={() => setActiveMainTab('security')} />
+        )}
+        {/* #7 Occupancy */}
+        {isModuleActive('lighting') && visibleSections.includes('occupancy-dashboard') && (
           <OccupancyPanel compact={true} />
-        </div>
-      )}
+        )}
+        {/* #8 Lighting Intelligence */}
+        {isModuleActive('lighting') && visibleSections.includes('lighting-intelligence') && (
+          <LightingIntelligencePanel siteId={siteId} />
+        )}
+      </div>
       </>
       )}
       </>

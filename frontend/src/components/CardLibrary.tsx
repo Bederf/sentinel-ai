@@ -1,27 +1,25 @@
 /**
- * CardLibrary Component - Dashboard card customization panel
+ * CardLibrary Component - Inline collapsible dashboard card customization
  *
  * Features:
- * - List of available dashboard cards with metadata
- * - Toggle switches to show/hide cards
- * - Grouped by category (KPI, Analytics, etc.)
- * - Slide-out panel from right side
+ * - Inline collapsible card (not a slide-out panel)
+ * - Toggle switches to show/hide intelligence cards
+ * - Grouped by category (KPI, Intelligence Sections)
+ * - Badge showing hidden count
  */
 
-import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { useState } from 'react';
 import {
-  X,
   LayoutGrid,
   Eye,
   EyeOff,
-  RotateCcw
+  RotateCcw,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { KPI_CARDS, SECTION_CARDS, type CardDefinition } from '../lib/cardDefinitions';
 
 interface CardLibraryProps {
-  isOpen: boolean;
-  onClose: () => void;
   visibleKpiCards: string[];
   visibleSections: string[];
   onKpiVisibilityChange: (cardId: string, visible: boolean) => void;
@@ -31,28 +29,19 @@ interface CardLibraryProps {
 }
 
 export default function CardLibrary({
-  isOpen,
-  onClose,
   visibleKpiCards,
   visibleSections,
   onKpiVisibilityChange,
   onSectionVisibilityChange,
   onResetToDefaults,
-  isSaving = false
+  isSaving = false,
 }: CardLibraryProps) {
+  const [expanded, setExpanded] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+  const totalCards = KPI_CARDS.length + SECTION_CARDS.length;
+  const visibleCount = visibleKpiCards.length + visibleSections.length;
+  const hiddenCount = totalCards - visibleCount;
 
   const handleReset = () => {
     onResetToDefaults();
@@ -64,217 +53,188 @@ export default function CardLibrary({
     isVisible: boolean,
     onToggle: (id: string, visible: boolean) => void
   ) => {
-    const bgStyle = isVisible
-      ? 'rgba(59, 130, 246, 0.1)'
-      : 'var(--color-sentinel-bg-secondary)';
-    const borderStyle = isVisible
-      ? 'rgba(59, 130, 246, 0.3)'
-      : 'var(--color-sentinel-border)';
-    const iconBg = isVisible
-      ? 'rgba(59, 130, 246, 0.2)'
-      : 'var(--color-sentinel-bg-panel)';
-    const iconColor = isVisible
-      ? 'var(--color-sentinel-blue)'
-      : 'var(--color-sentinel-text-secondary)';
-    const buttonBg = isVisible
-      ? 'var(--color-sentinel-blue)'
-      : 'rgba(100, 116, 139, 0.3)';
-    const buttonColor = isVisible ? 'white' : 'var(--color-sentinel-text-primary)';
-
     return (
       <div
         key={card.id}
-        className="flex items-center justify-between p-3 rounded-lg transition-colors"
+        className="flex items-center justify-between py-2 px-3 rounded transition-colors"
         style={{
-          background: bgStyle,
-          border: `1px solid ${borderStyle}`
+          background: isVisible ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
         }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div
-            className="p-2 rounded"
-            style={{ background: iconBg, color: iconColor }}
+            className="p-1 rounded"
+            style={{
+              color: isVisible ? 'var(--color-sentinel-blue)' : 'var(--color-sentinel-text-secondary)',
+            }}
           >
-            {/* Card icon placeholder */}
+            {card.icon}
           </div>
-          <div>
-            <p
-              className="font-medium text-sm"
-              style={{ color: 'var(--color-sentinel-text-primary)' }}
-            >
-              {card.name}
-            </p>
-            <p
-              className="text-xs"
-              style={{ color: 'var(--color-sentinel-text-secondary)' }}
-            >
-              {card.description}
-            </p>
-          </div>
+          <span
+            className="text-sm"
+            style={{
+              color: isVisible ? 'var(--color-sentinel-text-primary)' : 'var(--color-sentinel-text-secondary)',
+            }}
+          >
+            {card.name}
+          </span>
         </div>
 
         <button
           onClick={() => onToggle(card.id, !isVisible)}
-          className="p-2 rounded-lg transition-all hover:scale-110 active:scale-95"
+          className="p-1.5 rounded transition-all hover:scale-110 active:scale-95"
           style={{
-            background: buttonBg,
-            color: buttonColor,
-            border: '1px solid rgba(255,255,255,0.1)',
-            cursor: 'pointer'
+            background: isVisible ? 'rgba(59, 130, 246, 0.2)' : 'rgba(100, 116, 139, 0.2)',
+            color: isVisible ? 'var(--color-sentinel-blue)' : 'var(--color-sentinel-text-secondary)',
+            border: 'none',
+            cursor: 'pointer',
           }}
-          title={isVisible ? 'Hide card' : 'Show card'}
+          title={isVisible ? 'Hide' : 'Show'}
         >
-          {isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          {isVisible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
         </button>
       </div>
     );
   };
 
-  const panel = (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
-        style={{ zIndex: 9998 }}
-        onClick={onClose}
-      />
-
-      {/* Panel */}
-      <div
-        className="fixed right-0 top-0 h-full w-full max-w-md shadow-2xl overflow-hidden flex flex-col"
+  return (
+    <div
+      className="rounded-lg overflow-hidden mb-6"
+      style={{
+        background: 'var(--color-sentinel-bg-panel)',
+        border: '1px solid var(--color-sentinel-border)',
+      }}
+    >
+      {/* Header — always visible, click to toggle */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full p-3 flex items-center justify-between"
         style={{
-          zIndex: 9999,
-          background: 'var(--glass-bg)',
-          backdropFilter: 'blur(var(--glass-blur-lg)) saturate(180%)',
-          WebkitBackdropFilter: 'blur(var(--glass-blur-lg)) saturate(180%)',
-          borderLeft: '1px solid var(--glass-border)',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          borderBottom: expanded ? '1px solid var(--color-sentinel-border)' : 'none',
         }}
       >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-4 py-3"
-          style={{ borderBottom: '1px solid var(--glass-border)' }}
-        >
-          <div className="flex items-center gap-3">
-            <LayoutGrid className="w-5 h-5" style={{ color: 'var(--color-sentinel-amber)' }} />
-            <div>
-              <h2
-                className="font-semibold"
-                style={{ color: 'var(--color-sentinel-text-primary)' }}
-              >
-                Customize Dashboard
-              </h2>
-              <p
-                className="text-xs"
-                style={{ color: 'var(--color-sentinel-text-secondary)' }}
-              >
-                Show or hide dashboard cards
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg transition-colors hover:bg-white/10"
-            style={{ color: 'var(--color-sentinel-text-secondary)' }}
+        <div className="flex items-center gap-2">
+          <LayoutGrid className="w-4 h-4" style={{ color: 'var(--color-sentinel-amber)' }} />
+          <span
+            className="text-sm font-medium"
+            style={{ color: 'var(--color-sentinel-text-primary)' }}
           >
-            <X className="w-5 h-5" />
-          </button>
+            Customize Panels
+          </span>
+          {hiddenCount > 0 && (
+            <span
+              className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+              style={{
+                background: 'rgba(245, 158, 11, 0.15)',
+                color: 'var(--color-sentinel-amber)',
+              }}
+            >
+              {hiddenCount} hidden
+            </span>
+          )}
+          {isSaving && (
+            <div
+              className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"
+              style={{ color: 'var(--color-sentinel-text-secondary)' }}
+            />
+          )}
         </div>
+        {expanded ? (
+          <ChevronDown className="w-4 h-4" style={{ color: 'var(--color-sentinel-text-secondary)' }} />
+        ) : (
+          <ChevronRight className="w-4 h-4" style={{ color: 'var(--color-sentinel-text-secondary)' }} />
+        )}
+      </button>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
-          {/* KPI Cards Section */}
+      {/* Expandable content */}
+      {expanded && (
+        <div className="p-3 space-y-4">
+          {/* KPI Cards */}
           <div>
             <h3
-              className="text-xs font-medium uppercase tracking-wider mb-3"
+              className="text-xs font-medium uppercase tracking-wider mb-2 px-1"
               style={{ color: 'var(--color-sentinel-text-secondary)' }}
             >
               KPI Cards
             </h3>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {KPI_CARDS.map((card) =>
                 renderCardToggle(card, visibleKpiCards.includes(card.id), onKpiVisibilityChange)
               )}
             </div>
           </div>
 
-          {/* Dashboard Sections */}
+          {/* Intelligence Sections */}
           <div>
             <h3
-              className="text-xs font-medium uppercase tracking-wider mb-3"
+              className="text-xs font-medium uppercase tracking-wider mb-2 px-1"
               style={{ color: 'var(--color-sentinel-text-secondary)' }}
             >
-              Dashboard Sections
+              Intelligence Cards
             </h3>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {SECTION_CARDS.map((card) =>
                 renderCardToggle(card, visibleSections.includes(card.id), onSectionVisibilityChange)
               )}
             </div>
           </div>
-        </div>
 
-        {/* Footer */}
-        <div
-          className="px-4 py-3 space-y-3"
-          style={{ borderTop: '1px solid var(--glass-border)' }}
-        >
-          {isSaving && (
-            <div
-              className="flex items-center justify-center gap-2 text-sm"
-              style={{ color: 'var(--color-sentinel-text-secondary)' }}
-            >
-              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              Saving preferences...
-            </div>
-          )}
-
-          {showResetConfirm ? (
-            <div className="flex items-center gap-2">
-              <span
-                className="text-sm flex-1"
-                style={{ color: 'var(--color-sentinel-text-secondary)' }}
-              >
-                Reset all to defaults?
-              </span>
+          {/* Reset */}
+          <div className="pt-2" style={{ borderTop: '1px solid var(--color-sentinel-border)' }}>
+            {showResetConfirm ? (
+              <div className="flex items-center gap-2">
+                <span
+                  className="text-xs flex-1"
+                  style={{ color: 'var(--color-sentinel-text-secondary)' }}
+                >
+                  Reset all to defaults?
+                </span>
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  className="px-2 py-1 rounded text-xs"
+                  style={{
+                    background: 'var(--color-sentinel-bg-secondary)',
+                    color: 'var(--color-sentinel-text-secondary)',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="px-2 py-1 rounded text-xs font-medium"
+                  style={{
+                    background: 'var(--color-sentinel-red)',
+                    color: 'white',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Reset
+                </button>
+              </div>
+            ) : (
               <button
-                onClick={() => setShowResetConfirm(false)}
-                className="px-3 py-1.5 rounded text-sm"
+                onClick={() => setShowResetConfirm(true)}
+                className="flex items-center gap-1.5 text-xs transition-colors hover:opacity-80"
                 style={{
-                  background: 'var(--color-sentinel-bg-secondary)',
-                  color: 'var(--color-sentinel-text-secondary)'
+                  color: 'var(--color-sentinel-text-secondary)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
                 }}
               >
-                Cancel
+                <RotateCcw className="w-3 h-3" />
+                Reset to Defaults
               </button>
-              <button
-                onClick={handleReset}
-                className="px-3 py-1.5 rounded text-sm font-medium"
-                style={{
-                  background: 'var(--color-sentinel-red)',
-                  color: 'white'
-                }}
-              >
-                Reset
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowResetConfirm(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors hover:bg-white/5"
-              style={{
-                background: 'var(--color-sentinel-bg-secondary)',
-                color: 'var(--color-sentinel-text-secondary)'
-              }}
-            >
-              <RotateCcw className="w-4 h-4" />
-              Reset to Defaults
-            </button>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-    </>
+      )}
+    </div>
   );
-
-  return createPortal(panel, document.body);
 }

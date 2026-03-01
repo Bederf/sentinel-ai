@@ -780,6 +780,10 @@ function App() {
             <SimbiotPage />
           ) : currentView === "settings" ? (
             <Settings onError={(error) => setError(error)} />
+          ) : currentView === "assets" ? (
+            <div className="h-full overflow-y-auto">
+              <AssetWorkflowDashboard />
+            </div>
           ) : currentView === "maintenance" ? (
             <div className="h-full overflow-y-auto">
               <AssetWorkflowDashboard />

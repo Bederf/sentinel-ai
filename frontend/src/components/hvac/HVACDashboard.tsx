@@ -25,12 +25,16 @@ import {
 } from "@tremor/react";
 import {
   Thermometer,
+  Wind,
   Activity,
   Settings,
   AlertTriangle,
   CheckCircle,
 } from "lucide-react";
 import { hvacApi, type HVACOverview } from "../../lib/hvacApi";
+import { fetchEnergyComparisonSummary, calculateCarbonOffset } from "../../lib/api/energy";
+import { SentinelValueCard } from "../SentinelValueCard";
+import type { ComparisonSummary } from "../../lib/api/energy";
 import ZoneOverviewPanel from "./ZoneOverviewPanel";
 import EquipmentStatusPanel from "./EquipmentStatusPanel";
 import ChillerControlPanel from "./ChillerControlPanel";
@@ -129,6 +133,7 @@ export function HVACDashboard({
   const [overview, setOverview] = useState<HVACOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
+  const [comparison, setComparison] = useState<ComparisonSummary | null>(null);
 
   // Use ref to track if component is mounted
   const mountedRef = useRef(true);
@@ -163,6 +168,13 @@ export function HVACDashboard({
       clearInterval(interval);
     };
   }, [siteId, enabledModules, onAIRecommendation]);
+
+  // Fetch energy comparison for HVAC value card
+  useEffect(() => {
+    fetchEnergyComparisonSummary(siteId)
+      .then((data) => { if (mountedRef.current) setComparison(data); })
+      .catch(() => {});
+  }, [siteId]);
 
   if (loading) {
     return (
@@ -222,6 +234,43 @@ export function HVACDashboard({
     // Overview Tab
     <TabPanel key="overview">
       <div className="space-y-4">
+        {/* SENTINEL Value Card */}
+        {comparison ? (
+          <SentinelValueCard
+            title="HVAC Optimization Impact"
+            icon={Wind}
+            baseline={{
+              label: "Without SENTINEL",
+              value: Math.round(comparison.actual.hvac_kwh),
+              unit: "kWh",
+              costZar: Math.round(comparison.actual.hvac_kwh * 5),
+            }}
+            sentinel={{
+              label: "With SENTINEL AI",
+              value: Math.round(comparison.sentinel.hvac_kwh),
+              unit: "kWh",
+              costZar: Math.round(comparison.sentinel.hvac_kwh * 5),
+            }}
+            savingsPercent={
+              comparison.actual.hvac_kwh > 0
+                ? ((comparison.actual.hvac_kwh - comparison.sentinel.hvac_kwh) / comparison.actual.hvac_kwh) * 100
+                : 0
+            }
+            carbonSavedKg={calculateCarbonOffset(comparison.actual.hvac_kwh - comparison.sentinel.hvac_kwh)}
+            period="Monthly"
+          />
+        ) : (
+          <SentinelValueCard
+            title="HVAC Optimization Impact"
+            icon={Wind}
+            baseline={{ label: "", value: 0, unit: "kWh" }}
+            sentinel={{ label: "", value: 0, unit: "kWh" }}
+            savingsPercent={0}
+            period="Monthly"
+            collecting
+          />
+        )}
+
         {/* Status Cards */}
         <Grid className="grid grid-cols-4 gap-4">
           <Card decoration="top" decorationColor="green">
