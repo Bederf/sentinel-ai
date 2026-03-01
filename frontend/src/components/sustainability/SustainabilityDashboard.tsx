@@ -77,15 +77,16 @@ export function SustainabilityDashboard({
         setSites(fetchedSites);
         if (fetchedSites.length > 0) {
           // Default to site-002 (Sandton), or use provided siteId, or use first site
-          const defaultSite = fetchedSites.find(s => s.id === 'site-002') || fetchedSites[0];
+          const defaultSite = fetchedSites[0];
           const initialSite = _externalSiteId || defaultSite.id;
           setSelectedSiteId(initialSite);
         }
       })
       .catch(() => {
         // Fallback to site-002 if API fails
-        setSites([{ id: 'site-002', name: 'Sandton City Office Tower', location: 'Sandton', region: 'Gauteng', type: 'commercial', equipment_count: 0, alert_count: 0, status: 'normal' }]);
-        setSelectedSiteId(_externalSiteId || 'site-002');
+        // Fallback: empty state when API is unavailable
+        setSites([]);
+        setSelectedSiteId(_externalSiteId || '');
       })
       .finally(() => {
         setSitesLoading(false);

@@ -87,7 +87,7 @@ async function processSolarOverviewQueue() {
         resolve(cached.data);
       } else {
         // Fetch directly from API (NOT via fetchSolarOverview to avoid circular dependency)
-        const normalizedId = siteId === "sandton" ? "site-002" : siteId;
+        const normalizedId = siteId;
         const API_BASE_URL = (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) || "";
         const res = await authorizedFetch(`${API_BASE_URL}/api/solar/sites/${normalizedId}/overview`, {}, true);
         if (!res.ok) {

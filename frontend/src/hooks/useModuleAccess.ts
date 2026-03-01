@@ -3,9 +3,10 @@
  * Used by LockedFeatureOverlay to determine if a feature is accessible.
  */
 
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { authorizedFetch } from '@/lib/api'
 import type { ModuleType } from '@/lib/moduleRegistry'
+import { ModuleContext } from '@/contexts/moduleContextStore'
 
 export interface ModuleAccessState {
   isActive: boolean
@@ -33,6 +34,7 @@ export interface ModuleAccessState {
  * }
  */
 export function useModuleAccess(module: ModuleType | string): ModuleAccessState {
+  const moduleContext = useContext(ModuleContext)
   const [state, setState] = useState<ModuleAccessState>({
     isActive: false,
     loading: true,
@@ -43,8 +45,12 @@ export function useModuleAccess(module: ModuleType | string): ModuleAccessState 
   useEffect(() => {
     const checkModuleAccess = async () => {
       try {
-        // Get site ID from session storage
-        const siteId = sessionStorage.getItem('sentinel_selected_site') || 'site-002'
+        // Resolve site ID from module context, then session storage
+        const siteId = moduleContext?.siteId || sessionStorage.getItem('sentinel_selected_site')
+        if (!siteId) {
+          setState(prev => ({ ...prev, loading: false, isActive: false }))
+          return
+        }
 
         // Check if module is active
         const moduleResponse = await authorizedFetch(`/api/modules/site/${siteId}/active`)

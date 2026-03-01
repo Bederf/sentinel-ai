@@ -9,7 +9,7 @@
  * - Tab 5: Access Points (list of readers, locks, sensors with status)
  */
 
-import { useState, useEffect } from 'react';
+import { useContext, useState, useEffect } from 'react';
 import type { ReactElement } from 'react';
 import {
   Card,
@@ -53,13 +53,15 @@ import {
   type Visitor,
   type AccessPoint,
 } from '@/lib/api/index';
+import { ModuleContext } from '@/contexts/moduleContextStore';
 
 interface SecurityPanelProps {
   siteId?: string;
 }
 
 export function SecurityPanel({ siteId: propSiteId }: SecurityPanelProps): ReactElement {
-  const [selectedSiteId] = useState<string>(propSiteId || 'site-002');
+  const moduleContext = useContext(ModuleContext);
+  const [selectedSiteId] = useState<string>(propSiteId || moduleContext?.siteId || '');
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
 
   // Fetch data with React Query hooks

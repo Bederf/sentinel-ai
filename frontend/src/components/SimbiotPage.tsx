@@ -95,7 +95,7 @@ export function SimbiotPage() {
         )}
 
         {activeTab === "data-source" && (
-          <DataSourceTab siteId={selectedSiteId || "site-002"} />
+          <DataSourceTab siteId={selectedSiteId || undefined} />
         )}
       </div>
     </div>

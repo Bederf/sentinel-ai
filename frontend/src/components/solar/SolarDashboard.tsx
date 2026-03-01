@@ -73,10 +73,9 @@ export function SolarDashboard() {
       })
       .catch(() => {
         // Fallback if API not available
-        setSolarSites([
-          { site_id: "site-002", site_name: "Solar Campus", building_name: "Sandton City Office Tower", plants: 2, connectors: 3, last_poll: null },
-        ]);
-        if (!selectedSiteId) setSelectedSiteId("site-002");
+        // Fallback: empty state when API is unavailable
+        setSolarSites([]);
+        // selectedSiteId stays empty if no API data
       });
   }, [selectedSiteId]);
 

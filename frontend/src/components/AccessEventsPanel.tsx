@@ -22,7 +22,7 @@ interface AccessEventsPanelProps {
   refreshKey?: number;
 }
 
-export function AccessEventsPanel({ siteId = "site-002", refreshKey }: AccessEventsPanelProps) {
+export function AccessEventsPanel({ siteId = "", refreshKey }: AccessEventsPanelProps) {
   const [events, setEvents] = useState<BadgeEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

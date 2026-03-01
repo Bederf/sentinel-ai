@@ -187,10 +187,10 @@ export interface ContractListItem {
 
 const demoContracts: ContractProfitabilityDetail[] = [
   {
-    contract_id: "demo-site-002",
-    contract_name: "CON-SITE-002-2024",
-    building_id: "site-002",
-    building_name: "Sandton City Office Tower",
+    contract_id: "demo-contract-001",
+    contract_name: "CON-DEMO-2024",
+    building_id: "demo-building",
+    building_name: "Demo Office Tower",
     monthly_revenue_zar: 285000,
     clawbacks_zar: 0,
     net_revenue_zar: 285000,

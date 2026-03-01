@@ -127,7 +127,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
 
   // State
   const [sites, setSites] = useState<Site[]>([]);
-  const [selectedSiteId, setSelectedSiteId] = useState<string>("site-002");
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("");
   const [allScenarios, setAllScenarios] = useState<OptimizationScenario[]>([]);
   const [scenarios, setScenarios] = useState<ScenarioComparison[]>([]);
   const [actionHistory, setActionHistory] = useState<ActionHistoryItem[]>([]);
@@ -147,7 +147,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
   useEffect(() => {
     api.getSites().then((sitesData) => {
       setSites(sitesData);
-      const defaultSite = sitesData.find(s => s.id === "site-002") || sitesData[0];
+      const defaultSite = sitesData[0];
       if (defaultSite) setSelectedSiteId(defaultSite.id);
     }).catch(() => {});
   }, []);

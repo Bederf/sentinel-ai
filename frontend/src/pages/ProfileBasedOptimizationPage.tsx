@@ -25,7 +25,7 @@ interface ProfileBasedOptimizationPageProps {
 export const ProfileBasedOptimizationPage: React.FC<
   ProfileBasedOptimizationPageProps
 > = () => {
-  const [siteId, setSiteId] = useState<string>('site-002')
+  const [siteId, setSiteId] = useState<string>('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {

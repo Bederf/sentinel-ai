@@ -19,8 +19,8 @@ interface ESGPageProps {
 }
 
 export function ESGPage({ selectedBuilding }: ESGPageProps) {
-  const buildingId = selectedBuilding?.id || 'site-002';
-  const buildingName = selectedBuilding?.name || 'Sandton City Office Tower';
+  const buildingId = selectedBuilding?.id || '';
+  const buildingName = selectedBuilding?.name || 'Building';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">

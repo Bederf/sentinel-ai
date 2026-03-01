@@ -4051,7 +4051,7 @@ export interface OccupancyRecommendation {
 
 export const securityApi = {
   /** Get overall security system status */
-  getStatus: async (site: string = "site-002") => {
+  getStatus: async (site: string) => {
     try {
       const response = await fetchApi<{
         metrics?: {
@@ -4094,7 +4094,7 @@ export const securityApi = {
   /** Get badge events with optional filtering */
   getEvents: async (params?: { site?: string; zone_id?: string; limit?: number; after_hours?: boolean }) => {
     const searchParams = new URLSearchParams();
-    searchParams.set("site", params?.site || "site-002");
+    searchParams.set("site", params?.site || "");
     if (params?.zone_id) searchParams.set("location", params.zone_id);
     if (params?.limit) searchParams.set("limit", params.limit.toString());
     if (params?.after_hours) searchParams.set("after_hours", "true");
@@ -4121,7 +4121,7 @@ export const securityApi = {
   },
 
   /** Get denied access events */
-  getDeniedEvents: async (site: string = "site-002") => {
+  getDeniedEvents: async (site: string) => {
     try {
       const result = await securityApi.getEvents({ site, limit: 200 });
       const denied = result.events.filter((event) => !event.granted);
@@ -4132,7 +4132,7 @@ export const securityApi = {
   },
 
   /** Get after-hours access events */
-  getAfterHoursEvents: async (site: string = "site-002") => {
+  getAfterHoursEvents: async (site: string) => {
     try {
       return await securityApi.getEvents({ site, limit: 200, after_hours: true });
     } catch (error) {
@@ -4141,7 +4141,7 @@ export const securityApi = {
   },
 
   /** Get all cameras with status */
-  getCameras: async (_site: string = "site-002") => {
+  getCameras: async (_site: string) => {
     try {
       return { cameras: [], count: 0, online: 0 };
     } catch (error) {
@@ -4150,7 +4150,7 @@ export const securityApi = {
   },
 
   /** Get all alarm zones */
-  getAlarmZones: async (_site: string = "site-002") => {
+  getAlarmZones: async (_site: string) => {
     try {
       return { alarm_zones: [], count: 0, armed: 0 };
     } catch (error) {
@@ -4173,7 +4173,7 @@ export const securityApi = {
     ),
 
   /** Get building-wide occupancy */
-  getOccupancy: async (site: string = "site-002") => {
+  getOccupancy: async (site: string) => {
     try {
       const response = await fetchApi<{
         total_occupancy: number;
@@ -4223,7 +4223,7 @@ export const securityApi = {
     fetchApi<SecurityOccupancy>(`/api/security/occupancy/${zoneId}`),
 
   /** Get cross-module occupancy recommendations */
-  getOccupancyRecommendations: async (site: string = "site-002") => {
+  getOccupancyRecommendations: async (site: string) => {
     try {
       const response = await fetchApi<{
         recommendations: Array<Record<string, any>>;
@@ -4252,7 +4252,7 @@ export const securityApi = {
   },
 
   /** Get detected security anomalies (24h default) */
-  getAnomalies: async (site: string = "site-002", daysBack = 1) => {
+  getAnomalies: async (site: string, daysBack = 1) => {
     try {
       return await fetchApi<{ anomalies: any[]; anomaly_count: number }>(
         `/api/security/events/anomalies?site=${encodeURIComponent(site)}&days_back=${daysBack}`

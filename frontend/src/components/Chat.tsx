@@ -34,7 +34,7 @@ export function Chat() {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [sites, setSites] = useState<Site[]>([]);
-  const [selectedSiteId, setSelectedSiteId] = useState<string>("site-002");
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -60,7 +60,7 @@ export function Chat() {
           if (parsedSites.length > 0) {
             const sorted = parsedSites.sort((a, b) => a.name.localeCompare(b.name));
             setSites(sorted);
-            const defaultSite = sorted.find((s) => s.id === "site-002") || sorted[0];
+            const defaultSite = sorted[0];
             if (defaultSite) {
               setSelectedSiteId(defaultSite.id);
             }
@@ -75,7 +75,7 @@ export function Chat() {
         const sitesData = await api.getSites();
         setSites(sitesData.sort((a, b) => a.name.localeCompare(b.name)));
         // Default to Sandton City (site-002) or first site
-        const defaultSite = sitesData.find(s => s.id === "site-002") || sitesData[0];
+        const defaultSite = sitesData[0];
         if (defaultSite) {
           setSelectedSiteId(defaultSite.id);
         }

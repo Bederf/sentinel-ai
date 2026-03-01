@@ -229,12 +229,8 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           return;
         }
 
-        // Determine building_id from site_id (mapping sites.json to building folders)
-        // site-002 -> sandton
-        const SITE_TO_BUILDING: Record<string, string> = {
-          "site-002": "sandton",
-        };
-        const buildingId = SITE_TO_BUILDING[siteId] || siteId;
+        // Use site ID directly as building ID (no hardcoded mappings)
+        const buildingId = siteId;
 
         // Fetch equipment for this building using new building equipment endpoint
         try {
@@ -441,8 +437,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
       // Use equipment control endpoint for Supabase equipment
       await api.controlEquipment(deviceId, point, value);
       // Refresh equipment list after control action
-      const SITE_TO_BUILDING: Record<string, string> = { "site-002": "sandton" };
-      const buildingId = SITE_TO_BUILDING[siteId] || siteId;
+      const buildingId = siteId;
       try {
         const buildingEquipment = await api.getBuildingEquipment(buildingId);
         setEquipment(buildingEquipment.equipment.map((eq: any) => ({
@@ -564,8 +559,8 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   return (
     <div
       ref={containerRef}
-      className="h-full overflow-y-auto p-4 md:p-6"
-      style={{ background: "var(--color-sentinel-bg-canvas)" }}
+      className="overflow-y-auto p-4 md:p-6"
+      style={{ background: "var(--color-sentinel-bg-canvas)", height: 'calc(100vh - 3.5rem)' }}
     >
       {/* Back Button */}
       <button

@@ -48,7 +48,7 @@ export function ExpandableRiskList({
         setLoading(true);
         try {
           // Map site ID to building ID (site-002 -> sandton)
-          const buildingId = siteId === "site-002" ? "sandton" : siteId;
+          const buildingId = siteId;
           const response = await api.getBuildingEquipment(buildingId);
 
           // Filter for at-risk equipment: explicit status OR health-based degradation

@@ -83,10 +83,14 @@ interface SimulationProviderProps {
   siteId?: string
 }
 
-export function SimulationProvider({ children, siteId = 'site-002' }: SimulationProviderProps) {
+export function SimulationProvider({ children, siteId }: SimulationProviderProps) {
   const [state, setState] = useState<SimulationState>(initialState)
 
   const refresh = useCallback(async () => {
+    if (!siteId) {
+      setState(prev => ({ ...prev, isLoading: false }))
+      return
+    }
     setState(prev => ({ ...prev, isLoading: true }))
     try {
       const response = await fetch(`/api/lifecycle/status/${siteId}`)

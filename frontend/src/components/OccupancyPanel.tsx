@@ -36,7 +36,7 @@ interface OccupancyPanelProps {
 }
 
 // Sites with lighting integration installed
-const LIGHTING_ENABLED_SITES = ["site-002"]; // Sandton City
+// All registered sites are eligible for lighting integration (no hardcoded filter)
 
 export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPanelProps) {
   // Get live simulation state when available
@@ -50,7 +50,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
-  const [selectedSiteId, setSelectedSiteId] = useState<string>("site-002"); // Default to Sandton City
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("");
 
   // Zone details panel state
   const [selectedZone, setSelectedZone] = useState<ZoneOccupancy | null>(null);
@@ -61,8 +61,8 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
   } | null>(null);
   const [loadingZoneDetails, setLoadingZoneDetails] = useState(false);
 
-  // Filter sites to only show lighting-enabled buildings
-  const lightingSites = sites.filter(site => LIGHTING_ENABLED_SITES.includes(site.id));
+  // All registered sites are eligible for lighting
+  const lightingSites = sites;
 
   // Compute display occupancy: use simulated value if running, otherwise use API data
   const displayOccupancy = running ? simOccupancyPercent : buildingOccupancy?.occupancy_percent ?? 0;
@@ -111,12 +111,15 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
     }
   }, []);
 
-  // Fetch sites on mount
+  // Fetch sites on mount and auto-select first
   useEffect(() => {
     async function loadSites() {
       try {
         const sitesData = await api.getSites();
         setSites(sitesData);
+        if (sitesData.length > 0 && !selectedSiteId) {
+          setSelectedSiteId(sitesData[0].id);
+        }
       } catch (err) {
         if (!isExpectedApiError(err)) {
           console.error("Failed to fetch sites:", err);
@@ -211,6 +214,37 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
 
   // Compact mode for dashboard
   if (compact && buildingOccupancy && lightingStats) {
+    const wasteAlerts = lightingStats.energy_waste_alerts ?? 0;
+    // Count zones with occupancy-driven lighting control
+    const automatedZones = buildingOccupancy.floors.reduce(
+      (sum, f) => sum + f.zones.filter(z => z.occupancy_percent > 0).length,
+      0,
+    );
+    const totalZones = buildingOccupancy.floors.reduce((sum, f) => sum + f.zones.length, 0);
+    const linkedPct = totalZones > 0 ? Math.round((automatedZones / totalZones) * 100) : 0;
+
+    // Badge: lead with value
+    let compactBadge;
+    if (wasteAlerts > 0) {
+      compactBadge = (
+        <span className="text-xs px-2 py-1 rounded font-medium" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--color-sentinel-amber)" }}>
+          {wasteAlerts} energy waste alert{wasteAlerts !== 1 ? 's' : ''} detected
+        </span>
+      );
+    } else if (automatedZones > 0) {
+      compactBadge = (
+        <span className="text-xs px-2 py-1 rounded font-medium" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--color-sentinel-green)" }}>
+          {automatedZones} zones automated
+        </span>
+      );
+    } else {
+      compactBadge = (
+        <span className="text-xs px-2 py-1 rounded font-medium animate-pulse" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--color-sentinel-amber)" }}>
+          Monitoring and learning...
+        </span>
+      );
+    }
+
     return (
       <div
         className="rounded-md overflow-hidden"
@@ -240,57 +274,49 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
               </span>
             </div>
           </div>
-          <span
-            className="text-xs px-2 py-1 rounded"
-            style={{
-              background: "rgba(59, 130, 246, 0.15)",
-              color: "var(--color-sentinel-blue)",
-            }}
-          >
-            Smart Lighting
-          </span>
+          {compactBadge}
         </div>
 
         {/* Stats Cards */}
         <div className="p-4 space-y-4">
           <div className="grid grid-cols-3 gap-4">
-            {/* Occupancy */}
+            {/* Zones automated */}
             <div className="text-center">
               <span
                 className="text-2xl font-bold block"
-                style={{ color: getOccupancyColor(displayOccupancy) }}
+                style={{ color: automatedZones > 0 ? "var(--color-sentinel-green)" : "var(--color-sentinel-text-disabled)" }}
               >
-                {displayOccupancy.toFixed(0)}%
+                {automatedZones}
               </span>
               <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                {running ? "Live Occupancy" : "Occupancy"}
+                Zones automated
               </span>
             </div>
 
-            {/* Power */}
+            {/* Waste alerts */}
             <div className="text-center">
-              <span className="text-2xl font-bold block" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                {(lightingStats.current_power_watts / 1000).toFixed(1)}
+              <span className="text-2xl font-bold block" style={{
+                color: wasteAlerts > 0
+                  ? "var(--color-sentinel-amber)"
+                  : "var(--color-sentinel-green)",
+              }}>
+                {wasteAlerts}
               </span>
               <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                kW
+                Waste alerts
               </span>
             </div>
 
-            {/* Issues */}
+            {/* Occupancy→HVAC linked */}
             <div className="text-center">
               <span
                 className="text-2xl font-bold block"
-                style={{
-                  color: lightingStats.faulty_luminaires > 0
-                    ? "var(--color-sentinel-amber)"
-                    : "var(--color-sentinel-green)",
-                }}
+                style={{ color: "var(--color-sentinel-blue)" }}
               >
-                {lightingStats.faulty_luminaires}
+                {linkedPct}%
               </span>
               <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Faulty
+                HVAC linked
               </span>
             </div>
           </div>

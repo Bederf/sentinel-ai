@@ -30,7 +30,7 @@ interface SecurityOccupancyPanelProps {
   refreshKey?: number;
 }
 
-export function SecurityOccupancyPanel({ siteId = "site-002", refreshKey }: SecurityOccupancyPanelProps) {
+export function SecurityOccupancyPanel({ siteId = "", refreshKey }: SecurityOccupancyPanelProps) {
   const [zones, setZones] = useState<SecurityOccupancy[]>([]);
   const [totalOccupancy, setTotalOccupancy] = useState(0);
   const [recommendations, setRecommendations] = useState<OccupancyRecommendation[]>([]);

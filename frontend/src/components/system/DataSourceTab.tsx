@@ -143,7 +143,7 @@ interface DataSourceTabProps {
   siteId?: string;
 }
 
-export function DataSourceTab({ siteId = "site-002" }: DataSourceTabProps) {
+export function DataSourceTab({ siteId = "" }: DataSourceTabProps) {
   const [scenarios, setScenarios] = useState<ScenarioInfo[]>([]);
   const [selectedScenario, setSelectedScenario] = useState("fault_day");
   const [duration, setDuration] = useState(5);

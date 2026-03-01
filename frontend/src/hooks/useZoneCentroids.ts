@@ -8,7 +8,7 @@ import { sitesApi, type ZoneCentroid } from '@/lib/api/sites';
  * Cache: 5m staleTime, 30m gcTime (rarely changes)
  * Deduplicates identical queries via React Query
  *
- * @param buildingId - Building code (e.g., 'site-002')
+ * @param buildingId - Building code (resolved from registered buildings)
  * @param options.enabled - Enable/disable query (default: true)
  */
 export function useZoneCentroids(buildingId: string, options?: { enabled?: boolean }) {

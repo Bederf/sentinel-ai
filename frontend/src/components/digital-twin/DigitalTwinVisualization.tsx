@@ -177,7 +177,7 @@ interface DigitalTwinVisualizationProps {
 }
 
 export const DigitalTwinVisualization: React.FC<DigitalTwinVisualizationProps> = ({
-  siteId = 'site-002',
+  siteId = '',
   occupancyEnabled = false,
   people = [],
 }) => {

@@ -45,7 +45,7 @@ export function SecurityDashboard() {
   const [cameras, setCameras] = useState<SecurityCamera[]>([]);
   const [alarmZones, setAlarmZones] = useState<SecurityAlarmZone[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
-  const [selectedSiteId, setSelectedSiteId] = useState<string>("site-002");
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -86,7 +86,7 @@ export function SecurityDashboard() {
         const sitesData = await api.getSites();
         setSites(sitesData.sort((a, b) => a.name.localeCompare(b.name)));
         // Default to site-002 (Sandton City) if available, otherwise first site
-        const defaultSite = sitesData.find(s => s.id === "site-002") || sitesData[0];
+        const defaultSite = sitesData[0];
         if (defaultSite) {
           setSelectedSiteId(defaultSite.id);
         }

@@ -8,6 +8,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSimulation } from '@/contexts/SimulationContext';
+import { useModules } from '@/contexts/ModuleHooks';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card } from '@/components/Card';
 import { TrendingUp, AlertCircle } from 'lucide-react';
@@ -62,7 +63,8 @@ interface PeakHoursData {
 }
 
 export function OccupancyAnalyticsPage() {
-  const [buildingId] = useState('site-002');
+  const { siteId: contextSiteId } = useModules();
+  const [buildingId] = useState(contextSiteId || '');
   const [days, setDays] = useState<1 | 7 | 30>(1);
 
   // Get simulation context

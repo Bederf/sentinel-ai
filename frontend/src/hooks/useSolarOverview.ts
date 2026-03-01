@@ -14,7 +14,7 @@ import type { SolarOverview } from '@/lib/solarApi';
  * - staleTime: 15s (dynamic data, refresh frequently)
  * - gcTime: 5m (keep in memory 5m after unmount)
  *
- * @param siteId - Solar site identifier (e.g., "site-002", "sandton")
+ * @param siteId - Solar site identifier (resolved from registered buildings)
  * @returns Query result with SolarOverview data
  */
 export function useSolarOverview(siteId: string) {

@@ -11,7 +11,7 @@
  * Phase 69-01: Security Module Dashboard
  */
 
-import { useState, useEffect, useCallback, type ReactElement } from "react";
+import { useContext, useState, useEffect, useCallback, type ReactElement } from "react";
 import {
   Card,
   Title,
@@ -51,6 +51,7 @@ import { securityApi } from "@/lib/api";
 import type { SecurityOccupancy } from "@/lib/api";
 import { AccessEventsPanel } from "../AccessEventsPanel";
 import { SecurityOccupancyPanel } from "../SecurityOccupancyPanel";
+import { ModuleContext } from "../../contexts/moduleContextStore";
 
 interface SecurityDashboardProps {
   siteId?: string;
@@ -89,7 +90,9 @@ interface CameraInfo {
   camera_model?: string;
 }
 
-export function SecurityDashboard({ siteId = "site-002" }: SecurityDashboardProps) {
+export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps) {
+  const moduleContext = useContext(ModuleContext);
+  const siteId = propSiteId || moduleContext?.siteId || '';
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(true);
   const [occupancyData, setOccupancyData] = useState<{

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, Clock3, RefreshCw, Shield } from "lucide-react";
 import { aegisApi, type AegisDashboardFilters, type AegisDashboardResponse, type AegisDecision } from "../lib/api/aegis";
 import { formatDateTime } from "../lib/timeFormat";
 import { PageLoading } from "../components/PageLoading";
+import { ModuleContext } from "../contexts/moduleContextStore";
 
 interface AegisConsolePageProps {
   siteId?: string;
@@ -38,7 +39,9 @@ function getWriteStatus(decision: AegisDecision): string {
   return asString(decision.write_status ?? cf.execution_mode, "unknown");
 }
 
-export function AegisConsolePage({ siteId = "site-002" }: AegisConsolePageProps) {
+export function AegisConsolePage({ siteId: propSiteId }: AegisConsolePageProps) {
+  const moduleContext = useContext(ModuleContext);
+  const siteId = propSiteId || moduleContext?.siteId || '';
   const [snapshot, setSnapshot] = useState<AegisDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

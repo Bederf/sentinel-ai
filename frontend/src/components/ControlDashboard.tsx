@@ -89,7 +89,7 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
     const storedAlertContext = sessionStorage.getItem("sentinel_alert_context");
 
     if (storedEquipmentId && storedSiteId) {
-      // Map site ID to the format used in devices (e.g., "site-002" stays as-is for device matching)
+      // Use the stored site ID for device matching
       setSelectedSiteId(storedSiteId);
       setPendingEquipmentSelection(storedEquipmentId);
 

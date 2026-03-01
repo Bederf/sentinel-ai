@@ -21,7 +21,7 @@ export interface SecurityAnomaliesPanelProps {
 }
 
 export function SecurityAnomaliesPanel({
-  siteId = "site-002",
+  siteId = "",
   refreshKey = 0,
 }: SecurityAnomaliesPanelProps) {
   const [anomalies, setAnomalies] = useState<SecurityAnomaly[]>([]);

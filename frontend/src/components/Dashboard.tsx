@@ -68,7 +68,7 @@ interface DashboardProps {
 export function Dashboard({ onViewChange }: DashboardProps) {
   // React Query hooks — filter to primary site only
   const { data: allBuildings = [] } = useBuildingsList();
-  const buildingsList = allBuildings.filter((s: Site) => s.id === "site-002");
+  const buildingsList = allBuildings;
 
   // Module gating
   const { isModuleActive, activeModules } = useModules();
@@ -331,7 +331,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
   // Show site detail view if a site is selected
   if (selectedSiteId) {
     return (
-      <div className="h-full overflow-hidden">
+      <div className="h-full">
         <SiteDetail siteId={selectedSiteId} onBack={handleSiteDetailBack} />
       </div>
     );

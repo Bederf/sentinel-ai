@@ -127,7 +127,7 @@ export function useBESSStatus(siteId: string, refetchInterval?: number) {
  * Aggregate hook for full solar dashboard
  * Combines all four queries and returns consolidated result
  *
- * Usage: useSolarDashboard('site-002')
+ * Usage: useSolarDashboard(siteId)
  *
  * Returns: {
  *   systemOverview: { data, isLoading, error, ... },

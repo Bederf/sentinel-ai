@@ -83,17 +83,10 @@ export function DigitalTwin() {
   // Load available sites via React Query hook (auto-caching, deduplication)
   const { data: sites = [], isLoading: sitesLoading } = useSitesList();
 
-  // Auto-select site-002 as default
+  // Auto-select first available site as default
   useEffect(() => {
     if (!selectedBuildingId && sites.length > 0) {
-      // Try to select site-002 first
-      const site002 = sites.find(s => s.code === 'site-002' || s.id === 'site-002');
-      if (site002) {
-        setSelectedBuildingId(site002.id);
-      } else {
-        // Fallback to first site if site-002 not found
-        setSelectedBuildingId(sites[0].id);
-      }
+      setSelectedBuildingId(sites[0].id);
     }
   }, [sites, selectedBuildingId]);
 
@@ -203,7 +196,7 @@ export function DigitalTwin() {
 
   // Phase 4: Sync with SimulationContext occupancy targets
   const { simulationTime, totalOccupancy } = useOccupancySync({
-    buildingId: buildingId || 'site-002',
+    buildingId: buildingId || '',
     simulationRef,
     enabled: occupancyEnabled,
   });

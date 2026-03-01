@@ -313,24 +313,15 @@ export function MLMetrics() {
         setSites(fetchedSites);
         if (fetchedSites.length > 0 && !selectedSiteId) {
           // Default to site-002 if available, otherwise use first site
-          const site002 = fetchedSites.find(s => s.id === "site-002" || s.code === "site-002");
-          setSelectedSiteId(site002?.id || fetchedSites[0].id);
+          setSelectedSiteId(fetchedSites[0].id);
         }
       })
       .catch((err: any) => {
         console.error("Failed to fetch sites:", err);
         // Fallback if API not available
-        const fallbackSites: Site[] = [
-          {
-            id: "site-002",
-            code: "site-002",
-            name: "Sandton City Office Tower",
-            status: "active",
-            created_at: new Date().toISOString(),
-          },
-        ];
-        setSites(fallbackSites);
-        setSelectedSiteId("site-002");
+        // Fallback: empty state when API is unavailable
+        setSites([]);
+        setSelectedSiteId("");
       });
   }, [selectedSiteId]);
 

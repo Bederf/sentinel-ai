@@ -14,7 +14,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // Helper to normalize site IDs
 function normalizeSiteId(siteId: string): string {
-  if (siteId === 'sandton') return 'site-002';
+  // Legacy alias normalization removed — site IDs are resolved from registered buildings
   return siteId;
 }
 

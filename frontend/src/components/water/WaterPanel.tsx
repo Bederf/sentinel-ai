@@ -48,7 +48,7 @@ interface WaterPanelProps {
 }
 
 export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
-  const [selectedSiteId, setSelectedSiteId] = useState<string>(propSiteId || "site-002");
+  const [selectedSiteId, setSelectedSiteId] = useState<string>(propSiteId || "");
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [currentFlow, setCurrentFlow] = useState<CurrentFlowResponse | null>(null);
@@ -65,14 +65,8 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
         setBuildings(data.buildings || []);
       } catch (err) {
         console.error("Failed to fetch water buildings:", err);
-        // Fallback: only show site-002
-        setBuildings([
-          {
-            code: "site-002",
-            name: "Sandton City Office Tower",
-            region: "Johannesburg",
-          },
-        ]);
+        // Fallback: empty list when API is unavailable
+        setBuildings([]);
       }
     };
 
@@ -298,7 +292,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
                   </option>
                 ))
               ) : (
-                <option value="site-002">Sandton City Office Tower</option>
+                <option value="" disabled>No buildings available</option>
               )}
             </select>
           </div>

@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { Clock, Wifi, WifiOff, Bell, X, LogOut } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { formatTime } from "./lib/timeFormat";
 import api, { AUTH_EXPIRED_EVENT, isExpectedApiError, type Alert, type AuthUser } from "./lib/api";
 import { SimulationTimeIndicator } from "./components/SimulationTimeIndicator";
 import { useRecommendationToasts, RecommendationCard } from "./components/RecommendationToast";
+import { useBuildingsList } from "./hooks/useBuildingsList";
 
 // Security: Prevent console logging in production (Phase 75-07)
 import { initializeSecurityProtections } from "./lib/api/security-utils";
@@ -94,6 +95,11 @@ function App() {
     if (!storedUser || !storedToken) return null;
     return JSON.parse(storedUser);
   });
+
+  // Resolve primary site from registered buildings (no hardcoded site ID)
+  const { data: buildings = [] } = useBuildingsList({ enabled: !!currentUser });
+  const primarySiteId = useMemo(() => buildings[0]?.id || null, [buildings]);
+  const primarySiteName = useMemo(() => buildings[0]?.name || null, [buildings]);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -126,10 +132,14 @@ function App() {
   useEffect(() => {
     const checkSimulationStatus = async () => {
       try {
-        // Use demo_task_id if available (Grant's 365-day simulation), otherwise fall back to site-002
+        // Use demo_task_id if available (Grant's 365-day simulation), otherwise fall back to primary site
+        if (!demoTaskId && !primarySiteId) {
+          setSimulationRunning(false);
+          return;
+        }
         const statusEndpoint = demoTaskId
           ? `/api/lifecycle/status/${demoTaskId}`
-          : '/api/lifecycle/status/site-002';
+          : `/api/lifecycle/status/${primarySiteId}`;
 
         const response = await fetch(statusEndpoint);
         const data = await response.json();
@@ -144,7 +154,7 @@ function App() {
     checkSimulationStatus();
     const interval = setInterval(checkSimulationStatus, 5000);
     return () => clearInterval(interval);
-  }, [demoTaskId]);
+  }, [demoTaskId, primarySiteId]);
 
   // AI Recommendation card state
   const [selectedRec, setSelectedRec] = useState<any>(null);
@@ -165,7 +175,7 @@ function App() {
   }, []);
 
   // Use recommendation toasts hook when logged in
-  const siteId = currentUser ? 'site-002' : '';
+  const siteId = currentUser ? (primarySiteId || '') : '';
   useRecommendationToasts(siteId, handleShowRecCard);
 
   // Initialize devices from simulation on login
@@ -413,26 +423,37 @@ function App() {
       const scenario = (user as any).demo_scenario;
       const isAnnual = (scenario || '').includes('annual');
 
-      fetch('/api/lifecycle/status/site-002')
-        .then(res => res.json())
-        .then(status => {
-          if (status.running) {
-            toast.success(`Simulation in progress: Day ${status.days_simulated || 0}/365`);
-          } else {
-            fetch('/api/lifecycle/start', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ scenario, duration_minutes: isAnnual ? 480 : 24 })
-            })
-              .then(res => res.json())
-              .then(data => {
-                if (data.task_id) setDemoTaskId(data.task_id);
-                toast.success(`Simulation started: ${scenario} (365 days → 8 hours)`);
+      // Demo simulation needs a site ID — resolve from buildings or skip
+      const resolveDemoSite = async () => {
+        try {
+          const sitesResp = await api.getSites();
+          return sitesResp[0]?.id || null;
+        } catch { return null; }
+      };
+
+      resolveDemoSite().then(demoSiteId => {
+        if (!demoSiteId) return;
+        fetch(`/api/lifecycle/status/${demoSiteId}`)
+          .then(res => res.json())
+          .then(status => {
+            if (status.running) {
+              toast.success(`Simulation in progress: Day ${status.days_simulated || 0}/365`);
+            } else {
+              fetch('/api/lifecycle/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scenario, duration_minutes: isAnnual ? 480 : 24 })
               })
-              .catch(err => console.error('Failed to start simulation:', err));
-          }
-        })
-        .catch(err => console.error('Failed to check simulation status:', err));
+                .then(res => res.json())
+                .then(data => {
+                  if (data.task_id) setDemoTaskId(data.task_id);
+                  toast.success(`Simulation started: ${scenario} (365 days → 8 hours)`);
+                })
+                .catch(err => console.error('Failed to start simulation:', err));
+            }
+          })
+          .catch(err => console.error('Failed to check simulation status:', err));
+      });
     }
   }, []);
 
@@ -447,9 +468,9 @@ function App() {
   }
 
   return (
-    <SimulationProvider siteId="site-002">
+    <SimulationProvider siteId={primarySiteId || undefined}>
     <ThemeProvider>
-    <ModuleProvider initialSiteId="site-002" initialSiteName="Sandton City Office Tower">
+    <ModuleProvider initialSiteId={primarySiteId || undefined} initialSiteName={primarySiteName || undefined}>
     <div
       className="h-screen flex"
       style={{ background: "var(--color-sentinel-bg-canvas)" }}
@@ -464,7 +485,7 @@ function App() {
       />
 
       {/* Simulation Time Indicator - Shows when simulation is running */}
-      <SimulationTimeIndicator simulationRunning={simulationRunning} siteId="site-002" />
+      <SimulationTimeIndicator simulationRunning={simulationRunning} siteId={primarySiteId || ''} />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -750,7 +771,7 @@ function App() {
 
         {/* Main content - Takes remaining space */}
         <main
-          className="flex-1 overflow-hidden"
+          className="flex-1 min-h-0 overflow-hidden"
           style={{ background: "var(--color-sentinel-bg-canvas)" }}
         >
           <ViewGuard currentView={currentView} userRole={currentUser?.role} onRedirect={handleViewChange}>
@@ -772,7 +793,7 @@ function App() {
               onError={(error) => setError(error)}
               onViewDevice={(deviceId) => {
                 sessionStorage.setItem("sentinel_selected_equipment", deviceId);
-                sessionStorage.setItem("sentinel_selected_site", "site-002");
+                if (primarySiteId) sessionStorage.setItem("sentinel_selected_site", primarySiteId);
                 handleViewChange("dashboard");
               }}
             />
