@@ -625,6 +625,11 @@ async def shutdown_event(app: FastAPI) -> None:
     except Exception as e:
         _logger.error(f"Error saving simulation checkpoints on shutdown: {e}")
 
+    # ServiceNow client cleanup (Phase 138)
+    from app.services.servicenow_service import shutdown_servicenow_service
+
+    await shutdown_servicenow_service()
+
     scheduler_service.stop()
     await health_simulation_service.stop()
     await simbiot_service.shutdown()
