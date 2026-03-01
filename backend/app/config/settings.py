@@ -236,9 +236,12 @@ class Settings(BaseSettings):
     sprint0_max_power_kw: float = 5.0  # Max power per command during Sprint 0
     sprint0_max_duration_min: int = 10  # Max duration per command during Sprint 0
 
-    # Lifecycle simulation optimization mode (v28.0 — real SENTINEL wiring)
-    simulation_optimization_mode: str = "sentinel"  # sentinel | hardcoded | hybrid
-    simulation_llm_budget_max_calls: int = 5000  # Hard cap per simulation run
+    # Lifecycle simulation optimization mode
+    # IMPORTANT: Simulation MUST NOT consume LLM tokens. It uses rule-based
+    # optimization only. SENTINEL's own background scheduler (every 15 min)
+    # is the correct path for LLM-powered analysis — same as production.
+    simulation_optimization_mode: str = "hardcoded"  # hardcoded | sentinel | hybrid
+    simulation_llm_budget_max_calls: int = 0  # Simulation should not use LLM at all
     simulation_llm_model: str = ""  # Override model (empty = use claude_model)
     simulation_llm_temperature: float = 0.3  # Low temp for deterministic structured output
 

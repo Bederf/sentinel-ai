@@ -2468,23 +2468,26 @@ class LifecycleOrchestrator:
         daylight_factor: int,
         current_hour: int,
     ) -> list[dict]:
-        """Run real SENTINEL optimization — same code path as production.
+        """Run SENTINEL optimization via LLM — DEPRECATED for simulation use.
 
-        Calls AIOptimizerService.analyze_building() which:
-        1. Reads equipment + sensor data from Supabase (written by simulation)
-        2. Gathers current conditions from device_manager
-        3. Builds optimization prompt for Claude
-        4. Calls Claude (with Z.ai fallback)
-        5. Applies quality gate (14 metrics, enforcement)
-        6. Applies health feature enrichment
-        7. Returns OptimizationRecommendation
+        Simulation should NEVER consume LLM tokens. The simulation uses
+        rule-based (_hardcoded_optimization_batch) for its own equipment
+        state progression. SENTINEL's background scheduler (every 15 min)
+        independently runs LLM-powered analyze_building() — that's the
+        correct production path and it writes recommendations to Supabase.
 
-        The simulation never feeds data directly to SENTINEL — it goes through
-        the BMS data layer (Supabase), just like a real building would.
+        This method is retained for manual/hybrid testing only.
 
         Returns list of recommendation dicts for event tracking.
         """
         from app.config.settings import settings as app_settings
+
+        # Simulation must not consume LLM tokens — always use hardcoded
+        if app_settings.simulation_optimization_mode == "hardcoded":
+            logger.debug("Simulation using rule-based optimization (no LLM tokens)")
+            return self._hardcoded_optimization_batch(
+                controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
+            )
 
         # Skip if no LLM available
         if app_settings.local_ai_only:
