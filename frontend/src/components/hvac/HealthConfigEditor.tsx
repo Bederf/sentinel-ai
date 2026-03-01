@@ -234,11 +234,11 @@ export function HealthConfigEditor({ onConfigChange }: HealthConfigEditorProps) 
 
       {editedConfig && (
         <TabGroup>
-          <TabList className="mb-4">
-            <Tab>General Settings</Tab>
-            <Tab>Health Weights</Tab>
+          <TabList className="mb-4 overflow-x-auto">
+            <Tab>General</Tab>
+            <Tab>Weights</Tab>
             <Tab>Thresholds</Tab>
-            <Tab>Fault Weights</Tab>
+            <Tab>Faults</Tab>
           </TabList>
 
           <TabPanels>

@@ -1,7 +1,11 @@
 // @ts-nocheck
 import { useState, useEffect } from 'react';
-import { Shield, ArrowRight } from 'lucide-react';
+import { Shield } from 'lucide-react';
 import { securityApi } from '@/lib/api';
+import {
+  IntelligenceCard, ValueMetricBox, ValueBadge, LearningBadge, AwaitingDataBadge,
+  hasValue, type CardState,
+} from './shared';
 
 interface SecurityIntelligenceCardProps {
   siteId: string;
@@ -11,22 +15,32 @@ interface SecurityIntelligenceCardProps {
 export function SecurityIntelligenceCard({ siteId, onNavigate }: SecurityIntelligenceCardProps) {
   const [status, setStatus] = useState<any>(null);
   const [occupancy, setOccupancy] = useState<any>(null);
+  const [afterHours, setAfterHours] = useState<{ events: any[]; count: number }>({ events: [], count: 0 });
+  const [anomalies, setAnomalies] = useState<{ anomalies: any[]; anomaly_count: number }>({ anomalies: [], anomaly_count: 0 });
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setApiError(false);
       try {
-        const [s, o] = await Promise.allSettled([
+        const [s, o, ah, an] = await Promise.allSettled([
           securityApi.getStatus(siteId),
           securityApi.getOccupancy(siteId),
+          securityApi.getAfterHoursEvents(siteId),
+          securityApi.getAnomalies(siteId),
         ]);
         if (cancelled) return;
+        const anyOk = s.status === 'fulfilled' || o.status === 'fulfilled';
+        if (!anyOk) { setApiError(true); return; }
         if (s.status === 'fulfilled') setStatus(s.value);
         if (o.status === 'fulfilled') setOccupancy(o.value);
+        if (ah.status === 'fulfilled') setAfterHours(ah.value);
+        if (an.status === 'fulfilled') setAnomalies(an.value);
       } catch {
-        // graceful degradation
+        if (!cancelled) setApiError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -44,79 +58,61 @@ export function SecurityIntelligenceCard({ siteId, onNavigate }: SecurityIntelli
     );
   }
 
-  const alarmZones = status?.alarm_zones_total ?? 0;
-  const camerasOnline = status?.cameras_online ?? 0;
   const totalOccupancy = occupancy?.total_occupancy ?? status?.occupancy_total ?? 0;
+  const afterHoursCount = afterHours?.count ?? afterHours?.events?.length ?? 0;
+  const anomalyCount = anomalies?.anomaly_count ?? anomalies?.anomalies?.length ?? 0;
+  const hasOccupancyData = totalOccupancy > 0;
+
+  // Determine state
+  let state: CardState;
+  if (apiError || (!status && !occupancy)) {
+    state = 'no-data';
+  } else if (!hasOccupancyData && anomalyCount === 0 && afterHoursCount === 0) {
+    state = 'learning';
+  } else {
+    state = 'active';
+  }
+
+  // Badge
+  const badge = state === 'no-data'
+    ? <AwaitingDataBadge />
+    : state === 'learning'
+      ? <LearningBadge text="Collecting baseline" />
+      : anomalyCount > 0
+        ? <ValueBadge text={`${anomalyCount} anomal${anomalyCount === 1 ? 'y' : 'ies'} detected`} positive={false} />
+        : hasOccupancyData
+          ? <ValueBadge text={`${totalOccupancy} people — occupancy-HVAC correlation active`} />
+          : <ValueBadge text="Monitoring active" />;
+
+  // Footer
+  const footer = state === 'no-data'
+    ? 'Connected and ready. Start data source to begin analysis.'
+    : state === 'learning'
+      ? 'Building occupancy baseline for cross-system correlation. Anomaly detection will activate once patterns are established.'
+      : hasOccupancyData && afterHoursCount > 0
+        ? `Tracked ${totalOccupancy} occupants, flagged ${afterHoursCount} after-hours entr${afterHoursCount === 1 ? 'y' : 'ies'}, correlated with HVAC scheduling`
+        : hasOccupancyData
+          ? `Tracking ${totalOccupancy} occupants with cross-system HVAC correlation active`
+          : 'Monitoring access events for anomaly detection';
 
   return (
-    <div
-      className="rounded-lg overflow-hidden"
-      style={{
-        background: 'var(--color-sentinel-bg-panel)',
-        border: '1px solid var(--color-sentinel-border)',
-      }}
-    >
-      {/* Header */}
-      <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--color-sentinel-border)' }}>
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded" style={{ background: 'rgba(168, 85, 247, 0.15)' }}>
-            <Shield className="h-5 w-5" style={{ color: '#A855F7' }} />
-          </div>
-          <div>
-            <h3 className="font-medium text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>
-              Security Intelligence
-            </h3>
-            <span className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-              Access control &amp; occupancy monitoring
-            </span>
-          </div>
-        </div>
-        <span
-          className="text-xs px-2 py-1 rounded font-medium animate-pulse"
-          style={{
-            background: 'rgba(245, 158, 11, 0.15)',
-            color: 'var(--color-sentinel-amber)',
-          }}
-        >
-          Collecting baseline...
-        </span>
-      </div>
-
-      {/* Metrics */}
-      <div className="p-4">
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <MetricBox label="Alarm Zones" value={alarmZones > 0 ? `${alarmZones}` : '—'} color="#A855F7" />
-          <MetricBox label="Cameras Online" value={camerasOnline > 0 ? `${camerasOnline}` : '—'} color="#3B82F6" />
-          <MetricBox label="Occupancy" value={`${totalOccupancy}`} color="#10B981" />
-        </div>
-
-        {/* AI Value + Navigate */}
-        <div className="flex items-center justify-between">
-          <p className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-            <span style={{ color: '#A855F7' }}>SENTINEL AI:</span>{' '}
-            Anomaly detection with cross-system occupancy correlation
-          </p>
-          <button
-            onClick={onNavigate}
-            className="flex items-center gap-1 text-xs font-medium hover:underline"
-            style={{ color: '#A855F7', background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            View Details <ArrowRight className="h-3 w-3" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MetricBox({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <div className="p-3 rounded text-center" style={{
-      background: 'var(--color-sentinel-bg-secondary)',
-      border: '1px solid var(--color-sentinel-border)',
-    }}>
-      <div className="text-lg font-semibold" style={{ color }}>{value}</div>
-      <div className="text-xs mt-1" style={{ color: 'var(--color-sentinel-text-secondary)' }}>{label}</div>
-    </div>
+    <IntelligenceCard
+      title="Security Intelligence"
+      subtitle="Access control &amp; occupancy monitoring"
+      icon={<Shield className="h-5 w-5" style={{ color: '#A855F7' }} />}
+      iconBg="rgba(168, 85, 247, 0.15)"
+      accentColor="#A855F7"
+      badge={badge}
+      state={state}
+      footer={footer}
+      onNavigate={onNavigate}
+      metrics={
+        <>
+          <ValueMetricBox label="Occupants tracked" value={hasOccupancyData ? `${totalOccupancy}` : '—'} color="#A855F7" />
+          <ValueMetricBox label="After-hours flagged" value={`${afterHoursCount}`} color={afterHoursCount > 0 ? '#F59E0B' : '#22C55E'} />
+          <ValueMetricBox label="Cross-system correlation" value={hasOccupancyData ? 'Active' : 'Monitoring'} color={hasOccupancyData ? '#10B981' : '#6B7280'} />
+        </>
+      }
+    />
   );
 }

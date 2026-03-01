@@ -312,7 +312,7 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
       </Flex>
 
       <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-        <TabList className="mb-4">
+        <TabList className="mb-4 overflow-x-auto">
           <Tab>All</Tab>
           {types.map((type) => (
             <Tab key={type}>

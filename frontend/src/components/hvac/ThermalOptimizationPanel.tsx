@@ -180,9 +180,9 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
 
       {/* Tabs for different views */}
       <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-        <TabList className="mb-4">
-          <Tab>Temperature Curves</Tab>
-          <Tab>Pre-cooling Schedule</Tab>
+        <TabList className="mb-4 overflow-x-auto">
+          <Tab>Temp Curves</Tab>
+          <Tab>Pre-cooling</Tab>
         </TabList>
 
         <TabPanels>

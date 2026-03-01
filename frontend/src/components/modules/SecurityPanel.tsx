@@ -174,12 +174,12 @@ export function SecurityPanel({ siteId: propSiteId }: SecurityPanelProps): React
       {/* Tabs */}
       <Card>
         <TabGroup index={activeTabIndex} onIndexChange={setActiveTabIndex}>
-          <TabList className="mt-4">
+          <TabList className="mt-4 overflow-x-auto">
             <Tab>Overview</Tab>
-            <Tab>Access Events</Tab>
+            <Tab>Access</Tab>
             <Tab>Visitors</Tab>
             <Tab>Alerts</Tab>
-            <Tab>Access Points</Tab>
+            <Tab>Points</Tab>
           </TabList>
 
           <TabPanels>

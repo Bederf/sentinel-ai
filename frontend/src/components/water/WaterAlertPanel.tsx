@@ -226,12 +226,9 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
 
       {/* Filter Tabs */}
       <TabGroup index={activeTabIndex} onIndexChange={setActiveTabIndex}>
-        <TabList
-          className="glass-subtle rounded-md p-1"
-          style={{ border: "1px solid var(--glass-border)" }}
-        >
+        <TabList className="mb-4 overflow-x-auto">
           <Tab>All ({stats.total})</Tab>
-          <Tab>Unacknowledged ({stats.unacknowledged})</Tab>
+          <Tab>Open ({stats.unacknowledged})</Tab>
           <Tab>Critical ({stats.critical})</Tab>
           <Tab>In Progress</Tab>
           <Tab>Resolved</Tab>

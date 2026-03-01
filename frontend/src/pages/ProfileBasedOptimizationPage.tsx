@@ -63,9 +63,9 @@ export const ProfileBasedOptimizationPage: React.FC<
         </div>
 
         <TabGroup>
-          <TabList>
+          <TabList className="mb-4 overflow-x-auto">
             <Tab>Settings</Tab>
-            <Tab>Pending Recommendations</Tab>
+            <Tab>Pending</Tab>
             <Tab>History</Tab>
           </TabList>
 

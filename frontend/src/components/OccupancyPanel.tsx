@@ -192,7 +192,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
     return <PageLoading message="Loading occupancy data..." />;
   }
 
-  // Error state
+  // Error state — show clean "awaiting data" card instead of raw error
   if (error) {
     return (
       <div
@@ -202,11 +202,37 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
           border: "1px solid var(--color-sentinel-border)",
         }}
       >
-        <div className="p-4">
-          <div className="flex items-center gap-2 text-sm" style={{ color: "var(--color-sentinel-red)" }}>
-            <AlertTriangle className="h-4 w-4" />
-            <span>{error}</span>
+        <div className="p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div
+              className="p-2 rounded"
+              style={{ background: "rgba(59, 130, 246, 0.15)" }}
+            >
+              <Users className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
+            </div>
+            <div>
+              <span className="font-medium text-sm block" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Occupancy Signals
+              </span>
+              <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Occupancy monitoring &amp; automation
+              </span>
+            </div>
           </div>
+          <span
+            className="text-xs px-2 py-1 rounded font-medium"
+            style={{
+              background: "rgba(59, 130, 246, 0.12)",
+              color: "var(--color-sentinel-blue)",
+            }}
+          >
+            Awaiting data
+          </span>
+        </div>
+        <div className="px-4 pb-4">
+          <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            <span style={{ color: "var(--color-sentinel-blue)" }}>SENTINEL AI:</span> Connected and ready. Start data source to begin occupancy analysis.
+          </p>
         </div>
       </div>
     );

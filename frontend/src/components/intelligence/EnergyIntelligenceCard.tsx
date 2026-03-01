@@ -1,8 +1,13 @@
 // @ts-nocheck
 import { useState, useEffect } from 'react';
-import { Zap, ArrowRight } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import api from '@/lib/api';
 import type { OptimizationStatusResponse } from '@/lib/api';
+import {
+  IntelligenceCard, ValueMetricBox, ValueBadge, LearningBadge, AwaitingDataBadge,
+  hasValue, formatCurrencyZAR,
+  type CardState,
+} from './shared';
 
 interface EnergyIntelligenceCardProps {
   siteId: string;
@@ -12,16 +17,18 @@ interface EnergyIntelligenceCardProps {
 export function EnergyIntelligenceCard({ siteId, onNavigate }: EnergyIntelligenceCardProps) {
   const [status, setStatus] = useState<OptimizationStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setApiError(false);
       try {
         const s = await api.getOptimizationStatus(siteId);
         if (!cancelled) setStatus(s);
       } catch {
-        // graceful degradation
+        if (!cancelled) setApiError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -40,82 +47,52 @@ export function EnergyIntelligenceCard({ siteId, onNavigate }: EnergyIntelligenc
   }
 
   const savings = status?.monthly_savings?.monthly_savings_zar ?? 0;
+  const savingsPerHour = status?.monthly_savings?.savings_per_hour_zar ?? 0;
   const mode = status?.optimization_settings?.mode ?? 'supervised';
   const applied = status?.monthly_savings?.applied_recommendations ?? 0;
 
-  const savingsText = savings > 0
-    ? `R${savings.toLocaleString()}/month saved`
-    : 'Collecting baseline...';
+  // Determine state
+  let state: CardState;
+  if (apiError || !status || status.optimization_status === 'unknown') {
+    state = 'no-data';
+  } else if (!hasValue(savings) && applied === 0) {
+    state = 'learning';
+  } else {
+    state = 'active';
+  }
+
+  // Badge per state
+  const badge = state === 'no-data'
+    ? <AwaitingDataBadge />
+    : state === 'learning'
+      ? <LearningBadge text="Collecting baseline" />
+      : <ValueBadge text={`${formatCurrencyZAR(savings)} saved this month`} />;
+
+  // Footer per state
+  const footer = state === 'no-data'
+    ? 'Connected and ready. Start data source to begin analysis.'
+    : state === 'learning'
+      ? 'Building energy consumption baseline. Full analysis available once patterns are established.'
+      : `Applied ${applied} optimisation${applied !== 1 ? 's' : ''} saving ${formatCurrencyZAR(savings)}/month with tariff-aware scheduling`;
 
   return (
-    <div
-      className="rounded-lg overflow-hidden"
-      style={{
-        background: 'var(--color-sentinel-bg-panel)',
-        border: '1px solid var(--color-sentinel-border)',
-      }}
-    >
-      {/* Header */}
-      <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--color-sentinel-border)' }}>
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded" style={{ background: 'rgba(16, 185, 129, 0.15)' }}>
-            <Zap className="h-5 w-5" style={{ color: '#10B981' }} />
-          </div>
-          <div>
-            <h3 className="font-medium text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>
-              Energy Intelligence
-            </h3>
-            <span className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-              Optimisation &amp; cost management
-            </span>
-          </div>
-        </div>
-        <span
-          className="text-xs px-2 py-1 rounded font-medium"
-          style={{
-            background: savings > 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-            color: savings > 0 ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-amber)',
-          }}
-        >
-          {savingsText}
-        </span>
-      </div>
-
-      {/* Metrics */}
-      <div className="p-4">
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <MetricBox label="Monthly Savings" value={savings > 0 ? `R${savings.toLocaleString()}` : '—'} color="#10B981" />
-          <MetricBox label="Mode" value={mode === 'automatic' ? 'Auto' : 'Supervised'} color="#3B82F6" />
-          <MetricBox label="Applied" value={`${applied}`} color="#F59E0B" />
-        </div>
-
-        {/* AI Value + Navigate */}
-        <div className="flex items-center justify-between">
-          <p className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-            <span style={{ color: 'var(--color-sentinel-green)' }}>SENTINEL AI:</span>{' '}
-            Cross-system energy optimisation with tariff awareness
-          </p>
-          <button
-            onClick={onNavigate}
-            className="flex items-center gap-1 text-xs font-medium hover:underline"
-            style={{ color: 'var(--color-sentinel-green)', background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            View Details <ArrowRight className="h-3 w-3" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MetricBox({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <div className="p-3 rounded text-center" style={{
-      background: 'var(--color-sentinel-bg-secondary)',
-      border: '1px solid var(--color-sentinel-border)',
-    }}>
-      <div className="text-lg font-semibold" style={{ color }}>{value}</div>
-      <div className="text-xs mt-1" style={{ color: 'var(--color-sentinel-text-secondary)' }}>{label}</div>
-    </div>
+    <IntelligenceCard
+      title="Energy Intelligence"
+      subtitle="Optimisation &amp; cost management"
+      icon={<Zap className="h-5 w-5" style={{ color: '#10B981' }} />}
+      iconBg="rgba(16, 185, 129, 0.15)"
+      accentColor="var(--color-sentinel-green)"
+      badge={badge}
+      state={state}
+      footer={footer}
+      onNavigate={onNavigate}
+      metrics={
+        <>
+          <ValueMetricBox label="Optimisations applied" value={`${applied}`} color={applied > 0 ? '#10B981' : '#6B7280'} />
+          <ValueMetricBox label="Mode" value={mode === 'automatic' ? 'Auto' : 'Supervised'} color="#3B82F6" />
+          <ValueMetricBox label="Savings rate" value={hasValue(savingsPerHour) ? `${formatCurrencyZAR(savingsPerHour)}/hr` : '—'} color="#F59E0B" />
+        </>
+      }
+    />
   );
 }

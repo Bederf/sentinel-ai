@@ -177,7 +177,7 @@ export function ComplianceDashboard({ siteCode }: ComplianceDashboardProps) {
       <h1 className="text-3xl font-bold mb-6">Compliance Management</h1>
 
       <TabGroup index={selectedTab} onIndexChange={setSelectedTab}>
-        <TabList>
+        <TabList className="mb-4 overflow-x-auto">
           {tabs.map((tab) => (
             <Tab key={tab.name}>
               {tab.icon} {tab.name}

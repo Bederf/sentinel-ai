@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card, Title, Text, Grid, Badge, Flex, Tab, TabGroup, TabList, TabPanel, TabPanels } from '@tremor/react';
+import { Activity } from 'lucide-react';
 import { energyCentreApi } from '../../lib/energyCentreApi';
 import type { SCADAOverview } from '../../lib/energyCentreApi';
 import { SingleLineDiagram } from './SingleLineDiagram';
@@ -158,42 +159,75 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
 
   if (loading) {
     return (
-      <Card>
-        <Title>Energy Centre</Title>
-        <div className="animate-pulse h-96 bg-gray-100 rounded mt-4" />
-      </Card>
+      <div className="h-full p-4 md:p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded" style={{ background: "rgba(234, 179, 8, 0.15)" }}>
+            <Activity className="h-6 w-6" style={{ color: "#EAB308" }} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>Energy Centre</h1>
+            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Power Distribution & Generation Management</p>
+          </div>
+        </div>
+        <div className="animate-pulse h-96 bg-gray-100 dark:bg-gray-800 rounded" />
+      </div>
     );
   }
 
   if (!overview) {
     return (
-      <Card>
-        <Title>Energy Centre</Title>
+      <div className="h-full p-4 md:p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded" style={{ background: "rgba(234, 179, 8, 0.15)" }}>
+            <Activity className="h-6 w-6" style={{ color: "#EAB308" }} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>Energy Centre</h1>
+            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Power Distribution & Generation Management</p>
+          </div>
+        </div>
         <Text className="text-red-500">Failed to load energy centre data</Text>
-      </Card>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header with Status */}
+    <div className="h-full overflow-y-auto p-4 md:p-6">
+      {/* Page Header — matches Lighting tab pattern */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded" style={{ background: "rgba(234, 179, 8, 0.15)" }}>
+              <Activity className="h-6 w-6" style={{ color: "#EAB308" }} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  Energy Centre
+                </h1>
+                {overview.status.on_generator ? (
+                  <div className="px-2 py-0.5 rounded text-xs font-medium"
+                    style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B' }}>
+                    On Generator
+                  </div>
+                ) : (
+                  <div className="px-2 py-0.5 rounded text-xs font-medium"
+                    style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22C55E' }}>
+                    Mains Supply
+                  </div>
+                )}
+              </div>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Power Distribution & Generation Management
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+      {/* AI Alerts Card */}
       <Card>
-        <Flex justifyContent="between" alignItems="center">
-          <div>
-            <Title>Energy Centre - {overview.centre?.name || siteId}</Title>
-            <Text className="text-xs">Last update: {new Date(overview.timestamp).toLocaleTimeString()}</Text>
-          </div>
-          <div className="flex gap-2">
-            {overview.status.on_generator ? (
-              <Badge color="amber" size="lg">ON GENERATOR</Badge>
-            ) : (
-              <Badge color="green" size="lg">MAINS SUPPLY</Badge>
-            )}
-            <Badge color={overview.status.all_systems_normal ? 'green' : 'amber'}>
-              {overview.status.all_systems_normal ? 'Normal' : 'Attention'}
-            </Badge>
-          </div>
-        </Flex>
 
         {/* AI Alerts */}
         {alerts.length > 0 && (
@@ -228,7 +262,7 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
 
       {/* Tabbed Views */}
       <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-        <TabList className="mb-4">
+        <TabList className="mb-4 overflow-x-auto">
           <Tab>Overview</Tab>
           <Tab>Generators</Tab>
           <Tab>Power</Tab>
@@ -294,6 +328,7 @@ export function EnergyCentreDashboard({ siteId, onAIRecommendation, enabledModul
           </TabPanel>
         </TabPanels>
       </TabGroup>
+      </div>
     </div>
   );
 }

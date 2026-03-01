@@ -393,12 +393,11 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
       {/* Tab Navigation and Content */}
       <TabGroup index={activeTabIndex} onIndexChange={setActiveTabIndex}>
         <TabList
-          className="mb-6 glass-subtle rounded-md p-1"
-          style={{ border: "1px solid var(--glass-border)" }}
+          className="mb-6 overflow-x-auto"
         >
           <Tab>Overview</Tab>
           <Tab>Zones</Tab>
-          <Tab>Costs & Forecast</Tab>
+          <Tab>Costs</Tab>
           <Tab>Alerts</Tab>
         </TabList>
 

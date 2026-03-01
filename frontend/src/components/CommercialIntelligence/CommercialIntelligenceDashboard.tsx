@@ -115,18 +115,18 @@ export default function CommercialIntelligenceDashboard({
 
       {/* Main Navigation Tabs */}
       <TabGroup index={viewMode === 'quote-tools' ? 0 : viewMode === 'renewal-analysis' ? 1 : viewMode === 'benchmarks' ? 2 : 3}>
-        <TabList>
+        <TabList className="mb-4 overflow-x-auto">
           <Tab icon={FileText} onClick={() => { setViewMode('quote-tools'); setActiveTab(0) }}>
-            Quote Generator
+            Quotes
           </Tab>
           <Tab icon={FileText} onClick={() => { setViewMode('renewal-analysis'); setActiveTab(0) }}>
-            Renewal Analysis
+            Renewals
           </Tab>
           <Tab icon={BarChart3} onClick={() => { setViewMode('benchmarks'); setActiveTab(0) }}>
-            Market Benchmarks
+            Benchmarks
           </Tab>
           <Tab icon={TrendingUp} onClick={() => { setViewMode('win-loss'); setActiveTab(0) }}>
-            Win/Loss Analysis
+            Win/Loss
           </Tab>
         </TabList>
         <TabPanels>
@@ -135,10 +135,10 @@ export default function CommercialIntelligenceDashboard({
             {currentQuote ? (
               // After quote generation: show generator, analysis, and preview tabs
               <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-                <TabList>
-                  <Tab icon={FileText}>Quote Details</Tab>
-                  <Tab icon={BarChart3}>What-If Analysis</Tab>
-                  <Tab icon={FileText}>Preview & Export</Tab>
+                <TabList className="mb-4 overflow-x-auto">
+                  <Tab icon={FileText}>Details</Tab>
+                  <Tab icon={BarChart3}>What-If</Tab>
+                  <Tab icon={FileText}>Preview</Tab>
                 </TabList>
                 <TabPanels>
                   <TabPanel>

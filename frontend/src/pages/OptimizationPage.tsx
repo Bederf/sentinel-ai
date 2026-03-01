@@ -315,10 +315,10 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
   return (
     <div className="h-full overflow-y-auto p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
       <TabGroup>
-        <TabList className="mb-6">
+        <TabList className="mb-6 overflow-x-auto">
           <Tab>Load Shedding</Tab>
-          <Tab>Profile-Based Optimization</Tab>
-          <Tab>Validation Metrics</Tab>
+          <Tab>Optimization</Tab>
+          <Tab>Validation</Tab>
         </TabList>
 
         <TabPanels>

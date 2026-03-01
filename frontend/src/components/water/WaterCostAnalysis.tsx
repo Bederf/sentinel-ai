@@ -183,11 +183,8 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
 
   return (
     <TabGroup index={activeTabIndex} onIndexChange={setActiveTabIndex}>
-      <TabList
-        className="mb-6 glass-subtle rounded-md p-1"
-        style={{ border: "1px solid var(--glass-border)" }}
-      >
-        <Tab>Current Period</Tab>
+      <TabList className="mb-6 overflow-x-auto">
+        <Tab>Current</Tab>
         <Tab>Forecast</Tab>
         <Tab>Tariff</Tab>
       </TabList>

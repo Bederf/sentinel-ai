@@ -186,28 +186,31 @@ export default function SystemHealthPage() {
   const overallTone = getStatusTone(overallStatus);
 
   return (
-    <div className="p-6 space-y-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
-      {/* Page Header */}
-      <div
-        className="glass-panel rounded-lg p-5"
-        style={{ border: "1px solid var(--glass-border)" }}
-      >
-        <h1
-          className="text-2xl font-semibold tracking-tight"
-          style={{ color: "var(--color-sentinel-text-primary)" }}
-        >
-          System Health Dashboard
-        </h1>
-        <p className="text-sm mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-          Real-time monitoring and diagnostics
-        </p>
+    <div className="h-full overflow-y-auto p-4 md:p-6">
+      {/* Page Header — matches Lighting tab pattern */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded" style={{ background: "rgba(99, 102, 241, 0.15)" }}>
+              <Server className="h-6 w-6" style={{ color: "#6366F1" }} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                System Health
+              </h1>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Real-time monitoring &amp; diagnostics
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Tab Interface */}
       <TabGroup defaultIndex={selectedTab} onIndexChange={setSelectedTab}>
-        <TabList className="glass-subtle rounded-md p-1" style={{ border: "1px solid var(--glass-border)" }}>
+        <TabList className="mb-4 overflow-x-auto">
           <Tab>Health</Tab>
-          <Tab>Historical Insights</Tab>
+          <Tab>Historical</Tab>
           <Tab>AI Performance</Tab>
           <Tab>Model Health</Tab>
         </TabList>

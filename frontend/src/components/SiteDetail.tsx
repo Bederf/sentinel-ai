@@ -1483,7 +1483,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
         )}
         {/* #8 Lighting Intelligence */}
         {isModuleActive('lighting') && visibleSections.includes('lighting-intelligence') && (
-          <LightingIntelligencePanel siteId={siteId} />
+          <LightingIntelligencePanel siteId={siteId} compact />
         )}
       </div>
       </>

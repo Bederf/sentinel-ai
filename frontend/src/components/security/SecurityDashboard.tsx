@@ -593,7 +593,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
 
       {/* Tabbed Layout */}
       <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-        <TabList variant="solid">
+        <TabList variant="solid" className="overflow-x-auto">
           {tabs as unknown as ReactElement[]}
         </TabList>
         <TabPanels>

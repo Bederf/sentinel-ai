@@ -308,7 +308,7 @@ export function ModularDashboard({
 
       {/* Tabbed Module Views */}
       <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-        <TabList className="mb-4">
+        <TabList className="mb-4 overflow-x-auto">
           {tabs as unknown as React.ReactElement}
         </TabList>
         <TabPanels>

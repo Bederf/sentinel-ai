@@ -1,8 +1,12 @@
 // @ts-nocheck
 import { useState, useEffect } from 'react';
-import { Droplets, ArrowRight } from 'lucide-react';
+import { Droplets } from 'lucide-react';
 import { waterApi } from '@/lib/waterApi';
 import type { WaterTrending, WaterAlert } from '@/lib/waterApi';
+import {
+  IntelligenceCard, ValueMetricBox, ValueBadge, LearningBadge, AwaitingDataBadge,
+  hasValue, type CardState,
+} from './shared';
 
 interface WaterIntelligenceCardProps {
   siteId: string;
@@ -13,21 +17,26 @@ export function WaterIntelligenceCard({ siteId, onNavigate }: WaterIntelligenceC
   const [trending, setTrending] = useState<WaterTrending | null>(null);
   const [alerts, setAlerts] = useState<WaterAlert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setApiError(false);
       try {
         const [t, a] = await Promise.allSettled([
           waterApi.getTrending(siteId, 'weekly'),
           waterApi.getActiveAlerts(siteId),
         ]);
         if (cancelled) return;
-        if (t.status === 'fulfilled') setTrending(t.value);
-        if (a.status === 'fulfilled') setAlerts(Array.isArray(a.value) ? a.value : (a.value as any)?.alerts ?? []);
+        const trendOk = t.status === 'fulfilled';
+        const alertOk = a.status === 'fulfilled';
+        if (!trendOk && !alertOk) { setApiError(true); return; }
+        if (trendOk) setTrending(t.value);
+        if (alertOk) setAlerts(Array.isArray(a.value) ? a.value : (a.value as any)?.alerts ?? []);
       } catch {
-        // graceful degradation
+        if (!cancelled) setApiError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -47,96 +56,59 @@ export function WaterIntelligenceCard({ siteId, onNavigate }: WaterIntelligenceC
 
   const baselineComparison = trending?.baseline_comparison_percent ?? 0;
   const activeAlerts = alerts.length;
-  const peakFlow = trending?.peak_flow_rate_lpm ?? 0;
   const trendDirection = trending?.trend_direction ?? 'stable';
 
-  const savingsText = baselineComparison < 0
-    ? `${Math.abs(baselineComparison).toFixed(0)}% below baseline`
-    : baselineComparison > 0
-      ? `${baselineComparison.toFixed(0)}% above baseline`
-      : 'Collecting baseline...';
+  // Determine state
+  let state: CardState;
+  if (apiError || (!trending && activeAlerts === 0)) {
+    state = 'no-data';
+  } else if (trending && baselineComparison === 0 && activeAlerts === 0) {
+    state = 'learning';
+  } else {
+    state = 'active';
+  }
+
+  // Badge
+  const badge = state === 'no-data'
+    ? <AwaitingDataBadge />
+    : state === 'learning'
+      ? <LearningBadge text="Collecting baseline" />
+      : activeAlerts > 0
+        ? <ValueBadge text={`${activeAlerts} anomal${activeAlerts === 1 ? 'y' : 'ies'} detected`} positive={false} />
+        : <ValueBadge text={`${Math.abs(baselineComparison).toFixed(0)}% below baseline`} />;
+
+  // Footer
+  const footer = state === 'no-data'
+    ? 'Connected and ready. Start data source to begin analysis.'
+    : state === 'learning'
+      ? 'Building consumption baseline from historical patterns. Full comparison available soon.'
+      : activeAlerts > 0 && baselineComparison < 0
+        ? `Detected ${activeAlerts} anomal${activeAlerts === 1 ? 'y' : 'ies'}, maintained ${Math.abs(baselineComparison).toFixed(0)}% below baseline through pattern analysis`
+        : activeAlerts > 0
+          ? `Detected ${activeAlerts} consumption anomal${activeAlerts === 1 ? 'y' : 'ies'} through pattern analysis`
+          : `Maintained ${Math.abs(baselineComparison).toFixed(0)}% below baseline — no anomalies detected`;
+
+  const trendLabel = trendDirection === 'rising' ? 'Rising' : trendDirection === 'falling' ? 'Falling' : 'Stable';
+  const trendColor = trendDirection === 'falling' ? '#10B981' : trendDirection === 'rising' ? '#F59E0B' : '#3B82F6';
 
   return (
-    <div
-      className="rounded-lg overflow-hidden"
-      style={{
-        background: 'var(--color-sentinel-bg-panel)',
-        border: '1px solid var(--color-sentinel-border)',
-      }}
-    >
-      {/* Header */}
-      <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--color-sentinel-border)' }}>
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded" style={{ background: 'rgba(6, 182, 212, 0.15)' }}>
-            <Droplets className="h-5 w-5" style={{ color: '#06B6D4' }} />
-          </div>
-          <div>
-            <h3 className="font-medium text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>
-              Water Intelligence
-            </h3>
-            <span className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-              Consumption monitoring &amp; leak detection
-            </span>
-          </div>
-        </div>
-        <span
-          className="text-xs px-2 py-1 rounded font-medium"
-          style={{
-            background: baselineComparison <= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-            color: baselineComparison <= 0 ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-amber)',
-          }}
-        >
-          {savingsText}
-        </span>
-      </div>
-
-      {/* Metrics */}
-      <div className="p-4">
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <MetricBox
-            label="vs Baseline"
-            value={baselineComparison !== 0 ? `${baselineComparison > 0 ? '+' : ''}${baselineComparison.toFixed(0)}%` : '—'}
-            color={baselineComparison <= 0 ? '#10B981' : '#F59E0B'}
-          />
-          <MetricBox
-            label="Active Alerts"
-            value={`${activeAlerts}`}
-            color={activeAlerts > 0 ? '#EF4444' : '#22C55E'}
-          />
-          <MetricBox
-            label="Peak Flow"
-            value={peakFlow > 0 ? `${peakFlow.toFixed(1)} L/m` : '—'}
-            color="#06B6D4"
-          />
-        </div>
-
-        {/* AI Value + Navigate */}
-        <div className="flex items-center justify-between">
-          <p className="text-xs" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-            <span style={{ color: '#06B6D4' }}>SENTINEL AI:</span>{' '}
-            Leak detection with pattern analysis &amp; baseline tracking
-          </p>
-          <button
-            onClick={onNavigate}
-            className="flex items-center gap-1 text-xs font-medium hover:underline"
-            style={{ color: '#06B6D4', background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            View Details <ArrowRight className="h-3 w-3" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MetricBox({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <div className="p-3 rounded text-center" style={{
-      background: 'var(--color-sentinel-bg-secondary)',
-      border: '1px solid var(--color-sentinel-border)',
-    }}>
-      <div className="text-lg font-semibold" style={{ color }}>{value}</div>
-      <div className="text-xs mt-1" style={{ color: 'var(--color-sentinel-text-secondary)' }}>{label}</div>
-    </div>
+    <IntelligenceCard
+      title="Water Intelligence"
+      subtitle="Consumption monitoring &amp; leak detection"
+      icon={<Droplets className="h-5 w-5" style={{ color: '#06B6D4' }} />}
+      iconBg="rgba(6, 182, 212, 0.15)"
+      accentColor="#06B6D4"
+      badge={badge}
+      state={state}
+      footer={footer}
+      onNavigate={onNavigate}
+      metrics={
+        <>
+          <ValueMetricBox label="Below baseline" value={baselineComparison < 0 ? `${Math.abs(baselineComparison).toFixed(0)}%` : '—'} color={baselineComparison <= 0 ? '#10B981' : '#F59E0B'} />
+          <ValueMetricBox label="Alerts caught" value={`${activeAlerts}`} color={activeAlerts > 0 ? '#EF4444' : '#22C55E'} />
+          <ValueMetricBox label="Trend" value={trendLabel} color={trendColor} />
+        </>
+      }
+    />
   );
 }

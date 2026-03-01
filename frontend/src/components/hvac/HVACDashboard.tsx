@@ -178,19 +178,35 @@ export function HVACDashboard({
 
   if (loading) {
     return (
-      <Card>
-        <Title>HVAC Module</Title>
-        <div className="animate-pulse h-96 bg-gray-100 rounded mt-4" />
-      </Card>
+      <div className="h-full p-4 md:p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
+            <Wind className="h-6 w-6" style={{ color: "#3B82F6" }} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>HVAC Control</h1>
+            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Climate Control & Thermal Management</p>
+          </div>
+        </div>
+        <div className="animate-pulse h-96 bg-gray-100 dark:bg-gray-800 rounded" />
+      </div>
     );
   }
 
   if (!overview) {
     return (
-      <Card>
-        <Title>HVAC Module</Title>
+      <div className="h-full p-4 md:p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
+            <Wind className="h-6 w-6" style={{ color: "#3B82F6" }} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>HVAC Control</h1>
+            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Climate Control & Thermal Management</p>
+          </div>
+        </div>
         <Text className="text-red-500">Failed to load HVAC data</Text>
-      </Card>
+      </div>
     );
   }
 
@@ -221,11 +237,11 @@ export function HVACDashboard({
       </Flex>
     </Tab>,
     <Tab key="equipment">Equipment</Tab>,
-    <Tab key="optimization">Optimization</Tab>,
+    <Tab key="optimization">Optimize</Tab>,
     <Tab key="health-config">
       <Flex alignItems="center" className="gap-1">
         <Settings className="w-4 h-4" />
-        Health Config
+        Health
       </Flex>
     </Tab>,
   ];
@@ -404,41 +420,29 @@ export function HVACDashboard({
   ];
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <Card>
-        <Flex justifyContent="between" alignItems="center">
-          <div>
-            <Title>HVAC Module - {siteId}</Title>
-            <Text className="text-xs">
-              Last update: {new Date(overview.timestamp).toLocaleTimeString()}
-            </Text>
+    <div className="h-full overflow-y-auto p-4 md:p-6">
+      {/* Page Header — matches Lighting tab pattern */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
+              <Wind className="h-6 w-6" style={{ color: "#3B82F6" }} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                HVAC Control
+              </h1>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Climate Control & Thermal Management
+              </p>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Badge
-              color={
-                overview.health_status === "healthy"
-                  ? "green"
-                  : overview.health_status === "attention"
-                  ? "amber"
-                  : "red"
-              }
-              size="lg"
-            >
-              Health: {overview.overall_health.toFixed(0)}%
-            </Badge>
-            <Badge color={overview.zones.fault > 0 ? "amber" : "green"}>
-              {overview.zones.fault > 0
-                ? `${overview.zones.fault} Zone Fault(s)`
-                : "All Zones Normal"}
-            </Badge>
-          </div>
-        </Flex>
-      </Card>
+        </div>
+      </div>
 
       {/* Tabbed Views */}
       <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-        <TabList className="mb-4">{tabs as unknown as React.ReactElement}</TabList>
+        <TabList className="mb-4 overflow-x-auto">{tabs as unknown as React.ReactElement}</TabList>
         <TabPanels>{panels as unknown as React.ReactElement}</TabPanels>
       </TabGroup>
     </div>

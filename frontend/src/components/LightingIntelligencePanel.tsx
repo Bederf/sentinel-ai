@@ -66,7 +66,7 @@ interface DaliData {
   };
 }
 
-export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
+export function LightingIntelligencePanel({ siteId, compact = false }: { siteId: string; compact?: boolean }) {
   const [data, setData] = useState<DaliData | null>(null);
   const [loading, setLoading] = useState(true);
   const { daysSimulated, running } = useSimulation();
@@ -258,22 +258,22 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
               className="text-xs"
               style={{ color: 'var(--color-sentinel-text-secondary)' }}
             >
-              {isSimulation
-                ? `Day ${maxDay} of 365 · Comparative Simulation · Site-002 Sandton Office Complex`
-                : `Live Data · Real-Time Status · Site-002 Sandton Office Complex`}
+              {`${summary.total_zones ?? 0} zones · ${summary.total_luminaires ?? 0} luminaires`}
             </span>
           </div>
         </div>
         <span
-          className="text-xs px-2 py-1 rounded"
+          className="text-xs px-2 py-1 rounded font-medium"
           style={{
             background: isSimulation ? 'rgba(34, 197, 94, 0.15)' : 'rgba(76, 175, 80, 0.15)',
             color: isSimulation ? '#22C55E' : '#4CAF50',
           }}
         >
           {isSimulation
-            ? `${fmtPct(summary.savings_pct)} Total Savings`
-            : `${summary.total_zones} Zones · ${summary.avg_occupancy_percent}% Occupied`}
+            ? `${fmtRK(summary.total_savings_zar || 0)} annual savings projected`
+            : summary.faulty_luminaires > 0
+              ? `${summary.faulty_luminaires} fault${summary.faulty_luminaires !== 1 ? 's' : ''} detected`
+              : `${summary.total_zones ?? 0} zones monitored`}
         </span>
       </div>
 
@@ -291,7 +291,7 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
               />
               <MetricCard
                 icon={<Zap className="h-5 w-5" />}
-                label="Energy Reduced"
+                label="Energy waste prevented"
                 value={`${energyReductionPct.toFixed(0)}%`}
                 subtitle={`${fmtRK(
                   (summary.dali_annual_cost || 0) - (summary.sentinel_annual_cost || 0)
@@ -300,9 +300,9 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
               />
               <MetricCard
                 icon={<Brain className="h-5 w-5" />}
-                label="AI Accuracy"
+                label="ML effectiveness"
                 value={`${summary.ml_effectiveness_pct}%`}
-                subtitle="ML learning effectiveness"
+                subtitle="Pattern recognition accuracy"
                 color="#00D2FF"
               />
             </>
@@ -319,7 +319,7 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
                 icon={<Zap className="h-5 w-5" />}
                 label="Lighting Power"
                 value={`${(summary.total_power_w || 0).toFixed(0)}W`}
-                subtitle={`${summary.total_luminaires} luminaires active`}
+                subtitle={`${summary.total_luminaires ?? 0} luminaires active`}
                 color="#FACC15"
               />
               <MetricCard
@@ -333,8 +333,21 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
           )}
         </div>
 
-        {/* Charts - Different based on data source */}
-        {isSimulation ? (
+        {/* Compact mode: header + metrics + footer only */}
+        {compact && (
+          <div className="flex items-center justify-between">
+            <p
+              className="text-xs"
+              style={{ color: 'var(--color-sentinel-text-secondary)' }}
+            >
+              <span style={{ color: '#4CAF50' }}>SENTINEL AI:</span>{' '}
+              Monitoring {summary.total_zones ?? 0} zones with occupancy-driven lighting control
+            </p>
+          </div>
+        )}
+
+        {/* Charts - Different based on data source (hidden in compact mode) */}
+        {!compact && (isSimulation ? (
           <>
         {/* Cumulative Savings Chart */}
         <div>
@@ -495,21 +508,21 @@ export function LightingIntelligencePanel({ siteId }: { siteId: string }) {
               icon={<Zap className="h-4 w-4" />}
               title="24h Energy"
               value={`${(summary.energy_stats?.total_kwh_24h || 0).toFixed(1)} kWh`}
-              subtitle={`${summary.total_sensors} sensors monitoring`}
+              subtitle={`${summary.total_sensors ?? 0} sensors monitoring`}
               color="#FACC15"
             />
             <BreakdownCard
               icon={<Activity className="h-4 w-4" />}
               title="System Health"
-              value={`${summary.total_luminaires - (summary.faulty_luminaires || 0)}/${summary.total_luminaires}`}
+              value={`${(summary.total_luminaires ?? 0) - (summary.faulty_luminaires ?? 0)}/${summary.total_luminaires ?? 0}`}
               subtitle={`${summary.faulty_luminaires || 0} faulty luminaires`}
               color={summary.faulty_luminaires === 0 ? '#22C55E' : '#EF4444'}
             />
           </div>
           </>
-        )}
+        ))}
 
-        {isSimulation && (
+        {!compact && isSimulation && (
         <>
         {/* Monthly Savings Bar Chart */}
         <div>
