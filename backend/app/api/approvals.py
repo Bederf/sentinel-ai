@@ -18,6 +18,7 @@ from app.models.approval import ApprovalRequest, RejectionRequest, ApprovalRespo
 from app.services.approval_service import get_approval_service
 from app.database.repositories.recommendation_repository import RecommendationRepository
 from app.models.recommendation import RecommendationStatus
+from app.models.module_registry import ModuleType
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,25 @@ async def approve_recommendation(
     try:
         if not request:
             raise HTTPException(status_code=400, detail="Request body required with approved_by field")
+
+        # Gate: control module must be active for equipment's domain
+        recommendations_repo = RecommendationRepository()
+        recommendation = await recommendations_repo.get_by_id(recommendation_id)
+        if not recommendation:
+            raise HTTPException(status_code=404, detail=f"Recommendation {recommendation_id} not found")
+
+        control_module = _get_control_module_for_equipment(recommendation.target_equipment or "")
+        if control_module:
+            from app.services.module_registry_service import module_registry
+
+            site_id = recommendation.site_id or "site-002"
+            if not module_registry.is_module_active(site_id, control_module):
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"The {control_module.value.upper()} module is not active for this site. "
+                    f"Recommendations are visible in monitoring mode, but control actions "
+                    f"require the control module to be enabled.",
+                )
 
         approval_service = get_approval_service()
 
@@ -274,3 +294,51 @@ async def rollback_approval(
     except Exception as e:
         logger.error(f"Error rolling back recommendation {recommendation_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to rollback recommendation: {str(e)}")
+
+
+# Equipment type → control module mapping
+# Uses SENTINEL naming convention: {SITE}-{TYPE}-{LOCATION}-{SEQ}
+_EQUIPMENT_CONTROL_MAP: dict[str, ModuleType] = {
+    "CHILLER": ModuleType.HVAC_CONTROL,
+    "AHU": ModuleType.HVAC_CONTROL,
+    "FCU": ModuleType.HVAC_CONTROL,
+    "VAV": ModuleType.HVAC_CONTROL,
+    "SPLIT": ModuleType.HVAC_CONTROL,
+    "CT": ModuleType.HVAC_CONTROL,
+    "CRAC": ModuleType.HVAC_CONTROL,
+    "GEN": ModuleType.ENERGY_CONTROL,
+    "UPS": ModuleType.ENERGY_CONTROL,
+    "ATS": ModuleType.ENERGY_CONTROL,
+    "TX": ModuleType.ENERGY_CONTROL,
+    "MSB": ModuleType.ENERGY_CONTROL,
+    "MTR": ModuleType.ENERGY_CONTROL,
+    "DALI": ModuleType.LIGHTING_CONTROL,
+    "LTG": ModuleType.LIGHTING_CONTROL,
+    "LUM": ModuleType.LIGHTING_CONTROL,
+    "INV": ModuleType.SOLAR_CONTROL,
+    "BESS": ModuleType.SOLAR_CONTROL,
+    "PV": ModuleType.SOLAR_CONTROL,
+    "ACC": ModuleType.SECURITY_CONTROL,
+    "CCTV": ModuleType.SECURITY_CONTROL,
+    "FIRE": ModuleType.ENERGY_CONTROL,  # Fire panels are critical infrastructure
+}
+
+
+def _get_control_module_for_equipment(equipment_code: str) -> Optional[ModuleType]:
+    """Derive the required control module from an equipment code.
+
+    Equipment codes follow SENTINEL naming: {SITE}-{TYPE}-{LOCATION}-{SEQ}
+    e.g. S002-CHILLER-B1-001, S002-VAV-101, S002-INV-R-001
+    """
+    if not equipment_code:
+        return None
+    parts = equipment_code.upper().split("-")
+    # Try from longest prefix to shortest (handles MTR-R-SOLAR, etc.)
+    for length in range(min(len(parts), 4), 0, -1):
+        candidate = "-".join(parts[1 : 1 + length]) if len(parts) > 1 else parts[0]
+        if candidate in _EQUIPMENT_CONTROL_MAP:
+            return _EQUIPMENT_CONTROL_MAP[candidate]
+        # Also try just the first token after site prefix
+        if length == 1 and len(parts) > 1 and parts[1] in _EQUIPMENT_CONTROL_MAP:
+            return _EQUIPMENT_CONTROL_MAP[parts[1]]
+    return None

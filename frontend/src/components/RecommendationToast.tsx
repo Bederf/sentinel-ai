@@ -1,7 +1,25 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import * as React from 'react';
-import { Lightbulb, X, Zap, ThermometerSun, Lamp, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Lightbulb, X, Zap, ThermometerSun, Lamp, ChevronRight, CheckCircle2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Equipment type → control module mapping for frontend gating
+const EQUIPMENT_CONTROL_MODULE: Record<string, string> = {
+  CHILLER: 'hvac_control', AHU: 'hvac_control', FCU: 'hvac_control',
+  VAV: 'hvac_control', SPLIT: 'hvac_control', CT: 'hvac_control', CRAC: 'hvac_control',
+  GEN: 'energy_control', UPS: 'energy_control', ATS: 'energy_control',
+  TX: 'energy_control', MSB: 'energy_control', MTR: 'energy_control',
+  DALI: 'lighting_control', LTG: 'lighting_control', LUM: 'lighting_control',
+  INV: 'solar_control', BESS: 'solar_control', PV: 'solar_control',
+  ACC: 'security_control', CCTV: 'security_control',
+};
+
+function getControlModuleForEquipment(equipmentCode: string): string | null {
+  if (!equipmentCode) return null;
+  const parts = equipmentCode.toUpperCase().split('-');
+  if (parts.length < 2) return null;
+  return EQUIPMENT_CONTROL_MODULE[parts[1]] ?? null;
+}
 
 interface RecommendationData {
   id: string;
@@ -75,16 +93,45 @@ export function RecommendationCard({
   recommendation,
   onClose,
   onApprove,
+  controlActive,
 }: {
   recommendation: RecommendationData;
   onClose: () => void;
   onApprove: (id: string) => void;
+  controlActive?: boolean;
 }) {
-  const isHVAC = recommendation.action?.point?.includes('setpoint') || recommendation.action?.point?.includes('cooling');
-  const isDALI = recommendation.action?.point?.includes('lighting') || recommendation.action?.point?.includes('dimming');
+  // Auto-detect control module status from equipment code
+  const resolvedControlActive = useMemo(() => {
+    if (controlActive !== undefined) return controlActive;
+    // Try to check via modules API — but to avoid hook dependency issues,
+    // we'll check by fetching module status inline
+    const controlModule = getControlModuleForEquipment(recommendation.target_equipment);
+    if (!controlModule) return true; // Unknown equipment type — allow
+    return true; // Default to true; backend enforces the real gate
+  }, [controlActive, recommendation.target_equipment]);
 
-  const Icon = isHVAC ? ThermometerSun : isDALI ? Lamp : Zap;
-  const iconColor = isHVAC ? '#3B82F6' : isDALI ? '#FACC15' : '#10B981';
+  // Fetch actual module status on mount
+  const [isControlActive, setIsControlActive] = React.useState(resolvedControlActive);
+  React.useEffect(() => {
+    const controlModule = getControlModuleForEquipment(recommendation.target_equipment);
+    if (!controlModule || controlActive !== undefined) {
+      setIsControlActive(controlActive ?? true);
+      return;
+    }
+    fetch('/api/modules/status/site-002')
+      .then(r => r.json())
+      .then((modules: Array<{ module_type: string; status: string }>) => {
+        const mod = modules.find((m) => m.module_type === controlModule);
+        setIsControlActive(mod?.status === 'active');
+      })
+      .catch(() => setIsControlActive(true)); // Fail open — backend enforces
+  }, [recommendation.target_equipment, controlActive]);
+
+  const isHVAC = recommendation.action?.point?.includes('setpoint') || recommendation.action?.point?.includes('cooling');
+  const isLighting = recommendation.action?.point?.includes('lighting') || recommendation.action?.point?.includes('dimming');
+
+  const Icon = isHVAC ? ThermometerSun : isLighting ? Lamp : Zap;
+  const iconColor = isHVAC ? '#3B82F6' : isLighting ? '#FACC15' : '#10B981';
   const savings = recommendation.expected_impact?.energy_savings_percent ?? 0;
 
   return (
@@ -151,7 +198,7 @@ export function RecommendationCard({
                 Set <span className="font-mono">{recommendation.action.point}</span> to{' '}
                 <span className="font-bold" style={{ color: iconColor }}>
                   {recommendation.action.value}
-                  {isHVAC ? '°C' : isDALI ? '%' : ''}
+                  {isHVAC ? '°C' : isLighting ? '%' : ''}
                 </span>
               </span>
             </div>
@@ -205,24 +252,46 @@ export function RecommendationCard({
 
       {/* Footer */}
       <div
-        className="px-4 py-3 flex gap-2"
+        className="px-4 py-3 flex flex-col gap-2"
         style={{ borderTop: '1px solid var(--color-sentinel-border, #2a2a4a)' }}
       >
-        <button
-          onClick={() => { onApprove(recommendation.id); onClose(); }}
-          className="flex-1 py-2 rounded text-sm font-medium flex items-center justify-center gap-1.5 transition-colors hover:brightness-110"
-          style={{ background: 'var(--color-sentinel-green, #10B981)', color: '#fff' }}
-        >
-          <CheckCircle2 className="h-3.5 w-3.5" />
-          Approve & Execute
-        </button>
-        <button
-          onClick={onClose}
-          className="px-4 py-2 rounded text-sm transition-colors hover:bg-white/10"
-          style={{ color: 'var(--color-sentinel-text-secondary, #aaa)', border: '1px solid var(--color-sentinel-border, #2a2a4a)' }}
-        >
-          Dismiss
-        </button>
+        {!isControlActive && (
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded text-xs"
+            style={{ background: 'rgba(250, 204, 21, 0.1)', color: '#FACC15' }}
+          >
+            <Lock className="h-3 w-3 flex-shrink-0" />
+            <span>Control module not active. Enable the control add-on to execute recommendations.</span>
+          </div>
+        )}
+        <div className="flex gap-2">
+          {isControlActive ? (
+            <button
+              onClick={() => { onApprove(recommendation.id); onClose(); }}
+              className="flex-1 py-2 rounded text-sm font-medium flex items-center justify-center gap-1.5 transition-colors hover:brightness-110"
+              style={{ background: 'var(--color-sentinel-green, #10B981)', color: '#fff' }}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Approve & Execute
+            </button>
+          ) : (
+            <button
+              disabled
+              className="flex-1 py-2 rounded text-sm font-medium flex items-center justify-center gap-1.5 opacity-50 cursor-not-allowed"
+              style={{ background: 'var(--color-sentinel-text-disabled, #666)', color: '#fff' }}
+            >
+              <Lock className="h-3.5 w-3.5" />
+              Control Module Required
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded text-sm transition-colors hover:bg-white/10"
+            style={{ color: 'var(--color-sentinel-text-secondary, #aaa)', border: '1px solid var(--color-sentinel-border, #2a2a4a)' }}
+          >
+            Dismiss
+          </button>
+        </div>
       </div>
 
       <style>{`

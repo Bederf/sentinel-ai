@@ -244,12 +244,10 @@ class ApprovalService:
             original_value = None
             if not is_bess_dispatch:
                 try:
-                    # Try to read current value if device_manager supports it
-                    if hasattr(self.device_manager, "read_value"):
-                        current_result = await self.device_manager.read_value(
-                            equipment_id=equipment_id, point_name=control_point
-                        )
-                        original_value = current_result.get("value") if current_result.get("success") else None
+                    device_value = await self.device_manager.read_device_value(
+                        device_id=equipment_id, point_name=control_point
+                    )
+                    original_value = device_value.value
                 except Exception as e:
                     logger.warning(f"Could not read current device value: {e}")
                     # Continue with approval even if we can't read the original value
@@ -270,18 +268,13 @@ class ApprovalService:
                 }
                 cov_verified = False
             else:
-                # Execute write to Niagara device
+                # Execute write to device via adapter (BACnet, Modbus, or simulated)
                 logger.info(f"Writing to device {equipment_id}: {control_point} = {target_value}")
-                write_result = {"success": True, "message": "Demo mode - device write simulated"}
-                try:
-                    write_result = await self._execute_device_write(
-                        equipment_id=equipment_id, point_name=control_point, target_value=target_value
-                    )
-                except Exception as e:
-                    logger.warning(f"Device write not available in demo mode: {e}")
-                    # In demo mode, we allow approval to proceed without actual device write
+                write_result = await self._execute_device_write(
+                    equipment_id=equipment_id, point_name=control_point, target_value=target_value
+                )
 
-                if not write_result.get("success", True):
+                if not write_result.get("success", False):
                     logger.error(f"Device write failed: {write_result.get('error')}")
                     return ApprovalResult(
                         success=False,
@@ -290,8 +283,8 @@ class ApprovalService:
                         error_message=f"Device write failed: {write_result.get('error')}",
                     )
 
-                # Verify COV feedback (confirm device actually accepted the change)
-                cov_verified = True  # Default to verified in demo mode
+                # Verify COV feedback (confirm device accepted the change)
+                cov_verified = False
                 try:
                     cov_verified = await self._verify_cov_feedback(
                         equipment_id=equipment_id, point_name=control_point, expected_value=target_value
@@ -707,7 +700,10 @@ class ApprovalService:
             )
 
     async def _validate_safety(self, equipment_id: str, proposed_value: Any) -> Dict[str, Any]:
-        """Validate control change against safety rules.
+        """Pre-flight safety check before device write.
+
+        Note: The device adapter also runs safety validation during write_value().
+        This is an early check so we can reject before attempting the write.
 
         Args:
             equipment_id: Equipment code
@@ -717,17 +713,29 @@ class ApprovalService:
             Dict with is_safe (bool) and reason (str)
         """
         try:
-            # In demo mode, always allow. In production, use SafetyEngine
-            return {"is_safe": True, "reason": "Demo mode - no safety constraints"}
+            adapter = await self.device_manager.get_adapter(equipment_id)
+            if adapter:
+                # Use the adapter's safety validation (delegates to SafetyEngine)
+                result = await adapter.validate_control("", proposed_value)
+                return {
+                    "is_safe": result.get("allowed", True),
+                    "reason": ", ".join(result.get("reasons", [])) or "Passed safety check",
+                }
+            # No adapter found — allow, write will fail with a clear error
+            return {"is_safe": True, "reason": "No adapter — write will validate"}
         except Exception as e:
             logger.error(f"Error in safety validation: {str(e)}")
             return {"is_safe": False, "reason": f"Safety validation error: {str(e)}"}
 
     async def _execute_device_write(self, equipment_id: str, point_name: str, target_value: Any) -> Dict[str, Any]:
-        """Execute write to Niagara device.
+        """Execute write to device via adapter (BACnet, Modbus, or simulated).
+
+        The device manager routes writes to the correct adapter. SENTINEL does not
+        need to know whether the target is physical hardware or a simulator — the
+        adapter handles persistence.
 
         Args:
-            equipment_id: Equipment ID
+            equipment_id: Equipment ID (SENTINEL naming convention)
             point_name: Point/property name to write
             target_value: Value to write
 
@@ -735,23 +743,19 @@ class ApprovalService:
             Dict with success (bool) and error (str if failed)
         """
         try:
-            # In demo mode or if method doesn't exist, just return success
-            if not hasattr(self.device_manager, "set_value"):
-                logger.info(f"Demo mode: simulating write to {equipment_id}.{point_name} = {target_value}")
-                return {"success": True, "message": "Demo mode - device write simulated"}
-
-            result = await self.device_manager.set_value(
-                equipment_id=equipment_id, point_name=point_name, value=target_value
+            success = await self.device_manager.write_device_value(
+                device_id=equipment_id, point_name=point_name, value=target_value
             )
-            return result
+            return {"success": success}
         except Exception as e:
-            logger.error(f"Error writing to device {equipment_id}: {str(e)}")
-            logger.info("Demo mode: treating as successful write")
-            # In demo mode, return success to allow workflow to continue
-            return {"success": True, "message": f"Demo mode - simulated write: {str(e)}"}
+            logger.error(f"Device write failed for {equipment_id}.{point_name}: {e}")
+            return {"success": False, "error": str(e)}
 
     async def _verify_cov_feedback(self, equipment_id: str, point_name: str, expected_value: Any) -> bool:
         """Verify COV feedback (confirm device accepted the change).
+
+        Reads the point back from the device adapter to confirm the write
+        was applied. Works with any adapter (BACnet, Modbus, simulated).
 
         Args:
             equipment_id: Equipment ID
@@ -762,21 +766,22 @@ class ApprovalService:
             True if verified, False otherwise
         """
         try:
-            result = await self.device_manager.read_value(equipment_id=equipment_id, point_name=point_name)
+            device_value = await self.device_manager.read_device_value(device_id=equipment_id, point_name=point_name)
+            actual_value = device_value.value
 
-            if result.get("success"):
-                actual_value = result.get("value")
+            # For analog values, allow small tolerance (adapter adds ±2% noise on reads)
+            if isinstance(expected_value, (int, float)) and isinstance(actual_value, (int, float)):
+                tolerance = abs(expected_value * 0.05) if expected_value != 0 else 0.5
+                verified = abs(actual_value - expected_value) <= tolerance
+            else:
                 verified = actual_value == expected_value
 
-                if not verified:
-                    logger.warning(
-                        f"COV mismatch for {equipment_id}.{point_name}: wrote {expected_value}, read {actual_value}"
-                    )
+            if not verified:
+                logger.warning(
+                    f"COV mismatch for {equipment_id}.{point_name}: wrote {expected_value}, read {actual_value}"
+                )
 
-                return verified
-            else:
-                logger.warning(f"Failed to read COV feedback for {equipment_id}.{point_name}")
-                return False
+            return verified
 
         except Exception as e:
             logger.error(f"Error verifying COV feedback: {str(e)}")
@@ -999,8 +1004,14 @@ class ApprovalService:
                 )
 
             # Read current value for rollback capability
-            current_result = await self.device_manager.read_value(equipment_id=equipment_id, point_name=control_point)
-            original_value = current_result.get("value") if current_result.get("success") else None
+            try:
+                device_value = await self.device_manager.read_device_value(
+                    device_id=equipment_id, point_name=control_point
+                )
+                original_value = device_value.value
+            except Exception as e:
+                logger.warning(f"Could not read current value for rollback: {e}")
+                original_value = None
 
             # Execute write to Niagara device
             logger.info(f"Tier 3 auto-execute: Writing to device {equipment_id}: {control_point} = {target_value}")
