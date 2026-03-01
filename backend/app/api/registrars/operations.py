@@ -25,6 +25,7 @@ from app.api import sentry_email
 from app.api import security_health
 from app.api import servicenow
 from app.api import event_bus_monitor
+from app.api import n8n
 
 
 def register_operations_routers(app: FastAPI) -> None:
@@ -128,3 +129,6 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Event bus monitoring (Phase 139)
     app.include_router(event_bus_monitor.router, tags=["event-bus"])
+
+    # n8n workflow automation (Phase 140)
+    app.include_router(n8n.router, tags=["n8n"])

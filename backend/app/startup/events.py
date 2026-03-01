@@ -167,6 +167,11 @@ async def startup_event(app: FastAPI) -> None:
     register_default_subscribers()
     _logger.info("Event bus subscribers registered")
 
+    # n8n webhook bridge (Phase 140)
+    from app.services.n8n_event_subscriber import register_n8n_subscribers
+
+    register_n8n_subscribers()
+
     # Capture the main event loop for cross-thread scheduling (simulation tasks)
     scheduler_service.set_main_loop(asyncio.get_event_loop())
 
@@ -630,6 +635,11 @@ async def shutdown_event(app: FastAPI) -> None:
                     _logger.error(f"Failed to save checkpoint for {task_id}: {cp_err}")
     except Exception as e:
         _logger.error(f"Error saving simulation checkpoints on shutdown: {e}")
+
+    # n8n client cleanup (Phase 140)
+    from app.services.n8n_service import shutdown_n8n_service
+
+    await shutdown_n8n_service()
 
     # ServiceNow client cleanup (Phase 138)
     from app.services.servicenow_service import shutdown_servicenow_service

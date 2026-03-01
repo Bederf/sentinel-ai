@@ -248,26 +248,45 @@ def register_default_subscribers() -> None:
     async def trigger_n8n_workflow(event: SentinelEvent) -> None:
         """Trigger n8n workflow for contractor dispatch on WO creation.
 
-        TODO: Wire to n8n service:
-                  from app.services.n8n_service import n8n_service
-                  await n8n_service.trigger_workflow(
-                      workflow_name="contractor_dispatch",
-                      payload={
-                          "work_order_id": event.payload.get("work_order_id"),
-                          "site_id": event.site_id,
-                          "equipment_id": event.equipment_id,
-                          "priority": "urgent" if event.importance >= Importance.CRITICAL else "normal",
-                          "auto_created": event.payload.get("auto_created", False),
-                      },
-                  )
+        Wired to n8n service (Phase 140). Additional n8n event subscribers
+        (escalation, system alerts) registered separately via
+        n8n_event_subscriber.register_n8n_subscribers().
         """
-        logger.info(
-            "N8N TRIGGER | work_order=%s | site=%s | equip=%s | auto=%s",
-            event.payload.get("work_order_id", "?"),
-            event.site_id or "-",
-            event.equipment_id or "-",
-            event.payload.get("auto_created", False),
+        from app.services.n8n_service import get_n8n_service
+
+        service = get_n8n_service()
+        if not service.is_configured:
+            logger.debug("n8n not configured — logging WO event only")
+            logger.info(
+                "N8N TRIGGER | work_order=%s | site=%s | equip=%s | auto=%s",
+                event.payload.get("work_order_id", "?"),
+                event.site_id or "-",
+                event.equipment_id or "-",
+                event.payload.get("auto_created", False),
+            )
+            return
+
+        result = await service.trigger_webhook(
+            webhook_path="work-order-created",
+            payload={
+                "work_order_id": event.payload.get("work_order_id"),
+                "site_id": event.site_id,
+                "equipment_id": event.equipment_id,
+                "priority": "urgent" if event.importance >= Importance.CRITICAL else "normal",
+                "auto_created": event.payload.get("auto_created", False),
+            },
         )
+        if result.get("success"):
+            logger.info(
+                "N8N TRIGGER | work_order=%s dispatched via webhook",
+                event.payload.get("work_order_id", "?"),
+            )
+        else:
+            logger.warning(
+                "N8N TRIGGER | work_order=%s failed: %s",
+                event.payload.get("work_order_id", "?"),
+                result.get("reason", "unknown"),
+            )
 
     # ------------------------------------------------------------------
     # Registration complete
