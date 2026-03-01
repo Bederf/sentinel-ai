@@ -57,6 +57,11 @@ ANALYSIS_TOOLS: frozenset[str] = frozenset(
         "get_floor_temperatures",
         "search_documents",
         "process_recommendation",
+        # ServiceNow integration tools (Phase 138-02)
+        "check_servicenow_status",
+        "query_servicenow_incidents",
+        "query_servicenow_work_orders",
+        "get_servicenow_incident_summary",
     }
 )
 
@@ -93,6 +98,11 @@ SAFE_TO_ECHO_TOOLS: frozenset[str] = frozenset(
         "get_alerts_and_anomalies",
         "get_system_methodology",
         "lookup_desk",
+        # ServiceNow tools — read-only data, no secrets (Phase 138-02)
+        "check_servicenow_status",
+        "query_servicenow_incidents",
+        "query_servicenow_work_orders",
+        "get_servicenow_incident_summary",
     }
 )
 
