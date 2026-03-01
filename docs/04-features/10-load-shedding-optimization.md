@@ -272,10 +272,11 @@ Three pre-configured scenarios in `optimization_scenarios.json`:
 - `backend/app/data/optimization_scenarios.json` - Demo scenarios
 
 **Frontend:**
+- `frontend/src/components/intelligence/EnergyIntelligenceCard.tsx` - Overview tab compact card
 - `frontend/src/components/OptimizationPanel.tsx` - Main panel
 - `frontend/src/components/ThermalRunwayChart.tsx` - Visualization
 - `frontend/src/components/PrecoolingSchedule.tsx` - Timeline
-- `frontend/src/pages/OptimizationPage.tsx` - Full page view
+- `frontend/src/pages/OptimizationPage.tsx` - Full page view (3 tabs: Load Shedding, Profile, Validation)
 
 ## Business Value
 

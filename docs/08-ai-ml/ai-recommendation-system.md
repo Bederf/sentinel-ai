@@ -103,9 +103,12 @@ graph TB
 
 | Component | File | Responsibility |
 |-----------|------|----------------|
-| **Optimization Page** | `frontend/src/pages/OptimizationPage.tsx` | Full-page optimization view |
+| **Energy Intelligence Card** | `frontend/src/components/intelligence/EnergyIntelligenceCard.tsx` | Overview tab compact card (savings, mode, applied count) |
+| **Optimization Page** | `frontend/src/pages/OptimizationPage.tsx` | Full-page optimization view (3 tabs: Load Shedding, Profile, Validation) |
 | **Optimization Panel** | `frontend/src/components/OptimizationPanel.tsx` | Three-column layout |
 | **Recommendation Modal** | `frontend/src/components/OptimizationRecommendationModal.tsx` | Approval dialog |
+| **Energy Comparison** | `frontend/src/components/EnergyComparisonPanel.tsx` | Actual vs SENTINEL comparison (in Validation tab) |
+| **ROI Summary** | `frontend/src/components/ROISummaryCard.tsx` | Risk intelligence from predictions (in Validation tab) |
 
 ---
 

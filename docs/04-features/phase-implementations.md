@@ -361,7 +361,7 @@ All phases organized by number with implementation status, completion date, and 
 - HumanoidMeshBuilder with limb animations
 - ElevatorAnimator with cubic easing
 - PersonInstanceManager with LOD system (100+ people)
-- Dashboard validation cards for power meters and costs
+- Validation cards for power meters and costs (in Energy tab → Validation panel)
 - AI Recommendation ROI engine
 
 ---

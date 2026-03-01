@@ -123,7 +123,7 @@ Each control add-on gates write features within its discipline's building tab. T
 
 | Tab | Data Source | Control Gating | Notes |
 |-----|-------------|----------------|-------|
-| Overview | All systems | — | Always shows (KPIs, equipment, alerts) |
+| Overview | All systems | — | Always shows (KPIs, intelligence cards per discipline, occupancy, lighting). Full panels moved to discipline tabs. |
 | HVAC | HVAC data points | `hvac_control` | Setpoints, scheduling, rules |
 | Energy | Energy data points | `energy_control` | Peak shaving, load shedding |
 | Lighting | Lighting + occupancy | `lighting_control` | Sub-tabs: Lighting, Occupancy, Analytics, Correlation |

@@ -4,7 +4,7 @@ type: "architecture"
 status: "approved"
 version: "2.0.0"
 created: "2026-02-23"
-updated: "2026-02-28"
+updated: "2026-03-01"
 author: "Sentinel Development Team"
 tags: ["frontend", "navigation", "sidebar", "tabs", "modules", "lazy-loading"]
 related: ["system-overview.md", "module-system.md"]
@@ -67,7 +67,7 @@ When a user clicks a site card on the Dashboard, the `SiteDetail` component rend
 
 | Tab | Component | Control Gate | Notes |
 |-----|-----------|-------------|-------|
-| **Overview** | (inline) | — | KPIs, Equipment, Alerts, Energy, Predictions |
+| **Overview** | (inline) | — | KPIs, Intelligence Cards (HVAC/Energy/Solar/Water/Fire/Security), Occupancy, Lighting Intelligence. Full-detail panels live in discipline tabs. |
 | **HVAC** | `ControlDashboard` | `hvac_control` | Setpoints, scheduling, rules |
 | **Energy** | `OptimizationPage` | `energy_control` | Peak shaving, load shedding |
 | **Lighting** | Sub-tabs: LightingPage, OccupancyPanel, OccupancyAnalyticsPage, OccupancyEnergyCorrelationPage | `lighting_control` | 4 sub-tabs |
@@ -107,6 +107,63 @@ const OptimizationPage = lazy(() =>
 
 Components with only named exports use the `.then(m => ({ default: m.X }))` wrapper pattern, since `React.lazy()` requires a default export.
 
+## Overview Tab — Intelligence Card Architecture
+
+The Overview tab uses **compact intelligence cards** (one per discipline) instead of full-detail panels. Full-detail panels live in their respective discipline tabs to avoid duplication.
+
+### Card Layout
+
+Each intelligence card follows a shared template:
+
+```
+┌──────────────────────────────────────────────┐
+│ [Icon] Discipline Intelligence   [savings]   │
+│ ──────────────────────────────────────────── │
+│  [metric1]     [metric2]     [metric3]       │
+│ SENTINEL AI: value description  View Details →│
+└──────────────────────────────────────────────┘
+```
+
+### Overview Render Order
+
+| # | Card | Component | Module Gate | Section ID |
+|---|------|-----------|-------------|------------|
+| 0 | AI Optimization | `OptimizationInfoCard` | — | `ai-optimization` |
+| 1 | HVAC Intelligence | `HVACIntelligenceCard` | `hvac` | `hvac-intelligence` |
+| 2 | Energy Intelligence | `EnergyIntelligenceCard` | `energy` | `energy-intelligence` |
+| 3 | Solar & BESS Intelligence | `SolarIntelligenceCard` | `solar` | `solar-intelligence` |
+| 4 | Water Intelligence | `WaterIntelligenceCard` | `water` | `water-intelligence` |
+| 5 | Fire Safety Intelligence | `FireIntelligenceCard` | `fire` | `fire-intelligence` |
+| 6 | Security Intelligence | `SecurityIntelligenceCard` | `security` | `security-intelligence` |
+| 7 | Occupancy Dashboard | `OccupancyPanel` (compact) | `lighting` | `occupancy-dashboard` |
+| 8 | Lighting Intelligence | `LightingIntelligencePanel` | `lighting` | `lighting-intelligence` |
+
+Intelligence card components live in `frontend/src/components/intelligence/`.
+
+### CardLibrary — Inline Panel Toggle
+
+Users can show/hide any KPI card or intelligence card via the **CardLibrary** inline collapsible panel, rendered directly above the intelligence cards on the overview tab.
+
+- Component: `frontend/src/components/CardLibrary.tsx`
+- Definitions: `frontend/src/lib/cardDefinitions.tsx`
+- State: `visibleKpiCards` and `visibleSections` arrays in `SiteDetail.tsx`
+- Toggle: ChevronDown/Right to expand; hidden count badge when cards are hidden
+
+### Panels Moved to Discipline Tabs
+
+Previously on the Overview tab, these full-detail panels now live exclusively in their discipline tabs:
+
+| Panel | Moved To |
+|-------|----------|
+| Solar grid (SolarOverviewPanel, EnergyFlowDiagram, BESSStatusPanel, InverterStatusMatrix) | Solar & BESS tab (`SolarDashboard`) |
+| SolarAnnualCard | Solar & BESS tab (`SolarDashboard`) |
+| EnergyComparisonPanel | Energy tab (`OptimizationPage` Validation tab) |
+| ActualVsSentinelEnergyCard | Energy tab (`OptimizationPage` Validation tab) |
+| PowerMeterValidationCard | Energy tab (`OptimizationPage` Validation tab) |
+| CostValidationCard | Energy tab (`OptimizationPage` Validation tab) |
+| ROISummaryCard | Energy tab (`OptimizationPage` Validation tab) |
+| ComfortComplaintPanel (compact) | HVAC tab (`HVACDashboard`) |
+
 ## Key Files
 
 | File | Role |
@@ -114,6 +171,9 @@ Components with only named exports use the `.then(m => ({ default: m.X }))` wrap
 | `frontend/src/lib/navigation.ts` | Navigation config: `BASE_NAV_ITEMS`, `ADMIN_NAV_ITEMS`, `ADDON_NAV_ITEMS`, `BUILDING_TAB_ITEMS` |
 | `frontend/src/components/Sidebar.tsx` | Global sidebar (3 groups: base + admin + addon) |
 | `frontend/src/components/SiteDetail.tsx` | Building detail page with 10-tab bar and lazy content |
+| `frontend/src/components/intelligence/` | Discipline intelligence cards (HVAC, Energy, Solar, Water, Fire, Security) |
+| `frontend/src/components/CardLibrary.tsx` | Inline collapsible card toggle for showing/hiding dashboard sections |
+| `frontend/src/lib/cardDefinitions.tsx` | Section and KPI card definitions with IDs, names, icons |
 | `frontend/src/App.tsx` | Top-level view routing (10 sidebar views) |
 
 ## View Type

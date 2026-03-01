@@ -280,7 +280,7 @@ curl http://localhost:9095/api/lifecycle/status | jq
 
 ### Predictions
 - Fault injection creates ML predictions
-- Predictions appear in Risk Intelligence panel
+- Predictions appear in ROI Summary card (Energy tab → Validation)
 - Probability and timeframe calculated from fault type
 
 ### Service Feedback

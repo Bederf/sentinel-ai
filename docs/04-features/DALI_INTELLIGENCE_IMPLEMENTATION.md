@@ -52,20 +52,22 @@ Complete implementation of the DALI Intelligence Dashboard Card for Grant. The d
 
 ### 3. Dashboard Integration
 **Files Modified:**
-- `frontend/src/components/Dashboard.tsx` - Import added ✅
-- `frontend/src/lib/cardDefinitions.tsx` - Card registered ✅
+- `frontend/src/components/SiteDetail.tsx` - Rendered as Lighting Intelligence card in overview ✅
+- `frontend/src/lib/cardDefinitions.tsx` - Card registered as `lighting-intelligence` ✅
 
-**Card Configuration:**
+**Card Configuration (updated 2026-03-01):**
 ```typescript
 {
-  id: 'dali-intelligence',
-  name: 'DALI Intelligence: Tridonic',
-  description: '365-day simulation showing occupancy, daylight, and AI learning',
+  id: 'lighting-intelligence',
+  name: 'Lighting Intelligence',
+  description: 'AI-powered lighting optimization and zone control',
   icon: <Lightbulb className="w-4 h-4" />,
   category: 'section',
   defaultVisible: true
 }
 ```
+
+> **Note:** The CardLibrary is now an inline collapsible panel (not a slide-out). Users toggle intelligence cards directly on the Overview tab.
 
 ### 4. Router Registration
 **File Modified:** `backend/app/api/registrars/building.py`

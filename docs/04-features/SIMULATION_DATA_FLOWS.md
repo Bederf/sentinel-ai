@@ -225,6 +225,7 @@ Savings = 32 kWh × R5/kWh = R160
    - By-system breakdown (HVAC, lighting, other)
    - Which rules were applied (transparency)
    - Confidence score (builds trust over time)
+   - **Location:** Energy tab (`OptimizationPage` → Validation tab). Overview shows compact `EnergyIntelligenceCard` summary.
 
 ---
 

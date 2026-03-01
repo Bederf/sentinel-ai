@@ -138,15 +138,19 @@ const efficiency = formatPercentage(92.3);          // "92,3%"
 
 ## Architecture: Module System
 
+> **Note (2026-03-01):** The building Overview tab was restructured to use compact **intelligence cards** instead of full-detail panels. Full panels (Solar grid, Energy Comparison, Validation cards, etc.) were moved to their discipline tabs. See `docs/02-architecture/frontend-navigation.md` for the current architecture.
+
 When production modules are available:
 
-| Module | Shows |
-|--------|-------|
-| `energy` | Energy Analytics, Energy Comparison |
-| `ml` | Risk Predictions |
-| `hvac` | Comfort Assistant |
-| `lighting` | Lighting Intelligence, Occupancy Dashboard |
-| `solar` | Solar & BESS, Solar Annual |
+| Module | Overview Shows | Discipline Tab |
+|--------|---------------|----------------|
+| `hvac` | HVAC Intelligence Card | Full HVAC Dashboard |
+| `energy` | Energy Intelligence Card | OptimizationPage (comparison, validation, ROI) |
+| `solar` | Solar Intelligence Card | SolarDashboard (all solar panels) |
+| `water` | Water Intelligence Card | WaterPanel |
+| `fire` | Fire Intelligence Card | FireSafetyPage |
+| `security` | Security Intelligence Card | SecurityDashboard |
+| `lighting` | Lighting Intelligence + Occupancy | LightingPage (sub-tabs) |
 
 **Demo Mode** (DEMO_MODE=true): All sections visible by default
 

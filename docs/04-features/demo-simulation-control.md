@@ -91,8 +91,8 @@ When equipment transitions to warning:
 1. **Supabase Update** - Equipment health_score and status updated
 2. **Alert Created** - Stored in `alerts` table with severity, message, equipment_id
 3. **Telegram Notification** - Sent via Sentry bot to FM team chat
-4. **Prediction Generated** - Stored in `predictions` table for Risk Intelligence card
-5. **Dashboard Updates** - Risk Intelligence card shows highest risk equipment
+4. **Prediction Generated** - Stored in `predictions` table for ROI Summary card
+5. **Dashboard Updates** - ROI Summary card (Energy tab → Validation) shows highest risk equipment
 
 ## Usage
 
@@ -103,8 +103,8 @@ curl -X POST "http://localhost:9095/api/simulation/demo/trigger-warnings?site_co
 # Check alerts appear
 curl "http://localhost:9095/api/alerts?site_id=site-002"
 
-# Check Risk Intelligence card in dashboard
-# Frontend should show "Highest Risk - Immediate Attention Required"
+# Check ROI Summary card in Energy tab → Validation
+# Should show "Highest Risk - Immediate Attention Required"
 
 # Reset everything back to healthy
 curl -X POST "http://localhost:9095/api/simulation/demo/reset-to-healthy?site_code=site-002"

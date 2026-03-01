@@ -27,14 +27,15 @@
   - Responsive design (mobile/tablet/desktop)
 
 - [x] **Card Definition** (`frontend/src/lib/cardDefinitions.tsx`)
-  - Card registered in SECTION_CARDS array
+  - Card registered in SECTION_CARDS as `lighting-intelligence`
   - Lightbulb icon imported and configured
   - defaultVisible: true (shows by default)
   - Category: 'section' (dashboard section, not KPI)
 
-- [x] **Dashboard Import** (`frontend/src/components/Dashboard.tsx`)
-  - DaliIntelligencePanel imported
-  - Ready to render
+- [x] **Building Overview Integration** (`frontend/src/components/SiteDetail.tsx`)
+  - LightingIntelligencePanel rendered as card #8 in overview
+  - Gated by `isModuleActive('lighting')` and `visibleSections.includes('lighting-intelligence')`
+  - Toggleable via inline CardLibrary
 
 ### ⏳ REMAINING (Manual Step)
 

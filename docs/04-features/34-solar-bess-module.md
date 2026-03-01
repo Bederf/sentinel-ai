@@ -68,16 +68,17 @@ NRS 097-2-1 monitoring for South African SSEG (Small-Scale Embedded Generation) 
 
 ### Module 4: Dashboard (34-04)
 
-Six frontend components for at-a-glance solar monitoring.
+Seven frontend components for solar monitoring. Full-detail panels render in the **Solar & BESS** discipline tab (`SolarDashboard`). The building Overview tab shows a compact **SolarIntelligenceCard** (generation kW, self-consumption %, performance ratio).
 
-| Component | Purpose |
-|-----------|---------|
-| `SolarOverviewPanel` | Generation gauge, daily yield, PR, savings ticker |
-| `BESSStatusPanel` | SOC gauge (colour-coded), mode, power, SoH |
-| `InverterStatusMatrix` | Traffic-light grid of all 33 inverters |
-| `EnergyFlowDiagram` | Sankey-style energy flow (Solar → BESS → Building → Grid) |
-| `SolarFinancialReport` | Stacked bar chart of monthly savings breakdown |
-| `ForecastActualChart` | 48h forecast vs actual overlay with confidence band |
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `SolarIntelligenceCard` | Overview tab | Compact card: generation, self-consumption, PR, daily savings |
+| `SolarOverviewPanel` | Solar & BESS tab | Generation gauge, daily yield, PR, savings ticker |
+| `BESSStatusPanel` | Solar & BESS tab | SOC gauge (colour-coded), mode, power, SoH |
+| `InverterStatusMatrix` | Solar & BESS tab | Traffic-light grid of all 33 inverters |
+| `EnergyFlowDiagram` | Solar & BESS tab | Sankey-style energy flow (Solar → BESS → Building → Grid) |
+| `SolarFinancialReport` | Solar & BESS tab | Stacked bar chart of monthly savings breakdown |
+| `ForecastActualChart` | Solar & BESS tab | 48h forecast vs actual overlay with confidence band |
 
 ### Module 5: Energy Arbitrage & Dispatch (34-05)
 
