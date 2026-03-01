@@ -14,6 +14,7 @@ from app.database.repositories.module_access_repository import get_module_access
 from app.models.module_registry import ModuleType, RecommendationPriority, RecommendationType, AIRecommendation
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel
+from app.core.site_resolver import get_primary_site
 from app.database.supabase_client import get_supabase_client
 import logging
 
@@ -333,7 +334,7 @@ async def get_recommendations(
             building_response = client.table("buildings").select("id").eq("code", site_id).limit(1).execute()
             if not building_response.data:
                 # Try with 'sandton' mapping for legacy support
-                if site_id == "site-002":
+                if site_id == get_primary_site():
                     building_response = (
                         client.table("buildings").select("id").ilike("name", "%sandton%").limit(1).execute()
                     )

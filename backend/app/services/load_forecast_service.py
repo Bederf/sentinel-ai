@@ -29,6 +29,7 @@ from typing import Dict, List, Optional, Any
 import numpy as np
 from sklearn.ensemble import GradientBoostingRegressor
 
+from app.core.site_resolver import get_registered_site_ids
 from app.models.load_forecast import LoadForecast, LoadInterval
 
 logger = logging.getLogger(__name__)
@@ -130,8 +131,8 @@ class LoadForecastService:
         self._train_all_sites()
 
     def _train_all_sites(self) -> None:
-        """Train models for all known sites. Currently just site-002."""
-        for site_id in ["site-002"]:
+        """Train models for all registered sites."""
+        for site_id in get_registered_site_ids():
             try:
                 self._train_site(site_id)
             except Exception as e:

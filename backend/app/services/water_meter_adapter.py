@@ -34,7 +34,7 @@ class WaterMeterAdapter(DeviceInterface):
         self.pulse_weight = config.get("pulse_weight", 10.0)  # Liters per pulse
         self.register_address = config.get("register_address", 30001)
         self.protocol = config.get("protocol", "modbus")
-        self.site = config.get("site", "site-002")
+        self.site = config.get("site") or "unknown"
 
         # Modbus client (mock for demo, real implementation in production)
         self._mock_pulse_count = 0

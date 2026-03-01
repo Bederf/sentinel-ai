@@ -78,7 +78,7 @@ class FireSafetyRepository:
 
     # --- Zone operations (static config) ---
 
-    def get_zones(self, building_id: str = "site-002") -> List[Dict[str, Any]]:
+    def get_zones(self, building_id: str | None = None) -> List[Dict[str, Any]]:
         """Get all fire zones for a building."""
         if not self._use_json and self.client:
             try:
@@ -99,7 +99,7 @@ class FireSafetyRepository:
 
     # --- Alarm operations (dynamic) ---
 
-    def get_active_alarms(self, building_id: str = "site-002") -> List[Dict[str, Any]]:
+    def get_active_alarms(self, building_id: str | None = None) -> List[Dict[str, Any]]:
         """Get active (uncleared) fire alarms."""
         if not self._use_json and self.client:
             try:
@@ -113,7 +113,7 @@ class FireSafetyRepository:
         state = self._load_state()
         return [a for a in state.get("alarms", []) if not a.get("cleared", False)]
 
-    def get_all_alarms(self, building_id: str = "site-002") -> List[Dict[str, Any]]:
+    def get_all_alarms(self, building_id: str | None = None) -> List[Dict[str, Any]]:
         """Get all fire alarms (including cleared)."""
         if not self._use_json and self.client:
             try:
@@ -164,7 +164,7 @@ class FireSafetyRepository:
 
     # --- Damper operations (dynamic) ---
 
-    def get_dampers(self, building_id: str = "site-002") -> List[Dict[str, Any]]:
+    def get_dampers(self, building_id: str | None = None) -> List[Dict[str, Any]]:
         """Get all smoke damper positions and status."""
         if not self._use_json and self.client:
             try:
@@ -201,7 +201,7 @@ class FireSafetyRepository:
 
     # --- Pressurization operations (dynamic) ---
 
-    def get_pressurization(self, building_id: str = "site-002") -> List[Dict[str, Any]]:
+    def get_pressurization(self, building_id: str | None = None) -> List[Dict[str, Any]]:
         """Get stairwell pressurization readings."""
         if not self._use_json and self.client:
             try:
@@ -237,7 +237,7 @@ class FireSafetyRepository:
 
     # --- Cause-effect matrix (static config) ---
 
-    def get_cause_effect_matrix(self, building_id: str = "site-002") -> List[Dict[str, Any]]:
+    def get_cause_effect_matrix(self, building_id: str | None = None) -> List[Dict[str, Any]]:
         """Get the cause-effect matrix for fire coordination."""
         if not self._use_json and self.client:
             try:
@@ -274,7 +274,7 @@ class FireSafetyRepository:
         self._save_state(state)
         return action_data
 
-    def get_action_log(self, building_id: str = "site-002", limit: int = 50) -> List[Dict[str, Any]]:
+    def get_action_log(self, building_id: str | None = None, limit: int = 50) -> List[Dict[str, Any]]:
         """Get recent fire action log entries."""
         if not self._use_json and self.client:
             try:

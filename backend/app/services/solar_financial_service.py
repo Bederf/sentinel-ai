@@ -227,7 +227,7 @@ class SolarFinancialService:
 
     def __init__(self):
         try:
-            cfg = get_site_solar_config("site-002")
+            cfg = get_site_solar_config()
             self.DEMAND_CHARGE_ZAR_KVA = cfg.tariff.demand_charge_r_kva()
             self._CAPACITY_KWP = cfg.pv.total_capacity_kwp
         except Exception:

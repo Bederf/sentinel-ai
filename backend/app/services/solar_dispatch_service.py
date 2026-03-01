@@ -26,6 +26,7 @@ from app.services.solar_arbitrage_engine import (
     DispatchActionType,
 )
 from app.services.solar_config_service import get_site_solar_config
+from app.core.site_resolver import get_primary_site
 
 logger = logging.getLogger(__name__)
 
@@ -139,12 +140,12 @@ class SolarDispatchService:
         self._started_at: Dict[str, str] = {}
         self._mode: Dict[str, str] = {}  # autonomous / manual / stopped
         try:
-            cfg = get_site_solar_config("site-002")
+            cfg = get_site_solar_config()
             self.BESS_CAPACITY_KWH = cfg.bess.capacity_kwh
             self.BESS_RATED_POWER_KW = cfg.bess.rated_power_kw
         except Exception:
             pass
-        self._seed_demo_history("site-002")
+        self._seed_demo_history(get_primary_site() or "unknown")
 
     # === Demo seed ===
 

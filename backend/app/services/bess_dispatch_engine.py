@@ -147,7 +147,7 @@ class BESSDispatchEngine:
 
         # Override class defaults from site solar config
         try:
-            cfg = get_site_solar_config("site-002")
+            cfg = get_site_solar_config()
             self.BESS_CAPACITY_KWH = cfg.bess.capacity_kwh
             self.BESS_RATED_POWER_KW = cfg.bess.rated_power_kw
         except Exception:

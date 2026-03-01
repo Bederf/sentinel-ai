@@ -134,6 +134,7 @@ from app.database.repositories.building_repository import BuildingRepository  # 
 from app.database.repositories.equipment_repository import EquipmentRepository  # noqa: E402
 from app.services.log_parser import LogParserService  # noqa: E402
 from app.services.point_matcher import PointMatcherService  # noqa: E402
+from app.core.site_resolver import get_primary_site  # noqa: E402
 from app.services.commissioning_service import CommissioningService  # noqa: E402
 from app.models.commissioning import TruthCheckSubmission  # noqa: E402
 
@@ -991,14 +992,15 @@ async def seed_integration_data():
     Seed demo integration data for the monitoring dashboard.
 
     Creates demo point_asset_mappings and column_mappings for testing.
-    Uses REAL site-002 equipment IDs for realistic data.
+    Uses REAL equipment IDs from the primary registered building for realistic data.
     """
     import random
 
-    # Get Sandton building UUID
-    building = building_repo.get_by_id("site-002")
+    # Get primary registered building UUID
+    _primary_site = get_primary_site() or "unknown"
+    building = building_repo.get_by_id(_primary_site)
     if not building:
-        raise HTTPException(status_code=404, detail="Sandton building not found")
+        raise HTTPException(status_code=404, detail=f"Primary building '{_primary_site}' not found")
 
     building_id = building["id"]
 
@@ -1009,13 +1011,13 @@ async def seed_integration_data():
 
     source_id = sources[0]["id"]
 
-    # Get REAL equipment from site-002
-    equipment_list = equipment_repo.get_by_building_code("site-002")
+    # Get REAL equipment from the primary site
+    equipment_list = equipment_repo.get_by_building_code(_primary_site)
     if not equipment_list:
         # Fallback: try get_all with building_id filter
-        equipment_list = equipment_repo.get_all(building_id="site-002")
+        equipment_list = equipment_repo.get_all(building_id=_primary_site)
     if not equipment_list:
-        raise HTTPException(status_code=404, detail="No equipment found for site-002")
+        raise HTTPException(status_code=404, detail=f"No equipment found for {_primary_site}")
 
     # Build point mappings from real equipment
     point_mappings = []

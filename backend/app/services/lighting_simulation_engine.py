@@ -693,7 +693,7 @@ async def update_simulation_lighting(
 
     Example:
         lighting_power = await update_simulation_lighting(
-            building_id="site-002",
+            building_id="<site-id>",
             simulated_hour=11,
             occupancy_data={"Zone-001": 85, "Zone-101": 60, ...},
             daylight_lux=750,

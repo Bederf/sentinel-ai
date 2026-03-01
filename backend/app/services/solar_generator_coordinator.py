@@ -29,6 +29,7 @@ from datetime import datetime, timezone, timedelta
 from enum import Enum
 from typing import Dict, List, Optional, Any
 
+from app.core.site_resolver import get_primary_site
 from app.services.solar_config_service import get_site_solar_config
 
 logger = logging.getLogger(__name__)
@@ -242,7 +243,7 @@ class SolarGeneratorCoordinator:
     def __init__(self):
         self._events: Dict[str, List[GeneratorEvent]] = {}  # site_id -> events
         try:
-            cfg = get_site_solar_config("site-002")
+            cfg = get_site_solar_config()
             self.BESS_CAPACITY_KWH = cfg.bess.capacity_kwh
             self.BESS_RATED_POWER_KW = cfg.bess.rated_power_kw
         except Exception:
@@ -251,7 +252,7 @@ class SolarGeneratorCoordinator:
 
     def _seed_demo_events(self) -> None:
         """Seed realistic generator event history for demo."""
-        site_id = "site-002"
+        site_id = get_primary_site() or "unknown"
         events: List[GeneratorEvent] = []
         now = datetime.now(timezone.utc)
 

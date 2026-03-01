@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
 
+from app.core.site_resolver import get_primary_site
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.prediction_repository import PredictionRepository
 from app.database.repositories.recommendation_repository import (
@@ -263,10 +264,10 @@ class LifecycleOrchestrator:
     and multi-day seasonal patterns into a unified lifecycle loop.
     """
 
-    def __init__(self, task_id: str | None = None, site_id: str = "site-002"):
+    def __init__(self, task_id: str | None = None, site_id: str | None = None):
         self.task_id = task_id  # For database task tracking
-        self.site_id = site_id  # Parameterized site identifier
-        self.building_id = site_id  # Used by update_simulation_temperatures
+        self.site_id = site_id or get_primary_site() or "unknown"
+        self.building_id = self.site_id  # Used by update_simulation_temperatures
         self.running = False
         self.paused = False
         self.current_scenario: ScenarioConfig | None = None
@@ -3910,7 +3911,7 @@ class LifecycleOrchestrator:
     async def _inject_fault(self):
         """Inject a fault into equipment and create real alerts."""
         try:
-            # Get equipment to fault (resolve site code like "site-002" to UUID internally)
+            # Get equipment to fault (resolve site code to UUID internally)
             equipment_list = self.equipment_repo.get_by_building_code(self.site_id)
             if not equipment_list:
                 logger.warning("No equipment available to fault")
@@ -5076,13 +5077,13 @@ class LifecycleOrchestrator:
         }
 
 
-def create_lifecycle_orchestrator(task_id: str | None = None, site_id: str = "site-002") -> LifecycleOrchestrator:
+def create_lifecycle_orchestrator(task_id: str | None = None, site_id: str | None = None) -> LifecycleOrchestrator:
     """
     Create a new lifecycle orchestrator instance.
 
     Args:
         task_id: Optional task ID for database-backed task tracking
-        site_id: Target site identifier (default "site-002")
+        site_id: Target site identifier (resolved from registered buildings if None)
 
     Returns:
         New LifecycleOrchestrator instance
@@ -5094,12 +5095,12 @@ def create_lifecycle_orchestrator(task_id: str | None = None, site_id: str = "si
 _orchestrator_instance: LifecycleOrchestrator | None = None
 
 
-def get_lifecycle_orchestrator(site_id: str = "site-002") -> LifecycleOrchestrator:
+def get_lifecycle_orchestrator(site_id: str | None = None) -> LifecycleOrchestrator:
     """
     Get or create the global lifecycle orchestrator singleton.
 
     Args:
-        site_id: Target site identifier (default "site-002")
+        site_id: Target site identifier (resolved from registered buildings if None)
 
     Returns:
         Singleton LifecycleOrchestrator instance

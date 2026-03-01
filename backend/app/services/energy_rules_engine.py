@@ -16,6 +16,7 @@ Rules:
 from datetime import date
 from typing import Optional, List
 from app.models.energy_rules import BuildingState, RuleResult, RulesEngineOutput, SystemBreakdown, LearningCurvePhase
+from app.core.site_resolver import get_primary_site
 
 # ==================== RULE THRESHOLDS (Tunable) ====================
 
@@ -72,7 +73,7 @@ class EnergyRulesEngine:
     energy savings (0-35%) with transparent reasoning.
     """
 
-    def __init__(self, site_id: str = "site-002", deployment_date: Optional[date] = None):
+    def __init__(self, site_id: str | None = None, deployment_date: Optional[date] = None):
         """Initialize rules engine.
 
         Args:
@@ -81,7 +82,7 @@ class EnergyRulesEngine:
                            If None, tries to get from lifecycle orchestrator,
                            then falls back to DEFAULT_DEPLOYMENT_DATE
         """
-        self.site_id = site_id
+        self.site_id = site_id or get_primary_site() or "unknown"
 
         # Get deployment date, trying orchestrator first
         if deployment_date is None:
@@ -427,7 +428,7 @@ class EnergyRulesEngine:
         )
 
 
-def get_energy_rules_engine(site_id: str = "site-002", deployment_date: Optional[date] = None) -> EnergyRulesEngine:
+def get_energy_rules_engine(site_id: str | None = None, deployment_date: Optional[date] = None) -> EnergyRulesEngine:
     """Get or create singleton rules engine instance.
 
     Args:

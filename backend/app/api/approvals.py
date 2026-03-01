@@ -15,6 +15,7 @@ from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext
 from app.security.step_up import require_step_up
 from app.models.approval import ApprovalRequest, RejectionRequest, ApprovalResponse, ApprovalStatus
+from app.core.site_resolver import get_primary_site
 from app.services.approval_service import get_approval_service
 from app.database.repositories.recommendation_repository import RecommendationRepository
 from app.models.recommendation import RecommendationStatus
@@ -73,7 +74,7 @@ async def approve_recommendation(
         if control_module:
             from app.services.module_registry_service import module_registry
 
-            site_id = recommendation.site_id or "site-002"
+            site_id = recommendation.site_id or get_primary_site() or "unknown"
             if not module_registry.is_module_active(site_id, control_module):
                 raise HTTPException(
                     status_code=403,

@@ -37,7 +37,7 @@ class PerformanceMonitor:
         self.log_dir = log_dir
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-    def evaluate_predictions(self, days_back: int = 7, building_code: str = "site-002") -> Dict[str, Any]:
+    def evaluate_predictions(self, days_back: int = 7, building_code: str | None = None) -> Dict[str, Any]:
         """
         Evaluate prediction accuracy against actual simulation outcomes.
 
@@ -247,7 +247,7 @@ class PerformanceMonitor:
         return {
             "evaluated_at": datetime.now().isoformat(),
             "period_days": 7,
-            "building_code": "site-002",
+            "building_code": "unknown",
             "predictions_count": 0,
             "alerts_count": 0,
             "metrics": {

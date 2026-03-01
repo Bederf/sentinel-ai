@@ -28,6 +28,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from app.core.site_resolver import get_primary_site
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,12 +68,13 @@ class OccupancyControlService:
             self._zone_states[zone_id] = ZoneControlState(zone_id)
         return self._zone_states[zone_id]
 
-    async def run_cycle(self, site_id: str = "site-002") -> dict[str, Any]:
+    async def run_cycle(self, site_id: str | None = None) -> dict[str, Any]:
         """Execute one occupancy control cycle across all zones.
 
         Returns:
             Summary dict with actions_taken, zones_checked, errors.
         """
+        site_id = site_id or get_primary_site() or "unknown"
         from app.config.settings import settings
 
         correlation_id = f"occ-{uuid.uuid4().hex[:8]}"

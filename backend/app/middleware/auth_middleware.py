@@ -39,6 +39,7 @@ from app.database.repositories.user_entitlements_repository import (
     get_user_entitlements_repository,
 )
 from app.models.auth import AuthContext, AuthLevel, SentinelRole, ROLE_HIERARCHY
+from app.core.site_resolver import get_primary_site
 from app.models.module_registry import ModuleType
 
 logger = logging.getLogger(__name__)
@@ -939,7 +940,7 @@ def require_module(*required_modules: "ModuleType"):
             )
 
         # Get site_id from request headers or context
-        site_id = request.headers.get("X-Site-Id", "site-002")  # Default to site-002
+        site_id = request.headers.get("X-Site-Id") or get_primary_site() or "unknown"
 
         # Check if all required modules are active
         for module in required_modules:

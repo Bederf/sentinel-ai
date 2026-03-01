@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from app.database.repositories.security_repository import get_security_repository
 from app.models.security import OccupancySource, SecurityOccupancy
+from app.core.site_resolver import get_primary_site
 from app.services.profile_service import get_profile_service
 
 logger = logging.getLogger(__name__)
@@ -108,7 +109,7 @@ class SecurityOccupancyService:
             total += occ_data["occupancy_count"]
 
         return {
-            "building_id": "site-002",
+            "building_id": get_primary_site() or "unknown",
             "building_name": "Sandton City Office Tower",
             "total_occupancy": total,
             "zones": zone_occupancies,
@@ -409,7 +410,7 @@ class SecurityOccupancyService:
 
     # --- C•CURE 9000 Integration: Anomaly Detection (Phase 58.2) ---
 
-    def detect_after_hours_anomaly(self, site_id: str = "site-002") -> List[Dict]:
+    def detect_after_hours_anomaly(self, site_id: str | None = None) -> List[Dict]:
         """Detect after-hours badge access + HVAC/lighting activation correlation.
 
         Priority 1: After-hours anomaly detection

@@ -23,10 +23,20 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from app.core.site_resolver import get_registered_sites
 from app.services.building_loader import get_building_loader
 from app.services.device_abstraction import device_manager
 
 logger = logging.getLogger(__name__)
+
+
+def _building_to_site(building_id: str) -> str:
+    """Map a friendly building name to its site code using registered sites."""
+    sites = get_registered_sites()
+    for site in sites:
+        if site.get("name", "").lower() == building_id.lower():
+            return site.get("code", building_id)
+    return building_id
 
 
 def _normalize_device_id(device_id: str) -> str:
@@ -217,11 +227,10 @@ async def get_building(building_id: str) -> dict:
 
     Returns building metadata, desk count, zone count.
 
-    Maps friendly building names (e.g., 'sandton') to site codes (e.g., 'site-002')
+    Maps friendly building names to their registered site codes
     """
     # Map building_id to site code for JSON lookup
-    BUILDING_TO_SITE = {"sandton": "site-002"}
-    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+    site_code = _building_to_site(building_id)
 
     loader = get_building_loader()
     building = loader.get_building(site_code)
@@ -308,10 +317,9 @@ async def upload_desks(building_id: str, desks: List[dict]) -> dict:
     Upload/replace desk data for a building.
 
     Expects array of desk objects. Building field is added automatically.
-    Maps 'sandton' to 'site-002' for file operations.
+    Maps friendly names to site codes for file operations.
     """
-    BUILDING_TO_SITE = {"sandton": "site-002"}
-    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+    site_code = _building_to_site(building_id)
     building_path = DATA_PATH / site_code
 
     if not building_path.exists():
@@ -342,10 +350,9 @@ async def upload_zones(building_id: str, zones: List[dict]) -> dict:
     Upload/replace zone data for a building.
 
     Expects array of zone objects.
-    Maps 'sandton' to 'site-002' for file operations.
+    Maps friendly names to site codes for file operations.
     """
-    BUILDING_TO_SITE = {"sandton": "site-002"}
-    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+    site_code = _building_to_site(building_id)
     building_path = DATA_PATH / site_code
 
     if not building_path.exists():
@@ -377,10 +384,9 @@ async def activate_building(building_id: str, set_default: bool = False) -> dict
 
     Args:
         set_default: If True, also set as the default building
-    Maps 'sandton' to 'site-002' for file operations.
+    Maps friendly names to site codes for file operations.
     """
-    BUILDING_TO_SITE = {"sandton": "site-002"}
-    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+    site_code = _building_to_site(building_id)
     building_path = DATA_PATH / site_code
 
     if not building_path.exists():
@@ -425,10 +431,9 @@ async def activate_building(building_id: str, set_default: bool = False) -> dict
 async def deactivate_building(building_id: str) -> dict:
     """
     Deactivate a building (remove from registry but keep data).
-    Maps 'sandton' to 'site-002' for registry operations.
+    Maps friendly names to site codes for registry operations.
     """
-    BUILDING_TO_SITE = {"sandton": "site-002"}
-    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+    site_code = _building_to_site(building_id)
 
     registry_path = DATA_PATH / "_registry.json"
 
@@ -471,10 +476,9 @@ async def delete_building(building_id: str, confirm: bool = False) -> dict:
     Delete a building and all its data.
 
     Requires confirm=true to actually delete.
-    Maps 'sandton' to 'site-002' for file operations.
+    Maps friendly names to site codes for file operations.
     """
-    BUILDING_TO_SITE = {"sandton": "site-002"}
-    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+    site_code = _building_to_site(building_id)
 
     if not confirm:
         raise HTTPException(status_code=400, detail="Add ?confirm=true to confirm deletion")
@@ -515,9 +519,8 @@ async def delete_building(building_id: str, confirm: bool = False) -> dict:
 
 @router.get("/{building_id}/desks")
 async def get_building_desks(building_id: str) -> List[dict]:
-    """Get all desks for a building. Maps 'sandton' to 'site-002'."""
-    BUILDING_TO_SITE = {"sandton": "site-002"}
-    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+    """Get all desks for a building. Maps friendly names to site codes."""
+    site_code = _building_to_site(building_id)
 
     loader = get_building_loader()
     desks = loader.get_desks(site_code)
@@ -528,9 +531,8 @@ async def get_building_desks(building_id: str) -> List[dict]:
 
 @router.get("/{building_id}/zones")
 async def get_building_zones(building_id: str) -> List[dict]:
-    """Get all zones for a building. Maps 'sandton' to 'site-002'."""
-    BUILDING_TO_SITE = {"sandton": "site-002"}
-    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+    """Get all zones for a building. Maps friendly names to site codes."""
+    site_code = _building_to_site(building_id)
 
     loader = get_building_loader()
     zones = loader.get_zones(site_code)
@@ -594,8 +596,7 @@ async def get_equipment_summary(building_id: str) -> dict:
 
     # Fall back to JSON file counting
     # Map building_id to site code for JSON lookup
-    BUILDING_TO_SITE = {"sandton": "site-002"}
-    site_code = BUILDING_TO_SITE.get(building_id, building_id)
+    site_code = _building_to_site(building_id)
 
     loader = get_building_loader()
     building = loader.get_building(site_code)
@@ -705,9 +706,9 @@ async def get_building_equipment(building_id: str) -> dict:
     building_uuid = None
 
     # Try mapping first (for legacy string IDs like "sandton")
-    BUILDING_TO_SITE = {"sandton": "site-002"}
-    if building_id in BUILDING_TO_SITE:
-        site_code = BUILDING_TO_SITE[building_id]
+    mapped = _building_to_site(building_id)
+    if mapped != building_id:
+        site_code = mapped
     else:
         # If building_id looks like a UUID, look it up in buildings table
         import uuid
@@ -840,7 +841,7 @@ async def get_building_equipment(building_id: str) -> dict:
                         "location": eq.get("location", ""),
                         "building_id": site_code,
                         "building_name": building_name,
-                        "site_id": building_id,  # API parameter (e.g., "site-002" or "sandton")
+                        "site_id": building_id,  # API parameter (building_id or friendly name)
                         "details": {
                             "manufacturer": eq.get("manufacturer"),
                             "model": eq.get("model"),
@@ -1233,8 +1234,7 @@ async def get_building_equipment(building_id: str) -> dict:
 
     # 4. DALI Controllers
     # Map building_id to site_id for DALI data
-    BUILDING_TO_SITE = {"sandton": "site-002"}
-    site_id = BUILDING_TO_SITE.get(building_id, building_id)
+    site_id = _building_to_site(building_id)
 
     dali_file = Path(__file__).parent.parent / "data" / "dali_mock_data.json"
     if dali_file.exists():

@@ -210,41 +210,45 @@ def _seed_demo_values() -> None:
         return
     _DEMO_SEEDED = True
 
+    from app.core.site_resolver import get_primary_site
+
+    _site = get_primary_site() or "unknown"
+
     # Quality gate evaluations
-    sentinel_quality_gate_evaluations_total.labels(site_id="site-002", status="pass").inc(142)
-    sentinel_quality_gate_evaluations_total.labels(site_id="site-002", status="warn").inc(18)
-    sentinel_quality_gate_evaluations_total.labels(site_id="site-002", status="fail").inc(3)
+    sentinel_quality_gate_evaluations_total.labels(site_id=_site, status="pass").inc(142)
+    sentinel_quality_gate_evaluations_total.labels(site_id=_site, status="warn").inc(18)
+    sentinel_quality_gate_evaluations_total.labels(site_id=_site, status="fail").inc(3)
 
     # Enforcement gauge — normal is active
-    sentinel_quality_gate_enforcement.labels(site_id="site-002", enforcement="normal").set(1)
-    sentinel_quality_gate_enforcement.labels(site_id="site-002", enforcement="cap_confidence").set(0)
-    sentinel_quality_gate_enforcement.labels(site_id="site-002", enforcement="suppress_tier3").set(0)
-    sentinel_quality_gate_enforcement.labels(site_id="site-002", enforcement="block_writes").set(0)
+    sentinel_quality_gate_enforcement.labels(site_id=_site, enforcement="normal").set(1)
+    sentinel_quality_gate_enforcement.labels(site_id=_site, enforcement="cap_confidence").set(0)
+    sentinel_quality_gate_enforcement.labels(site_id=_site, enforcement="suppress_tier3").set(0)
+    sentinel_quality_gate_enforcement.labels(site_id=_site, enforcement="block_writes").set(0)
 
     # Recommendations
-    sentinel_recommendations_total.labels(site_id="site-002", tier="tier1", action="auto_execute").inc(87)
-    sentinel_recommendations_total.labels(site_id="site-002", tier="tier2", action="pending_approval").inc(34)
-    sentinel_recommendations_total.labels(site_id="site-002", tier="tier3", action="advisory").inc(12)
-    sentinel_recommendations_total.labels(site_id="site-002", tier="tier3", action="blocked").inc(2)
+    sentinel_recommendations_total.labels(site_id=_site, tier="tier1", action="auto_execute").inc(87)
+    sentinel_recommendations_total.labels(site_id=_site, tier="tier2", action="pending_approval").inc(34)
+    sentinel_recommendations_total.labels(site_id=_site, tier="tier3", action="advisory").inc(12)
+    sentinel_recommendations_total.labels(site_id=_site, tier="tier3", action="blocked").inc(2)
 
     # Approvals
-    sentinel_approval_decisions_total.labels(site_id="site-002", decision="approved").inc(31)
-    sentinel_approval_decisions_total.labels(site_id="site-002", decision="rejected").inc(2)
-    sentinel_approval_decisions_total.labels(site_id="site-002", decision="expired").inc(1)
+    sentinel_approval_decisions_total.labels(site_id=_site, decision="approved").inc(31)
+    sentinel_approval_decisions_total.labels(site_id=_site, decision="rejected").inc(2)
+    sentinel_approval_decisions_total.labels(site_id=_site, decision="expired").inc(1)
 
     # Safety — zero violations (healthy state)
-    sentinel_safety_violations_total.labels(site_id="site-002", severity="warning").inc(0)
-    sentinel_safety_violations_total.labels(site_id="site-002", severity="block").inc(0)
-    sentinel_safety_violations_total.labels(site_id="site-002", severity="alarm").inc(0)
+    sentinel_safety_violations_total.labels(site_id=_site, severity="warning").inc(0)
+    sentinel_safety_violations_total.labels(site_id=_site, severity="block").inc(0)
+    sentinel_safety_violations_total.labels(site_id=_site, severity="alarm").inc(0)
 
     # Drift — no active alerts
-    sentinel_model_drift_alerts.labels(site_id="site-002", model_type="AHU").set(0)
-    sentinel_model_drift_alerts.labels(site_id="site-002", model_type="CHILLER").set(0)
-    sentinel_model_drift_alerts.labels(site_id="site-002", model_type="FCU").set(0)
+    sentinel_model_drift_alerts.labels(site_id=_site, model_type="AHU").set(0)
+    sentinel_model_drift_alerts.labels(site_id=_site, model_type="CHILLER").set(0)
+    sentinel_model_drift_alerts.labels(site_id=_site, model_type="FCU").set(0)
 
     # Rollbacks — zero
-    sentinel_rollback_total.labels(site_id="site-002", equipment_type="CHILLER").inc(0)
-    sentinel_rollback_total.labels(site_id="site-002", equipment_type="AHU").inc(0)
+    sentinel_rollback_total.labels(site_id=_site, equipment_type="CHILLER").inc(0)
+    sentinel_rollback_total.labels(site_id=_site, equipment_type="AHU").inc(0)
 
 
 # ---------------------------------------------------------------------------

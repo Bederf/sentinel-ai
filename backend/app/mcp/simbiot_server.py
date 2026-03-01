@@ -24,6 +24,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from collections import defaultdict
 
+from app.core.site_resolver import get_primary_site
 from app.services.device_abstraction import device_manager
 from app.services.building_loader import get_building_loader
 
@@ -1704,7 +1705,7 @@ async def process_municipal_bill_tool(
     MCP Tool: process_municipal_bill
 
     Args:
-        building_id: Building/site ID (e.g., "site-002")
+        building_id: Building/site ID (e.g., the registered building code)
         pdf_file_path: Absolute path to PDF file
         municipality: Municipality name (e.g., "city_of_johannesburg")
         utility_type: "electricity" or "water"
@@ -2184,8 +2185,8 @@ async def activate_building_tool(
 
 async def get_building_config_tool(building_id: str) -> Dict[str, Any]:
     """Get a building's full configuration."""
-    # LOCKED: Sentry only works with site-002 for now
-    building_id = "site-002"
+    # Resolve to primary registered building if not specified
+    building_id = building_id or get_primary_site() or "unknown"
 
     loader = get_building_loader()
     building = loader.get_building(building_id)
@@ -3143,7 +3144,7 @@ async def discover_tridonic_gateway_tool(
     full metadata and save to database.
 
     Args:
-        building_id: Building/site ID (e.g., "site-002")
+        building_id: Building/site ID (e.g., the registered building code)
         gateway_ip: IP address of DALI gateway (e.g., "192.168.10.50")
         gateway_type: Gateway type - "tridonic", "philips", "helvar", "generic"
         username: Optional HTTP Basic Auth username for gateway API
@@ -3182,7 +3183,7 @@ async def discover_tridonic_gateway_tool(
         "error": None,
     }
 
-    # Extract site code from building_id (e.g., "site-002" -> "S002")
+    # Extract site code from building_id (e.g., "site-XXX" -> "SXXX")
     match = re.match(r"^site-(\d+)", building_id, re.IGNORECASE)
     if match:
         site_num = match.group(1).zfill(3)
@@ -4449,13 +4450,12 @@ async def configure_asset_metrics_tool(
 # ============================================================================
 
 
-async def get_solar_overview_tool(site_id: str = "site-002") -> Dict[str, Any]:
+async def get_solar_overview_tool(site_id: str | None = None) -> Dict[str, Any]:
     """Get solar site overview — generation, BESS SOC, grid status, PR.
 
     MCP Tool: get_solar_overview
     """
-    # LOCKED: Sentry only works with site-002 for now
-    site_id = "site-002"
+    site_id = site_id or get_primary_site() or "unknown"
 
     try:
         from app.services.solar_ingestion_service import get_solar_ingestion_service
@@ -4470,13 +4470,12 @@ async def get_solar_overview_tool(site_id: str = "site-002") -> Dict[str, Any]:
         return {"error": str(e)}
 
 
-async def get_bess_status_tool(site_id: str = "site-002") -> Dict[str, Any]:
+async def get_bess_status_tool(site_id: str | None = None) -> Dict[str, Any]:
     """Get BESS status — SOC, mode, health, dispatch schedule.
 
     MCP Tool: get_bess_status
     """
-    # LOCKED: Sentry only works with site-002 for now
-    site_id = "site-002"
+    site_id = site_id or get_primary_site() or "unknown"
 
     try:
         from app.services.solar_ingestion_service import get_solar_ingestion_service
@@ -4503,13 +4502,14 @@ async def get_bess_status_tool(site_id: str = "site-002") -> Dict[str, Any]:
 
 
 async def get_solar_savings_tool(
-    site_id: str = "site-002",
+    site_id: str | None = None,
     period: str = "ytd",
 ) -> Dict[str, Any]:
     """Get financial summary — daily/monthly/YTD savings breakdown.
 
     MCP Tool: get_solar_savings
     """
+    site_id = site_id or get_primary_site() or "unknown"
     try:
         from app.services.solar_financial_service import get_solar_financial_service
 
@@ -4522,13 +4522,14 @@ async def get_solar_savings_tool(
 
 
 async def get_solar_forecast_tool(
-    site_id: str = "site-002",
+    site_id: str | None = None,
     hours: int = 24,
 ) -> Dict[str, Any]:
     """Get next 24h generation forecast with confidence.
 
     MCP Tool: get_solar_forecast
     """
+    site_id = site_id or get_primary_site() or "unknown"
     try:
         from app.services.solar_forecast_service import get_solar_forecast_service
 
@@ -4540,13 +4541,12 @@ async def get_solar_forecast_tool(
         return {"error": str(e)}
 
 
-async def get_solar_diagnostics_tool(site_id: str = "site-002") -> Dict[str, Any]:
+async def get_solar_diagnostics_tool(site_id: str | None = None) -> Dict[str, Any]:
     """Get solar diagnostics — top issues, underperformers, maintenance.
 
     MCP Tool: get_solar_diagnostics
     """
-    # LOCKED: Sentry only works with site-002 for now
-    site_id = "site-002"
+    site_id = site_id or get_primary_site() or "unknown"
 
     try:
         from app.services.solar_performance_service import get_solar_performance_service
@@ -5351,9 +5351,7 @@ MCP_TOOLS = [
         ),
         "input_schema": {
             "type": "object",
-            "properties": {
-                "site_id": {"type": "string", "description": "Solar site ID (default: site-002)", "default": "site-002"}
-            },
+            "properties": {"site_id": {"type": "string", "description": "Site ID (resolved from registered building)"}},
             "required": [],
         },
     },
@@ -5366,9 +5364,7 @@ MCP_TOOLS = [
         ),
         "input_schema": {
             "type": "object",
-            "properties": {
-                "site_id": {"type": "string", "description": "Solar site ID (default: site-002)", "default": "site-002"}
-            },
+            "properties": {"site_id": {"type": "string", "description": "Site ID (resolved from registered building)"}},
             "required": [],
         },
     },
@@ -5385,8 +5381,7 @@ MCP_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: site-002)",
-                    "default": "site-002",
+                    "description": "Site ID (resolved from registered building)",
                 },
                 "period": {
                     "type": "string",
@@ -5411,8 +5406,7 @@ MCP_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: site-002)",
-                    "default": "site-002",
+                    "description": "Site ID (resolved from registered building)",
                 },
                 "hours": {
                     "type": "integer",
@@ -5433,9 +5427,7 @@ MCP_TOOLS = [
         ),
         "input_schema": {
             "type": "object",
-            "properties": {
-                "site_id": {"type": "string", "description": "Solar site ID (default: site-002)", "default": "site-002"}
-            },
+            "properties": {"site_id": {"type": "string", "description": "Site ID (resolved from registered building)"}},
             "required": [],
         },
     },

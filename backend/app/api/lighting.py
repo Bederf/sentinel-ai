@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Query
 
 from app.database.supabase_client import get_supabase_client
+from app.core.site_resolver import get_primary_site
 
 router = APIRouter()
 
@@ -596,7 +597,7 @@ async def get_live_lighting_data(
     from app.services.lighting_service import get_lighting_service
 
     try:
-        # Normalize site_id: "site-002" → "S002"
+        # Normalize site_id to equipment prefix format
         normalized_site_id = site_id
         if site_id.startswith("site-"):
             num = site_id.split("-")[1]
@@ -1101,8 +1102,8 @@ async def get_detailed_occupancy(
             try:
                 # Map building_id to site_id for file path
                 site_id = building_id.replace("-", "_")
-                if building_id == "gateway-centre":
-                    site_id = "site-002"
+                if building_id == "gateway-centre":  # Legacy mapping
+                    site_id = get_primary_site() or "unknown"
 
                 zones_json_path = f"/opt/bms-intelligence/backend/app/data/buildings/{site_id}/zones.json"
                 logger.debug(f"Trying to load zones from: {zones_json_path}")

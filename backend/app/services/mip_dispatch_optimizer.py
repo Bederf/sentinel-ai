@@ -146,7 +146,7 @@ class MIPDispatchOptimizer:
         try:
             from app.services.solar_config_service import get_site_solar_config
 
-            self._site_config = get_site_solar_config("site-002")
+            self._site_config = get_site_solar_config()
         except Exception:
             logger.debug("SiteConfig not available — using default tariffs")
 

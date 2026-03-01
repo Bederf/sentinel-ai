@@ -22,6 +22,7 @@ from dataclasses import dataclass, asdict
 import logging
 
 from app.services.health_threshold_service import get_health_thresholds
+from app.core.site_resolver import get_primary_site
 from app.services.sentry_integration.alert_notifier import alert_notifier
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ class BMSimulationService:
 
         # Simulation configuration
         self.config = {
-            "site_id": "site-002",  # Only simulate equipment for Sandton
+            "site_id": get_primary_site() or "unknown",  # Simulate equipment for registered site
             "site_name": "Sandton City Office Tower",
             "demand_sites": ["site-002", "site-004"],
             "use_supabase_equipment": True,  # Load real equipment from Supabase
@@ -119,7 +120,7 @@ class BMSimulationService:
     async def _initialize_equipment(self):
         """Initialize simulated equipment from Supabase or fallback to generated"""
         self.equipment = {}
-        site_id = self.config.get("site_id", "site-002")
+        site_id = self.config.get("site_id") or get_primary_site() or "unknown"
         site_name = self.config.get("site_name", "Sandton City Office Tower")
 
         # Try to load equipment from Supabase
@@ -227,7 +228,7 @@ class BMSimulationService:
             return {"supply_temp": 18, "room_temp": 22, "fan_speed": 0.6}
         return {"value": random.uniform(0, 100)}
 
-    def _create_ahu(self, index: int, site_id: str = "site-002", site_name: str = "Sandton") -> EquipmentState:
+    def _create_ahu(self, index: int, site_id: str | None = None, site_name: str = "Sandton") -> EquipmentState:
         """Create an AHU (Air Handling Unit)"""
         return EquipmentState(
             id=f"{site_id}-AHU-L{index + 1:02d}-01",
@@ -252,7 +253,7 @@ class BMSimulationService:
             timestamp=datetime.now(),
         )
 
-    def _create_chiller(self, index: int, site_id: str = "site-002", site_name: str = "Sandton") -> EquipmentState:
+    def _create_chiller(self, index: int, site_id: str | None = None, site_name: str = "Sandton") -> EquipmentState:
         """Create a chiller unit"""
         return EquipmentState(
             id=f"{site_id}-CH-{index + 1:02d}",
@@ -277,7 +278,7 @@ class BMSimulationService:
             timestamp=datetime.now(),
         )
 
-    def _create_fcu(self, index: int, site_id: str = "site-002", site_name: str = "Sandton") -> EquipmentState:
+    def _create_fcu(self, index: int, site_id: str | None = None, site_name: str = "Sandton") -> EquipmentState:
         """Create a Fan Coil Unit"""
         zone = (index // 4) + 1
         unit = (index % 4) + 1
@@ -305,7 +306,7 @@ class BMSimulationService:
             timestamp=datetime.now(),
         )
 
-    def _create_ups(self, index: int, site_id: str = "site-002", site_name: str = "Sandton") -> EquipmentState:
+    def _create_ups(self, index: int, site_id: str | None = None, site_name: str = "Sandton") -> EquipmentState:
         """Create a UPS unit"""
         return EquipmentState(
             id=f"{site_id}-UPS-{index + 1:02d}",
@@ -331,7 +332,7 @@ class BMSimulationService:
         )
 
     def _create_sensor(
-        self, sensor_type: str, index: int, site_id: str = "site-002", site_name: str = "Sandton"
+        self, sensor_type: str, index: int, site_id: str | None = None, site_name: str = "Sandton"
     ) -> EquipmentState:
         """Create a sensor device"""
         sensor_configs = {
@@ -988,7 +989,7 @@ class BMSimulationService:
             "id": f"SIM-ALERT-{self._alert_id_counter}",
             "equipment_id": equipment.id,
             "equipment_name": equipment.name,
-            "site_id": self.config.get("site_id", "site-002"),
+            "site_id": self.config.get("site_id") or get_primary_site() or "unknown",
             "site_name": self.config.get("site_name", "Sandton City Office Tower"),
             "type": alert_type,
             "severity": severity,

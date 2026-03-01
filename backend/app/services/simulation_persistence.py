@@ -1,7 +1,7 @@
 """
 Simulation BMS Data Store — writes building state to JSON.
 
-The simulation engine acts as the BMS for site-002, producing equipment
+The simulation engine acts as the BMS for the registered building, producing equipment
 readings, sensor data, and energy consumption. This module persists that
 data to the local JSON simulation store only.
 
@@ -13,6 +13,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+from app.core.site_resolver import get_primary_site
 from app.services.simulation_store import get_simulation_store
 
 logger = logging.getLogger(__name__)
@@ -21,8 +22,8 @@ logger = logging.getLogger(__name__)
 class SimulationPersistence:
     """BMS simulation persistence: JSON store only."""
 
-    def __init__(self, site_id: str = "site-002"):
-        self.site_id = site_id
+    def __init__(self, site_id: str | None = None):
+        self.site_id = site_id or get_primary_site() or "unknown"
         self.store = get_simulation_store(site_id)
 
     async def persist_hourly_state(
@@ -346,7 +347,7 @@ class SimulationPersistence:
 _persistence_instance: Optional[SimulationPersistence] = None
 
 
-def get_simulation_persistence(site_id: str = "site-002") -> SimulationPersistence:
+def get_simulation_persistence(site_id: str | None = None) -> SimulationPersistence:
     global _persistence_instance
     if _persistence_instance is None:
         _persistence_instance = SimulationPersistence(site_id=site_id)

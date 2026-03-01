@@ -23,13 +23,13 @@ logger = logging.getLogger(__name__)
 _active_simulations: Dict[str, LifecycleOrchestrator] = {}
 
 
-def create_orchestrator(task_id: str, site_id: str = "site-002") -> LifecycleOrchestrator:
+def create_orchestrator(task_id: str, site_id: str | None = None) -> LifecycleOrchestrator:
     """
     Create a new orchestrator instance for a task.
 
     Args:
         task_id: Unique task identifier from database
-        site_id: Target site identifier (default "site-002")
+        site_id: Target site identifier (resolved from registered buildings if None)
 
     Returns:
         New LifecycleOrchestrator instance

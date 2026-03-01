@@ -4,6 +4,8 @@ import json
 import logging
 from pathlib import Path
 
+from app.core.site_resolver import get_primary_site
+
 logger = logging.getLogger(__name__)
 
 # Data directory
@@ -283,7 +285,7 @@ class FMContextService:
 
         return "\n".join(lines)
 
-    def get_agent_memory_context(self, site_id: str = "site-002") -> str:
+    def get_agent_memory_context(self, site_id: str | None = None) -> str:
         """Get agent memory context for injection into Claude system prompt.
 
         Returns a concise markdown block with up to 20 memories grouped by
@@ -295,6 +297,7 @@ class FMContextService:
         Returns:
             Markdown-formatted agent memory section, or empty string if none.
         """
+        site_id = site_id or get_primary_site() or "unknown"
         try:
             from app.database.repositories.agent_memory_repository import (
                 get_agent_memory_repository,

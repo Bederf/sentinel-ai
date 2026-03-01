@@ -572,9 +572,16 @@ async def list_sites(
     if site_type:
         sites = [s for s in sites if s["type"].lower() == site_type.lower()]
 
+    # Merge persisted processing state from JSON fallback
+    processing_state = _load_processing_state()
+
     result = []
     for site in sites:
         site_id = site["id"]
+
+        # Apply persisted processing toggle state
+        if site_id in processing_state:
+            site["sentinel_processing_enabled"] = processing_state[site_id]
 
         # Get aggregated asset counts from all JSON sources
         asset_counts = get_json_asset_counts(site_id)
@@ -1047,6 +1054,11 @@ async def get_site(site_id: str) -> SiteResponse:
     site = next((s for s in sites if s["id"] == site_id), None)
     if not site:
         raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
+
+    # Merge persisted processing state from JSON fallback
+    processing_state = _load_processing_state()
+    if site_id in processing_state:
+        site["sentinel_processing_enabled"] = processing_state[site_id]
 
     # Get aggregated asset counts from all JSON sources
     asset_counts = get_json_asset_counts(site_id)

@@ -20,6 +20,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 
 from app.services.solar_config_service import get_site_solar_config
+from app.core.site_resolver import get_primary_site
 
 logger = logging.getLogger(__name__)
 
@@ -210,14 +211,14 @@ class SolarSelfConsumptionService:
     def __init__(self):
         self._energy_balance_cache: Dict[str, EnergyBalance] = {}
         try:
-            cfg = get_site_solar_config("site-002")
+            cfg = get_site_solar_config()
             self.PV_CAPACITY_KWP = cfg.pv.total_capacity_kwp
             self.BESS_CAPACITY_KWH = cfg.bess.capacity_kwh
             self.BESS_RATED_POWER_KW = cfg.bess.rated_power_kw
             self.EXPORT_LIMIT_KW = cfg.grid.max_export_kw
         except Exception:
             pass
-        self._seed_demo_data("site-002")
+        self._seed_demo_data(get_primary_site() or "unknown")
 
     def _seed_demo_data(self, site_id: str) -> None:
         """Seed a full day energy balance for demo."""

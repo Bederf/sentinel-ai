@@ -10,6 +10,7 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.core.site_resolver import get_primary_site, get_registered_site_ids
 from app.services.lifecycle_orchestrator import ALL_SCENARIOS, SCENARIOS
 from app.services.simulation_orchestrator import (
     get_simulation_by_task_id,
@@ -243,7 +244,7 @@ async def stop_simulation(task_id: str):
             return {"success": True, "status": "cancelled", "message": "Simulation stopped successfully"}
         else:
             # Simulation not running - update JSON store status
-            store = get_simulation_store("site-002")  # TODO: resolve from task_id
+            store = get_simulation_store(get_primary_site() or "unknown")
             store.update_task_progress(
                 task_id,
                 {
@@ -456,7 +457,7 @@ async def get_simulation_status(task_id: str):
     try:
         # Query task from JSON store (check all building stores)
         task = None
-        for site_id in ["site-002", "site-005", "site-012"]:
+        for site_id in get_registered_site_ids():
             store = get_simulation_store(site_id)
             task_data = store.get_task_progress(task_id)
             if task_data:

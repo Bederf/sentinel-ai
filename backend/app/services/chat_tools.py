@@ -16,6 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from app.core.site_resolver import get_primary_site
 from app.database.repositories.module_access_repository import get_module_access_repository
 from app.models.auth import ROLE_HIERARCHY, SentinelRole
 from app.services.device_abstraction import device_manager
@@ -27,8 +28,11 @@ from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
-# Sandton building - the one with DALI integration
-SANDTON_SITE_ID = "site-002"  # Sandton City in sites.json
+
+def _default_site_id() -> str:
+    """Resolve the default site from the registered building list."""
+    return get_primary_site() or "unknown"
+
 
 # Data directory for building data
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -256,7 +260,7 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
     Get overall BMS system status including alerts, anomalies, and equipment health from Supabase.
 
     Args:
-        site_id: Optional site ID/code to filter status (e.g., 'site-002')
+        site_id: Optional site ID/code to filter status (e.g., the registered building code)
 
     Returns:
         Dictionary with system status, active alerts, predicted issues, and recommendations
@@ -536,7 +540,7 @@ async def get_equipment_health(
     Get equipment health status and maintenance information from Supabase.
 
     Args:
-        site_id: Optional site ID/code to filter (e.g., 'site-002')
+        site_id: Optional site ID/code to filter (e.g., the registered building code)
         equipment_id: Optional specific equipment ID
         status_filter: Filter by status (critical, warning, normal)
 
@@ -954,7 +958,7 @@ async def get_alerts_and_anomalies(
     Get active alerts and detected anomalies from Supabase.
 
     Args:
-        site_id: Optional site ID/code to filter (e.g., 'site-002')
+        site_id: Optional site ID/code to filter (e.g., the registered building code)
         severity: Filter by severity (critical, warning, info)
         include_resolved: Include resolved/acknowledged alerts
 
@@ -1170,7 +1174,7 @@ async def get_floor_temperatures(floor: str | None = None, site_id: str | None =
 
     Args:
         floor: Floor level to filter by: 'L0', 'L1', 'L2'. Omit for all floors.
-        site_id: Site ID (default: site-002)
+        site_id: Site ID (resolved from registered building)
 
     Returns:
         Dictionary with zone temperatures, setpoints, and status
@@ -1183,7 +1187,7 @@ async def get_floor_temperatures(floor: str | None = None, site_id: str | None =
 
         return {
             "success": True,
-            "site_id": site_id or "site-002",
+            "site_id": site_id or _default_site_id(),
             "floor_filter": floor,
             "zone_count": len(zones),
             "zones": [
@@ -1213,7 +1217,7 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
 
     Args:
         desk_id: Desk identifier (e.g., "205", "desk 205", "25")
-        building: Optional building code (defaults to site-002).
+        building: Optional building code (defaults to the primary registered building).
 
     Returns:
         Dictionary with desk info, zone, HVAC status, and DALI sensor data
@@ -1238,7 +1242,7 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
         desk_num_padded = desk_num.zfill(3)
 
         # Query Supabase for desk
-        building_code = building or SANDTON_SITE_ID
+        building_code = building or _default_site_id()
         client = get_supabase_client()
 
         # Get building UUID
@@ -1452,7 +1456,7 @@ async def diagnose_comfort_complaint(
     Args:
         desk_id: Desk identifier (e.g., "205")
         complaint_type: Type of complaint: "too_hot", "too_cold", "stuffy", "drafty"
-        building: Optional building code (defaults to site-002)
+        building: Optional building code (defaults to the primary registered building)
         additional_info: Any additional context from the technician
 
     Returns:
@@ -1471,7 +1475,7 @@ async def diagnose_comfort_complaint(
         desk = desk_info.get("desk", {}) or {}
 
         # Get ALL equipment status for this zone
-        building_code = building or SANDTON_SITE_ID
+        building_code = building or _default_site_id()
         zone_equip = await _get_zone_equipment_status(zone, building_code)
         equipment = zone_equip["equipment"]
         live = zone_equip["live_readings"]
@@ -1807,7 +1811,7 @@ async def diagnose_comfort_complaint(
 
 async def discover_niagara_points(
     device_ip: str,
-    site_id: str = "site-002",
+    site_id: str | None = None,
 ) -> dict[str, Any]:
     """
     Trigger Niagara BACnet point discovery and AI classification.
@@ -1825,6 +1829,8 @@ async def discover_niagara_points(
     Returns:
         Discovery summary with equipment counts and confidence breakdown
     """
+    site_id = site_id or _default_site_id()
+
     # --- SSRF Protection (137-07) ---
     from app.security.tool_policy import validate_bms_ip
 
@@ -2383,8 +2389,9 @@ async def get_security_status() -> dict[str, Any]:
 # ============================================================================
 
 
-async def get_solar_overview(site_id: str = "site-002") -> dict[str, Any]:
+async def get_solar_overview(site_id: str | None = None) -> dict[str, Any]:
     """Get solar site overview — generation, BESS, grid, savings."""
+    site_id = site_id or _default_site_id()
     try:
         from app.services.solar_ingestion_service import get_solar_ingestion_service
 
@@ -2398,8 +2405,9 @@ async def get_solar_overview(site_id: str = "site-002") -> dict[str, Any]:
         return {"error": str(e)}
 
 
-async def get_bess_status_chat(site_id: str = "site-002") -> dict[str, Any]:
+async def get_bess_status_chat(site_id: str | None = None) -> dict[str, Any]:
     """Get BESS battery status — SOC, mode, health."""
+    site_id = site_id or _default_site_id()
     try:
         from app.services.solar_ingestion_service import get_solar_ingestion_service
 
@@ -2414,10 +2422,11 @@ async def get_bess_status_chat(site_id: str = "site-002") -> dict[str, Any]:
 
 
 async def get_solar_savings(
-    site_id: str = "site-002",
+    site_id: str | None = None,
     period: str = "ytd",
 ) -> dict[str, Any]:
     """Get solar savings — monthly/YTD financial summary."""
+    site_id = site_id or _default_site_id()
     try:
         from app.services.solar_financial_service import get_solar_financial_service
 
@@ -2429,8 +2438,9 @@ async def get_solar_savings(
         return {"error": str(e)}
 
 
-async def get_solar_diagnostics(site_id: str = "site-002") -> dict[str, Any]:
+async def get_solar_diagnostics(site_id: str | None = None) -> dict[str, Any]:
     """Get solar diagnostics — underperformers, issues, maintenance."""
+    site_id = site_id or _default_site_id()
     try:
         from app.services.solar_performance_service import get_solar_performance_service
 
@@ -2455,10 +2465,11 @@ async def get_solar_diagnostics(site_id: str = "site-002") -> dict[str, Any]:
 
 
 async def get_solar_forecast(
-    site_id: str = "site-002",
+    site_id: str | None = None,
     hours: int = 24,
 ) -> dict[str, Any]:
     """Get solar generation forecast — next 24h with confidence."""
+    site_id = site_id or _default_site_id()
     try:
         from app.services.solar_forecast_service import get_solar_forecast_service
 
@@ -2843,8 +2854,7 @@ CHAT_TOOLS = [
                 },
                 "site_id": {
                     "type": "string",
-                    "description": "SENTINEL site ID (e.g., 'site-002')",
-                    "default": "site-002",
+                    "description": "Site ID (resolved from registered building)",
                 },
             },
             "required": ["device_ip"],
@@ -2973,8 +2983,7 @@ CHAT_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": ("Solar site ID (default: site-002)"),
-                    "default": "site-002",
+                    "description": "Site ID (resolved from registered building)",
                 }
             },
             "required": [],
@@ -2996,8 +3005,7 @@ CHAT_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": ("Solar site ID (default: site-002)"),
-                    "default": "site-002",
+                    "description": "Site ID (resolved from registered building)",
                 }
             },
             "required": [],
@@ -3020,8 +3028,7 @@ CHAT_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: site-002)",
-                    "default": "site-002",
+                    "description": "Site ID (resolved from registered building)",
                 },
                 "period": {"type": "string", "description": "Period: ytd or month", "default": "ytd"},
             },
@@ -3043,8 +3050,7 @@ CHAT_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": ("Solar site ID (default: site-002)"),
-                    "default": "site-002",
+                    "description": "Site ID (resolved from registered building)",
                 }
             },
             "required": [],
@@ -3065,8 +3071,7 @@ CHAT_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Solar site ID (default: site-002)",
-                    "default": "site-002",
+                    "description": "Site ID (resolved from registered building)",
                 },
                 "hours": {
                     "type": "integer",
@@ -3092,7 +3097,7 @@ CHAT_TOOLS = [
                     "description": "Floor level to filter by: 'L0', 'L1', or 'L2'. Omit for all floors.",
                     "enum": ["L0", "L1", "L2"],
                 },
-                "site_id": {"type": "string", "description": "Site ID (default: site-002)", "default": "site-002"},
+                "site_id": {"type": "string", "description": "Site ID (resolved from registered building)"},
             },
             "required": [],
         },
@@ -3963,7 +3968,7 @@ async def create_work_order_chat(
         reported_by = _user_email or "AI Chat (operator)"
         wo = work_order_service.create_work_order(
             description=description,
-            site_id=site_id or "site-002",
+            site_id=site_id or _default_site_id(),
             equipment_ref=equipment_code,
             category=category,
             priority=priority,

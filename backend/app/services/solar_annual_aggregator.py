@@ -10,6 +10,8 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from enum import Enum
 
+from app.core.site_resolver import get_primary_site
+
 logger = logging.getLogger(__name__)
 
 
@@ -173,8 +175,8 @@ class SolarAnnualAggregator:
     # Theoretical max solar generation (kWh/kWp/day in SA)
     THEORETICAL_SOLAR_KWH_PER_KWP_DAY = 5.2
 
-    def __init__(self, site_id: str = "site-002"):
-        self.site_id = site_id
+    def __init__(self, site_id: str | None = None):
+        self.site_id = site_id or get_primary_site() or "unknown"
         self.month_names = [
             "January",
             "February",
@@ -482,5 +484,5 @@ def get_solar_annual_aggregator() -> SolarAnnualAggregator:
     """Get or create singleton aggregator instance."""
     global _solar_annual_aggregator
     if _solar_annual_aggregator is None:
-        _solar_annual_aggregator = SolarAnnualAggregator(site_id="site-002")
+        _solar_annual_aggregator = SolarAnnualAggregator()
     return _solar_annual_aggregator
