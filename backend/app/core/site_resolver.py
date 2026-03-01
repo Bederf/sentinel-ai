@@ -15,7 +15,6 @@ Fallback order: Supabase -> JSON (backend/app/data/buildings.json)
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
 from fastapi import HTTPException, Query
 
@@ -25,11 +24,11 @@ logger = logging.getLogger(__name__)
 _BUILDINGS_JSON = Path(__file__).parent.parent / "data" / "buildings.json"
 
 # In-memory cache (refreshed each call to Supabase; JSON is stable)
-_cached_sites: Optional[list[dict]] = None
-_cache_source: Optional[str] = None
+_cached_sites: list[dict] | None = None
+_cache_source: str | None = None
 
 
-def _load_from_supabase() -> Optional[list[dict]]:
+def _load_from_supabase() -> list[dict] | None:
     """Attempt to load buildings from Supabase.
 
     Returns:
@@ -106,7 +105,7 @@ def get_registered_site_ids() -> list[str]:
     return [s["code"] for s in sites if s.get("code")]
 
 
-def get_primary_site() -> Optional[dict]:
+def get_primary_site() -> dict | None:
     """Return the first (or only) registered building, or None if empty.
 
     Useful for single-site deployments or as a safe accessor.
