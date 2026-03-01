@@ -57,6 +57,29 @@ class ModuleType(str, Enum):
     FLEET_ML = "fleet_ml"
 
 
+# 15 mandatory base modules — must exist and be active for every site.
+# Mirrors frontend/src/lib/mandatoryModules.ts
+MANDATORY_MODULES: list[str] = [
+    # Platform (7)
+    "kpi",
+    "ml",
+    "notifications",
+    "integrations",
+    "simbiot",
+    "logging",
+    "assets",
+    # Building Systems (8)
+    "hvac",
+    "energy",
+    "lighting",
+    "solar",
+    "water",
+    "fire",
+    "security",
+    "digital_twin",
+]
+
+
 class ModuleStatus(str, Enum):
     """Module operational status."""
 

@@ -315,6 +315,18 @@ async def startup_event(app: FastAPI) -> None:
         except Exception as e:
             _logger.warning(f"⚠️ POPIA retention job initialization failed: {e}")
 
+    # Ensure all sites have the 15 mandatory base modules (Phase 142)
+    try:
+        from app.services.module_registry_service import module_registry as _mod_registry
+
+        _seeded = _mod_registry.ensure_base_modules_all_sites()
+        if _seeded:
+            _logger.info(f"✅ Base module auto-seed: backfilled modules for {len(_seeded)} site(s)")
+        else:
+            _logger.info("✅ Base modules verified for all sites")
+    except Exception as e:
+        _logger.warning(f"⚠️ Base module auto-seed failed: {e}")
+
     # AEGIS Phase 0 — dispatch cycle (5 min) + daily evidence collector (24h)
     # Gated by solar module being active (AEGIS is the Solar/BESS dispatch optimizer)
     _aegis_enabled = False

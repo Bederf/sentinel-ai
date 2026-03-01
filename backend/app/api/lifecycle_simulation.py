@@ -399,6 +399,19 @@ async def get_simulation_status(task_id: str):
     Returns:
         SimulationStatusResponse with status, progress, and recent events
     """
+    # If the simulation data source is disabled, always report not-running
+    # (stale persisted state may say "running" from a previous session)
+    from app.config.settings import settings as app_settings
+
+    if not app_settings.site002_source_enabled:
+        return SimulationStatusResponse(
+            running=False,
+            paused=False,
+            scenario=None,
+            simulated_time=None,
+            simulated_hour=None,
+        )
+
     # If this looks like a site_id (e.g., "site-002"), find the most recent running/queued task
     if task_id.startswith("site-"):
         try:
@@ -656,6 +669,17 @@ async def get_default_simulation_status():
     Returns the status of any currently running simulation or a default empty response.
     Used by frontend health check to determine if a simulation is running.
     """
+    from app.config.settings import settings as app_settings
+
+    if not app_settings.site002_source_enabled:
+        return {
+            "running": False,
+            "paused": False,
+            "scenario": None,
+            "simulated_time": None,
+            "simulated_hour": None,
+        }
+
     try:
         # Try to get the default site's running simulation
         orchestrator = get_simulation_by_task_id("default")

@@ -838,6 +838,39 @@ class ModuleRegistryService:
             ),
         }
 
+    def ensure_base_modules(self, site_id: str, site_name: str) -> list[str]:
+        """Ensure all 15 mandatory base modules exist and are active for a site.
+
+        Idempotent — activating an existing module is a no-op.
+        Returns list of module_types that were newly created.
+        """
+        from app.models.module_registry import MANDATORY_MODULES
+
+        created = []
+        for mod_type_str in MANDATORY_MODULES:
+            try:
+                mt = ModuleType(mod_type_str)
+                if not self.is_module_active(site_id, mt):
+                    self.activate_module(site_id, site_name, mt)
+                    created.append(mod_type_str)
+            except Exception as e:
+                logger.warning(f"Failed to seed module {mod_type_str} for {site_id}: {e}")
+        if created:
+            logger.info(f"Backfilled {len(created)} base modules for {site_id}: {created}")
+        return created
+
+    def ensure_base_modules_all_sites(self) -> dict[str, list[str]]:
+        """Ensure all registered sites have all 15 mandatory base modules.
+
+        Returns dict of {site_id: [newly_created_modules]}.
+        """
+        results: dict[str, list[str]] = {}
+        for site_id, config in self._site_configs.items():
+            created = self.ensure_base_modules(site_id, config.site_name)
+            if created:
+                results[site_id] = created
+        return results
+
 
 # Singleton instance
 module_registry = ModuleRegistryService()
