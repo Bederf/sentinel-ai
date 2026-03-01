@@ -19,6 +19,7 @@ from app.api import system_health, solar, solar_grid, solar_performance, solar_a
 from app.api import solar_config, peak_demand, solar_annual
 from app.api import load_forecast, dispatch_optimizer
 from app.api import agent_memory
+from app.api import dashboard_generator
 
 
 def register_analytics_routers(app: FastAPI) -> None:
@@ -87,6 +88,9 @@ def register_analytics_routers(app: FastAPI) -> None:
 
     # Agent Memory (persistent conversational memory for AI agents)
     app.include_router(agent_memory.router, tags=["agent-memory"])
+
+    # Dashboard Generator (Phase 141: auto-dashboard from equipment discovery)
+    app.include_router(dashboard_generator.router, tags=["dashboard-generator"])
 
     # RLM Runner orchestration (Phase 113 — feature-gated)
     if settings.rlm_runner_enabled:
