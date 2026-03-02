@@ -73,7 +73,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
         setIsRefreshing(true);
       }
 
-      const occupancy = await lightingApi.getBuildingOccupancy();
+      const occupancy = await lightingApi.getBuildingOccupancy(selectedSiteId || undefined);
       // Stagger subsequent requests by 250ms to avoid 429 rate limiting
       await new Promise((resolve) => setTimeout(resolve, 250));
       const stats = await lightingApi.getStats();

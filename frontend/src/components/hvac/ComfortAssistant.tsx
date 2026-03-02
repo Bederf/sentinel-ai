@@ -8,7 +8,7 @@
  */
 
 import { useState } from "react";
-import { Card, Title, Text, Flex, Button } from "@tremor/react";
+import { Text, Flex, Button } from "@tremor/react";
 import { MessageSquare, ThermometerSun, ThermometerSnowflake, Wind, Cloud } from "lucide-react";
 import ComfortComplaintPanel from "../ComfortComplaintPanel";
 
@@ -23,7 +23,7 @@ export function ComfortAssistant({ compact = true, onViewDetails }: ComfortAssis
   // Ultra-compact version - just a button that expands
   if (compact && !showFullPanel) {
     return (
-      <Card className="bg-gradient-to-r from-amber-900/20 to-orange-900/20 border-amber-500/30">
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <Flex justifyContent="between" alignItems="center">
           <Flex alignItems="center" className="gap-3">
             <div
@@ -82,7 +82,7 @@ export function ComfortAssistant({ compact = true, onViewDetails }: ComfortAssis
             <span className="text-cyan-300">Drafty</span>
           </div>
         </Flex>
-      </Card>
+      </div>
     );
   }
 

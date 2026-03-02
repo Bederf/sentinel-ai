@@ -3247,7 +3247,7 @@
     "S002": {
       "records": 16,
       "site_id": "S002",
-      "refreshed_at": "2026-03-02T09:23:28.750754",
+      "refreshed_at": "2026-03-02T11:19:00.582492",
       "module_multipliers": {
         "hvac": 1.1,
         "control": 1.1
@@ -3260,7 +3260,7 @@
     "site-002": {
       "records": 16,
       "site_id": "site-002",
-      "refreshed_at": "2026-03-02T09:23:28.750848",
+      "refreshed_at": "2026-03-02T11:19:00.582568",
       "module_multipliers": {
         "hvac": 0.9
       },
@@ -3270,5 +3270,5 @@
     }
   },
   "record_counter": 91,
-  "updated_at": "2026-03-02T10:09:41.259512"
+  "updated_at": "2026-03-02T11:20:23.610417"
 }

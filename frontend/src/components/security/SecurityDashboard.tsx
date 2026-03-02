@@ -140,7 +140,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
   // Loading state
   if (loading) {
     return (
-      <Card>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <Title>Security Module</Title>
         <div className="animate-pulse h-96 bg-gray-100 dark:bg-gray-800 rounded mt-4" />
       </Card>
@@ -224,7 +224,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
 
         {/* KPI Cards */}
         <Grid className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card decoration="top" decorationColor="blue">
+          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <Flex alignItems="center" className="gap-2 mb-2">
               <Users className="w-5 h-5 text-blue-400" />
               <Text className="font-medium">Total Occupancy</Text>
@@ -233,18 +233,18 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
             <Text className="text-xs text-gray-400">
               {capacityPercent}% of {totalCapacity} capacity
             </Text>
-          </Card>
+          </div>
 
-          <Card decoration="top" decorationColor={capacityPercent > 80 ? "red" : capacityPercent > 50 ? "amber" : "green"}>
+          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <Flex alignItems="center" className="gap-2 mb-2">
               <CheckCircle className="w-5 h-5 text-green-400" />
               <Text className="font-medium">Active Zones</Text>
             </Flex>
             <div className="text-3xl font-bold">{zoneOccupancies.filter((z) => z.occupancy_count > 0).length}</div>
             <Text className="text-xs text-gray-400">of {zoneOccupancies.length} zones</Text>
-          </Card>
+          </div>
 
-          <Card decoration="top" decorationColor="cyan">
+          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <Flex alignItems="center" className="gap-2 mb-2">
               <Camera className="w-5 h-5 text-cyan-400" />
               <Text className="font-medium">Cameras Online</Text>
@@ -253,20 +253,20 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
             <Text className="text-xs text-gray-400">
               {demoCameras.filter((c) => c.has_analytics).length} with AI analytics
             </Text>
-          </Card>
+          </div>
 
-          <Card decoration="top" decorationColor={breachEvents > 0 ? "red" : "green"}>
+          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <Flex alignItems="center" className="gap-2 mb-2">
               <AlertTriangle className="w-5 h-5 text-amber-400" />
               <Text className="font-medium">Breach Events (24h)</Text>
             </Flex>
             <div className="text-3xl font-bold">{breachEvents}</div>
             <Text className="text-xs text-gray-400">Unauthorized access attempts</Text>
-          </Card>
+          </div>
         </Grid>
 
         {/* Floor Occupancy Cards */}
-        <Card>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Title className="text-sm mb-3">Zone Occupancy</Title>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {zoneOccupancies.map((zone) => {
@@ -325,7 +325,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
     // ===== Tab 3: Cameras =====
     <TabPanel key="cameras">
       <div className="space-y-4 mt-4">
-        <Card>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Title className="text-sm mb-3">CCTV Camera Status</Title>
           <div className="space-y-2">
             {demoCameras.map((cam) => (
@@ -376,7 +376,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
     <TabPanel key="analysis">
       <div className="space-y-4 mt-4">
         {/* 24-hour trend chart */}
-        <Card>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Title className="text-sm mb-3">24-Hour Occupancy Trend</Title>
           <AreaChart
             className="h-64"
@@ -397,7 +397,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
 
         {/* Peak hours and floor breakdown */}
         <Grid className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card>
+          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <Title className="text-sm mb-3">Peak Hours</Title>
             <div className="space-y-3">
               {[
@@ -419,7 +419,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
             </div>
           </Card>
 
-          <Card>
+          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
             <Title className="text-sm mb-3">Floor-by-Floor Breakdown</Title>
             <BarChart
               className="h-48"
@@ -447,7 +447,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
     <TabPanel key="integrations">
       <div className="space-y-4 mt-4">
         {/* HVAC Integration */}
-        <Card>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Flex alignItems="center" className="gap-2 mb-4">
             <Thermometer className="w-5 h-5 text-blue-400" />
             <Title className="text-sm">Security + HVAC Integration</Title>
@@ -482,7 +482,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
         </Card>
 
         {/* Lighting Integration */}
-        <Card>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Flex alignItems="center" className="gap-2 mb-4">
             <Sun className="w-5 h-5 text-amber-400" />
             <Title className="text-sm">Security + Lighting Integration</Title>
@@ -517,7 +517,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
         </Card>
 
         {/* Integration Status Summary */}
-        <Card>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Title className="text-sm mb-3">Cross-Module Integration Status</Title>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="text-center p-4 rounded-lg border border-green-500/30 bg-green-500/5">

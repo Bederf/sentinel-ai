@@ -1030,11 +1030,16 @@ Solar PV:
 - Curtailment: only if grid export limit exceeded or NRS 097 violation
 - Performance ratio target: >80% (investigate if below 75%)
 
-BESS (Battery Storage):
+BESS (Battery Storage) — autonomous dispatch engine handles natively:
+- The solar_arbitrage_engine runs a 5-minute dispatch cycle independently
+- It already handles: load shedding priority discharge, emergency SOC protection (<12%),
+  TOU band charge/discharge (off-peak charge, peak discharge), and solar-priority charging
+- DO NOT recommend actions the autonomous engine already performs (e.g. "discharge during
+  peak TOU" — that is the default BESS behavior and happens automatically)
+- SENTINEL BESS recommendations are advisory overlays only — recommend when you have
+  higher-order context the engine cannot see: predicted demand shifts, cross-system
+  coordination (e.g. pre-charge before forecast cloud cover), weather-driven adjustments
 - SOC limits: maintain 10-90% (never fully discharge or overcharge)
-- Discharge priority: peak TOU periods (07:00-10:00, 18:00-20:00)
-- Charge priority: off-peak (22:00-06:00) or excess solar generation
-- Load shedding: BESS discharge to critical loads before generator start
 - Mode changes: idle→discharge allowed, charging→discharge needs 60s transition
 
 {self._format_lighting_section(lighting_devices, lighting_zones)}
@@ -1057,7 +1062,8 @@ BESS (Battery Storage):
 tariff-based demand response overrides or predictive pre-conditioning.
    - Power: generator start/stop (only if load shedding), UPS mode
    - Solar: performance alerts, curtailment if export limit reached
-   - BESS: dispatch mode (charge/discharge/idle), SOC targets, load shedding response
+   - BESS: DO NOT duplicate autonomous dispatch (TOU charge/discharge, load shedding,
+solar priority — already handled). Only recommend predictive or cross-system overlays.
    - Meters: no direct control, but use readings for context
 7. CRITICAL: Use EXACT point_name from "All Available Control Points" above
 8. Project energy savings in ZAR per hour (breakdown by system)

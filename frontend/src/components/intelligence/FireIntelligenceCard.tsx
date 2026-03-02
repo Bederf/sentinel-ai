@@ -31,7 +31,7 @@ export function FireIntelligenceCard({ siteId, onNavigate }: FireIntelligenceCar
       setLoading(true);
       setApiError(false);
       try {
-        const res = await authorizedFetch(`/api/compliance/fire/health?site_code=${encodeURIComponent(siteId)}`);
+        const res = await authorizedFetch(`/api/fire/health?site_code=${encodeURIComponent(siteId)}`);
         if (cancelled) return;
         if (res.ok) {
           setHealth(await res.json());

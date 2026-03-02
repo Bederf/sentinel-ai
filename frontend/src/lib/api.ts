@@ -3133,9 +3133,10 @@ export const lightingApi = {
   /**
    * Get building occupancy overview
    */
-  getBuildingOccupancy: async (): Promise<BuildingOccupancy> => {
+  getBuildingOccupancy: async (siteId?: string): Promise<BuildingOccupancy> => {
     try {
-      return await fetchApi<BuildingOccupancy>("/api/lighting/building/occupancy");
+      const params = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
+      return await fetchApi<BuildingOccupancy>(`/api/lighting/building/occupancy${params}`);
     } catch (error) {
       if (isExpectedApiError(error)) {
         return {

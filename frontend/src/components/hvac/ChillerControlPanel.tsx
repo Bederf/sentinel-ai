@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Card, Title, Text, Badge, Flex, Grid } from "@tremor/react";
+import { Text, Badge, Flex, Grid } from "@tremor/react";
 import { Thermometer, Power, PowerOff, Activity, AlertTriangle, Clock, Droplets } from "lucide-react";
 import { hvacApi, type Chiller } from "../../lib/hvacApi";
 import { useHealthThresholds } from "../../hooks/useHealthThresholds";
@@ -116,32 +116,32 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
 
   if (loading) {
     return (
-      <Card>
-        <Title>Chiller Control</Title>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Chiller Control</h3>
         <div className="animate-pulse space-y-4 mt-4">
           {[1, 2].map((i) => (
             <div key={i} className="h-40 bg-gray-200 rounded" />
           ))}
         </div>
-      </Card>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Card>
-        <Title>Chiller Control</Title>
-        <Text className="text-red-500 mt-4">{error}</Text>
-      </Card>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Chiller Control</h3>
+        <p className="text-red-500 mt-4">{error}</p>
+      </div>
     );
   }
 
   if (chillers.length === 0) {
     return (
-      <Card>
-        <Title>Chiller Control</Title>
-        <Text className="text-gray-500 mt-4">No chillers found</Text>
-      </Card>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Chiller Control</h3>
+        <p className="text-gray-500 mt-4">No chillers found</p>
+      </div>
     );
   }
 
@@ -152,8 +152,8 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
       {!compact && (
         <Flex justifyContent="between" alignItems="center">
           <div>
-            <Title>Chiller Control</Title>
-            <Text>{chillers.length} chillers configured</Text>
+            <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Chiller Control</h3>
+            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>{chillers.length} chillers configured</p>
           </div>
           <Badge color={runningCount > 0 ? "green" : "gray"} size="lg">
             {runningCount}/{chillers.length} Running
@@ -170,11 +170,10 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
           const hasChanges = pendingSetpoints[chiller.id] !== undefined;
 
           return (
-            <Card
+            <div
               key={chiller.id}
-              className="relative overflow-hidden"
-              decoration="left"
-              decorationColor={chiller.is_running ? "green" : "red"}
+              className="rounded-md p-4 relative overflow-hidden"
+              style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
             >
               {/* Status indicator line */}
               <div
@@ -415,14 +414,14 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
                   <Text className="text-xs">Service recommended</Text>
                 </Flex>
               )}
-            </Card>
+            </div>
           );
         })}
       </Grid>
 
       {/* Safety Note */}
       {!compact && (
-        <Card className="bg-blue-900/10 border border-blue-500/30">
+        <div className="rounded-md p-4" style={{ background: "rgba(30, 58, 138, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)" }}>
           <Flex alignItems="start" className="gap-3">
             <AlertTriangle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
             <div>
@@ -433,7 +432,7 @@ export function ChillerControlPanel({ siteId, compact = false, onChillerChange }
               </Text>
             </div>
           </Flex>
-        </Card>
+        </div>
       )}
     </div>
   );

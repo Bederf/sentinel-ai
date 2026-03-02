@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Card, Title, Text, Badge, Flex, Grid, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@tremor/react";
+import { Text, Badge, Flex, Grid, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@tremor/react";
 import { Thermometer, Clock, Zap, AlertTriangle } from "lucide-react";
 import { hvacApi, type ThermalRunway } from "../../lib/hvacApi";
 import { ThermalRunwayChart } from "../ThermalRunwayChart";
@@ -53,28 +53,28 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
 
   if (loading) {
     return (
-      <Card>
-        <Title>Thermal Optimization</Title>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Thermal Optimization</h3>
         <div className="animate-pulse h-64 bg-gray-200 rounded mt-4" />
-      </Card>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Card>
-        <Title>Thermal Optimization</Title>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Thermal Optimization</h3>
         <Text className="text-red-500 mt-4">{error}</Text>
-      </Card>
+      </div>
     );
   }
 
   if (!thermalData) {
     return (
-      <Card>
-        <Title>Thermal Optimization</Title>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Thermal Optimization</h3>
         <Text className="text-gray-500 mt-4">No thermal data available</Text>
-      </Card>
+      </div>
     );
   }
 
@@ -83,7 +83,7 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
   // Compact view
   if (compact) {
     return (
-      <Card>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <Flex justifyContent="between" alignItems="center" className="mb-4">
           <Flex alignItems="center" className="gap-2">
             <Thermometer className="w-5 h-5" style={{ color: "var(--color-sentinel-blue)" }} />
@@ -118,7 +118,7 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
             <Text className="text-xs text-green-400">Comfort maintained</Text>
           </div>
         </Grid>
-      </Card>
+      </div>
     );
   }
 
@@ -127,7 +127,7 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
     <div className="space-y-4">
       <Flex justifyContent="between" alignItems="center">
         <div>
-          <Title>Thermal Optimization</Title>
+          <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Thermal Optimization</h3>
           <Text>Load shedding preparation and thermal modeling</Text>
         </div>
         <div className="flex gap-2">
@@ -141,7 +141,7 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
       </Flex>
 
       {/* Key Metrics Summary */}
-      <Card>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <Grid className="grid grid-cols-4 gap-4">
           <div
             className="p-4 rounded-lg text-center"
@@ -176,7 +176,7 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
             <Text className="text-2xl font-bold text-green-300">+{metrics.improvement_percent}%</Text>
           </div>
         </Grid>
-      </Card>
+      </div>
 
       {/* Tabs for different views */}
       <TabGroup index={activeTab} onIndexChange={setActiveTab}>
@@ -187,7 +187,7 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
 
         <TabPanels>
           <TabPanel>
-            <Card>
+            <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
               <ThermalRunwayChart
                 data={data}
                 outagePeriod={outage_period}
@@ -198,7 +198,7 @@ export function ThermalOptimizationPanel({ siteId, compact = false }: ThermalOpt
                   recoveryTime: metrics.recovery_time,
                 }}
               />
-            </Card>
+            </div>
           </TabPanel>
 
           <TabPanel>

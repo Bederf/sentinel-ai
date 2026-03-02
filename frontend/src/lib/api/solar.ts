@@ -125,7 +125,7 @@ export interface BESSStatusData {
 
 /**
  * Fetch live system data (power, BESS, yield, inverters)
- * GET /api/solar/systems/{id}/overview
+ * GET /api/solar/sites/{id}/overview
  *
  * @param siteId - Solar site identifier
  * @returns LiveSystemData with real-time metrics
@@ -133,7 +133,7 @@ export interface BESSStatusData {
 export async function fetchLiveSystemData(siteId: string): Promise<LiveSystemData> {
   const normalizedId = normalizeSiteId(siteId);
   const response = await authorizedFetch(
-    `${API_BASE_URL}/api/solar/systems/${normalizedId}/overview`,
+    `${API_BASE_URL}/api/solar/sites/${normalizedId}/overview`,
     { method: 'GET' }
   );
 

@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Card, Title, Text, Badge, Flex, Grid, Button } from "@tremor/react";
+import { Badge, Flex, Grid, Button } from "@tremor/react";
 import { Thermometer, AlertTriangle, Fan, Settings } from "lucide-react";
 import { hvacApi, type HVACZone } from "../../lib/hvacApi";
 import TemperatureControl from "../TemperatureControl";
@@ -86,26 +86,26 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
 
   if (loading) {
     return (
-      <Card>
-        <Title>Zone Overview</Title>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Zone Overview</h3>
         <div className="animate-pulse space-y-4 mt-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-24 bg-gray-200 rounded" />
           ))}
         </div>
-      </Card>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Card>
-        <Title>Zone Overview</Title>
-        <Text className="text-red-500 mt-4">{error}</Text>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Zone Overview</h3>
+        <p className="text-red-500 mt-4">{error}</p>
         <Button size="xs" className="mt-2" onClick={() => { setError(null); loadZonesRef.current?.(); }}>
           Retry
         </Button>
-      </Card>
+      </div>
     );
   }
 
@@ -122,8 +122,8 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
       {!compact && (
         <Flex justifyContent="between" alignItems="center" className="mb-4">
           <div>
-            <Title>Zone Overview</Title>
-            <Text>{zones.length} zones configured</Text>
+            <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Zone Overview</h3>
+            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>{zones.length} zones configured</p>
           </div>
           <div className="flex gap-2">
             <Badge color="green">{zones.filter(z => z.status === "running").length} Running</Badge>
@@ -139,20 +139,19 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
           )}
           <Grid className={`grid ${compact ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
             {floorZones.map((zone) => (
-              <Card
+              <div
                 key={zone.zone_id}
-                className="cursor-pointer hover:ring-2 hover:ring-blue-500/30 transition-all"
-                decoration="left"
-                decorationColor={getStatusColor(zone.status)}
+                className="rounded-md p-4 cursor-pointer hover:ring-2 hover:ring-blue-500/30 transition-all"
+                style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
                 onClick={() => !editingZone && onZoneSelect?.(zone)}
               >
                 {/* Zone Header */}
                 <Flex justifyContent="between" alignItems="start" className="mb-3">
                   <div>
-                    <Text className="font-medium">{zone.zone_name}</Text>
-                    <Text className="text-xs text-gray-400">
+                    <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{zone.zone_name}</span>
+                    <p className="text-xs text-gray-400">
                       {zone.fcu_id || zone.ahu_id || "No FCU"}
-                    </Text>
+                    </p>
                   </div>
                   <Badge color={getStatusColor(zone.status)} size="xs">
                     {zone.status}
@@ -263,7 +262,7 @@ export function ZoneOverviewPanel({ siteId, compact = false, onZoneSelect }: Zon
                     <span>Occ: {zone.typical_occupancy}</span>
                   </Flex>
                 )}
-              </Card>
+              </div>
             ))}
           </Grid>
         </div>

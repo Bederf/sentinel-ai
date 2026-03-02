@@ -24,7 +24,7 @@ router = APIRouter(
         Depends(
             require_active_module(
                 ModuleType.FIRE,
-                site_keys=("site_id", "site"),
+                site_keys=("site_id", "site", "site_code"),
             )
         )
     ],

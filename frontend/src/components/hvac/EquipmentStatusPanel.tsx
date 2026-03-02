@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Card, Title, Text, Badge, Flex, Grid, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@tremor/react";
+import { Text, Badge, Flex, Grid, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@tremor/react";
 import { Fan, Thermometer, Activity, AlertTriangle, CheckCircle, Clock, Wrench, ClipboardList } from "lucide-react";
 import { hvacApi, type HVACEquipment } from "../../lib/hvacApi";
 
@@ -88,23 +88,23 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
 
   if (loading) {
     return (
-      <Card>
-        <Title>Equipment Status</Title>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Equipment Status</h3>
         <div className="animate-pulse space-y-4 mt-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-32 bg-gray-200 rounded" />
           ))}
         </div>
-      </Card>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Card>
-        <Title>Equipment Status</Title>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Equipment Status</h3>
         <Text className="text-red-500 mt-4">{error}</Text>
-      </Card>
+      </div>
     );
   }
 
@@ -129,10 +129,9 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
   const types = Object.keys(equipmentByType);
 
   const EquipmentCard = ({ eq }: { eq: HVACEquipment }) => (
-    <Card
-      className="cursor-pointer hover:ring-2 hover:ring-blue-500/30 transition-all"
-      decoration="top"
-      decorationColor={getHealthColor(eq.calculated_health || eq.health_score)}
+    <div
+      className="rounded-md p-4 cursor-pointer hover:ring-2 hover:ring-blue-500/30 transition-all"
+      style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
       onClick={() => onEquipmentSelect?.(eq)}
     >
       {/* Header */}
@@ -272,7 +271,7 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
           Create Work Order
         </button>
       )}
-    </Card>
+    </div>
   );
 
   if (compact) {
@@ -295,7 +294,7 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
     <div className="space-y-4">
       <Flex justifyContent="between" alignItems="center">
         <div>
-          <Title>Equipment Status</Title>
+          <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Equipment Status</h3>
           <Text>{equipment.length} HVAC equipment items</Text>
         </div>
         <div className="flex gap-2">

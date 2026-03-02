@@ -477,7 +477,7 @@ def run_lighting_simulation(max_day: int = 365) -> dict:
 
 @router.get("/simulation")
 async def get_lighting_simulation(
-    site_id: str = Query(..., description="Site ID"),
+    site_id: str = Query(None, description="Site ID"),
     max_day: int = Query(365, ge=1, le=365, description="Simulate up to this many days (1-365)"),
 ):
     """
@@ -538,7 +538,7 @@ async def get_lighting_simulation(
 
 @router.get("/live")
 async def get_live_lighting_data(
-    site_id: str = Query(..., description="Site ID"),
+    site_id: str = Query(None, description="Site ID"),
 ):
     """
     Get real-time DALI lighting data from Supabase.
@@ -643,7 +643,7 @@ async def get_live_lighting_data(
 
 
 @router.get("/building/occupancy")
-async def get_building_occupancy(site_id: str = Query(..., description="Site ID")):
+async def get_building_occupancy(site_id: str = Query(None, description="Site ID")):
     """
     Get building-wide occupancy overview with floor and zone breakdown.
 
@@ -1001,7 +1001,7 @@ async def get_zone_lighting(zone_id: str):
 
 
 @router.get("/stats")
-async def get_lighting_stats(site_id: str = Query(..., description="Site ID")):
+async def get_lighting_stats(site_id: str = Query(None, description="Site ID")):
     """
     Get system-wide DALI statistics.
 
