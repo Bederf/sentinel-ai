@@ -4,7 +4,7 @@ Replaces keyword matching + template replies with a single LLM call that
 classifies the issue, extracts location/phone, scores completeness, and
 generates a natural context-aware reply.
 
-LLM fallback chain: OpenAI gpt-4.1-nano → Claude → keyword matching.
+LLM fallback chain: OpenAI (settings.openai_model) → Claude → keyword matching.
 
 Follows the ``ai_optimizer.py`` pattern: gather context → build prompt →
 call LLM → parse JSON → fallback to rules if LLM fails.
@@ -109,7 +109,8 @@ class EmailIntakeAgent:
     def __init__(self):
         self._api_key = settings.openai_api_key
         self._base_url = (settings.openai_base_url or "https://api.openai.com/v1").rstrip("/")
-        self._model = "gpt-4.1-nano"
+        # Use configured model — not hardcoded — so it picks up env overrides
+        self._model = settings.openai_model or "gpt-4.1-nano"
         self._timeout = settings.email_intake_agent_timeout_seconds
 
     async def classify_and_reply(
@@ -135,9 +136,9 @@ class EmailIntakeAgent:
         )
 
         try:
-            raw = await self._call_llm(prompt)
+            raw, used_model = await self._call_llm(prompt)
             parsed = self._parse_response(raw)
-            result = self._validate(parsed)
+            result = self._validate(parsed, used_model=used_model)
             result.agent_latency_ms = int((time.monotonic() - t0) * 1000)
             # Wrap HTML around the reply text
             result.reply_html = self._wrap_html(
@@ -148,7 +149,13 @@ class EmailIntakeAgent:
             )
             return result
         except Exception as exc:
-            logger.warning("Agent LLM failed (%s), falling back to keywords", exc)
+            logger.error(
+                "Agent LLM failed for sender=%s subject=%r — falling back to keywords. Error: %s",
+                from_email,
+                subject,
+                exc,
+                exc_info=True,
+            )
             result = self._keyword_fallback(
                 from_name=from_name,
                 from_email=from_email,
@@ -247,7 +254,7 @@ is missing (only things NOT already provided), ask specifically.
 - Never fabricate work order numbers — use {{{{ref}}}} as placeholder.
 - Use South African English conventions.
 - Keep the reply under 150 words.
-- Sign off as "Kind regards,\nSENTINEL Building Management"
+- Sign off as "Kind regards,\\nSENTINEL Building Management"
 {bms_section}
 
 ## Email to Classify
@@ -277,18 +284,25 @@ Respond with ONLY a JSON object (no markdown, no explanation):
     # LLM call
     # ------------------------------------------------------------------
 
-    async def _call_llm(self, prompt: str) -> str:
-        """OpenAI gpt-4.1-nano → Claude → raise."""
+    async def _call_llm(self, prompt: str) -> tuple[str, str]:
+        """OpenAI → Claude → raise. Returns (response_text, model_name)."""
         # Try OpenAI first
         if self._api_key:
             try:
-                return await self._call_openai(prompt)
+                text = await self._call_openai(prompt)
+                return text, self._model
             except Exception as exc:
-                logger.warning("OpenAI call failed: %s, trying Claude", exc)
+                logger.error(
+                    "OpenAI call failed (model=%s): %s — trying Claude fallback",
+                    self._model,
+                    exc,
+                )
 
         # Try Claude fallback
+        claude_model = settings.claude_model or "claude-haiku-4-5-20251001"
         try:
-            return await self._call_claude(prompt)
+            text = await self._call_claude(prompt)
+            return text, f"claude:{claude_model}"
         except Exception as exc:
             raise RuntimeError(f"All LLM providers failed. Last error: {exc}") from exc
 
@@ -335,6 +349,7 @@ Respond with ONLY a JSON object (no markdown, no explanation):
         if not api_key:
             raise RuntimeError("ANTHROPIC_API_KEY not configured")
 
+        claude_model = settings.claude_model or "claude-haiku-4-5-20251001"
         url = "https://api.anthropic.com/v1/messages"
         headers = {
             "x-api-key": api_key,
@@ -342,7 +357,7 @@ Respond with ONLY a JSON object (no markdown, no explanation):
             "content-type": "application/json",
         }
         payload = {
-            "model": settings.claude_model or "claude-haiku-4-5-20251001",
+            "model": claude_model,
             "max_tokens": 1000,
             "messages": [{"role": "user", "content": prompt}],
             "system": "You are a JSON-only facilities management email triage agent. Respond with valid JSON only.",
@@ -361,7 +376,7 @@ Respond with ONLY a JSON object (no markdown, no explanation):
         if not text:
             raise RuntimeError("Claude returned empty content")
 
-        logger.info("Agent LLM response from Claude (%d chars)", len(text))
+        logger.info("Agent LLM response from Claude/%s (%d chars)", claude_model, len(text))
         return text
 
     # ------------------------------------------------------------------
@@ -389,7 +404,7 @@ Respond with ONLY a JSON object (no markdown, no explanation):
     # Validation
     # ------------------------------------------------------------------
 
-    def _validate(self, parsed: dict) -> AgentResult:
+    def _validate(self, parsed: dict, *, used_model: str) -> AgentResult:
         """Validate discipline/sub_category against taxonomy, clamp values."""
         discipline = parsed.get("discipline", "General")
         sub_category = parsed.get("sub_category", "Unclassified")
@@ -434,9 +449,6 @@ Respond with ONLY a JSON object (no markdown, no explanation):
         else:
             action = "manual_review"
 
-        # Determine which model succeeded
-        agent_model = self._model if self._api_key else "claude"
-
         return AgentResult(
             discipline=discipline,
             sub_category=sub_category,
@@ -450,7 +462,8 @@ Respond with ONLY a JSON object (no markdown, no explanation):
             completeness=completeness,
             action=action,
             reply_text=parsed.get("reply_text", ""),
-            agent_model=agent_model,
+            # Track exactly which model produced this result
+            agent_model=used_model,
         )
 
     # ------------------------------------------------------------------
