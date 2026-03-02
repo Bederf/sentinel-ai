@@ -30,13 +30,12 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request, status
 
 from app.config.settings import settings
 from app.middleware.auth_middleware import _authenticate_request, _extract_ip_address
-from app.models.auth import AuthContext, SentinelRole
+from app.models.auth import AuthContext
 from app.security.constants import ROLE_LEVELS, SITE_ID_PATTERN
 
 logger = logging.getLogger(__name__)
@@ -49,7 +48,7 @@ logger = logging.getLogger(__name__)
 # ADMINs bypass this entirely.
 # ---------------------------------------------------------------------------
 _SITE_ACCESS_CONFIG_PATH = Path(__file__).parent.parent / "data" / "site_access_config.json"
-_site_access_cache: Optional[dict] = None
+_site_access_cache: dict | None = None
 
 
 def _load_site_access_config() -> dict:
@@ -115,36 +114,7 @@ async def _get_auth_context(request: Request) -> AuthContext:
     if existing is not None:
         return existing
 
-    # Demo mode bypass
-    if settings.demo_mode:
-        if settings.environment == "production":
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Service misconfigured",
-            )
-
-        source_ip = _extract_ip_address(request)
-
-        # Try real auth first
-        auth_ctx = await _authenticate_request(request)
-        if auth_ctx:
-            request.state.auth = auth_ctx
-            return auth_ctx
-
-        # Phase 137-02: Demo fallback — OPERATOR (level 2), not ADMIN (level 4)
-        demo_ctx = AuthContext(
-            user_id="demo-user",
-            role=SentinelRole.OPERATOR,
-            auth_method="demo_mode",
-            source_ip=source_ip,
-            email="demo@sentinel.local",
-            scopes=["operator:all"],
-            metadata={"demo_mode": True},
-        )
-        request.state.auth = demo_ctx
-        return demo_ctx
-
-    # Production auth
+    # Authenticate
     auth_ctx = await _authenticate_request(request)
     if auth_ctx is None:
         raise HTTPException(

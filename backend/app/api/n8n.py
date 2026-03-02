@@ -36,8 +36,7 @@ async def get_status(
     service = get_n8n_service()
     if not service.is_configured:
         return service.status.to_dict()
-    if service.status.status.value == "not_configured":
-        await service.check_connection()
+    await service.check_connection()
     return service.status.to_dict()
 
 

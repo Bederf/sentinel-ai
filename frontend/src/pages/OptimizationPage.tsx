@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useSimulation } from "@/contexts/SimulationContext";
 import { useModules } from "@/contexts/ModuleHooks";
-import { Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, Button, TabGroup, TabList, Tab, TabPanels, TabPanel, Title, Text } from "@tremor/react";
+import { TabGroup, TabList, Tab, TabPanels, TabPanel } from "@tremor/react";
 import api from '@/lib/api';
 import type { OptimizationScenario, OptimizationStatusResponse, Site, Prediction } from '@/lib/api';
 import { fetchEnergyComparisonSummary, calculateCarbonOffset } from '@/lib/api/energy';
@@ -292,7 +292,8 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
     return (
       <div className="h-full overflow-y-auto p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
         <div
-          className="glass-panel p-8 text-center"
+          className="rounded-md p-8 text-center"
+          style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <div
             className="h-12 w-12 mx-auto mb-4 rounded-full flex items-center justify-center"
@@ -314,8 +315,27 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
 
   return (
     <div className="h-full overflow-y-auto p-4 md:p-6" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
+      {/* Page Header — matches Lighting tab pattern */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded" style={{ background: "rgba(250, 204, 21, 0.15)" }}>
+              <Zap className="h-6 w-6" style={{ color: "#FACC15" }} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Energy Control
+              </h1>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Optimisation &amp; Cost Management
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <TabGroup>
-        <TabList className="mb-6 overflow-x-auto">
+        <TabList className="mb-6 overflow-x-auto [&>*]:whitespace-nowrap">
           <Tab>Load Shedding</Tab>
           <Tab>Optimization</Tab>
           <Tab>Validation</Tab>
@@ -359,29 +379,17 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
       </div>
 
       {/* Load Shedding Optimization */}
-      <div className="glass-card overflow-hidden mb-6">
-        <div
-          className="p-4 flex items-center justify-between"
-          style={{ borderBottom: "1px solid var(--glass-border)" }}
-        >
+      <div className="rounded-md p-4 mb-6" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div
-              className="p-2 rounded"
-              style={{ background: "rgba(59, 130, 246, 0.15)" }}
-            >
+            <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
               <Zap className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
             </div>
             <div>
-              <h3
-                className="font-medium text-sm"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
+              <h3 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
                 Load Shedding Optimization
               </h3>
-              <span
-                className="text-xs"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
-              >
+              <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 {isSimulationRunning
                   ? `Live HVAC ${hvacLoadPercent?.toFixed(0)}% load • Hour ${simulatedHour}:00 (Day ${daysSimulated}/365) • ${ambientTemp?.toFixed(1)}°C`
                   : 'Optimize building comfort and energy use during outages'
@@ -393,15 +401,13 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
             {isSimulationRunning ? "Live" : "Monitoring"}
           </SentinelBadge>
         </div>
-        <div className="p-4">
-          <OptimizationPanelGated compact={false} />
-        </div>
+        <OptimizationPanelGated compact={false} />
       </div>
 
       {/* Metrics Grid - KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div
-          className="glass-card p-4"
+          className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <div className="flex items-center justify-between">
             <div>
@@ -438,7 +444,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
         </div>
 
         <div
-          className="glass-card p-4"
+          className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <div className="flex items-center justify-between">
             <div>
@@ -475,7 +481,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
         </div>
 
         <div
-          className="glass-card p-4"
+          className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <div className="flex items-center justify-between">
             <div>
@@ -508,7 +514,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
         </div>
 
         <div
-          className="glass-card p-4"
+          className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <div className="flex items-center justify-between">
             <div>
@@ -545,147 +551,80 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
       <div className={`grid grid-cols-1 ${isModuleActive('fleet_ml') ? 'lg:grid-cols-2' : ''} gap-6 pb-6`}>
         {/* Scenario Comparison — cross-building comparison, requires Fleet ML */}
         {isModuleActive('fleet_ml') && (
-        <div
-          className="glass-card overflow-hidden"
-        >
-          <div
-            className="p-4 flex items-center justify-between"
-            style={{ borderBottom: "1px solid var(--glass-border)" }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded"
-                style={{ background: "rgba(245, 158, 11, 0.15)" }}
-              >
-                <BarChart className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
-              </div>
-              <div>
-                <h3
-                  className="font-medium text-sm"
-                  style={{ color: "var(--color-sentinel-text-primary)" }}
-                >
-                  Scenario Comparison
-                </h3>
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--color-sentinel-text-secondary)" }}
-                >
-                  Compare optimization strategies across sites
-                </span>
-              </div>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded" style={{ background: "rgba(245, 158, 11, 0.15)" }}>
+              <BarChart className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
+            </div>
+            <div>
+              <h3 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Scenario Comparison
+              </h3>
+              <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Compare optimization strategies across sites
+              </span>
             </div>
           </div>
 
-          <div className="p-4">
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableHeaderCell>Scenario</TableHeaderCell>
-                  <TableHeaderCell>Runway</TableHeaderCell>
-                  <TableHeaderCell>Energy Savings</TableHeaderCell>
-                  <TableHeaderCell>Cost</TableHeaderCell>
-                  <TableHeaderCell>Success Rate</TableHeaderCell>
-                  <TableHeaderCell>Action</TableHeaderCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
+                  {["Scenario", "Runway", "Energy Savings", "Cost", "Success Rate", "Action"].map((h) => (
+                    <th key={h} className="text-left py-2 px-3 text-xs font-medium" style={{ color: "var(--color-sentinel-text-secondary)" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
                 {scenarios.map((scenario) => (
-                  <TableRow key={scenario.id}>
-                    <TableCell>
-                      <span style={{ color: "var(--color-sentinel-text-primary)" }}>
-                        {scenario.name}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <SentinelBadge
-                        variant={scenario.id === "baseline" ? "error" : "success"}
-                        size="sm"
-                      >
-                        {scenario.runwayExtension}
-                      </SentinelBadge>
-                    </TableCell>
-                    <TableCell>
-                      <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                        {scenario.energySavings}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                        {formatZAR(scenario.costSavings)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <SentinelBadge
-                        variant={
-                          scenario.id === "baseline"
-                            ? "error"
-                            : scenario.id === "sentinel"
-                            ? "success"
-                            : "warning"
-                        }
-                        size="sm"
-                      >
-                        {scenario.successRate}
-                      </SentinelBadge>
-                    </TableCell>
-                    <TableCell>
+                  <tr key={scenario.id} style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
+                    <td className="py-2.5 px-3" style={{ color: "var(--color-sentinel-text-primary)" }}>{scenario.name}</td>
+                    <td className="py-2.5 px-3">
+                      <SentinelBadge variant={scenario.id === "baseline" ? "error" : "success"} size="sm">{scenario.runwayExtension}</SentinelBadge>
+                    </td>
+                    <td className="py-2.5 px-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>{scenario.energySavings}</td>
+                    <td className="py-2.5 px-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>{formatZAR(scenario.costSavings)}</td>
+                    <td className="py-2.5 px-3">
+                      <SentinelBadge variant={scenario.id === "baseline" ? "error" : scenario.id === "sentinel" ? "success" : "warning"} size="sm">{scenario.successRate}</SentinelBadge>
+                    </td>
+                    <td className="py-2.5 px-3">
                       {scenario.id !== "baseline" && (
-                        <Button
-                          size="xs"
+                        <button
                           onClick={() => handleExecuteOptimization(scenario.id)}
                           disabled={showConfirmModal}
-                          style={{
-                            background: "var(--color-sentinel-blue)",
-                          }}
+                          className="inline-flex items-center text-xs px-3 py-1.5 rounded font-medium"
+                          style={{ background: "var(--color-sentinel-blue)", color: "#fff", cursor: showConfirmModal ? "not-allowed" : "pointer", opacity: showConfirmModal ? 0.5 : 1 }}
                         >
                           <Play className="h-3 w-3 mr-1" />
                           Execute
-                        </Button>
+                        </button>
                       )}
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           </div>
         </div>
         )}
 
         {/* Action History */}
-        <div
-          className="glass-card overflow-hidden"
-        >
-          {/* Panel Header */}
-          <div
-            className="p-4 flex items-center justify-between"
-            style={{ borderBottom: "1px solid var(--glass-border)" }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded"
-                style={{ background: "rgba(16, 185, 129, 0.15)" }}
-              >
-                <Clock className="h-5 w-5" style={{ color: "var(--color-sentinel-green)" }} />
-              </div>
-              <div>
-                <h3
-                  className="font-medium text-sm"
-                  style={{ color: "var(--color-sentinel-text-primary)" }}
-                >
-                  Recent Actions
-                </h3>
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--color-sentinel-text-secondary)" }}
-                >
-                  Optimization execution history
-                </span>
-              </div>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded" style={{ background: "rgba(16, 185, 129, 0.15)" }}>
+              <Clock className="h-5 w-5" style={{ color: "var(--color-sentinel-green)" }} />
+            </div>
+            <div>
+              <h3 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Recent Actions
+              </h3>
+              <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Optimization execution history
+              </span>
             </div>
           </div>
 
-          {/* Panel Content */}
-          <div className="p-4">
+          <div>
             <div className="space-y-3">
               {actionHistory.length === 0 && (
                 <div className="p-4 rounded text-center" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
@@ -744,7 +683,8 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
             onClick={() => setShowConfirmModal(false)}
           />
           <div
-            className="relative z-10 glass-panel p-6"
+            className="relative z-10 rounded-md p-6"
+            style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
           >
             <div className="mb-4">
               <span
@@ -762,24 +702,26 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
               </span>
             </div>
             <div className="flex justify-end gap-3">
-              <Button
-                size="sm"
+              <button
                 onClick={() => setShowConfirmModal(false)}
+                className="text-sm px-4 py-2 rounded font-medium"
                 style={{
                   background: "var(--color-sentinel-bg-secondary)",
                   color: "var(--color-sentinel-text-primary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                  cursor: "pointer",
                 }}
               >
                 Cancel
-              </Button>
-              <Button
-                size="sm"
+              </button>
+              <button
                 onClick={confirmExecution}
-                style={{ background: "var(--color-sentinel-green)", color: "white" }}
+                className="inline-flex items-center text-sm px-4 py-2 rounded font-medium"
+                style={{ background: "var(--color-sentinel-green)", color: "#fff", cursor: "pointer" }}
               >
                 <CheckCircle className="h-4 w-4 mr-1" />
                 Confirm
-              </Button>
+              </button>
             </div>
           </div>
         </div>
@@ -803,16 +745,16 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
               <EnergyComparisonPanel siteId={selectedSiteId} />
 
               {/* Actual vs SENTINEL Energy */}
-              <div className="glass-panel rounded-md overflow-hidden">
+              <div className="rounded-md overflow-hidden" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                 <ActualVsSentinelEnergyCard siteId={selectedSiteId} />
               </div>
 
               {/* Validation Metrics */}
               <div>
-                <Title className="mb-4">Energy &amp; Cost Validation</Title>
-                <Text className="text-gray-400 mb-4">
+                <h3 className="font-medium text-sm mb-2" style={{ color: "var(--color-sentinel-text-primary)" }}>Energy &amp; Cost Validation</h3>
+                <p className="text-xs mb-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   Real-time validation of simulated energy consumption and costs against meter readings and invoices.
-                </Text>
+                </p>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <PowerMeterValidationCard buildingId={selectedSiteId} />

@@ -648,8 +648,11 @@ export function SiteCard({ site, onClick, showSafetyStatus = true, showOptimizat
         </div>
       </div>
 
-      {/* Expandable Risk List */}
-      {hasAlerts && (
+      {/* Expandable Risk List — show when safety summary has risks OR legacy alert_count > 0 */}
+      {(safetySummary
+        ? (safetySummary.warning + safetySummary.alarm + safetySummary.blocked) > 0
+        : hasAlerts
+      ) && (
         <ExpandableRiskList
           siteId={site.id}
           expanded={riskListExpanded}

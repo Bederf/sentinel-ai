@@ -25,21 +25,20 @@ Usage:
 
 import hashlib
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import urlparse
 import uuid
+from datetime import datetime, timedelta
+from typing import Any
 
 import jwt as pyjwt
 from fastapi import HTTPException, Request, status
 
 from app.config.settings import settings
-from app.database.supabase_client import get_supabase_client
+from app.core.site_resolver import get_primary_site
 from app.database.repositories.user_entitlements_repository import (
     get_user_entitlements_repository,
 )
-from app.models.auth import AuthContext, AuthLevel, SentinelRole, ROLE_HIERARCHY
-from app.core.site_resolver import get_primary_site
+from app.database.supabase_client import get_supabase_client
+from app.models.auth import AuthContext, AuthLevel, SentinelRole
 from app.models.module_registry import ModuleType
 
 logger = logging.getLogger(__name__)
@@ -88,43 +87,16 @@ def sanitize_email(email: str) -> str:
 
 # Demo API keys for development/testing
 # In production, these would be stored in Supabase with hashed keys
-_API_KEY_STORE: Dict[str, Dict[str, Any]] = {}
-_API_KEY_CACHE: Dict[str, Tuple[datetime, Dict[str, Any]]] = {}
+_API_KEY_STORE: dict[str, dict[str, Any]] = {}
+_API_KEY_CACHE: dict[str, tuple[datetime, dict[str, Any]]] = {}
 _API_KEY_CACHE_TTL_SECONDS = 300
-
-
-def _extract_allowed_demo_hosts() -> set[str]:
-    """Build host allowlist for DEMO_MODE from configured origins."""
-    hosts: set[str] = set()
-    for configured_origin in (*settings.demo_allowed_origins, *settings.cors_origins):
-        try:
-            parsed = urlparse(configured_origin)
-            if parsed.hostname:
-                hosts.add(parsed.hostname.lower())
-        except Exception:
-            continue
-    return hosts
-
-
-def _is_demo_origin_allowed(request: Request) -> bool:
-    """Return True when request origin/host matches configured demo-safe origins."""
-    origin = (request.headers.get("origin") or "").strip()
-    host_header = (request.headers.get("host") or "").strip()
-    host_only = host_header.split(":", 1)[0].lower() if host_header else ""
-
-    configured_origins = set(settings.demo_allowed_origins) | set(settings.cors_origins)
-    if origin and origin in configured_origins:
-        return True
-
-    allowed_hosts = _extract_allowed_demo_hosts()
-    return bool(host_only and host_only in allowed_hosts)
 
 
 def register_api_key(
     key_hash: str,
     owner: str,
     role: SentinelRole,
-    scopes: Optional[List[str]] = None,
+    scopes: list[str] | None = None,
     description: str = "",
 ) -> None:
     """Register an API key in the in-memory store.
@@ -217,7 +189,7 @@ def create_refresh_token(user_id: str, email: str, role: str, full_name: str) ->
     )
 
 
-def validate_jwt_token(token: str, required_token_type: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def validate_jwt_token(token: str, required_token_type: str | None = None) -> dict[str, Any] | None:
     """Validate a JWT token and return payload.
 
     Checks token expiration, token_type claim, and blacklist status.
@@ -290,7 +262,7 @@ def validate_jwt_token(token: str, required_token_type: Optional[str] = None) ->
 # =============================================================================
 
 
-def _extract_bearer_token(request: Request) -> Optional[str]:
+def _extract_bearer_token(request: Request) -> str | None:
     """Extract Bearer token from Authorization header.
 
     Args:
@@ -312,7 +284,7 @@ def _extract_bearer_token(request: Request) -> Optional[str]:
     return None
 
 
-def _extract_api_key(request: Request) -> Optional[str]:
+def _extract_api_key(request: Request) -> str | None:
     """Extract API key from request headers.
 
     Checks both Authorization header (Bearer sent_sk_...) and X-API-Key header.
@@ -365,7 +337,7 @@ def _extract_ip_address(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-async def _validate_supabase_token(token: str) -> Optional[Dict[str, Any]]:
+async def _validate_supabase_token(token: str) -> dict[str, Any] | None:
     """Validate a Supabase JWT token.
 
     Attempts to decode and verify the token using Supabase's JWT secret
@@ -391,7 +363,7 @@ async def _validate_supabase_token(token: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def _validate_api_key(api_key: str) -> Optional[Dict[str, Any]]:
+def _validate_api_key(api_key: str) -> dict[str, Any] | None:
     """Validate an API key against database (with short in-memory cache).
 
     Args:
@@ -463,7 +435,7 @@ def _validate_api_key(api_key: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _extract_role_from_token(payload: Dict[str, Any]) -> SentinelRole:
+def _extract_role_from_token(payload: dict[str, Any]) -> SentinelRole:
     """Extract SENTINEL role from a JWT token payload.
 
     Checks multiple locations for role information.
@@ -535,7 +507,7 @@ async def _load_user_entitlements(auth_ctx: AuthContext) -> None:
 # =============================================================================
 
 
-async def _authenticate_request(request: Request) -> Optional[AuthContext]:
+async def _authenticate_request(request: Request) -> AuthContext | None:
     """Attempt to authenticate a request using any available method.
 
     Tries Bearer token first, then API key.
@@ -642,72 +614,6 @@ def require_auth(level: AuthLevel = AuthLevel.AUTHENTICATED):
     """
 
     async def _dependency(request: Request) -> AuthContext:
-        # DEMO_MODE bypass: allow all requests but log them
-        if settings.demo_mode:
-            # Block DEMO_MODE bypass in production environment
-            if settings.environment == "production":
-                logger.error(f"DEMO_MODE bypass attempted in production environment - path={request.url.path}")
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Service misconfigured",
-                )
-
-            source_ip = _extract_ip_address(request)
-
-            # Restrict demo mode to localhost or explicitly allowed origins (C-4)
-            _LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost", "testclient", "unknown"}
-            if source_ip not in _LOCALHOST_IPS:
-                if not _is_demo_origin_allowed(request):
-                    logger.warning(
-                        f"DEMO_MODE access denied from non-local IP: "
-                        f"ip={source_ip} origin={request.headers.get('origin')} "
-                        f"host={request.headers.get('host')} path={request.url.path}"
-                    )
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Demo mode is only available from localhost",
-                    )
-
-            # Still try to authenticate if credentials are provided
-            auth_ctx = await _authenticate_request(request)
-            if auth_ctx:
-                request.state.auth = auth_ctx
-                return auth_ctx
-
-            # Phase 120-03: Detect bot agents in demo mode via header or key prefix.
-            # Bots get BOT_AGENT role instead of OPERATOR to prevent privilege escalation.
-            _is_demo_bot = request.headers.get("X-Agent-Type", "").lower() == "bot" or (
-                _extract_api_key(request) or ""
-            ).startswith("sent_bot_")
-
-            if _is_demo_bot:
-                demo_ctx = AuthContext(
-                    user_id="demo-bot",
-                    role=SentinelRole.BOT_AGENT,
-                    auth_method="demo_mode",
-                    source_ip=source_ip,
-                    email="bot@sentinel.local",
-                    scopes=["bot_agent:all"],
-                    metadata={"demo_mode": True},
-                    is_bot_agent=True,
-                )
-            else:
-                # Phase 137-02: Demo mode grants OPERATOR (level 2), not ADMIN (level 4)
-                # OPERATOR can read all data and control devices but cannot
-                # access admin-only endpoints (user management, config changes).
-                demo_ctx = AuthContext(
-                    user_id="demo-user",
-                    role=SentinelRole.OPERATOR,
-                    auth_method="demo_mode",
-                    source_ip=source_ip,
-                    email="demo@sentinel.local",
-                    scopes=["operator:all"],
-                    metadata={"demo_mode": True},
-                )
-            request.state.auth = demo_ctx
-            logger.debug(f"Demo mode auth: path={request.url.path} ip={source_ip} is_bot={_is_demo_bot}")
-            return demo_ctx
-
         # PUBLIC endpoints don't need auth
         if level == AuthLevel.PUBLIC:
             source_ip = _extract_ip_address(request)
@@ -781,68 +687,6 @@ def require_role(*roles: SentinelRole):
     """
 
     async def _dependency(request: Request) -> AuthContext:
-        # DEMO_MODE bypass
-        if settings.demo_mode:
-            if settings.environment == "production":
-                logger.error(f"DEMO_MODE role bypass attempted in production - path={request.url.path}")
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Service misconfigured",
-                )
-
-            source_ip = _extract_ip_address(request)
-
-            # Restrict demo mode to localhost or configured allowed origins/hosts (C-4)
-            _LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost", "testclient", "unknown"}
-            if source_ip not in _LOCALHOST_IPS and not _is_demo_origin_allowed(request):
-                logger.warning(
-                    f"DEMO_MODE role access denied from non-local IP: ip={source_ip} path={request.url.path}"
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Demo mode is only available from localhost",
-                )
-
-            auth_ctx = await _authenticate_request(request)
-            if auth_ctx:
-                request.state.auth = auth_ctx
-                return auth_ctx
-
-            # Phase 120-03: Detect bot agents in demo mode via header or key prefix
-            _is_demo_bot = request.headers.get("X-Agent-Type", "").lower() == "bot" or (
-                _extract_api_key(request) or ""
-            ).startswith("sent_bot_")
-
-            if _is_demo_bot:
-                demo_ctx = AuthContext(
-                    user_id="demo-bot",
-                    role=SentinelRole.BOT_AGENT,
-                    auth_method="demo_mode",
-                    source_ip=source_ip,
-                    email="bot@sentinel.local",
-                    scopes=["bot_agent:all"],
-                    metadata={"demo_mode": True},
-                    is_bot_agent=True,
-                )
-            else:
-                # Phase 137-02: Demo mode grants at most OPERATOR (level 2).
-                # Cap the role so demo sessions never get ADMIN or DEVELOPER.
-                demo_role = max(roles, key=lambda r: ROLE_HIERARCHY.get(r, 0))
-                max_demo_level = ROLE_HIERARCHY.get(SentinelRole.OPERATOR, 2)
-                if ROLE_HIERARCHY.get(demo_role, 0) > max_demo_level:
-                    demo_role = SentinelRole.OPERATOR
-                demo_ctx = AuthContext(
-                    user_id="demo-user",
-                    role=demo_role,
-                    auth_method="demo_mode",
-                    source_ip=source_ip,
-                    email="demo@sentinel.local",
-                    scopes=[f"{demo_role.value}:all"],
-                    metadata={"demo_mode": True},
-                )
-            request.state.auth = demo_ctx
-            return demo_ctx
-
         # Authenticate
         auth_ctx = await _authenticate_request(request)
         if auth_ctx is None:
@@ -873,7 +717,7 @@ def require_role(*roles: SentinelRole):
     return _dependency
 
 
-def get_current_auth(request: Request) -> Optional[AuthContext]:
+def get_current_auth(request: Request) -> AuthContext | None:
     """Get the current auth context from request state.
 
     Utility function for code that needs auth info but doesn't

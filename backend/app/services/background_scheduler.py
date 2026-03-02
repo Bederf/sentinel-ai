@@ -9,7 +9,7 @@ Handles periodic background tasks such as:
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -17,12 +17,8 @@ from apscheduler.triggers.interval import IntervalTrigger
 from app.config.settings import settings
 from app.services.audit_logger import AuditLogger
 from app.services.ai_optimizer import get_ai_optimizer
-from app.models.optimization import OptimizationStatus
 
 logger = logging.getLogger(__name__)
-
-# Data directory
-DATA_DIR = Path(__file__).parent.parent / "data"
 
 
 class BackgroundSchedulerService:
@@ -141,39 +137,9 @@ class BackgroundSchedulerService:
             except Exception as e:
                 logger.warning(f"Could not fetch equipment for registered sites: {e}")
 
-            # Fallback to real Sandton City equipment codes if Supabase unavailable
             if not demo_devices:
-                demo_devices = [
-                    "S002-CHILLER-B1-001",
-                    "S002-CHILLER-B1-002",
-                    "S002-CHILLER-B1-003",
-                    "S002-AHU-L0-01",
-                    "S002-AHU-L1-01",
-                    "S002-AHU-L2-01",
-                    "S002-FCU-L0-A",
-                    "S002-FCU-L1-A",
-                    "S002-FCU-L1-C",
-                    "S002-FCU-L2-A",
-                    "S002-FCU-L2-C",
-                    "S002-VAV-L0-C",
-                    "S002-VAV-L1-A",
-                    "S002-VAV-L1-E",
-                    "S002-VAV-L2-A",
-                    "S002-VAV-L2-E",
-                    "S002-DALI-L0-01",
-                    "S002-DALI-L1-01",
-                    "S002-DALI-L2-05",
-                    "S002-LUM-L0-A",
-                    "S002-LUM-L1-A",
-                    "S002-LUM-L2-E",
-                    "S002-GEN-B1-001",
-                    "S002-GEN-B1-002",
-                    "S002-UPS-B1-001",
-                    "S002-ATS-B1-001",
-                    "S002-TX-B1-001",
-                    "S002-MTR-B1-MAIN",
-                    "S002-CO2-L1-E",
-                ]
+                logger.debug("No equipment found for demo audit data — skipping")
+                return
 
             demo_users = ["operator-1", "operator-2", "system", "scheduler", "admin", "SENTINEL"]
             demo_points_by_type = {
@@ -293,156 +259,167 @@ class BackgroundSchedulerService:
 
     def _run_optimization_analysis(self):
         """
-        Wrapper to run optimization analysis for all enabled sites (runs in background).
+        Run AI optimization analysis for all registered sites and persist
+        recommendations to Supabase (or JSON fallback).
+
+        Uses site_resolver to discover sites (data-source-agnostic), then
+        ai_optimizer.analyze_building() to generate recommendations, then
+        recommendation_repo.create() to persist them.  Deduplicates against
+        existing PENDING recommendations for the same equipment+action within
+        the last 30 minutes.
         """
         try:
             logger.debug("Running periodic optimization analysis...")
 
-            # Load sites
-            import json
+            from app.core.site_resolver import get_registered_site_ids
+            from app.database.repositories.recommendation_repository import (
+                get_recommendation_repository,
+            )
+            from app.models.recommendation import (
+                ActionRiskLevel,
+                Recommendation,
+                RecommendationStatus,
+            )
 
-            sites_file = DATA_DIR / "sites.json"
-            if not sites_file.exists():
-                logger.warning("sites.json not found, skipping optimization analysis")
+            site_ids = get_registered_site_ids()
+            if not site_ids:
+                logger.debug("No registered sites found, skipping optimization analysis")
                 return
 
-            with open(sites_file) as f:
-                sites = json.load(f)
+            logger.info(f"Running optimization analysis for {len(site_ids)} registered sites")
 
-            # Find sites with optimization enabled
-            enabled_sites = [s for s in sites if s.get("optimization_enabled", False)]
+            recommendation_repo = get_recommendation_repository()
+            created_count = 0
+            skipped_count = 0
+            error_count = 0
 
-            if not enabled_sites:
-                logger.debug("No sites with optimization enabled found")
-                return
-
-            logger.info(f"Running optimization analysis for {len(enabled_sites)} enabled sites")
-
-            import asyncio
-
-            results = []
-
-            # Run analysis for each enabled site
-            for site in enabled_sites:
-                site_id = site.get("id")
-                site_name = site.get("name", site_id)
-
+            for site_id in site_ids:
                 try:
-                    # Run async analysis in new event loop
+                    # Normalize site_id for storage: "site-002" → "S002"
+                    # (the recommendation service queries with this format)
+                    storage_site_id = site_id
+                    if site_id.startswith("site-"):
+                        num = site_id.split("-")[1]
+                        storage_site_id = f"S{num}"
+
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
 
-                    recommendation = loop.run_until_complete(get_ai_optimizer().analyze_building(site_id))
+                    try:
+                        optimization_result = loop.run_until_complete(get_ai_optimizer().analyze_building(site_id))
+                    finally:
+                        loop.close()
 
-                    loop.close()
+                    if not optimization_result.recommendations:
+                        logger.debug(f"No recommendations for {site_id}")
+                        continue
 
-                    # Validate recommendation
+                    # Validate recommendations
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-
-                    validation = loop.run_until_complete(
-                        get_ai_optimizer().validate_recommendation(site_id, recommendation)
-                    )
-
-                    loop.close()
-
-                    # Update site status
-                    # Only mark as pending if there are actual recommendations to show
-                    if validation["allowed"] and len(recommendation.recommendations) > 0:
-                        site["optimization_status"] = OptimizationStatus.RECOMMENDATION_PENDING.value
-                        site["last_recommendation"] = recommendation.to_dict()
-                        results.append(
-                            {
-                                "site_id": site_id,
-                                "site_name": site_name,
-                                "status": "success",
-                                "confidence": recommendation.confidence,
-                                "recommendations_count": len(recommendation.recommendations),
-                            }
+                    try:
+                        validation = loop.run_until_complete(
+                            get_ai_optimizer().validate_recommendation(site_id, optimization_result)
                         )
-                    elif validation["allowed"] and len(recommendation.recommendations) == 0:
-                        # No actionable recommendations - don't show notification
-                        site["optimization_status"] = OptimizationStatus.OPTIMIZED.value
-                        site["last_recommendation"] = None  # Clear any old recommendation
-                        results.append(
-                            {
-                                "site_id": site_id,
-                                "site_name": site_name,
-                                "status": "skipped",
-                                "reason": (
-                                    "No actionable adjustments available"
-                                    " (building has no controllable HVAC"
-                                    " assets or conditions don't warrant"
-                                    " changes)"
-                                ),
-                            }
+                    finally:
+                        loop.close()
+
+                    # Build set of individually-allowed recommendations
+                    # (top-level "allowed" is an AND — one failure blocks all)
+                    allowed_keys: set[tuple[str, str]] = set()
+                    for vr in validation.get("validation_results", []):
+                        if vr.get("allowed", False):
+                            allowed_keys.add((vr.get("equipment_id", ""), vr.get("point_name", "")))
+
+                    if not allowed_keys:
+                        logger.info(f"No recommendations passed safety validation for {site_id}")
+                        continue
+
+                    # Fetch existing PENDING recs for dedup
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        existing_pending = loop.run_until_complete(
+                            recommendation_repo.get_by_status(storage_site_id, RecommendationStatus.PENDING, limit=50)
                         )
-                    else:
-                        site["optimization_status"] = OptimizationStatus.WARNING.value
-                        site["last_recommendation"] = recommendation.to_dict()
-                        results.append(
-                            {
-                                "site_id": site_id,
-                                "site_name": site_name,
-                                "status": "warning",
-                                "reason": "Safety validation failed",
-                            }
+                    finally:
+                        loop.close()
+
+                    # Build dedup set: (target_equipment, action_type) for recs < 30 min old
+                    dedup_cutoff = datetime.utcnow() - timedelta(minutes=30)
+                    recent_keys: set[tuple[str, str]] = set()
+                    for existing in existing_pending:
+                        ts = existing.timestamp
+                        if isinstance(ts, str):
+                            try:
+                                ts = datetime.fromisoformat(ts)
+                            except (ValueError, TypeError):
+                                continue
+                        # Strip timezone info for comparison (cutoff is UTC-naive)
+                        if hasattr(ts, "tzinfo") and ts.tzinfo is not None:
+                            ts = ts.replace(tzinfo=None)
+                        if ts >= dedup_cutoff:
+                            action_point = ""
+                            if isinstance(existing.action, dict):
+                                action_point = existing.action.get("point", "")
+                            recent_keys.add((existing.target_equipment, action_point))
+
+                    # Persist each recommendation
+                    for rec_dict in optimization_result.recommendations:
+                        equipment_id = rec_dict.get("equipment_id", "")
+                        point_name = rec_dict.get("point_name", "")
+
+                        # Safety check: skip recs that failed individual validation
+                        if (equipment_id, point_name) not in allowed_keys:
+                            skipped_count += 1
+                            continue
+
+                        # Dedup check
+                        if (equipment_id, point_name) in recent_keys:
+                            skipped_count += 1
+                            continue
+
+                        rec = Recommendation(
+                            site_id=storage_site_id,
+                            timestamp=datetime.utcnow(),
+                            action_type="ai_optimization",
+                            risk_level=ActionRiskLevel.LOW,
+                            target_equipment=equipment_id,
+                            action={
+                                "point": point_name,
+                                "value": rec_dict.get("recommended_value"),
+                            },
+                            reason=rec_dict.get("reason", ""),
+                            expected_impact={
+                                "current_value": rec_dict.get("current_value"),
+                                "recommended_value": rec_dict.get("recommended_value"),
+                                "unit": rec_dict.get("unit", ""),
+                                "energy_savings_percent": rec_dict.get("savings_kwh", 5),
+                            },
+                            confidence=str(optimization_result.confidence),
+                            profile=optimization_result.profile or "",
+                            status=RecommendationStatus.PENDING,
+                            requires_approval=True,
                         )
 
-                    # Update last_analysis timestamp
-                    if "optimization_settings" not in site:
-                        site["optimization_settings"] = {}
-
-                    site["optimization_settings"]["last_analysis"] = datetime.now().isoformat()
-
-                    # Add to history
-                    if "optimization_history" not in site:
-                        site["optimization_history"] = []
-
-                    from app.models.optimization import OptimizationHistoryEntry
-
-                    history_entry = OptimizationHistoryEntry(
-                        timestamp=datetime.now().isoformat(),
-                        action="analyzed",
-                        result="success" if validation["allowed"] else "warning",
-                        user="scheduler",
-                        details={
-                            "confidence": recommendation.confidence,
-                            "validation_passed": validation["allowed"],
-                            "recommendations_count": len(recommendation.recommendations),
-                        },
-                    )
-                    site["optimization_history"].append(history_entry.to_dict())
-
-                    # Keep only last 50 history entries
-                    if len(site["optimization_history"]) > 50:
-                        site["optimization_history"] = site["optimization_history"][-50:]
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            loop.run_until_complete(recommendation_repo.create(rec))
+                            created_count += 1
+                        except Exception as e:
+                            logger.warning(f"Failed to persist recommendation for {equipment_id}: {e}")
+                            error_count += 1
+                        finally:
+                            loop.close()
 
                 except Exception as e:
                     logger.error(f"Error analyzing site {site_id}: {e}")
-                    site["optimization_status"] = OptimizationStatus.ERROR.value
-                    site["error_message"] = str(e)
-                    results.append(
-                        {
-                            "site_id": site_id,
-                            "site_name": site_name,
-                            "status": "error",
-                            "error": str(e),
-                        }
-                    )
-
-            # Save updated sites back to file
-            with open(sites_file, "w") as f:
-                json.dump(sites, f, indent=2)
-
-            # Log summary
-            success_count = len([r for r in results if r["status"] == "success"])
-            warning_count = len([r for r in results if r["status"] == "warning"])
-            error_count = len([r for r in results if r["status"] == "error"])
+                    error_count += 1
 
             logger.info(
-                f"Optimization analysis complete: {success_count} success, "
-                f"{warning_count} warnings, {error_count} errors"
+                f"Optimization analysis complete: {created_count} created, "
+                f"{skipped_count} deduped, {error_count} errors"
             )
 
         except Exception as e:
@@ -863,14 +840,11 @@ class BackgroundSchedulerService:
     def _get_all_sites(self):
         """Get all configured sites for demand coordination."""
         try:
-            import json
+            from app.core.site_resolver import get_registered_sites
 
-            sites_file = DATA_DIR / "sites.json"
-            if sites_file.exists():
-                with open(sites_file) as f:
-                    return json.load(f)
+            return get_registered_sites()
         except Exception as e:
-            logger.debug(f"Could not load sites.json: {e}")
+            logger.debug(f"Could not load registered sites: {e}")
         return []
 
     def add_ml_retraining_job(self, interval_seconds: int = 86400):

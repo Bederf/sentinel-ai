@@ -35,9 +35,8 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> User:
     Raises:
         HTTPException: If no valid authorization provided
     """
-    # No authorization header - return demo user for development
     if not authorization:
-        return User(id="demo-user", username="demo_technician", email="demo@sentinel.bms", role="technician")
+        raise HTTPException(status_code=401, detail="Authentication required")
 
     # Parse Bearer token
     if authorization.startswith("Bearer "):

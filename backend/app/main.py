@@ -1,12 +1,16 @@
 """BMS Intelligence Backend - FastAPI Application."""
 
-from fastapi import FastAPI
+from dotenv import load_dotenv
 
-from app.config.settings import settings
-from app.logging_config import setup_logging
-from app.startup.middleware import register_middleware, register_exception_handlers
-from app.startup.events import register_events
-from app.startup.routes import register_all_routes
+load_dotenv(override=True)  # Export .env vars to os.environ; override system env where .env takes precedence
+
+from fastapi import FastAPI  # noqa: E402
+
+from app.config.settings import settings  # noqa: E402
+from app.logging_config import setup_logging  # noqa: E402
+from app.startup.middleware import register_middleware, register_exception_handlers  # noqa: E402
+from app.startup.events import register_events  # noqa: E402
+from app.startup.routes import register_all_routes  # noqa: E402
 
 # Configure structured logging (file handlers for Promtail/Loki)
 setup_logging()

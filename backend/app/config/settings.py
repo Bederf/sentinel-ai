@@ -86,7 +86,8 @@ class Settings(BaseSettings):
     # Environment (development, staging, production)
     environment: str = "development"
 
-    # Demo mode for pre-seeded responses
+    # Demo mode — DEPRECATED: no longer grants auth bypasses.
+    # Kept for backward compatibility with .env files.
     demo_mode: bool = False
     demo_allowed_origins: list[str] = []
     ingestion_mode: str = "simulation"  # env: INGESTION_MODE
@@ -297,14 +298,8 @@ class Settings(BaseSettings):
 
     @property
     def recommendation_interval(self) -> int:
-        """Recommendation generation interval in seconds.
-
-        Returns 2 minutes (120s) in DEMO_MODE for faster iteration during demos.
-        Returns 10 minutes (600s) in production for realistic operation.
-        """
-        if self.demo_mode:
-            return 120  # 2 minutes for demos
-        return 600  # 10 minutes for production
+        """Recommendation generation interval in seconds (600s = 10 minutes)."""
+        return 600
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

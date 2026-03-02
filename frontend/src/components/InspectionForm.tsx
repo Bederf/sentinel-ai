@@ -91,20 +91,27 @@ export default function InspectionForm({
     }));
   };
 
-  // Handle photo addition (demo - in production would open camera/file picker)
+  // Handle photo addition via file input
   const handlePhotoAdd = (itemId: string) => {
-    const fileUrl = window.prompt('Enter photo URL (demo mode):');
-    if (fileUrl) {
-      setPhotos((prev) => [
-        ...prev,
-        {
-          file_url: fileUrl,
-          file_name: `photo_${Date.now()}.jpg`,
-          description: `Photo for ${itemId}`,
-          element_id: itemId,
-        },
-      ]);
-    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const fileUrl = URL.createObjectURL(file);
+        setPhotos((prev) => [
+          ...prev,
+          {
+            file_url: fileUrl,
+            file_name: file.name,
+            description: `Photo for ${itemId}`,
+            element_id: itemId,
+          },
+        ]);
+      }
+    };
+    input.click();
   };
 
   // Calculate completion progress

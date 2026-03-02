@@ -3245,7 +3245,9 @@
   "prediction_accuracy": {},
   "scoring_inputs": {
     "S002": {
+      "records": 16,
       "site_id": "S002",
+      "refreshed_at": "2026-03-02T09:23:28.750754",
       "module_multipliers": {
         "hvac": 1.1,
         "control": 1.1
@@ -3253,22 +3255,20 @@
       "module_success_rates": {
         "hvac": 100.0,
         "control": 100.0
-      },
-      "records": 16,
-      "refreshed_at": "2026-03-01T13:50:17.506198"
+      }
     },
     "site-002": {
+      "records": 16,
       "site_id": "site-002",
+      "refreshed_at": "2026-03-02T09:23:28.750848",
       "module_multipliers": {
         "hvac": 0.9
       },
       "module_success_rates": {
         "hvac": 50.0
-      },
-      "records": 16,
-      "refreshed_at": "2026-03-01T13:50:17.506260"
+      }
     }
   },
   "record_counter": 91,
-  "updated_at": "2026-03-01T13:50:17.509331"
+  "updated_at": "2026-03-02T10:09:41.259512"
 }

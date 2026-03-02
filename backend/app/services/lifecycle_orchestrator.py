@@ -24,15 +24,7 @@ from typing import Any
 from app.core.site_resolver import get_primary_site
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.prediction_repository import PredictionRepository
-from app.database.repositories.recommendation_repository import (
-    get_recommendation_repository,
-)
 from app.database.repositories.work_order_repository import get_work_order_repository
-from app.models.recommendation import (
-    ActionRiskLevel,
-    Recommendation,
-    RecommendationStatus,
-)
 from app.services.building_schedule import (
     BuildingSchedule,
     BuildingState,
@@ -283,7 +275,6 @@ class LifecycleOrchestrator:
         self.prediction_repo = PredictionRepository()
         self.work_order_repo = get_work_order_repository()
         self.feedback_service = get_feedback_collection_service()
-        self.recommendation_repo = get_recommendation_repository()
         self.device_control_service = get_device_control_service()
         self._sentinel_alert_engine = SentinelAlertEngine()
         self._task: asyncio.Task | None = None
@@ -2181,35 +2172,6 @@ class LifecycleOrchestrator:
                 )
                 recommendations_created = sentinel_recs
                 hvac_recs = [r.get("equipment", "") for r in sentinel_recs]
-                # Persist sentinel recommendations so frontend can display them
-                # Site 002 is in supervised mode — requires human approval
-                for s_rec in sentinel_recs:
-                    try:
-                        rec = Recommendation(
-                            site_id=self.site_prefix,
-                            timestamp=datetime.utcnow(),
-                            action_type="ai_optimization",
-                            risk_level=ActionRiskLevel.LOW,
-                            target_equipment=s_rec.get("equipment", ""),
-                            action={
-                                "point": s_rec.get("control_point", ""),
-                                "value": s_rec.get("target_value"),
-                            },
-                            reason=s_rec.get("reason", ""),
-                            expected_impact={
-                                "description": s_rec.get("reason", ""),
-                                "energy_savings_percent": s_rec.get("energy_savings_percent", 5),
-                                "source": s_rec.get("source", "sentinel"),
-                                "quality_gate": s_rec.get("quality_gate_status"),
-                            },
-                            confidence=str(s_rec.get("confidence", 0.75)),
-                            profile=context,
-                            status=RecommendationStatus.PENDING,
-                            requires_approval=True,
-                        )
-                        await self.recommendation_repo.create(rec)
-                    except Exception as e:
-                        logger.warning(f"Failed to persist sentinel recommendation: {e}")
             elif self._optimization_mode == "hybrid":
                 sentinel_recs = await self._sentinel_optimization(
                     controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
@@ -2221,65 +2183,12 @@ class LifecycleOrchestrator:
                 # Use SENTINEL results, log hardcoded for comparison
                 recommendations_created = sentinel_recs
                 hvac_recs = [r.get("equipment", "") for r in sentinel_recs]
-                # Store hardcoded recs too (for comparison in DB)
-                for hc_rec in hardcoded_recs:
-                    try:
-                        rec = Recommendation(
-                            site_id=self.site_prefix,
-                            timestamp=datetime.utcnow(),
-                            action_type="ai_optimization_hardcoded_comparison",
-                            risk_level=ActionRiskLevel.LOW,
-                            target_equipment=hc_rec.get("equipment", ""),
-                            action={
-                                "point": hc_rec["control_point"],
-                                "value": hc_rec["target_value"],
-                            },
-                            reason=hc_rec["reason"],
-                            expected_impact={
-                                "description": hc_rec.get("description", ""),
-                                "energy_savings_percent": hc_rec.get("savings", 5),
-                                "source": "hardcoded_comparison",
-                            },
-                            confidence="high",
-                            profile=context,
-                            status=RecommendationStatus.PENDING,
-                            requires_approval=True,
-                        )
-                        await self.recommendation_repo.create(rec)
-                    except Exception:
-                        pass
             else:  # "hardcoded"
                 hardcoded_recs = self._hardcoded_optimization_batch(
                     controllable_equipment, context, occupancy_percent, daylight_factor, current_hour
                 )
                 recommendations_created = hardcoded_recs
                 hvac_recs = [r.get("equipment", "") for r in hardcoded_recs]
-                # Store hardcoded recs (original behavior)
-                for hc_rec in hardcoded_recs:
-                    try:
-                        rec = Recommendation(
-                            site_id=self.site_prefix,
-                            timestamp=datetime.utcnow(),
-                            action_type="ai_optimization",
-                            risk_level=ActionRiskLevel.LOW,
-                            target_equipment=hc_rec.get("equipment", ""),
-                            action={
-                                "point": hc_rec["control_point"],
-                                "value": hc_rec["target_value"],
-                            },
-                            reason=hc_rec["reason"],
-                            expected_impact={
-                                "description": hc_rec.get("description", ""),
-                                "energy_savings_percent": hc_rec.get("savings", 5),
-                            },
-                            confidence="high",
-                            profile=context,
-                            status=RecommendationStatus.PENDING,
-                            requires_approval=True,
-                        )
-                        await self.recommendation_repo.create(rec)
-                    except Exception as e:
-                        logger.warning(f"Failed to create recommendation: {e}")
 
             # ========== DEMO MODE: BESS TOU ARBITRAGE ==========
             if self.current_scenario and self.current_scenario.demo_mode:

@@ -34,7 +34,6 @@ class UserEntitlementsRepository:
                 "grant@demo.local": PRESET_ENTITLEMENTS["grant"]["modules"],
                 "bederf@demo.local": PRESET_ENTITLEMENTS["bederf"]["modules"],
                 "admin@demo.local": PRESET_ENTITLEMENTS["full"]["modules"],
-                "demo@sentinel.local": PRESET_ENTITLEMENTS["full"]["modules"],
             }
             with open(self.entitlements_file, "w") as f:
                 json.dump(seed_data, f, indent=2)

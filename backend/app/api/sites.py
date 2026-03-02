@@ -73,6 +73,58 @@ def load_alerts() -> list[dict]:
     return []
 
 
+def _load_building_json(site_id: str) -> Optional[dict]:
+    """Load building.json for a site (canonical building metadata).
+
+    Building metadata (contacts, BMS vendor, features) is external to SENTINEL
+    and lives in JSON files under buildings/{site_id}/building.json.
+    """
+    building_file = BUILDINGS_DIR / site_id / "building.json"
+    if building_file.exists():
+        try:
+            with open(building_file) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"Failed to read building.json for {site_id}: {e}")
+    return None
+
+
+def _enrich_from_building_json(site_dict: dict) -> dict:
+    """Enrich a site dict with building.json metadata for missing fields.
+
+    Building.json is the canonical source for building metadata (contacts,
+    BMS info, etc.). Supabase may have these fields too, but building.json
+    takes precedence when Supabase values are empty.
+    """
+    site_id = site_dict.get("id", "")
+    building = _load_building_json(site_id)
+    if not building:
+        return site_dict
+
+    # Map nested contacts to flat fields
+    contacts = building.get("contacts", {})
+    if not site_dict.get("contact_email"):
+        site_dict["contact_email"] = contacts.get("email", "")
+    if not site_dict.get("contact_phone"):
+        site_dict["contact_phone"] = contacts.get("emergency", "")
+
+    # Building.json is authoritative for building metadata — override Supabase defaults
+    if building.get("type"):
+        site_dict["type"] = building["type"]
+    if building.get("year_built"):
+        site_dict["year_built"] = building["year_built"]
+
+    # Enrich other fields from building.json if missing from Supabase
+    metadata = building.get("metadata", {})
+    if not site_dict.get("sqm") and metadata.get("sqm"):
+        site_dict["sqm"] = metadata["sqm"]
+
+    if not site_dict.get("timezone"):
+        site_dict["timezone"] = building.get("timezone", "")
+
+    return site_dict
+
+
 def get_json_asset_counts(site_id: str) -> dict:
     """Aggregate asset counts from all JSON sources for a site.
 
@@ -341,6 +393,9 @@ def db_to_site_dict(
     if equipment_status:
         result["equipment_status"] = equipment_status
 
+    # Enrich from building.json (canonical source for building metadata)
+    result = _enrich_from_building_json(result)
+
     return result
 
 
@@ -545,8 +600,13 @@ async def list_sites(
     )
 
     if success and sites:
+        # Merge persisted processing state (JSON is authoritative for toggle)
+        processing_state = _load_processing_state()
         result = []
         for site in sites:
+            site_id = site.get("id", "")
+            if site_id in processing_state:
+                site["sentinel_processing_enabled"] = processing_state[site_id]
             status = calculate_site_status_from_equipment(site.get("equipment_status"))
             result.append(
                 SiteResponse(
@@ -1038,6 +1098,10 @@ async def get_site(site_id: str) -> SiteResponse:
 
     if success:
         if site:
+            # Merge persisted processing state (JSON is authoritative for toggle)
+            processing_state = _load_processing_state()
+            if site_id in processing_state:
+                site["sentinel_processing_enabled"] = processing_state[site_id]
             status = calculate_site_status_from_equipment(site.get("equipment_status"))
             return SiteResponse(
                 **site,

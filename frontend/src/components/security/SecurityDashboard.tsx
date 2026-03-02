@@ -198,36 +198,13 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
   const onlineCameras = demoCameras.filter((c) => c.status === "online").length;
   const breachEvents = 0; // Placeholder for breach alert count
 
-  // Build tab arrays externally, cast as unknown as ReactElement (Tremor pattern)
+  // Build tab arrays — clean labels matching Lighting tab style
   const tabs = [
-    <Tab key="overview">
-      <Flex alignItems="center" className="gap-2">
-        <Shield className="w-4 h-4" /> Overview
-      </Flex>
-    </Tab>,
-    <Tab key="access">
-      <Flex alignItems="center" className="gap-2">
-        <Users className="w-4 h-4" /> Access Control
-      </Flex>
-    </Tab>,
-    <Tab key="cameras">
-      <Flex alignItems="center" className="gap-2">
-        <Camera className="w-4 h-4" /> Cameras
-        <Badge color={onlineCameras === demoCameras.length ? "green" : "amber"} size="xs">
-          {onlineCameras}/{demoCameras.length}
-        </Badge>
-      </Flex>
-    </Tab>,
-    <Tab key="analysis">
-      <Flex alignItems="center" className="gap-2">
-        <TrendingUp className="w-4 h-4" /> Occupancy Analysis
-      </Flex>
-    </Tab>,
-    <Tab key="integrations">
-      <Flex alignItems="center" className="gap-2">
-        <Link2 className="w-4 h-4" /> Integrations
-      </Flex>
-    </Tab>,
+    <Tab key="overview">Overview</Tab>,
+    <Tab key="access">Access</Tab>,
+    <Tab key="cameras">Cameras</Tab>,
+    <Tab key="analysis">Occupancy</Tab>,
+    <Tab key="integrations">Integrations</Tab>,
   ];
 
   const panels = [
@@ -562,38 +539,29 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
   ];
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <Flex justifyContent="between" alignItems="center">
-        <Flex alignItems="center" className="gap-3">
-          <Shield className="w-6 h-6 text-blue-400" />
-          <div>
-            <Title>Security</Title>
-            <Text className="text-xs text-gray-400">
-              Real-time occupancy, access monitoring, and cross-module automation
-            </Text>
+    <div className="h-full overflow-y-auto p-4 md:p-6">
+      {/* Page Header — matches Lighting tab pattern */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
+              <Shield className="h-6 w-6" style={{ color: "#3B82F6" }} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Security
+              </h1>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Access Control &amp; Occupancy Monitoring
+              </p>
+            </div>
           </div>
-        </Flex>
-        <Flex alignItems="center" className="gap-3">
-          {lastUpdated && (
-            <Text className="text-xs text-gray-400">
-              Updated: {formatTime(lastUpdated)}
-            </Text>
-          )}
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
-        </Flex>
-      </Flex>
+        </div>
+      </div>
 
       {/* Tabbed Layout */}
       <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-        <TabList variant="solid" className="overflow-x-auto">
+        <TabList className="mb-4 overflow-x-auto [&>*]:whitespace-nowrap">
           {tabs as unknown as ReactElement[]}
         </TabList>
         <TabPanels>

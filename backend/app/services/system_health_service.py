@@ -8,15 +8,19 @@ This service provides:
 """
 
 import asyncio
+import logging
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 
 import httpx
 
+
 from app.config.settings import settings
 from app.core.site_resolver import get_primary_site
 from app.database.supabase_client import get_supabase_client
+
+logger = logging.getLogger(__name__)
 
 
 class SystemHealthService:
@@ -30,63 +34,62 @@ class SystemHealthService:
 
     async def get_current_health(self) -> Dict[str, Any]:
         """
-        Aggregate health from 15+ endpoints into unified snapshot.
+        Aggregate health by probing real services.
 
         Returns:
             Dict with overall_status, overall_score, and component details
         """
-        # Default scores for components
-        # These are used to provide realistic health assessment without requiring
-        # service account credentials. In production, authenticated checks can be added.
-        default_scores = {
-            "api_basic": 90,
-            "api_control": 90,
-            "integration_health": 85,
-            "niagara_connectivity": 80,
-            "bacnet_network": 85,
-            "dali_gateway": 90,
-            "device_manager": 85,
-            "redis_cache": 90,
-        }
+        checks = await asyncio.gather(
+            self._check_supabase(),
+            self._check_redis(),
+            self._check_event_bus(),
+            self._check_n8n(),
+            self._check_servicenow(),
+            self._check_notifications(),
+            self._check_device_manager(),
+            return_exceptions=True,
+        )
 
-        # For now, all components use default scores
-        # In the future, we can add authenticated endpoint checks here
-        component_scores = dict(default_scores)
-        component_details = {
-            key: {"status": "healthy", "note": "Default healthy score"} for key in default_scores.keys()
-        }
+        labels = [
+            "supabase",
+            "redis_cache",
+            "event_bus",
+            "n8n",
+            "servicenow",
+            "notifications",
+            "device_manager",
+        ]
+
+        component_scores: Dict[str, int] = {}
+        component_details: Dict[str, Dict[str, Any]] = {}
         errors = []
 
-        # Calculate weighted overall score
-        # Weights: BMS 40%, API 30%, Integration 20%, Cache 10% (total = 1.0)
+        for label, result in zip(labels, checks):
+            if isinstance(result, Exception):
+                component_scores[label] = 0
+                component_details[label] = {"status": "critical", "note": str(result)}
+                errors.append({"component": label, "error": str(result)})
+            else:
+                component_scores[label] = result["score"]
+                component_details[label] = {
+                    "status": result["status"],
+                    "note": result["note"],
+                }
 
+        # Weights sum to 1.0
         weights = {
-            # BMS Connectivity (40% total)
-            "niagara_connectivity": 0.15,
-            "bacnet_network": 0.15,
-            "dali_gateway": 0.10,
-            # API Health (30% total)
-            "api_basic": 0.15,
-            "api_control": 0.15,
-            # Integration & Services (20% total)
-            "integration_health": 0.15,
-            "device_manager": 0.05,
-            # Cache (10% total)
-            "redis_cache": 0.10,
+            "supabase": 0.25,
+            "redis_cache": 0.15,
+            "event_bus": 0.20,
+            "n8n": 0.10,
+            "servicenow": 0.10,
+            "notifications": 0.10,
+            "device_manager": 0.10,
         }
 
-        weighted_score = 0.0
-
-        # Calculate weighted score using actual component scores
-        # Scores are already 0-100, weights sum to 1.0
-        for component, weight in weights.items():
-            score = component_scores.get(component, 0)
-            weighted_score += score * weight
-
-        # Result is already 0-100 since scores are 0-100 and weights sum to 1.0
+        weighted_score = sum(component_scores.get(c, 0) * w for c, w in weights.items())
         overall_score = int(weighted_score)
 
-        # Determine overall status
         if overall_score >= 80:
             overall_status = "healthy"
         elif overall_score >= 60:
@@ -102,6 +105,188 @@ class SystemHealthService:
             "component_details": component_details,
             "errors": errors,
         }
+
+    # ==================== Individual Probes ====================
+
+    async def _check_supabase(self) -> Dict[str, Any]:
+        """Probe Supabase with a lightweight query."""
+        try:
+            result = self.client.table("buildings").select("id", count="exact").limit(1).execute()
+            count = result.count if result.count is not None else len(result.data or [])
+            return {
+                "score": 95,
+                "status": "healthy",
+                "note": f"Connected · {count} building(s)",
+            }
+        except Exception as e:
+            return {"score": 30, "status": "degraded", "note": f"Query failed: {e}"}
+
+    async def _check_redis(self) -> Dict[str, Any]:
+        """Probe Redis health via direct connection."""
+        if not settings.redis_enabled:
+            return {"score": 70, "status": "degraded", "note": "Disabled in config"}
+        try:
+            import redis
+
+            client = redis.from_url(
+                settings.redis_url,
+                decode_responses=True,
+                socket_connect_timeout=2,
+                socket_timeout=2,
+            )
+            client.ping()
+            info = client.info("memory")
+            used_mb = round(info.get("used_memory", 0) / 1024 / 1024, 1)
+            client.close()
+            return {
+                "score": 95,
+                "status": "healthy",
+                "note": f"Connected · {used_mb} MB used",
+            }
+        except ImportError:
+            # redis package not available — raw socket fallback
+            try:
+                import socket
+
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(2)
+                try:
+                    sock.connect(("localhost", 6379))
+                    sock.sendall(b"PING\r\n")
+                    resp = sock.recv(16)
+                    if b"PONG" in resp:
+                        return {
+                            "score": 85,
+                            "status": "healthy",
+                            "note": "Reachable · redis package unavailable",
+                        }
+                finally:
+                    sock.close()
+            except Exception:
+                pass
+            return {"score": 40, "status": "degraded", "note": "Connection failed"}
+        except Exception as e:
+            logger.error("Redis check error (%s): %s", type(e).__name__, e)
+            return {"score": 20, "status": "critical", "note": f"Unreachable: {e}"}
+
+    async def _check_event_bus(self) -> Dict[str, Any]:
+        """Check Event Bus singleton metrics."""
+        try:
+            from app.services.event_bus import get_event_bus
+
+            bus = get_event_bus()
+            m = bus.metrics  # property, not method
+            subs = m.get("subscription_count", 0)
+            emitted = m.get("events_emitted", 0)
+            errs = m.get("handler_errors", 0)
+
+            if subs == 0:
+                return {"score": 50, "status": "degraded", "note": "No subscribers"}
+
+            score = 95
+            if errs > 0:
+                score -= min(30, errs * 5)
+
+            status = "healthy" if score >= 80 else "degraded"
+            return {
+                "score": score,
+                "status": status,
+                "note": f"{subs} subscribers · {emitted} events · {errs} errors",
+            }
+        except Exception as e:
+            return {"score": 0, "status": "critical", "note": f"Not available: {e}"}
+
+    async def _check_n8n(self) -> Dict[str, Any]:
+        """Check n8n connectivity."""
+        try:
+            from app.services.n8n_service import get_n8n_service, N8nConnectionStatus
+
+            svc = get_n8n_service()
+            if not svc.is_configured:
+                return {
+                    "score": 50,
+                    "status": "degraded",
+                    "note": "Not configured (N8N_API_URL missing)",
+                }
+
+            status = await svc.check_connection()
+            if status.status == N8nConnectionStatus.CONNECTED:
+                return {
+                    "score": 95,
+                    "status": "healthy",
+                    "note": f"Connected · {status.active_workflows}/{status.total_workflows} workflows active",
+                }
+            return {
+                "score": 40,
+                "status": "degraded",
+                "note": status.message,
+            }
+        except Exception as e:
+            return {"score": 30, "status": "degraded", "note": f"Check failed: {e}"}
+
+    async def _check_servicenow(self) -> Dict[str, Any]:
+        """Check ServiceNow configuration."""
+        try:
+            from app.services.servicenow_service import get_servicenow_service
+
+            svc = get_servicenow_service()
+            if not svc.is_configured:
+                return {
+                    "score": 50,
+                    "status": "degraded",
+                    "note": "Credentials not configured",
+                }
+            domain = svc.config.domain or "unknown"
+            return {
+                "score": 95,
+                "status": "healthy",
+                "note": f"Connected · {domain}",
+            }
+        except Exception as e:
+            return {"score": 30, "status": "degraded", "note": f"Check failed: {e}"}
+
+    async def _check_notifications(self) -> Dict[str, Any]:
+        """Check Notification Router state."""
+        try:
+            from app.services.sentry_notification_router import get_sentry_router
+
+            router = get_sentry_router()
+            status = router.get_status()
+            recipients = status.get("recipients", 0)
+            sent = status.get("metrics", {}).get("pushes_sent", 0)
+            if recipients == 0:
+                return {
+                    "score": 50,
+                    "status": "degraded",
+                    "note": "No recipients configured",
+                }
+            return {
+                "score": 90,
+                "status": "healthy",
+                "note": f"{recipients} recipients · {sent} sent",
+            }
+        except Exception as e:
+            return {"score": 30, "status": "degraded", "note": f"Check failed: {e}"}
+
+    async def _check_device_manager(self) -> Dict[str, Any]:
+        """Check Device Manager state."""
+        try:
+            from app.services.device_abstraction import device_manager
+
+            if not device_manager._initialized:
+                return {
+                    "score": 50,
+                    "status": "degraded",
+                    "note": "Not initialized",
+                }
+            adapter_count = len(device_manager._adapters)
+            return {
+                "score": 90,
+                "status": "healthy",
+                "note": f"{adapter_count} device adapters active",
+            }
+        except Exception as e:
+            return {"score": 40, "status": "degraded", "note": f"Check failed: {e}"}
 
     async def _check_endpoint(
         self,

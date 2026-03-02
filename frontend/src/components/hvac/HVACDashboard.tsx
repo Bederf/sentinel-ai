@@ -11,12 +11,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import {
-  Card,
-  Title,
-  Text,
-  Badge,
-  Flex,
-  Grid,
   Tab,
   TabGroup,
   TabList,
@@ -27,7 +21,6 @@ import {
   Thermometer,
   Wind,
   Activity,
-  Settings,
   AlertTriangle,
   CheckCircle,
 } from "lucide-react";
@@ -205,45 +198,18 @@ export function HVACDashboard({
             <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Climate Control & Thermal Management</p>
           </div>
         </div>
-        <Text className="text-red-500">Failed to load HVAC data</Text>
+        <span className="text-sm" style={{ color: "var(--color-sentinel-red)" }}>Failed to load HVAC data</span>
       </div>
     );
   }
 
-  // Build tab arrays to avoid Tremor typing issues
+  // Build tab arrays — clean labels matching Lighting tab style
   const tabs = [
-    <Tab key="overview">
-      <Flex alignItems="center" className="gap-2">
-        Overview
-        {overview.alerts.length > 0 && (
-          <Badge
-            color={overview.alerts.some((a) => a.priority === "critical") ? "red" : "amber"}
-            size="xs"
-          >
-            {overview.alerts.length}
-          </Badge>
-        )}
-      </Flex>
-    </Tab>,
-    <Tab key="zones">
-      <Flex alignItems="center" className="gap-2">
-        Zones
-        <Badge
-          color={overview.zones.fault > 0 ? "red" : "green"}
-          size="xs"
-        >
-          {overview.zones.total}
-        </Badge>
-      </Flex>
-    </Tab>,
+    <Tab key="overview">Overview</Tab>,
+    <Tab key="zones">Zones</Tab>,
     <Tab key="equipment">Equipment</Tab>,
     <Tab key="optimization">Optimize</Tab>,
-    <Tab key="health-config">
-      <Flex alignItems="center" className="gap-1">
-        <Settings className="w-4 h-4" />
-        Health
-      </Flex>
-    </Tab>,
+    <Tab key="health-config">Health</Tab>,
   ];
 
   const panels = [
@@ -287,102 +253,91 @@ export function HVACDashboard({
           />
         )}
 
-        {/* Status Cards */}
-        <Grid className="grid grid-cols-4 gap-4">
-          <Card decoration="top" decorationColor="green">
-            <Flex alignItems="center" className="gap-2 mb-2">
-              <Thermometer className="w-5 h-5 text-blue-400" />
-              <Text className="font-medium">Zones</Text>
-            </Flex>
-            <div className="text-3xl font-bold">{overview.zones.total}</div>
-            <Text className="text-xs text-gray-400">
+        {/* Status Cards — Grafana style (matching Lighting) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+            <div className="flex items-center gap-2 mb-2">
+              <Thermometer className="w-5 h-5" style={{ color: "#3B82F6" }} />
+              <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Zones</span>
+            </div>
+            <div className="text-3xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>{overview.zones.total}</div>
+            <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               {overview.zones.normal} running, {overview.zones.fault} fault
-            </Text>
-          </Card>
+            </span>
+          </div>
 
-          <Card decoration="top" decorationColor="cyan">
-            <Flex alignItems="center" className="gap-2 mb-2">
-              <Activity className="w-5 h-5 text-cyan-400" />
-              <Text className="font-medium">Chillers</Text>
-            </Flex>
-            <div className="text-3xl font-bold">
+          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className="w-5 h-5" style={{ color: "#06B6D4" }} />
+              <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Chillers</span>
+            </div>
+            <div className="text-3xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
               {overview.chillers_running}/{overview.equipment.chiller?.count || 0}
             </div>
-            <Text className="text-xs text-gray-400">Running</Text>
-          </Card>
+            <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>Running</span>
+          </div>
 
-          <Card
-            decoration="top"
-            decorationColor={overview.health_status === "healthy" ? "green" : overview.health_status === "attention" ? "amber" : "red"}
-          >
-            <Flex alignItems="center" className="gap-2 mb-2">
+          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+            <div className="flex items-center gap-2 mb-2">
               {overview.health_status === "healthy" ? (
-                <CheckCircle className="w-5 h-5 text-green-400" />
+                <CheckCircle className="w-5 h-5" style={{ color: "#22C55E" }} />
               ) : (
-                <AlertTriangle className="w-5 h-5 text-amber-400" />
+                <AlertTriangle className="w-5 h-5" style={{ color: "#F59E0B" }} />
               )}
-              <Text className="font-medium">Health</Text>
-            </Flex>
-            <div className="text-3xl font-bold">{overview.overall_health.toFixed(0)}%</div>
-            <Text className="text-xs text-gray-400 capitalize">
+              <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Health</span>
+            </div>
+            <div className="text-3xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>{overview.overall_health.toFixed(0)}%</div>
+            <span className="text-xs capitalize" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               {overview.health_status}
-            </Text>
-          </Card>
+            </span>
+          </div>
 
-          <Card decoration="top" decorationColor="amber">
-            <Flex alignItems="center" className="gap-2 mb-2">
-              <AlertTriangle className="w-5 h-5 text-amber-400" />
-              <Text className="font-medium">Alerts</Text>
-            </Flex>
-            <div className="text-3xl font-bold">{overview.alerts.length}</div>
-            <Text className="text-xs text-gray-400">
+          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="w-5 h-5" style={{ color: "#F59E0B" }} />
+              <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Alerts</span>
+            </div>
+            <div className="text-3xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>{overview.alerts.length}</div>
+            <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               {overview.alerts.filter((a) => a.priority === "high" || a.priority === "critical").length} high priority
-            </Text>
-          </Card>
-        </Grid>
+            </span>
+          </div>
+        </div>
 
         {/* Alerts */}
         {overview.alerts.length > 0 && (
-          <Card>
-            <Title className="text-sm">Active Alerts</Title>
-            <div className="space-y-2 mt-3">
-              {overview.alerts.slice(0, 5).map((alert, idx) => (
+          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+            <h3 className="text-sm font-medium mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Active Alerts</h3>
+            <div className="space-y-2">
+              {overview.alerts.slice(0, 5).map((alert, idx) => {
+                const alertColor = alert.priority === "critical" ? "#EF4444" : alert.priority === "high" ? "#F59E0B" : "#3B82F6";
+                return (
                 <div
                   key={idx}
-                  className={`p-3 rounded-lg ${
-                    alert.priority === "critical"
-                      ? "bg-red-900/20 border border-red-500/30"
-                      : alert.priority === "high"
-                      ? "bg-amber-900/20 border border-amber-500/30"
-                      : "bg-blue-900/20 border border-blue-500/30"
-                  }`}
+                  className="p-3 rounded-lg"
+                  style={{ background: `${alertColor}15`, border: `1px solid ${alertColor}30` }}
                 >
-                  <Flex justifyContent="between">
-                    <Text className="font-medium">{alert.title}</Text>
-                    <Badge
-                      color={
-                        alert.priority === "critical"
-                          ? "red"
-                          : alert.priority === "high"
-                          ? "amber"
-                          : "blue"
-                      }
-                      size="xs"
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{alert.title}</span>
+                    <span
+                      className="text-xs px-2 py-0.5 rounded capitalize"
+                      style={{ background: `${alertColor}20`, color: alertColor }}
                     >
                       {alert.priority}
-                    </Badge>
-                  </Flex>
-                  <Text className="text-xs text-gray-400 mt-1">
+                    </span>
+                  </div>
+                  <span className="text-xs mt-1 block" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                     {alert.description}
-                  </Text>
+                  </span>
                 </div>
-              ))}
+                );
+              })}
             </div>
-          </Card>
+          </div>
         )}
 
         {/* Compact Panels */}
-        <Grid className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-4">
             <ZoneOverviewPanel siteId={siteId} compact />
           </div>
@@ -391,7 +346,7 @@ export function HVACDashboard({
             <ThermalOptimizationPanelGated siteId={siteId} compact />
             <ComfortAssistant compact />
           </div>
-        </Grid>
+        </div>
       </div>
     </TabPanel>,
 
@@ -442,7 +397,7 @@ export function HVACDashboard({
 
       {/* Tabbed Views */}
       <TabGroup index={activeTab} onIndexChange={setActiveTab}>
-        <TabList className="mb-4 overflow-x-auto">{tabs as unknown as React.ReactElement}</TabList>
+        <TabList className="mb-4 overflow-x-auto [&>*]:whitespace-nowrap">{tabs as unknown as React.ReactElement}</TabList>
         <TabPanels>{panels as unknown as React.ReactElement}</TabPanels>
       </TabGroup>
     </div>

@@ -1357,9 +1357,6 @@ export const api = {
       if (apiError?.status === 401 && message.includes("authentication required")) {
         return [];
       }
-      if (apiError?.status === 403 && message.includes("demo mode is only available from localhost")) {
-        return [];
-      }
       if (apiError?.status === 429) {
         return [];
       }

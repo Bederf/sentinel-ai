@@ -29,38 +29,45 @@ async def startup_event(app: FastAPI) -> None:
 
     # === Security startup checks ===
 
-    # Block DEMO_MODE in production
-    if settings.environment == "production" and settings.demo_mode:
-        raise RuntimeError(
-            "DEMO_MODE cannot be enabled in production environment. Set DEMO_MODE=false or ENVIRONMENT=development."
+    # DEMO_MODE deprecation warning
+    if settings.demo_mode:
+        _logger.warning(
+            "DEMO_MODE is set but no longer grants auth bypasses. "
+            "All requests require valid JWT tokens. Consider removing DEMO_MODE from your .env."
         )
 
-    # Require JWT secret when not in DEMO_MODE (C-2: Secure JWT signing)
-    if not settings.demo_mode and not settings.jwt_secret_key and not settings.supabase_key:
+    # Require JWT secret (C-2: Secure JWT signing)
+    if not settings.jwt_secret_key and not settings.supabase_key:
         raise RuntimeError(
-            "JWT_SECRET_KEY (or SUPABASE_KEY) must be set when DEMO_MODE is disabled. "
+            "JWT_SECRET_KEY (or SUPABASE_KEY) must be set. "
             'Generate a 256-bit secret: python -c "import secrets; print(secrets.token_hex(32))" '
             "and set JWT_SECRET_KEY in your .env file."
         )
 
     # Warn about weak JWT secrets (less than 32 characters)
     _jwt_key = settings.jwt_secret_key or settings.supabase_key
-    if _jwt_key and len(_jwt_key) < 32 and not settings.demo_mode:
+    if _jwt_key and len(_jwt_key) < 32:
         _logger.warning(
             "JWT_SECRET_KEY is shorter than 32 characters — consider using a "
             '256-bit secret: python -c "import secrets; print(secrets.token_hex(32))"'
         )
 
-    # Warn about DEMO_MODE
-    if settings.demo_mode:
-        _logger.warning("DEMO_MODE is enabled - auth bypassed, requests get OPERATOR role. Do NOT use in production.")
-
-    # Warn about missing methodology password
-    if not settings.demo_mode and not settings.jwt_secret_key:
+    # Warn about missing dedicated JWT key
+    if not settings.jwt_secret_key:
         _logger.warning(
             "JWT_SECRET_KEY not set - falling back to SUPABASE_KEY for JWT signing. "
             "Set JWT_SECRET_KEY for a dedicated signing secret."
         )
+
+    # Bootstrap ADMIN_EMAILS into sentinel_users table
+    _admin_emails_raw = os.environ.get("ADMIN_EMAILS", "").strip()
+    if _admin_emails_raw:
+        from app.database.repositories.user_repository import get_user_repository
+
+        _user_repo = get_user_repository()
+        _admin_list = [e.strip().lower() for e in _admin_emails_raw.split(",") if e.strip()]
+        _user_repo.ensure_admin_emails(_admin_list)
+        _logger.info("ADMIN_EMAILS bootstrap complete: %s", ", ".join(_admin_list))
 
     # === SENTINEL LIVE MODE BANNER ===
     # Sprint 0 hardening: loud banner when hardware writes are possible

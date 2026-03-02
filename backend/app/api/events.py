@@ -23,7 +23,6 @@ from fastapi.responses import StreamingResponse
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel
 from app.services.event_emitter import get_event_emitter
-from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -156,13 +155,12 @@ async def stream_events(request: Request) -> StreamingResponse:
 
     if ticket:
         user_id = _validate_ticket(ticket)
-        if user_id is None and not settings.demo_mode:
+        if user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired SSE ticket",
             )
-    elif not settings.demo_mode:
-        # No ticket and not demo mode - reject
+    else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="SSE ticket required. POST /api/events/ticket first.",

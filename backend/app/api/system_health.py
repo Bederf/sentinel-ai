@@ -116,18 +116,13 @@ async def get_current_health():
         components = {}
         for key, score in snapshot.get("component_scores", {}).items():
             component_detail = snapshot.get("component_details", {}).get(key, {})
-
-            if score >= 80:
-                status = "healthy"
-            elif score >= 60:
-                status = "degraded"
-            else:
-                status = "critical"
+            status = component_detail.get("status", "healthy")
 
             components[key] = ComponentHealth(
                 name=key,
                 status=status,
                 score=score,
+                message=component_detail.get("note"),
                 details=component_detail,
             )
 

@@ -362,6 +362,23 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
       className="h-full overflow-hidden flex flex-col"
       style={{ background: "var(--color-sentinel-bg-canvas)" }}
     >
+      {/* Page Header — matches Lighting tab pattern */}
+      <div className="flex-none px-4 md:px-6 pt-4 md:pt-6 pb-2">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded" style={{ background: "rgba(16, 185, 129, 0.15)" }}>
+            <Cpu className="h-6 w-6" style={{ color: "#10B981" }} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              Device Control
+            </h1>
+            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Building Management Control Centre
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Alert Context Banner - shown when navigating from an alert */}
       {alertContext && (
         <div

@@ -26,7 +26,7 @@ export function WaterIntelligenceCard({ siteId, onNavigate }: WaterIntelligenceC
       setApiError(false);
       try {
         const [t, a] = await Promise.allSettled([
-          waterApi.getTrending(siteId, 'weekly'),
+          waterApi.getTrending(siteId, 'week'),
           waterApi.getActiveAlerts(siteId),
         ]);
         if (cancelled) return;

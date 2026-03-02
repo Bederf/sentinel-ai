@@ -234,33 +234,31 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
       className="h-full overflow-y-auto p-4 md:p-6"
       style={{ background: "var(--color-sentinel-bg-canvas)" }}
     >
-      {/* Header */}
-      <div
-        className="glass-panel rounded-lg p-4 md:p-5 mb-6 flex items-center justify-between flex-wrap gap-3"
-        style={{ border: "1px solid var(--glass-border)" }}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="p-2 rounded"
-            style={{ background: "rgba(59, 130, 246, 0.15)" }}
-          >
-            <Droplets className="h-5 w-5" style={{ color: "var(--color-sentinel-blue)" }} />
-          </div>
-          <div>
-            <h2
-              className="text-lg font-semibold"
-              style={{ color: "var(--color-sentinel-text-primary)" }}
+      {/* Page Header — matches Lighting tab pattern */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div
+              className="p-2 rounded"
+              style={{ background: "rgba(59, 130, 246, 0.15)" }}
             >
-              Water Consumption
-            </h2>
-            <p
-              className="text-xs"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
-            >
-              Real-time monitoring, leak detection, and consumption trending
-            </p>
+              <Droplets className="h-6 w-6" style={{ color: "var(--color-sentinel-blue)" }} />
+            </div>
+            <div>
+              <h1
+                className="text-2xl font-bold"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Water Management
+              </h1>
+              <p
+                className="text-sm"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                Consumption Monitoring &amp; Leak Detection
+              </p>
+            </div>
           </div>
-        </div>
 
         <div className="flex items-center gap-3">
           {/* Site Selector */}
@@ -297,6 +295,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
             </select>
           </div>
         </div>
+      </div>
       </div>
 
       {/* SENTINEL Value Card */}

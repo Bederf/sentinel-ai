@@ -1,28 +1,28 @@
 """Chat API endpoint with Server-Sent Events streaming."""
 
 import logging
-import os
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
-from fastapi import APIRouter, Depends, HTTPException, Request as FastAPIRequest
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi import Request as FastAPIRequest
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from app.services.claude_service import claude_service
-from app.services.demo_cache import DemoCache
-from app.services.work_order_service import work_order_service
-from app.services.feature_request_logger import log_chat_query
-from app.services.hybrid_ai_service import hybrid_ai_service
-from app.services.zai_service import zai_service
+from app.config.settings import settings
 from app.middleware.auth_middleware import get_current_auth
 from app.models.auth import AuthContext
 from app.security.constants import MAX_CHAT_MESSAGE_LENGTH
 from app.security.pipeline import prompt_guard, require_role
-from app.utils.ai_provenance import get_cloud_llm_provenance, get_local_llm_provenance, provenance_headers
-from app.services.popia_consent_guard import should_allow_cloud_processing
 from app.security.sse_buffer import SecureSSEBuffer
+from app.services.claude_service import claude_service
+from app.services.feature_request_logger import log_chat_query
+from app.services.hybrid_ai_service import hybrid_ai_service
+from app.services.popia_consent_guard import should_allow_cloud_processing
+from app.services.work_order_service import work_order_service
+from app.services.zai_service import zai_service
+from app.utils.ai_provenance import get_cloud_llm_provenance, get_local_llm_provenance, provenance_headers
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -367,32 +367,6 @@ async def chat(
                 },
             )
 
-    # Check demo cache if DEMO_MODE is enabled
-    demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
-    if demo_mode:
-        demo_cache = DemoCache()
-        cached_response = demo_cache.get_cached_response(user_message)
-        if cached_response:
-            logger.info("Using cached demo response for query")
-            _citations = demo_cache.get_citations(user_message)
-
-            async def stream_cached_response() -> AsyncGenerator[str, None]:
-                yield format_sse_chunk(cached_response)
-                yield "data: [DONE]\n\n"
-
-            return StreamingResponse(
-                stream_cached_response(),
-                media_type="text/event-stream",
-                headers={
-                    "Cache-Control": "no-cache",
-                    "Connection": "keep-alive",
-                    "X-Accel-Buffering": "no",
-                    "X-Response-Type": "ai_response",
-                    "X-Demo-Cached": "true",
-                    **get_chat_provenance_headers(data_subject_id),
-                },
-            )
-
     tools_enabled = hybrid_ai_service.get_active_cloud_provider() == "anthropic"
     return StreamingResponse(
         generate_sse_stream(
@@ -419,7 +393,6 @@ async def chat_status():
     """Check if the chat service is configured and available."""
     from app.services.tts_service import get_tts_service
 
-    demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
     tts = get_tts_service()
     local_mode = hybrid_ai_service.is_local_ai_only_mode()
     cloud_provider = hybrid_ai_service.get_active_cloud_provider()
@@ -429,7 +402,6 @@ async def chat_status():
 
     return {
         "configured": configured,
-        "demo_mode": demo_mode,
         "model": active_model,
         "local_ai_only": local_mode,
         "cloud_provider": "sentinel-local" if local_mode else cloud_provider,
@@ -437,7 +409,7 @@ async def chat_status():
             "device_control": tools_enabled,  # Tool-based control is Claude-only
             "work_orders": True,
             "building_context": True,
-            "demo_cache": demo_mode,
+            "demo_cache": settings.demo_mode,
             "tool_calling": tools_enabled,
             "documentation_search": True,  # RAG-based documentation search
             "tts": tts.is_configured(),  # Voice chat TTS

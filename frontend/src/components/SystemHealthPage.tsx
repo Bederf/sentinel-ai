@@ -36,6 +36,7 @@ import {
 import type { IntegrationHealthSummary } from '@/lib/api';
 import { monitoringApi } from '@/lib/api';
 import { authorizedFetch } from '../lib/api/client';
+
 import { PageLoading } from './PageLoading';
 import { AIPerformanceTab } from './system/AIPerformanceTab';
 import { ModelHealthTab } from './system/ModelHealthTab';
@@ -337,22 +338,40 @@ export default function SystemHealthPage() {
                 {/* Component Status Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {Object.entries(currentHealth.components || {}).map(
-                    ([key, component]: [string, any]) => (
-                      <Card key={key} className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <Text className="capitalize" style={{ color: "var(--color-sentinel-text-secondary)" }}>{key}</Text>
-                            <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{component.score}</Metric>
+                    ([key, component]: [string, any]) => {
+                      const labels: Record<string, string> = {
+                        supabase: "Supabase",
+                        redis_cache: "Redis Cache",
+                        event_bus: "Event Bus",
+                        n8n: "n8n Workflows",
+                        servicenow: "ServiceNow",
+                        notifications: "Notifications",
+                        device_manager: "Device Manager",
+                      };
+                      return (
+                        <Card key={key} className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                {labels[key] || key}
+                              </Text>
+                              <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{component.score}</Metric>
+                            </div>
+                            {getStatusIcon(component.status)}
                           </div>
-                          {getStatusIcon(component.status)}
-                        </div>
-                        <ProgressBar
-                          value={component.score}
-                          color={getStatusColor(component.status)}
-                          className="mt-2"
-                        />
-                      </Card>
-                    )
+                          <ProgressBar
+                            value={component.score}
+                            color={getStatusColor(component.status)}
+                            className="mt-2"
+                          />
+                          {component.message && (
+                            <Text className="mt-2 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                              {component.message}
+                            </Text>
+                          )}
+                        </Card>
+                      );
+                    }
                   )}
                 </div>
               </>

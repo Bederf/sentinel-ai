@@ -16,6 +16,10 @@ class BuildingRepository:
     _COLUMNS = (
         "id, code, name, type, region, address, latitude, longitude, "
         "equipment_count, floors, sqm, created_at, updated_at, "
+        "year_built, operating_hours, occupancy_pattern, "
+        "contact_email, contact_phone, "
+        "optimization_enabled, optimization_status, "
+        "control_enabled, control_note, "
         "sentinel_processing_enabled"
     )
 

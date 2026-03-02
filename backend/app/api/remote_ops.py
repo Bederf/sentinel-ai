@@ -32,21 +32,13 @@ _auth_service = get_authorization_service()
 _monitoring_service = get_remote_monitoring_service()
 _audit_logger = AuditLogger()
 
-# Demo user lookup from remote_ops_config.json
-_DEMO_USERS = {
-    "view_user": {"role": "viewer", "full_name": "View Only User"},
-    "operator_user": {"role": "operator", "full_name": "Building Operator"},
-    "tech_user": {"role": "technician", "full_name": "Field Technician"},
-    "engineer_user": {"role": "engineer", "full_name": "Building Engineer"},
-    "demo-user": {"role": "technician", "full_name": "Demo Technician"},
-}
-
 
 def _resolve_user(x_user_id: Optional[str]) -> dict:
-    """Resolve user from X-User-Id header (or fallback to demo technician)."""
-    user_id = x_user_id or "demo-user"
-    info = _DEMO_USERS.get(user_id, {"role": "technician", "full_name": user_id})
-    return {"user_id": user_id, "role": info["role"], "full_name": info.get("full_name", user_id)}
+    """Resolve user from X-User-Id header. Requires valid user ID."""
+    if not x_user_id:
+        raise HTTPException(status_code=401, detail="X-User-Id header required")
+    # Default role mapping — callers authenticated upstream via JWT
+    return {"user_id": x_user_id, "role": "technician", "full_name": x_user_id}
 
 
 def _check_auth(user_role: str, required: AuthorizationLevel) -> None:

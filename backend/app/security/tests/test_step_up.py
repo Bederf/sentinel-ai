@@ -230,20 +230,11 @@ class TestRequireStepUpDependency:
         mock_request.state.auth = auth_ctx
         mock_request.client.host = "127.0.0.1"
 
-        # Ensure demo_mode is off for this test
-        import app.config.settings as settings_mod
-
-        original_demo = settings_mod.settings.demo_mode
-        settings_mod.settings.demo_mode = False
-
-        try:
-            dep = require_step_up()
-            with pytest.raises(Exception) as exc_info:
-                await dep(mock_request)
-            assert exc_info.value.status_code == 403
-            assert exc_info.value.detail == "step_up_required"
-        finally:
-            settings_mod.settings.demo_mode = original_demo
+        dep = require_step_up()
+        with pytest.raises(Exception) as exc_info:
+            await dep(mock_request)
+        assert exc_info.value.status_code == 403
+        assert exc_info.value.detail == "step_up_required"
 
     @pytest.mark.asyncio
     async def test_control_endpoint_passes_with_step_up(self):
@@ -269,26 +260,19 @@ class TestRequireStepUpDependency:
         mock_request.state.auth = auth_ctx
         mock_request.client.host = "127.0.0.1"
 
-        import app.config.settings as settings_mod
-
-        original_demo = settings_mod.settings.demo_mode
-        settings_mod.settings.demo_mode = False
-
-        try:
-            dep = require_step_up()
-            result = await dep(mock_request)
-            assert result is None  # Passed without exception
-        finally:
-            settings_mod.settings.demo_mode = original_demo
+        dep = require_step_up()
+        result = await dep(mock_request)
+        assert result is None  # Passed without exception
 
     @pytest.mark.asyncio
-    async def test_step_up_bypassed_in_demo_mode(self):
-        """In demo mode, step-up is not enforced."""
+    async def test_step_up_not_bypassed_in_demo_mode(self):
+        """Demo mode no longer bypasses step-up auth."""
         from unittest.mock import MagicMock
 
         mock_request = MagicMock()
         mock_request.headers = {}
         mock_request.cookies = {}
+        mock_request.state = MagicMock(spec=[])  # No auth attribute
 
         import app.config.settings as settings_mod
 
@@ -297,7 +281,8 @@ class TestRequireStepUpDependency:
 
         try:
             dep = require_step_up()
-            result = await dep(mock_request)
-            assert result is None  # Passed without exception
+            # Without auth context, step-up should fail (not be bypassed)
+            with pytest.raises(Exception):
+                await dep(mock_request)
         finally:
             settings_mod.settings.demo_mode = original_demo

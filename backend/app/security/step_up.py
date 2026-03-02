@@ -24,7 +24,6 @@ from typing import Optional
 import bcrypt
 from fastapi import HTTPException, Request, status
 
-from app.config.settings import settings
 from app.middleware.auth_middleware import _authenticate_request, _extract_ip_address
 from app.models.auth import AuthContext
 from app.security.constants import STEP_UP_VALIDITY_SECONDS
@@ -248,10 +247,6 @@ def require_step_up():
     """
 
     async def _dependency(request: Request) -> None:
-        # Demo mode bypass: step-up is not enforced in demo mode
-        if settings.demo_mode:
-            return None
-
         # Get auth context from request state (set by require_auth upstream)
         auth_ctx: Optional[AuthContext] = getattr(request.state, "auth", None)
 

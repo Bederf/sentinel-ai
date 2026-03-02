@@ -124,12 +124,12 @@ export function SolarDashboard() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2
-                className="text-lg font-semibold"
+              <h1
+                className="text-2xl font-bold"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                Solar & BESS
-              </h2>
+                Solar &amp; BESS
+              </h1>
               {isSimulationRunning && (
                 <div className="px-2 py-0.5 rounded text-xs font-medium"
                   style={{
@@ -142,12 +142,12 @@ export function SolarDashboard() {
               )}
             </div>
             <p
-              className="text-xs"
+              className="text-sm"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               {isSimulationRunning
-                ? `Live generation data • Hour ${simulatedHour}:00 (Day ${daysSimulated}/365) • ${cloudCover?.toFixed(0)}% cloud cover`
-                : 'Generation, storage, dispatch, and financial performance'
+                ? `Live generation data \u2022 Hour ${simulatedHour}:00 (Day ${daysSimulated}/365) \u2022 ${cloudCover?.toFixed(0)}% cloud cover`
+                : 'Generation, Storage, Dispatch &amp; Financial Performance'
               }
             </p>
           </div>

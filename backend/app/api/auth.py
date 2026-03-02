@@ -1,8 +1,8 @@
 """
 Authentication API endpoints for SENTINEL BMS Platform.
 
-Simple email-based authentication for demo purposes.
-Users enter their email address and receive a JWT token for session management.
+Email-based authentication with Supabase-backed user registry.
+Users must be pre-registered; unknown emails are rejected.
 
 FSR Domain: 4.6 - Logical Access Control (MFA for privileged access)
 FSR Domain: 4.7 - Logical Access Control
@@ -32,6 +32,7 @@ from app.security.step_up import (
     create_step_up_session,
     _extract_device_id,
 )
+from app.database.repositories.user_repository import get_user_repository
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -129,65 +130,8 @@ _ADMIN_EMAILS: list[str] = [
 _ADMIN_PIN_HASH: str = os.environ.get("ADMIN_PIN_HASH", "")
 
 
-# Demo users store - in production this would be in Supabase
-# Email -> User mapping
-_DEMO_USERS: dict[str, dict] = {
-    # Default admin user (always present)
-    "admin@sentinel.bms": {
-        "user_id": "admin-001",
-        "email": "admin@sentinel.bms",
-        "full_name": "SENTINEL Administrator",
-        "role": SentinelRole.ADMIN,
-    },
-    # Operator users (can control devices)
-    "operator@sentinel.bms": {
-        "user_id": "operator-001",
-        "email": "operator@sentinel.bms",
-        "full_name": "BMS Operator",
-        "role": SentinelRole.OPERATOR,
-    },
-    # Developer users
-    "dev@sentinel.bms": {
-        "user_id": "dev-001",
-        "email": "dev@sentinel.bms",
-        "full_name": "Developer",
-        "role": SentinelRole.DEVELOPER,
-    },
-    # Auditor users (read-only)
-    "auditor@sentinel.bms": {
-        "user_id": "auditor-001",
-        "email": "auditor@sentinel.bms",
-        "full_name": "Compliance Auditor",
-        "role": SentinelRole.AUDITOR,
-    },
-    # Grant Demo - Automation Specialist
-    "grant@grantdemo.co.za": {
-        "user_id": "grant-demo-001",
-        "email": "grant@grantdemo.co.za",
-        "full_name": "Grant - Demo",
-        "role": SentinelRole.OPERATOR,  # Operator access for production demo
-    },
-    # Solar/BESS Demo User
-    "bederf@protonmail.com": {
-        "user_id": "bederf-solar-001",
-        "email": "bederf@protonmail.com",
-        "full_name": "Bederf - Solar Demo",
-        "role": SentinelRole.OPERATOR,  # Operator access for production demo
-    },
-}
-
-# Register admin emails from env var as ADMIN users
-for _admin_email in _ADMIN_EMAILS:
-    if _admin_email not in _DEMO_USERS:
-        _DEMO_USERS[_admin_email] = {
-            "user_id": f"admin-{_admin_email[:8]}",
-            "email": _admin_email,
-            "full_name": "Admin User",
-            "role": SentinelRole.ADMIN,
-        }
-    else:
-        # Ensure env-listed emails always have ADMIN role
-        _DEMO_USERS[_admin_email]["role"] = SentinelRole.ADMIN
+# User repository — Supabase-backed with JSON fallback
+_user_repo = get_user_repository()
 
 
 def _create_jwt_token(user_data: dict, token_type: str = "access") -> str:
@@ -214,13 +158,13 @@ def _create_jwt_token(user_data: dict, token_type: str = "access") -> str:
 @router.post("/login")
 @limiter.limit("5/15minutes")
 async def login_with_email(request: Request, email: str):
-    """Login with email address (simple authentication).
+    """Login with email address.
 
     The email address IS the credential - no password required.
     Token expires after jwt_expiration_hours (default 8h, one work shift).
 
-    Known demo users get specific roles (admin, operator, developer, auditor).
-    Unknown emails automatically get AUDITOR (read-only) role.
+    Users must be pre-registered in sentinel_users (Supabase or JSON fallback).
+    Unknown emails are rejected with 403.
 
     For ADMIN users, MFA is required (FSR 4.6.3). If MFA is required:
     - If not enrolled: Returns mfa_required=true, mfa_enrolled=false (prompt enrollment)
@@ -240,25 +184,32 @@ async def login_with_email(request: Request, email: str):
         # Brute-force check (Phase 58-04 M-5) — keyed by email
         _check_brute_force(email)
 
-        # Look up user in demo store
-        user_data = _DEMO_USERS.get(email)
+        # Look up user in Supabase → JSON fallback
+        user_data = _user_repo.get_user_by_email(email)
 
+        if not user_data:
+            _record_failed_attempt(email)
+            logger.warning("Login rejected — unregistered email: %s", email)
+            raise HTTPException(
+                status_code=403,
+                detail="User not registered. Contact your administrator.",
+            )
+
+        # Map role string to SentinelRole enum
+        role_str = user_data.get("role", "auditor")
+        try:
+            role = SentinelRole(role_str)
+        except ValueError:
+            role = SentinelRole.AUDITOR
+
+        user_info = {
+            "user_id": user_data.get("user_id", f"user-{email[:8]}"),
+            "email": user_data["email"],
+            "full_name": user_data.get("full_name", email.split("@")[0].title()),
+            "role": role,
+        }
         is_new_user = False
-        if user_data:
-            # Known demo user
-            user_info = user_data.copy()
-            logger.info(f"Demo user login: {email} as {user_data['role'].value}")
-        else:
-            # Unknown email - create a new AUDITOR (read-only) user
-            # In production, this would require proper user registration
-            user_info = {
-                "user_id": f"user-{email[:8]}",
-                "email": email,
-                "full_name": email.split("@")[0].title(),
-                "role": SentinelRole.AUDITOR,  # Read-only by default
-            }
-            is_new_user = True
-            logger.info(f"New user login: {email} as AUDITOR (read-only)")
+        logger.info("User login: %s as %s", email, role.value)
 
         # Check MFA status for the user (FSR 4.6.3 - MFA for privileged access)
         mfa_service = get_mfa_service()
@@ -393,9 +344,11 @@ async def login_with_email(request: Request, email: str):
 
         return response
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Login failed for {email}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Login failed")
 
 
 class VerifyPinRequest(BaseModel):
@@ -590,18 +543,24 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
     # Brute-force check (Phase 58-04 M-5) — keyed by email
     _check_brute_force(email)
 
-    # Look up user
-    user_data = _DEMO_USERS.get(email)
+    # Look up user in Supabase → JSON fallback
+    user_data = _user_repo.get_user_by_email(email)
     if not user_data:
-        # Check if it's a dynamic user (non-demo)
-        user_data = {
-            "user_id": f"user-{email[:8]}",
-            "email": email,
-            "full_name": email.split("@")[0].title(),
-            "role": SentinelRole.AUDITOR,
-        }
+        raise HTTPException(status_code=403, detail="User not registered. Contact your administrator.")
 
-    user_info = user_data.copy() if isinstance(user_data.get("role"), SentinelRole) else user_data
+    # Map role string to SentinelRole enum
+    role_str = user_data.get("role", "auditor")
+    try:
+        role = SentinelRole(role_str)
+    except ValueError:
+        role = SentinelRole.AUDITOR
+
+    user_info = {
+        "user_id": user_data.get("user_id", f"user-{email[:8]}"),
+        "email": user_data["email"],
+        "full_name": user_data.get("full_name", email.split("@")[0].title()),
+        "role": role,
+    }
 
     # Verify MFA code
     mfa_service = get_mfa_service()
