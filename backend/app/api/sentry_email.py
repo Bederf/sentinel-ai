@@ -729,6 +729,23 @@ async def _send_reply_and_respond(
     reply_message_id: Optional[str] = None
     reply_error: Optional[str] = None
 
+    # ------------------------------------------------------------------
+    # Threading pre-flight: surface misconfigurations clearly in logs
+    # ------------------------------------------------------------------
+    if not settings.email_reply_enabled:
+        logger.warning(
+            "Threading disabled: email_reply_enabled=False — reply for intake %s will be sent "
+            "by n8n WITHOUT In-Reply-To/References headers. "
+            "Set EMAIL_REPLY_ENABLED=true and configure SMTP to enable threaded replies.",
+            intake_id,
+        )
+    elif not req.message_id:
+        logger.warning(
+            "Threading degraded: intake %s has no message_id — In-Reply-To header cannot be set. "
+            "Ensure n8n extracts and forwards the original email's Message-ID header.",
+            intake_id,
+        )
+
     svc = get_email_reply_service()
     if svc.is_configured():
         # Build subject with Re: prefix + WO code suffix for Outlook threading
