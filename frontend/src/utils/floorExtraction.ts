@@ -37,12 +37,22 @@ export function extractFloorFromCode(code: string): string | null {
     if (match && match[1]) return match[1]; // G, R
   }
 
-  // Site-002 format: S002-TYPE-ZONE_ID
-  // Zone format: 001-099 (L0), 100-199 (L1), 200-299 (L2)
+  // Site-002 format: S002-TYPE-ZONE_ID or S002-TYPE-FLOOR-ID
   if (code.startsWith('S002-')) {
-    const match = code.match(/S002-[^-]+-(\d+)/);
-    if (match && match[1]) {
-      const zone = parseInt(match[1]);
+    const parts = code.split('-');
+    const thirdPart = parts[2] || '';
+
+    // Explicit floor codes: S002-CHILLER-B1-001, S002-INV-R-002, S002-AHU-L2-001
+    if (/^(B[12]|R|G)$/i.test(thirdPart)) return thirdPart.toUpperCase();
+    if (/^L\d+$/i.test(thirdPart)) return thirdPart.toUpperCase();
+
+    // Utility codes: S002-MTR-W-MAIN (W=Water) → basement
+    if (thirdPart === 'W') return 'B1';
+
+    // Zone-encoded floor: S002-FCU-204 → zone 204 → L2
+    const zoneMatch = code.match(/S002-[^-]+-(\d+)/);
+    if (zoneMatch && zoneMatch[1]) {
+      const zone = parseInt(zoneMatch[1]);
       if (zone >= 1 && zone <= 99) return 'L0';
       if (zone >= 100 && zone <= 199) return 'L1';
       if (zone >= 200 && zone <= 299) return 'L2';
@@ -98,25 +108,25 @@ export function generateFloorsFromEquipment(
  * Each floor is 3 units tall
  */
 export function getFloorY(floorCode: string): number {
-  // Base positions
+  // Y offsets aligned with BuildingModel.tsx slab positions (+0.5 to sit ON the slab)
+  // BuildingModel slabs: B1=0, G/L0=3, L1=6, L2=9, R=12
   const baseY: Record<string, number> = {
-    B1: 0.5,   // Basement 1
-    G: 3.5,    // Ground level
-    L0: 3.5,   // Ground level (alternative)
+    B1: 0.5,   // Basement slab at Y=0
+    G: 3.5,    // Ground slab at Y=3
+    L0: 3.5,   // Ground (alternative)
   };
 
-  // If in base, return that
   if (baseY[floorCode]) return baseY[floorCode];
 
   // Parse L# and calculate: L1=6.5, L2=9.5, L3=12.5, etc.
   const match = floorCode.match(/L(\d+)/);
   if (match) {
     const level = parseInt(match[1]);
-    return 3.5 + level * 3; // L1=6.5, L2=9.5, L3=12.5, L4=15.5, L5=18.5, etc.
+    return 3.5 + level * 3; // L1=6.5, L2=9.5, L3=12.5
   }
 
-  // Roof at high level
-  if (floorCode === 'R') return 25.5;
+  // Roof slab at Y=12 in BuildingModel → equipment at 12.5
+  if (floorCode === 'R') return 12.5;
 
   // Default to ground if unknown
   return 3.5;
@@ -136,7 +146,7 @@ export function getFloorId(floorCode: string): number {
     return level + 1; // L1=2, L2=3, L3=4, ..., L9=10
   }
 
-  if (floorCode === 'R') return 20; // Roof at high ID
+  if (floorCode === 'R') return 4; // Roof — matches BuildingModel floor id=4
 
   return 1; // Default to ground
 }

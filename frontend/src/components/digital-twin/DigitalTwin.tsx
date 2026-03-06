@@ -21,6 +21,7 @@ import { useEquipmentData } from '@/hooks/useEquipmentData';
 import { useSitesList } from '@/hooks/useSitesList';
 
 import { useZoneBounds } from '@/hooks/useZoneBounds';
+import { useStoredPositions } from '@/hooks/useStoredPositions';
 import {
   distributeEquipmentInZone,
   extractFloor,
@@ -199,6 +200,9 @@ export function DigitalTwin() {
   // Load zone bounds for adaptive equipment positioning
   const zoneBounds = useZoneBounds(siteId);
 
+  // Load stored positions from site_3d_configs (overrides algorithmic)
+  const storedPositions = useStoredPositions(siteId || '');
+
   const toggleFloor = (floor: number) => {
     const newFloors = new Set(selectedFloors);
     if (newFloors.has(floor)) {
@@ -244,67 +248,82 @@ export function DigitalTwin() {
     });
   }, [equipment, equipmentTypeFilter]);
 
-  // Pre-calculate equipment positions using zone-aware adaptive grid.
-  // Merges desk-derived zone bounds with synthetic bounds for floors
-  // without desk data (B1 basement, R roof).
-  // 5 zones per floor: N, E, S, W, C (compass directions)
+  // Pre-calculate equipment positions with 3-tier priority:
+  // 1. Stored positions from site_3d_configs (user-placed, persistent)
+  // 2. Desk-derived zone bounds (adaptive grid within zones)
+  // 3. Synthetic grid fallback (5x5 building grid)
   const equipmentPositions = useMemo(() => {
     const positions = new Map<string, EquipmentPosition>();
 
-    // Group equipment by zone key (Zone-{floor}-{zoneNum})
-    const byZone: Record<string, typeof filteredEquipment> = {};
-    const floorsNeeded = new Set<string>();
+    // Tier 1: Apply stored positions first (these are authoritative)
+    const needsAlgorithmic: typeof filteredEquipment = [];
 
     filteredEquipment.forEach((eq) => {
-      const code = (eq as any).code || eq.id || '';
-      const floor = extractFloor(code);
-      const normalizedFloor = floor === 'G' ? 'L0' : floor;
-      const zoneNum = extractZoneNumber(code); // Returns 0-99
-      const zoneKey = `Zone-${normalizedFloor}-${zoneNum}`;
-
-      if (!byZone[zoneKey]) byZone[zoneKey] = [];
-      byZone[zoneKey].push(eq);
-      floorsNeeded.add(normalizedFloor);
+      const stored = storedPositions[eq.id];
+      if (stored) {
+        // Stored position found — use it (x, y in stored = x, z in 3D)
+        const floorY = getFloorY(stored.floor === 'G' ? 'L0' : stored.floor);
+        positions.set(eq.id, { x: stored.x, y: floorY, z: stored.y });
+      } else {
+        needsAlgorithmic.push(eq);
+      }
     });
 
-    // Merge desk-derived bounds with synthetic bounds for missing floors
-    const allBounds: Record<string, import('@/utils/equipmentPositioning').ZoneBounds> = { ...zoneBounds };
-    for (const floor of floorsNeeded) {
-      // Check if this floor has any zone bounds from desk data
-      const hasFloorBounds = Object.keys(allBounds).some(
-        (key) => key.startsWith(`Zone-${floor}-`)
-      );
-      if (!hasFloorBounds) {
-        // Generate synthetic zones for this floor (B1, R, or any without desks)
-        const synthetic = generateSyntheticZoneBounds(floor);
-        Object.assign(allBounds, synthetic);
+    // Tier 2+3: Algorithmic placement for equipment without stored positions
+    if (needsAlgorithmic.length > 0) {
+      // Group by zone key
+      const byZone: Record<string, typeof needsAlgorithmic> = {};
+      const floorsNeeded = new Set<string>();
+
+      needsAlgorithmic.forEach((eq) => {
+        const code = (eq as any).code || eq.id || '';
+        const floor = extractFloor(code);
+        const normalizedFloor = floor === 'G' ? 'L0' : floor;
+        const zoneNum = extractZoneNumber(code);
+        const zoneKey = `Zone-${normalizedFloor}-${zoneNum}`;
+
+        if (!byZone[zoneKey]) byZone[zoneKey] = [];
+        byZone[zoneKey].push(eq);
+        floorsNeeded.add(normalizedFloor);
+      });
+
+      // Merge desk-derived bounds with synthetic bounds for missing floors
+      const allBounds: Record<string, import('@/utils/equipmentPositioning').ZoneBounds> = { ...zoneBounds };
+      for (const floor of floorsNeeded) {
+        const hasFloorBounds = Object.keys(allBounds).some(
+          (key) => key.startsWith(`Zone-${floor}-`)
+        );
+        if (!hasFloorBounds) {
+          const synthetic = generateSyntheticZoneBounds(floor);
+          Object.assign(allBounds, synthetic);
+        }
       }
+
+      // Distribute within zones
+      Object.entries(byZone).forEach(([zoneKey, zoneEquipment]) => {
+        const bounds = allBounds[zoneKey];
+        if (!bounds) return;
+
+        const floor = zoneKey.split('-')[1] || 'L0';
+        const floorY = getFloorY(floor);
+
+        const distributed = distributeEquipmentInZone(zoneEquipment, bounds, floorY);
+        distributed.forEach((pos, id) => positions.set(id, pos));
+      });
+
+      // Final fallback for unpositioned equipment
+      needsAlgorithmic.forEach((eq) => {
+        if (!positions.has(eq.id)) {
+          const code = (eq as any).code || eq.id || '';
+          const floor = extractFloor(code) || 'L0';
+          const floorY = getFloorY(floor === 'G' ? 'L0' : floor);
+          positions.set(eq.id, { x: 0, y: floorY, z: 0 });
+        }
+      });
     }
 
-    // Distribute equipment within each zone using adaptive grid
-    Object.entries(byZone).forEach(([zoneKey, zoneEquipment]) => {
-      const bounds = allBounds[zoneKey];
-      if (!bounds) return;
-
-      const floor = zoneKey.split('-')[1] || 'L0';
-      const floorY = getFloorY(floor);
-
-      const distributed = distributeEquipmentInZone(zoneEquipment, bounds, floorY);
-      distributed.forEach((pos, id) => positions.set(id, pos));
-    });
-
-    // Fallback for any equipment that didn't get positioned (no zone bounds at all)
-    filteredEquipment.forEach((eq) => {
-      if (!positions.has(eq.id)) {
-        const code = (eq as any).code || eq.id || '';
-        const floor = extractFloor(code) || 'L0';
-        const floorY = getFloorY(floor === 'G' ? 'L0' : floor);
-        positions.set(eq.id, { x: 0, y: floorY, z: 0 });
-      }
-    });
-
     return positions;
-  }, [filteredEquipment, zoneBounds]);
+  }, [filteredEquipment, zoneBounds, storedPositions]);
 
   // Find selected equipment data
   const selectedEquipmentData = useMemo(

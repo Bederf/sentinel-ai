@@ -128,7 +128,7 @@ async def create_or_update_config(
         service = get_site_3d_config_service()
 
         # Validate structure
-        is_valid, error = service.validate_site_structure(
+        is_valid, error = service.validate_building_structure(
             {
                 "name": request.site_structure.name,
                 "code": request.site_structure.code,
@@ -318,6 +318,129 @@ async def get_viewer_data(site_id: str) -> Building3DViewerDataResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve viewer data: {str(e)}",
+        )
+
+
+@router.get(
+    "/{site_id}/equipment-positions",
+    summary="Get stored equipment positions for a building",
+    responses={404: {"description": "No stored positions"}},
+)
+async def get_equipment_positions(site_id: str) -> Dict[str, Any]:
+    """Retrieve stored equipment positions for frontend rendering.
+
+    Returns a map of equipment_id -> {floor, x, y} for all stored positions.
+    Frontend uses this to override algorithmic placement.
+
+    Args:
+        site_id: Building UUID or site code (e.g., "site-002")
+    """
+    try:
+        config_repo = get_site_3d_config_service().repository
+        config = config_repo.get_by_site_id(site_id)
+
+        if not config or not config.get("equipment_positions"):
+            return {"site_id": site_id, "positions": {}, "count": 0}
+
+        # Convert list to map keyed by equipment_id for fast frontend lookup
+        positions_map = {}
+        for pos in config.get("equipment_positions", []):
+            eq_id = pos.get("equipment_id")
+            if eq_id:
+                positions_map[eq_id] = {
+                    "floor": pos.get("floor"),
+                    "x": pos.get("x"),
+                    "y": pos.get("y"),
+                }
+
+        return {
+            "site_id": site_id,
+            "positions": positions_map,
+            "count": len(positions_map),
+        }
+
+    except Exception as e:
+        logger.error(f"Error retrieving equipment positions: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve equipment positions: {str(e)}",
+        )
+
+
+@router.patch(
+    "/{site_id}/equipment-positions/{equipment_id}",
+    summary="Update a single equipment position",
+)
+async def update_equipment_position(
+    site_id: str,
+    equipment_id: str,
+    position: EquipmentPosition,
+) -> Dict[str, Any]:
+    """Update or add a single equipment position within the 3D config.
+
+    If no 3D config exists for the site, creates one with this position.
+    If the equipment already has a stored position, updates it.
+
+    Args:
+        site_id: Building UUID or site code
+        equipment_id: Equipment identifier
+        position: New position (floor, x, y)
+    """
+    try:
+        service = get_site_3d_config_service()
+        config_repo = service.repository
+        existing = config_repo.get_by_site_id(site_id)
+
+        new_pos = {
+            "equipment_id": equipment_id,
+            "floor": position.floor,
+            "x": position.x,
+            "y": position.y,
+        }
+
+        if existing:
+            # Update existing config — replace or append position
+            positions = existing.get("equipment_positions", [])
+            updated = False
+            for i, pos in enumerate(positions):
+                if pos.get("equipment_id") == equipment_id:
+                    positions[i] = new_pos
+                    updated = True
+                    break
+            if not updated:
+                positions.append(new_pos)
+
+            config_repo.update(
+                site_id=site_id,
+                equipment_positions=positions,
+            )
+        else:
+            # Create new config with just this position
+            config_repo.create(
+                site_id=site_id,
+                site_code=site_id,
+                name=site_id,
+                floors=[],
+                equipment_positions=[new_pos],
+            )
+
+        logger.info(
+            f"Updated position for {equipment_id} on {site_id}: floor={position.floor}, x={position.x}, y={position.y}"
+        )
+
+        return {
+            "equipment_id": equipment_id,
+            "floor": position.floor,
+            "x": position.x,
+            "y": position.y,
+            "status": "saved",
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating equipment position: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update equipment position: {str(e)}",
         )
 
 
