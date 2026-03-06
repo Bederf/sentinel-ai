@@ -20,8 +20,9 @@ export type ModuleType =
   // Control Add-ons (7, toggleable)
   | 'hvac_control' | 'energy_control' | 'lighting_control' | 'solar_control'
   | 'water_control' | 'security_control' | 'digital_twin_control'
-  // Standalone Add-ons (5, toggleable)
-  | 'maintenance' | 'financial' | 'compliance' | 'simulation' | 'fleet_ml';
+  // Standalone Add-ons (6, toggleable)
+  | 'maintenance' | 'financial' | 'compliance' | 'simulation' | 'fleet_ml'
+  | 'block_booking';
 export type ModuleStatus = 'active' | 'inactive' | 'error' | 'maintenance';
 export type RecommendationType = 'optimization' | 'maintenance' | 'alert' | 'cross_system' | 'predictive';
 export type RecommendationPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -404,6 +405,7 @@ export const MODULE_ICONS: Record<ModuleType, string> = {
   compliance: 'leaf',
   simulation: 'play',
   fleet_ml: 'brain',
+  block_booking: 'calendar-check',
 };
 
 export const MODULE_COLORS: Record<ModuleType, string> = {
@@ -438,6 +440,7 @@ export const MODULE_COLORS: Record<ModuleType, string> = {
   compliance: 'emerald',
   simulation: 'cyan',
   fleet_ml: 'cyan',
+  block_booking: 'rose',
 };
 
 export const PRIORITY_COLORS: Record<RecommendationPriority, string> = {

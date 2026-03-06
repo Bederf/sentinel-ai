@@ -46,7 +46,7 @@ class ModuleType(str, Enum):
     DIGITAL_TWIN_CONTROL = "digital_twin_control"
     CONTROL = "control"  # Generic control (gates all write operations)
 
-    # Standalone Add-ons (8, toggleable)
+    # Standalone Add-ons (9, toggleable)
     MAINTENANCE = "maintenance"
     FINANCIAL = "financial"
     COMPLIANCE = "compliance"
@@ -55,6 +55,7 @@ class ModuleType(str, Enum):
     ACCESS = "access"  # Building access control / badge readers
     SIMULATION = "simulation"
     FLEET_ML = "fleet_ml"
+    BLOCK_BOOKING = "block_booking"  # Block booking detection (Space Intelligence)
 
 
 # 15 mandatory base modules — must exist and be active for every site.

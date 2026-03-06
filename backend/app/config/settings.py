@@ -290,6 +290,16 @@ class Settings(BaseSettings):
     email_reply_from_address: str = "workorder@sentinel-ai.co.za"
     email_reply_from_name: str = "SENTINEL Work Orders"
 
+    # Block Booking Detection
+    block_booking_enabled: bool = False  # Master switch
+    block_booking_min_rooms: int = 2  # Flag when same person holds N+ rooms
+    block_booking_mailbox_email: str = ""  # IMAP mailbox for BCC'd confirmations
+    block_booking_mailbox_password: str = ""
+    block_booking_mailbox_host: str = ""  # e.g. outlook.office365.com
+    block_booking_concierge_email: str = ""  # Notification target
+    block_booking_concierge_whatsapp: str = ""  # E.164 format
+    block_booking_concierge_telegram_id: str = ""  # Telegram chat ID
+
     @property
     def resolved_ingestion_mode(self) -> IngestionMode:
         """Resolve ingestion mode based on data source config and safe fallback."""

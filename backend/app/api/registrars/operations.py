@@ -30,6 +30,7 @@ from app.api import notification_router
 from app.api import event_intelligence
 from app.api import control_policy
 from app.api import decision_memory
+from app.api import block_bookings
 
 
 def register_operations_routers(app: FastAPI) -> None:
@@ -148,3 +149,6 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Decision Memory (Phase 145)
     app.include_router(decision_memory.router, tags=["decision-memory"])
+
+    # Block Booking Detection (Space Intelligence)
+    app.include_router(block_bookings.router, tags=["block-bookings"])
