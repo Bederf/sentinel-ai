@@ -1,21 +1,36 @@
 /**
  * 3D OCCUPANCY MARKERS FOR REACT THREE FIBER
  *
- * Renders animated 3D cylinders representing people on the building
- * using React Three Fiber canvas context.
- * Handles:
- * - Person mesh creation and positioning
- * - Smooth interpolation to target positions (60fps)
- * - Walking animation (subtle bobbing effect)
- * - Persona-based color coding
- * - Vertical positioning on building floors
+ * Renders subtle occupancy dots on building floors.
+ * Small semi-transparent cyan spheres that provide background context
+ * without competing with equipment markers.
+ *
+ * Coordinate mapping: simulation canvas (600x400) → building footprint (30x20m)
+ * Floor Y: aligned with BuildingModel slab positions (B1=0, L0=3, L1=6, L2=9, R=12)
  */
 
 import React, { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Person } from '@/lib/occupancySimulation';
-import { getPersonaColor } from '@/lib/occupancySimulation';
+
+// Subtle cyan for all occupancy dots — distinct from equipment health colors
+const OCCUPANCY_COLOR = 0x00bcd4;
+
+// Building footprint matches BuildingModel.tsx (30m wide, 20m deep)
+const BUILDING_HALF_W = 15; // 30m / 2
+const BUILDING_HALF_D = 10; // 20m / 2
+
+// Simulation canvas dimensions (from occupancySimulation.ts)
+const SIM_W = 600;
+const SIM_H = 400;
+
+// Floor Y positions aligned with BuildingModel slabs (+0.3 to sit just above slab)
+const FLOOR_Y: Record<number, number> = {
+  0: 3.3,  // Ground (L0) slab at Y=3
+  1: 6.3,  // L1 slab at Y=6
+  2: 9.3,  // L2 slab at Y=9
+};
 
 interface OccupancyMarkers3DFiberProps {
   people: Person[];
@@ -24,43 +39,36 @@ interface OccupancyMarkers3DFiberProps {
   floorHeight?: number;
 }
 
-// Helper: Convert CSS color to THREE.js hex
-function personaColorToHex(cssColor: string): number {
-  const match = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-  if (match) {
-    const r = parseInt(match[1]);
-    const g = parseInt(match[2]);
-    const b = parseInt(match[3]);
-    return (r << 16) | (g << 8) | b;
-  }
-  return 0xffffff;
-}
-
 /**
- * Component that renders occupancy markers as 3D cylinders in React Three Fiber
+ * Renders occupancy as small semi-transparent spheres on floor surfaces
  */
 export const OccupancyMarkers3DFiber: React.FC<OccupancyMarkers3DFiberProps> = ({
   people,
-  buildingWidth = 12,
-  buildingDepth = 8,
-  floorHeight = 3.5,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
-  const meshesRef = useRef<Map<string, any>>(new Map());
+  const meshesRef = useRef<Map<string, THREE.Mesh>>(new Map());
   const timeRef = useRef<number>(0);
 
-  // Create or update meshes for people
+  // Shared geometry and material (reused across all dots)
+  const sharedGeometry = useRef(new THREE.SphereGeometry(0.3, 8, 6));
+  const sharedMaterial = useRef(
+    new THREE.MeshPhongMaterial({
+      color: OCCUPANCY_COLOR,
+      emissive: OCCUPANCY_COLOR,
+      emissiveIntensity: 0.15,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+    })
+  );
+
   useEffect(() => {
     const meshes = meshesRef.current;
 
     // Remove meshes for people who left
     for (const [id, mesh] of meshes.entries()) {
       if (!people.find(p => p.id === id)) {
-        if (groupRef.current) {
-          groupRef.current.remove(mesh);
-        }
-        mesh.geometry?.dispose();
-        mesh.material?.dispose();
+        groupRef.current?.remove(mesh);
         meshes.delete(id);
       }
     }
@@ -70,71 +78,34 @@ export const OccupancyMarkers3DFiber: React.FC<OccupancyMarkers3DFiberProps> = (
       let mesh = meshes.get(person.id);
 
       if (!mesh) {
-        // Create new person mesh (cylinder)
-        const geometry = new THREE.CylinderGeometry(0.25, 0.25, 1.7, 12);
-        const hexColor = personaColorToHex(getPersonaColor(person.persona));
-
-        const material = new THREE.MeshPhongMaterial({
-          color: hexColor,
-          emissive: hexColor,
-          emissiveIntensity: 0.2,
-          shininess: 10,
-          transparent: true,
-          opacity: 1.0,
-        });
-
-        mesh = new THREE.Mesh(geometry, material);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
+        mesh = new THREE.Mesh(sharedGeometry.current, sharedMaterial.current);
         mesh.userData.personId = person.id;
-        mesh.userData.persona = person.persona;
-
-        if (groupRef.current) {
-          groupRef.current.add(mesh);
-        }
+        groupRef.current?.add(mesh);
         meshes.set(person.id, mesh);
       }
 
-      // Update target position
-      // Convert from simulation coords to scene coords
-      mesh.userData.targetX = (person.x - 300) / 50;
-      mesh.userData.targetZ = (person.y - 200) / 50;
-      mesh.userData.targetY = person.floor * floorHeight + 0.85;
-
-      // Update opacity based on state
-      if (person.state === 'exiting') {
-        mesh.material.opacity = 0.5;
-      } else {
-        mesh.material.opacity = 1.0;
-      }
+      // Map simulation coords (0..600, 0..400) to building footprint (-15..15, -10..10)
+      mesh.userData.targetX = (person.x / SIM_W) * BUILDING_HALF_W * 2 - BUILDING_HALF_W;
+      mesh.userData.targetZ = (person.y / SIM_H) * BUILDING_HALF_D * 2 - BUILDING_HALF_D;
+      mesh.userData.targetY = FLOOR_Y[person.floor] ?? 3.3;
     }
   }, [people]);
 
-  // Animation loop: smooth interpolation + walking effect
-  useFrame((state, delta) => {
+  // Smooth position interpolation
+  useFrame((_state, delta) => {
     timeRef.current += delta;
-    const meshes = meshesRef.current;
 
-    for (const mesh of meshes.values()) {
-      if (!mesh.userData.targetX) continue;
+    for (const mesh of meshesRef.current.values()) {
+      if (mesh.userData.targetX == null) continue;
 
-      // Smooth interpolation to target position (lerp)
-      const lerpFactor = Math.min(delta * 5, 1); // 5 units/sec movement speed
-      mesh.position.x += (mesh.userData.targetX - mesh.position.x) * lerpFactor;
-      mesh.position.y += (mesh.userData.targetY - mesh.position.y) * lerpFactor;
-      mesh.position.z += (mesh.userData.targetZ - mesh.position.z) * lerpFactor;
-
-      // Walking animation: subtle bobbing effect
-      const bobAmount = Math.sin(timeRef.current * 4 + mesh.position.x) * 0.08;
-      mesh.position.y += bobAmount;
-
-      // Optional: subtle rotation while moving
-      mesh.rotation.y += 0.01;
+      const lerp = Math.min(delta * 4, 1);
+      mesh.position.x += (mesh.userData.targetX - mesh.position.x) * lerp;
+      mesh.position.y += (mesh.userData.targetY - mesh.position.y) * lerp;
+      mesh.position.z += (mesh.userData.targetZ - mesh.position.z) * lerp;
     }
   });
 
-  // Return mesh group that will be added to the scene
-  return <group ref={groupRef} name="occupancy-markers-3d-fiber" />;
+  return <group ref={groupRef} name="occupancy-markers-3d" />;
 };
 
 export default OccupancyMarkers3DFiber;

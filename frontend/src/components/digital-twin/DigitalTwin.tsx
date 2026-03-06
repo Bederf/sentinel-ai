@@ -558,14 +558,9 @@ export function DigitalTwin() {
               equipmentPositions={equipmentPositions}
             />
 
-            {/* Occupancy Markers - Phase 3: 3D people visualization */}
+            {/* Occupancy dots — subtle cyan spheres on floor surfaces */}
             {occupancyEnabled && people.length > 0 && (
-              <OccupancyMarkers3DFiber
-                people={people}
-                buildingWidth={12}
-                buildingDepth={8}
-                floorHeight={3.5}
-              />
+              <OccupancyMarkers3DFiber people={people} />
             )}
 
             {/* Controls */}
