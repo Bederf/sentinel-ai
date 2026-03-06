@@ -38,7 +38,7 @@ def _load_from_supabase() -> list[dict] | None:
         from app.database.supabase_client import get_supabase_client
 
         client = get_supabase_client()
-        result = client.table("sites").select("*").execute()
+        result = client.table("sites").select("*").order("code").execute()
         if result.data:
             return result.data
         # Empty table is a valid result — return empty list, not None
@@ -115,6 +115,23 @@ def get_primary_site() -> dict | None:
     """
     sites = get_registered_sites()
     return sites[0] if sites else None
+
+
+def get_primary_site_code() -> str | None:
+    """Return the site code of the first registered site, or None if empty.
+
+    Most callers need a string site code (e.g. 'site-002'), not the full dict.
+    Use this instead of ``get_primary_site()`` when you need a string.
+
+    Returns:
+        Site code string or None.
+    """
+    site = get_primary_site()
+    if site is None:
+        return None
+    if isinstance(site, dict):
+        return site.get("code")
+    return site
 
 
 async def require_any_site(

@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 from app.database.repositories.module_access_repository import get_module_access_repository
 from app.models.auth import ROLE_HIERARCHY, SentinelRole
 from app.services.device_abstraction import device_manager
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 def _default_site_id() -> str:
     """Resolve the default site from the registered building list."""
-    return get_primary_site() or "unknown"
+    return get_primary_site_code() or "unknown"
 
 
 # Data directory for building data
@@ -1238,23 +1238,33 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
         desk_num_padded = desk_num.zfill(3)
 
         # Query Supabase for desk
-        site_code = building or _default_site_id()
         client = get_supabase_client()
 
-        # Get building UUID
-        bld_resp = client.table("sites").select("id").eq("code", site_code).execute()
-        if not bld_resp.data:
-            return {
-                "success": False,
-                "error": f"Building {site_code} not found",
-                "prompt_user": f"Building '{site_code}' not found in the database.",
-            }
-        site_uuid = bld_resp.data[0]["id"]
-
-        # Find desk by padded ID
-        desk_resp = client.table("desks").select("*").eq("site_id", site_uuid).eq("desk_id", desk_num_padded).execute()
+        if building:
+            # Specific building requested — filter by site
+            bld_resp = client.table("sites").select("id").eq("code", building).execute()
+            if not bld_resp.data:
+                return {
+                    "success": False,
+                    "error": f"Building {building} not found",
+                    "prompt_user": f"Building '{building}' not found in the database.",
+                }
+            site_uuid = bld_resp.data[0]["id"]
+            desk_resp = (
+                client.table("desks").select("*").eq("site_id", site_uuid).eq("desk_id", desk_num_padded).execute()
+            )
+        else:
+            # No building specified — search across all sites
+            desk_resp = client.table("desks").select("*").eq("desk_id", desk_num_padded).limit(1).execute()
 
         desk = desk_resp.data[0] if desk_resp.data else None
+        site_uuid = desk.get("site_id") if desk else None
+
+        # Resolve site_code from the desk's site_id for zone lookups
+        site_code = building
+        if desk and not site_code and site_uuid:
+            code_resp = client.table("sites").select("code").eq("id", site_uuid).execute()
+            site_code = code_resp.data[0]["code"] if code_resp.data else _default_site_id()
 
         if not desk:
             # Show nearby desks from the same floor for guidance
@@ -1262,15 +1272,10 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
             floor_map = {"0": "L0", "1": "L1", "2": "L2", "3": "L3"}
             floor = floor_map.get(floor_prefix, "L0")
 
-            nearby_resp = (
-                client.table("desks")
-                .select("desk_id, zone_id")
-                .eq("site_id", site_uuid)
-                .eq("floor", floor)
-                .order("desk_id")
-                .limit(10)
-                .execute()
-            )
+            nearby_query = client.table("desks").select("desk_id, zone_id")
+            if site_uuid:
+                nearby_query = nearby_query.eq("site_id", site_uuid)
+            nearby_resp = nearby_query.eq("floor", floor).order("desk_id").limit(10).execute()
             nearby = [d["desk_id"] for d in (nearby_resp.data or [])]
 
             return {
@@ -1466,8 +1471,8 @@ async def diagnose_comfort_complaint(
         dali = desk_info.get("dali", {}) or {}
         desk = desk_info.get("desk", {}) or {}
 
-        # Get ALL equipment status for this zone
-        site_code = building or _default_site_id()
+        # Get ALL equipment status for this zone — use the site resolved from the desk
+        site_code = desk.get("building") or building or _default_site_id()
         zone_equip = await _get_zone_equipment_status(zone, site_code)
         equipment = zone_equip["equipment"]
         live = zone_equip["live_readings"]

@@ -129,6 +129,10 @@ class ComfortComplaintHandler:
             # Only map if not already mapped (first match wins)
             if number_only not in self._desk_id_map:
                 self._desk_id_map[number_only] = full_id
+            # Also map without leading zeros (e.g., "25" -> "025")
+            stripped = number_only.lstrip("0") or "0"
+            if stripped not in self._desk_id_map:
+                self._desk_id_map[stripped] = full_id
 
         # Map without hyphen (e.g., "L1225" -> "L12-25")
         no_hyphen = full_id.replace("-", "").lower()
@@ -163,6 +167,10 @@ class ComfortComplaintHandler:
             number = match.group(1)
             if number in self._desk_id_map:
                 return self._desk_id_map[number]
+            # Try zero-padded to 3 digits (user says "25", DB has "025")
+            padded = number.zfill(3)
+            if padded in self._desk_id_map:
+                return self._desk_id_map[padded]
 
         return None
 
