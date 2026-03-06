@@ -244,7 +244,7 @@ class PredictionGeneratorService:
         """Build evidence data for prediction."""
         health_score = equipment.get("health_score", 50)
 
-        return {
+        evidence = {
             "health_score": health_score,
             "health_trend": "declining" if health_score < 70 else "stable",
             "formula_version": FORMULA_VERSION_STATIC,
@@ -257,6 +257,19 @@ class PredictionGeneratorService:
                 "trend": "declining",
             },
         }
+
+        # Add asset age if install_date available
+        install_date = equipment.get("install_date")
+        if install_date:
+            try:
+                age = (
+                    datetime.now() - datetime.fromisoformat(install_date.replace("Z", "+00:00").replace("+00:00", ""))
+                ).days / 365.25
+                evidence["asset_age_years"] = round(age, 1)
+            except Exception:
+                pass
+
+        return evidence
 
     def _calculate_financial_impact(self, equipment_type: str, severity: str) -> Dict[str, int]:
         """Calculate estimated financial impact."""

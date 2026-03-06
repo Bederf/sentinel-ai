@@ -39,7 +39,7 @@ import {
   Shield,
   ClipboardList,
 } from "lucide-react";
-import api from '@/lib/api';
+import api, { createWorkOrder } from '@/lib/api';
 import type {
   Alert,
   Prediction,
@@ -288,6 +288,30 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   const handlePredictionClick = (prediction: Prediction) => {
     setSelectedPrediction(prediction);
     setIsPredictionDetailOpen(true);
+  };
+
+  const handleCreateWorkOrderFromPrediction = async (equipmentId: string, equipmentName: string) => {
+    if (!siteId) return;
+    try {
+      const pred = selectedPrediction;
+      const faultDesc = pred
+        ? `${equipmentName} — ${pred.prediction_type || "predicted failure"} (${pred.probability_percent}% probability)`
+        : `${equipmentName} — maintenance required`;
+      const diagnosis = pred?.recommended_action || `Predicted failure for ${equipmentName}`;
+      const priority = pred?.severity === "critical" ? "critical" as const : "high" as const;
+
+      const wo = await createWorkOrder({
+        site_id: siteId,
+        equipment_id: equipmentId,
+        fault_description: faultDesc,
+        diagnosis,
+        priority,
+      });
+      alert(`Work Order ${wo.id} created for ${equipmentName}`);
+    } catch (err) {
+      console.error("Failed to create work order:", err);
+      alert("Failed to create work order. Check console for details.");
+    }
   };
 
   // Handle click on equipment status badge (warning/critical) to open prediction detail
@@ -1636,6 +1660,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
             setIsPredictionDetailOpen(false);
             setSelectedPrediction(null);
           }}
+          onCreateWorkOrder={handleCreateWorkOrderFromPrediction}
         />
       )}
 

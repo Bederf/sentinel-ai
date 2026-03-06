@@ -15,6 +15,7 @@ from app.api import sites_3d, digital_twin
 from app.api import zone_ingestion, desks, documents
 from app.api import device_controls
 from app.api import occupancy_analytics, occupancy_energy_correlation
+from app.api import iaq
 
 
 def register_site_routers(app: FastAPI) -> None:
@@ -60,6 +61,9 @@ def register_site_routers(app: FastAPI) -> None:
 
     # Occupancy-energy correlation (wasted energy, "lights left on" cost impact)
     app.include_router(occupancy_energy_correlation.router, prefix="/api", tags=["occupancy-energy"])
+
+    # Indoor Air Quality intelligence (IAQ scores, alerts, WELL/ESG compliance)
+    app.include_router(iaq.router, prefix="/api", tags=["iaq"])
 
     # Building systems - Fire & Security
     app.include_router(fire.router, tags=["fire"])

@@ -190,6 +190,7 @@ backend/app/
   - Learning curve confidence 78%→92% over 12 months
   - Module-conditional logic (DALI rule only fires when module active)
   - System breakdown allocating savings to HVAC/Lighting/Power
+- **IAQ Intelligence** - Indoor air quality scoring per zone (CO2/humidity/temp/VOC/PM2.5 weighted composite), threshold alerts, WELL v2 and ESG compliance reports. Reads from existing HVAC zone telemetry.
 - **Agent Memory Service** - Persistent AI institutional knowledge
   - Building quirks, equipment notes, operator preferences, seasonal patterns, safety notes
   - Injected into Claude system prompts (both tool and non-tool paths) so AI doesn't re-discover known facts
@@ -682,3 +683,5 @@ flowchart TB
 - [Brick Ontology Layer](brick-ontology-layer.md) - Semantic building model for equipment/point/location relationships
 - [Hybrid Knowledge Layer](hybrid-knowledge-layer.md) - Context assembly combining RAG + asset graph + telemetry
 - [Drive Intake Pipeline](../05-integrations/drive-intake-pipeline.md) - MRI Evolution document ingestion via Google Drive
+- [IAQ Intelligence](../04-features/iaq-intelligence.md) - Indoor air quality scoring, alerts, and WELL/ESG compliance
+- [IAQ API](../03-api-reference/iaq-api.md) - IAQ zone scores, alerts, and compliance report endpoints
