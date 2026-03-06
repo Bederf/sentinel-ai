@@ -33,7 +33,7 @@ class GeneratorService:
         """Load mock generator data from JSON."""
         # Try building-specific data first (Sandton)
         data_paths = [
-            Path(__file__).parent.parent / "data" / "buildings" / "sandton" / "generators.json",
+            Path(__file__).parent.parent / "data" / "sites" / "sandton" / "generators.json",
             Path(__file__).parent.parent / "data" / "generators.json",
         ]
 

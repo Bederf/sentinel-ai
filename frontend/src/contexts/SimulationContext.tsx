@@ -142,32 +142,43 @@ export function SimulationProvider({ children, siteId }: SimulationProviderProps
     }
   }, [siteId])
 
-  // Poll every 25s for backend sync (1 simulated hour at 10min/day compression)
+  // Poll interval adapts to simulation speed:
+  // At 10x: poll every 10s. At 50x+: poll every 3s for responsive updates.
+  const pollMs = state.speedMultiplier >= 50 ? 3000
+    : state.speedMultiplier >= 20 ? 5000
+    : 10000
   useEffect(() => {
     refresh()
-    const interval = setInterval(refresh, 25000)
+    const interval = setInterval(refresh, pollMs)
     return () => clearInterval(interval)
-  }, [refresh])
+  }, [refresh, pollMs])
 
   // Smooth client-side interpolation: advance displayed time every second
   // between backend polls so the clock ticks smoothly instead of jumping.
-  // Compression: 1 day = 10 real minutes → 1 hour = 25s → ~2.4 sim-minutes/real-second
-  const SIM_MINUTES_PER_TICK = 2.4
+  // Rate adapts to speed: sim-minutes per tick = 60 / secondsPerHour
   const lastPollHourRef = useRef<number>(0)
 
   useEffect(() => {
     lastPollHourRef.current = state.simulatedHour
   }, [state.lastUpdated]) // only reset on actual backend poll
 
+  const secondsPerHour = state.secondsPerHour
   useEffect(() => {
     if (!state.running || state.paused) return
+
+    // Calculate sim-minutes per real second based on backend speed
+    // secondsPerHour = real seconds per simulated hour
+    // At 10x: secondsPerHour=6 → 60/6 = 10 sim-min/s (cap to prevent overshoot)
+    // At 50x: secondsPerHour=1.2 → 60/1.2 = 50 sim-min/s
+    const sph = secondsPerHour > 0 ? secondsPerHour : 6
+    const simMinPerTick = Math.min(60 / sph, 30) // cap at 30 min/tick to prevent big jumps
 
     const ticker = setInterval(() => {
       setState(prev => {
         if (!prev.running || prev.paused) return prev
         try {
           const t = new Date(prev.simulatedTime)
-          t.setMinutes(t.getMinutes() + Math.round(SIM_MINUTES_PER_TICK))
+          t.setMinutes(t.getMinutes() + Math.round(simMinPerTick))
           const newHour = t.getHours()
           // If hour wrapped past 23→0, let the backend poll handle the day increment
           if (newHour < prev.simulatedHour && prev.simulatedHour >= 22) return prev
@@ -183,7 +194,7 @@ export function SimulationProvider({ children, siteId }: SimulationProviderProps
     }, 1000)
 
     return () => clearInterval(ticker)
-  }, [state.running, state.paused])
+  }, [state.running, state.paused, secondsPerHour])
 
   return (
     <SimulationContext.Provider value={{ state, refresh }}>

@@ -204,21 +204,20 @@ async def startup_event(app: FastAPI) -> None:
     # NOTE: Fake audit data generator removed — audit trail must only contain
     # real control actions, not synthetic noise.
 
-    # Start AI optimization analysis job (runs every 15 minutes)
-    # Scans all sites with optimization_enabled=true and generates recommendations
-    # When a recommendation is generated, the flashing lightbulb appears on dashboard
-    scheduler_service.add_optimization_analysis_job(interval_seconds=900)  # 15 minutes
+    # --- Sim-time-gated AI jobs ---
+    # Jobs poll every 30 real seconds but only execute when enough *simulated*
+    # time has elapsed (default: 4 sim-hours).  When no simulation is running,
+    # they fall back to the real-time interval passed here.
+    # At 10x sim speed: 4 sim-hours = 24 real seconds → fires ~6× per sim-day.
 
-    # Start prediction generation job (runs every 5 minutes)
-    # Scans equipment health scores and creates predictions for at-risk equipment
-    # When equipment health drops below 90%, a prediction is auto-generated
-    scheduler_service.add_prediction_generation_job(interval_seconds=300)  # 5 minutes
+    # Start AI optimization analysis job (LLM-driven, sim-time gated)
+    scheduler_service.add_optimization_analysis_job(interval_seconds=900)  # 15 min real-time fallback
 
-    # Start AI recommendation generation job (runs every 10 minutes, or 2 minutes in DEMO_MODE)
-    # Scans ALL equipment and generates recommendations:
-    # - Healthy equipment (>=90%): Optimization & preventive maintenance
-    # - At-risk equipment (<90%): Maintenance & repair recommendations
-    scheduler_service.add_recommendation_generation_job(interval_seconds=settings.recommendation_interval)
+    # Start prediction generation job (no LLM, can run more often)
+    scheduler_service.add_prediction_generation_job(interval_seconds=300)  # 5 min
+
+    # Start AI recommendation generation job (rule-based, sim-time gated)
+    scheduler_service.add_recommendation_generation_job(interval_seconds=600)  # 10 min real-time fallback
 
     # Start integration sync job (runs every 15 minutes)
     # Updates last_sync_at on all active log sources so System Health dashboard stays fresh
@@ -598,6 +597,16 @@ async def startup_event(app: FastAPI) -> None:
 
     # Error auto-resolution job (daily) - resolves errors if component healthy for 24+ hours
     scheduler_service.add_error_auto_resolve_job(interval_seconds=86400)
+
+    # Event Intelligence evaluation (every 2 minutes)
+    # Converts raw telemetry into structured operational events (temp deviations,
+    # energy spikes, sensor failures, comfort violations, ML anomalies).
+    # Read-only: detects conditions and emits to event bus. No control actions.
+    try:
+        scheduler_service.add_event_intelligence_job(interval_seconds=120)
+        _logger.info("Event intelligence job initialized (2 min interval)")
+    except Exception as e:
+        _logger.warning(f"Event intelligence job initialization failed: {e}")
 
     # BMS simulation service - DISABLED for demo stability
     # try:

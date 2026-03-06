@@ -1,7 +1,7 @@
 [
   {
     "id": "36b71ffa-82ed-4a5f-aa46-14a1536bd1e6",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "technician_id": "8218b69d-62ab-4531-808f-478ffdb0c3e5",
     "specialty": "hvac",
     "is_primary": true,
@@ -9,7 +9,7 @@
   },
   {
     "id": "589bff06-ef82-4e40-96ce-d7fd6e0ce05e",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "technician_id": "8218b69d-62ab-4531-808f-478ffdb0c3e5",
     "specialty": "plumbing",
     "is_primary": true,
@@ -17,7 +17,7 @@
   },
   {
     "id": "9fb30a25-6b62-413a-8a02-d985c3e36105",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "technician_id": "8218b69d-62ab-4531-808f-478ffdb0c3e5",
     "specialty": "dali",
     "is_primary": true,
@@ -25,7 +25,7 @@
   },
   {
     "id": "abee68ba-3144-4f74-ae65-5bbf451735fb",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "technician_id": "8218b69d-62ab-4531-808f-478ffdb0c3e5",
     "specialty": "general",
     "is_primary": true,
@@ -33,7 +33,7 @@
   },
   {
     "id": "bee08cf7-51fa-4ac3-bdf3-e9c211ba0a57",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "technician_id": "8218b69d-62ab-4531-808f-478ffdb0c3e5",
     "specialty": "electrical",
     "is_primary": true,
@@ -41,7 +41,7 @@
   },
   {
     "id": "e462f782-b333-4b54-adb9-82dabe644326",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "technician_id": "8218b69d-62ab-4531-808f-478ffdb0c3e5",
     "specialty": "security",
     "is_primary": true,
@@ -49,7 +49,7 @@
   },
   {
     "id": "eb8ada43-2c81-44df-aab2-a849bc3a7f48",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "technician_id": "8218b69d-62ab-4531-808f-478ffdb0c3e5",
     "specialty": "fire",
     "is_primary": true,

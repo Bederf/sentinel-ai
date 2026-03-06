@@ -134,9 +134,7 @@ async def create_repair_work_order_from_inspection(
         raise HTTPException(status_code=404, detail="Inspection WO not found")
 
     # Get equipment
-    equipment = (
-        client.table("equipment").select("id, code, name, building_id").eq("code", body.equipment_code).execute()
-    )
+    equipment = client.table("equipment").select("id, code, name, site_id").eq("code", body.equipment_code).execute()
 
     if not equipment.data:
         raise HTTPException(status_code=404, detail="Equipment not found")
@@ -161,7 +159,7 @@ async def create_repair_work_order_from_inspection(
     repair_wo_data = {
         "id": repair_wo_id,
         "equipment_id": eq["id"],
-        "building_id": eq.get("building_id"),
+        "site_id": eq.get("site_id"),
         "status": "assigned",
         "priority": body.priority,
         "work_order_type": "maintenance",

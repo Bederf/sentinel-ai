@@ -81,7 +81,7 @@ class EquipmentDataQuality(BaseModel):
 
     equipment_id: str = Field(..., description="Equipment identifier")
     equipment_type: str = Field(..., description="Equipment type (chiller, ahu, generator)")
-    building_id: str = Field(default="", description="Building this equipment belongs to")
+    site_id: str = Field(default="", description="Building this equipment belongs to")
     overall_quality: DataQualityLevel = Field(default=DataQualityLevel.POOR, description="Overall data quality level")
     quality_score: float = Field(default=0.0, ge=0.0, le=100.0, description="Quality score (0-100)")
     sensor_health: List[SensorHealth] = Field(default_factory=list, description="Health metrics per sensor")
@@ -150,8 +150,8 @@ class BuildingDataQualityReport(BaseModel):
     for daily monitoring and reporting.
     """
 
-    building_id: str = Field(..., description="Building identifier")
-    building_name: str = Field(default="", description="Building name")
+    site_id: str = Field(..., description="Building identifier")
+    site_name: str = Field(default="", description="Building name")
     report_date: datetime = Field(default_factory=datetime.utcnow, description="Report generation date")
     equipment_count: int = Field(default=0, ge=0, description="Number of equipment")
     overall_quality: DataQualityLevel = Field(default=DataQualityLevel.POOR, description="Building-wide quality level")

@@ -243,7 +243,7 @@ class SolarSelfConsumptionService:
         return max(0, gen * random.uniform(0.93, 1.07))
 
     @staticmethod
-    def _building_load_kw(hour: float) -> float:
+    def _site_load_kw(hour: float) -> float:
         """Simulate Site-002 building load profile."""
         if hour < 5:
             return 1200 + random.uniform(-30, 30)
@@ -293,7 +293,7 @@ class SolarSelfConsumptionService:
             hour = sast_t.hour + sast_t.minute / 60.0
 
             solar_kw = self._solar_generation_kw(hour)
-            load_kw = self._building_load_kw(hour)
+            load_kw = self._site_load_kw(hour)
 
             solar_kwh = solar_kw * interval_hours
             load_kwh = load_kw * interval_hours
@@ -446,7 +446,7 @@ class SolarSelfConsumptionService:
         hour = sast.hour + sast.minute / 60.0
 
         solar_kw = self._solar_generation_kw(hour)
-        load_kw = self._building_load_kw(hour)
+        load_kw = self._site_load_kw(hour)
 
         # Net export = solar - load (if positive, we're exporting)
         net = solar_kw - load_kw
@@ -490,7 +490,7 @@ class SolarSelfConsumptionService:
         hour = sast.hour + sast.minute / 60.0
 
         solar_kw = self._solar_generation_kw(hour)
-        load_kw = self._building_load_kw(hour)
+        load_kw = self._site_load_kw(hour)
         excess = max(0, solar_kw - load_kw)
 
         plan_items: List[Dict[str, Any]] = []
@@ -552,7 +552,7 @@ class SolarSelfConsumptionService:
                 plan_items.append(
                     {
                         "priority": 2,
-                        "action": "increase_building_load",
+                        "action": "increase_site_load",
                         "power_kw": round(deferrable_load, 0),
                         "note": "Bring forward deferrable loads: pre-cooling, UPS charging, hot water",
                     }

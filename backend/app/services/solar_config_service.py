@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 _DATA_DIR = Path(__file__).parent.parent / "data"
 _SOLAR_DIR = _DATA_DIR / "solar"
 _TARIFF_DIR = _SOLAR_DIR / "tariffs"
-_BUILDINGS_DIR = _DATA_DIR / "buildings"
+_SITES_DIR = _DATA_DIR / "sites"
 
 
 @dataclass(frozen=True)
@@ -219,7 +219,7 @@ def _load_site_config(site_id: str) -> SiteConfig:
             logger.warning("Using deprecated city_power_2026.json — migrate to city_power_2025_26.json")
 
     # 4. Energy centre fallback for NMD
-    energy_centre = _load_json(_BUILDINGS_DIR / site_id / "energy_centre.json") or {}
+    energy_centre = _load_json(_SITES_DIR / site_id / "energy_centre.json") or {}
 
     # Build BESS config
     bess_data = solar_cfg.get("bess", {})

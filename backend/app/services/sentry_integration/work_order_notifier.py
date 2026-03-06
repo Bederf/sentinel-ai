@@ -11,9 +11,7 @@ import json
 import os
 from typing import Dict, Any, Optional
 from datetime import datetime
-import httpx
 
-from app.config.settings import settings
 from app.database.repositories.service_record_repository import ServiceRecordRepository
 from app.database.repositories.work_order_repository import get_work_order_repository
 from app.services.ml_template_service import MLTemplateService
@@ -40,6 +38,120 @@ class WorkOrderNotifier:
             return ""
         text = str(value).strip()
         return text.replace("\\n", "\n")
+
+    @staticmethod
+    def _resolve_equipment(equipment_id: str, equipment_name: str = "") -> Optional[Dict[str, Any]]:
+        """Look up equipment by UUID or code for email body enrichment."""
+        if not equipment_id:
+            return None
+        try:
+            import re
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            is_uuid = bool(
+                re.match(
+                    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                    equipment_id,
+                    re.IGNORECASE,
+                )
+            )
+            field = "id" if is_uuid else "code"
+            resp = sb.table("equipment").select("id,code,name,type").eq(field, equipment_id).execute()
+            if resp.data:
+                return resp.data[0]
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def _resolve_site(site_id: str) -> Optional[Dict[str, Any]]:
+        """Look up site by UUID or code for email body enrichment."""
+        if not site_id:
+            return None
+        try:
+            import re
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            is_uuid = bool(
+                re.match(
+                    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                    site_id,
+                    re.IGNORECASE,
+                )
+            )
+            field = "id" if is_uuid else "code"
+            resp = sb.table("sites").select("id,code,name").eq(field, site_id).execute()
+            if resp.data:
+                return resp.data[0]
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def _get_inspection_checklist(equipment_type: str) -> str:
+        """Get the inspection checklist for an equipment type as plain text for email.
+
+        Returns formatted checklist string, or empty string if no checklist exists.
+        """
+        if not equipment_type or equipment_type == "n/a":
+            return ""
+        try:
+            from app.services.checklist_service import get_checklist_service
+
+            svc = get_checklist_service()
+            template = svc.get_template_for_inspection(equipment_type.lower(), "routine")
+            if not template:
+                return ""
+
+            items = template.get("checklist_items", [])
+            name = template.get("template_name", f"{equipment_type.upper()} Inspection")
+            duration = template.get("estimated_duration_minutes", 30)
+
+            lines = [f"{name} (est. {duration} min)", ""]
+            current_category = None
+
+            for item in items:
+                cat = item.get("category", "General")
+                if cat != current_category:
+                    current_category = cat
+                    lines.append(f"  {cat}:")
+
+                q = item.get("question") or item.get("description") or ""
+                if not q:
+                    continue
+                item_type = item.get("item_type", "")
+                options = item.get("options", [])
+                method = item.get("method", "")
+                acceptance = item.get("acceptance_criteria", "")
+
+                if item_type == "measurement":
+                    unit = item.get("unit", "")
+                    tmin = item.get("tolerance_min")
+                    tmax = item.get("tolerance_max")
+                    tol = f" (acceptable: {tmin}-{tmax} {unit})" if tmin is not None else ""
+                    lines.append(f"    [ ] {q}{tol}")
+                elif options:
+                    opts_str = " / ".join(o.get("label", "") for o in options)
+                    lines.append(f"    [ ] {q} ({opts_str})")
+                elif acceptance:
+                    lines.append(f"    [ ] {q}")
+                    lines.append(f"         Criteria: {acceptance}")
+                else:
+                    lines.append(f"    [ ] {q}")
+
+                if method and method != "visual_inspection":
+                    lines.append(f"         Method: {method.replace('_', ' ')}")
+
+                photos = item.get("photos_required") or ("photo" in (item.get("recording_required") or []))
+                if photos:
+                    lines.append("         ^ Photo required")
+
+            return "\n".join(lines)
+        except Exception as e:
+            logger.warning(f"Could not load checklist for {equipment_type}: {e}")
+            return ""
 
     async def _load_work_order_context(self, work_order_id: str) -> Dict[str, Any]:
         """Load work order context from repository using ID or code."""
@@ -80,8 +192,25 @@ class WorkOrderNotifier:
     ) -> str:
         """Build full-detail email body for technician execution."""
         equipment_obj = work_order.get("equipment") or {}
-        building_obj = work_order.get("buildings") or {}
+        site_obj = work_order.get("sites") or {}
         diagnostic_context = work_order_data.get("diagnostic_context") or service_record.get("diagnostic_context") or {}
+
+        # Resolve equipment/site from Supabase if not joined in work_order
+        if not equipment_obj.get("code"):
+            equipment_obj = (
+                self._resolve_equipment(
+                    work_order_data.get("equipment_id", ""),
+                    work_order_data.get("equipment_name", ""),
+                )
+                or equipment_obj
+            )
+        if not site_obj.get("name"):
+            site_obj = (
+                self._resolve_site(
+                    work_order_data.get("site_id", ""),
+                )
+                or site_obj
+            )
 
         wo_ref = (
             work_order.get("code")
@@ -90,15 +219,10 @@ class WorkOrderNotifier:
             or "N/A"
         )
         equipment_name = work_order_data.get("equipment_name") or equipment_obj.get("name") or "Unknown Equipment"
-        equipment_code = (
-            equipment_obj.get("code")
-            or work_order_data.get("equipment_code")
-            or work_order_data.get("equipment_id")
-            or "N/A"
-        )
-        equipment_type = equipment_obj.get("type") or work_order_data.get("equipment_type") or "N/A"
-        building_name = building_obj.get("name") or work_order_data.get("building_name") or "N/A"
-        building_code = building_obj.get("code") or work_order_data.get("building_code") or "N/A"
+        equipment_code = equipment_obj.get("code") or work_order_data.get("equipment_code") or "N/A"
+        equipment_type = (equipment_obj.get("type") or work_order_data.get("equipment_type") or "N/A").upper()
+        site_name = site_obj.get("name") or work_order_data.get("site_name") or "N/A"
+        site_code = site_obj.get("code") or work_order_data.get("site_code") or "N/A"
         priority = str(work_order_data.get("criticality") or work_order.get("priority") or "MEDIUM").upper()
         service_type = str(work_order_data.get("service_type") or "callout").lower()
         technician_name = work_order_data.get("technician_name", "Technician")
@@ -134,7 +258,7 @@ class WorkOrderNotifier:
             f"- Service Type: {service_type}",
             "",
             "EQUIPMENT & SITE",
-            f"- Site: {building_name} ({building_code})",
+            f"- Site: {site_name} ({site_code})",
             f"- Equipment: {equipment_name}",
             f"- Equipment Code: {equipment_code}",
             f"- Equipment Type: {equipment_type}",
@@ -154,14 +278,13 @@ class WorkOrderNotifier:
                 ]
             )
 
-        if instructions:
-            lines.extend(
-                [
-                    "",
-                    "FIELD INSTRUCTIONS",
-                    instructions,
-                ]
-            )
+        # Load equipment-specific inspection checklist
+        checklist_text = self._get_inspection_checklist(equipment_type.lower())
+
+        if checklist_text:
+            lines.extend(["", "INSPECTION CHECKLIST", checklist_text])
+        elif instructions:
+            lines.extend(["", "FIELD INSTRUCTIONS", instructions])
         else:
             lines.extend(
                 [
@@ -171,17 +294,30 @@ class WorkOrderNotifier:
                     "2. Inspect the faulted subsystem and capture photos/readings.",
                     "3. Run diagnostics and record measured values.",
                     "4. Identify likely root cause and required corrective action.",
-                    "5. Reply DONE on Telegram to submit structured findings.",
                 ]
+            )
+
+        # Telegram equipment code for commands (dashes → underscores)
+        tg_code = equipment_code.replace("-", "_") if equipment_code != "N/A" else ""
+        tg_commands = ""
+        if tg_code:
+            tg_commands = (
+                f"\nTELEGRAM COMMANDS\n"
+                f"  /info_{tg_code} — Equipment status & readings\n"
+                f"  /note_{tg_code} — Add a note during inspection\n"
+                f"  done #{wo_ref} — Submit inspection findings"
             )
 
         lines.extend(
             [
                 "",
-                "NEXT STEPS",
-                "1. Perform inspection and diagnostics per instructions.",
-                "2. Capture required photos/audio/readings for the service record.",
-                "3. Reply DONE on Telegram to start structured item-by-item feedback capture.",
+                "HOW TO REPORT",
+                "When you have completed the inspection, open Telegram and type:",
+                f"  done #{wo_ref}",
+                "",
+                "Sentry will guide you through each checklist item one at a time.",
+                "Your answers are saved to the service record automatically.",
+                tg_commands,
                 "",
                 "---",
                 "SENTINEL BMS Intelligence / Sentry",
@@ -235,12 +371,49 @@ class WorkOrderNotifier:
             logger.warning("Exception in gmail_helper fallback: %s", e)
             return False
 
+    async def _send_email_via_native_smtp(
+        self, to_email: str, subject: str, body: str, technician_name: str = "Technician"
+    ) -> bool:
+        """Send email via native SMTP (aiosmtplib) using configured SMTP settings.
+
+        Uses workorder@sentinel-ai.co.za (or whatever is in notification_smtp_* settings).
+        This is the preferred fallback when the Sentry /send-email endpoint is unavailable.
+        """
+        if not to_email or "@" not in to_email:
+            return False
+
+        try:
+            from app.services.email_reply_service import get_email_reply_service
+
+            service = get_email_reply_service()
+            if not service.is_configured():
+                logger.info("Native SMTP not configured — skipping")
+                return False
+
+            result = await service.send_reply(
+                to_email=to_email,
+                to_name=technician_name,
+                subject=subject,
+                body_plain=body,
+                body_html=None,
+            )
+
+            if result.sent:
+                logger.warning("[WO-NOTIFY] Email sent via SMTP to %s", to_email)
+                return True
+            else:
+                logger.warning("[WO-NOTIFY] SMTP failed: %s", result.error)
+                return False
+        except Exception as e:
+            logger.warning("Exception in native SMTP email: %s", e)
+            return False
+
     async def notify_technician_with_code(self, work_order_data: Dict[str, Any]) -> Dict[str, Any]:
         """Notify technician via BOTH email and Telegram.
 
         Creates a service record for the work order and sends notifications via:
         1. Telegram via Sentry bot (instant messaging)
-        2. Email via Sentry Gmail API (documentation + record)
+        2. Email via native SMTP (workorder@sentinel-ai.co.za)
 
         Returns:
             Dict with success status and service_record_code
@@ -252,17 +425,36 @@ class WorkOrderNotifier:
             if not service_record:
                 return {"success": False, "error": "Failed to create service record"}
 
-            logger.info(
-                f"Service record created: {service_record['code']} for equipment {work_order_data['equipment_name']}"
+            logger.warning(
+                f"[WO-NOTIFY] Service record {service_record['code']} created for {work_order_data['equipment_name']}"
             )
+
+            # Ensure technician email is available (look up if not passed)
+            if not work_order_data.get("technician_email"):
+                try:
+                    from app.database.repositories.technician_repository import get_technician_repository
+
+                    tech_repo = get_technician_repository()
+                    tech_name = work_order_data.get("technician_name", "")
+                    all_techs = await tech_repo.get_all_technicians(active_only=True)
+                    needle = tech_name.strip().lower()
+                    matched = next(
+                        (t for t in all_techs if t.get("name", "").lower() == needle),
+                        None,
+                    )
+                    if matched and matched.get("email"):
+                        work_order_data["technician_email"] = matched["email"]
+                        logger.warning(f"[WO-NOTIFY] Resolved email for {tech_name}: {matched['email']}")
+                except Exception as e:
+                    logger.warning(f"Could not look up technician email: {e}")
 
             # Send Telegram notification (Sentry will poll /api/sentry/work-order/pending)
             telegram_sent = await self._send_telegram_notification(work_order_data, service_record)
 
-            # Send Email notification via Sentry Gmail API
+            # Send Email notification via native SMTP
             email_sent = await self._send_email_notification(work_order_data, service_record)
 
-            logger.info(f"Notifications sent - Telegram: {telegram_sent}, Email: {email_sent}")
+            logger.warning(f"[WO-NOTIFY] Notifications sent — Telegram: {telegram_sent}, Email: {email_sent}")
 
             return {
                 "success": True,
@@ -292,17 +484,13 @@ class WorkOrderNotifier:
             return False
 
     async def _send_email_notification(self, work_order_data: Dict[str, Any], service_record: Dict[str, Any]) -> bool:
-        """Send email notification via Sentry Gmail API.
-
-        Calls Sentry bot's email endpoint to send work order details via Gmail.
-        """
+        """Send email notification to technician via native SMTP (workorder@sentinel-ai.co.za)."""
         try:
             work_order = await self._load_work_order_context(work_order_data.get("work_order_id", ""))
 
             technician_id = work_order_data.get("technician_id", "")
             technician_email = work_order_data.get("technician_email")
 
-            # In this environment technician_id is commonly an email address.
             recipient = technician_email or technician_id
             if "@" not in str(recipient):
                 logger.warning("No valid recipient email for work order %s", work_order_data.get("work_order_id"))
@@ -310,41 +498,18 @@ class WorkOrderNotifier:
 
             email_subject = self._build_email_subject(work_order_data, work_order)
             email_body = self._build_email_body(work_order_data, service_record, work_order)
+            technician_name = work_order_data.get("technician_name", "Technician")
 
-            # Call Sentry bot email endpoint
-            sentry_secret = (settings.sentry_webhook_secret or "").strip()
-            headers = {"X-Sentry-Secret": sentry_secret} if sentry_secret else {}
-            async with httpx.AsyncClient(timeout=10) as client:
-                response = await client.post(
-                    f"{self.sentry_api_url}/send-email",  # Sentry email endpoint
-                    json={
-                        "to": recipient,
-                        "subject": email_subject,
-                        "body": email_body,
-                        "service_record_code": service_record.get("code", ""),
-                        "work_order_id": work_order_data.get("work_order_id", ""),
-                    },
-                    headers=headers,
-                )
-
-                if response.status_code == 200:
-                    logger.info("Email notification sent via Sentry for %s", service_record.get("code", ""))
-                    return True
-                else:
-                    logger.warning("Failed to send email via Sentry: %s", response.text)
-                    return await self._send_email_via_local_gmail_helper(
-                        to_email=recipient,
-                        subject=email_subject,
-                        body=email_body,
-                    )
+            return await self._send_email_via_native_smtp(
+                to_email=recipient,
+                subject=email_subject,
+                body=email_body,
+                technician_name=technician_name,
+            )
 
         except Exception as e:
-            logger.warning("Failed to send email notification via Sentry: %s", e)
-            return await self._send_email_via_local_gmail_helper(
-                to_email=recipient if "recipient" in locals() else "",
-                subject=email_subject if "email_subject" in locals() else "Work Order Notification",
-                body=email_body if "email_body" in locals() else "Work order notification.",
-            )
+            logger.warning("Failed to send WO email notification: %s", e)
+            return False
 
     async def notify_technician(self, work_order_data: Dict[str, Any]) -> bool:
         """Notify technician about new work order via Sentry.
@@ -356,7 +521,7 @@ class WorkOrderNotifier:
             work_order_data: Work order information including:
                 - work_order_id: UUID
                 - equipment_id: Equipment UUID
-                - building_id: Building UUID
+                - site_id: Building UUID
                 - equipment_name: Display name
                 - criticality: HIGH/MEDIUM/LOW
                 - service_type: minor/major/breakdown/callout
@@ -409,7 +574,7 @@ class WorkOrderNotifier:
             "code": code,
             "work_order_id": work_order_data["work_order_id"],
             "equipment_id": work_order_data["equipment_id"],
-            "building_id": work_order_data["building_id"],
+            "site_id": work_order_data["site_id"],
             "service_type": work_order_data["service_type"],
             "technician_id": work_order_data["technician_id"],
             "technician_name": work_order_data["technician_name"],

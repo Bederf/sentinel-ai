@@ -15,7 +15,7 @@ interface FormatDetectionResult {
 }
 
 interface ColumnMappingStepProps {
-  buildingId: string;
+  siteId: string;
   formatDetection: FormatDetectionResult;
   onNext: (data: { columnMappings: ColumnMapping[] }) => void;
   onBack: () => void;
@@ -41,7 +41,7 @@ const TRANSFORM_TYPES = [
   { value: 'boolean_parse', label: 'Parse Boolean' }
 ];
 
-export function ColumnMappingStep({ buildingId: _buildingId, formatDetection, onNext, onBack }: ColumnMappingStepProps) {
+export function ColumnMappingStep({ siteId: _siteId, formatDetection, onNext, onBack }: ColumnMappingStepProps) {
   const [mappings, setMappings] = useState<Record<string, { target_field: string; transform_type: string }>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

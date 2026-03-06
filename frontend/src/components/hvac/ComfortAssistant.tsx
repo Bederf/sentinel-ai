@@ -91,7 +91,7 @@ export function ComfortAssistant({ compact = true, onViewDetails }: ComfortAssis
     <div className="space-y-4">
       {compact && (
         <Flex justifyContent="between" alignItems="center">
-          <Title>Comfort Assistant</Title>
+          <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Comfort Assistant</h3>
           <Button
             size="xs"
             variant="secondary"

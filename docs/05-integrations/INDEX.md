@@ -324,3 +324,13 @@ For questions:
 - **Covers**: Goals, workflows, tools, data sources, complaint types, AI tier system, context/memory, events/state, error handling, metrics, open questions
 
 See also: [AI Recommendation Agent Spec](../08-ai-ml/ai-recommendation-agent-spec.md) for the backend PARASITE autonomous recommendation system.
+
+---
+
+## Document Intake & Knowledge Pipeline
+
+### [Google Drive Intake Pipeline](drive-intake-pipeline.md)
+- **Status**: Planned
+- **Audience**: Developers, integrators
+- **Covers**: MRI Concept Evolution -> Google Drive -> SENTINEL RAG pipeline, gws CLI integration, Thorium security scanning, document classification, folder ACL mapping
+- **Related**: [Hybrid Knowledge Layer](../02-architecture/hybrid-knowledge-layer.md), [Brick Ontology Layer](../02-architecture/brick-ontology-layer.md)

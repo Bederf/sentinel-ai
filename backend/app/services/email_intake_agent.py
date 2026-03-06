@@ -185,8 +185,8 @@ class EmailIntakeAgent:
         bms_section = ""
         if bms_context:
             parts: list[str] = []
-            if bms_context.get("building_name"):
-                parts.append(f"Building: {bms_context['building_name']}")
+            if bms_context.get("site_name"):
+                parts.append(f"Building: {bms_context['site_name']}")
             alerts = bms_context.get("active_alerts", [])
             if alerts:
                 alert_lines = [f"  - [{a.get('severity', 'info').upper()}] {a.get('message', '')}" for a in alerts[:5]]

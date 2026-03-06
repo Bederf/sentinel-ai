@@ -32,7 +32,7 @@ class EquipmentAlertService:
     def create_alert_for_equipment(
         self,
         equipment_id: str,
-        building_id: str,
+        site_id: str,
         severity: str,
         message: str,
         alert_type: str = "health_degradation",
@@ -43,7 +43,7 @@ class EquipmentAlertService:
 
         Args:
             equipment_id: Equipment UUID
-            building_id: Building UUID
+            site_id: Building UUID
             severity: Alert severity (critical, warning, info)
             message: Alert message
             alert_type: Type of alert (default: health_degradation)
@@ -58,12 +58,12 @@ class EquipmentAlertService:
             return {"error": f"Equipment {equipment_id} not found"}
 
         # Resolve building to UUID (accepts UUID or site/building code)
-        building = self._get_building(building_id)
-        if not building and equipment.get("building_id"):
-            building = self._get_building(str(equipment.get("building_id")))
+        building = self._get_site(site_id)
+        if not building and equipment.get("site_id"):
+            building = self._get_site(str(equipment.get("site_id")))
 
-        resolved_building_id = building.get("id") if building else equipment.get("building_id", building_id)
-        building_name = building.get("name", "Unknown") if building else "Unknown"
+        resolved_site_id = building.get("id") if building else equipment.get("site_id", site_id)
+        site_name = building.get("name", "Unknown") if building else "Unknown"
 
         # Use equipment code as primary identifier
         resolved_equipment_id = equipment.get("id", equipment_id)
@@ -74,7 +74,7 @@ class EquipmentAlertService:
         alert_id = str(uuid.uuid4())
         alert_data = {
             "id": alert_id,
-            "building_id": resolved_building_id,
+            "site_id": resolved_site_id,
             "equipment_id": resolved_equipment_id,
             "type": alert_type,
             "severity": severity,
@@ -96,7 +96,7 @@ class EquipmentAlertService:
         if notify_telegram:
             sentry_alert = {
                 "id": alert_id,
-                "building_name": building_name,
+                "site_name": site_name,
                 "zone_name": equipment.get("zone_name", "Unknown"),
                 "equipment_name": equipment.get("display_name", equipment.get("name", "Unknown")),
                 "equipment_code": equipment.get("code", ""),
@@ -117,25 +117,42 @@ class EquipmentAlertService:
             "equipment_code": equipment_code,
             "equipment_name": equipment.get("name"),
             "equipment_type": equipment_type,
-            "building_name": building_name,
+            "site_name": site_name,
         }
 
     def _get_equipment(self, equipment_id: str) -> dict[str, Any] | None:
         """Get equipment by UUID or code."""
         try:
-            response = (
-                self.supabase.table("equipment")
-                .select("id, code, name, type, health_score, building_id")
-                .eq("id", equipment_id)
-                .execute()
+            # Try code first if it doesn't look like a UUID (avoids Postgres type error)
+            is_uuid = bool(
+                re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", equipment_id, re.IGNORECASE)
             )
-            if not response.data:
+
+            if is_uuid:
                 response = (
                     self.supabase.table("equipment")
-                    .select("id, code, name, type, health_score, building_id")
+                    .select("id, code, name, type, health_score, site_id")
+                    .eq("id", equipment_id)
+                    .execute()
+                )
+            else:
+                response = (
+                    self.supabase.table("equipment")
+                    .select("id, code, name, type, health_score, site_id")
                     .eq("code", equipment_id)
                     .execute()
                 )
+
+            # Fallback: try the other field
+            if not response.data:
+                fallback_field = "code" if is_uuid else "id"
+                response = (
+                    self.supabase.table("equipment")
+                    .select("id, code, name, type, health_score, site_id")
+                    .eq(fallback_field, equipment_id)
+                    .execute()
+                )
+
             if not response.data:
                 return None
             equipment = response.data[0]
@@ -180,31 +197,37 @@ class EquipmentAlertService:
             logger.warning(f"Zone lookup failed for {equipment_code}: {e}")
             return "Unknown"
 
-    def _get_building(self, building_id: str) -> dict[str, Any] | None:
+    def _get_site(self, site_id: str) -> dict[str, Any] | None:
         """Get building by UUID or building/site code."""
         try:
-            response = self.supabase.table("buildings").select("id, code, name").eq("id", building_id).execute()
+            is_uuid = bool(
+                re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", site_id, re.IGNORECASE)
+            )
+            field = "id" if is_uuid else "code"
+            response = self.supabase.table("sites").select("id, code, name").eq(field, site_id).execute()
             if response.data:
                 return response.data[0]
-            response = self.supabase.table("buildings").select("id, code, name").eq("code", building_id).execute()
+            # Fallback: try the other field
+            fallback_field = "code" if is_uuid else "id"
+            response = self.supabase.table("sites").select("id, code, name").eq(fallback_field, site_id).execute()
             return response.data[0] if response.data else None
         except Exception as e:
             logger.error(f"Failed to get building: {e}")
             return None
 
-    def resolve_alerts_for_building(self, building_id: str) -> int:
+    def resolve_alerts_for_site(self, site_id: str) -> int:
         """
         Resolve all active alerts for a building.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
 
         Returns:
             Number of alerts resolved
         """
         try:
             # Get active alerts for building
-            active_alerts = self.alert_repo.get_active_by_building(building_id)
+            active_alerts = self.alert_repo.get_active_by_site(site_id)
 
             resolved_count = 0
             for alert in active_alerts:
@@ -212,7 +235,7 @@ class EquipmentAlertService:
                 resolved_count += 1
 
             if resolved_count > 0:
-                logger.info(f"Resolved {resolved_count} alerts for building {building_id}")
+                logger.info(f"Resolved {resolved_count} alerts for building {site_id}")
 
             return resolved_count
 

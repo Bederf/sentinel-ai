@@ -10,7 +10,7 @@ class AlertRepository:
 
     _COLUMNS = (
         "id, title, message, severity, status, type, "
-        "building_id, equipment_id, created_at, updated_at, "
+        "site_id, equipment_id, created_at, updated_at, "
         "acknowledged_by, acknowledged_at"
     )
 
@@ -20,7 +20,7 @@ class AlertRepository:
 
     def get_all(
         self,
-        building_id: Optional[str] = None,
+        site_id: Optional[str] = None,
         equipment_id: Optional[str] = None,
         status: Optional[str] = None,
         severity: Optional[str] = None,
@@ -28,7 +28,7 @@ class AlertRepository:
         """Get all alerts with optional filtering.
 
         Args:
-            building_id: Filter by building UUID
+            site_id: Filter by building UUID
             equipment_id: Filter by equipment UUID
             status: Filter by status
             severity: Filter by severity
@@ -38,8 +38,8 @@ class AlertRepository:
         """
         query = self.client.table("alerts").select(self._COLUMNS)
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
         if equipment_id:
             query = query.eq("equipment_id", equipment_id)
         if status:
@@ -65,30 +65,30 @@ class AlertRepository:
             return response.data[0]
         return None
 
-    def get_active_by_building(self, building_uuid: str) -> List[Dict[str, Any]]:
+    def get_active_by_site(self, site_uuid: str) -> List[Dict[str, Any]]:
         """Get active alerts for a building.
 
         Args:
-            building_uuid: Building UUID
+            site_uuid: Building UUID
 
         Returns:
             List of active alerts
         """
-        cached = cache.get(CacheKeys.alerts_active(building_uuid))
+        cached = cache.get(CacheKeys.alerts_active(site_uuid))
         if cached is not None:
             return cached
 
-        with track_query("alert", "get_active_by_building"):
+        with track_query("alert", "get_active_by_site"):
             response = (
                 self.client.table("alerts")
                 .select(self._COLUMNS)
-                .eq("building_id", building_uuid)
+                .eq("site_id", site_uuid)
                 .eq("status", "active")
                 .execute()
             )
 
         result = response.data
-        cache.set(CacheKeys.alerts_active(building_uuid), result, CacheService.TTL_DYNAMIC)
+        cache.set(CacheKeys.alerts_active(site_uuid), result, CacheService.TTL_DYNAMIC)
         return result
 
     def get_active_by_equipment(self, equipment_uuid: str) -> List[Dict[str, Any]]:
@@ -161,7 +161,7 @@ class AlertRepository:
         """
         response = self.client.table("alerts").insert(alert_data).execute()
         result = response.data[0]
-        CacheInvalidation.on_alert_change(building_id=alert_data.get("building_id"))
+        CacheInvalidation.on_alert_change(site_id=alert_data.get("site_id"))
         return result
 
     def update(self, alert_id: str, alert_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -177,7 +177,7 @@ class AlertRepository:
         response = self.client.table("alerts").update(alert_data).eq("id", alert_id).execute()
 
         if response.data:
-            CacheInvalidation.on_alert_change(building_id=response.data[0].get("building_id"))
+            CacheInvalidation.on_alert_change(site_id=response.data[0].get("site_id"))
             return response.data[0]
         return None
 
@@ -256,17 +256,17 @@ class AlertRepository:
 
         return resolved_count
 
-    def resolve_by_building(self, building_id: str) -> int:
+    def resolve_by_site(self, site_id: str) -> int:
         """Resolve all active alerts for a specific building.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
 
         Returns:
             Number of alerts resolved
         """
         # Get all active alerts for this building
-        active_alerts = self.get_active_by_building(building_id)
+        active_alerts = self.get_active_by_site(site_id)
 
         if not active_alerts:
             return 0

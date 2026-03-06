@@ -9,7 +9,7 @@
       "ip_address": "192.168.10.11",
       "bacnet_device_id": 200001,
       "channels": 3,
-      "building_id": "demo-office",
+      "site_id": "demo-office",
       "status": "online",
       "firmware_version": "3.2.1"
     },
@@ -20,7 +20,7 @@
       "ip_address": "192.168.10.12",
       "bacnet_device_id": 200002,
       "channels": 3,
-      "building_id": "demo-office",
+      "site_id": "demo-office",
       "status": "online",
       "firmware_version": "3.2.1"
     },
@@ -31,7 +31,7 @@
       "ip_address": "192.168.10.13",
       "bacnet_device_id": 200003,
       "channels": 3,
-      "building_id": "demo-office",
+      "site_id": "demo-office",
       "status": "online",
       "firmware_version": "3.2.1"
     },
@@ -42,7 +42,7 @@
       "ip_address": "192.168.10.14",
       "bacnet_device_id": 200004,
       "channels": 3,
-      "building_id": "demo-office",
+      "site_id": "demo-office",
       "status": "online",
       "firmware_version": "3.2.1"
     },
@@ -53,7 +53,7 @@
       "ip_address": "192.168.10.15",
       "bacnet_device_id": 200005,
       "channels": 3,
-      "building_id": "demo-office",
+      "site_id": "demo-office",
       "status": "online",
       "firmware_version": "3.2.1"
     },
@@ -64,7 +64,7 @@
       "ip_address": "192.168.10.21",
       "bacnet_device_id": 200011,
       "channels": 3,
-      "building_id": "demo-office",
+      "site_id": "demo-office",
       "status": "online",
       "firmware_version": "3.2.1"
     },
@@ -75,7 +75,7 @@
       "ip_address": "192.168.10.22",
       "bacnet_device_id": 200012,
       "channels": 3,
-      "building_id": "demo-office",
+      "site_id": "demo-office",
       "status": "online",
       "firmware_version": "3.2.1"
     },
@@ -86,7 +86,7 @@
       "ip_address": "192.168.10.23",
       "bacnet_device_id": 200013,
       "channels": 3,
-      "building_id": "demo-office",
+      "site_id": "demo-office",
       "status": "online",
       "firmware_version": "3.2.1"
     },
@@ -97,7 +97,7 @@
       "ip_address": "192.168.10.24",
       "bacnet_device_id": 200014,
       "channels": 3,
-      "building_id": "demo-office",
+      "site_id": "demo-office",
       "status": "online",
       "firmware_version": "3.2.1"
     },
@@ -108,7 +108,7 @@
       "ip_address": "192.168.10.25",
       "bacnet_device_id": 200015,
       "channels": 3,
-      "building_id": "demo-office",
+      "site_id": "demo-office",
       "status": "online",
       "firmware_version": "3.2.1"
     }

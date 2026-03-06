@@ -21,7 +21,7 @@ interface FormatDetectionResult {
 type WizardStep = 'upload' | 'mapping' | 'matching' | 'review';
 
 interface ReviewStepProps {
-  buildingId: string;
+  siteId: string;
   wizardData: {
     file: File | null;
     formatDetection: FormatDetectionResult | null;
@@ -37,7 +37,7 @@ interface ReviewStepProps {
   onBack: () => void;
 }
 
-function ReviewStep({ buildingId, wizardData, onActivate, onBack }: ReviewStepProps) {
+function ReviewStep({ siteId, wizardData, onActivate, onBack }: ReviewStepProps) {
   const [activating, setActivating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -69,7 +69,7 @@ function ReviewStep({ buildingId, wizardData, onActivate, onBack }: ReviewStepPr
         <div className="bg-gray-50 rounded-lg p-4 mt-4 text-left">
           <Title className="text-lg">Configuration Summary</Title>
           <div className="mt-4 space-y-2 text-sm">
-            <p><strong>Building ID:</strong> {buildingId}</p>
+            <p><strong>Building ID:</strong> {siteId}</p>
             <p><strong>File:</strong> {wizardData.file?.name}</p>
             <p><strong>Format:</strong> {wizardData.formatDetection?.file_format.toUpperCase()}</p>
             <p><strong>Vendor:</strong> {wizardData.formatDetection?.vendor}</p>
@@ -165,8 +165,8 @@ function ReviewStep({ buildingId, wizardData, onActivate, onBack }: ReviewStepPr
 }
 
 
-export function IntegrationWizard({ buildingId, onClose, onComplete: _onComplete }: {
-  buildingId: string;
+export function IntegrationWizard({ siteId, onClose, onComplete: _onComplete }: {
+  siteId: string;
   onClose: () => void;
   onComplete: () => void;
 }) {
@@ -235,7 +235,7 @@ export function IntegrationWizard({ buildingId, onClose, onComplete: _onComplete
       {/* Step content */}
       {currentStep === 'upload' && (
         <FileUploadStep
-          buildingId={buildingId}
+          siteId={siteId}
           onNext={(data) => {
             setWizardData({ ...wizardData, ...data });
             setCurrentStep('mapping');
@@ -245,7 +245,7 @@ export function IntegrationWizard({ buildingId, onClose, onComplete: _onComplete
 
       {currentStep === 'mapping' && wizardData.formatDetection && (
         <ColumnMappingStep
-          buildingId={buildingId}
+          siteId={siteId}
           formatDetection={wizardData.formatDetection}
           onNext={(data) => {
             setWizardData({ ...wizardData, ...data });
@@ -257,7 +257,7 @@ export function IntegrationWizard({ buildingId, onClose, onComplete: _onComplete
 
       {currentStep === 'matching' && (
         <PointMatchingStep
-          buildingId={buildingId}
+          siteId={siteId}
           columnMappings={[]}
           onNext={(data) => {
             setWizardData({ ...wizardData, ...data });
@@ -269,7 +269,7 @@ export function IntegrationWizard({ buildingId, onClose, onComplete: _onComplete
 
       {currentStep === 'review' && (
         <ReviewStep
-          buildingId={buildingId}
+          siteId={siteId}
           wizardData={wizardData}
           onActivate={async () => {
             // Activate integration
@@ -277,7 +277,7 @@ export function IntegrationWizard({ buildingId, onClose, onComplete: _onComplete
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                building_id: buildingId,
+                site_id: siteId,
                 log_source_id: 'temp-source-id',
                 dry_run: false,
                 sync_settings: wizardData.syncSettings

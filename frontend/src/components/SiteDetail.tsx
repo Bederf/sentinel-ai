@@ -36,6 +36,8 @@ import {
   Server,
   ChevronDown,
   ChevronRight,
+  Shield,
+  ClipboardList,
 } from "lucide-react";
 import api from '@/lib/api';
 import type {
@@ -185,9 +187,19 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null);
   const [isPredictionDetailOpen, setIsPredictionDetailOpen] = useState(false);
 
-  // Card visibility (CardLibrary toggle)
-  const [visibleKpiCards, setVisibleKpiCards] = useState<string[]>(DEFAULT_KPI_CARDS);
-  const [visibleSections, setVisibleSections] = useState<string[]>(DEFAULT_SECTIONS);
+  // Card visibility (CardLibrary toggle) — persisted to localStorage
+  const [visibleKpiCards, setVisibleKpiCards] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("sentinel_visible_kpi_cards");
+      return saved ? JSON.parse(saved) : DEFAULT_KPI_CARDS;
+    } catch { return DEFAULT_KPI_CARDS; }
+  });
+  const [visibleSections, setVisibleSections] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("sentinel_visible_sections");
+      return saved ? JSON.parse(saved) : DEFAULT_SECTIONS;
+    } catch { return DEFAULT_SECTIONS; }
+  });
 
   // Scroll container ref — reset to top on mount
   const containerRef = useRef<HTMLDivElement>(null);
@@ -229,12 +241,9 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           return;
         }
 
-        // Use site ID directly as building ID (no hardcoded mappings)
-        const buildingId = siteId;
-
         // Fetch equipment for this building using new building equipment endpoint
         try {
-          const buildingEquipment = await api.getBuildingEquipment(buildingId);
+          const buildingEquipment = await api.getSiteEquipment(siteId);
           // API returns Equipment[] with health_score field
           setEquipment(buildingEquipment.equipment as any);
           setEquipmentCategories(buildingEquipment.categories);
@@ -437,9 +446,8 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
       // Use equipment control endpoint for Supabase equipment
       await api.controlEquipment(deviceId, point, value);
       // Refresh equipment list after control action
-      const buildingId = siteId;
       try {
-        const buildingEquipment = await api.getBuildingEquipment(buildingId);
+        const buildingEquipment = await api.getSiteEquipment(siteId);
         setEquipment(buildingEquipment.equipment.map((eq: any) => ({
           ...eq,
           health_score: eq.health || eq.health_score,
@@ -1446,14 +1454,24 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
         visibleKpiCards={visibleKpiCards}
         visibleSections={visibleSections}
         onKpiVisibilityChange={(id, visible) => {
-          setVisibleKpiCards(prev => visible ? [...prev, id] : prev.filter(c => c !== id));
+          setVisibleKpiCards(prev => {
+            const next = visible ? [...prev, id] : prev.filter(c => c !== id);
+            localStorage.setItem("sentinel_visible_kpi_cards", JSON.stringify(next));
+            return next;
+          });
         }}
         onSectionVisibilityChange={(id, visible) => {
-          setVisibleSections(prev => visible ? [...prev, id] : prev.filter(c => c !== id));
+          setVisibleSections(prev => {
+            const next = visible ? [...prev, id] : prev.filter(c => c !== id);
+            localStorage.setItem("sentinel_visible_sections", JSON.stringify(next));
+            return next;
+          });
         }}
         onResetToDefaults={() => {
           setVisibleKpiCards(DEFAULT_KPI_CARDS);
           setVisibleSections(DEFAULT_SECTIONS);
+          localStorage.removeItem("sentinel_visible_kpi_cards");
+          localStorage.removeItem("sentinel_visible_sections");
         }}
       />
 
@@ -1593,7 +1611,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
 
           {/* Digital Twin (write actions gated by digital_twin_control) */}
           {activeMainTab === "digital-twin" && (
-            <div className="h-[calc(100vh-300px)]"><DigitalTwin /></div>
+            <div className="h-[calc(100vh-180px)]"><DigitalTwin /></div>
           )}
 
           {/* Controls — all-device control panel (visible when any control add-on active) */}
@@ -1691,11 +1709,20 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                   safetyStatus={{
                     status: selectedDevice.safety_status === "critical" ? "blocked" :
                             selectedDevice.safety_status === "warning" ? "warning" : "safe",
+                    message: selectedDevice.safety_status === "critical"
+                      ? `Safety interlock active — ${selectedEquipment.name} has a critical safety condition that prevents control operations.`
+                      : selectedDevice.safety_status === "warning"
+                      ? `Safety warning — ${selectedEquipment.name} has an active safety warning. Controls available with caution.`
+                      : undefined,
+                  }}
+                  equipmentHealth={{
+                    score: selectedEquipment.health_score,
+                    status: selectedEquipment.status as "normal" | "warning" | "critical",
                   }}
                 />
               ) : (
                 <div style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {/* Equipment Info Header with Discovery Button */}
+                  {/* ── A. Equipment Overview Header ── */}
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-4">
                       <div
@@ -1716,9 +1743,24 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                         <p className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
                           {selectedEquipment.name}
                         </p>
-                        <p className="text-sm font-mono" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-                          {selectedEquipment.id}
-                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span
+                            className="inline-block px-2 py-0.5 rounded text-xs font-medium"
+                            style={{
+                              background: selectedEquipment.category === "HVAC"
+                                ? "rgba(59, 130, 246, 0.15)"
+                                : selectedEquipment.category === "Lighting"
+                                ? "rgba(251, 191, 36, 0.15)"
+                                : "var(--color-sentinel-bg-secondary)",
+                              color: "var(--color-sentinel-text-secondary)",
+                            }}
+                          >
+                            {selectedEquipment.category}
+                          </span>
+                          <span className="text-xs font-mono" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                            {selectedEquipment.id}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <button
@@ -1736,9 +1778,35 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                     </button>
                   </div>
 
-                  {/* Metadata Tabs */}
+                  {/* ── Health Status Bar ── */}
                   <div
-                    className="flex gap-1 mb-4 p-1 rounded-lg"
+                    className="p-3 rounded-lg mb-4"
+                    style={{
+                      background: selectedEquipment.status === "critical" ? "rgba(220, 38, 38, 0.1)"
+                        : selectedEquipment.status === "warning" ? "rgba(245, 158, 11, 0.1)"
+                        : "rgba(16, 185, 129, 0.1)",
+                      border: `1px solid ${getStatusColor(selectedEquipment.status)}30`,
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(selectedEquipment.status)}
+                        <span className="text-sm font-medium capitalize" style={{ color: getStatusColor(selectedEquipment.status) }}>
+                          {selectedEquipment.status === "normal" ? "Healthy" : selectedEquipment.status}
+                        </span>
+                      </div>
+                      <span className="text-sm font-bold" style={{ color: getStatusColor(selectedEquipment.status) }}>
+                        {selectedEquipment.health_score}%
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
+                      <div className="h-full rounded-full transition-all" style={{ width: `${selectedEquipment.health_score}%`, background: getStatusColor(selectedEquipment.status) }} />
+                    </div>
+                  </div>
+
+                  {/* ── Metadata Tabs ── */}
+                  <div
+                    className="flex gap-1 mb-4 p-1 rounded-lg overflow-x-auto"
                     style={{ background: "var(--color-sentinel-bg-secondary)" }}
                   >
                     {[
@@ -1754,7 +1822,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                         <button
                           key={tab.id}
                           onClick={() => setMetadataTab(tab.id)}
-                          className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-md text-xs font-medium transition-colors"
+                          className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-md text-xs font-medium transition-colors whitespace-nowrap"
                           style={{
                             background: isActive ? "var(--color-sentinel-bg-panel)" : "transparent",
                             color: isActive ? "var(--color-sentinel-text-primary)" : "var(--color-sentinel-text-secondary)",
@@ -1767,7 +1835,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                     })}
                   </div>
 
-                  {/* Tab Content */}
+                  {/* ── Tab Content ── */}
                   {loadingMetadata ? (
                     <div className="flex items-center justify-center py-8">
                       <div
@@ -1777,51 +1845,243 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
                     </div>
                   ) : (
                     <>
-                      {/* Info Tab */}
+                      {/* Info Tab — expanded with specs, warranty, location */}
                       {metadataTab === "info" && (
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
-                            <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Category</p>
-                            <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{selectedEquipment.category}</p>
-                          </div>
-                          <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
-                            <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Type</p>
-                            <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{selectedEquipment.type.replace(/_/g, " ")}</p>
-                          </div>
-                          <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
-                            <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Status</p>
-                            <div className="flex items-center gap-2">
-                              {getStatusIcon(selectedEquipment.status)}
-                              <p className="font-medium text-sm" style={{ color: getStatusColor(selectedEquipment.status) }}>{selectedEquipment.status}</p>
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                              <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Type</p>
+                              <p className="font-medium text-sm capitalize" style={{ color: "var(--color-sentinel-text-primary)" }}>{selectedEquipment.type.replace(/_/g, " ")}</p>
                             </div>
-                          </div>
-                          <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
-                            <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Health</p>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
-                                <div className="h-full rounded-full" style={{ width: `${selectedEquipment.health_score}%`, background: getStatusColor(selectedEquipment.status) }} />
+                            {selectedEquipment.location && (
+                              <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Location</p>
+                                <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{selectedEquipment.location}</p>
                               </div>
-                              <span className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{selectedEquipment.health_score}%</span>
+                            )}
+                            {(equipmentMetadata?.device_info?.manufacturer || equipmentMetadata?.manufacturer) && (
+                              <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Manufacturer</p>
+                                <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata?.device_info?.manufacturer || equipmentMetadata?.manufacturer}</p>
+                              </div>
+                            )}
+                            {(equipmentMetadata?.device_info?.model || equipmentMetadata?.model) && (
+                              <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Model</p>
+                                <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata?.device_info?.model || equipmentMetadata?.model}</p>
+                              </div>
+                            )}
+                            {equipmentMetadata?.device_info?.serial_number && (
+                              <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Serial Number</p>
+                                <p className="font-mono text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.device_info.serial_number}</p>
+                              </div>
+                            )}
+                            {equipmentMetadata?.commissioning_date && (
+                              <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Commissioned</p>
+                                <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.commissioning_date}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Warranty Status */}
+                          {equipmentMetadata?.warranty_expiry && (() => {
+                            const expiryDate = new Date(equipmentMetadata.warranty_expiry);
+                            const now = new Date();
+                            const isExpired = expiryDate < now;
+                            const daysUntil = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                            const isExpiringSoon = !isExpired && daysUntil <= 90;
+                            return (
+                              <div
+                                className="p-3 rounded-lg flex items-center gap-3"
+                                style={{
+                                  background: isExpired ? "rgba(220, 38, 38, 0.1)" : isExpiringSoon ? "rgba(245, 158, 11, 0.1)" : "rgba(16, 185, 129, 0.1)",
+                                  border: `1px solid ${isExpired ? "var(--color-sentinel-red)" : isExpiringSoon ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)"}30`,
+                                }}
+                              >
+                                <Shield className="h-4 w-4 flex-shrink-0" style={{ color: isExpired ? "var(--color-sentinel-red)" : isExpiringSoon ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)" }} />
+                                <div>
+                                  <p className="text-xs font-medium" style={{ color: isExpired ? "var(--color-sentinel-red)" : isExpiringSoon ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)" }}>
+                                    Warranty {isExpired ? "Expired" : isExpiringSoon ? `Expiring in ${daysUntil} days` : "Active"}
+                                  </p>
+                                  <p className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                                    {isExpired ? "Expired" : "Expires"}: {expiryDate.toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Operating Data Summary (inline in Info tab) */}
+                          {equipmentMetadata?.operating_data && Object.keys(equipmentMetadata.operating_data).length > 0 && (
+                            <div>
+                              <h4 className="text-xs font-medium uppercase tracking-wider mb-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                Current Readings
+                              </h4>
+                              <div className="grid grid-cols-3 gap-2">
+                                {equipmentMetadata.operating_data.runtime_hours !== undefined && (
+                                  <div className="p-2 rounded-lg text-center" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                    <p className="text-lg font-bold" style={{ color: "var(--color-sentinel-text-primary)", fontVariantNumeric: "tabular-nums" }}>
+                                      {equipmentMetadata.operating_data.runtime_hours.toLocaleString()}
+                                    </p>
+                                    <p className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>Runtime hrs</p>
+                                  </div>
+                                )}
+                                {equipmentMetadata.operating_data.power_cycles !== undefined && (
+                                  <div className="p-2 rounded-lg text-center" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                    <p className="text-lg font-bold" style={{ color: "var(--color-sentinel-text-primary)", fontVariantNumeric: "tabular-nums" }}>
+                                      {equipmentMetadata.operating_data.power_cycles.toLocaleString()}
+                                    </p>
+                                    <p className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>Power Cycles</p>
+                                  </div>
+                                )}
+                                {equipmentMetadata.operating_data.energy_kwh !== undefined && (
+                                  <div className="p-2 rounded-lg text-center" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                    <p className="text-lg font-bold" style={{ color: "var(--color-sentinel-text-primary)", fontVariantNumeric: "tabular-nums" }}>
+                                      {equipmentMetadata.operating_data.energy_kwh.toLocaleString()}
+                                    </p>
+                                    <p className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>kWh Total</p>
+                                  </div>
+                                )}
+                                {equipmentMetadata.operating_data.fault_count !== undefined && (
+                                  <div className="p-2 rounded-lg text-center" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                    <p className="text-lg font-bold" style={{ color: equipmentMetadata.operating_data.fault_count > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-primary)", fontVariantNumeric: "tabular-nums" }}>
+                                      {equipmentMetadata.operating_data.fault_count}
+                                    </p>
+                                    <p className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>Faults</p>
+                                  </div>
+                                )}
+                                {equipmentMetadata.operating_data.lamp_hours !== undefined && (
+                                  <div className="p-2 rounded-lg text-center" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                    <p className="text-lg font-bold" style={{ color: "var(--color-sentinel-text-primary)", fontVariantNumeric: "tabular-nums" }}>
+                                      {equipmentMetadata.operating_data.lamp_hours.toLocaleString()}
+                                    </p>
+                                    <p className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>Lamp hrs</p>
+                                  </div>
+                                )}
+                                {equipmentMetadata.operating_data.rated_capacity && (
+                                  <div className="p-2 rounded-lg text-center" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                    <p className="text-sm font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                                      {equipmentMetadata.operating_data.rated_capacity}
+                                    </p>
+                                    <p className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>Capacity</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Maintenance Section */}
+                          <div>
+                            <h4 className="text-xs font-medium uppercase tracking-wider mb-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                              Maintenance
+                            </h4>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Last Service</p>
+                                <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                                  {equipmentMetadata?.last_service
+                                    ? new Date(equipmentMetadata.last_service).toLocaleDateString()
+                                    : "No records"}
+                                </p>
+                              </div>
+                              <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Install Date</p>
+                                <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                                  {equipmentMetadata?.install_date
+                                    ? new Date(equipmentMetadata.install_date).toLocaleDateString()
+                                    : equipmentMetadata?.commissioning_date
+                                    ? new Date(equipmentMetadata.commissioning_date).toLocaleDateString()
+                                    : "Unknown"}
+                                </p>
+                              </div>
                             </div>
                           </div>
-                          {selectedEquipment.location && (
-                            <div className="p-3 rounded-lg col-span-2" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
-                              <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Location</p>
-                              <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{selectedEquipment.location}</p>
-                            </div>
-                          )}
-                          {equipmentMetadata?.commissioning_date && (
-                            <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
-                              <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Commissioned</p>
-                              <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.commissioning_date}</p>
-                            </div>
-                          )}
-                          {equipmentMetadata?.warranty_expiry && (
-                            <div className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
-                              <p className="text-xs uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>Warranty Expiry</p>
-                              <p className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>{equipmentMetadata.warranty_expiry}</p>
-                            </div>
-                          )}
+
+                          {/* Related Alerts */}
+                          {(() => {
+                            const eqAlerts = alerts.filter(a => a.equipment_id === selectedEquipment.id);
+                            return eqAlerts.length > 0 ? (
+                              <div>
+                                <h4 className="text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: "var(--color-sentinel-amber)" }}>
+                                  <AlertTriangle className="h-3.5 w-3.5" />
+                                  Active Alerts ({eqAlerts.length})
+                                </h4>
+                                <div className="space-y-2">
+                                  {eqAlerts.slice(0, 3).map(alert => (
+                                    <div
+                                      key={alert.id}
+                                      className="p-2 rounded-lg flex items-start gap-2"
+                                      style={{
+                                        background: alert.severity === "critical" ? "rgba(220, 38, 38, 0.1)" : "rgba(245, 158, 11, 0.1)",
+                                        border: `1px solid ${alert.severity === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)"}20`,
+                                      }}
+                                    >
+                                      <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" style={{ color: alert.severity === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)" }} />
+                                      <div>
+                                        <p className="text-xs font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>{alert.message}</p>
+                                        <p className="text-xs mt-0.5" style={{ color: "var(--color-sentinel-text-disabled)" }}>{new Date(alert.created_at).toLocaleString()}</p>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null;
+                          })()}
+
+                          {/* Related Predictions */}
+                          {(() => {
+                            const eqPredictions = predictions.filter(p => p.equipment_id === selectedEquipment.id);
+                            return eqPredictions.length > 0 ? (
+                              <div>
+                                <h4 className="text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: "var(--color-sentinel-blue)" }}>
+                                  <TrendingUp className="h-3.5 w-3.5" />
+                                  Predictions ({eqPredictions.length})
+                                </h4>
+                                <div className="space-y-2">
+                                  {eqPredictions.slice(0, 3).map(pred => (
+                                    <div
+                                      key={pred.id}
+                                      className="p-2 rounded-lg flex items-start gap-2"
+                                      style={{
+                                        background: "rgba(59, 130, 246, 0.1)",
+                                        border: "1px solid rgba(59, 130, 246, 0.2)",
+                                      }}
+                                    >
+                                      <TrendingUp className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" style={{ color: "var(--color-sentinel-blue)" }} />
+                                      <div>
+                                        <p className="text-xs font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>{pred.prediction_type.replace(/_/g, " ")}</p>
+                                        <p className="text-xs mt-0.5" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                                          {pred.probability_percent}% probability
+                                          {pred.predicted_failure_date && ` — ${new Date(pred.predicted_failure_date).toLocaleDateString()}`}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null;
+                          })()}
+
+                          {/* Actions */}
+                          <div className="flex gap-2 pt-2">
+                            {isModuleActive('maintenance') && (
+                              <button
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors hover:brightness-110"
+                                style={{
+                                  background: "var(--color-sentinel-amber)",
+                                  color: "white",
+                                }}
+                                onClick={() => {
+                                  window.open(`/work-orders?equipment=${selectedEquipment.id}`, '_blank');
+                                }}
+                              >
+                                <ClipboardList className="h-4 w-4" />
+                                Create Work Order
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )}
 

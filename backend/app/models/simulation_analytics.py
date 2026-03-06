@@ -23,7 +23,7 @@ class SimulationRunRecord(BaseModel):
 
     run_id: str
     scenario: str
-    building_code: str
+    site_code: str
     started_at: str
     ended_at: Optional[str] = None
     duration_minutes: Optional[float] = None
@@ -78,7 +78,7 @@ class SimulationAnalysisReport(BaseModel):
 
     run_id: str
     scenario: str
-    building_code: str
+    site_code: str
     analyzed_at: str
     metrics: SimulationMetrics
     profile_results: Dict[str, ProfileAnalysisResult] = Field(description="Analysis results keyed by profile name")

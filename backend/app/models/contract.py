@@ -348,7 +348,7 @@ class ContractCreate(BaseModel):
 
     code: str = Field(..., description="Unique contract code, e.g. 'CON-SITE-002-2026-001'")
     organization_id: str
-    building_id: str
+    site_id: str
     contract_type: Optional[ContractType] = None
     start_date: date
     end_date: Optional[date] = None
@@ -394,7 +394,7 @@ class Contract(BaseModel):
     id: str
     code: str
     organization_id: str
-    building_id: str
+    site_id: str
     contract_type: Optional[ContractType] = None
     start_date: date
     end_date: Optional[date] = None
@@ -521,7 +521,7 @@ class ConditionAssessmentCreate(BaseModel):
     """Data required to create a condition assessment."""
 
     code: str = Field(..., description="Unique code, e.g. 'CA-001-2026-001'")
-    building_id: Optional[str] = None
+    site_id: Optional[str] = None
     equipment_id: Optional[str] = None
     contract_id: Optional[str] = None
     assessment_type: AssessmentType
@@ -549,7 +549,7 @@ class ConditionAssessment(BaseModel):
 
     id: str
     code: str
-    building_id: Optional[str] = None
+    site_id: Optional[str] = None
     equipment_id: Optional[str] = None
     contract_id: Optional[str] = None
     assessment_type: AssessmentType
@@ -801,8 +801,8 @@ class ContractProfitabilityDetail(BaseModel):
 
     contract_id: str
     contract_name: str
-    building_id: str
-    building_name: Optional[str] = None
+    site_id: str
+    site_name: Optional[str] = None
 
     # Revenue components
     monthly_revenue_zar: float

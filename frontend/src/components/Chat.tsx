@@ -24,9 +24,8 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  isStreaming?: boolean;
 }
-
-const CHAT_AUTOGREET_DISABLED_KEY = "sentinel_chat_autogreet_disabled";
 
 export function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -39,7 +38,6 @@ export function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const hasLoadedSitesRef = useRef(false);
-  const hasAutoGreetedRef = useRef(false);
 
   // Voice chat hooks
   const stt = useSpeechRecognition({
@@ -109,48 +107,7 @@ export function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingContent]);
 
-  // Auto-greet: send a welcome query on first load so the user sees live data immediately
-  useEffect(() => {
-    if (hasAutoGreetedRef.current || messages.length > 0 || isLoading) return;
-    if (!selectedSiteId) return;
-    if (localStorage.getItem(CHAT_AUTOGREET_DISABLED_KEY) === "true") return;
-    hasAutoGreetedRef.current = true;
-
-    const autoGreet = async () => {
-      const greetMessage = "Good day. Give me a quick overview of how the building is doing.";
-      const greetMsg: Message = {
-        id: `msg-${Date.now()}-greet`,
-        role: "user",
-        content: greetMessage,
-      };
-      setMessages([greetMsg]);
-      setIsLoading(true);
-      setStreamingContent("");
-
-      try {
-        let fullResponse = "";
-        await streamChat(greetMessage, undefined, (chunk) => {
-          fullResponse += chunk;
-          setStreamingContent(fullResponse);
-        }, selectedSiteId);
-
-        setMessages((prev) => [
-          ...prev,
-          { id: `msg-${Date.now()}-greet-resp`, role: "assistant", content: fullResponse },
-        ]);
-      } catch (error) {
-        console.error("Auto-greet error:", error);
-        setMessages((prev) => [
-          ...prev,
-          { id: `msg-${Date.now()}-greet-err`, role: "assistant", content: "Welcome to SENTINEL. Ask me anything about your building." },
-        ]);
-      } finally {
-        setIsLoading(false);
-        setStreamingContent("");
-      }
-    };
-    autoGreet();
-  }, [selectedSiteId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // No auto-greet — chat opens clean every time
 
   // Generate unique ID for messages
   const generateId = () => `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -160,26 +117,27 @@ export function Chat() {
     setInput("");
     setStreamingContent("");
     setIsLoading(false);
-    localStorage.setItem(CHAT_AUTOGREET_DISABLED_KEY, "true");
     stt.reset();
     tts.stop();
     inputRef.current?.focus();
   };
 
-  // Handle form submission
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  // Core send logic shared by form submit and command clicks
+  const sendMessage = async (text: string) => {
+    if (!text || isLoading) return;
 
-    const trimmedInput = input.trim();
-    if (!trimmedInput || isLoading) return;
-
-    // Add user message
     const userMessage: Message = {
       id: generateId(),
       role: "user",
-      content: trimmedInput,
+      content: text,
     };
-    setMessages((prev) => [...prev, userMessage]);
+    const assistantId = generateId();
+    // Add both user message and a streaming placeholder in one update
+    setMessages((prev) => [
+      ...prev,
+      userMessage,
+      { id: assistantId, role: "assistant", content: "", isStreaming: true },
+    ]);
     setInput("");
     setIsLoading(true);
     setStreamingContent("");
@@ -187,38 +145,49 @@ export function Chat() {
     try {
       let fullResponse = "";
 
-      // Stream the response
-      await streamChat(trimmedInput, undefined, (chunk) => {
+      await streamChat(text, undefined, (chunk) => {
         fullResponse += chunk;
-        setStreamingContent(fullResponse);
+        // Update the streaming message content in-place
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: fullResponse } : m
+          )
+        );
       }, selectedSiteId);
 
-      // When streaming completes, add assistant message with full content
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: generateId(),
-          role: "assistant",
-          content: fullResponse,
-        },
-      ]);
+      // Mark streaming complete (same message, no unmount/remount)
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: fullResponse, isStreaming: false }
+            : m
+        )
+      );
     } catch (error) {
       console.error("Chat error:", error);
-      // Add error message
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: generateId(),
-          role: "assistant",
-          content: "Sorry, I encountered an error. Please try again.",
-        },
-      ]);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: "Sorry, I encountered an error. Please try again.", isStreaming: false }
+            : m
+        )
+      );
     } finally {
       setIsLoading(false);
       setStreamingContent("");
-      // Refocus input after response
       inputRef.current?.focus();
     }
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    await sendMessage(input.trim());
+  };
+
+  // Handle clickable slash command buttons
+  const handleCommandClick = (command: string) => {
+    sendMessage(command);
   };
 
   // Handle Enter key
@@ -328,8 +297,10 @@ export function Chat() {
             messageId={msg.id}
             role={msg.role}
             content={msg.content}
+            isStreaming={msg.isStreaming}
+            onCommandClick={msg.role === "assistant" ? handleCommandClick : undefined}
             onSpeak={
-              tts.isAvailable && msg.role === "assistant"
+              tts.isAvailable && msg.role === "assistant" && !msg.isStreaming
                 ? (text, id) => tts.speak(text, id)
                 : undefined
             }
@@ -343,37 +314,6 @@ export function Chat() {
             }
           />
         ))}
-
-        {/* Streaming message */}
-        {isLoading && streamingContent && (
-          <ChatMessage role="assistant" content={streamingContent} isStreaming={true} />
-        )}
-
-        {/* Loading indicator when waiting for first chunk */}
-        {isLoading && !streamingContent && (
-          <div className="flex justify-start mb-4">
-            <div
-              className="rounded-lg px-4 py-3"
-              style={{
-                background: "var(--color-grafana-bg-secondary)",
-                border: "1px solid var(--color-grafana-border)",
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <div
-                  className="animate-spin h-4 w-4 border-2 border-t-transparent rounded-full"
-                  style={{ borderColor: "var(--color-grafana-blue)", borderTopColor: "transparent" }}
-                />
-                <span
-                  className="text-sm"
-                  style={{ color: "var(--color-grafana-text-secondary)" }}
-                >
-                  SENTINEL is thinking...
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Scroll anchor */}
         <div ref={messagesEndRef} />
@@ -421,7 +361,7 @@ export function Chat() {
 
           {/* Document upload button */}
           <DocumentUpload
-            buildingId={selectedSiteId}
+            siteId={selectedSiteId}
             onUploadComplete={() => {
               setMessages((prev) => [
                 ...prev,

@@ -27,22 +27,22 @@ class ZoneIngestionService:
         self.desk_repo = DeskRepository()
         self.client = get_supabase_client()
 
-    def get_building_uuid(self, building_code: str) -> Optional[str]:
+    def get_site_uuid(self, site_code: str) -> Optional[str]:
         """Convert building code to UUID.
 
         Args:
-            building_code: Building code (e.g., 'site-002')
+            site_code: Building code (e.g., 'site-002')
 
         Returns:
             Building UUID or None if not found
         """
-        response = self.client.table("buildings").select("id").eq("code", building_code).execute()
+        response = self.client.table("sites").select("id").eq("code", site_code).execute()
 
         if response.data:
             return response.data[0]["id"]
         return None
 
-    async def ingest_zones(self, building_id: str, zones: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def ingest_zones(self, site_id: str, zones: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Ingest zone configuration for a building.
 
         Each building can have a unique zone structure. This method validates
@@ -55,7 +55,7 @@ class ZoneIngestionService:
         - Zone letter must be A-Z for single letters, or numeric for multi-digit
 
         Args:
-            building_id: Building code (e.g., "site-002") or UUID
+            site_id: Building code (e.g., "site-002") or UUID
             zones: List of zone configurations with:
                 - zone_id: Unique identifier e.g., "Zone-L1-A"
                 - zone_name: Human-readable name
@@ -71,9 +71,9 @@ class ZoneIngestionService:
             ValueError: If validation fails or building not found
         """
         # Convert building code to UUID if needed
-        building_uuid = self.get_building_uuid(building_id)
-        if not building_uuid:
-            raise ValueError(f"Building not found: {building_id}")
+        site_uuid = self.get_site_uuid(site_id)
+        if not site_uuid:
+            raise ValueError(f"Building not found: {site_id}")
 
         # Validate zones
         zone_ids = [z["zone_id"] for z in zones]
@@ -109,7 +109,7 @@ class ZoneIngestionService:
         # Insert into Supabase
         for zone in zones:
             zone_data = {
-                "building_id": building_uuid,
+                "site_id": site_uuid,
                 "zone_id": zone["zone_id"],
                 "zone_name": zone["zone_name"],
                 "floor": zone["floor"],
@@ -124,10 +124,10 @@ class ZoneIngestionService:
                 logger.error(f"Failed to create zone {zone['zone_id']}: {e}")
                 raise ValueError(f"Failed to create zone {zone['zone_id']}: {e}")
 
-        logger.info(f"Ingested {len(zones)} zones for building {building_id}")
+        logger.info(f"Ingested {len(zones)} zones for building {site_id}")
         return {"status": "success", "zones_created": len(zones)}
 
-    async def ingest_desks(self, building_id: str, desks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def ingest_desks(self, site_id: str, desks: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Ingest desk configuration for a building.
 
         Validation:
@@ -138,7 +138,7 @@ class ZoneIngestionService:
         - Floor code must match zone floor
 
         Args:
-            building_id: Building code (e.g., "site-002") or UUID
+            site_id: Building code (e.g., "site-002") or UUID
             desks: List of desk configurations with:
                 - desk_id: Unique identifier
                 - zone_id: Reference to zone (must exist)
@@ -153,9 +153,9 @@ class ZoneIngestionService:
             ValueError: If validation fails or building not found
         """
         # Convert building code to UUID if needed
-        building_uuid = self.get_building_uuid(building_id)
-        if not building_uuid:
-            raise ValueError(f"Building not found: {building_id}")
+        site_uuid = self.get_site_uuid(site_id)
+        if not site_uuid:
+            raise ValueError(f"Building not found: {site_id}")
 
         # Validate desks
         desk_ids = [d["desk_id"] for d in desks]
@@ -163,7 +163,7 @@ class ZoneIngestionService:
             raise ValueError("Duplicate desk_ids detected within ingestion")
 
         # Validate zone references
-        zones = self.zone_repo.get_by_building(building_uuid)
+        zones = self.zone_repo.get_by_site(site_uuid)
         valid_zone_ids = {z["zone_id"] for z in zones}
         valid_zone_dict = {z["zone_id"]: z for z in zones}
 
@@ -205,7 +205,7 @@ class ZoneIngestionService:
         # Insert desks
         for desk in desks:
             desk_data = {
-                "building_id": building_uuid,
+                "site_id": site_uuid,
                 "zone_id": desk["zone_id"],
                 "desk_id": desk["desk_id"],
                 "floor": desk["floor"],
@@ -220,10 +220,10 @@ class ZoneIngestionService:
                 logger.error(f"Failed to create desk {desk['desk_id']}: {e}")
                 raise ValueError(f"Failed to create desk {desk['desk_id']}: {e}")
 
-        logger.info(f"Ingested {len(desks)} desks for building {building_id}")
+        logger.info(f"Ingested {len(desks)} desks for building {site_id}")
         return {"status": "success", "desks_created": len(desks)}
 
-    async def calculate_zone_centroid(self, building_id: str, zone_id: str) -> Optional[Dict[str, float]]:
+    async def calculate_zone_centroid(self, site_id: str, zone_id: str) -> Optional[Dict[str, float]]:
         """Calculate zone centroid from desk positions.
 
         The centroid is the average X, Z position of all desks in a zone.
@@ -231,22 +231,22 @@ class ZoneIngestionService:
         needing to load all individual desk data.
 
         Args:
-            building_id: Building code (e.g., "site-002") or UUID
+            site_id: Building code (e.g., "site-002") or UUID
             zone_id: Zone ID (e.g., "Zone-L1-A")
 
         Returns:
             Dict with centroid coordinates {x, z} or None if no desks found
         """
         # Convert building code to UUID if needed
-        building_uuid = self.get_building_uuid(building_id)
-        if not building_uuid:
-            logger.warning(f"Building not found: {building_id}")
+        site_uuid = self.get_site_uuid(site_id)
+        if not site_uuid:
+            logger.warning(f"Building not found: {site_id}")
             return None
 
-        desks = self.desk_repo.get_by_zone_id(building_uuid, zone_id)
+        desks = self.desk_repo.get_by_zone_id(site_uuid, zone_id)
 
         if not desks:
-            logger.warning(f"No desks found for zone {zone_id} in building {building_id}")
+            logger.warning(f"No desks found for zone {zone_id} in building {site_id}")
             return None
 
         avg_x = sum(float(d.get("x_coord", 0)) for d in desks) / len(desks)
@@ -254,26 +254,26 @@ class ZoneIngestionService:
 
         return {"x": round(avg_x, 2), "z": round(avg_z, 2)}
 
-    def get_all_zone_centroids(self, building_id: str) -> Dict[str, Dict[str, float]]:
+    def get_all_zone_centroids(self, site_id: str) -> Dict[str, Dict[str, float]]:
         """Get centroids for all zones in a building.
 
         Efficient operation: loads all desks once, calculates centroids for
         all zones in a single pass.
 
         Args:
-            building_id: Building code (e.g., "site-002") or UUID
+            site_id: Building code (e.g., "site-002") or UUID
 
         Returns:
             Dict mapping zone_id → {x, z} centroid coordinates
         """
         # Convert building code to UUID if needed
-        building_uuid = self.get_building_uuid(building_id)
-        if not building_uuid:
-            logger.warning(f"Building not found: {building_id}")
+        site_uuid = self.get_site_uuid(site_id)
+        if not site_uuid:
+            logger.warning(f"Building not found: {site_id}")
             return {}
 
-        zones = self.zone_repo.get_by_building(building_uuid)
-        all_desks = self.desk_repo.get_by_building_uuid(building_uuid)
+        zones = self.zone_repo.get_by_site(site_uuid)
+        all_desks = self.desk_repo.get_by_site_uuid(site_uuid)
 
         centroids = {}
         for zone in zones:
@@ -284,10 +284,10 @@ class ZoneIngestionService:
                 avg_z = sum(float(d.get("z_coord", 0)) for d in zone_desks) / len(zone_desks)
                 centroids[zone["zone_id"]] = {"x": round(avg_x, 2), "z": round(avg_z, 2)}
 
-        logger.info(f"Calculated {len(centroids)} zone centroids for building {building_id}")
+        logger.info(f"Calculated {len(centroids)} zone centroids for building {site_id}")
         return centroids
 
-    async def validate_zone_structure(self, building_id: str) -> Tuple[bool, List[str]]:
+    async def validate_zone_structure(self, site_id: str) -> Tuple[bool, List[str]]:
         """Validate zone and desk structure for a building.
 
         Checks:
@@ -297,7 +297,7 @@ class ZoneIngestionService:
         - Consistent floor assignments
 
         Args:
-            building_id: Building code (e.g., "site-002") or UUID
+            site_id: Building code (e.g., "site-002") or UUID
 
         Returns:
             Tuple of (is_valid, list of error messages)
@@ -305,12 +305,12 @@ class ZoneIngestionService:
         errors = []
 
         # Convert building code to UUID if needed
-        building_uuid = self.get_building_uuid(building_id)
-        if not building_uuid:
-            return False, [f"Building not found: {building_id}"]
+        site_uuid = self.get_site_uuid(site_id)
+        if not site_uuid:
+            return False, [f"Building not found: {site_id}"]
 
-        zones = self.zone_repo.get_by_building(building_uuid)
-        desks = self.desk_repo.get_by_building_uuid(building_uuid)
+        zones = self.zone_repo.get_by_site(site_uuid)
+        desks = self.desk_repo.get_by_site_uuid(site_uuid)
 
         if not zones:
             errors.append("No zones configured for building")

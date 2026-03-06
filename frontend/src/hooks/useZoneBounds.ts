@@ -13,21 +13,21 @@ import { calculateZoneBoundsFromCoords, type ZoneBounds } from '@/utils/equipmen
 /**
  * Fetch desk data for a building and calculate zone boundaries
  *
- * @param buildingId Building UUID
+ * @param siteId Building UUID
  * @returns Map of zone_id → ZoneBounds (e.g., "Zone-L1-A" → bounds)
  *
  * @example
- * const zoneBounds = useZoneBounds(buildingId);
+ * const zoneBounds = useZoneBounds(siteId);
  * // zoneBounds = { "Zone-L0-A": { minX, maxX, minZ, maxZ, ... }, ... }
  */
-export function useZoneBounds(buildingId: string): Record<string, ZoneBounds> {
+export function useZoneBounds(siteId: string): Record<string, ZoneBounds> {
   // Fetch desk data via sitesApi.getDesks()
   // Cached with 5m staleTime (desk positions rarely change during operation)
   const { data: desks = [] } = useQuery({
-    queryKey: ['desks', buildingId],
-    queryFn: () => sitesApi.getDesks(buildingId),
+    queryKey: ['desks', siteId],
+    queryFn: () => sitesApi.getDesks(siteId),
     staleTime: 5 * 60 * 1000, // 5 minutes
-    enabled: !!buildingId,
+    enabled: !!siteId,
     retry: 0,
     // Return empty array on failure (fallback positioning will be used)
     throwOnError: false,

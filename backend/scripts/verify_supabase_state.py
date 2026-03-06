@@ -19,7 +19,7 @@ try:
     print("✓ Connected to Supabase\n")
 
     # Check buildings
-    buildings_result = client.table("buildings").select("id, code, name", count="exact").execute()
+    buildings_result = client.table("sites").select("id, code, name", count="exact").execute()
     print(f"Buildings: {buildings_result.count}")
     if buildings_result.data:
         for b in buildings_result.data[:5]:
@@ -34,9 +34,7 @@ try:
     if buildings_result.data:
         print("\nEquipment per building:")
         for building in buildings_result.data[:5]:
-            eq_result = (
-                client.table("equipment").select("id", count="exact").eq("building_id", building["id"]).execute()
-            )
+            eq_result = client.table("equipment").select("id", count="exact").eq("site_id", building["id"]).execute()
             print(f"  {building['code']}: {eq_result.count} items")
 
     # Check zones
@@ -48,7 +46,7 @@ try:
         site002 = next((b for b in buildings_result.data if b["code"] == "site-002"), None)
         if site002:
             sample = (
-                client.table("equipment").select("code, name, type").eq("building_id", site002["id"]).limit(5).execute()
+                client.table("equipment").select("code, name, type").eq("site_id", site002["id"]).limit(5).execute()
             )
             if sample.data:
                 print("\nSample equipment from site-002:")

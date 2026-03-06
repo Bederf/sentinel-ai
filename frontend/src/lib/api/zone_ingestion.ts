@@ -47,7 +47,7 @@ export interface IngestionResponse {
 }
 
 export interface ZoneValidationResult {
-  building_id: string;
+  site_id: string;
   is_valid: boolean;
   errors: string[];
   error_count: number;
@@ -59,13 +59,13 @@ export const zoneIngestionApi = {
   /**
    * Ingest zone configuration for a building
    *
-   * @param buildingId - Building UUID
+   * @param siteId - Building UUID
    * @param request - Zone ingestion request with list of zones
    * @returns Ingestion response with status and count
    */
-  ingestZones: (buildingId: string, request: ZonesIngestionRequest) =>
+  ingestZones: (siteId: string, request: ZonesIngestionRequest) =>
     fetchApi<IngestionResponse>(
-      `/api/buildings/${buildingId}/zone-ingestion/zones`,
+      `/api/buildings/${siteId}/zone-ingestion/zones`,
       {
         method: 'POST',
         body: JSON.stringify(request),
@@ -75,13 +75,13 @@ export const zoneIngestionApi = {
   /**
    * Ingest desk configuration for a building
    *
-   * @param buildingId - Building UUID
+   * @param siteId - Building UUID
    * @param request - Desk ingestion request with list of desks
    * @returns Ingestion response with status and count
    */
-  ingestDesks: (buildingId: string, request: DesksIngestionRequest) =>
+  ingestDesks: (siteId: string, request: DesksIngestionRequest) =>
     fetchApi<IngestionResponse>(
-      `/api/buildings/${buildingId}/zone-ingestion/desks`,
+      `/api/buildings/${siteId}/zone-ingestion/desks`,
       {
         method: 'POST',
         body: JSON.stringify(request),
@@ -91,30 +91,30 @@ export const zoneIngestionApi = {
   /**
    * Validate zone and desk structure for a building
    *
-   * @param buildingId - Building UUID
+   * @param siteId - Building UUID
    * @returns Validation result with errors if any
    */
-  validateZoneStructure: (buildingId: string) =>
+  validateZoneStructure: (siteId: string) =>
     fetchApi<ZoneValidationResult>(
-      `/api/buildings/${buildingId}/zone-ingestion/validate`
+      `/api/buildings/${siteId}/zone-ingestion/validate`
     ),
 
   /**
    * Get zone centroid from zone ingestion API
    *
-   * @param buildingId - Building UUID
+   * @param siteId - Building UUID
    * @param zoneId - Zone ID
    * @returns Zone centroid response
    */
-  getZoneCentroid: (buildingId: string, zoneId: string) =>
-    fetchApi(`/api/buildings/${buildingId}/zone-ingestion/zones/${encodeURIComponent(zoneId)}/centroid`),
+  getZoneCentroid: (siteId: string, zoneId: string) =>
+    fetchApi(`/api/buildings/${siteId}/zone-ingestion/zones/${encodeURIComponent(zoneId)}/centroid`),
 
   /**
    * Get all zone centroids from zone ingestion API
    *
-   * @param buildingId - Building UUID
+   * @param siteId - Building UUID
    * @returns All zone centroids for building
    */
-  getAllCentroids: (buildingId: string) =>
-    fetchApi(`/api/buildings/${buildingId}/zone-ingestion/centroids`),
+  getAllCentroids: (siteId: string) =>
+    fetchApi(`/api/buildings/${siteId}/zone-ingestion/centroids`),
 };

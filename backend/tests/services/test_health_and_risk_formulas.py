@@ -142,12 +142,8 @@ def test_prediction_generator_probability_bounds_and_severity(monkeypatch):
     service._get_contributing_factors = lambda equipment: []
     service._get_recommended_action = lambda equipment_type, severity, prediction_type: "Inspect"
 
-    critical = service._generate_prediction(
-        {"id": "eqp-1", "type": "generator", "health_score": 0, "building_id": "b1"}
-    )
-    warning = service._generate_prediction(
-        {"id": "eqp-2", "type": "generator", "health_score": 65, "building_id": "b1"}
-    )
+    critical = service._generate_prediction({"id": "eqp-1", "type": "generator", "health_score": 0, "site_id": "b1"})
+    warning = service._generate_prediction({"id": "eqp-2", "type": "generator", "health_score": 65, "site_id": "b1"})
 
     assert critical["probability_percent"] == 95  # upper bound cap
     assert critical["severity"] == "critical"

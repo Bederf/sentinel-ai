@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 # Data directory for mapping storage
 DATA_DIR = Path(__file__).parent.parent.parent / "data" / "niagara"
-BUILDINGS_DIR = Path(__file__).parent.parent.parent / "data" / "buildings"
+SITES_DIR = Path(__file__).parent.parent.parent / "data" / "sites"
 
 
 class EquipmentMapping:
@@ -578,10 +578,10 @@ class PointMappingService:
                 return {"success": False, "reason": "No site_id in mappings"}
 
             # 1. Get or create building record
-            building_result = client.table("buildings").select("id").eq("code", site_id).execute()
+            site_result = client.table("sites").select("id").eq("code", site_id).execute()
 
-            if building_result.data:
-                building_id = building_result.data[0]["id"]
+            if site_result.data:
+                site_id = site_result.data[0]["id"]
             else:
                 # Load building.json and create record
                 building_json = self._load_building_json(site_id)
@@ -590,7 +590,7 @@ class PointMappingService:
 
                 metadata = building_json.get("metadata", {})
                 insert_result = (
-                    client.table("buildings")
+                    client.table("sites")
                     .insert(
                         {
                             "code": site_id,
@@ -604,8 +604,8 @@ class PointMappingService:
                     )
                     .execute()
                 )
-                building_id = insert_result.data[0]["id"]
-                logger.info("Created building record in Supabase: %s -> %s", site_id, building_id)
+                site_id = insert_result.data[0]["id"]
+                logger.info("Created building record in Supabase: %s -> %s", site_id, site_id)
 
             # 2. Insert equipment records
             equipment_created = 0
@@ -621,7 +621,7 @@ class PointMappingService:
                 try:
                     client.table("equipment").insert(
                         {
-                            "building_id": building_id,
+                            "site_id": site_id,
                             "code": mapping.equipment_id,
                             "name": mapping.equipment_name,
                             "equipment_type": mapping.equipment_type,
@@ -652,7 +652,7 @@ class PointMappingService:
     def _load_building_json(self, site_id: str) -> Optional[Dict[str, Any]]:
         """Load building.json for a site."""
         try:
-            filepath = BUILDINGS_DIR / site_id / "building.json"
+            filepath = SITES_DIR / site_id / "building.json"
             if not filepath.exists():
                 return None
             with open(filepath) as f:
@@ -873,7 +873,7 @@ class PointMappingService:
             return False
 
         try:
-            equip_dir = BUILDINGS_DIR / site_id / "equipment"
+            equip_dir = SITES_DIR / site_id / "equipment"
             equip_dir.mkdir(parents=True, exist_ok=True)
 
             for model in models:
@@ -918,7 +918,7 @@ class PointMappingService:
             zones = zone_service.create_zones_from_equipment(equipment_list, site_id)
 
             # Save zones.json
-            zones_dir = BUILDINGS_DIR / site_id
+            zones_dir = SITES_DIR / site_id
             zones_dir.mkdir(parents=True, exist_ok=True)
             zones_file = zones_dir / "zones.json"
 

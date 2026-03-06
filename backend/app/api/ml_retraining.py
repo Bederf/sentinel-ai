@@ -110,7 +110,7 @@ async def evaluate_performance(
     request: Request,
     days_back: int = Query(7, description="Number of days to evaluate"),
     site_id: str = Query(None, description="Site to evaluate (omit for all sites)"),
-    building_code: str = Query(None, description="Deprecated: use site_id", include_in_schema=False),
+    site_code: str = Query(None, description="Deprecated: use site_id", include_in_schema=False),
 ):
     """Evaluate prediction accuracy against actual outcomes.
 
@@ -118,9 +118,9 @@ async def evaluate_performance(
     """
     from ml.monitoring.performance_monitor import get_performance_monitor
 
-    code = building_code or site_id
+    code = site_code or site_id
     monitor = get_performance_monitor()
-    return monitor.evaluate_predictions(days_back=days_back, building_code=code)
+    return monitor.evaluate_predictions(days_back=days_back, site_code=code)
 
 
 @router.get("/performance/health")

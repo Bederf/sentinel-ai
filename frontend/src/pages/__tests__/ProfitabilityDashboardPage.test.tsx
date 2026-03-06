@@ -67,8 +67,8 @@ describe('ProfitabilityDashboardPage', () => {
     (vi.mocked(profitabilityApi.getContractProfitability) as any).mockResolvedValue({
       contract_id: 'contract-1',
       contract_name: 'Sandton Tower',
-      building_id: 'bldg-1',
-      building_name: 'Sandton',
+      site_id: 'bldg-1',
+      site_name: 'Sandton',
       net_revenue_zar: 100000,
       total_cost_zar: 70000,
       gross_margin_zar: 30000,
@@ -193,8 +193,8 @@ describe('ProfitabilityDashboardPage', () => {
       const mockContract = {
         contract_id: 'c123',
         contract_name: 'Building A',
-        building_id: 'b123',
-        building_name: 'Downtown Complex',
+        site_id: 'b123',
+        site_name: 'Downtown Complex',
         net_revenue_zar: 250000,
         total_cost_zar: 175000,
         gross_margin_zar: 75000,

@@ -104,7 +104,7 @@ async def get_equipment_health_rating(equipment_id: str) -> HealthRating:
         )
         # Store the freshly computed snapshot
         try:
-            await snapshot_svc.store_snapshot(rating, building_id=equipment.get("building_id"))
+            await snapshot_svc.store_snapshot(rating, site_id=equipment.get("site_id"))
         except Exception as e:
             logger.warning("Failed to store fresh snapshot for %s: %s", equipment_id, e)
 

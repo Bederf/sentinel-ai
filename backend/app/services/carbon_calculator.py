@@ -44,7 +44,7 @@ class CarbonCalculator:
 
     def calculate_scope_1(
         self,
-        building_id: str,
+        site_id: str,
         period_start: date,
         period_end: date,
     ) -> Tuple[float, Dict]:
@@ -58,7 +58,7 @@ class CarbonCalculator:
         - Company vehicle fuel
 
         Args:
-            building_id: UUID of building
+            site_id: UUID of building
             period_start: Start date for calculation period
             period_end: End date for calculation period
 
@@ -70,7 +70,7 @@ class CarbonCalculator:
             response = (
                 self.supabase.table("emissions_sources")
                 .select("source_type,monthly_value,unit,co2_factor,co2e_kg")
-                .eq("building_id", building_id)
+                .eq("site_id", site_id)
                 .eq("scope", 1)
                 .gte("measurement_date", period_start.isoformat())
                 .lte("measurement_date", period_end.isoformat())
@@ -79,7 +79,7 @@ class CarbonCalculator:
 
             if not response.data:
                 self._logger.warning(
-                    f"No Scope 1 emissions data found for {building_id} in period {period_start} to {period_end}"
+                    f"No Scope 1 emissions data found for {site_id} in period {period_start} to {period_end}"
                 )
                 return 0.0, {}
 
@@ -96,8 +96,7 @@ class CarbonCalculator:
                 breakdown[source] += co2e
 
             self._logger.info(
-                f"Scope 1 calculation for {building_id}: {total_kg_co2e:.2f} kg CO2e "
-                f"(sources: {list(breakdown.keys())})"
+                f"Scope 1 calculation for {site_id}: {total_kg_co2e:.2f} kg CO2e (sources: {list(breakdown.keys())})"
             )
             return total_kg_co2e, breakdown
 
@@ -107,7 +106,7 @@ class CarbonCalculator:
 
     def calculate_scope_2(
         self,
-        building_id: str,
+        site_id: str,
         period_start: date,
         period_end: date,
     ) -> Tuple[float, Dict]:
@@ -119,7 +118,7 @@ class CarbonCalculator:
         - Renewable energy offset (if available from Phase 34 Solar module)
 
         Args:
-            building_id: UUID of building
+            site_id: UUID of building
             period_start: Start date for calculation period
             period_end: End date for calculation period
 
@@ -131,7 +130,7 @@ class CarbonCalculator:
             response = (
                 self.supabase.table("emissions_sources")
                 .select("source_type,monthly_value,unit,co2_factor,co2e_kg")
-                .eq("building_id", building_id)
+                .eq("site_id", site_id)
                 .eq("scope", 2)
                 .gte("measurement_date", period_start.isoformat())
                 .lte("measurement_date", period_end.isoformat())
@@ -140,7 +139,7 @@ class CarbonCalculator:
 
             if not response.data:
                 self._logger.warning(
-                    f"No Scope 2 emissions data found for {building_id} in period {period_start} to {period_end}"
+                    f"No Scope 2 emissions data found for {site_id} in period {period_start} to {period_end}"
                 )
                 return 0.0, {}
 
@@ -162,7 +161,7 @@ class CarbonCalculator:
                 solar_result = (
                     self.supabase.table("daily_sustainability_metrics")
                     .select("solar_generation_kwh")
-                    .eq("site_id", building_id)
+                    .eq("site_id", site_id)
                     .gte("date", period_start.isoformat())
                     .lte("date", period_end.isoformat())
                     .execute()
@@ -180,7 +179,7 @@ class CarbonCalculator:
                 breakdown["net_grid_kg_co2e"] = round(total_kg_co2e, 2)
 
             self._logger.info(
-                f"Scope 2 calculation for {building_id}: {total_kg_co2e:.2f} kg CO2e"
+                f"Scope 2 calculation for {site_id}: {total_kg_co2e:.2f} kg CO2e"
                 f"{f' (solar offset: {solar_kwh:.1f} kWh)' if solar_kwh > 0 else ''}"
             )
             return total_kg_co2e, breakdown
@@ -191,7 +190,7 @@ class CarbonCalculator:
 
     def calculate_scope_3(
         self,
-        building_id: str,
+        site_id: str,
         period_start: date,
         period_end: date,
     ) -> Tuple[float, Dict]:
@@ -205,7 +204,7 @@ class CarbonCalculator:
         - Business travel: distance × 0.12 kg CO2/km
 
         Args:
-            building_id: UUID of building
+            site_id: UUID of building
             period_start: Start date for calculation period
             period_end: End date for calculation period
 
@@ -217,7 +216,7 @@ class CarbonCalculator:
             response = (
                 self.supabase.table("emissions_sources")
                 .select("source_type,monthly_value,unit,co2_factor,co2e_kg")
-                .eq("building_id", building_id)
+                .eq("site_id", site_id)
                 .eq("scope", 3)
                 .gte("measurement_date", period_start.isoformat())
                 .lte("measurement_date", period_end.isoformat())
@@ -226,10 +225,10 @@ class CarbonCalculator:
 
             if not response.data:
                 self._logger.warning(
-                    f"No Scope 3 emissions data found for {building_id} in period {period_start} to {period_end}"
+                    f"No Scope 3 emissions data found for {site_id} in period {period_start} to {period_end}"
                 )
                 # Return estimate based on occupancy if available
-                return self._estimate_scope_3(building_id, period_start, period_end)
+                return self._estimate_scope_3(site_id, period_start, period_end)
 
             breakdown = {}
             total_kg_co2e = 0.0
@@ -243,7 +242,7 @@ class CarbonCalculator:
                     breakdown[source] = 0.0
                 breakdown[source] += co2e
 
-            self._logger.info(f"Scope 3 calculation for {building_id}: {total_kg_co2e:.2f} kg CO2e")
+            self._logger.info(f"Scope 3 calculation for {site_id}: {total_kg_co2e:.2f} kg CO2e")
             return total_kg_co2e, breakdown
 
         except Exception as e:
@@ -252,7 +251,7 @@ class CarbonCalculator:
 
     def _estimate_scope_3(
         self,
-        building_id: str,
+        site_id: str,
         period_start: date,
         period_end: date,
     ) -> Tuple[float, Dict]:
@@ -264,10 +263,7 @@ class CarbonCalculator:
         try:
             # Get building info (occupancy, floor area)
             response = (
-                self.supabase.table("buildings")
-                .select("occupancy_capacity,floor_area_m2")
-                .eq("id", building_id)
-                .execute()
+                self.supabase.table("sites").select("occupancy_capacity,floor_area_m2").eq("id", site_id).execute()
             )
 
             if not response.data:
@@ -287,7 +283,7 @@ class CarbonCalculator:
             }
 
             self._logger.info(
-                f"Estimated Scope 3 for {building_id}: {estimated_commute_co2e:.2f} kg CO2e "
+                f"Estimated Scope 3 for {site_id}: {estimated_commute_co2e:.2f} kg CO2e "
                 f"(based on occupancy {occupancy})"
             )
             return estimated_commute_co2e, breakdown
@@ -298,7 +294,7 @@ class CarbonCalculator:
 
     def calculate_total_emissions(
         self,
-        building_id: str,
+        site_id: str,
         period_start: date,
         period_end: date,
     ) -> Dict:
@@ -306,16 +302,16 @@ class CarbonCalculator:
         Calculate total emissions (Scope 1 + 2 + 3) for a building.
 
         Args:
-            building_id: UUID of building
+            site_id: UUID of building
             period_start: Start date for calculation period
             period_end: End date for calculation period
 
         Returns:
             Dict with scope1_kg_co2e, scope2_kg_co2e, scope3_kg_co2e, total_kg_co2e, breakdown
         """
-        scope1, breakdown1 = self.calculate_scope_1(building_id, period_start, period_end)
-        scope2, breakdown2 = self.calculate_scope_2(building_id, period_start, period_end)
-        scope3, breakdown3 = self.calculate_scope_3(building_id, period_start, period_end)
+        scope1, breakdown1 = self.calculate_scope_1(site_id, period_start, period_end)
+        scope2, breakdown2 = self.calculate_scope_2(site_id, period_start, period_end)
+        scope3, breakdown3 = self.calculate_scope_3(site_id, period_start, period_end)
 
         return {
             "scope1_kg_co2e": round(scope1, 2),
@@ -331,7 +327,7 @@ class CarbonCalculator:
 
     def calculate_carbon_intensity(
         self,
-        building_id: str,
+        site_id: str,
         period_start: date,
         period_end: date,
     ) -> Dict:
@@ -341,7 +337,7 @@ class CarbonCalculator:
         Used for benchmarking: SA office average is 0.15 kg/m²/day.
 
         Args:
-            building_id: UUID of building
+            site_id: UUID of building
             period_start: Start date for calculation period
             period_end: End date for calculation period
 
@@ -350,19 +346,19 @@ class CarbonCalculator:
         """
         try:
             # Get emissions total
-            emissions = self.calculate_total_emissions(building_id, period_start, period_end)
+            emissions = self.calculate_total_emissions(site_id, period_start, period_end)
             total_co2e = emissions["total_kg_co2e"]
 
             # Get building floor area
-            response = self.supabase.table("buildings").select("floor_area_m2,code").eq("id", building_id).execute()
+            response = self.supabase.table("sites").select("floor_area_m2,code").eq("id", site_id).execute()
 
             if not response.data:
-                self._logger.error(f"Building {building_id} not found")
+                self._logger.error(f"Building {site_id} not found")
                 return {}
 
             building = response.data[0]
             floor_area = building.get("floor_area_m2", 1000)  # Default 1000 m² if missing
-            building_code = building.get("code")
+            site_code = building.get("code")
 
             if floor_area <= 0:
                 floor_area = 1000
@@ -377,8 +373,8 @@ class CarbonCalculator:
             benchmark_ratio = round(intensity_kg_per_m2_per_day / sa_benchmark_kg_per_m2_per_day, 2)
 
             result = {
-                "building_id": building_id,
-                "building_code": building_code,
+                "site_id": site_id,
+                "site_code": site_code,
                 "period_start": period_start.isoformat(),
                 "period_end": period_end.isoformat(),
                 "total_emissions_kg_co2e": total_co2e,
@@ -398,7 +394,7 @@ class CarbonCalculator:
             }
 
             self._logger.info(
-                f"Carbon intensity for {building_code}: {intensity_kg_per_m2_per_day} kg/m²/day "
+                f"Carbon intensity for {site_code}: {intensity_kg_per_m2_per_day} kg/m²/day "
                 f"({result['rating']} vs SA benchmark {sa_benchmark_kg_per_m2_per_day})"
             )
             return result
@@ -409,7 +405,7 @@ class CarbonCalculator:
 
     def calculate_emissions_baseline(
         self,
-        building_id: str,
+        site_id: str,
         year: int,
     ) -> Dict:
         """
@@ -418,7 +414,7 @@ class CarbonCalculator:
         Used for year-over-year benchmarking and carbon reduction tracking.
 
         Args:
-            building_id: UUID of building
+            site_id: UUID of building
             year: Year for baseline calculation
 
         Returns:
@@ -429,16 +425,16 @@ class CarbonCalculator:
             period_start = date(year, 1, 1)
             period_end = date(year, 12, 31)
 
-            emissions = self.calculate_total_emissions(building_id, period_start, period_end)
+            emissions = self.calculate_total_emissions(site_id, period_start, period_end)
 
             # Get building floor area
-            response = self.supabase.table("buildings").select("floor_area_m2").eq("id", building_id).execute()
+            response = self.supabase.table("sites").select("floor_area_m2").eq("id", site_id).execute()
 
             floor_area = response.data[0]["floor_area_m2"] if response.data else 1000
 
             # Update emissions_baseline table
             baseline = {
-                "building_id": building_id,
+                "site_id": site_id,
                 "baseline_year": year,
                 "scope1_kg_co2e": emissions["scope1_kg_co2e"],
                 "scope2_kg_co2e": emissions["scope2_kg_co2e"],
@@ -449,11 +445,11 @@ class CarbonCalculator:
             # Upsert to database
             self.supabase.table("emissions_baseline").upsert(
                 baseline,
-                on_conflict="building_id,baseline_year",
+                on_conflict="site_id,baseline_year",
             ).execute()
 
             self._logger.info(
-                f"Baseline calculated for {building_id} year {year}: "
+                f"Baseline calculated for {site_id} year {year}: "
                 f"S1={baseline['scope1_kg_co2e']} S2={baseline['scope2_kg_co2e']} "
                 f"S3={baseline['scope3_kg_co2e']} Total={emissions['total_kg_co2e']}"
             )
@@ -466,7 +462,7 @@ class CarbonCalculator:
 
     def calculate_esg_score(
         self,
-        building_id: str,
+        site_id: str,
         period_start: date,
         period_end: date,
     ) -> Dict:
@@ -480,7 +476,7 @@ class CarbonCalculator:
         - Water efficiency: 10%
 
         Args:
-            building_id: UUID of building
+            site_id: UUID of building
             period_start: Start date
             period_end: End date
 
@@ -490,7 +486,7 @@ class CarbonCalculator:
         try:
             # Get carbon intensity and convert to score (0-100)
             # Higher intensity = lower score
-            intensity_data = self.calculate_carbon_intensity(building_id, period_start, period_end)
+            intensity_data = self.calculate_carbon_intensity(site_id, period_start, period_end)
 
             if not intensity_data:
                 return {}

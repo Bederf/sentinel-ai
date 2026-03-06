@@ -46,7 +46,7 @@ class DiagnosticResult(BaseModel):
     status: str  # "pending", "running", "completed", "failed"
     duration_seconds: Optional[int] = None
     device_inventory: Optional[dict] = None
-    building_config: Optional[dict] = None
+    site_config: Optional[dict] = None
     alarms_found: Optional[List[dict]] = None
     health_scores: Optional[dict] = None
     asset_details: Optional[List[dict]] = None
@@ -92,7 +92,7 @@ class DiagnosticsRequest(BaseModel):
     """Request to run diagnostics."""
 
     target: str = "full_system"  # "full_system", "building:{code}", "component:{name}"
-    building_code: Optional[str] = None
+    site_code: Optional[str] = None
 
 
 # ==================== Endpoints ====================
@@ -186,7 +186,7 @@ async def run_diagnostics(
     Returns immediately with diagnostic_id for polling.
 
     Args:
-        request: Diagnostics request with target and optional building_code
+        request: Diagnostics request with target and optional site_code
 
     Returns:
         {"diagnostic_id": "uuid", "status": "pending"}
@@ -194,7 +194,7 @@ async def run_diagnostics(
     try:
         diagnostic_id = await service.run_diagnostics(
             target=request.target,
-            building_code=request.building_code,
+            site_code=request.site_code,
         )
         return {
             "diagnostic_id": diagnostic_id,
@@ -230,7 +230,7 @@ async def get_diagnostic_results(diagnostic_id: str):
             status=result["status"],
             duration_seconds=result.get("duration_seconds"),
             device_inventory=result.get("results", {}).get("device_inventory"),
-            building_config=result.get("results", {}).get("buildings"),
+            site_config=result.get("results", {}).get("sites"),
             alarms_found=result.get("results", {}).get("alarms"),
             health_scores=result.get("results", {}).get("health_score"),
             asset_details=result.get("results", {}).get("asset_details"),
@@ -349,9 +349,9 @@ async def trigger_store_snapshot(background_tasks: BackgroundTasks):
 
 
 @router.get("/monitoring")
-async def get_monitoring_snapshot(building_id: Optional[str] = Query(None)):
+async def get_monitoring_snapshot(site_id: Optional[str] = Query(None)):
     """Unified monitoring snapshot — ingestion, control, alerts, quality gate."""
     from app.services.monitoring_service import MonitoringService
 
     svc = MonitoringService()
-    return await svc.get_snapshot(building_id=building_id)
+    return await svc.get_snapshot(site_id=site_id)

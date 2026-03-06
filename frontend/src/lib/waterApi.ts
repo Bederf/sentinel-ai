@@ -124,7 +124,7 @@ export interface ZoneConsumption {
 /** Floor consumption with zone breakdown */
 export interface FloorConsumption {
   floor: string;
-  building_id: string;
+  site_id: string;
   start_date: string;
   end_date: string;
   total_liters: number;
@@ -169,7 +169,7 @@ export interface ZoneTrendResponse {
 export interface ZoneComparison {
   zone_id: string;
   zone_name?: string;
-  building_id: string;
+  site_id: string;
   zone_daily_avg: number;
   building_daily_avg: number;
   difference_percent: number;
@@ -350,15 +350,15 @@ export async function getZoneTrend(
 
 /**
  * Compare zone consumption to building average
- * GET /api/water/zones/{zone_id}/comparison?building_id={site}&days={days}
+ * GET /api/water/zones/{zone_id}/comparison?site_id={site}&days={days}
  */
 export async function getZoneComparison(
   zoneId: string,
-  buildingId: string,
+  siteId: string,
   days = 30
 ): Promise<ZoneComparison> {
   const params = new URLSearchParams({
-    building_id: buildingId,
+    site_id: siteId,
     days: days.toString(),
   });
   return fetchJson<ZoneComparison>(

@@ -2,7 +2,7 @@
   "access_points": [
     {
       "point_id": "AP-001",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "zone": "L0",
       "location": "Main Entrance",
       "device_type": "reader",
@@ -11,7 +11,7 @@
     },
     {
       "point_id": "AP-002",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "zone": "B1",
       "location": "Server Room Door",
       "device_type": "reader",
@@ -20,7 +20,7 @@
     },
     {
       "point_id": "AP-003",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "zone": "L1",
       "location": "Parking Access Gate",
       "device_type": "lock",
@@ -29,7 +29,7 @@
     },
     {
       "point_id": "AP-004",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "zone": "R",
       "location": "Roof Access Door",
       "device_type": "sensor",
@@ -38,7 +38,7 @@
     },
     {
       "point_id": "AP-005",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "zone": "L2",
       "location": "Emergency Exit B",
       "device_type": "sensor",
@@ -312,7 +312,7 @@
       "alert_type": "after_hours",
       "timestamp": "2026-02-13T22:30:00",
       "location": "Server Room Door",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "severity": "warning",
       "status": "open",
       "description": "Unauthorized after-hours access detected at Server Room Door at 22:30",
@@ -326,7 +326,7 @@
       "alert_type": "tailgating",
       "timestamp": "2026-02-13T15:45:00",
       "location": "Main Entrance",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "severity": "info",
       "status": "acknowledged",
       "description": "Tailgating detected: multiple people entered on single badge swipe",

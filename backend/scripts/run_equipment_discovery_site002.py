@@ -17,7 +17,7 @@ import asyncio
 # Add backend to path
 sys.path.insert(0, "/opt/bms-intelligence/backend")
 
-from app.database.repositories.building_repository import BuildingRepository  # noqa: E402
+from app.database.repositories.site_repository import SiteRepository  # noqa: E402
 from app.services.lighting_discovery_service import SimulatedLightingDiscovery  # noqa: E402
 from app.services.bacnet_discovery_service import SimulatedBACnetDiscovery  # noqa: E402
 from app.services.modbus_discovery_service import SimulatedModbusDiscovery  # noqa: E402
@@ -82,13 +82,13 @@ async def discover_equipment_for_site(site_code: str):
     print(f"\n📡 Starting equipment discovery for {site_code}...")
 
     # Get building
-    building_repo = BuildingRepository()
+    building_repo = SiteRepository()
     building = building_repo.get_by_id(site_code)
     if not building:
         print(f"❌ Site {site_code} not found")
         return
 
-    _building_uuid = building["id"]
+    _site_uuid = building["id"]
     print(f"✅ Found site: {building['name']}")
 
     # Get all equipment

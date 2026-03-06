@@ -359,9 +359,9 @@ class SolarDemandService:
             return self._nmd_cache[site_id]
 
         try:
-            from app.database.repositories.building_repository import BuildingRepository
+            from app.database.repositories.site_repository import SiteRepository
 
-            building_repo = BuildingRepository()
+            building_repo = SiteRepository()
             building = await building_repo.get_by_code(site_id)
 
             if building and building.get("nmd_limit_kva"):
@@ -395,7 +395,7 @@ class SolarDemandService:
             hour = sast_t.hour + sast_t.minute / 60.0
 
             # Building load profile with morning and afternoon peaks
-            building_kw = self._simulated_building_load(hour)
+            building_kw = self._simulated_site_load(hour)
 
             # Solar offset (bell curve peaking at solar noon)
             solar_kw = self._simulated_solar_generation(hour)
@@ -468,7 +468,7 @@ class SolarDemandService:
         )
 
     @staticmethod
-    def _simulated_building_load(hour: float) -> float:
+    def _simulated_site_load(hour: float) -> float:
         """Simulate Site-002 building load profile (kW) by hour of day.
 
         Sandton office tower: base load ~900 kW (overnight), peak ~1750-1850 kW
@@ -538,7 +538,7 @@ class SolarDemandService:
         sast = now + timedelta(hours=2)
         hour = sast.hour + sast.minute / 60.0
 
-        building_kw = self._simulated_building_load(hour)
+        building_kw = self._simulated_site_load(hour)
         solar_kw = self._simulated_solar_generation(hour)
         net_demand = max(0, building_kw - solar_kw)
 
@@ -682,13 +682,13 @@ class SolarDemandService:
         elif hour < 12:
             # Between peaks: morning peak likely happened
             predicted_peak = max(
-                self._simulated_building_load(9.5),
-                self._simulated_building_load(14.5),
+                self._simulated_site_load(9.5),
+                self._simulated_site_load(14.5),
             )
             predicted_time = sast.replace(hour=14, minute=30).isoformat()
         elif hour < 16:
             # Afternoon: peak imminent or happening
-            predicted_peak = self._simulated_building_load(hour)
+            predicted_peak = self._simulated_site_load(hour)
             predicted_time = sast.isoformat()
         else:
             # After peak hours: use actual observed max

@@ -20,7 +20,7 @@ interface PointMatch {
 }
 
 interface PointMatchingStepProps {
-  buildingId: string;
+  siteId: string;
   columnMappings: Array<{ source_column: string; target_field: string }>;
   onNext: (data: { pointMatches: PointMatch[]; syncSettings: SyncSettings }) => void;
   onBack: () => void;
@@ -32,7 +32,7 @@ interface SyncSettings {
   store_aggregated_years: number;
 }
 
-export function PointMatchingStep({ buildingId, columnMappings: _columnMappings, onNext, onBack }: PointMatchingStepProps) {
+export function PointMatchingStep({ siteId, columnMappings: _columnMappings, onNext, onBack }: PointMatchingStepProps) {
   const [matches, setMatches] = useState<PointMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncSettings, setSyncSettings] = useState<SyncSettings>({
@@ -55,7 +55,7 @@ export function PointMatchingStep({ buildingId, columnMappings: _columnMappings,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          building_id: buildingId,
+          site_id: siteId,
           log_source_id: 'temp-source-id',
           bms_points: [] // Backend will extract from uploaded file
         })
@@ -92,7 +92,7 @@ export function PointMatchingStep({ buildingId, columnMappings: _columnMappings,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          building_id: buildingId,
+          site_id: siteId,
           log_source_id: 'temp-source-id',
           dry_run: false,
           sync_settings: syncSettings

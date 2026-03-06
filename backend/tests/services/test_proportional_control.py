@@ -10,7 +10,7 @@ Validates that:
 
 import pytest
 
-from app.services.building_schedule import BuildingSchedule
+from app.services.building_schedule import SiteSchedule
 from app.services.lifecycle_orchestrator import LifecycleOrchestrator, RAMP_RATES
 
 
@@ -23,14 +23,14 @@ def orchestrator():
 @pytest.fixture
 def schedule_occupied():
     """10 AM Wednesday — occupied business hours."""
-    bs = BuildingSchedule()
+    bs = SiteSchedule()
     return bs.get_state(10, day_of_week=2)
 
 
 @pytest.fixture
 def schedule_off():
     """2 AM Wednesday — HVAC off."""
-    bs = BuildingSchedule()
+    bs = SiteSchedule()
     return bs.get_state(2, day_of_week=2)
 
 
@@ -74,7 +74,7 @@ class TestFCUProportionalControl:
 
     def test_warm_room_opens_valve(self, orchestrator, schedule_occupied):
         """Room above setpoint should open valve proportionally."""
-        setpoint = orchestrator.building_schedule.COMFORT_SETPOINT
+        setpoint = orchestrator.site_schedule.COMFORT_SETPOINT
         # Warm room: 3°C above setpoint
         zone_id = "Zone-201"
         orchestrator.zone_temperatures[zone_id] = setpoint + 3.0
@@ -86,7 +86,7 @@ class TestFCUProportionalControl:
 
     def test_cool_room_closes_valve(self, orchestrator, schedule_occupied):
         """Room below setpoint should close valve to minimum."""
-        setpoint = orchestrator.building_schedule.COMFORT_SETPOINT
+        setpoint = orchestrator.site_schedule.COMFORT_SETPOINT
         zone_id = "Zone-201"
         orchestrator.zone_temperatures[zone_id] = setpoint - 2.0
         orchestrator._actuator_state["S002-FCU-201"] = {"valve_position": 10.0, "fan_speed": 1.0}
@@ -96,7 +96,7 @@ class TestFCUProportionalControl:
 
     def test_fan_follows_valve(self, orchestrator, schedule_occupied):
         """Fan speed should increase with valve demand."""
-        setpoint = orchestrator.building_schedule.COMFORT_SETPOINT
+        setpoint = orchestrator.site_schedule.COMFORT_SETPOINT
         zone_id = "Zone-201"
         # Very warm room — high valve demand
         orchestrator.zone_temperatures[zone_id] = setpoint + 4.0
@@ -120,7 +120,7 @@ class TestAHUSupplyAirReset:
 
     def test_high_demand_lowers_sat(self, orchestrator, schedule_occupied):
         """Warm zones should drive SAT lower (toward 12°C)."""
-        setpoint = orchestrator.building_schedule.COMFORT_SETPOINT
+        setpoint = orchestrator.site_schedule.COMFORT_SETPOINT
         # Many zones warm
         for i in range(1, 10):
             orchestrator.zone_temperatures[f"Zone-{100 + i}"] = setpoint + 3.0
@@ -131,7 +131,7 @@ class TestAHUSupplyAirReset:
 
     def test_satisfied_zones_raise_sat(self, orchestrator, schedule_occupied):
         """Satisfied zones should allow SAT to rise (toward 16°C)."""
-        setpoint = orchestrator.building_schedule.COMFORT_SETPOINT
+        setpoint = orchestrator.site_schedule.COMFORT_SETPOINT
         # All zones at setpoint
         for i in range(1, 10):
             orchestrator.zone_temperatures[f"Zone-{100 + i}"] = setpoint
@@ -146,7 +146,7 @@ class TestPumpAffinityLaws:
 
     def test_dp_follows_speed_squared(self, orchestrator, schedule_occupied):
         """Differential pressure should scale with speed squared."""
-        setpoint = orchestrator.building_schedule.COMFORT_SETPOINT
+        setpoint = orchestrator.site_schedule.COMFORT_SETPOINT
         # Set some zones warm so pump speeds up
         for i in range(1, 5):
             orchestrator.zone_temperatures[f"Zone-{100 + i}"] = setpoint + 2.0
@@ -165,8 +165,8 @@ class TestMultiHourRamping:
 
     def test_morning_startup_ramp(self, orchestrator):
         """Morning startup should ramp valve up over multiple hours."""
-        bs = BuildingSchedule()
-        setpoint = orchestrator.building_schedule.COMFORT_SETPOINT
+        bs = SiteSchedule()
+        setpoint = orchestrator.site_schedule.COMFORT_SETPOINT
         zone_id = "Zone-201"
         # Zone is warm in the morning (building was off overnight)
         orchestrator.zone_temperatures[zone_id] = setpoint + 2.5
@@ -187,8 +187,8 @@ class TestMultiHourRamping:
 
     def test_evening_shutdown_gradual(self, orchestrator):
         """Evening shutdown should not snap to zero."""
-        bs = BuildingSchedule()
-        setpoint = orchestrator.building_schedule.COMFORT_SETPOINT
+        bs = SiteSchedule()
+        setpoint = orchestrator.site_schedule.COMFORT_SETPOINT
         zone_id = "Zone-201"
         orchestrator.zone_temperatures[zone_id] = setpoint + 1.0
         # Prime with a midday valve position

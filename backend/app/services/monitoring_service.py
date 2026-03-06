@@ -63,24 +63,24 @@ class MonitoringService:
         self._integration_repo = IntegrationRepository()
         self._audit_logger = AuditLogger()
 
-    async def get_snapshot(self, building_id: Optional[str] = None) -> MonitoringSnapshot:
+    async def get_snapshot(self, site_id: Optional[str] = None) -> MonitoringSnapshot:
         """Build a unified monitoring snapshot."""
         mode = settings.resolved_ingestion_mode
         is_live = settings.is_live_mode
 
-        ingestion = self._collect_ingestion_kpis(building_id)
+        ingestion = self._collect_ingestion_kpis(site_id)
         control = self._collect_control_kpis()
-        commissioning = await self._collect_commissioning(building_id, mode)
-        alerts = self._evaluate_alert_rules(ingestion, control, commissioning, mode, is_live, building_id)
+        commissioning = await self._collect_commissioning(site_id, mode)
+        alerts = self._evaluate_alert_rules(ingestion, control, commissioning, mode, is_live, site_id)
         trend = self._build_trend_buckets(control)
 
         # Phase 109: Quality gate evaluation using already-collected KPIs
-        quality_gate = self._evaluate_quality_gate(ingestion, commissioning, mode, building_id)
+        quality_gate = self._evaluate_quality_gate(ingestion, commissioning, mode, site_id)
 
         return MonitoringSnapshot(
             ingestion_mode=mode.value,
             is_live=is_live,
-            building_id=building_id,
+            site_id=site_id,
             ingestion=ingestion,
             control=control,
             commissioning=commissioning,
@@ -94,10 +94,10 @@ class MonitoringService:
     # Ingestion KPIs
     # ------------------------------------------------------------------
 
-    def _collect_ingestion_kpis(self, building_id: Optional[str] = None) -> IngestionKPIs:
+    def _collect_ingestion_kpis(self, site_id: Optional[str] = None) -> IngestionKPIs:
         """Pull quality metrics and integration health from the integration repo."""
         try:
-            health = self._integration_repo.get_integration_health(building_id)
+            health = self._integration_repo.get_integration_health(site_id)
         except Exception:
             health = {
                 "total_points_mapped": 0,
@@ -107,14 +107,14 @@ class MonitoringService:
         total_points = health.get("total_points_mapped") or 0
         unmatched = health.get("unmatched_points") or 0
 
-        # Quality metrics need a building_id; fall back to defaults if absent
+        # Quality metrics need a site_id; fall back to defaults if absent
         freshness = 9999.0
         error_rate = 0.0
         match_coverage = 0.0
 
-        if building_id:
+        if site_id:
             try:
-                qm = self._integration_repo.get_quality_metrics(building_id)
+                qm = self._integration_repo.get_quality_metrics(site_id)
                 freshness = qm.get("data_freshness_hours") or 9999.0
                 error_rate = qm.get("error_rate") or 0.0
                 match_coverage = qm.get("match_coverage") or 0.0
@@ -126,7 +126,7 @@ class MonitoringService:
                 matched = total_points - unmatched
                 match_coverage = round(matched / total_points * 100, 1)
 
-        provenance = self._get_provenance_summary(building_id)
+        provenance = self._get_provenance_summary(site_id)
 
         return IngestionKPIs(
             freshness_hours=round(freshness, 2),
@@ -178,25 +178,25 @@ class MonitoringService:
 
     async def _collect_commissioning(
         self,
-        building_id: Optional[str],
+        site_id: Optional[str],
         mode: IngestionMode,
     ) -> Optional[CommissioningSnapshot]:
         """Run commissioning scorecard if not in SIMULATION mode.
 
-        Per adjustment #3: if is_live_mode and building_id is missing,
+        Per adjustment #3: if is_live_mode and site_id is missing,
         return None (don't silently run commissioning on None).
         """
         if mode == IngestionMode.SIMULATION:
             return None
 
-        if not building_id:
+        if not site_id:
             return None
 
         try:
             from app.services.commissioning_service import CommissioningService
 
             svc = CommissioningService()
-            scorecard = await svc.run_scorecard(building_id)
+            scorecard = await svc.run_scorecard(site_id)
 
             gates_passed = sum(1 for g in scorecard.gates if g.passed)
             gates_total = len(scorecard.gates)
@@ -225,7 +225,7 @@ class MonitoringService:
         commissioning: Optional[CommissioningSnapshot],
         mode: IngestionMode,
         is_live: bool,
-        building_id: Optional[str] = None,
+        site_id: Optional[str] = None,
     ) -> list[MonitoringAlert]:
         """Evaluate monitoring alert rules.
 
@@ -239,7 +239,7 @@ class MonitoringService:
 
         # Pull existing integration health alerts (dedup adjustment #6)
         try:
-            health = self._integration_repo.get_integration_health(building_id)
+            health = self._integration_repo.get_integration_health(site_id)
             # Re-create the same alert logic from api/integration.py
             # to surface them in our snapshot without calling the API endpoint
             self._import_integration_alerts(alerts, health, now)
@@ -411,7 +411,7 @@ class MonitoringService:
         ingestion: "IngestionKPIs",
         commissioning: "CommissioningSnapshot | None",
         mode: "IngestionMode",
-        building_id: "str | None",
+        site_id: "str | None",
     ) -> dict | None:
         """Evaluate quality gate using already-collected KPIs.
 
@@ -468,12 +468,12 @@ class MonitoringService:
     # Provenance summary
     # ------------------------------------------------------------------
 
-    def _get_provenance_summary(self, building_id: Optional[str] = None) -> dict[str, int]:
+    def _get_provenance_summary(self, site_id: Optional[str] = None) -> dict[str, int]:
         """Bucket log sources by connection type into live_protocol vs file_manual."""
         result = {"live_protocol": 0, "file_manual": 0}
 
         try:
-            sources = self._integration_repo.get_log_sources(building_id=building_id, is_active=True)
+            sources = self._integration_repo.get_log_sources(site_id=site_id, is_active=True)
             for source in sources:
                 conn_type = source.get("connection_type", "")
                 if conn_type in _LIVE_PROTOCOLS:

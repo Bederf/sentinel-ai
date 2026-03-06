@@ -2,7 +2,7 @@
   {
     "id": "0085d2b3-366d-4fe0-9eb1-d27ba783715d",
     "desk_id": "192",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -34,7 +34,7 @@
   {
     "id": "02274e4a-86a1-454d-b1d5-7d60c9619f65",
     "desk_id": "103",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -66,7 +66,7 @@
   {
     "id": "028df74d-442d-43f4-9a93-f88484645339",
     "desk_id": "109",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -98,7 +98,7 @@
   {
     "id": "03fa4177-e4a8-4838-979f-f38a80bd7a3b",
     "desk_id": "142",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -130,7 +130,7 @@
   {
     "id": "04774c46-674e-4bb1-8ca2-65f0bf536dec",
     "desk_id": "314",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -162,7 +162,7 @@
   {
     "id": "04b03fcf-1fe5-4772-9f5c-8e5301a72034",
     "desk_id": "260",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -194,7 +194,7 @@
   {
     "id": "04eb8b23-1a26-4d89-a4db-21e72700e965",
     "desk_id": "025",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -226,7 +226,7 @@
   {
     "id": "05b6007e-f40d-4d7f-ae86-0a043f9b25ce",
     "desk_id": "303",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -258,7 +258,7 @@
   {
     "id": "05c2e017-3b2b-4367-b46e-fcadc907b340",
     "desk_id": "091",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -290,7 +290,7 @@
   {
     "id": "05d19924-336a-41c5-a8f5-0d73ff9f4f35",
     "desk_id": "042",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -322,7 +322,7 @@
   {
     "id": "075a4e7e-8b4b-484c-91ac-97120a0193a9",
     "desk_id": "348",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -354,7 +354,7 @@
   {
     "id": "07a6b171-59f0-4418-8dd0-46cff7696c03",
     "desk_id": "133",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -386,7 +386,7 @@
   {
     "id": "086e2dcc-db70-4188-9d20-a83dce99a34f",
     "desk_id": "274",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -418,7 +418,7 @@
   {
     "id": "0877d7c1-01d3-4acb-a1a2-961cf32e9e2d",
     "desk_id": "245",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -450,7 +450,7 @@
   {
     "id": "08eb7bdd-82cd-4feb-9778-f14d2fd1fe66",
     "desk_id": "019",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -482,7 +482,7 @@
   {
     "id": "0922339f-9420-4212-96fb-f2ade7f3f36b",
     "desk_id": "073",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -514,7 +514,7 @@
   {
     "id": "0949076f-1b20-4c25-9db8-2301256b9e70",
     "desk_id": "335",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -546,7 +546,7 @@
   {
     "id": "09c33efa-e87b-4d57-95e2-b91b39162504",
     "desk_id": "095",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -578,7 +578,7 @@
   {
     "id": "0a7aa665-f189-414e-8194-c7454b1d99d3",
     "desk_id": "125",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -610,7 +610,7 @@
   {
     "id": "0b30822f-d019-46cd-a419-6a43255bd637",
     "desk_id": "090",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -642,7 +642,7 @@
   {
     "id": "0bb694dc-0db5-4d60-9a67-33cdcbd9ab0c",
     "desk_id": "168",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -674,7 +674,7 @@
   {
     "id": "0c1a2ef2-3fcd-4667-90ba-da883fd030ba",
     "desk_id": "044",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -706,7 +706,7 @@
   {
     "id": "0ca09a8b-56a4-4b7d-ba99-b3fe40d6a0cd",
     "desk_id": "128",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -738,7 +738,7 @@
   {
     "id": "0cd8c817-316c-4579-b2fc-3b67e6db8ac8",
     "desk_id": "225",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -770,7 +770,7 @@
   {
     "id": "0d77cdc4-3dc0-49fd-a044-7664d787b35f",
     "desk_id": "361",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -802,7 +802,7 @@
   {
     "id": "0d8b7ff7-0c12-45a0-bd22-d19adc68ae70",
     "desk_id": "220",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -834,7 +834,7 @@
   {
     "id": "0dd3a5fb-6f56-4fb0-8b3e-b304730a7d89",
     "desk_id": "062",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -866,7 +866,7 @@
   {
     "id": "0e46d6ae-0b36-48ac-a57b-ae3b7dd86589",
     "desk_id": "164",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -898,7 +898,7 @@
   {
     "id": "0e4eed86-2d3e-4e34-bade-901012b07875",
     "desk_id": "277",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -930,7 +930,7 @@
   {
     "id": "0eae9193-a4ee-41d3-b81d-197c2f8fe2fd",
     "desk_id": "144",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -962,7 +962,7 @@
   {
     "id": "0f42d225-00f3-4739-90e1-0b8c00c8df3e",
     "desk_id": "265",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -994,7 +994,7 @@
   {
     "id": "0fa86934-9d69-49d6-bd4c-0c48699f5a41",
     "desk_id": "203",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -1026,7 +1026,7 @@
   {
     "id": "1024fc1e-7041-4869-9f31-c52c8be9f718",
     "desk_id": "351",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -1058,7 +1058,7 @@
   {
     "id": "10862a3a-81db-4006-bc6c-e7e9674a63f9",
     "desk_id": "116",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -1090,7 +1090,7 @@
   {
     "id": "10ba27a6-27eb-449c-b724-20fd7829bf3f",
     "desk_id": "310",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -1122,7 +1122,7 @@
   {
     "id": "10bf588a-71f7-4e75-b4fa-b31142a210ae",
     "desk_id": "376",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -1154,7 +1154,7 @@
   {
     "id": "1125da6b-e086-4921-926e-1b21442e5a7a",
     "desk_id": "268",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -1186,7 +1186,7 @@
   {
     "id": "125fbf24-b8cf-4973-a725-da64060a209e",
     "desk_id": "382",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -1218,7 +1218,7 @@
   {
     "id": "13e342cb-f44f-4ffb-998f-3a70ab96162d",
     "desk_id": "024",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -1250,7 +1250,7 @@
   {
     "id": "1467c71d-11ef-4842-b0ad-043af0c02b16",
     "desk_id": "398",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -1282,7 +1282,7 @@
   {
     "id": "14a16579-34e8-4078-b277-34ee4f4fe37a",
     "desk_id": "200",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -1314,7 +1314,7 @@
   {
     "id": "16bf7648-beff-4a89-b043-717bfd00632a",
     "desk_id": "009",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -1346,7 +1346,7 @@
   {
     "id": "1764b38f-d02f-45a1-940a-edd4ab02bb29",
     "desk_id": "196",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -1378,7 +1378,7 @@
   {
     "id": "18531c82-2892-412b-8270-bf5eb872a705",
     "desk_id": "154",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -1410,7 +1410,7 @@
   {
     "id": "189b13bf-94a0-49ec-a606-d415c8cbc954",
     "desk_id": "371",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -1442,7 +1442,7 @@
   {
     "id": "19b9bad8-3457-4906-b1e5-b47ec9a62103",
     "desk_id": "074",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -1474,7 +1474,7 @@
   {
     "id": "1ae7c680-a1fd-4d3b-810e-4cc725f133ab",
     "desk_id": "375",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -1506,7 +1506,7 @@
   {
     "id": "1b3108e9-924a-4164-a5d8-0b84991cda05",
     "desk_id": "130",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -1538,7 +1538,7 @@
   {
     "id": "1c9dacc2-4fcb-41ee-9502-3a20afff1458",
     "desk_id": "337",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -1570,7 +1570,7 @@
   {
     "id": "1cc6c44a-826c-4222-b978-9fdf3423fbac",
     "desk_id": "043",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -1602,7 +1602,7 @@
   {
     "id": "1d65fd8e-cec2-4f11-9042-9b9d802bcc11",
     "desk_id": "313",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -1634,7 +1634,7 @@
   {
     "id": "1d9b5205-fda1-4b90-93dd-fc767a92db6b",
     "desk_id": "325",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -1666,7 +1666,7 @@
   {
     "id": "1ddcda13-e2fd-44c7-a848-d8f3f4b47d1f",
     "desk_id": "252",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -1698,7 +1698,7 @@
   {
     "id": "1e0f1995-5e93-4b43-bc06-4bf044869ab4",
     "desk_id": "385",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -1730,7 +1730,7 @@
   {
     "id": "1f42eed2-c70c-4c1f-a06d-3a67c7580cf4",
     "desk_id": "346",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -1762,7 +1762,7 @@
   {
     "id": "1ff387f2-7b4a-484a-81c9-623ef26e02f8",
     "desk_id": "185",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -1794,7 +1794,7 @@
   {
     "id": "208a23ee-3acc-43d5-a1ff-9459474a4ced",
     "desk_id": "110",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -1826,7 +1826,7 @@
   {
     "id": "2138780c-4153-454d-848e-6e638e7b260b",
     "desk_id": "153",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -1858,7 +1858,7 @@
   {
     "id": "2177166a-dff5-4f63-a72b-51e4144a754a",
     "desk_id": "118",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -1890,7 +1890,7 @@
   {
     "id": "23e19ae5-fecc-48c4-933f-e91b96a91287",
     "desk_id": "065",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -1922,7 +1922,7 @@
   {
     "id": "24f23a83-3dc5-423d-8b6c-9f700ab0a9d5",
     "desk_id": "079",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -1954,7 +1954,7 @@
   {
     "id": "25156fa3-a712-41ef-8ef9-366ee404b43a",
     "desk_id": "228",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -1986,7 +1986,7 @@
   {
     "id": "2520999f-2bcf-485b-bcff-f80b6479679b",
     "desk_id": "061",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -2018,7 +2018,7 @@
   {
     "id": "2580cd58-260e-42e6-ad50-f76b4def6efd",
     "desk_id": "219",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -2050,7 +2050,7 @@
   {
     "id": "2719b08d-f0cc-45d5-a33a-02706e3fbc02",
     "desk_id": "336",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -2082,7 +2082,7 @@
   {
     "id": "279d70b7-fa59-4b40-a0a5-b655a16793a5",
     "desk_id": "175",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -2114,7 +2114,7 @@
   {
     "id": "27d21d3c-064c-4bbb-a862-5e7cc0779fdd",
     "desk_id": "269",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -2146,7 +2146,7 @@
   {
     "id": "2b17ca5b-ee22-4eae-b41b-89f40efb0ff1",
     "desk_id": "357",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -2178,7 +2178,7 @@
   {
     "id": "2cc99346-aab7-4ba2-9d91-85fd75f6142e",
     "desk_id": "030",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -2210,7 +2210,7 @@
   {
     "id": "2d20f0a8-d1ed-43ad-9b00-c5dada90aa14",
     "desk_id": "004",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -2242,7 +2242,7 @@
   {
     "id": "2f007ba3-a2c5-4693-9307-6e847ac2a558",
     "desk_id": "104",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -2274,7 +2274,7 @@
   {
     "id": "2f741cd6-0e7c-4ca3-be4a-482d1d3e38c7",
     "desk_id": "290",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -2306,7 +2306,7 @@
   {
     "id": "2f915fc8-12d0-4b30-97a8-d2123057874d",
     "desk_id": "094",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -2338,7 +2338,7 @@
   {
     "id": "2fd9956c-15c3-43cf-992e-00fcfc3d145d",
     "desk_id": "251",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -2370,7 +2370,7 @@
   {
     "id": "30e75068-b560-4daa-8da7-c3a67d17a549",
     "desk_id": "242",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -2402,7 +2402,7 @@
   {
     "id": "314b5120-528e-4708-9bbf-73b618ff354d",
     "desk_id": "041",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -2434,7 +2434,7 @@
   {
     "id": "32b556d3-9ded-45de-bee3-b36e2ee4c111",
     "desk_id": "037",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -2466,7 +2466,7 @@
   {
     "id": "337c509c-4a4b-4943-8dcb-b8bbd1e212ca",
     "desk_id": "108",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -2498,7 +2498,7 @@
   {
     "id": "33b80182-f711-4354-b9eb-5b3e54010e9c",
     "desk_id": "089",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -2530,7 +2530,7 @@
   {
     "id": "3559fc37-92d0-479f-950e-316b8d4fbb18",
     "desk_id": "010",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -2562,7 +2562,7 @@
   {
     "id": "3582017e-ee4a-4495-9f8c-c96180966d3a",
     "desk_id": "099",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -2594,7 +2594,7 @@
   {
     "id": "36331c4e-0a01-4a5a-9199-d86ca60262a3",
     "desk_id": "298",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -2626,7 +2626,7 @@
   {
     "id": "37220b39-0a9a-4c40-985f-3a327ea1f0d6",
     "desk_id": "113",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -2658,7 +2658,7 @@
   {
     "id": "3899c954-0d87-45a2-b848-b0fe7eaf9b7f",
     "desk_id": "211",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -2690,7 +2690,7 @@
   {
     "id": "38ac998f-38bf-4594-bf6d-c3333593cd94",
     "desk_id": "215",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -2722,7 +2722,7 @@
   {
     "id": "38f8eaeb-586c-46e0-b71e-23721879fe25",
     "desk_id": "271",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -2754,7 +2754,7 @@
   {
     "id": "3920a5c6-2722-493c-9413-8e808f1c66e8",
     "desk_id": "027",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -2786,7 +2786,7 @@
   {
     "id": "39695562-40b8-4588-87aa-7c2733e5e802",
     "desk_id": "233",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -2818,7 +2818,7 @@
   {
     "id": "39825340-d635-4f97-943c-0cf40c4f5399",
     "desk_id": "349",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -2850,7 +2850,7 @@
   {
     "id": "399b40d9-a95c-4268-93a7-c553a30307ba",
     "desk_id": "366",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -2882,7 +2882,7 @@
   {
     "id": "3a182920-c289-4485-94b3-184f81eff962",
     "desk_id": "315",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -2914,7 +2914,7 @@
   {
     "id": "3a1af570-7d89-4142-acf0-d0dc1b0e4776",
     "desk_id": "400",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -2946,7 +2946,7 @@
   {
     "id": "3a8cc76a-f339-41a6-97ad-c4ef873f5ba5",
     "desk_id": "327",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -2978,7 +2978,7 @@
   {
     "id": "3a9577db-dd26-4887-868b-04661126ccd2",
     "desk_id": "114",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -3010,7 +3010,7 @@
   {
     "id": "3ad1d481-31a5-4088-b0eb-b8651c71446f",
     "desk_id": "176",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -3042,7 +3042,7 @@
   {
     "id": "3b05366b-c3d8-4990-95ca-aa32ac50f566",
     "desk_id": "377",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -3074,7 +3074,7 @@
   {
     "id": "3bab8535-e67c-4e9d-a77f-b1bf8da94f55",
     "desk_id": "145",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -3106,7 +3106,7 @@
   {
     "id": "3bc9e628-364e-4625-92f3-25626364d043",
     "desk_id": "340",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -3138,7 +3138,7 @@
   {
     "id": "3c2ce309-1223-40bc-ad50-ba062ad7c486",
     "desk_id": "187",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -3170,7 +3170,7 @@
   {
     "id": "3cd13ccb-c2b2-4adf-a8ee-2be7f9fe6e48",
     "desk_id": "096",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -3202,7 +3202,7 @@
   {
     "id": "3dca170a-704a-48a7-8b4a-316c0ce1364a",
     "desk_id": "256",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -3234,7 +3234,7 @@
   {
     "id": "3e019207-dac0-48ff-9909-9aa7785df0ce",
     "desk_id": "088",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -3266,7 +3266,7 @@
   {
     "id": "3e57f524-ff3f-4991-895b-914cd6aa8cda",
     "desk_id": "085",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -3298,7 +3298,7 @@
   {
     "id": "3ecf7a57-ca07-4329-8eee-21f1d30cbe52",
     "desk_id": "052",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -3330,7 +3330,7 @@
   {
     "id": "401d6448-7d06-4725-b540-fd1498e737e1",
     "desk_id": "117",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -3362,7 +3362,7 @@
   {
     "id": "40f3939e-bd64-4df3-85f3-a76f4937516d",
     "desk_id": "169",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -3394,7 +3394,7 @@
   {
     "id": "41311959-1e15-4919-8d48-d0bc82418b99",
     "desk_id": "247",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -3426,7 +3426,7 @@
   {
     "id": "420148d4-af0a-43ad-bb44-65b5ce4c0d69",
     "desk_id": "358",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -3458,7 +3458,7 @@
   {
     "id": "424fe89a-f93d-4208-9e1b-eed416f9c66f",
     "desk_id": "226",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -3490,7 +3490,7 @@
   {
     "id": "428551e8-a36b-4c16-a67f-a048b0f4dca0",
     "desk_id": "255",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -3522,7 +3522,7 @@
   {
     "id": "42f34d90-ce43-45c7-b43f-5ca12e88db4f",
     "desk_id": "014",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -3554,7 +3554,7 @@
   {
     "id": "43aa73b5-f3bf-4af0-924f-2b7526d6e410",
     "desk_id": "015",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -3586,7 +3586,7 @@
   {
     "id": "4438fff9-6b14-45c1-b0a9-c7937baef48f",
     "desk_id": "285",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -3618,7 +3618,7 @@
   {
     "id": "4451f1a1-f57f-4761-976b-54d58d836a38",
     "desk_id": "275",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -3650,7 +3650,7 @@
   {
     "id": "448ce447-647c-456c-b0ad-7a7673192e75",
     "desk_id": "353",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -3682,7 +3682,7 @@
   {
     "id": "4500ef85-38bc-4696-baf5-7fc54b1bc7ed",
     "desk_id": "306",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -3714,7 +3714,7 @@
   {
     "id": "45656f80-6d6f-4b76-a7bc-39896506c72d",
     "desk_id": "137",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -3746,7 +3746,7 @@
   {
     "id": "45d2e94e-08a3-4e8c-b837-3861f6ff30e8",
     "desk_id": "352",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -3778,7 +3778,7 @@
   {
     "id": "46253fba-d8b1-457e-8671-569e1e533657",
     "desk_id": "392",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -3810,7 +3810,7 @@
   {
     "id": "46b47786-3136-4eb7-948a-2c0b341961df",
     "desk_id": "180",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -3842,7 +3842,7 @@
   {
     "id": "4881b212-7e1d-46d5-9dee-1cd6a554d9fd",
     "desk_id": "071",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -3874,7 +3874,7 @@
   {
     "id": "4a056670-9c5e-42f8-9318-58dfa0908099",
     "desk_id": "262",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -3906,7 +3906,7 @@
   {
     "id": "4bbe6f6d-efff-4d38-8303-17ab1222d344",
     "desk_id": "354",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -3938,7 +3938,7 @@
   {
     "id": "4d625150-9e84-40a2-9dfc-7692cb4dc5ed",
     "desk_id": "057",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -3970,7 +3970,7 @@
   {
     "id": "4e127599-723b-4709-9fcf-7749fbf98853",
     "desk_id": "134",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -4002,7 +4002,7 @@
   {
     "id": "4e67d27e-b22e-415a-b32a-45d3dbd3e3d5",
     "desk_id": "066",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -4034,7 +4034,7 @@
   {
     "id": "4eb67f25-0281-44bc-b35d-d10fc1ee2a2b",
     "desk_id": "173",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -4066,7 +4066,7 @@
   {
     "id": "4f1f7a0d-2caa-4c30-80f6-ccaa3118fdd5",
     "desk_id": "021",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -4098,7 +4098,7 @@
   {
     "id": "502e1c71-4c07-4e2d-a094-4a6a3b2c30ab",
     "desk_id": "181",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -4130,7 +4130,7 @@
   {
     "id": "50a87520-84af-4203-a422-e05ecc2434d3",
     "desk_id": "295",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -4162,7 +4162,7 @@
   {
     "id": "510a50d9-956a-4870-8eaf-821a1ff9d61e",
     "desk_id": "239",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -4194,7 +4194,7 @@
   {
     "id": "52a6126a-827b-4fcd-aaba-34436855d4d1",
     "desk_id": "355",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -4226,7 +4226,7 @@
   {
     "id": "52eb77be-94f5-446c-82a4-c64e0b6391b6",
     "desk_id": "374",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -4258,7 +4258,7 @@
   {
     "id": "53f529a7-63a7-41b7-b9cc-a2917600f980",
     "desk_id": "381",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -4290,7 +4290,7 @@
   {
     "id": "55d6c954-4296-45a8-a13b-1d56b0580bfc",
     "desk_id": "397",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -4322,7 +4322,7 @@
   {
     "id": "56076766-d2ea-44db-9b08-e84b94cbff67",
     "desk_id": "166",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -4354,7 +4354,7 @@
   {
     "id": "56761b93-a9f5-47c0-a784-05e71f2e7cb2",
     "desk_id": "178",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -4386,7 +4386,7 @@
   {
     "id": "56b02210-d252-4c25-9fc9-622339da02b4",
     "desk_id": "201",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -4418,7 +4418,7 @@
   {
     "id": "5727ab2a-5b02-46e3-91c7-b68206dc3ac6",
     "desk_id": "241",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -4450,7 +4450,7 @@
   {
     "id": "582a256d-4a25-4375-99e0-e9a9bc0ce54c",
     "desk_id": "018",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -4482,7 +4482,7 @@
   {
     "id": "585c07c6-41cf-4b68-a5d9-b6b4c6460a05",
     "desk_id": "107",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -4514,7 +4514,7 @@
   {
     "id": "5899a4d4-c1ac-4672-91ac-ea045e02ad3b",
     "desk_id": "075",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -4546,7 +4546,7 @@
   {
     "id": "58ed60bd-6888-4062-807a-5eea8db91a8a",
     "desk_id": "284",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -4578,7 +4578,7 @@
   {
     "id": "59738c1d-1246-48a2-8800-9eebad583e29",
     "desk_id": "362",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -4610,7 +4610,7 @@
   {
     "id": "5aa20f9d-c282-421b-828f-362296a2ef18",
     "desk_id": "048",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -4642,7 +4642,7 @@
   {
     "id": "5b8baa36-3e1e-4286-9f88-096c49203954",
     "desk_id": "087",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -4674,7 +4674,7 @@
   {
     "id": "5b992c66-9d7e-40e1-8982-add269af3a6b",
     "desk_id": "038",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -4706,7 +4706,7 @@
   {
     "id": "5ba9622c-ce94-454b-9ded-754888236b67",
     "desk_id": "316",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -4738,7 +4738,7 @@
   {
     "id": "5bc7523f-c4e7-42e8-bca0-a904a730e760",
     "desk_id": "287",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -4770,7 +4770,7 @@
   {
     "id": "5d947ab1-8789-4b54-ad1a-fe4fa8419bc1",
     "desk_id": "270",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -4802,7 +4802,7 @@
   {
     "id": "5de460bd-cd4c-483a-bd0c-3948300be05b",
     "desk_id": "257",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -4834,7 +4834,7 @@
   {
     "id": "5ecf89aa-eca8-4a3d-bf17-414a17f7a0a3",
     "desk_id": "077",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -4866,7 +4866,7 @@
   {
     "id": "5f7b4bc2-6274-4a89-9bfd-fdb9ce104379",
     "desk_id": "151",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -4898,7 +4898,7 @@
   {
     "id": "5f7f0cb4-a048-4d14-9cfe-fd6df7fb551c",
     "desk_id": "318",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -4930,7 +4930,7 @@
   {
     "id": "603c70ae-47a6-4d95-aa34-79ed69c9ee50",
     "desk_id": "263",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -4962,7 +4962,7 @@
   {
     "id": "60b9fb6b-8ddb-44a9-818b-4f2c31b9d4fa",
     "desk_id": "328",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -4994,7 +4994,7 @@
   {
     "id": "616db41f-5160-4add-86f8-1d3210c1c1af",
     "desk_id": "221",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -5026,7 +5026,7 @@
   {
     "id": "618f33da-ab5d-4d92-b804-f03645721600",
     "desk_id": "236",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -5058,7 +5058,7 @@
   {
     "id": "6195f087-85a0-4976-9a35-650146855b62",
     "desk_id": "206",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -5090,7 +5090,7 @@
   {
     "id": "621bf885-59f0-4d3e-8139-a3c340a7fb06",
     "desk_id": "373",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -5122,7 +5122,7 @@
   {
     "id": "622158a9-7bb4-492c-a32f-63eab0af25d6",
     "desk_id": "076",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -5154,7 +5154,7 @@
   {
     "id": "63308d3f-ffe5-433c-99e9-24c3203b94e5",
     "desk_id": "183",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -5186,7 +5186,7 @@
   {
     "id": "63d6e31c-c06b-4138-ba1a-5a788573a75f",
     "desk_id": "341",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -5218,7 +5218,7 @@
   {
     "id": "64184612-c9be-437a-8395-1a820ff3ec03",
     "desk_id": "184",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -5250,7 +5250,7 @@
   {
     "id": "64dc0f44-0751-40ef-bacc-bef0e7e8edbd",
     "desk_id": "217",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -5282,7 +5282,7 @@
   {
     "id": "6502807a-152a-407a-941d-e50ff0f3bd6e",
     "desk_id": "199",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -5314,7 +5314,7 @@
   {
     "id": "6735c69d-08ea-40cc-b478-837473130ac3",
     "desk_id": "013",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -5346,7 +5346,7 @@
   {
     "id": "677ec4f0-8e9c-430a-b6f1-7037934f206f",
     "desk_id": "294",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -5378,7 +5378,7 @@
   {
     "id": "67cdf43f-6b48-433c-aa9f-0eeefb9b50d5",
     "desk_id": "267",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -5410,7 +5410,7 @@
   {
     "id": "68b4522b-7239-4ba9-a75a-c8d8de365d6e",
     "desk_id": "119",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -5442,7 +5442,7 @@
   {
     "id": "6be8fbac-1818-496d-89bf-148be8dba620",
     "desk_id": "234",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -5474,7 +5474,7 @@
   {
     "id": "6c7464c7-7fcf-420a-9c8d-9089abee8cd1",
     "desk_id": "053",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -5506,7 +5506,7 @@
   {
     "id": "6ce67be8-8ba7-4016-bbbe-62b391a4199d",
     "desk_id": "106",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -5538,7 +5538,7 @@
   {
     "id": "6cf4c455-8a8a-4c34-97bb-d76dff5a71d9",
     "desk_id": "072",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -5570,7 +5570,7 @@
   {
     "id": "6d615f93-9112-4f8d-b6b2-387f7122c4ed",
     "desk_id": "083",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -5602,7 +5602,7 @@
   {
     "id": "6e46ef10-9238-4f98-8360-e393e84f5836",
     "desk_id": "356",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -5634,7 +5634,7 @@
   {
     "id": "6f5b2afc-e6d5-4fec-b92d-647d3dc66205",
     "desk_id": "100",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -5666,7 +5666,7 @@
   {
     "id": "6f88a253-9b9b-419b-98d0-b0e948910d7e",
     "desk_id": "011",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -5698,7 +5698,7 @@
   {
     "id": "6f8fd8c4-9863-49ce-b226-49044cee4eaf",
     "desk_id": "039",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -5730,7 +5730,7 @@
   {
     "id": "6fa4d0d1-7079-498b-9607-2e19b8bf565f",
     "desk_id": "190",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -5762,7 +5762,7 @@
   {
     "id": "6fe7e843-a621-4d91-9cf6-51ab1bc6530b",
     "desk_id": "289",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -5794,7 +5794,7 @@
   {
     "id": "70e43f4d-22a9-4d13-acf1-e21b05659d84",
     "desk_id": "344",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -5826,7 +5826,7 @@
   {
     "id": "7153f934-b519-4922-a2c3-bc3467411850",
     "desk_id": "140",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -5858,7 +5858,7 @@
   {
     "id": "7459cba6-1336-4fbc-9342-cdb714313693",
     "desk_id": "084",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -5890,7 +5890,7 @@
   {
     "id": "759ff591-d5b3-4505-890a-793c54d856ee",
     "desk_id": "338",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -5922,7 +5922,7 @@
   {
     "id": "763050b6-efe0-4461-b7e8-b0dd471d8dc5",
     "desk_id": "170",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -5954,7 +5954,7 @@
   {
     "id": "76606f3f-1cdd-4043-83ee-e917f7f08ade",
     "desk_id": "253",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -5986,7 +5986,7 @@
   {
     "id": "772db233-b4ae-4bcc-9ade-e9c2eee2d9cb",
     "desk_id": "223",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -6018,7 +6018,7 @@
   {
     "id": "77619635-39b1-429f-8df3-9296deac5328",
     "desk_id": "060",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -6050,7 +6050,7 @@
   {
     "id": "7837acb4-a004-4f1c-972c-879315c214f1",
     "desk_id": "135",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -6082,7 +6082,7 @@
   {
     "id": "78543597-7265-445c-81ed-732a150292c6",
     "desk_id": "070",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -6114,7 +6114,7 @@
   {
     "id": "78c1caba-9552-4958-acd4-5cf41b6ca042",
     "desk_id": "395",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -6146,7 +6146,7 @@
   {
     "id": "78e01f1f-36e8-4a6c-95d2-7f83e24af523",
     "desk_id": "032",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -6178,7 +6178,7 @@
   {
     "id": "78fefaca-b6b9-4841-8eb6-1199383983ae",
     "desk_id": "129",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -6210,7 +6210,7 @@
   {
     "id": "79d0fa97-18cb-4f65-92d9-df7d5d8821e7",
     "desk_id": "216",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -6242,7 +6242,7 @@
   {
     "id": "7b2bd015-8d59-468e-b15c-f9bd507d38f3",
     "desk_id": "264",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -6274,7 +6274,7 @@
   {
     "id": "7b4b15c1-f58a-4d05-b57f-8ed587d88c5a",
     "desk_id": "148",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -6306,7 +6306,7 @@
   {
     "id": "7bcd58dc-cfa2-456a-9449-6629ea0f026e",
     "desk_id": "288",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -6338,7 +6338,7 @@
   {
     "id": "7c0581d1-2224-4ec1-90b3-82691d7de5f7",
     "desk_id": "189",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -6370,7 +6370,7 @@
   {
     "id": "7df76de6-4f04-4b9e-a1d0-58eb04165e74",
     "desk_id": "330",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -6402,7 +6402,7 @@
   {
     "id": "7e864d4b-c357-4d73-ae86-2b7983abc4e7",
     "desk_id": "162",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -6434,7 +6434,7 @@
   {
     "id": "7ef48412-2f5e-4afe-8125-48fd0922fde9",
     "desk_id": "081",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -6466,7 +6466,7 @@
   {
     "id": "80eb5b30-ab4a-49ff-9680-b0538410776c",
     "desk_id": "146",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -6498,7 +6498,7 @@
   {
     "id": "812d8bb7-7418-4ed5-880c-1642df58acaa",
     "desk_id": "370",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -6530,7 +6530,7 @@
   {
     "id": "81fa18d2-9f7f-4a6a-83a6-859c5e746f51",
     "desk_id": "002",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -6562,7 +6562,7 @@
   {
     "id": "82cb6378-71ee-46bc-a51b-f73cfb9643a0",
     "desk_id": "045",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -6594,7 +6594,7 @@
   {
     "id": "83c1598b-b387-4e98-824e-6f881164bdfc",
     "desk_id": "101",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -6626,7 +6626,7 @@
   {
     "id": "85ca8612-bf28-4bc4-a21a-bb45b7959936",
     "desk_id": "141",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -6658,7 +6658,7 @@
   {
     "id": "85e67070-f495-4a50-8cb9-7bb90e7f1a4d",
     "desk_id": "387",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -6690,7 +6690,7 @@
   {
     "id": "86a6b82f-163c-4c63-80d4-ba5a15064af4",
     "desk_id": "143",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -6722,7 +6722,7 @@
   {
     "id": "86bc1d04-0473-4fa9-903b-4c2f9b8ad12f",
     "desk_id": "016",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -6754,7 +6754,7 @@
   {
     "id": "871ba2bf-49d3-4bfe-8e0f-f4f41b5bedce",
     "desk_id": "105",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -6786,7 +6786,7 @@
   {
     "id": "87d3b638-86dd-4e12-9276-efb1ff24e001",
     "desk_id": "058",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -6818,7 +6818,7 @@
   {
     "id": "87db933f-f72a-4b5b-bece-69e832067be3",
     "desk_id": "115",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -6850,7 +6850,7 @@
   {
     "id": "8854b108-b14b-40e0-ab1d-d648a934e141",
     "desk_id": "069",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -6882,7 +6882,7 @@
   {
     "id": "88bd3140-6155-42fd-8560-4981f04760e0",
     "desk_id": "389",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -6914,7 +6914,7 @@
   {
     "id": "8a7eb157-5072-498b-9da0-fe3ddd5a17c8",
     "desk_id": "321",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -6946,7 +6946,7 @@
   {
     "id": "8bdb19bf-95fa-4dd3-8bda-063d87fbb64b",
     "desk_id": "123",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -6978,7 +6978,7 @@
   {
     "id": "8c227280-6a00-4634-ab82-623b88e39f95",
     "desk_id": "324",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -7010,7 +7010,7 @@
   {
     "id": "8cae98f2-a817-4516-a164-42ec693db3f1",
     "desk_id": "345",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -7042,7 +7042,7 @@
   {
     "id": "8ef946b2-d85b-42e2-9931-9dd6a7cabad7",
     "desk_id": "235",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -7074,7 +7074,7 @@
   {
     "id": "8f9b9a7e-d478-4a32-9ff6-f10bbdf9cb0c",
     "desk_id": "261",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -7106,7 +7106,7 @@
   {
     "id": "8fde25e2-66c8-42d5-9bb7-64d62d143e75",
     "desk_id": "365",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -7138,7 +7138,7 @@
   {
     "id": "900de953-6c50-45f3-afd2-e98344e81697",
     "desk_id": "046",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -7170,7 +7170,7 @@
   {
     "id": "90bea609-337c-470a-824a-6d542bec7cbe",
     "desk_id": "311",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -7202,7 +7202,7 @@
   {
     "id": "9143a6f9-6b2d-4536-bd06-ac9059138ffa",
     "desk_id": "098",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -7234,7 +7234,7 @@
   {
     "id": "92c9452c-9a29-4da5-aecf-164d38a2c562",
     "desk_id": "120",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -7266,7 +7266,7 @@
   {
     "id": "9359f65c-5344-4bfd-ac25-3edbfe7cdbfd",
     "desk_id": "202",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -7298,7 +7298,7 @@
   {
     "id": "9507cc71-78f4-4def-962f-17b1d532868f",
     "desk_id": "249",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -7330,7 +7330,7 @@
   {
     "id": "9568705a-6ffd-4784-a1fc-b854c2ed03a7",
     "desk_id": "008",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -7362,7 +7362,7 @@
   {
     "id": "9577b2f4-6c05-4f1c-9a2b-630f10dc6a5c",
     "desk_id": "193",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -7394,7 +7394,7 @@
   {
     "id": "95a16ef6-1ba4-4b4c-aade-a26af35a560c",
     "desk_id": "232",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -7426,7 +7426,7 @@
   {
     "id": "973268ca-ec9e-4cc5-a1db-f8e8c4bcbafa",
     "desk_id": "280",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -7458,7 +7458,7 @@
   {
     "id": "9825a319-27a2-4796-8182-4395864b735b",
     "desk_id": "222",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -7490,7 +7490,7 @@
   {
     "id": "98372535-e63d-425a-97dd-aaf693a9d001",
     "desk_id": "243",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -7522,7 +7522,7 @@
   {
     "id": "985809e2-b8fe-4595-8dfe-a3fbe01d8c73",
     "desk_id": "394",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -7554,7 +7554,7 @@
   {
     "id": "98a41a72-f3ec-4bb5-9022-3ed553e42cdb",
     "desk_id": "147",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -7586,7 +7586,7 @@
   {
     "id": "98b6c3b3-4b63-4338-8f01-fc0c5c5ee010",
     "desk_id": "360",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -7618,7 +7618,7 @@
   {
     "id": "98ef295c-be38-4a2f-bb52-cbc0de5c95b2",
     "desk_id": "005",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -7650,7 +7650,7 @@
   {
     "id": "996ffa8f-ccae-44cd-86d0-5a1dac34e4c3",
     "desk_id": "204",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -7682,7 +7682,7 @@
   {
     "id": "9a344dc8-5bc8-4562-98e9-d6b3cf61b53c",
     "desk_id": "194",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -7714,7 +7714,7 @@
   {
     "id": "9ab930b6-f58f-43bd-aec4-9211482482cd",
     "desk_id": "304",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -7746,7 +7746,7 @@
   {
     "id": "9acda67f-8648-48ad-ae9f-54b0dc210d7c",
     "desk_id": "155",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -7778,7 +7778,7 @@
   {
     "id": "9c04ddb1-f321-4a0b-8c1a-a18c2010ee92",
     "desk_id": "158",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -7810,7 +7810,7 @@
   {
     "id": "9c193541-a7f0-4d7b-be15-ba87a6311914",
     "desk_id": "059",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -7842,7 +7842,7 @@
   {
     "id": "9c4b55fd-3d39-4a1e-8694-538a6877c6b1",
     "desk_id": "364",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -7874,7 +7874,7 @@
   {
     "id": "9c61ab01-b3c4-4b3e-85f7-8638e0624d7e",
     "desk_id": "067",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -7906,7 +7906,7 @@
   {
     "id": "9cbb0120-aa7f-423f-a5af-9b7401741faa",
     "desk_id": "282",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -7938,7 +7938,7 @@
   {
     "id": "9d2ba481-9822-4050-ba15-3d19ef9dd4e3",
     "desk_id": "209",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -7970,7 +7970,7 @@
   {
     "id": "9d7c4d3f-2f6c-4d17-8d2a-50f08f16ca91",
     "desk_id": "317",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -8002,7 +8002,7 @@
   {
     "id": "9d995b17-1063-4283-ba6a-e92e3192d7f0",
     "desk_id": "238",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -8034,7 +8034,7 @@
   {
     "id": "9e79df65-76db-4754-8842-8f475e7e6849",
     "desk_id": "121",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -8066,7 +8066,7 @@
   {
     "id": "9fb24e53-e9dd-4e75-a972-315d05a96c36",
     "desk_id": "393",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -8098,7 +8098,7 @@
   {
     "id": "9fc211d7-a092-407e-a8a8-a465ec41bb61",
     "desk_id": "350",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -8130,7 +8130,7 @@
   {
     "id": "a0bc1100-f4a6-438f-8a98-8c48c68b030b",
     "desk_id": "307",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -8162,7 +8162,7 @@
   {
     "id": "a185985d-9b28-4225-86f1-c949b3b4b9a9",
     "desk_id": "198",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -8194,7 +8194,7 @@
   {
     "id": "a19ef5e5-8792-4ab4-a43f-293fcd7fa6cd",
     "desk_id": "332",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -8226,7 +8226,7 @@
   {
     "id": "a1fa36e4-e5fd-4810-b587-e57800cb0a68",
     "desk_id": "080",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -8258,7 +8258,7 @@
   {
     "id": "a2a61113-d5c7-4f31-8fd9-11337dbe1c50",
     "desk_id": "186",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -8290,7 +8290,7 @@
   {
     "id": "a2fc19bb-5ad9-43d8-9103-9101e2c3c576",
     "desk_id": "276",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -8322,7 +8322,7 @@
   {
     "id": "a331d458-c3bd-413d-8125-401342269ba3",
     "desk_id": "322",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -8354,7 +8354,7 @@
   {
     "id": "a3d75759-1fd4-4fc2-b1b1-37614789840a",
     "desk_id": "266",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -8386,7 +8386,7 @@
   {
     "id": "a3ec56c6-4c7a-4910-8c33-924ac70f0352",
     "desk_id": "028",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -8418,7 +8418,7 @@
   {
     "id": "a4222b0a-4394-40ec-bf75-bfa64e4ebf15",
     "desk_id": "283",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -8450,7 +8450,7 @@
   {
     "id": "a42505ce-d8f5-4ad4-8b18-22c62aeab45d",
     "desk_id": "161",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -8482,7 +8482,7 @@
   {
     "id": "a52ea4bd-e941-4a8b-9eca-2768e571e9af",
     "desk_id": "229",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -8514,7 +8514,7 @@
   {
     "id": "a56cb8d2-2785-4df1-b665-819d4b54a300",
     "desk_id": "320",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -8546,7 +8546,7 @@
   {
     "id": "a80bacfe-f98f-421a-a472-96a94156c36f",
     "desk_id": "022",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -8578,7 +8578,7 @@
   {
     "id": "a850ae88-9298-491a-8316-4c0ce914092f",
     "desk_id": "319",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -8610,7 +8610,7 @@
   {
     "id": "a89b6d86-89e8-48f9-99a4-c518071de157",
     "desk_id": "308",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -8642,7 +8642,7 @@
   {
     "id": "a8d236fe-bfb1-4e5b-84c3-7235b707e553",
     "desk_id": "049",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -8674,7 +8674,7 @@
   {
     "id": "a9c1633b-57d5-41e7-bf3b-7f8c67a9eaf1",
     "desk_id": "034",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -8706,7 +8706,7 @@
   {
     "id": "a9f31bef-9d19-45cf-b5fd-b89b63764882",
     "desk_id": "124",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -8738,7 +8738,7 @@
   {
     "id": "aa36ff86-9f71-4304-a5aa-dc5d9ab70e9f",
     "desk_id": "068",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -8770,7 +8770,7 @@
   {
     "id": "aa8c77ec-9136-4f1e-9827-dd822e88372a",
     "desk_id": "136",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -8802,7 +8802,7 @@
   {
     "id": "aab8fe00-46aa-4e83-8768-55af8a604b66",
     "desk_id": "188",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -8834,7 +8834,7 @@
   {
     "id": "aae66249-9cb2-4354-b18c-5297ee442ffd",
     "desk_id": "205",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -8866,7 +8866,7 @@
   {
     "id": "ace518fa-5b6a-4d9f-8d8f-c4baa49d54f7",
     "desk_id": "380",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -8898,7 +8898,7 @@
   {
     "id": "af9b1cf9-4438-492d-91a0-2c6d2eeb32be",
     "desk_id": "111",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -8930,7 +8930,7 @@
   {
     "id": "b073cf4b-20b1-43cb-bb12-f226ffd5819c",
     "desk_id": "224",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -8962,7 +8962,7 @@
   {
     "id": "b0bf15dd-0b09-459b-b01f-8a8bc9d99805",
     "desk_id": "051",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -8994,7 +8994,7 @@
   {
     "id": "b0f2a732-17b0-4e9e-bacf-6de3f2910acb",
     "desk_id": "063",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -9026,7 +9026,7 @@
   {
     "id": "b20cd9bc-e300-4340-96c0-be01f00d0717",
     "desk_id": "177",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -9058,7 +9058,7 @@
   {
     "id": "b22dea12-5a3f-49d9-abf5-aeabb47bf955",
     "desk_id": "286",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -9090,7 +9090,7 @@
   {
     "id": "b2da80dd-0053-4009-a287-75f8b9c37466",
     "desk_id": "390",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -9122,7 +9122,7 @@
   {
     "id": "b3d43b86-4b9a-4f09-9fb5-1c25619c12cf",
     "desk_id": "174",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -9154,7 +9154,7 @@
   {
     "id": "b3ec026b-31f2-412d-98db-2406e8730b36",
     "desk_id": "396",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -9186,7 +9186,7 @@
   {
     "id": "b4467c7d-40ad-4885-9a5a-590ff2a23123",
     "desk_id": "333",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -9218,7 +9218,7 @@
   {
     "id": "b5bbf05a-e045-47b0-b7e2-7c3b3d2b49cf",
     "desk_id": "372",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -9250,7 +9250,7 @@
   {
     "id": "b767a456-a6ec-4ed7-b6c9-a09924bfbc1c",
     "desk_id": "093",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -9282,7 +9282,7 @@
   {
     "id": "b80b8d63-e662-4a0a-86cc-e32607e674f7",
     "desk_id": "326",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -9314,7 +9314,7 @@
   {
     "id": "ba0d0643-7223-4da7-83f9-6b5659fdc482",
     "desk_id": "033",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -9346,7 +9346,7 @@
   {
     "id": "ba871ea1-61ef-4ee7-951d-4b25797f45da",
     "desk_id": "001",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -9378,7 +9378,7 @@
   {
     "id": "bb8026db-17c1-423e-96e8-ca8ba981acb4",
     "desk_id": "031",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -9410,7 +9410,7 @@
   {
     "id": "bd4e86ca-fcc1-4f52-983b-6f906c03c171",
     "desk_id": "102",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -9442,7 +9442,7 @@
   {
     "id": "bda14108-dc18-4e60-b1ed-cf64edd3703a",
     "desk_id": "379",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -9474,7 +9474,7 @@
   {
     "id": "be46d52b-da8d-422a-8917-1d4321a64fce",
     "desk_id": "082",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -9506,7 +9506,7 @@
   {
     "id": "be50728c-26c7-483f-adbf-de1517b3a428",
     "desk_id": "156",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -9538,7 +9538,7 @@
   {
     "id": "be6cc39e-d065-4717-b02e-cefbf0fb6e62",
     "desk_id": "383",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -9570,7 +9570,7 @@
   {
     "id": "c05a5e2f-96c7-4088-81a4-16672022d9d2",
     "desk_id": "237",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -9602,7 +9602,7 @@
   {
     "id": "c201e460-1554-4bd7-8241-3410ef837132",
     "desk_id": "218",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -9634,7 +9634,7 @@
   {
     "id": "c2020521-d370-4b9c-bb43-42c030814cc5",
     "desk_id": "172",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -9666,7 +9666,7 @@
   {
     "id": "c4d2b109-6bb3-4fc8-871f-b0fb84c49af9",
     "desk_id": "017",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -9698,7 +9698,7 @@
   {
     "id": "c5d30e77-37fc-4f4a-bfc7-10a1a06b685f",
     "desk_id": "020",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -9730,7 +9730,7 @@
   {
     "id": "c630c596-69ab-46fe-8eb0-813edbe8e436",
     "desk_id": "281",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -9762,7 +9762,7 @@
   {
     "id": "c6f4decb-ab8d-446b-bac4-8eb776e0137d",
     "desk_id": "035",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -9794,7 +9794,7 @@
   {
     "id": "c86ce520-273d-4941-9514-0778d87bc24a",
     "desk_id": "250",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -9826,7 +9826,7 @@
   {
     "id": "c87b04da-b1bf-44c1-902e-bd72038b3dcc",
     "desk_id": "126",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -9858,7 +9858,7 @@
   {
     "id": "c8d9bea8-3b34-411d-8de5-39a07a847b34",
     "desk_id": "293",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -9890,7 +9890,7 @@
   {
     "id": "ca80ef15-6889-48ef-b8d4-d78105107da0",
     "desk_id": "342",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -9922,7 +9922,7 @@
   {
     "id": "cad9d57b-e20f-48f6-b98e-b33065f8d584",
     "desk_id": "112",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -9954,7 +9954,7 @@
   {
     "id": "cb1a0400-884f-440e-a9d5-a50521bcc064",
     "desk_id": "347",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -9986,7 +9986,7 @@
   {
     "id": "cb253ba2-71f9-49f2-a77d-7500fe7643b9",
     "desk_id": "165",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -10018,7 +10018,7 @@
   {
     "id": "cbb2d4ae-df28-4fa4-8eae-76e2233c220e",
     "desk_id": "279",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -10050,7 +10050,7 @@
   {
     "id": "cca683b8-e054-4f47-9373-52c9e9542ff7",
     "desk_id": "329",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -10082,7 +10082,7 @@
   {
     "id": "ccb7bc01-11b9-4d4c-adbf-6e975f551d83",
     "desk_id": "003",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -10114,7 +10114,7 @@
   {
     "id": "cd306558-5470-43fc-9be4-59a4475080dd",
     "desk_id": "386",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -10146,7 +10146,7 @@
   {
     "id": "cd549413-74b5-4944-9082-377426cf7c44",
     "desk_id": "297",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -10178,7 +10178,7 @@
   {
     "id": "cd830c1f-deb8-441c-852a-66ea78282a42",
     "desk_id": "302",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -10210,7 +10210,7 @@
   {
     "id": "cdb476fd-b8c0-4d04-b03a-0ed4f5fb9326",
     "desk_id": "208",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -10242,7 +10242,7 @@
   {
     "id": "ce7f3520-d50d-411e-bef9-487589dafcb2",
     "desk_id": "197",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -10274,7 +10274,7 @@
   {
     "id": "ce9e6a5d-03c7-466e-9134-383ab47b32a4",
     "desk_id": "359",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -10306,7 +10306,7 @@
   {
     "id": "cffc104d-0bda-4b05-bc74-46cae8c4509f",
     "desk_id": "132",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -10338,7 +10338,7 @@
   {
     "id": "d08097a2-80bd-4c2c-b39c-57dff6a30695",
     "desk_id": "323",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -10370,7 +10370,7 @@
   {
     "id": "d3a7c278-4d82-445b-a777-47d98e18b4d4",
     "desk_id": "127",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -10402,7 +10402,7 @@
   {
     "id": "d3bde8a3-4c05-44e5-9bd6-836fc3237d46",
     "desk_id": "369",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -10434,7 +10434,7 @@
   {
     "id": "d3ef9633-fa07-44fe-974c-89f5c15e06ce",
     "desk_id": "055",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -10466,7 +10466,7 @@
   {
     "id": "d4b4aa62-6483-4027-8d47-2e96ce9ae5b8",
     "desk_id": "191",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -10498,7 +10498,7 @@
   {
     "id": "d4bcfcae-d559-4305-b345-f5bfdcf6df62",
     "desk_id": "248",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -10530,7 +10530,7 @@
   {
     "id": "d731decc-4dab-4294-896a-3cf5ceb52d00",
     "desk_id": "006",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -10562,7 +10562,7 @@
   {
     "id": "d7a20670-0265-498a-93c8-c42786a5dc0e",
     "desk_id": "149",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -10594,7 +10594,7 @@
   {
     "id": "d84dfb73-5646-45d4-8420-7c97111c909d",
     "desk_id": "291",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -10626,7 +10626,7 @@
   {
     "id": "d87b8837-d3fc-4519-9237-141fe682a4f1",
     "desk_id": "160",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -10658,7 +10658,7 @@
   {
     "id": "d964f3c7-e76b-48f8-9483-2693a7279445",
     "desk_id": "368",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -10690,7 +10690,7 @@
   {
     "id": "d9b1e4a4-4e04-40b4-9796-a4972884e611",
     "desk_id": "231",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -10722,7 +10722,7 @@
   {
     "id": "d9d57194-15f6-4ca8-abc1-7129e9cedafb",
     "desk_id": "092",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -10754,7 +10754,7 @@
   {
     "id": "db9bb252-773d-40db-9e2e-223fbeb2ee58",
     "desk_id": "122",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -10786,7 +10786,7 @@
   {
     "id": "dbdb8691-3bce-4499-a0a0-44cead9504ad",
     "desk_id": "388",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -10818,7 +10818,7 @@
   {
     "id": "dbf777f5-dc2f-4e7d-a6e5-f3bcb8c26979",
     "desk_id": "138",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -10850,7 +10850,7 @@
   {
     "id": "dcf0488f-eb48-440b-8b65-6e13aff572d3",
     "desk_id": "212",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -10882,7 +10882,7 @@
   {
     "id": "dd2c312b-9936-47d1-ab60-471bb91929f7",
     "desk_id": "029",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -10914,7 +10914,7 @@
   {
     "id": "dd32d2a2-592c-4f82-a270-8e8044be2da1",
     "desk_id": "254",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -10946,7 +10946,7 @@
   {
     "id": "ddb2f6e1-eb71-48d1-bc73-564ed3888b80",
     "desk_id": "078",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -10978,7 +10978,7 @@
   {
     "id": "de300899-805e-4ef8-80bc-5f1eee3e519e",
     "desk_id": "026",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -11010,7 +11010,7 @@
   {
     "id": "df24fa5f-3619-4faa-92bc-c663d8c7fc10",
     "desk_id": "244",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -11042,7 +11042,7 @@
   {
     "id": "e08240d8-bfd0-4a55-9dd2-06a25180bb62",
     "desk_id": "056",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -11074,7 +11074,7 @@
   {
     "id": "e0869bed-55a7-47de-852b-aed274956903",
     "desk_id": "240",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -11106,7 +11106,7 @@
   {
     "id": "e0f58066-4c0b-4d69-b126-50764171f760",
     "desk_id": "150",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -11138,7 +11138,7 @@
   {
     "id": "e1130045-2ec1-44d2-84e0-38d34f319aa9",
     "desk_id": "167",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -11170,7 +11170,7 @@
   {
     "id": "e2d49a2d-15d5-4fa9-9eed-8af825e57909",
     "desk_id": "399",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -11202,7 +11202,7 @@
   {
     "id": "e3cf74a8-4894-4bb9-ab26-32e5dbfd0491",
     "desk_id": "210",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -11234,7 +11234,7 @@
   {
     "id": "e41cc4c5-6f4e-47d3-b500-f20ac2273aa1",
     "desk_id": "012",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -11266,7 +11266,7 @@
   {
     "id": "e5f0eb12-1cbd-4504-9344-0c96825ffaf8",
     "desk_id": "097",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -11298,7 +11298,7 @@
   {
     "id": "e65f24b3-c66d-47f8-a957-c598fc98412e",
     "desk_id": "246",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -11330,7 +11330,7 @@
   {
     "id": "e67fb074-f079-4b75-beae-a8334d687571",
     "desk_id": "278",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -11362,7 +11362,7 @@
   {
     "id": "e68c1c68-d252-4ce4-b477-f3f0186bc3ee",
     "desk_id": "331",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -11394,7 +11394,7 @@
   {
     "id": "e69c9756-beed-416c-bfdc-787b1b6b37c3",
     "desk_id": "007",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -11426,7 +11426,7 @@
   {
     "id": "e6be6bcb-46b3-41be-9096-a13da5722fe3",
     "desk_id": "207",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -11458,7 +11458,7 @@
   {
     "id": "e6d70fb4-a680-4f49-9cef-14dc8689937f",
     "desk_id": "195",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -11490,7 +11490,7 @@
   {
     "id": "e88c90ea-01a9-477d-9c03-06a613b8a69c",
     "desk_id": "258",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -11522,7 +11522,7 @@
   {
     "id": "e93fc50f-94d3-4d79-ac6a-3a41efa1f681",
     "desk_id": "363",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -11554,7 +11554,7 @@
   {
     "id": "ea6fd18e-9e1b-4b08-8b28-49d339c511fc",
     "desk_id": "378",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -11586,7 +11586,7 @@
   {
     "id": "eaa35926-3bbf-4469-99fa-c6004f2ef26c",
     "desk_id": "230",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -11618,7 +11618,7 @@
   {
     "id": "eb2ef25b-16f1-4678-b4a7-d84292d40210",
     "desk_id": "272",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -11650,7 +11650,7 @@
   {
     "id": "ec0204b3-5446-4f10-9f46-df78ee6c18b9",
     "desk_id": "299",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -11682,7 +11682,7 @@
   {
     "id": "ed8eed90-f117-4c83-a23e-a2c3954a84bc",
     "desk_id": "023",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -11714,7 +11714,7 @@
   {
     "id": "ede9ba1f-c284-4790-8e0f-9c4efc2b1a7c",
     "desk_id": "312",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -11746,7 +11746,7 @@
   {
     "id": "ee6642fd-3bcf-4194-b2e3-710d9e5a0d91",
     "desk_id": "301",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -11778,7 +11778,7 @@
   {
     "id": "ee911835-3a8c-43ce-b646-3f2aea1b3699",
     "desk_id": "227",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -11810,7 +11810,7 @@
   {
     "id": "eea4c9ad-0038-43d8-9f0a-a8c25e05ba39",
     "desk_id": "086",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -11842,7 +11842,7 @@
   {
     "id": "ef96aa98-f691-450c-af3e-ad8fb92a7297",
     "desk_id": "139",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -11874,7 +11874,7 @@
   {
     "id": "efa80f3e-697d-4a3a-abfd-93423a3ec037",
     "desk_id": "050",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -11906,7 +11906,7 @@
   {
     "id": "efca4bcb-9e1c-4fc5-a697-77ed9fa8c358",
     "desk_id": "182",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -11938,7 +11938,7 @@
   {
     "id": "efcb5a74-9e19-4e94-a43c-8d78735edf29",
     "desk_id": "163",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -11970,7 +11970,7 @@
   {
     "id": "f011d0ac-4f26-49aa-b10d-1d84324ad76d",
     "desk_id": "384",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -12002,7 +12002,7 @@
   {
     "id": "f082cf95-426c-4045-b9f3-efac456420f0",
     "desk_id": "157",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -12034,7 +12034,7 @@
   {
     "id": "f1034b3b-5bae-490a-90fd-34f6c5f97af0",
     "desk_id": "273",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -12066,7 +12066,7 @@
   {
     "id": "f1142f7b-08bb-42bb-9d41-5d14835981be",
     "desk_id": "296",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -12098,7 +12098,7 @@
   {
     "id": "f1238b6b-eaec-4ed5-94bc-2814addf3a7f",
     "desk_id": "152",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -12130,7 +12130,7 @@
   {
     "id": "f2f297b4-f830-4668-a557-838c07fa8355",
     "desk_id": "300",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -12162,7 +12162,7 @@
   {
     "id": "f31f0189-cb52-44a5-ab13-29d54c07ea05",
     "desk_id": "214",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -12194,7 +12194,7 @@
   {
     "id": "f364da8d-6376-42a1-8851-55bf16e44e64",
     "desk_id": "054",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -12226,7 +12226,7 @@
   {
     "id": "f53d6c68-2200-421c-8b5e-e4c6cdfb6505",
     "desk_id": "309",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -12258,7 +12258,7 @@
   {
     "id": "f67c4efa-79f7-493c-ba33-f2ff4545a464",
     "desk_id": "334",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -12290,7 +12290,7 @@
   {
     "id": "f6d0f647-9b81-4ddf-a918-141011ee3d0d",
     "desk_id": "259",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -12322,7 +12322,7 @@
   {
     "id": "f74cfbeb-f329-4cfc-adf2-3fc961c73e9e",
     "desk_id": "367",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -12354,7 +12354,7 @@
   {
     "id": "f77f0dea-61d2-431b-bb53-13decf0c57bc",
     "desk_id": "305",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -12386,7 +12386,7 @@
   {
     "id": "f7bdd9bb-5921-4343-ac68-1c7f3033474d",
     "desk_id": "171",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -12418,7 +12418,7 @@
   {
     "id": "f7c25e2e-f28a-453e-bae4-a47072fb6bf4",
     "desk_id": "339",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -12450,7 +12450,7 @@
   {
     "id": "f8979837-a8ea-4065-814f-d18ffdfc1284",
     "desk_id": "159",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -12482,7 +12482,7 @@
   {
     "id": "f89f7451-0e0f-45e7-a782-ecfbe787fdb8",
     "desk_id": "040",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -12514,7 +12514,7 @@
   {
     "id": "fa3e6ab4-5375-48a2-aad6-ab22f747818f",
     "desk_id": "391",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -12546,7 +12546,7 @@
   {
     "id": "fa50ce1a-2285-490a-a14c-f52a1edd99dc",
     "desk_id": "179",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -12578,7 +12578,7 @@
   {
     "id": "fa94e9b2-7e27-48f7-9f62-eea1199c11e8",
     "desk_id": "064",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -12610,7 +12610,7 @@
   {
     "id": "fabbcbd6-6cc2-4ee7-a5ed-3b91435aaa51",
     "desk_id": "292",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -12642,7 +12642,7 @@
   {
     "id": "fb2824ca-c582-4446-a516-135b8e1e65fd",
     "desk_id": "213",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L2",
     "x_coord": null,
@@ -12674,7 +12674,7 @@
   {
     "id": "fd09d7a2-9adb-4bd0-9bc9-98bc412cfbfc",
     "desk_id": "131",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L1",
     "x_coord": null,
@@ -12706,7 +12706,7 @@
   {
     "id": "fd332bed-036c-4498-a161-c3f9ef293c39",
     "desk_id": "047",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,
@@ -12738,7 +12738,7 @@
   {
     "id": "fdce0de6-0a9b-4c2a-a0ff-8d18b1cbeaf4",
     "desk_id": "343",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L3",
     "x_coord": null,
@@ -12770,7 +12770,7 @@
   {
     "id": "fdd1db4b-7b03-4dc2-aac1-69fbdf6c3a37",
     "desk_id": "036",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "hvac_zone_id": null,
     "floor": "L0",
     "x_coord": null,

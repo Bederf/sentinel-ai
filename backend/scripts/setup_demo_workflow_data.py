@@ -38,7 +38,7 @@ from app.models.inspection import (  # noqa: E402
 # ============================================================================
 
 DEMO_BUILDING = {
-    "building_id": "sandton-mall-demo",
+    "site_id": "sandton-mall-demo",
     "name": "Sandton City Mall",
     "address": "83 5th St, Sandton, South Africa",
     "description": "Demo building for SENTINEL asset management workflow",

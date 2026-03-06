@@ -285,7 +285,7 @@ class TestTelemetryAccessor:
         telemetry = engine_with_telemetry.get_latest_telemetry()
         for key in (
             "timestamp",
-            "building_id",
+            "site_id",
             "luminaires",
             "sensors",
             "controllers",

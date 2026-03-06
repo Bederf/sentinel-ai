@@ -53,9 +53,9 @@ export function EnergyIntelligenceCard({ siteId, onNavigate }: EnergyIntelligenc
 
   // Determine state
   let state: CardState;
-  if (apiError || !status || status.optimization_status === 'unknown') {
+  if (apiError || !status) {
     state = 'no-data';
-  } else if (!hasValue(savings) && applied === 0) {
+  } else if (status.optimization_status === 'unknown' || (!hasValue(savings) && applied === 0)) {
     state = 'learning';
   } else {
     state = 'active';

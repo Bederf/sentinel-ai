@@ -102,7 +102,7 @@ class DeviceControlRequest(BaseModel):
 
 # Data directory
 DATA_DIR = Path(__file__).parent.parent / "data"
-BUILDINGS_DIR = DATA_DIR / "buildings"
+SITES_DIR = DATA_DIR / "sites"
 
 # Reference devices for Site-002 simulation (inside bms_simulator package)
 REFERENCE_DEVICES_PATH = Path(__file__).parent.parent / "services" / "bms_simulator" / "data" / "reference_devices.json"
@@ -128,7 +128,7 @@ async def load_equipment_from_buildings() -> List[dict]:
     all_devices = []
 
     # Get active buildings from registry
-    registry_path = BUILDINGS_DIR / "_registry.json"
+    registry_path = SITES_DIR / "_registry.json"
     if not registry_path.exists():
         logger.warning("Building registry not found")
         return []
@@ -136,10 +136,10 @@ async def load_equipment_from_buildings() -> List[dict]:
     with open(registry_path) as f:
         registry = json.load(f)
 
-    active_buildings = registry.get("active_buildings", [])
+    active_sites = registry.get("active_sites", [])
 
-    for building_id in active_buildings:
-        equipment_dir = BUILDINGS_DIR / building_id / "equipment"
+    for site_id in active_sites:
+        equipment_dir = SITES_DIR / site_id / "equipment"
         if not equipment_dir.exists():
             continue
 
@@ -192,7 +192,7 @@ def _transform_equipment_to_device(eq_data: dict) -> Optional[dict]:
             "metadata": {
                 **eq_data.get("metadata", {}),
                 "equipment_type": eq_data.get("equipment_type"),
-                "source": "building_equipment",
+                "source": "site_equipment",
             },
         }
 
@@ -246,11 +246,11 @@ async def startup_event():
         else:
             print("[DEVICES] Site-002 data source disabled — skipping reference devices")
 
-        building_devices = []
+        site_devices = []
         if not testing_mode:
             # Load all equipment from building directories (including monitoring-only)
-            building_devices = await load_equipment_from_buildings()
-            print(f"[DEVICES] Loaded {len(building_devices)} building equipment")
+            site_devices = await load_equipment_from_buildings()
+            print(f"[DEVICES] Loaded {len(site_devices)} building equipment")
         else:
             print("[DEVICES] TESTING mode: skipping building equipment load")
             # Keep startup fast by limiting reference devices
@@ -262,7 +262,7 @@ async def startup_event():
 
         # Add building devices that don't already exist in reference devices
         added_count = 0
-        for device in building_devices:
+        for device in site_devices:
             if device["id"] not in existing_ids:
                 devices_data.append(device)
                 existing_ids.add(device["id"])

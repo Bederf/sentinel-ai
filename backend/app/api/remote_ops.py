@@ -57,7 +57,7 @@ def _check_auth(user_role: str, required: AuthorizationLevel) -> None:
 
 
 @router.get("/building/{site_id}/status")
-async def get_building_status(
+async def get_site_status(
     site_id: str,
     x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
 ):
@@ -70,10 +70,10 @@ async def get_building_status(
     _check_auth(user["role"], AuthorizationLevel.VIEW_ONLY)
 
     try:
-        status = await _monitoring_service.get_building_status(site_id)
+        status = await _monitoring_service.get_site_status(site_id)
         # Log the action
         _audit_logger.log_system_event(
-            event_type="remote_building_status",
+            event_type="remote_site_status",
             user=user["user_id"],
             metadata={"site_id": site_id},
         )

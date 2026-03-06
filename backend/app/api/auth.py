@@ -482,7 +482,7 @@ async def create_access_request(request: Request, payload: AccessRequestCreateRe
 
     try:
         client = get_supabase_client()
-        building = client.table("buildings").select("id, code").eq("code", site_code).limit(1).execute()
+        building = client.table("sites").select("id, code").eq("code", site_code).limit(1).execute()
         if not building.data:
             raise HTTPException(status_code=404, detail=f"Unknown site code: {site_code}")
     except HTTPException:

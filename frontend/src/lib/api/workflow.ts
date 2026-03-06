@@ -10,7 +10,7 @@ import { fetchApi } from './client';
 
 export interface InspectionScheduleItem {
   equipment_id: string;
-  building_id: string;
+  site_id: string;
   equipment_name: string;
   frequency_days: number;
   last_inspected: string | null;
@@ -50,7 +50,6 @@ export interface WorkflowState {
 
 export interface WorkflowDashboardResponse {
   site_id: string;
-  building_id: string;
   buildings_count: number;
   total_assets: number;
   onboarded_assets: number;
@@ -65,14 +64,14 @@ export const inspectionApi = {
   /**
    * Get inspection schedule for a building
    */
-  getSchedule: (buildingId: string) =>
-    fetchApi<InspectionScheduleItem[]>(`/api/buildings/${buildingId}/inspection-schedule`),
+  getSchedule: (siteId: string) =>
+    fetchApi<InspectionScheduleItem[]>(`/api/buildings/${siteId}/inspection-schedule`),
 
   /**
    * Submit inspection checklist
    */
-  submitChecklist: (buildingId: string, equipmentId: string, data: { checklist_items: ChecklistItem[] }) =>
-    fetchApi(`/api/buildings/${buildingId}/equipment/${equipmentId}/inspection`, {
+  submitChecklist: (siteId: string, equipmentId: string, data: { checklist_items: ChecklistItem[] }) =>
+    fetchApi(`/api/buildings/${siteId}/equipment/${equipmentId}/inspection`, {
       method: "POST",
       body: JSON.stringify(data),
     }),
@@ -80,8 +79,8 @@ export const inspectionApi = {
   /**
    * Get validation checklist
    */
-  getChecklist: (buildingId: string, equipmentId: string) =>
-    fetchApi<ValidationChecklist>(`/api/buildings/${buildingId}/equipment/${equipmentId}/validation-checklist`),
+  getChecklist: (siteId: string, equipmentId: string) =>
+    fetchApi<ValidationChecklist>(`/api/buildings/${siteId}/equipment/${equipmentId}/validation-checklist`),
 };
 
 // ============= Workflow API Methods =============
@@ -90,14 +89,14 @@ export const workflowApi = {
   /**
    * Get current workflow state
    */
-  getStatus: (buildingId: string) =>
-    fetchApi<WorkflowDashboardResponse>(`/api/buildings/${buildingId}/workflow`),
+  getStatus: (siteId: string) =>
+    fetchApi<WorkflowDashboardResponse>(`/api/buildings/${siteId}/workflow`),
 
   /**
    * Update workflow state
    */
-  updateState: (buildingId: string, state: string, message: string) =>
-    fetchApi(`/api/buildings/${buildingId}/workflow/state`, {
+  updateState: (siteId: string, state: string, message: string) =>
+    fetchApi(`/api/buildings/${siteId}/workflow/state`, {
       method: "POST",
       body: JSON.stringify({ state, message }),
     }),

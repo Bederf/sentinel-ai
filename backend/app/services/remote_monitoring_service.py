@@ -49,7 +49,7 @@ class RemoteMonitoringService:
     # Building-level aggregation
     # ------------------------------------------------------------------
 
-    async def get_building_status(self, site_id: str) -> Dict[str, Any]:
+    async def get_site_status(self, site_id: str) -> Dict[str, Any]:
         """Aggregate building-wide status from all devices at a site.
 
         Returns device counts, active alarms, devices in warning/alarm,

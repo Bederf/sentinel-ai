@@ -91,7 +91,7 @@ class TestSimulationPointAdapter:
         current_eq_code = {"code": None}
 
         def mock_table(table_name):
-            if table_name == "buildings":
+            if table_name == "sites":
                 return _build_chain_mock([])  # empty buildings
             elif table_name == "equipment":
                 return _build_chain_mock(equipment_data)
@@ -337,7 +337,7 @@ class TestAPIEndpoint:
         # Verify demo fields are NOT in model
         fields = DiscoverRequest.model_fields
         assert "use_demo" not in fields, "use_demo should be removed"
-        assert "demo_building_id" not in fields, "demo_building_id should be removed"
+        assert "demo_site_id" not in fields, "demo_site_id should be removed"
 
         # Verify only expected fields exist
         expected_fields = {"device_ip", "site_id", "device_bacnet_id", "bms_vendor"}

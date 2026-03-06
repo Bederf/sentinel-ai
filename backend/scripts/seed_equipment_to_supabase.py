@@ -27,25 +27,25 @@ sys.path.insert(0, "/opt/bms-intelligence/backend")
 from app.database.supabase_client import get_supabase_client  # noqa: E402
 
 DATA_PATH = Path("/opt/bms-intelligence/backend/app/data")
-BUILDINGS_PATH = DATA_PATH / "buildings"
+BUILDINGS_PATH = DATA_PATH / "sites"
 
 
 def get_or_create_building(client, site_code: str, building_data: dict) -> str:
     """Get or create building in Supabase. Returns building UUID."""
     try:
         # Check if building already exists
-        result = client.table("buildings").select("id").eq("code", site_code).execute()
+        result = client.table("sites").select("id").eq("code", site_code).execute()
 
         if result.data:
-            building_uuid = result.data[0]["id"]
-            print(f"  ✓ Building {site_code} already exists (UUID: {building_uuid[:8]}...)")
-            return building_uuid
+            site_uuid = result.data[0]["id"]
+            print(f"  ✓ Building {site_code} already exists (UUID: {site_uuid[:8]}...)")
+            return site_uuid
 
         # Create new building
-        building_uuid = str(uuid.uuid4())
+        site_uuid = str(uuid.uuid4())
 
         insert_data = {
-            "id": building_uuid,
+            "id": site_uuid,
             "code": site_code,
             "name": building_data.get("name", building_data.get("display_name", site_code)),
             "address": building_data.get("address", ""),
@@ -56,10 +56,10 @@ def get_or_create_building(client, site_code: str, building_data: dict) -> str:
             "year_built": 2020,
         }
 
-        client.table("buildings").insert(insert_data).execute()
-        print(f"  ✓ Created building {site_code} (UUID: {building_uuid[:8]}...)")
+        client.table("sites").insert(insert_data).execute()
+        print(f"  ✓ Created building {site_code} (UUID: {site_uuid[:8]}...)")
 
-        return building_uuid
+        return site_uuid
 
     except Exception as e:
         print(f"  ✗ ERROR creating building {site_code}: {e}")
@@ -115,7 +115,7 @@ def _map_equipment_status(status_value):
     return mappings.get(status_lower, "normal")
 
 
-def seed_equipment_for_site(client, site_code: str, building_uuid: str) -> int:
+def seed_equipment_for_site(client, site_code: str, site_uuid: str) -> int:
     """
     Seed all equipment for a site from equipment/*.json files.
     Returns count of equipment created/updated.
@@ -172,7 +172,7 @@ def seed_equipment_for_site(client, site_code: str, building_uuid: str) -> int:
                     {
                         "id": eq_uuid,
                         "code": equipment_code,
-                        "building_id": building_uuid,
+                        "site_id": site_uuid,
                         "name": equipment_name,
                         "type": equipment_type,
                         "status": mapped_status,
@@ -226,7 +226,7 @@ def _map_zone_status(status_value):
     return mappings.get(status_lower, "idle")
 
 
-def seed_zones_for_site(client, site_code: str, building_uuid: str) -> int:
+def seed_zones_for_site(client, site_code: str, site_uuid: str) -> int:
     """
     Seed all HVAC zones for a site from zones.json.
     Returns count of zones created/updated.
@@ -283,7 +283,7 @@ def seed_zones_for_site(client, site_code: str, building_uuid: str) -> int:
                             "id": zone_uuid,
                             "zone_id": zone_id,
                             "zone_name": zone_name,
-                            "building_id": building_uuid,
+                            "site_id": site_uuid,
                             "floor": zone.get("floor", ""),
                             "current_temp": zone.get("current_temp"),
                             "setpoint": zone.get("setpoint"),
@@ -359,19 +359,19 @@ def main():
                 building_data = {"name": site_code}
 
         # Get or create building
-        building_uuid = get_or_create_building(client, site_code, building_data)
-        if not building_uuid:
+        site_uuid = get_or_create_building(client, site_code, building_data)
+        if not site_uuid:
             print(f"  ✗ Skipping {site_code}: failed to create building")
             continue
 
         total_buildings += 1
 
         # Seed equipment
-        eq_count = seed_equipment_for_site(client, site_code, building_uuid)
+        eq_count = seed_equipment_for_site(client, site_code, site_uuid)
         total_equipment += eq_count
 
         # Seed zones
-        zone_count = seed_zones_for_site(client, site_code, building_uuid)
+        zone_count = seed_zones_for_site(client, site_code, site_uuid)
         total_zones += zone_count
 
     print("\n" + "=" * 80)
@@ -389,7 +389,7 @@ def main():
 
     try:
         # Count buildings
-        b_result = client.table("buildings").select("id", count="exact").execute()
+        b_result = client.table("sites").select("id", count="exact").execute()
         print(f"Buildings in Supabase: {b_result.count}")
 
         # Count equipment
@@ -402,11 +402,9 @@ def main():
 
         # Count by building
         print("\nEquipment per building:")
-        buildings_result = client.table("buildings").select("id, code, name").execute()
+        buildings_result = client.table("sites").select("id, code, name").execute()
         for building in buildings_result.data[:5]:  # Show first 5
-            eq_result = (
-                client.table("equipment").select("id", count="exact").eq("building_id", building["id"]).execute()
-            )
+            eq_result = client.table("equipment").select("id", count="exact").eq("site_id", building["id"]).execute()
             print(f"  {building['code']}: {eq_result.count} equipment")
 
     except Exception as e:

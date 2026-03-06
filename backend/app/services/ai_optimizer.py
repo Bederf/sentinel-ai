@@ -26,7 +26,7 @@ from app.models.optimization import (
     SiteOptimizationStatus,
 )
 from app.models.device import Device, DeviceType, DevicePoint, ZoneType, ExposureDirection
-from app.config.settings import settings
+from app.config.settings import settings, BACKGROUND_AI_MODEL
 from app.services.claude_service import claude_service
 from app.services.zai_service import zai_service
 from app.services.device_abstraction import device_manager
@@ -57,12 +57,12 @@ async def ensure_device_manager_initialized() -> None:
             # Load all building equipment (including monitoring-only solar/meters)
             from app.api.devices import load_equipment_from_buildings
 
-            building_devices = await load_equipment_from_buildings()
+            site_devices = await load_equipment_from_buildings()
 
             # Merge building devices with reference devices (dedup by ID)
             existing_ids = {d["id"] for d in devices_data}
             added_count = 0
-            for device in building_devices:
+            for device in site_devices:
                 if device["id"] not in existing_ids:
                     devices_data.append(device)
                     existing_ids.add(device["id"])
@@ -83,9 +83,9 @@ def load_sites() -> List[Dict[str, Any]]:
     # Try Supabase first
     if not settings.use_json_storage:
         try:
-            from app.database.repositories.building_repository import BuildingRepository
+            from app.database.repositories.site_repository import SiteRepository
 
-            repo = BuildingRepository()
+            repo = SiteRepository()
             buildings = repo.get_all()
             if buildings:
                 sites = []
@@ -139,6 +139,13 @@ class AIOptimizerService:
         else:
             self._llm_service = claude_service
             self._llm_provider = "anthropic"
+        # Use cheaper model for background optimization if configured
+        if settings.optimization_model:
+            self._optimization_model_override = settings.optimization_model
+        elif self._llm_provider == "anthropic":
+            self._optimization_model_override = BACKGROUND_AI_MODEL
+        else:
+            self._optimization_model_override = None
         self._sites = None
         self._optimization_status_cache: Dict[str, SiteOptimizationStatus] = {}
 
@@ -379,6 +386,8 @@ class AIOptimizerService:
 
     async def _gather_current_conditions(self, site_id: str) -> Dict[str, Any]:
         """Gather current building conditions from devices and DALI sensors."""
+        from app.services.lifecycle_orchestrator import get_effective_now
+
         try:
             devices = await device_manager.list_devices_by_site(site_id)
 
@@ -388,7 +397,7 @@ class AIOptimizerService:
                 "humidity": 55.0,
                 "occupancy": "high",
                 "equipment_status": "normal",
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": get_effective_now().isoformat(),
                 "zone_occupancy": {},  # Real occupancy from DALI
                 # Track which readings are defaults vs live sensor data
                 "_data_sources": {
@@ -604,6 +613,55 @@ class AIOptimizerService:
             except Exception as e:
                 logger.warning(f"Failed to get BESS telemetry: {e}")
 
+            # Gather equipment health from Supabase — enables health-aware recs
+            try:
+                from app.database.supabase_client import get_supabase_client
+                from app.services.health_threshold_service import get_health_thresholds
+
+                thresholds = get_health_thresholds()
+                t_healthy = thresholds.get("healthy", 90)
+                t_warning = thresholds.get("warning", 70)
+                t_critical = thresholds.get("critical", 50)
+
+                sb = get_supabase_client()
+                site_resp = sb.table("sites").select("id").eq("code", site_id).execute()
+                if site_resp.data:
+                    site_uuid = site_resp.data[0]["id"]
+                    eq_resp = (
+                        sb.table("equipment").select("code,type,health_score,status").eq("site_id", site_uuid).execute()
+                    )
+                    if eq_resp.data:
+                        degraded = []
+                        worst_health = 100
+                        for eq in eq_resp.data:
+                            hs = eq.get("health_score")
+                            if hs is not None and hs < t_healthy:
+                                degraded.append(
+                                    {
+                                        "code": eq["code"],
+                                        "type": eq.get("type", "unknown"),
+                                        "health": hs,
+                                        "status": eq.get("status", "normal"),
+                                    }
+                                )
+                                worst_health = min(worst_health, hs)
+
+                        if degraded:
+                            conditions["equipment_health"] = degraded
+                            conditions["_health_thresholds"] = thresholds
+                            if worst_health < t_critical:
+                                conditions["equipment_status"] = "critical"
+                            elif worst_health < t_warning:
+                                conditions["equipment_status"] = "degraded"
+                            else:
+                                conditions["equipment_status"] = "warning"
+                            logger.warning(
+                                f"[AI-OPT] Equipment health: {len(degraded)} degraded, "
+                                f"worst={worst_health}%, status={conditions['equipment_status']}"
+                            )
+            except Exception as e:
+                logger.warning(f"Could not fetch equipment health: {e}")
+
             return conditions
 
         except Exception as e:
@@ -778,7 +836,7 @@ class AIOptimizerService:
             from app.services.feature_engineering_service import get_feature_engineering_service
 
             feat_svc = get_feature_engineering_service()
-            ml_context["feature_metrics"] = await feat_svc.compute_building_features(site_id)
+            ml_context["feature_metrics"] = await feat_svc.compute_site_features(site_id)
         except Exception as e:
             logger.debug(f"Feature engineering service unavailable: {e}")
 
@@ -951,38 +1009,68 @@ class AIOptimizerService:
 **Your optimization must respect these profile priorities above all else.**
 """
 
+        # Use configured health thresholds from settings page
+        _ht = current_conditions.get("_health_thresholds", {"healthy": 90, "warning": 70, "critical": 50})
+        _t_healthy = _ht.get("healthy", 90)
+        _t_warning = _ht.get("warning", 70)
+        _t_critical = _ht.get("critical", 50)
+
         prompt = (
-            "You are an expert building optimization engineer. "
-            "Analyze this building's equipment and recommend optimal "
-            "setpoints for energy efficiency and occupant comfort.\n\n"
-            "**IMPORTANT:** This building has a SPECIFIC equipment "
-            "inventory. Only recommend changes for equipment that "
-            "EXISTS at this site. Different buildings have different "
-            "equipment combinations.\n\n"
+            "You are an expert building optimization engineer operating in INTERVENTION mode. "
+            "You must ONLY recommend changes when current conditions diverge from optimal. "
+            "If the building is running normally, output zero recommendations.\n\n"
+            "**CRITICAL RULE:** Do NOT generate recommendations for the sake of coverage. "
+            "Every recommendation must cite a specific measured condition that is suboptimal "
+            "and explain exactly what is wrong and why your change fixes it.\n\n"
+            "**NOTE:** Equipment health/maintenance recommendations are handled separately by "
+            "a rule-based engine. Focus ONLY on operational optimization: setpoints, scheduling, "
+            "energy, BESS dispatch, solar, and load management.\n\n"
         )
 
         op_hours = site.get("operating_hours", {})
         op_start = op_hours.get("start", "08:00")
         op_end = op_hours.get("end", "18:00")
 
+        # Current time for schedule-aware decisions — use simulated time when
+        # simulator is running at accelerated speed, otherwise real wall-clock.
+        from app.services.lifecycle_orchestrator import get_effective_now
+
+        now_sast = get_effective_now()
+        current_time_str = now_sast.strftime("%H:%M")
+        current_weekday = now_sast.strftime("%A")
+        is_occupied_hours = now_sast.weekday() < 5 and int(op_start.replace(":", "")) <= int(
+            current_time_str.replace(":", "")
+        ) <= int(op_end.replace(":", ""))
+
         prompt += f"""**Building:** {site["name"]} ({site["id"]})
 - Type: {site.get("type", "commercial")}
 - Size: {site.get("sqm", 5000)} sqm
 - Floors: {site.get("floors", 1)}
-- Operating hours: {op_start} - {op_end}
+- Operating hours: {op_start} - {op_end} (weekdays only)
 - Region: {site.get("region", "Gauteng")}
+
+**Current Time:** {current_time_str} SAST, {current_weekday}
+**Building Status:** {"OCCUPIED — within operating hours" if is_occupied_hours else "UNOCCUPIED — outside hours"}
+
+**SCHEDULE RULES:**
+- During occupied hours ({op_start}-{op_end} weekdays): HVAC comfort/setpoint/pre-conditioning recommendations allowed
+- Outside occupied hours: HVAC comfort recommendations are FORBIDDEN. Only these are allowed:
+  * BESS charge/discharge scheduling for TOU optimization
+  * Generator load-shedding readiness
+  * Energy minimization (shut down unnecessary equipment)
+  * Safety and security equipment monitoring
 
 **Equipment Inventory at This Site:**
 {chr(10).join(inventory_summary) if inventory_summary else "No equipment registered"}
 {profile_section}
 
-**Current Conditions:**
+**Current Conditions (LIVE SENSOR DATA):**
 - Indoor temperature: {current_conditions.get("indoor_temp", 22)}°C
 - Outdoor temperature: {current_conditions.get("outdoor_temp", 28)}°C
 - Humidity: {current_conditions.get("humidity", 55)}%
 - Occupancy: {current_conditions.get("occupancy", "unknown")}
 - Equipment status: {current_conditions.get("equipment_status", "normal")}
-
+{self._format_equipment_health(current_conditions)}
 {self._format_solar_bess_telemetry(current_conditions)}
 {self._format_ml_context_section(ml_context) if ml_context else ""}
 **Weather Forecast (next 4 hours):**
@@ -1032,104 +1120,88 @@ Solar PV:
 
 BESS (Battery Storage) — autonomous dispatch engine handles natively:
 - The solar_arbitrage_engine runs a 5-minute dispatch cycle independently
-- It already handles: load shedding priority discharge, emergency SOC protection (<12%),
-  TOU band charge/discharge (off-peak charge, peak discharge), and solar-priority charging
-- DO NOT recommend actions the autonomous engine already performs (e.g. "discharge during
-  peak TOU" — that is the default BESS behavior and happens automatically)
-- SENTINEL BESS recommendations are advisory overlays only — recommend when you have
-  higher-order context the engine cannot see: predicted demand shifts, cross-system
-  coordination (e.g. pre-charge before forecast cloud cover), weather-driven adjustments
+- It ALREADY handles ALL of these — DO NOT recommend ANY of them:
+  * Peak TOU discharge (07:00-10:00, 18:00-20:00 SAST)
+  * Off-peak TOU charge (22:00-06:00 SAST)
+  * Emergency SOC protection below 12%
+  * Load shedding priority discharge
+  * Solar-priority charging
+- If you include ANY of these, it will be discarded as a duplicate of autonomous behaviour
+- SENTINEL BESS recs are advisory overlays ONLY — recommend when you have
+  higher-order context the engine cannot see: demand response coordination,
+  weather-driven pre-charge before forecast cloud cover, or grid anomaly response
 - SOC limits: maintain 10-90% (never fully discharge or overcharge)
 - Mode changes: idle→discharge allowed, charging→discharge needs 60s transition
 
 {self._format_lighting_section(lighting_devices, lighting_zones)}
 
-**Your Task:**
-1. Review the equipment inventory - ONLY recommend changes for equipment that EXISTS at this site
-2. Analyze current conditions vs outdoor weather and occupancy
-3. Consider energy pricing (higher rates = more aggressive optimization)
-4. Apply zone-aware rules based on zone_type and exposure
-5. USE ML MODEL INTELLIGENCE above to make PREDICTIVE recommendations:
-   - If LSTM forecasts predict rising temperatures, pre-cool NOW
-   - If anomaly scores are elevated, flag equipment for inspection
-   - If fault classification shows bearing wear risk, recommend maintenance
-   - If health trends show degradation, factor into equipment loading decisions
-   - If base load index is high, recommend after-hours equipment audit
-6. Recommend setpoint changes for ALL relevant equipment types:
-   - HVAC: temperature setpoints, fan speeds, damper positions
-   - Lighting: DO NOT recommend dim levels or occupancy dimming
-(Tridonic handles natively via DALI-2 + net4more). Only recommend
-tariff-based demand response overrides or predictive pre-conditioning.
-   - Power: generator start/stop (only if load shedding), UPS mode
-   - Solar: performance alerts, curtailment if export limit reached
+**Your Task — INTERVENTION MODE:**
+
+**Core principle:** Generate 0 recommendations if the building is running normally.
+Only recommend changes when you detect a SPECIFIC problem or opportunity.
+
+1. Review current sensor data above. For each equipment item, ask: "Is this currently suboptimal?"
+   - If current indoor temp is within ±1°C of setpoint → NO recommendation needed
+   - If damper positions match occupancy level → NO recommendation needed
+   - If equipment is already at the correct operating point → skip it entirely
+2. ONLY generate a recommendation when you identify a SPECIFIC divergence:
+   - Indoor temp 26°C but setpoint 22°C → recommend investigation or setpoint adjustment
+   - Occupancy at 10% but full HVAC active → recommend setback
+   - Peak tariff period with BESS idle → recommend discharge (only if arbitrage engine missed it)
+   - ML anomaly score elevated → flag for inspection
+3. Every recommendation reason MUST cite the actual sensor value that triggered it:
+   - ✅ "Indoor temp 26.3°C exceeds setpoint 24°C by 2.3°C — investigate FCU capacity"
+   - ✅ "Occupancy at 8% (sensor reading) but cooling at full capacity — setback to 25°C"
+   - ❌ "Low occupancy — reduce active cooling" (too generic, no actual values)
+   - ❌ "High occupancy — increase airflow" (what is the actual occupancy %? what is current airflow?)
+4. USE ML MODEL INTELLIGENCE above for PREDICTIVE interventions only:
+   - If LSTM forecasts predict rising temperatures, pre-cool NOW (cite the forecast)
+   - If anomaly scores > 0.5, flag equipment for inspection (cite the score)
+   - If fault classification shows bearing wear risk, recommend maintenance (cite confidence)
+   - If base load index is high, recommend after-hours equipment audit (cite the BLI value)
+5. System-specific rules:
+   - HVAC: Only during occupied hours. Cite current temp vs setpoint delta
+   - Lighting: DO NOT recommend dim levels or occupancy dimming (Tridonic DALI-2 handles natively).
+     Only recommend tariff-based demand response overrides. DALI brightness range is 0-254 only.
+   - Power: Generator start/stop ONLY if load shedding active or imminent
+   - Solar: Performance alerts only if PR < 75%
    - BESS: DO NOT duplicate autonomous dispatch (TOU charge/discharge, load shedding,
-solar priority — already handled). Only recommend predictive or cross-system overlays.
-   - Meters: no direct control, but use readings for context
-7. CRITICAL: Use EXACT point_name from "All Available Control Points" above
-8. Project energy savings in ZAR per hour (breakdown by system)
-9. Ensure all recommendations are within safety limits
-10. Prioritize coordination:
-   - Tridonic handles occupancy-based HVAC setback and lighting dimming natively
-   - Peak solar: charge BESS
-   - Load shedding: BESS before generator
-   - Tariff scheduling: shift discretionary loads to off-peak
+     SOC protection). Only recommend cross-system coordination the arbitrage engine cannot see.
+   - Meters: No direct control, use for context only
+6. CRITICAL: Use EXACT point_name from "All Available Control Points" above
+7. Project energy savings in ZAR per hour for each recommendation
+8. Ensure all recommendations are within safety limits
+9. Set confidence between 0.50 and 0.95 based on data quality:
+   - 0.50-0.65: Limited sensor data, stale readings, or uncertain conditions
+   - 0.65-0.80: Normal conditions with good sensor coverage
+   - 0.80-0.95: High certainty with multiple corroborating data points
 
 **Response Format (JSON):**
+
+NOTE: The "recommendations" array may be EMPTY if the building is running normally.
+This is the correct response when no interventions are needed.
+
 ```json
 {{
   "recommendations": [
     {{
-      "equipment_id": "device-id",
-      "equipment_name": "Device Name",
+      "equipment_id": "S002-FCU-101",
+      "equipment_name": "FCU Zone 101",
       "point_name": "zone_cooling_setpoint",
       "current_value": 22.0,
-      "recommended_value": 23.0,
+      "recommended_value": 24.0,
       "unit": "°C",
-      "reason": "Raise setpoint during low occupancy",
-      "system": "hvac"
-    }},
-    {{
-      "equipment_id": "zone-L11-S",
-      "equipment_name": "Level 11 South",
-      "point_name": "dim_level",
-      "current_value": 254,
-      "recommended_value": 102,
-      "unit": "level",
-      "reason": "Peak tariff demand response - reduce to 40% (Tridonic override)",
-      "system": "lighting"
-    }},
-    {{
-      "equipment_id": "S002-GEN-1",
-      "equipment_name": "Main Generator",
-      "point_name": "mode",
-      "current_value": "standby",
-      "recommended_value": "standby",
-      "unit": "mode",
-      "reason": "No load shedding - maintain standby",
-      "system": "power"
-    }},
-    {{
-      "equipment_id": "S002-BESS-B1-001",
-      "equipment_name": "Battery Energy Storage (B1)",
-      "point_name": "mode",
-      "current_value": "idle",
-      "recommended_value": "discharging",
-      "unit": "mode",
-      "reason": "Peak TOU period - discharge BESS to reduce grid import",
-      "system": "bess"
+      "reason": "Indoor temp 22.1°C with occupancy at 12% — raise setpoint 2°C to reduce cooling energy",
+      "system": "hvac",
+      "savings_kwh": 1.5
     }}
   ],
-  "cross_system_recommendations": [
-    {{
-      "zone_id": "Zone-L11-S",
-      "zone_name": "Level 11 South",
-      "hvac_action": "Raise setpoint +2°C",
-      "lighting_action": "Dim to 20%",
-      "power_action": null,
-      "reason": "Zone unoccupied - coordinated energy savings",
-      "combined_savings_kw": 1.2
-    }}
+  "no_action_reasons": [
+    "HVAC zones 201-205: indoor temps within ±0.5°C of setpoints, no intervention needed",
+    "BESS: autonomous dispatch active, SOC at 65%, TOU schedule on track",
+    "Generators: standby mode appropriate, no load shedding forecast"
   ],
+  "cross_system_recommendations": [],
   "projected_savings": {{
     "hvac_kwh": 12.5,
     "lighting_kwh": 3.2,
@@ -1142,7 +1214,7 @@ solar priority — already handled). Only recommend predictive or cross-system o
   }},
   "equipment_not_optimized": ["S002-GEN-1", "S002-UPS-1"],
   "equipment_not_optimized_reason": "Generator and UPS in standby - no optimization needed",
-  "confidence": 0.85,
+  "confidence": 0.72,
   "reasoning": "Summary of optimization strategy for this building's specific equipment"
 }}
 ```
@@ -1171,14 +1243,16 @@ Provide ONLY the JSON response, no additional text."""
             profile: Active optimization profile (if any)
         """
         try:
-            logger.info(f"Using {self._llm_provider} for optimization of site {site_id}")
+            model_label = self._optimization_model_override or self._llm_provider
+            logger.info(f"Using {model_label} for optimization of site {site_id}")
 
             # Call LLM (via configured provider)
 
             response_text = ""
             async for chunk in self._llm_service.stream_response(
                 messages=[{"role": "user", "content": prompt}],
-                include_building_context=False,  # Don't include full context to save tokens
+                include_site_context=False,  # Don't include full context to save tokens
+                model_override=self._optimization_model_override,
             ):
                 response_text += chunk
 
@@ -1197,6 +1271,17 @@ Provide ONLY the JSON response, no additional text."""
                     json_text = response_text.strip()
 
                 result = json.loads(json_text)
+
+                # Log no-action reasons for observability
+                no_action_reasons = result.get("no_action_reasons", [])
+                rec_count = len(result.get("recommendations", []))
+                if no_action_reasons or rec_count == 0:
+                    logger.warning(
+                        f"[AI-OPT] LLM response for {site_id}: {rec_count} recommendations, "
+                        f"{len(no_action_reasons)} no-action reasons"
+                    )
+                    for reason in no_action_reasons[:5]:
+                        logger.warning(f"[AI-OPT]   No action: {reason}")
 
                 return OptimizationRecommendation(
                     site_id=site_id,
@@ -1545,7 +1630,9 @@ Provide ONLY the JSON response, no additional text."""
         if outdoor_temp < 25.0:
             return 0.0
 
-        hour = datetime.now().hour
+        from app.services.lifecycle_orchestrator import get_effective_now
+
+        hour = get_effective_now().hour
         modifiers = {
             ExposureDirection.NORTH: 1.5 if 10 <= hour <= 16 else 0.5,  # Max solar gain (sun in north sky in SA)
             ExposureDirection.WEST: 1.0 if 14 <= hour <= 18 else 0.0,  # Afternoon heat
@@ -1695,6 +1782,27 @@ Provide ONLY the JSON response, no additional text."""
             logger.warning(f"Failed to gather DALI zone data: {e}")
 
         return zone_data
+
+    def _format_equipment_health(self, conditions: Dict[str, Any]) -> str:
+        """Format equipment health section for the prompt when degraded equipment exists."""
+        degraded = conditions.get("equipment_health")
+        if not degraded:
+            return ""
+
+        ht = conditions.get("_health_thresholds", {"healthy": 90, "warning": 70, "critical": 50})
+        t_warning = ht.get("warning", 70)
+        t_critical = ht.get("critical", 50)
+
+        lines = [f"\n**DEGRADED EQUIPMENT (health < {ht.get('healthy', 90)}% — ACTION REQUIRED):**"]
+        for eq in sorted(degraded, key=lambda e: e["health"]):
+            severity = "CRITICAL" if eq["health"] < t_critical else "WARNING" if eq["health"] < t_warning else "MONITOR"
+            lines.append(f"- [{severity}] {eq['code']} ({eq['type']}): health={eq['health']}%")
+        lines.append(
+            f"\nYou MUST generate a maintenance recommendation for each [{severity}] and [CRITICAL] item above. "
+            f"Equipment below {t_warning}% needs inspection/service. Below {t_critical}% needs URGENT action. "
+            "These are NOT no_action items — they require recommendations."
+        )
+        return "\n".join(lines)
 
     def _format_solar_bess_telemetry(self, conditions: Dict[str, Any]) -> str:
         """Format solar/BESS telemetry section for the optimization prompt.
@@ -2680,7 +2788,7 @@ Provide ONLY the JSON response, no additional text."""
             },
         )
 
-    async def analyze_building_load_shedding(
+    async def analyze_site_load_shedding(
         self,
         site_id: str,
         load_shedding_stage: int,

@@ -141,8 +141,8 @@ class MessageFormatter:
         title = cls._event_title(event)
         lines = [f"{emoji} *{title}*", ""]
 
-        if event.building_name:
-            lines.append(f"\U0001f3e2 {event.building_name}")
+        if event.site_name:
+            lines.append(f"\U0001f3e2 {event.site_name}")
         elif event.site_id:
             lines.append(f"\U0001f3e2 {event.site_id}")
 

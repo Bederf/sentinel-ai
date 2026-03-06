@@ -324,7 +324,7 @@ class HybridAIService:
             async for chunk in self._stream_from_provider(
                 provider,
                 [{"role": "user", "content": message}],
-                include_building_context=False,
+                include_site_context=False,
             ):
                 chunks.append(chunk)
             return "".join(chunks)
@@ -336,34 +336,34 @@ class HybridAIService:
         self,
         provider: str,
         messages: list[dict],
-        include_building_context: bool = True,
+        include_site_context: bool = True,
         tier: int = 2,
     ) -> AsyncGenerator[str, None]:
         """Stream response from a specific provider."""
         if provider == "openai":
             async for chunk in openai_service.stream_response(
                 messages,
-                include_building_context=include_building_context,
+                include_site_context=include_site_context,
                 tier=tier,
             ):
                 yield chunk
         elif provider == "zai":
             async for chunk in zai_service.stream_response(
                 messages,
-                include_building_context=include_building_context,
+                include_site_context=include_site_context,
             ):
                 yield chunk
         else:  # anthropic
             async for chunk in claude_service.stream_response(
                 messages,
-                include_building_context=include_building_context,
+                include_site_context=include_site_context,
             ):
                 yield chunk
 
     async def _try_cloud_with_fallback(
         self,
         message: str,
-        include_building_context: bool = True,
+        include_site_context: bool = True,
         data_subject_id: str | None = None,
         tier: int = 2,
     ) -> AsyncGenerator[str, None]:
@@ -378,7 +378,7 @@ class HybridAIService:
             async for chunk in self._stream_from_provider(
                 provider,
                 messages,
-                include_building_context,
+                include_site_context,
                 tier,
             ):
                 yield chunk
@@ -400,7 +400,7 @@ class HybridAIService:
                 async for chunk in self._stream_from_provider(
                     fallback,
                     messages,
-                    include_building_context,
+                    include_site_context,
                     tier,
                 ):
                     yield chunk
@@ -562,7 +562,7 @@ class HybridAIService:
         logger.info("Using cloud provider with fallback: %s", routing["provider"])
         async for chunk in self._try_cloud_with_fallback(
             message,
-            include_building_context=True,
+            include_site_context=True,
             data_subject_id=data_subject_id,
             tier=routing.get("tier", 2),
         ):

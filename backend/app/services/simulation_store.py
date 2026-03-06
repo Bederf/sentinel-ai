@@ -9,7 +9,7 @@ When SENTINEL turns on it reads from the building via DeviceManager,
 NOT from these files directly.  SENTINEL writes to its own Supabase.
 
 File layout:
-    backend/app/data/simulation/{building_id}/
+    backend/app/data/simulation/{site_id}/
         sensor_readings.jsonl    — append-only hourly readings
         power_meters.json        — current meter state (latest values)
         energy_history.json      — daily energy aggregation {date: {hvac_kwh, lighting_kwh, ...}}
@@ -44,9 +44,9 @@ _DEFAULT_JSONL_MAX_BYTES = 50 * 1024 * 1024  # 50 MB default
 class SimulationStore:
     """JSON-backed store for a single building's simulation state."""
 
-    def __init__(self, building_id: str):
-        self.building_id = building_id
-        self._dir = _DATA_ROOT / building_id
+    def __init__(self, site_id: str):
+        self.site_id = site_id
+        self._dir = _DATA_ROOT / site_id
         self._dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
 
@@ -160,7 +160,7 @@ class SimulationStore:
         """Upsert a daily energy field (hvac_kwh, lighting_kwh, other_kwh)."""
         with self._lock:
             if date_str not in self._energy_history:
-                self._energy_history[date_str] = {"building_id": self.building_id, "date": date_str}
+                self._energy_history[date_str] = {"site_id": self.site_id, "date": date_str}
             prev = self._energy_history[date_str].get(field, 0.0)
             self._energy_history[date_str][field] = round(prev + kwh, 2)
             self._save_json("energy_history.json", self._energy_history)
@@ -270,7 +270,7 @@ class SimulationStore:
                 if f.suffix in (".json", ".jsonl", ".tmp"):
                     f.unlink()
 
-            logger.info(f"[SIM-STORE] Reset simulation state for {self.building_id}")
+            logger.info(f"[SIM-STORE] Reset simulation state for {self.site_id}")
 
 
 # ------------------------------------------------------------------
@@ -280,8 +280,8 @@ class SimulationStore:
 _stores: Dict[str, SimulationStore] = {}
 
 
-def get_simulation_store(building_id: str) -> SimulationStore:
+def get_simulation_store(site_id: str) -> SimulationStore:
     """Get or create simulation store for a building."""
-    if building_id not in _stores:
-        _stores[building_id] = SimulationStore(building_id)
-    return _stores[building_id]
+    if site_id not in _stores:
+        _stores[site_id] = SimulationStore(site_id)
+    return _stores[site_id]

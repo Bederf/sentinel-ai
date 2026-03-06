@@ -24,7 +24,7 @@ const mockDevice: Device = {
   id: 'device-001',
   code: 'S002-CHILLER-B1-001',
   name: 'Chiller Unit 1',
-  building_id: 'building-001',
+  site_id: 'building-001',
   type: 'CHILLER',
   status: 'online',
   health_score: 85,
@@ -140,7 +140,7 @@ describe('DevicesApi - Device Queries', () => {
       expect(result.id).toBeDefined();
       expect(result.code).toBeDefined();
       expect(result.name).toBeDefined();
-      expect(result.building_id).toBeDefined();
+      expect(result.site_id).toBeDefined();
       expect(result.type).toBeDefined();
       expect(result.status).toBeDefined();
       expect(result.health_score).toBeDefined();

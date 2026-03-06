@@ -2,7 +2,7 @@
 
 Provides 96-interval (24-hour) demand forecasts using scikit-learn
 GradientBoostingRegressor trained on synthetic load profiles derived from
-solar_demand_service._simulated_building_load().
+solar_demand_service._simulated_site_load().
 
 Features per interval:
   - hour_of_day (0-23.75 in 0.25 steps)
@@ -54,13 +54,13 @@ _SEASONAL_TEMPS = {
 _PEAK_HOURS = {7, 8, 9, 18, 19}
 
 
-def _simulated_building_load(hour: float, rng: Optional[random.Random] = None) -> float:
+def _simulated_site_load(hour: float, rng: Optional[random.Random] = None) -> float:
     """Simulate Site-002 building load profile (kW) by hour of day.
 
     Sandton office tower: base load ~900 kW (overnight), peak ~1750-1850 kW
     during business hours (09:30-15:00). Morning ramp 06:00-09:30.
 
-    Matches solar_demand_service._simulated_building_load() but accepts an
+    Matches solar_demand_service._simulated_site_load() but accepts an
     optional seeded RNG for reproducibility.
     """
     noise = rng.uniform(-1, 1) if rng else random.uniform(-1, 1)
@@ -159,7 +159,7 @@ class LoadForecastService:
             day_demands = []
             for interval in range(self.INTERVALS_PER_DAY):
                 hour = interval / self.INTERVALS_PER_HOUR
-                base_demand = _simulated_building_load(hour, rng) * weekend_factor
+                base_demand = _simulated_site_load(hour, rng) * weekend_factor
                 day_demands.append(max(0.0, base_demand))
 
             # Previous day's demands for lagged feature
@@ -170,7 +170,7 @@ class LoadForecastService:
             prev_demands = []
             for interval in range(self.INTERVALS_PER_DAY):
                 hour = interval / self.INTERVALS_PER_HOUR
-                prev_demands.append(max(0.0, _simulated_building_load(hour, prev_rng) * prev_weekend_factor))
+                prev_demands.append(max(0.0, _simulated_site_load(hour, prev_rng) * prev_weekend_factor))
 
             for interval in range(self.INTERVALS_PER_DAY):
                 hour = interval / self.INTERVALS_PER_HOUR
@@ -372,7 +372,7 @@ class LoadForecastService:
         hour = sast.hour + sast.minute / 60.0
 
         if not model:
-            return _simulated_building_load(hour)
+            return _simulated_site_load(hour)
 
         day_of_week = sast.weekday()
         month = sast.month
@@ -381,8 +381,8 @@ class LoadForecastService:
         solar_kw = _synthetic_solar_kw(hour)
 
         # Use simulated values for lagged features
-        prev_demand = _simulated_building_load(max(0, hour - 0.25))
-        prev_day_demand = _simulated_building_load(hour)
+        prev_demand = _simulated_site_load(max(0, hour - 0.25))
+        prev_day_demand = _simulated_site_load(hour)
 
         features = np.array(
             [

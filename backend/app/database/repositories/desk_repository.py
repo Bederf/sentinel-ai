@@ -40,42 +40,39 @@ class DeskRepository:
         if last_error:
             raise last_error
 
-    def get_all(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_all(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all desks with optional building filter.
 
         Args:
-            building_id: Filter by building UUID
+            site_id: Filter by building UUID
 
         Returns:
             List of desks
         """
         query = self.client.table("desks").select("*")
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
 
         response = query.execute()
         return response.data
 
-    def get_by_building_code(self, building_code: str) -> List[Dict[str, Any]]:
+    def get_by_site_code(self, site_code: str) -> List[Dict[str, Any]]:
         """Get desks by building code with zone_id resolved.
 
         Args:
-            building_code: Building code (e.g., 'sandton' or 'site-002')
+            site_code: Building code (e.g., 'sandton' or 'site-002')
 
         Returns:
             List of desks with zone_id (string) from hvac_zones join
         """
-        building_uuid = self.get_building_uuid(building_code)
-        if not building_uuid:
+        site_uuid = self.get_site_uuid(site_code)
+        if not site_uuid:
             return []
 
         # Join with hvac_zones to get zone_id string
         response = (
-            self.client.table("desks")
-            .select("*, hvac_zones(zone_id, zone_name)")
-            .eq("building_id", building_uuid)
-            .execute()
+            self.client.table("desks").select("*, hvac_zones(zone_id, zone_name)").eq("site_id", site_uuid).execute()
         )
 
         # Flatten hvac_zones data into desk dict
@@ -135,32 +132,32 @@ class DeskRepository:
 
         return response.data
 
-    def get_by_floor(self, building_code: str, floor: str) -> List[Dict[str, Any]]:
+    def get_by_floor(self, site_code: str, floor: str) -> List[Dict[str, Any]]:
         """Get desks by building and floor.
 
         Args:
-            building_code: Building code
+            site_code: Building code
             floor: Floor identifier
 
         Returns:
             List of desks on the floor
         """
-        building_uuid = self.get_building_uuid(building_code)
-        if not building_uuid:
+        site_uuid = self.get_site_uuid(site_code)
+        if not site_uuid:
             return []
 
-        response = self.client.table("desks").select("*").eq("building_id", building_uuid).eq("floor", floor).execute()
+        response = self.client.table("desks").select("*").eq("site_id", site_uuid).eq("floor", floor).execute()
 
         return response.data
 
-    def find_desk(self, desk_id: str, building_code: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def find_desk(self, desk_id: str, site_code: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Find a desk by ID, optionally filtered by building.
 
         Handles various desk ID formats (e.g., '201', 'desk 201', 'L12-D001').
 
         Args:
             desk_id: Desk ID to search for
-            building_code: Optional building code filter
+            site_code: Optional building code filter
 
         Returns:
             Desk data or None if not found
@@ -172,10 +169,10 @@ class DeskRepository:
         # Build query
         query = self.client.table("desks").select("*")
 
-        if building_code:
-            building_uuid = self.get_building_uuid(building_code)
-            if building_uuid:
-                query = query.eq("building_id", building_uuid)
+        if site_code:
+            site_uuid = self.get_site_uuid(site_code)
+            if site_uuid:
+                query = query.eq("site_id", site_uuid)
 
         # Try exact match first
         response = query.ilike("desk_id", normalized).execute()
@@ -189,16 +186,16 @@ class DeskRepository:
 
         return None
 
-    def get_building_uuid(self, building_code: str) -> Optional[str]:
+    def get_site_uuid(self, site_code: str) -> Optional[str]:
         """Get building UUID from building code.
 
         Args:
-            building_code: Building code (e.g., 'sandton')
+            site_code: Building code (e.g., 'sandton')
 
         Returns:
             Building UUID or None
         """
-        response = self.client.table("buildings").select("id").eq("code", building_code).execute()
+        response = self.client.table("sites").select("id").eq("code", site_code).execute()
 
         if response.data:
             return response.data[0]["id"]
@@ -287,20 +284,20 @@ class DeskRepository:
 
         return len(response.data) > 0
 
-    def delete_by_building(self, building_code: str) -> int:
+    def delete_by_site(self, site_code: str) -> int:
         """Delete all desks for a building.
 
         Args:
-            building_code: Building code
+            site_code: Building code
 
         Returns:
             Number of desks deleted
         """
-        building_uuid = self.get_building_uuid(building_code)
-        if not building_uuid:
+        site_uuid = self.get_site_uuid(site_code)
+        if not site_uuid:
             return 0
 
-        response = self.client.table("desks").delete().eq("building_id", building_uuid).execute()
+        response = self.client.table("desks").delete().eq("site_id", site_uuid).execute()
 
         return len(response.data)
 
@@ -325,46 +322,44 @@ class DeskRepository:
             return response.data[0]
         return None
 
-    def get_by_building_uuid(self, building_id: str) -> List[Dict[str, Any]]:
+    def get_by_site_uuid(self, site_id: str) -> List[Dict[str, Any]]:
         """Get all desks for a building UUID.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
 
         Returns:
             List of desks in the building
         """
-        query = self.client.table("desks").select("*").eq("building_id", building_id)
+        query = self.client.table("desks").select("*").eq("site_id", site_id)
         response = self._execute_with_retry(query)
         return response.data
 
-    def get_by_zone_id(self, building_id: str, zone_id: str) -> List[Dict[str, Any]]:
+    def get_by_zone_id(self, site_id: str, zone_id: str) -> List[Dict[str, Any]]:
         """Get desks by building-level zone ID.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             zone_id: Zone ID (e.g., 'Zone-L1-A')
 
         Returns:
             List of desks in the zone
         """
-        response = (
-            self.client.table("desks").select("*").eq("building_id", building_id).eq("zone_id", zone_id).execute()
-        )
+        response = self.client.table("desks").select("*").eq("site_id", site_id).eq("zone_id", zone_id).execute()
 
         return response.data
 
-    def get_centroids_for_zones(self, building_id: str, zones: List[str]) -> Dict[str, Dict[str, float]]:
+    def get_centroids_for_zones(self, site_id: str, zones: List[str]) -> Dict[str, Dict[str, float]]:
         """Get centroids for specific zones from desk positions.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             zones: List of zone IDs
 
         Returns:
             Dict mapping zone_id → {x: avg_x, z: avg_z}
         """
-        all_desks = self.get_by_building_uuid(building_id)
+        all_desks = self.get_by_site_uuid(site_id)
         centroids = {}
 
         for zone_id in zones:

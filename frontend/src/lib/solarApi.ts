@@ -255,7 +255,6 @@ export interface ForecastWithActual {
 export interface SolarSite {
   site_id: string;
   site_name: string;
-  building_name: string;
   plants: number;
   connectors: number;
   last_poll: string | null;

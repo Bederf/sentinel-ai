@@ -20,7 +20,7 @@ def default_context():
     return AlertContext(
         simulated_hour=10,
         is_peak=True,
-        building_state="peak_occupied",
+        site_state="peak_occupied",
         occupancy_pct=80.0,
         hvac_mode="cooling",
     )
@@ -174,7 +174,7 @@ class TestBoundaryLogic:
         off_peak_context = AlertContext(
             simulated_hour=22,
             is_peak=False,
-            building_state="night_mode",
+            site_state="night_mode",
             occupancy_pct=5.0,
             hvac_mode="night_setback",
         )

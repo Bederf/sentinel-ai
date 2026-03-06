@@ -1,7 +1,7 @@
 {
   "run_id": "sim_20260212_183007_1b2a7a51",
   "scenario": "fault_day",
-  "building_code": "site-002",
+  "site_code": "site-002",
   "started_at": "2026-02-12T18:30:07.916276",
   "ended_at": null,
   "duration_minutes": null,

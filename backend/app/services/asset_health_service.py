@@ -31,7 +31,7 @@ class AssetHealthService:
     async def get_site_assets(self, site_code: str) -> List[AssetHealthBaseline]:
         """Get baseline + health snapshot for ALL equipment at a site."""
         # 1. Fetch equipment list
-        equipment_list = self._equipment_repo.get_by_building_code(site_code)
+        equipment_list = self._equipment_repo.get_by_site_code(site_code)
         if not equipment_list:
             logger.debug("No equipment found for site %s", site_code)
             return []

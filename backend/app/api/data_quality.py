@@ -5,7 +5,7 @@ readiness assessments for ML model development.
 
 Endpoints:
 - GET /api/data-quality/equipment/{equipment_id} - Quality for one equipment
-- GET /api/data-quality/building/{building_id} - Quality for all equipment in building
+- GET /api/data-quality/building/{site_id} - Quality for all equipment in building
 - GET /api/data-quality/report/daily - Daily quality report
 - GET /api/data-quality/alerts - Active quality alerts
 - GET /api/data-quality/gaps/equipment/{equipment_id} - Data gaps for equipment
@@ -87,10 +87,10 @@ async def get_equipment_quality(
     return quality
 
 
-@router.get("/building/{building_id}", response_model=BuildingDataQualityReport)
+@router.get("/building/{site_id}", response_model=BuildingDataQualityReport)
 async def get_building_quality(
-    building_id: str,
-    building_name: str = Query(default="", description="Building name"),
+    site_id: str,
+    site_name: str = Query(default="", description="Building name"),
 ):
     """Get data quality report for all equipment in a building.
 
@@ -99,8 +99,8 @@ async def get_building_quality(
     quality_service = get_data_quality_service()
 
     report = quality_service.generate_daily_report(
-        building_id=building_id,
-        building_name=building_name,
+        site_id=site_id,
+        site_name=site_name,
     )
 
     return report
@@ -108,8 +108,8 @@ async def get_building_quality(
 
 @router.get("/report/daily", response_model=BuildingDataQualityReport)
 async def get_daily_report(
-    building_id: str = Query(..., description="Building ID for report"),
-    building_name: str = Query(default="", description="Building name"),
+    site_id: str = Query(..., description="Building ID for report"),
+    site_name: str = Query(default="", description="Building name"),
 ):
     """Generate daily data quality report for a building.
 
@@ -118,8 +118,8 @@ async def get_daily_report(
     quality_service = get_data_quality_service()
 
     report = quality_service.generate_daily_report(
-        building_id=building_id,
-        building_name=building_name,
+        site_id=site_id,
+        site_name=site_name,
     )
 
     return report

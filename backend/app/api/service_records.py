@@ -49,7 +49,7 @@ async def create_service_record(
             "code": code,
             "work_order_id": record.work_order_id,
             "equipment_id": record.equipment_id,
-            "building_id": record.building_id,
+            "site_id": record.site_id,
             "service_type": record.service_type.value,
             "technician_id": record.technician_id,
             "technician_name": record.technician_name,

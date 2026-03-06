@@ -43,7 +43,7 @@ class HealthSimulationService:
             "min_health": 10,  # Don't go below 10%
             "max_health": 98,  # Don't go above 98%
             "target_equipment_per_cycle": 10,  # How many to update per cycle
-            "building_id": get_primary_site() or "unknown",  # Target building for simulation
+            "site_id": get_primary_site() or "unknown",  # Target building for simulation
             "business_hours_only": True,  # Only run during business hours
             "business_hours_start": 8,  # 08:00
             "business_hours_end": 17,  # 17:00
@@ -222,21 +222,19 @@ class HealthSimulationService:
         """Get equipment from Supabase."""
         try:
             # First get the building UUID from the code
-            building_response = (
-                self.client.table("buildings").select("id").eq("code", self.config["building_id"]).execute()
-            )
+            site_response = self.client.table("sites").select("id").eq("code", self.config["site_id"]).execute()
 
-            if not building_response.data:
-                logger.warning(f"Building {self.config['building_id']} not found")
+            if not site_response.data:
+                logger.warning(f"Building {self.config['site_id']} not found")
                 return []
 
-            building_uuid = building_response.data[0]["id"]
+            site_uuid = site_response.data[0]["id"]
 
             # Get equipment for that building
             response = (
                 self.client.table("equipment")
-                .select("id, code, name, type, health_score, building_id")
-                .eq("building_id", building_uuid)
+                .select("id, code, name, type, health_score, site_id")
+                .eq("site_id", site_uuid)
                 .execute()
             )
             return response.data or []
@@ -327,7 +325,7 @@ class HealthSimulationService:
             "last_run": self.last_run.isoformat() if self.last_run else None,
             "total_updates": self.total_updates,
             "alerts_triggered": self.alerts_triggered,
-            "building_id": self.config["building_id"],
+            "site_id": self.config["site_id"],
         }
 
     def set_config(self, **kwargs):

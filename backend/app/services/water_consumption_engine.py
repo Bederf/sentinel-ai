@@ -51,15 +51,15 @@ JOHANNESBURG_FIXED_MONTHLY_CHARGE = 285.00  # Monthly fixed charge
 class WaterConsumptionEngine:
     """Engine for simulating water consumption with occupancy and seasonal effects."""
 
-    def __init__(self, building_id: str):
+    def __init__(self, site_id: str):
         """Initialize water consumption engine.
 
         Args:
-            building_id: Building/site identifier (e.g., 'site-002')
+            site_id: Building/site identifier (e.g., 'site-002')
         """
-        self.building_id = building_id
+        self.site_id = site_id
         self.client = get_supabase_client()
-        self.sim_store = get_simulation_store(building_id)
+        self.sim_store = get_simulation_store(site_id)
         self.cost_repo = WaterCostRepository()
 
     def calculate_water_consumption(
@@ -175,7 +175,7 @@ class WaterConsumptionEngine:
             simulated_date: Simulated date
         """
         try:
-            meter_id = f"{self.building_id.split('-')[-1]}-MTR-B1-WATER"
+            meter_id = f"{self.site_id.split('-')[-1]}-MTR-B1-WATER"
 
             # Write to simulation store (JSON), not Supabase
             self.sim_store.update_power_meter(meter_id, 0.0)
@@ -249,7 +249,7 @@ class WaterConsumptionEngine:
 
 
 async def update_simulation_water(
-    building_id: str,
+    site_id: str,
     simulated_hour: int,
     occupancy_data: Dict[str, float],
     cloud_cover_pct: float = 0.0,
@@ -261,7 +261,7 @@ async def update_simulation_water(
     Called hourly from lifecycle_orchestrator via thermal_simulation_engine.
 
     Args:
-        building_id: Building/site ID
+        site_id: Building/site ID
         simulated_hour: Current hour (0-23)
         occupancy_data: Zone occupancy percentages
         cloud_cover_pct: Cloud cover (0-100)
@@ -271,7 +271,7 @@ async def update_simulation_water(
     Returns:
         Tuple of (zone_consumption, total_liters)
     """
-    engine = WaterConsumptionEngine(building_id)
+    engine = WaterConsumptionEngine(site_id)
     zone_consumption, total_liters = engine.calculate_water_consumption(
         simulated_hour=simulated_hour,
         occupancy_data=occupancy_data,
@@ -291,13 +291,13 @@ async def update_simulation_water(
     return zone_consumption, total_liters
 
 
-def get_water_consumption_engine(building_id: str) -> WaterConsumptionEngine:
+def get_water_consumption_engine(site_id: str) -> WaterConsumptionEngine:
     """Get singleton instance of WaterConsumptionEngine.
 
     Args:
-        building_id: Building identifier
+        site_id: Building identifier
 
     Returns:
         WaterConsumptionEngine instance
     """
-    return WaterConsumptionEngine(building_id)
+    return WaterConsumptionEngine(site_id)

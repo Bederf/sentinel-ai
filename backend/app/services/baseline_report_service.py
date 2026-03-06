@@ -11,7 +11,7 @@ from datetime import datetime
 import logging
 
 from app.services.baseline_service import get_baseline_service
-from app.services.building_loader import get_building_loader
+from app.services.site_loader import get_site_loader
 from app.models.baseline import BaselineComparison
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ class BaselineReportService:
 
     def __init__(self):
         self.baseline_service = get_baseline_service()
-        self.building_loader = get_building_loader()
+        self.site_loader = get_site_loader()
 
     async def generate_json_report(
         self, equipment_id: str, include_element_baselines: bool = True, include_comparison_history: bool = True
@@ -39,7 +39,7 @@ class BaselineReportService:
             Complete baseline report as dictionary
         """
         # Get equipment details
-        equipment = await self.building_loader.get_equipment(equipment_id)
+        equipment = await self.site_loader.get_equipment(equipment_id)
         if not equipment:
             raise ValueError(f"Equipment {equipment_id} not found")
 

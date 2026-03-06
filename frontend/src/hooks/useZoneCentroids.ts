@@ -8,19 +8,19 @@ import { sitesApi, type ZoneCentroid } from '@/lib/api/sites';
  * Cache: 5m staleTime, 30m gcTime (rarely changes)
  * Deduplicates identical queries via React Query
  *
- * @param buildingId - Building code (resolved from registered buildings)
+ * @param siteId - Building code (resolved from registered buildings)
  * @param options.enabled - Enable/disable query (default: true)
  */
-export function useZoneCentroids(buildingId: string, options?: { enabled?: boolean }) {
+export function useZoneCentroids(siteId: string, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['zone-centroids', buildingId],
+    queryKey: ['zone-centroids', siteId],
     queryFn: async () => {
-      const response = await sitesApi.getZoneCentroids(buildingId);
+      const response = await sitesApi.getZoneCentroids(siteId);
       return response?.centroids || {} as Record<string, ZoneCentroid>;
     },
     staleTime: 5 * 60 * 1000, // 5m - zone configs rarely change
     gcTime: 30 * 60 * 1000, // 30m
-    enabled: !!buildingId && options?.enabled !== false,
+    enabled: !!siteId && options?.enabled !== false,
     retry: 2,
   });
 }

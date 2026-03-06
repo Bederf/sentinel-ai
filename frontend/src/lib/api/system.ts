@@ -134,10 +134,10 @@ export const systemApi = {
    * Returns immediately with diagnostic_id for polling.
    * Client should poll getDiagnosticResults() every 5 seconds until complete.
    */
-  async runDiagnostics(target: string = 'full_system', buildingCode?: string): Promise<{ diagnostic_id: string; status: string }> {
+  async runDiagnostics(target: string = 'full_system', siteCode?: string): Promise<{ diagnostic_id: string; status: string }> {
     return fetchApi<{ diagnostic_id: string; status: string }>('/api/system/diagnostics', {
       method: 'POST',
-      body: JSON.stringify({ target, building_code: buildingCode }),
+      body: JSON.stringify({ target, site_code: siteCode }),
     });
   },
 
@@ -208,10 +208,10 @@ export function useDiagnostics() {
   const [loading, setLoading] = React.useState(false);
   const [diagnosticId, setDiagnosticId] = React.useState<string | null>(null);
 
-  const runDiagnostics = async (target: string = 'full_system', buildingCode?: string) => {
+  const runDiagnostics = async (target: string = 'full_system', siteCode?: string) => {
     setLoading(true);
     try {
-      const { diagnostic_id } = await systemApi.runDiagnostics(target, buildingCode);
+      const { diagnostic_id } = await systemApi.runDiagnostics(target, siteCode);
       setDiagnosticId(diagnostic_id);
 
       // Start polling for results

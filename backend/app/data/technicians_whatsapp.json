@@ -5,6 +5,7 @@
       "name": "John Smith",
       "specialty": "electrical",
       "whatsapp_number": "+27721234567",
+      "email": "bederf@protonmail.com",
       "active": true,
       "site_id": "S002"
     },
@@ -18,17 +19,19 @@
     },
     {
       "id": "tech-003",
-      "name": "Sarah Lee",
+      "name": "Ntaote Moshoeshoe",
       "specialty": "plumbing",
       "whatsapp_number": "+27721234569",
+      "email": "ntaote.moshoeshoe@fnb.co.za",
       "active": true,
       "site_id": "S002"
     },
     {
       "id": "tech-004",
-      "name": "David Chen",
+      "name": "Neal van Breda",
       "specialty": "controls",
       "whatsapp_number": "+27721234570",
+      "email": "nvanbreda@fnb.co.za",
       "active": true,
       "site_id": "S002"
     },

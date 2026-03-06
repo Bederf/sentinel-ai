@@ -698,14 +698,14 @@ class WaterConsumptionRepository:
 
     def get_top_consuming_zones(
         self,
-        building_id: str,
+        site_id: str,
         limit: int = 10,
         days: int = 30,
     ) -> List[Dict[str, Any]]:
         """Get top N zones by consumption for a building.
 
         Args:
-            building_id: Building/site identifier
+            site_id: Building/site identifier
             limit: Number of top zones to return
             days: Look-back period (default: 30 days)
 
@@ -717,7 +717,7 @@ class WaterConsumptionRepository:
 
         # Get all consumption records for building
         records = self.get_consumption_by_site(
-            building_id,
+            site_id,
             start_date,
             end_date,
             limit=100000,

@@ -95,7 +95,7 @@ class ZoneCentroidResponse(BaseModel):
 class AllCentroidsResponse(BaseModel):
     """Response with all zone centroids for a building."""
 
-    building_id: str = Field(..., description="Building UUID")
+    site_id: str = Field(..., description="Building UUID")
     centroid_count: int = Field(..., description="Number of zones with centroids")
     centroids: Dict[str, ZoneCentroid] = Field(..., description="Map of zone_id → centroid")
 
@@ -105,9 +105,9 @@ class AllCentroidsResponse(BaseModel):
 # ============================================================================
 
 
-@router.post("/{building_id}/zone-ingestion/zones", response_model=IngestionResponse)
+@router.post("/{site_id}/zone-ingestion/zones", response_model=IngestionResponse)
 async def ingest_zones(
-    building_id: str = Path(..., description="Building UUID"),
+    site_id: str = Path(..., description="Building UUID"),
     request: ZoneIngestionRequest = None,
 ) -> IngestionResponse:
     """Ingest zone configuration for a building.
@@ -139,7 +139,7 @@ async def ingest_zones(
     ```
 
     Args:
-        building_id: Building UUID
+        site_id: Building UUID
         request: Zone ingestion request with list of zones
 
     Returns:
@@ -152,7 +152,7 @@ async def ingest_zones(
     service = ZoneIngestionService()
 
     try:
-        result = await service.ingest_zones(building_id, request.zones)
+        result = await service.ingest_zones(site_id, request.zones)
         return IngestionResponse(
             status="success",
             message=f"Ingested {result['zones_created']} zones",
@@ -166,9 +166,9 @@ async def ingest_zones(
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {e}")
 
 
-@router.post("/{building_id}/zone-ingestion/desks", response_model=IngestionResponse)
+@router.post("/{site_id}/zone-ingestion/desks", response_model=IngestionResponse)
 async def ingest_desks(
-    building_id: str = Path(..., description="Building UUID"),
+    site_id: str = Path(..., description="Building UUID"),
     request: DeskIngestionRequest = None,
 ) -> IngestionResponse:
     """Ingest desk configuration for a building.
@@ -199,7 +199,7 @@ async def ingest_desks(
     ```
 
     Args:
-        building_id: Building UUID
+        site_id: Building UUID
         request: Desk ingestion request with list of desks
 
     Returns:
@@ -212,7 +212,7 @@ async def ingest_desks(
     service = ZoneIngestionService()
 
     try:
-        result = await service.ingest_desks(building_id, request.desks)
+        result = await service.ingest_desks(site_id, request.desks)
         return IngestionResponse(
             status="success",
             message=f"Ingested {result['desks_created']} desks",
@@ -227,11 +227,11 @@ async def ingest_desks(
 
 
 @router.get(
-    "/{building_id}/zone-ingestion/zones/{zone_id}/centroid",
+    "/{site_id}/zone-ingestion/zones/{zone_id}/centroid",
     response_model=ZoneCentroidResponse,
 )
 async def get_zone_centroid(
-    building_id: str = Path(..., description="Building UUID"),
+    site_id: str = Path(..., description="Building UUID"),
     zone_id: str = Path(..., description="Zone ID (e.g., Zone-L1-A)"),
 ) -> ZoneCentroidResponse:
     """Get zone centroid calculated from desk positions.
@@ -240,7 +240,7 @@ async def get_zone_centroid(
     positioning without loading all individual desk data.
 
     Args:
-        building_id: Building UUID
+        site_id: Building UUID
         zone_id: Zone ID
 
     Returns:
@@ -252,7 +252,7 @@ async def get_zone_centroid(
     service = ZoneIngestionService()
 
     try:
-        centroid = await service.calculate_zone_centroid(building_id, zone_id)
+        centroid = await service.calculate_zone_centroid(site_id, zone_id)
 
         if not centroid:
             raise HTTPException(status_code=404, detail=f"Zone {zone_id} or desks not found")
@@ -268,9 +268,9 @@ async def get_zone_centroid(
         raise HTTPException(status_code=500, detail=f"Centroid calculation failed: {e}")
 
 
-@router.get("/{building_id}/zone-ingestion/centroids", response_model=AllCentroidsResponse)
+@router.get("/{site_id}/zone-ingestion/centroids", response_model=AllCentroidsResponse)
 async def get_all_zone_centroids(
-    building_id: str = Path(..., description="Building UUID"),
+    site_id: str = Path(..., description="Building UUID"),
 ) -> AllCentroidsResponse:
     """Get centroids for all zones in a building.
 
@@ -278,7 +278,7 @@ async def get_all_zone_centroids(
     in a single response. Used by Digital Twin for equipment positioning.
 
     Args:
-        building_id: Building UUID
+        site_id: Building UUID
 
     Returns:
         AllCentroidsResponse with map of zone_id → centroid coordinates
@@ -289,21 +289,21 @@ async def get_all_zone_centroids(
     service = ZoneIngestionService()
 
     try:
-        centroids = service.get_all_zone_centroids(building_id)
+        centroids = service.get_all_zone_centroids(site_id)
 
         return AllCentroidsResponse(
-            building_id=building_id,
+            site_id=site_id,
             centroid_count=len(centroids),
             centroids={zone_id: ZoneCentroid(**coords) for zone_id, coords in centroids.items()},
         )
     except Exception as e:
-        logger.error(f"Failed to get centroids for building {building_id}: {e}")
+        logger.error(f"Failed to get centroids for building {site_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Centroid retrieval failed: {e}")
 
 
-@router.get("/{building_id}/zone-ingestion/validate")
+@router.get("/{site_id}/zone-ingestion/validate")
 async def validate_zone_structure(
-    building_id: str = Path(..., description="Building UUID"),
+    site_id: str = Path(..., description="Building UUID"),
 ) -> Dict[str, Any]:
     """Validate zone and desk structure for a building.
 
@@ -314,7 +314,7 @@ async def validate_zone_structure(
     - Consistent floor assignments
 
     Args:
-        building_id: Building UUID
+        site_id: Building UUID
 
     Returns:
         Dict with validation results
@@ -325,14 +325,14 @@ async def validate_zone_structure(
     service = ZoneIngestionService()
 
     try:
-        is_valid, errors = await service.validate_zone_structure(building_id)
+        is_valid, errors = await service.validate_zone_structure(site_id)
 
         return {
-            "building_id": building_id,
+            "site_id": site_id,
             "is_valid": is_valid,
             "errors": errors,
             "error_count": len(errors),
         }
     except Exception as e:
-        logger.error(f"Failed to validate structure for building {building_id}: {e}")
+        logger.error(f"Failed to validate structure for building {site_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Validation failed: {e}")

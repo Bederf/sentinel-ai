@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 
 DATA_PATH = Path("/opt/bms-intelligence/backend/app/data")
-BUILDINGS_PATH = DATA_PATH / "buildings"
+BUILDINGS_PATH = DATA_PATH / "sites"
 
 
 def count_json_equipment(site_code: str) -> dict:
@@ -130,7 +130,7 @@ if BUILDINGS_PATH.exists():
 If JSON shows equipment (good) but API shows only 1:
   → Supabase query is returning fewer results
   → Supabase building or equipment table is empty
-  → Check: SELECT COUNT(*) FROM equipment WHERE building_id = '...'
+  → Check: SELECT COUNT(*) FROM equipment WHERE site_id = '...'
 
 If JSON shows 0 equipment (bad):
   → Check if data/buildings/{site-code}/equipment/ exists

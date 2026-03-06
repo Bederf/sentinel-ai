@@ -11,16 +11,16 @@ from app.api import lighting, lighting_discovery, equipment_discovery, equipment
 from app.api import generators, energy_centre, energy, modules
 from app.api import hvac, fire, security
 from app.api import niagara, niagara_bacnet, niagara_discovery
-from app.api import buildings_3d, digital_twin
+from app.api import sites_3d, digital_twin
 from app.api import zone_ingestion, desks, documents
 from app.api import device_controls
 from app.api import occupancy_analytics, occupancy_energy_correlation
 
 
-def register_building_routers(app: FastAPI) -> None:
+def register_site_routers(app: FastAPI) -> None:
     """Register building API routers (buildings, equipment, devices, systems)."""
     # Building and equipment management
-    app.include_router(buildings.router, tags=["buildings"])
+    app.include_router(buildings.router, tags=["sites"])
     app.include_router(documents.router, prefix="/api", tags=["documents"])
     app.include_router(equipment.router, prefix="/api", tags=["equipment"])
     app.include_router(sensors.router, prefix="/api", tags=["sensors"])
@@ -31,7 +31,7 @@ def register_building_routers(app: FastAPI) -> None:
     app.include_router(equipment_metadata.router, prefix="/api", tags=["equipment-metadata"])
 
     # Building 3D configuration (structure + equipment placement)
-    app.include_router(buildings_3d.router, prefix="/api", tags=["buildings-3d"])
+    app.include_router(sites_3d.router, prefix="/api", tags=["sites-3d"])
 
     # Digital Twin Builder (floor plan extraction + AI-powered onboarding)
     app.include_router(digital_twin.router, prefix="/api", tags=["digital-twin"])

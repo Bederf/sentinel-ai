@@ -270,13 +270,13 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
         thresholds = get_health_thresholds()
 
         # Get building info
-        building_uuid = None
-        building_name = None
+        site_uuid = None
+        site_name = None
         if site_id:
-            building_resp = client.table("buildings").select("id, name, code").eq("code", site_id).execute()
+            building_resp = client.table("sites").select("id, name, code").eq("code", site_id).execute()
             if building_resp.data:
-                building_uuid = building_resp.data[0]["id"]
-                building_name = building_resp.data[0]["name"]
+                site_uuid = building_resp.data[0]["id"]
+                site_name = building_resp.data[0]["name"]
             else:
                 return {
                     "success": False,
@@ -286,8 +286,8 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
 
         # Get equipment for site
         eq_query = client.table("equipment").select("id, code, name, type, health_score, status, last_service")
-        if building_uuid:
-            eq_query = eq_query.eq("building_id", building_uuid)
+        if site_uuid:
+            eq_query = eq_query.eq("site_id", site_uuid)
         eq_resp = eq_query.execute()
         equipment = eq_resp.data if eq_resp.data else []
 
@@ -297,26 +297,24 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
             .select("id, type, severity, message, status, created_at, equipment_id")
             .eq("status", "active")
         )
-        if building_uuid:
-            alerts_query = alerts_query.eq("building_id", building_uuid)
+        if site_uuid:
+            alerts_query = alerts_query.eq("site_id", site_uuid)
         alerts_resp = alerts_query.execute()
         alerts = alerts_resp.data if alerts_resp.data else []
 
         # Get predictions for site
         pred_query = (
             client.table("predictions")
-            .select(
-                "id, equipment_id, prediction_type, probability_percent, status, equipment(code, name, building_id)"
-            )
+            .select("id, equipment_id, prediction_type, probability_percent, status, equipment(code, name, site_id)")
             .eq("status", "active")
         )
         pred_resp = pred_query.execute()
         predictions = pred_resp.data if pred_resp.data else []
-        if building_uuid:
-            predictions = [p for p in predictions if p.get("equipment", {}).get("building_id") == building_uuid]
+        if site_uuid:
+            predictions = [p for p in predictions if p.get("equipment", {}).get("site_id") == site_uuid]
 
         # Count sites
-        sites_resp = client.table("buildings").select("id").execute()
+        sites_resp = client.table("sites").select("id").execute()
         total_sites = len(sites_resp.data) if sites_resp.data else 0
 
         # Active alerts summary
@@ -352,7 +350,7 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
         status = {
             "success": True,
             "site_id": site_id,
-            "site_name": building_name,
+            "site_name": site_name,
             "timestamp": datetime.now().isoformat(),
             "summary": {
                 "total_sites": total_sites if not site_id else 1,
@@ -554,16 +552,16 @@ async def get_equipment_health(
         # Build equipment query from Supabase
         query = client.table("equipment").select(
             "id, code, name, type, health_score, status, last_service, "
-            "install_date, manufacturer, model, location, device_info, building_id, buildings(code, name, floors, sqm)"
+            "install_date, manufacturer, model, location, device_info, site_id, buildings(code, name, floors, sqm)"
         )
 
         # Filter by site if provided
         if site_id:
             # First get building UUID from site code
-            building_resp = client.table("buildings").select("id").eq("code", site_id).execute()
+            building_resp = client.table("sites").select("id").eq("code", site_id).execute()
             if building_resp.data:
-                building_uuid = building_resp.data[0]["id"]
-                query = query.eq("building_id", building_uuid)
+                site_uuid = building_resp.data[0]["id"]
+                query = query.eq("site_id", site_uuid)
             else:
                 return {"success": False, "error": f"Site '{site_id}' not found", "count": 0, "equipment": []}
 
@@ -609,8 +607,8 @@ async def get_equipment_health(
             health_score = eq.get("health_score", 100) or 100
 
             # Get site code from joined building
-            building_info = eq.get("buildings", {}) or {}
-            eq_site_id = building_info.get("code", "unknown")
+            site_info = eq.get("sites", {}) or {}
+            eq_site_id = site_info.get("code", "unknown")
 
             # Extract sensor reading from device_info if available
             device_info = eq.get("device_info") or {}
@@ -759,14 +757,14 @@ async def get_equipment_health(
             equipment_list.append(item)
 
         # Get building info for site summary
-        building_info = {}
+        site_info = {}
         if site_id:
             building_resp = (
-                client.table("buildings").select("name, code, floors, sqm, address").eq("code", site_id).execute()
+                client.table("sites").select("name, code, floors, sqm, address").eq("code", site_id).execute()
             )
             if building_resp.data:
                 b = building_resp.data[0]
-                building_info = {
+                site_info = {
                     "name": b.get("name"),
                     "code": b.get("code"),
                     "floors": b.get("floors"),
@@ -924,7 +922,7 @@ async def get_equipment_health(
             "success": True,
             "count": len(equipment_list),
             "site_id": site_id,
-            "building": building_info,
+            "building": site_info,
             "equipment": equipment_list,
             "health_summary": {
                 "critical_count": len([e for e in equipment_list if e["health_score"] < thresholds["critical"]]),
@@ -969,22 +967,22 @@ async def get_alerts_and_anomalies(
         client = get_supabase_client()
 
         # Get building UUID if site_id provided
-        building_uuid = None
+        site_uuid = None
         if site_id:
-            building_resp = client.table("buildings").select("id").eq("code", site_id).execute()
+            building_resp = client.table("sites").select("id").eq("code", site_id).execute()
             if building_resp.data:
-                building_uuid = building_resp.data[0]["id"]
+                site_uuid = building_resp.data[0]["id"]
 
         # Build alerts query
         alerts_query = client.table("alerts").select(
             "id, type, severity, message, status, created_at, acknowledged_at, "
-            "equipment_id, building_id, buildings(code, name), equipment(code, name)"
+            "equipment_id, site_id, buildings(code, name), equipment(code, name)"
         )
 
         if not include_resolved:
             alerts_query = alerts_query.eq("status", "active")
-        if building_uuid:
-            alerts_query = alerts_query.eq("building_id", building_uuid)
+        if site_uuid:
+            alerts_query = alerts_query.eq("site_id", site_uuid)
         if severity:
             alerts_query = alerts_query.eq("severity", severity)
 
@@ -996,17 +994,15 @@ async def get_alerts_and_anomalies(
             client.table("predictions")
             .select(
                 "id, equipment_id, prediction_type, probability_percent, contributing_factors, "
-                "recommended_action, status, created_at, equipment(code, name, building_id)"
+                "recommended_action, status, created_at, equipment(code, name, site_id)"
             )
             .eq("status", "active")
         )
 
-        if building_uuid:
+        if site_uuid:
             # Filter by equipment's building
             pred_resp = pred_query.execute()
-            predictions_data = [
-                p for p in (pred_resp.data or []) if p.get("equipment", {}).get("building_id") == building_uuid
-            ]
+            predictions_data = [p for p in (pred_resp.data or []) if p.get("equipment", {}).get("site_id") == site_uuid]
         else:
             pred_resp = pred_query.limit(10).execute()
             predictions_data = pred_resp.data if pred_resp.data else []
@@ -1014,7 +1010,7 @@ async def get_alerts_and_anomalies(
         # Format alerts
         formatted_alerts = []
         for alert in alerts_data:
-            building_info = alert.get("buildings", {}) or {}
+            site_info = alert.get("sites", {}) or {}
             equipment_info = alert.get("equipment", {}) or {}
             formatted_alerts.append(
                 {
@@ -1022,8 +1018,8 @@ async def get_alerts_and_anomalies(
                     "severity": alert.get("severity"),
                     "title": alert.get("type", "Alert"),
                     "description": alert.get("message"),
-                    "site_id": building_info.get("code"),
-                    "site_name": building_info.get("name"),
+                    "site_id": site_info.get("code"),
+                    "site_name": site_info.get("name"),
                     "equipment_id": equipment_info.get("code"),
                     "equipment_name": equipment_info.get("name"),
                     "status": alert.get("status"),
@@ -1242,23 +1238,21 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
         desk_num_padded = desk_num.zfill(3)
 
         # Query Supabase for desk
-        building_code = building or _default_site_id()
+        site_code = building or _default_site_id()
         client = get_supabase_client()
 
         # Get building UUID
-        bld_resp = client.table("buildings").select("id").eq("code", building_code).execute()
+        bld_resp = client.table("sites").select("id").eq("code", site_code).execute()
         if not bld_resp.data:
             return {
                 "success": False,
-                "error": f"Building {building_code} not found",
-                "prompt_user": f"Building '{building_code}' not found in the database.",
+                "error": f"Building {site_code} not found",
+                "prompt_user": f"Building '{site_code}' not found in the database.",
             }
-        building_uuid = bld_resp.data[0]["id"]
+        site_uuid = bld_resp.data[0]["id"]
 
         # Find desk by padded ID
-        desk_resp = (
-            client.table("desks").select("*").eq("building_id", building_uuid).eq("desk_id", desk_num_padded).execute()
-        )
+        desk_resp = client.table("desks").select("*").eq("site_id", site_uuid).eq("desk_id", desk_num_padded).execute()
 
         desk = desk_resp.data[0] if desk_resp.data else None
 
@@ -1271,7 +1265,7 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
             nearby_resp = (
                 client.table("desks")
                 .select("desk_id, zone_id")
-                .eq("building_id", building_uuid)
+                .eq("site_id", site_uuid)
                 .eq("floor", floor)
                 .order("desk_id")
                 .limit(10)
@@ -1298,9 +1292,7 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
         zone_id = desk.get("zone_id")
         zone = None
         if zone_id:
-            zone_resp = (
-                client.table("zones").select("*").eq("building_id", building_uuid).eq("zone_id", zone_id).execute()
-            )
+            zone_resp = client.table("zones").select("*").eq("site_id", site_uuid).eq("zone_id", zone_id).execute()
             zone = zone_resp.data[0] if zone_resp.data else None
 
         # Get DALI/occupancy context
@@ -1328,7 +1320,7 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
             "desk": {
                 "desk_id": desk.get("desk_id"),
                 "floor": desk.get("floor"),
-                "building": building_code,
+                "building": site_code,
                 "zone_id": zone_id,
                 "context": desk.get("context"),
                 "near_window": desk.get("near_window", False),
@@ -1386,7 +1378,7 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
         }
 
 
-async def _get_zone_equipment_status(zone: dict, building_code: str) -> dict[str, Any]:
+async def _get_zone_equipment_status(zone: dict, site_code: str) -> dict[str, Any]:
     """Query all equipment in a zone and return their status/health.
 
     Gathers FCU, VAV, AHU, temp sensor, CO2 sensor, humidity sensor,
@@ -1419,16 +1411,16 @@ async def _get_zone_equipment_status(zone: dict, building_code: str) -> dict[str
         equipment_status[d["code"]] = d
 
     # Get latest zone history readings (temp, humidity, co2)
-    bld_resp = client.table("buildings").select("id").eq("code", building_code).execute()
-    building_uuid = bld_resp.data[0]["id"] if bld_resp.data else None
+    bld_resp = client.table("sites").select("id").eq("code", site_code).execute()
+    site_uuid = bld_resp.data[0]["id"] if bld_resp.data else None
 
     live_readings = {}
-    if building_uuid:
+    if site_uuid:
         hist_resp = (
             client.table("hvac_zone_history")
             .select("temp, humidity, co2, setpoint, status, occupancy, time")
             .eq("zone_id", zone_id)
-            .eq("building_id", building_uuid)
+            .eq("site_id", site_uuid)
             .order("time", desc=True)
             .limit(1)
             .execute()
@@ -1475,8 +1467,8 @@ async def diagnose_comfort_complaint(
         desk = desk_info.get("desk", {}) or {}
 
         # Get ALL equipment status for this zone
-        building_code = building or _default_site_id()
-        zone_equip = await _get_zone_equipment_status(zone, building_code)
+        site_code = building or _default_site_id()
+        zone_equip = await _get_zone_equipment_status(zone, site_code)
         equipment = zone_equip["equipment"]
         live = zone_equip["live_readings"]
         diffusers = zone_equip["diffusers"]
@@ -3132,6 +3124,53 @@ CHAT_TOOLS = [
         },
     },
     # ================================================================
+    # Hybrid Context — Brick + RAG + Telemetry + ML in one call
+    # ================================================================
+    {
+        "name": "get_hybrid_context",
+        "description": (
+            "Get merged context for an asset combining Brick graph metadata, "
+            "live telemetry, ML predictions, and document search results. "
+            "Use this BEFORE answering fault diagnosis, maintenance planning, "
+            "SLA compliance, inspection history, or vendor questions about a "
+            "specific piece of equipment. Provide either equipment_id or "
+            "bacnet_ref. Returns structured data plus a prompt-ready text block."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "equipment_id": {
+                    "type": "string",
+                    "description": "Equipment code (e.g., 'S002-CHILLER-B1-001'). Provide this or bacnet_ref.",
+                },
+                "bacnet_ref": {
+                    "type": "string",
+                    "description": "BMS-native point reference (e.g., 'CH-1.ChwSupplyTemp').",
+                },
+                "question": {
+                    "type": "string",
+                    "description": "Optional question to tailor document retrieval and context formatting.",
+                },
+                "include_documents": {
+                    "type": "boolean",
+                    "description": "Include document RAG results (default: true).",
+                    "default": True,
+                },
+                "include_telemetry": {
+                    "type": "boolean",
+                    "description": "Include live telemetry data (default: true).",
+                    "default": True,
+                },
+                "include_ml": {
+                    "type": "boolean",
+                    "description": "Include ML context — anomalies, forecasts, health trends (default: true).",
+                    "default": True,
+                },
+            },
+            "required": [],
+        },
+    },
+    # ================================================================
     # Write/Action Tools — Operator+ only (role-gated)
     # ================================================================
     {
@@ -3174,9 +3213,14 @@ CHAT_TOOLS = [
         "description": (
             "Create a maintenance work order for equipment issues. "
             "WRITE action — restricted to operators and admins. "
-            "Provide a clear description, priority, and optionally "
-            "the equipment code. The work order will be logged and "
-            "assigned to the maintenance team."
+            "IMPORTANT: Before calling this tool, ALWAYS guide the user through "
+            "the FM workflow first. Present clickable slash commands in this order:\n"
+            "1. `/info_{CODE}` — show equipment diagnostics first\n"
+            "2. `/inspect_{CODE}` — schedule inspection with technician notification\n"
+            "3. `/WO_{CODE}` — create general work order\n"
+            "Only call this tool directly if the user explicitly confirms they want "
+            "to skip diagnostics and create a work order immediately. "
+            "Replace {CODE} with the equipment code using underscores (e.g., S002_FCU_301)."
         ),
         "input_schema": {
             "type": "object",
@@ -3198,6 +3242,10 @@ CHAT_TOOLS = [
                     "type": "string",
                     "description": "Work order category",
                     "enum": ["hvac", "electrical", "plumbing", "maintenance", "other"],
+                },
+                "assigned_to": {
+                    "type": "string",
+                    "description": "Technician name to assign the WO to. Auto-assigns if omitted.",
                 },
             },
             "required": ["description"],
@@ -3882,7 +3930,7 @@ async def _fetch_equipment_diagnostics(equipment_code: str) -> dict[str, Any] | 
             client.table("equipment")
             .select(
                 "id, code, name, type, health_score, status, last_service, "
-                "manufacturer, model, location, device_info, building_id"
+                "manufacturer, model, location, device_info, site_id"
             )
             .eq("code", equipment_code)
             .execute()
@@ -3954,48 +4002,111 @@ async def create_work_order_chat(
     equipment_code: str | None = None,
     priority: str = "medium",
     category: str = "other",
+    assigned_to: str | None = None,
     site_id: str | None = None,
     _user_email: str | None = None,
 ) -> dict[str, Any]:
-    """Create a work order from chat and email confirmation to the logged-in user.
+    """Create a work order from chat via the Sentry work-order API.
 
-    Sends a detailed email matching the WorkOrderNotifier format, including
-    equipment diagnostics (health, alerts, predictions) and field instructions.
+    Uses the same POST /api/sentry/create-work-order endpoint as the /WO_
+    slash command, ensuring work orders are persisted to Supabase and
+    technicians are auto-assigned.
+
+    Falls back to the in-memory work_order_service only if the Sentry API
+    is unreachable.
     """
+    try:
+        import httpx
+        from app.config.settings import settings
+
+        reported_by = _user_email or "AI Chat (operator)"
+        title = description[:120] if description else "Work order from chat"
+        port = settings.port if hasattr(settings, "port") else 9095
+        base_url = f"http://127.0.0.1:{port}"
+
+        payload: dict[str, Any] = {
+            "equipment_code": equipment_code or "GENERAL",
+            "title": title,
+            "description": description,
+            "priority": priority,
+            "created_by": reported_by,
+        }
+        if assigned_to:
+            payload["assigned_to"] = assigned_to
+
+        # Use the Sentry create-work-order endpoint (same as /WO_ slash command)
+        headers: dict[str, str] = {
+            "X-Sentry-Secret": settings.sentry_webhook_secret,
+            "Content-Type": "application/json",
+        }
+        if settings.sentry_bot_api_key:
+            headers["X-Sentry-API-Key"] = settings.sentry_bot_api_key
+
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.post(
+                f"{base_url}/api/sentry/create-work-order",
+                json=payload,
+                headers=headers,
+            )
+
+        if resp.status_code == 200:
+            wo_data = resp.json()
+            wo_code = wo_data.get("code", "N/A")
+            assigned = wo_data.get("assigned_to", "Unassigned")
+
+            confirmation = (
+                f"**Work Order Created:** `{wo_code}`\n"
+                f"**Equipment:** `{equipment_code or 'General'}`\n"
+                f"**Priority:** {priority}\n"
+                f"**Assigned To:** {assigned}\n"
+                f"**Status:** scheduled"
+            )
+
+            # Send email confirmation if user email available
+            if _user_email and "@" in _user_email:
+                try:
+                    from app.services.sentry_integration.work_order_notifier import WorkOrderNotifier
+
+                    notifier = WorkOrderNotifier()
+                    email_body = f"Work Order {wo_code} created for {equipment_code or 'General'}.\n\n{description}"
+                    await notifier._send_email_via_local_gmail_helper(
+                        to_email=_user_email,
+                        subject=f"Work Order Created: {wo_code} — {equipment_code or 'General'}",
+                        body=email_body,
+                    )
+                    logger.info(f"WO email confirmation sent to {_user_email} for {wo_code}")
+                except Exception as email_err:
+                    logger.warning(f"Could not send WO email to {_user_email}: {email_err}")
+
+            return {
+                "success": True,
+                "work_order": wo_data,
+                "message": confirmation,
+                "email_sent_to": _user_email if _user_email and "@" in _user_email else None,
+            }
+
+        # Sentry API returned an error — log and fall back
+        logger.warning(f"Sentry create-work-order returned {resp.status_code}, falling back to in-memory")
+
+    except Exception as e:
+        logger.warning(f"Sentry WO API unreachable, falling back to in-memory: {e}")
+
+    # Fallback: in-memory work order service (for demo/offline scenarios)
     try:
         from app.services.work_order_service import work_order_service
 
-        reported_by = _user_email or "AI Chat (operator)"
         wo = work_order_service.create_work_order(
             description=description,
             site_id=site_id or _default_site_id(),
             equipment_ref=equipment_code,
             category=category,
             priority=priority,
-            reported_by=reported_by,
+            reported_by=_user_email or "AI Chat (operator)",
         )
-
-        # Send detailed email confirmation to the logged-in user via Sentry Gmail API
-        if _user_email and "@" in _user_email:
-            try:
-                from app.services.sentry_integration.work_order_notifier import WorkOrderNotifier
-
-                notifier = WorkOrderNotifier()
-                email_body = await _build_wo_email_body(wo, description, reported_by, equipment_code)
-                await notifier._send_email_via_local_gmail_helper(
-                    to_email=_user_email,
-                    subject=f"Work Order Created: {wo.id} — {wo.equipment_name or 'General'}",
-                    body=email_body,
-                )
-                logger.info(f"WO email confirmation sent to {_user_email} for {wo.id}")
-            except Exception as email_err:
-                logger.warning(f"Could not send WO email to {_user_email}: {email_err}")
-
         return {
             "success": True,
             "work_order": wo.to_dict(),
-            "message": wo.format_confirmation(),
-            "email_sent_to": _user_email if _user_email and "@" in _user_email else None,
+            "message": wo.format_confirmation() + "\n\n*Note: Saved in-memory only (Sentry API unavailable)*",
         }
     except Exception as e:
         logger.error(f"Error creating work order: {e}")
@@ -4131,6 +4242,66 @@ async def search_documents(
     except Exception as e:
         logger.error(f"Error searching documents: {e}")
         return {"success": False, "error": str(e), "results": []}
+
+
+# ---------------------------------------------------------------------------
+# Hybrid Context Tool (wires hybrid_query_service into chat)
+# ---------------------------------------------------------------------------
+
+
+async def get_hybrid_context(
+    site_id: str | None = None,
+    equipment_id: str | None = None,
+    bacnet_ref: str | None = None,
+    question: str | None = None,
+    include_documents: bool = True,
+    include_telemetry: bool = True,
+    include_ml: bool = True,
+) -> dict[str, Any]:
+    """Merge Brick graph + telemetry + ML + document context for one asset.
+
+    Read-only. Returns structured dict plus prompt-formatted text.
+    """
+    if not equipment_id and not bacnet_ref:
+        return {
+            "success": False,
+            "error": "Provide either equipment_id or bacnet_ref.",
+        }
+
+    try:
+        from app.services.hybrid_query_service import get_hybrid_query_service
+
+        effective_site = site_id or "site-002"
+        svc = get_hybrid_query_service(effective_site)
+
+        ctx = await svc.query(
+            equipment_id=equipment_id,
+            bacnet_ref=bacnet_ref,
+            question=question,
+            include_documents=bool(include_documents),
+            include_telemetry=bool(include_telemetry),
+            include_ml=bool(include_ml),
+        )
+
+        result: dict[str, Any] = {
+            "success": True,
+            "equipment_id": ctx.equipment_id,
+            "equipment_type": ctx.equipment_type,
+            "site_id": effective_site,
+            "sources_used": ctx.sources_used,
+            "context": ctx.to_dict(),
+            "prompt_context": ctx.format_for_prompt(),
+        }
+
+        # Cap points in returned dict to avoid bloating tool response
+        if result["context"].get("points") and len(result["context"]["points"]) > 10:
+            result["context"]["points"] = result["context"]["points"][:10]
+            result["context"]["points_truncated"] = True
+
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching hybrid context: {e}")
+        return {"success": False, "error": str(e)}
 
 
 # ---------------------------------------------------------------------------
@@ -4345,6 +4516,7 @@ TOOL_HANDLERS = {
     "reject_recommendation": reject_recommendation_chat,
     "reset_equipment_fault": reset_equipment_fault_chat,
     "search_documents": search_documents,
+    "get_hybrid_context": get_hybrid_context,
     # ServiceNow integration tools (Phase 138-02)
     "check_servicenow_status": check_servicenow_status,
     "query_servicenow_incidents": query_servicenow_incidents,
@@ -4426,6 +4598,15 @@ async def execute_tool(
     handler = TOOL_HANDLERS.get(tool_name)
     if not handler:
         return {"error": f"Unknown tool: {tool_name}"}
+
+    # Auto-inject site_id from chat context when Claude didn't pass it explicitly.
+    # This ensures the user's building selector always scopes tool queries.
+    if site_id and "site_id" not in tool_input:
+        import inspect as _inspect
+
+        sig = _inspect.signature(handler)
+        if "site_id" in sig.parameters:
+            tool_input["site_id"] = site_id
 
     # Inject user context into tools that accept it (137-07: real user attribution)
     if user_email and tool_name in ("create_work_order", "control_device"):

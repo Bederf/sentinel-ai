@@ -76,7 +76,7 @@ class CreateAlertRequest(BaseModel):
 
     alert_type: str
     location: str
-    building_id: str
+    site_id: str
     severity: str
     description: str
 
@@ -360,7 +360,7 @@ async def get_access_point_details(request: Request, point_id: str):
             raise HTTPException(status_code=404, detail=f"Access point {point_id} not found")
 
         # Get recent events for this point
-        all_events = repo.list_events(point["building_id"], limit=500)
+        all_events = repo.list_events(point["site_id"], limit=500)
         recent_events = [e for e in all_events if e["access_point_id"] == point_id][:20]
 
         return {"point": point, "recent_events": recent_events}
@@ -498,7 +498,7 @@ async def create_alert(request: Request, data: CreateAlertRequest):
             alert_type=AlertType(data.alert_type),
             timestamp=datetime.now(),
             location=data.location,
-            building_id=data.building_id,
+            site_id=data.site_id,
             severity=AlertSeverity(data.severity),
             status=AlertStatus.OPEN,
             description=data.description,

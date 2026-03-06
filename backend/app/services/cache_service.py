@@ -13,8 +13,8 @@ Usage:
     data = cache.get("buildings:all")
 
     # Use decorator for automatic caching
-    @cache.cached("equipment:building:{building_id}", ttl=300)
-    def get_equipment_by_building(building_id: str):
+    @cache.cached("equipment:building:{site_id}", ttl=300)
+    def get_equipment_by_site(site_id: str):
         return repo.query(...)
 
     # Invalidate on write
@@ -253,8 +253,8 @@ class CacheService:
             ttl: Time-to-live in seconds
 
         Example:
-            @cache.cached("equipment:building:{building_id}", ttl=300)
-            def get_equipment(building_id: str):
+            @cache.cached("equipment:building:{site_id}", ttl=300)
+            def get_equipment(site_id: str):
                 return repo.query(...)
         """
 
@@ -381,7 +381,7 @@ class CacheKeys:
     """Standard cache key patterns."""
 
     @staticmethod
-    def buildings_all() -> str:
+    def sites_all() -> str:
         return "buildings:all"
 
     @staticmethod
@@ -397,40 +397,40 @@ class CacheKeys:
         return "equipment:all"
 
     @staticmethod
-    def equipment_by_building(building_id: str) -> str:
-        return f"equipment:building:{building_id}"
+    def equipment_by_site(site_id: str) -> str:
+        return f"equipment:building:{site_id}"
 
     @staticmethod
     def equipment_by_code(code: str) -> str:
         return f"equipment:code:{code}"
 
     @staticmethod
-    def equipment_count(building_id: str) -> str:
-        return f"equipment:count:{building_id}"
+    def equipment_count(site_id: str) -> str:
+        return f"equipment:count:{site_id}"
 
     @staticmethod
-    def alerts_active(building_id: Optional[str] = None) -> str:
-        if building_id:
-            return f"alerts:active:building:{building_id}"
+    def alerts_active(site_id: Optional[str] = None) -> str:
+        if site_id:
+            return f"alerts:active:building:{site_id}"
         return "alerts:active:all"
 
     @staticmethod
-    def predictions_active(building_id: Optional[str] = None) -> str:
-        if building_id:
-            return f"predictions:active:building:{building_id}"
+    def predictions_active(site_id: Optional[str] = None) -> str:
+        if site_id:
+            return f"predictions:active:building:{site_id}"
         return "predictions:active:all"
 
     @staticmethod
-    def technicians_by_building(building_id: str) -> str:
-        return f"technicians:building:{building_id}"
+    def technicians_by_site(site_id: str) -> str:
+        return f"technicians:building:{site_id}"
 
     @staticmethod
     def user_access(email: str) -> str:
         return f"user_access:{email}"
 
     @staticmethod
-    def asset_summary(building_code: str) -> str:
-        return f"asset_summary:{building_code}"
+    def asset_summary(site_code: str) -> str:
+        return f"asset_summary:{site_code}"
 
 
 # Invalidation helpers
@@ -438,38 +438,38 @@ class CacheInvalidation:
     """Cache invalidation patterns for write operations."""
 
     @staticmethod
-    def on_building_change(building_id: str = None, building_code: str = None):
+    def on_building_change(site_id: str = None, site_code: str = None):
         """Invalidate building-related caches."""
-        cache.delete(CacheKeys.buildings_all())
-        if building_id:
-            cache.delete(CacheKeys.building_by_id(building_id))
-        if building_code:
-            cache.delete(CacheKeys.building(building_code))
-            cache.delete(CacheKeys.asset_summary(building_code))
+        cache.delete(CacheKeys.sites_all())
+        if site_id:
+            cache.delete(CacheKeys.building_by_id(site_id))
+        if site_code:
+            cache.delete(CacheKeys.building(site_code))
+            cache.delete(CacheKeys.asset_summary(site_code))
 
     @staticmethod
-    def on_equipment_change(building_id: str = None, equipment_code: str = None):
+    def on_equipment_change(site_id: str = None, equipment_code: str = None):
         """Invalidate equipment-related caches."""
         cache.delete(CacheKeys.equipment_all())
-        if building_id:
-            cache.delete(CacheKeys.equipment_by_building(building_id))
-            cache.delete(CacheKeys.equipment_count(building_id))
+        if site_id:
+            cache.delete(CacheKeys.equipment_by_site(site_id))
+            cache.delete(CacheKeys.equipment_count(site_id))
         if equipment_code:
             cache.delete(CacheKeys.equipment_by_code(equipment_code))
 
     @staticmethod
-    def on_alert_change(building_id: str = None):
+    def on_alert_change(site_id: str = None):
         """Invalidate alert-related caches."""
         cache.delete(CacheKeys.alerts_active())
-        if building_id:
-            cache.delete(CacheKeys.alerts_active(building_id))
+        if site_id:
+            cache.delete(CacheKeys.alerts_active(site_id))
 
     @staticmethod
-    def on_prediction_change(building_id: str = None):
+    def on_prediction_change(site_id: str = None):
         """Invalidate prediction-related caches."""
         cache.delete(CacheKeys.predictions_active())
-        if building_id:
-            cache.delete(CacheKeys.predictions_active(building_id))
+        if site_id:
+            cache.delete(CacheKeys.predictions_active(site_id))
 
     @staticmethod
     def on_user_access_change(email: str):

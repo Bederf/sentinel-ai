@@ -252,7 +252,7 @@ class QualityGateEvaluator:
             from app.services.monitoring_service import MonitoringService
 
             monitoring = MonitoringService()
-            snapshot = await asyncio.wait_for(monitoring.get_snapshot(building_id=site_id), timeout=5.0)
+            snapshot = await asyncio.wait_for(monitoring.get_snapshot(site_id=site_id), timeout=5.0)
             metrics["freshness_minutes"] = snapshot.ingestion.freshness_hours * 60.0
             metrics["ingest_error_rate_pct_1h"] = snapshot.ingestion.error_rate * 100.0
             metrics["match_coverage_pct"] = snapshot.ingestion.match_coverage * 100.0

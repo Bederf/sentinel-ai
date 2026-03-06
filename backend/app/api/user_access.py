@@ -16,7 +16,7 @@ from app.database.repositories.user_site_access_repository import (
     get_user_site_access_repository,
 )
 from app.database.repositories.module_access_repository import get_module_access_repository
-from app.database.repositories import BuildingRepository
+from app.database.repositories import SiteRepository
 
 logger = logging.getLogger(__name__)
 
@@ -33,22 +33,22 @@ class GrantAccessRequest(BaseModel):
     """Request to grant building access."""
 
     user_email: EmailStr
-    building_code: str  # e.g., 'site-002'
+    site_code: str  # e.g., 'site-002'
 
 
 class RevokeAccessRequest(BaseModel):
     """Request to revoke building access."""
 
     user_email: EmailStr
-    building_code: str
+    site_code: str
 
 
 class BuildingAccessInfo(BaseModel):
     """Building access info for a user."""
 
-    building_id: str
-    building_code: str
-    building_name: str
+    site_id: str
+    site_code: str
+    site_name: str
     region: Optional[str] = None
     granted_by: Optional[str] = None
     granted_at: Optional[str] = None
@@ -64,7 +64,7 @@ class UserAccessResponse(BaseModel):
 class BuildingUsersResponse(BaseModel):
     """Response with users who have access to a building."""
 
-    building_code: str
+    site_code: str
     users: List[dict]
 
 
@@ -107,12 +107,12 @@ async def get_user_buildings(
 
     buildings = []
     for access in access_list:
-        building = access.get("buildings", {})
+        building = access.get("sites", {})
         buildings.append(
             BuildingAccessInfo(
-                building_id=building.get("id", ""),
-                building_code=building.get("code", ""),
-                building_name=building.get("name", ""),
+                site_id=building.get("id", ""),
+                site_code=building.get("code", ""),
+                site_name=building.get("name", ""),
                 region=building.get("region"),
                 granted_by=access.get("granted_by"),
                 granted_at=access.get("granted_at"),
@@ -133,33 +133,33 @@ async def grant_access(
     """Grant a user access to a building.
 
     Args:
-        request: Grant access request with user_email and building_code
+        request: Grant access request with user_email and site_code
 
     Returns:
         Success message
     """
     # Look up building by code
-    building_repo = BuildingRepository()
-    building = building_repo.get_by_id(request.building_code)
+    building_repo = SiteRepository()
+    building = building_repo.get_by_id(request.site_code)
 
     if not building:
-        raise HTTPException(status_code=404, detail=f"Building '{request.building_code}' not found")
+        raise HTTPException(status_code=404, detail=f"Building '{request.site_code}' not found")
 
-    building_id = building.get("id")
+    site_id = building.get("id")
 
     # Grant access
     access_repo = get_user_site_access_repository()
     result = access_repo.grant_access(
         user_email=request.user_email,
-        building_id=building_id,
+        site_id=site_id,
         granted_by=auth.email or auth.user_id,
     )
 
     if result:
-        logger.info(f"Admin {auth.email} granted {request.user_email} access to {request.building_code}")
+        logger.info(f"Admin {auth.email} granted {request.user_email} access to {request.site_code}")
         return {
             "success": True,
-            "message": f"Granted {request.user_email} access to {request.building_code}",
+            "message": f"Granted {request.user_email} access to {request.site_code}",
         }
     else:
         raise HTTPException(status_code=500, detail="Failed to grant access")
@@ -173,67 +173,67 @@ async def revoke_access(
     """Revoke a user's access to a building.
 
     Args:
-        request: Revoke access request with user_email and building_code
+        request: Revoke access request with user_email and site_code
 
     Returns:
         Success message
     """
     # Look up building by code
-    building_repo = BuildingRepository()
-    building = building_repo.get_by_id(request.building_code)
+    building_repo = SiteRepository()
+    building = building_repo.get_by_id(request.site_code)
 
     if not building:
-        raise HTTPException(status_code=404, detail=f"Building '{request.building_code}' not found")
+        raise HTTPException(status_code=404, detail=f"Building '{request.site_code}' not found")
 
-    building_id = building.get("id")
+    site_id = building.get("id")
 
     # Revoke access
     access_repo = get_user_site_access_repository()
     success = access_repo.revoke_access(
         user_email=request.user_email,
-        building_id=building_id,
+        site_id=site_id,
     )
 
     if success:
-        logger.info(f"Admin {auth.email} revoked {request.user_email} access to {request.building_code}")
+        logger.info(f"Admin {auth.email} revoked {request.user_email} access to {request.site_code}")
         return {
             "success": True,
-            "message": f"Revoked {request.user_email} access to {request.building_code}",
+            "message": f"Revoked {request.user_email} access to {request.site_code}",
         }
     else:
         raise HTTPException(
-            status_code=404, detail=f"No access record found for {request.user_email} to {request.building_code}"
+            status_code=404, detail=f"No access record found for {request.user_email} to {request.site_code}"
         )
 
 
-@router.get("/building/{building_code}/users", response_model=BuildingUsersResponse)
+@router.get("/building/{site_code}/users", response_model=BuildingUsersResponse)
 async def get_building_users(
-    building_code: str,
+    site_code: str,
     auth: AuthContext = Depends(require_auth(AuthLevel.ADMIN)),
 ):
     """Get all users with access to a building.
 
     Args:
-        building_code: Building code (e.g., 'site-002')
+        site_code: Building code (e.g., 'site-002')
 
     Returns:
         List of users with access
     """
     # Look up building by code
-    building_repo = BuildingRepository()
-    building = building_repo.get_by_id(building_code)
+    building_repo = SiteRepository()
+    building = building_repo.get_by_id(site_code)
 
     if not building:
-        raise HTTPException(status_code=404, detail=f"Building '{building_code}' not found")
+        raise HTTPException(status_code=404, detail=f"Building '{site_code}' not found")
 
-    building_id = building.get("id")
+    site_id = building.get("id")
 
     # Get users
     access_repo = get_user_site_access_repository()
-    users = access_repo.get_building_users(building_id)
+    users = access_repo.get_building_users(site_id)
 
     return BuildingUsersResponse(
-        building_code=building_code,
+        site_code=site_code,
         users=users,
     )
 
@@ -274,7 +274,7 @@ async def decide_access_request(
         granted_modules = decision.granted_modules or access_request.get("requested_modules", [])
 
         # Ensure user can access the site itself
-        building_repo = BuildingRepository()
+        building_repo = SiteRepository()
         building = building_repo.get_by_id(site_code)
         if not building:
             raise HTTPException(status_code=404, detail=f"Building '{site_code}' not found")
@@ -282,7 +282,7 @@ async def decide_access_request(
         access_repo = get_user_site_access_repository()
         access_repo.grant_access(
             user_email=user_email,
-            building_id=building.get("id"),
+            site_id=building.get("id"),
             granted_by=reviewer,
         )
 
@@ -343,7 +343,7 @@ async def set_user_module_grants(
     user_email = request.user_email.strip().lower()
 
     # Ensure building access exists
-    building_repo = BuildingRepository()
+    building_repo = SiteRepository()
     building = building_repo.get_by_id(site_code)
     if not building:
         raise HTTPException(status_code=404, detail=f"Building '{site_code}' not found")
@@ -351,7 +351,7 @@ async def set_user_module_grants(
     access_repo = get_user_site_access_repository()
     access_repo.grant_access(
         user_email=user_email,
-        building_id=building.get("id"),
+        site_id=building.get("id"),
         granted_by=reviewer,
     )
 

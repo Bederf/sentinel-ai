@@ -72,7 +72,7 @@ class SupabaseTrainingDataLoader:
     def __init__(self, site_id: Optional[str] = None):
         """
         Args:
-            site_id: Optional site filter (building_id in the table). If None, loads all sites.
+            site_id: Optional site filter (site_id in the table). If None, loads all sites.
         """
         self.site_id = site_id
         self.client = _get_supabase_client()
@@ -106,7 +106,7 @@ class SupabaseTrainingDataLoader:
         )
 
         if self.site_id:
-            query = query.eq("building_id", self.site_id)
+            query = query.eq("site_id", self.site_id)
 
         if min_date:
             query = query.gte("recorded_at", min_date.isoformat())
@@ -180,7 +180,7 @@ class SupabaseTrainingDataLoader:
                 .in_("sensor_type", [sensor_types[0]])  # Check one sensor as proxy
             )
             if self.site_id:
-                query = query.eq("building_id", self.site_id)
+                query = query.eq("site_id", self.site_id)
 
             result = query.execute()
             return result.count or 0

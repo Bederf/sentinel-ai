@@ -7,8 +7,8 @@ and equipment placement data for 3D visualization.
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.database.repositories.building_3d_config_repository import (
-    get_building_3d_config_repository,
+from app.database.repositories.site_3d_config_repository import (
+    get_site_3d_config_repository,
 )
 from app.services.zone_mapping_service import get_zone_mapping_service
 
@@ -22,12 +22,12 @@ MAX_FLOOR_DIMENSION = 1000.0  # Maximum 1000m
 MIN_EQUIPMENT_SPACING = 0.5  # Minimum 0.5m between equipment centers
 
 
-class Building3DConfigService:
+class Site3DConfigService:
     """Service for building 3D configuration operations."""
 
     def __init__(self):
         """Initialize service with dependencies."""
-        self.repository = get_building_3d_config_repository()
+        self.repository = get_site_3d_config_repository()
         self.zone_service = get_zone_mapping_service()
 
     def validate_building_structure(self, structure: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
@@ -276,7 +276,7 @@ class Building3DConfigService:
                 "floor": floor,
                 "equipment_ids": equipment_ids,
                 "type": "open_office",  # Default type; can be customized
-                "building_id": site_id,
+                "site_id": site_id,
             }
             zones.append(zone_def)
 
@@ -285,7 +285,7 @@ class Building3DConfigService:
 
     def generate_viewer_data(
         self,
-        building_id: str,
+        site_id: str,
         structure: Dict[str, Any],
         positions: List[Dict[str, Any]],
         equipment_map: Dict[str, Dict[str, Any]],
@@ -293,7 +293,7 @@ class Building3DConfigService:
         """Generate data formatted for 3D viewer display.
 
         Args:
-            building_id: Building ID
+            site_id: Building ID
             structure: Building structure
             positions: Equipment positions
             equipment_map: Map of equipment to metadata
@@ -337,8 +337,8 @@ class Building3DConfigService:
             floors.append(floor_data)
 
         return {
-            "building_id": building_id,
-            "building_name": structure.get("name"),
+            "site_id": site_id,
+            "site_name": structure.get("name"),
             "floors": floors,
             "metadata": {
                 "generated_at": "2026-02-09T00:00:00Z",
@@ -359,8 +359,8 @@ class Building3DConfigService:
         return {
             "version": "1.0",
             "export_format": "building-3d-config",
-            "building_name": config.get("name"),
-            "building_code": config.get("code"),
+            "site_name": config.get("name"),
+            "site_code": config.get("code"),
             "floors": config.get("floors", []),
             "equipment_positions": config.get("equipment_positions", []),
             "zones": config.get("zones", []),
@@ -368,13 +368,13 @@ class Building3DConfigService:
 
     def import_config_from_dict(
         self,
-        building_id: str,
+        site_id: str,
         import_data: Dict[str, Any],
     ) -> Tuple[bool, Optional[str]]:
         """Import configuration from standardized format.
 
         Args:
-            building_id: Building ID to import into
+            site_id: Building ID to import into
             import_data: Data to import
 
         Returns:
@@ -386,8 +386,8 @@ class Building3DConfigService:
                 return False, "Invalid export format"
 
             structure = {
-                "name": import_data.get("building_name"),
-                "code": import_data.get("building_code"),
+                "name": import_data.get("site_name"),
+                "code": import_data.get("site_code"),
                 "numberOfFloors": len(import_data.get("floors", [])),
                 "floors": import_data.get("floors", []),
             }
@@ -403,8 +403,8 @@ class Building3DConfigService:
 
             # All valid - save to repository
             self.repository.create(
-                building_id=building_id,
-                site_id=building_id,  # Assume site_id same as building_id for imports
+                site_id=site_id,
+                site_code=site_id,  # site_code same as site_id for imports
                 name=structure["name"],
                 code=structure["code"],
                 floors=structure["floors"],
@@ -418,18 +418,18 @@ class Building3DConfigService:
 
 
 # Singleton instance
-_building_3d_config_service: Optional[Building3DConfigService] = None
+_site_3d_config_service: Optional[Site3DConfigService] = None
 
 
-def get_building_3d_config_service() -> Building3DConfigService:
+def get_site_3d_config_service() -> Site3DConfigService:
     """Get or create singleton service instance.
 
     Returns:
-        Building3DConfigService instance
+        Site3DConfigService instance
     """
-    global _building_3d_config_service
+    global _site_3d_config_service
 
-    if _building_3d_config_service is None:
-        _building_3d_config_service = Building3DConfigService()
+    if _site_3d_config_service is None:
+        _site_3d_config_service = Site3DConfigService()
 
-    return _building_3d_config_service
+    return _site_3d_config_service

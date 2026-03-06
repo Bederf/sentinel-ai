@@ -11,8 +11,6 @@
 
 import { useState } from "react";
 import {
-  Card,
-  Title,
   Text,
   BarChart,
   Table,
@@ -40,19 +38,19 @@ interface ZoneBreakdown {
 }
 
 interface WaterZoneBreakdownProps {
-  buildingId: string;
+  siteId: string;
   days?: number;
 }
 
 export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
-  buildingId,
+  siteId,
   days = 30,
 }) => {
   const [sortBy, setSortBy] = useState<"consumption" | "cost">("consumption");
 
   // Mock data generation since backend doesn't yet have zone breakdown endpoint
   const { data: zones, isLoading } = useQuery({
-    queryKey: ["water", "zones", "breakdown", buildingId, days],
+    queryKey: ["water", "zones", "breakdown", siteId, days],
     queryFn: async () => {
       // Fallback: Generate demo zones until backend implements endpoint
       const mockZones: ZoneBreakdown[] = [
@@ -119,13 +117,13 @@ export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
 
   if (isLoading || !zones) {
     return (
-      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <div className="flex items-center justify-center h-64">
           <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Loading zone data...
           </Text>
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -151,7 +149,7 @@ export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
   return (
     <div className="space-y-6">
       {/* Highest Cost Zone Card */}
-      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <Flex justifyContent="between" alignItems="center">
           <div>
             <Text
@@ -160,7 +158,7 @@ export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
             >
               Highest Cost Zone
             </Text>
-            <Title className="text-xl mt-1">{highestCost.zone_name}</Title>
+            <h4 className="text-xl font-medium mt-1" style={{ color: "var(--color-sentinel-text-primary)" }}>{highestCost.zone_name}</h4>
             <Flex justifyContent="start" alignItems="center" className="gap-4 mt-2">
               <div>
                 <Text
@@ -201,12 +199,12 @@ export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
             {highestCost.status.toUpperCase()}
           </Badge>
         </Flex>
-      </Card>
+      </div>
 
       {/* Consumption Chart */}
-      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <Flex justifyContent="between" alignItems="center" className="mb-4">
-          <Title>Consumption by Zone</Title>
+          <h4 className="font-medium text-base" style={{ color: "var(--color-sentinel-text-primary)" }}>Consumption by Zone</h4>
           <div className="flex gap-2">
             <button
               onClick={() => setSortBy("consumption")}
@@ -243,11 +241,11 @@ export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
           </div>
         </Flex>
         <BarChart data={chartData} index="name" categories={["Consumption (L)"]} />
-      </Card>
+      </div>
 
       {/* Zones Table */}
-      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
-        <Title className="mb-4">Zone Details</Title>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h4 className="font-medium text-base mb-4" style={{ color: "var(--color-sentinel-text-primary)" }}>Zone Details</h4>
         <div className="overflow-x-auto">
           <Table>
             <TableHead>
@@ -321,7 +319,7 @@ export const WaterZoneBreakdown: React.FC<WaterZoneBreakdownProps> = ({
             </TableBody>
           </Table>
         </div>
-      </Card>
+      </div>
     </div>
   );
 };

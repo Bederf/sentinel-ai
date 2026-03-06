@@ -58,7 +58,7 @@ class BmsIngestionDemo:
             "device_ip": DEVICE_IP,
             "site_id": SITE_ID,
             "use_demo": DEMO_MODE,
-            "demo_building_id": "site-002",
+            "demo_site_id": "site-002",
             "bms_vendor": "niagara",
         }
 
@@ -225,7 +225,7 @@ class BmsIngestionDemo:
             print(f"\n⚠ API check failed: {e}, checking filesystem...")
 
         # Check filesystem
-        building_file = Path(__file__).parent.parent / "app" / "data" / "buildings" / SITE_ID / "building.json"
+        building_file = Path(__file__).parent.parent / "app" / "data" / "sites" / SITE_ID / "building.json"
         equipment_dir = building_file.parent / "equipment"
 
         if building_file.exists():

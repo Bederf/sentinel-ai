@@ -237,7 +237,7 @@ export function RiskDetailModal({
                 className="text-xs"
                 style={{ color: "var(--color-sentinel-text-disabled)" }}
               >
-                {equipment.building_name}
+                {equipment.site_name}
               </div>
             </div>
             <button

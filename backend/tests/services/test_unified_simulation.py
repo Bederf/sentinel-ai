@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.services.building_schedule import BuildingSchedule
+from app.services.building_schedule import SiteSchedule
 from app.services.lifecycle_orchestrator import LifecycleOrchestrator
 
 
@@ -25,7 +25,7 @@ def orchestrator():
 @pytest.fixture
 def schedule_state_occupied():
     """A schedule state representing occupied business hours."""
-    bs = BuildingSchedule()
+    bs = SiteSchedule()
     state = bs.get_state(10, day_of_week=2)  # 10 AM Wednesday — occupied
     return state
 
@@ -33,7 +33,7 @@ def schedule_state_occupied():
 @pytest.fixture
 def schedule_state_unoccupied():
     """A schedule state representing unoccupied night hours."""
-    bs = BuildingSchedule()
+    bs = SiteSchedule()
     state = bs.get_state(2, day_of_week=2)  # 2 AM Wednesday — unoccupied
     return state
 

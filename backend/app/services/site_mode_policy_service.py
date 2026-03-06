@@ -206,7 +206,7 @@ class SiteModePolicyService:
         policy = self.load_policy(site_id)
         state = self._load_state(site_id, policy)
 
-        snapshot = await self._monitoring.get_snapshot(building_id=site_id)
+        snapshot = await self._monitoring.get_snapshot(site_id=site_id)
         metrics = self._extract_metrics(snapshot)
 
         stages = policy.get("stages", {})

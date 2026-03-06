@@ -197,7 +197,7 @@ class PredictionGeneratorService:
 
         return {
             "code": code,
-            "building_id": equipment.get("building_id"),
+            "site_id": equipment.get("site_id"),
             "equipment_id": equipment.get("id"),
             "prediction_type": prediction_type,
             "probability_percent": probability,

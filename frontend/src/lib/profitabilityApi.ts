@@ -76,8 +76,8 @@ export interface PortfolioMetrics {
 export interface ContractProfitabilityDetail {
   contract_id: string;
   contract_name: string;
-  building_id: string;
-  building_name?: string | null;
+  site_id: string;
+  site_name?: string | null;
   monthly_revenue_zar: number;
   clawbacks_zar: number;
   net_revenue_zar: number;
@@ -160,7 +160,7 @@ export interface ContractProfitabilityReport {
     code?: string;
     status?: string;
     organization_name?: string | null;
-    building_name?: string | null;
+    site_name?: string | null;
   };
   period: {
     start: string;
@@ -179,7 +179,7 @@ export interface ContractProfitabilityReport {
 export interface ContractListItem {
   id: string;
   code?: string;
-  building_name?: string | null;
+  site_name?: string | null;
   organization_name?: string | null;
 }
 
@@ -189,8 +189,8 @@ const demoContracts: ContractProfitabilityDetail[] = [
   {
     contract_id: "demo-contract-001",
     contract_name: "CON-DEMO-2024",
-    building_id: "demo-building",
-    building_name: "Demo Office Tower",
+    site_id: "demo-building",
+    site_name: "Demo Office Tower",
     monthly_revenue_zar: 285000,
     clawbacks_zar: 0,
     net_revenue_zar: 285000,
@@ -211,8 +211,8 @@ const demoContracts: ContractProfitabilityDetail[] = [
   {
     contract_id: "demo-uch-s004",
     contract_name: "CON-UCH-S004-2024",
-    building_id: "site-004",
-    building_name: "uMhlanga Private Hospital",
+    site_id: "site-004",
+    site_name: "uMhlanga Private Hospital",
     monthly_revenue_zar: 185000,
     clawbacks_zar: 12000,
     net_revenue_zar: 173000,
@@ -517,20 +517,20 @@ export const profitabilityApi = {
         return demoContracts.map((contract) => ({
           id: contract.contract_id,
           code: contract.contract_name,
-          building_name: contract.building_name,
+          site_name: contract.site_name,
         }));
       }
       return response.contracts.map((contract) => ({
         id: contract.id,
         code: contract.code,
-        building_name: contract.buildings?.name ?? null,
+        site_name: contract.buildings?.name ?? null,
         organization_name: contract.organizations?.name ?? null,
       }));
     } catch {
       return demoContracts.map((contract) => ({
         id: contract.contract_id,
         code: contract.contract_name,
-        building_name: contract.building_name,
+        site_name: contract.site_name,
       }));
     }
   },

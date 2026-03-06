@@ -35,7 +35,7 @@ CARBON_INTENSITY = 0.35  # kg CO₂/kWh (SA grid)
 
 @router.get("/occupancy-energy/correlation")
 async def get_correlation_data(
-    building_id: str = "bld-002", date: Optional[str] = Query(None, description="ISO date for analysis")
+    site_id: str = "bld-002", date: Optional[str] = Query(None, description="ISO date for analysis")
 ):
     """
     Get time-series correlation between occupancy and energy consumption.
@@ -97,7 +97,7 @@ async def get_correlation_data(
 
     return {
         "date": sim_date.strftime("%Y-%m-%d"),
-        "building_id": building_id,
+        "site_id": site_id,
         "hourly_data": correlation_data,
         "daily_summary": {
             "total_wasted_kwh": round(total_wasted, 2),
@@ -110,7 +110,7 @@ async def get_correlation_data(
 
 
 @router.get("/occupancy-energy/scenarios")
-async def get_lights_left_on_scenarios(building_id: str = "bld-002", date: Optional[str] = Query(None)):
+async def get_lights_left_on_scenarios(site_id: str = "bld-002", date: Optional[str] = Query(None)):
     """
     Get "Lights Left On" cost impact scenarios.
 
@@ -149,7 +149,7 @@ async def get_lights_left_on_scenarios(building_id: str = "bld-002", date: Optio
 
     return {
         "date": sim_date.strftime("%Y-%m-%d"),
-        "building_id": building_id,
+        "site_id": site_id,
         "scenarios": [
             {
                 "name": "All Lights On 24/7",
@@ -193,7 +193,7 @@ async def get_lights_left_on_scenarios(building_id: str = "bld-002", date: Optio
 
 
 @router.get("/occupancy-energy/savings-potential")
-async def get_savings_potential(building_id: str = "bld-002", date: Optional[str] = Query(None)):
+async def get_savings_potential(site_id: str = "bld-002", date: Optional[str] = Query(None)):
     """
     Get HVAC and Lighting savings breakdown.
 
@@ -249,7 +249,7 @@ async def get_savings_potential(building_id: str = "bld-002", date: Optional[str
 
     return {
         "date": sim_date.strftime("%Y-%m-%d"),
-        "building_id": building_id,
+        "site_id": site_id,
         "baseline": {
             "hvac_kwh": round(baseline_hvac_daily, 2),
             "lighting_kwh": round(baseline_lighting_daily, 2),

@@ -1,7 +1,7 @@
 [
   {
     "id": "036ae90a-cb0b-4aac-a1be-2b3418643d2d",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L11-C",
     "dali_floor": "L11",
     "desk_zone_id": "Zone-102",
@@ -14,7 +14,7 @@
   },
   {
     "id": "22be9a4a-4672-4a13-a364-a7250cc5b39f",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L13-N",
     "dali_floor": "L13",
     "desk_zone_id": "Zone-301",
@@ -27,7 +27,7 @@
   },
   {
     "id": "254ae2c3-f9b3-4661-ac32-328bb6dab547",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L10-E",
     "dali_floor": "L10",
     "desk_zone_id": "Zone-005",
@@ -40,7 +40,7 @@
   },
   {
     "id": "329c1bf8-dfd3-4130-aa21-ba9044fd66c5",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L10-B",
     "dali_floor": "L10",
     "desk_zone_id": "Zone-002",
@@ -53,7 +53,7 @@
   },
   {
     "id": "3db84723-0a5e-447b-9b6b-ff609e713580",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L13-A",
     "dali_floor": "L13",
     "desk_zone_id": "Zone-301",
@@ -66,7 +66,7 @@
   },
   {
     "id": "3e120535-73a1-4a85-9453-e901c07c0b81",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L13-C",
     "dali_floor": "L13",
     "desk_zone_id": "Zone-303",
@@ -79,7 +79,7 @@
   },
   {
     "id": "446832f0-908a-486d-9b8a-3ed3c2e9783d",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L11-N",
     "dali_floor": "L11",
     "desk_zone_id": "Zone-100",
@@ -92,7 +92,7 @@
   },
   {
     "id": "4bca0898-38f4-46b7-9ac3-10bd820cc952",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L12-A",
     "dali_floor": "L12",
     "desk_zone_id": "Zone-200",
@@ -105,7 +105,7 @@
   },
   {
     "id": "5df8e7a8-f6ac-44eb-b21e-5abf38c86a7c",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L10-D",
     "dali_floor": "L10",
     "desk_zone_id": "Zone-004",
@@ -118,7 +118,7 @@
   },
   {
     "id": "655afd14-ab4b-4222-9036-72bacbe67b7a",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L12-C",
     "dali_floor": "L12",
     "desk_zone_id": "Zone-202",
@@ -131,7 +131,7 @@
   },
   {
     "id": "68130dfa-cc0a-4aa9-a271-760f5509ef9b",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L11-E",
     "dali_floor": "L11",
     "desk_zone_id": "Zone-104",
@@ -144,7 +144,7 @@
   },
   {
     "id": "819eea78-f971-4639-9135-aaf136ac17b8",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L13-D",
     "dali_floor": "L13",
     "desk_zone_id": "Zone-304",
@@ -157,7 +157,7 @@
   },
   {
     "id": "867fd877-5042-4feb-986e-b0fa6e75a1eb",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L13-E",
     "dali_floor": "L13",
     "desk_zone_id": "Zone-305",
@@ -170,7 +170,7 @@
   },
   {
     "id": "8c155c38-84d5-4718-928c-d50e21275bb4",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L12-D",
     "dali_floor": "L12",
     "desk_zone_id": "Zone-203",
@@ -183,7 +183,7 @@
   },
   {
     "id": "98694f17-5fbe-4282-a0b6-17e7f55d4f82",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L10-A",
     "dali_floor": "L10",
     "desk_zone_id": "Zone-001",
@@ -196,7 +196,7 @@
   },
   {
     "id": "9ce52e81-bcae-495f-b055-0c5fb6947021",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L12-E",
     "dali_floor": "L12",
     "desk_zone_id": "Zone-204",
@@ -209,7 +209,7 @@
   },
   {
     "id": "a68673d2-8e6d-443e-8cde-398a3378ad30",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L10-C",
     "dali_floor": "L10",
     "desk_zone_id": "Zone-003",
@@ -222,7 +222,7 @@
   },
   {
     "id": "a8ec403b-65f0-42f7-8fd4-d8c6c6842175",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L10-N",
     "dali_floor": "L10",
     "desk_zone_id": "Zone-001",
@@ -235,7 +235,7 @@
   },
   {
     "id": "a91d25e4-dc04-4797-bf22-850785e31938",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L13-B",
     "dali_floor": "L13",
     "desk_zone_id": "Zone-302",
@@ -248,7 +248,7 @@
   },
   {
     "id": "b284cf38-db1f-48d6-8075-13cc2cdc8335",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L11-D",
     "dali_floor": "L11",
     "desk_zone_id": "Zone-103",
@@ -261,7 +261,7 @@
   },
   {
     "id": "b6dd6b51-507e-4614-8607-46c167dfc951",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L12-N",
     "dali_floor": "L12",
     "desk_zone_id": "Zone-200",
@@ -274,7 +274,7 @@
   },
   {
     "id": "c7905b5b-b71a-4758-be36-194e65cf399e",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L11-B",
     "dali_floor": "L11",
     "desk_zone_id": "Zone-101",
@@ -287,7 +287,7 @@
   },
   {
     "id": "e348d646-d7d7-4d8c-b9a4-6d694bb974a6",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L12-B",
     "dali_floor": "L12",
     "desk_zone_id": "Zone-201",
@@ -300,7 +300,7 @@
   },
   {
     "id": "e5a3d686-5f21-4c8a-861b-5756a5108221",
-    "building_id": "d73a5a5f-6de5-4081-8c46-411954013156",
+    "site_id": "d73a5a5f-6de5-4081-8c46-411954013156",
     "dali_zone_id": "Zone-L11-A",
     "dali_floor": "L11",
     "desk_zone_id": "Zone-100",

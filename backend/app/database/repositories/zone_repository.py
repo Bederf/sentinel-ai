@@ -44,49 +44,47 @@ class ZoneRepository:
         if last_error:
             raise last_error
 
-    def get_all(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_all(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all zones with optional building filter.
 
         Args:
-            building_id: Filter by building UUID
+            site_id: Filter by building UUID
 
         Returns:
             List of zones
         """
         query = self.client.table("zones").select("*")
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
 
         response = query.execute()
         return response.data
 
-    def get_by_building(self, building_id: str) -> List[Dict[str, Any]]:
+    def get_by_site(self, site_id: str) -> List[Dict[str, Any]]:
         """Get all zones for a specific building.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
 
         Returns:
             List of zones in the building
         """
-        query = self.client.table("zones").select("*").eq("building_id", building_id)
+        query = self.client.table("zones").select("*").eq("site_id", site_id)
         response = self._execute_with_retry(query)
         return response.data
 
-    def get_by_zone_id(self, building_id: str, zone_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_zone_id(self, site_id: str, zone_id: str) -> Optional[Dict[str, Any]]:
         """Get a specific zone by zone_id within a building.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             zone_id: Zone ID (e.g., "Zone-L1-A")
 
         Returns:
             Zone data or None if not found
         """
-        response = (
-            self.client.table("zones").select("*").eq("building_id", building_id).eq("zone_id", zone_id).execute()
-        )
+        response = self.client.table("zones").select("*").eq("site_id", site_id).eq("zone_id", zone_id).execute()
 
         if response.data:
             return response.data[0]
@@ -107,17 +105,17 @@ class ZoneRepository:
             return response.data[0]
         return None
 
-    def get_by_floor(self, building_id: str, floor: str) -> List[Dict[str, Any]]:
+    def get_by_floor(self, site_id: str, floor: str) -> List[Dict[str, Any]]:
         """Get zones by building and floor.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             floor: Floor code (L0, L1, L2, B1, etc.)
 
         Returns:
             List of zones on the floor
         """
-        response = self.client.table("zones").select("*").eq("building_id", building_id).eq("floor", floor).execute()
+        response = self.client.table("zones").select("*").eq("site_id", site_id).eq("floor", floor).execute()
         return response.data
 
     def create(self, zone_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -125,7 +123,7 @@ class ZoneRepository:
 
         Args:
             zone_data: Zone data including:
-                - building_id
+                - site_id
                 - zone_id
                 - zone_name
                 - floor
@@ -136,7 +134,7 @@ class ZoneRepository:
         """
         response = self.client.table("zones").insert(zone_data).execute()
         if response.data:
-            logger.info(f"Created zone {zone_data.get('zone_id')} for building {zone_data.get('building_id')}")
+            logger.info(f"Created zone {zone_data.get('zone_id')} for building {zone_data.get('site_id')}")
             return response.data[0]
         else:
             raise ValueError(f"Failed to create zone: {zone_data}")
@@ -162,12 +160,12 @@ class ZoneRepository:
         """Insert or update a zone.
 
         Args:
-            zone_data: Zone data with building_id and zone_id as unique key
+            zone_data: Zone data with site_id and zone_id as unique key
 
         Returns:
             Upserted zone data
         """
-        response = self.client.table("zones").upsert(zone_data, on_conflict="building_id,zone_id").execute()
+        response = self.client.table("zones").upsert(zone_data, on_conflict="site_id,zone_id").execute()
         return response.data[0] if response.data else {}
 
     def upsert_many(self, zones: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -182,7 +180,7 @@ class ZoneRepository:
         if not zones:
             return []
 
-        response = self.client.table("zones").upsert(zones, on_conflict="building_id,zone_id").execute()
+        response = self.client.table("zones").upsert(zones, on_conflict="site_id,zone_id").execute()
         return response.data
 
     def delete(self, zone_id: str) -> bool:
@@ -201,35 +199,35 @@ class ZoneRepository:
             return True
         return False
 
-    def delete_by_building(self, building_id: str) -> int:
+    def delete_by_site(self, site_id: str) -> int:
         """Delete all zones for a building.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
 
         Returns:
             Number of zones deleted
         """
-        response = self.client.table("zones").delete().eq("building_id", building_id).execute()
+        response = self.client.table("zones").delete().eq("site_id", site_id).execute()
 
         count = len(response.data)
-        logger.info(f"Deleted {count} zones for building {building_id}")
+        logger.info(f"Deleted {count} zones for building {site_id}")
         return count
 
-    def get_zone_centroids(self, building_id: str) -> Dict[str, Dict[str, float]]:
+    def get_zone_centroids(self, site_id: str) -> Dict[str, Dict[str, float]]:
         """Get zone centroids for all zones in a building.
 
         Centroids are calculated from desk positions and used for
         accurate equipment positioning in 3D visualization.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
 
         Returns:
             Dict mapping zone_id → {x, z} centroid coordinates
         """
         # Query the zone_centroids view
-        response = self.client.table("zone_centroids").select("*").eq("building_id", building_id).execute()
+        response = self.client.table("zone_centroids").select("*").eq("site_id", site_id).execute()
 
         centroids = {}
         for row in response.data:

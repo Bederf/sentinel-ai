@@ -106,7 +106,7 @@ class BackgroundSchedulerService:
                 equipment_repo = EquipmentRepository()
                 site_ids = get_registered_site_ids()
                 for site_id in site_ids:
-                    equipment_list = equipment_repo.get_by_building_code(site_id)
+                    equipment_list = equipment_repo.get_by_site_code(site_id)
                     if equipment_list:
                         # Sample controllable equipment types for realistic audit logs
                         controllable_types = [
@@ -235,27 +235,103 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error(f"Failed to generate periodic demo audit data: {e}")
 
+    # Sim-time tracking for optimization/recommendation gates
+    _last_optimization_sim_time: datetime | None = None
+    _last_recommendation_sim_time: datetime | None = None
+    # Target interval in simulated hours between optimization cycles
+    OPTIMIZATION_SIM_HOURS: float = 8.0
+    # Target interval in simulated hours between recommendation cycles
+    RECOMMENDATION_SIM_HOURS: float = 8.0
+
     def add_optimization_analysis_job(self, interval_seconds: int = 900):
         """
         Add a job to run optimization analysis periodically.
 
+        When the simulator is running at accelerated speed, the job polls every
+        30 real seconds but only executes when enough *simulated* time has
+        elapsed (OPTIMIZATION_SIM_HOURS).  When no simulation is running, it
+        uses the real-time interval_seconds as before.
+
         Args:
-            interval_seconds: How often to run analysis (default: 900 seconds = 15 minutes)
+            interval_seconds: Real-time interval when no simulation is running
+                              (default: 900 seconds = 15 minutes)
         """
         # Remove existing job if it exists
         if self.scheduler.get_job("run_optimization_analysis"):
             self.scheduler.remove_job("run_optimization_analysis")
             logger.info("Removed existing optimization analysis job")
 
-        # Add new job
+        # Store the real-time interval for non-simulation mode
+        self._optimization_real_interval = interval_seconds
+
+        # Poll every 30s so we can react quickly to sim-time changes.
+        # The sim-time gate inside _run_optimization_analysis_gated() decides
+        # whether to actually run.
+        poll_seconds = 30
+        first_run = datetime.now() + timedelta(seconds=60)  # 60s warmup
+
         self.scheduler.add_job(
-            func=self._run_optimization_analysis,
-            trigger=IntervalTrigger(seconds=interval_seconds),
+            func=self._run_optimization_analysis_gated,
+            trigger=IntervalTrigger(seconds=poll_seconds),
             id="run_optimization_analysis",
-            name="Run Optimization Analysis",
+            name="Run Optimization Analysis (sim-aware)",
             replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
         )
-        logger.info(f"Added optimization analysis job with {interval_seconds}s interval")
+        logger.info(
+            f"Added optimization analysis job: poll every {poll_seconds}s, "
+            f"sim-gate={self.OPTIMIZATION_SIM_HOURS}h, "
+            f"real-fallback={interval_seconds}s "
+            f"(first run at {first_run.strftime('%H:%M:%S')})"
+        )
+
+    def _run_optimization_analysis_gated(self):
+        """Sim-time gate wrapper around _run_optimization_analysis.
+
+        Checks whether enough simulated time has elapsed since the last run.
+        If the simulator is running, uses simulated-time intervals.
+        If no simulator, falls back to real-time interval.
+        """
+        import app.services.lifecycle_orchestrator as _orch_mod
+
+        now_eff = _orch_mod.get_effective_now()
+        orch = _orch_mod._orchestrator_instance
+        sim_running = orch is not None and orch.running
+
+        if sim_running:
+            # Sim-time gate: skip if insufficient simulated time elapsed
+            if self._last_optimization_sim_time is not None:
+                elapsed = (now_eff - self._last_optimization_sim_time).total_seconds()
+                threshold = self.OPTIMIZATION_SIM_HOURS * 3600
+                if elapsed < threshold:
+                    return  # Silent skip — fires every 30s, would flood logs
+                logger.warning(
+                    f"[SIM-GATE] Optimization PASSED: {elapsed / 3600:.1f} sim-hours elapsed "
+                    f"(threshold={self.OPTIMIZATION_SIM_HOURS}h), "
+                    f"sim-time={now_eff.strftime('%m-%d %H:%M')}"
+                )
+            else:
+                logger.warning(f"[SIM-GATE] Optimization first run, sim-time={now_eff.strftime('%m-%d %H:%M')}")
+            self._last_optimization_sim_time = now_eff
+
+            # Occupied-hours gate: skip LLM call during simulated off-hours
+            sim_hour = now_eff.hour
+            sim_weekday = now_eff.weekday()
+            if sim_weekday >= 5 or sim_hour < 6 or sim_hour >= 19:
+                logger.info(
+                    f"[SIM-GATE] Optimization SKIPPED: simulated off-hours (hour={sim_hour}, weekday={sim_weekday})"
+                )
+                return
+        else:
+            # Real-time gate: use wall-clock interval
+            if self._last_optimization_sim_time is not None:
+                elapsed = (datetime.now() - self._last_optimization_sim_time).total_seconds()
+                if elapsed < self._optimization_real_interval:
+                    return
+            self._last_optimization_sim_time = datetime.now()
+
+        self._run_optimization_analysis()
 
     def _run_optimization_analysis(self):
         """
@@ -265,11 +341,30 @@ class BackgroundSchedulerService:
         Uses site_resolver to discover sites (data-source-agnostic), then
         ai_optimizer.analyze_building() to generate recommendations, then
         recommendation_repo.create() to persist them.  Deduplicates against
-        existing PENDING recommendations for the same equipment+action within
-        the last 30 minutes.
+        existing PENDING recommendations for the same equipment+action+value
+        within the last 24 hours.
+
+        Schedule-aware: HVAC comfort recs are skipped outside occupied hours
+        (weekdays 05:30-17:30 SAST). BESS/solar/generator/meter recs flow 24/7.
         """
         try:
             logger.debug("Running periodic optimization analysis...")
+
+            # Schedule gate: determine if HVAC comfort recs should be suppressed
+            # Use simulated time when simulator is running (accelerated clock),
+            # otherwise fall back to real wall-clock time.
+            from app.services.lifecycle_orchestrator import get_effective_now
+
+            now = get_effective_now()
+            hour = now.hour
+            weekday = now.weekday()  # 0=Mon, 6=Sun
+            # Skip HVAC comfort recs outside occupied window (07:00-17:59 weekdays)
+            skip_hvac_comfort = weekday >= 5 or hour < 7 or hour >= 18
+            if skip_hvac_comfort:
+                logger.info(
+                    f"Outside occupied hours (hour={hour}, weekday={weekday}) — "
+                    "HVAC comfort recs will be suppressed; BESS/solar/generator still active"
+                )
 
             from app.core.site_resolver import get_registered_site_ids
             from app.database.repositories.recommendation_repository import (
@@ -295,6 +390,24 @@ class BackgroundSchedulerService:
 
             for site_id in site_ids:
                 try:
+                    # Site mode gate: skip LLM optimization for sites not in 'automatic' mode
+                    try:
+                        from app.services.site_mode_policy_service import SiteModePolicyService
+
+                        policy_service = SiteModePolicyService()
+                        policy = policy_service.load_policy(site_id)
+                        if policy:
+                            state = policy_service._load_state(site_id, policy)
+                            current_stage = state.get("current_stage", "commissioning")
+                            if current_stage != "automatic":
+                                logger.info(
+                                    f"[AI-OPT] Skipping LLM optimization for {site_id} "
+                                    f"(mode={current_stage}, requires 'automatic')"
+                                )
+                                continue
+                    except Exception as gate_err:
+                        logger.debug(f"[AI-OPT] Mode gate check failed for {site_id}: {gate_err}")
+
                     # Normalize site_id for storage: "site-002" → "S002"
                     # (the recommendation service queries with this format)
                     storage_site_id = site_id
@@ -311,7 +424,7 @@ class BackgroundSchedulerService:
                         loop.close()
 
                     if not optimization_result.recommendations:
-                        logger.debug(f"No recommendations for {site_id}")
+                        logger.warning(f"[AI-OPT] {site_id}: 0 recommendations (building at optimal)")
                         continue
 
                     # Validate recommendations
@@ -335,19 +448,20 @@ class BackgroundSchedulerService:
                         logger.info(f"No recommendations passed safety validation for {site_id}")
                         continue
 
-                    # Fetch existing PENDING recs for dedup
+                    # Fetch existing PENDING recs for dedup — 24h window, higher limit
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     try:
                         existing_pending = loop.run_until_complete(
-                            recommendation_repo.get_by_status(storage_site_id, RecommendationStatus.PENDING, limit=50)
+                            recommendation_repo.get_by_status(storage_site_id, RecommendationStatus.PENDING, limit=500)
                         )
                     finally:
                         loop.close()
 
-                    # Build dedup set: (target_equipment, action_type) for recs < 30 min old
-                    dedup_cutoff = datetime.utcnow() - timedelta(minutes=30)
-                    recent_keys: set[tuple[str, str]] = set()
+                    # Build value-aware dedup set: (equipment, point, value) for recs < 48 sim-hours old
+                    # Use effective time so dedup window matches simulated day boundaries
+                    dedup_cutoff = get_effective_now().replace(tzinfo=None) - timedelta(hours=48)
+                    recent_keys: set[tuple[str, str, str]] = set()
                     for existing in existing_pending:
                         ts = existing.timestamp
                         if isinstance(ts, str):
@@ -360,9 +474,11 @@ class BackgroundSchedulerService:
                             ts = ts.replace(tzinfo=None)
                         if ts >= dedup_cutoff:
                             action_point = ""
+                            action_value = ""
                             if isinstance(existing.action, dict):
                                 action_point = existing.action.get("point", "")
-                            recent_keys.add((existing.target_equipment, action_point))
+                                action_value = str(existing.action.get("value", "")).strip().lower()
+                            recent_keys.add((existing.target_equipment, action_point, action_value))
 
                     # Persist each recommendation
                     for rec_dict in optimization_result.recommendations:
@@ -374,10 +490,33 @@ class BackgroundSchedulerService:
                             skipped_count += 1
                             continue
 
-                        # Dedup check
-                        if (equipment_id, point_name) in recent_keys:
+                        # Schedule gate: skip HVAC comfort recs outside occupied hours
+                        if skip_hvac_comfort:
+                            system = rec_dict.get("system", "")
+                            if system == "hvac" and "setpoint" in point_name:
+                                skipped_count += 1
+                                continue
+
+                        # Value-aware dedup check: same equipment + point + value within 48h
+                        rec_value = str(rec_dict.get("recommended_value", "")).strip().lower()
+                        if (equipment_id, point_name, rec_value) in recent_keys:
                             skipped_count += 1
                             continue
+
+                        # Parse confidence from Claude response
+                        confidence_raw = optimization_result.confidence
+                        try:
+                            confidence_num = float(confidence_raw)
+                            confidence_num = max(0.0, min(1.0, confidence_num))
+                        except (TypeError, ValueError):
+                            confidence_num = 0.7
+
+                        # Determine sim_hour for traceability
+                        import app.services.lifecycle_orchestrator as _orch_mod_local
+
+                        sim_now = get_effective_now()
+                        orch = _orch_mod_local._orchestrator_instance
+                        is_sim = orch is not None and orch.running
 
                         rec = Recommendation(
                             site_id=storage_site_id,
@@ -388,6 +527,7 @@ class BackgroundSchedulerService:
                             action={
                                 "point": point_name,
                                 "value": rec_dict.get("recommended_value"),
+                                "sim_hour": sim_now.strftime("%Y-%m-%d %H:%M") if is_sim else None,
                             },
                             reason=rec_dict.get("reason", ""),
                             expected_impact={
@@ -396,7 +536,8 @@ class BackgroundSchedulerService:
                                 "unit": rec_dict.get("unit", ""),
                                 "energy_savings_percent": rec_dict.get("savings_kwh", 5),
                             },
-                            confidence=str(optimization_result.confidence),
+                            confidence=str(confidence_num),
+                            confidence_score=confidence_num,
                             profile=optimization_result.profile or "",
                             status=RecommendationStatus.PENDING,
                             requires_approval=True,
@@ -417,13 +558,228 @@ class BackgroundSchedulerService:
                     logger.error(f"Error analyzing site {site_id}: {e}")
                     error_count += 1
 
-            logger.info(
-                f"Optimization analysis complete: {created_count} created, "
-                f"{skipped_count} deduped, {error_count} errors"
+            # === RULE-BASED HEALTH RECOMMENDATIONS (no LLM) ===
+            # Uses thresholds from settings page to generate maintenance recs
+            try:
+                health_created, health_deduped = self._generate_health_recommendations(site_ids, recommendation_repo)
+                created_count += health_created
+                skipped_count += health_deduped
+            except Exception as e:
+                logger.warning(f"[HEALTH-REC] Failed: {e}")
+
+            logger.warning(
+                f"[AI-OPT] Cycle complete: {created_count} created, {skipped_count} deduped, {error_count} errors"
             )
 
         except Exception as e:
             logger.error(f"Failed to run optimization analysis: {e}")
+
+    def _generate_health_recommendations(self, site_ids, recommendation_repo) -> tuple[int, int]:
+        """Generate maintenance recommendations for degraded equipment using configured thresholds.
+
+        Rule-based — no LLM call. Reads health thresholds from settings page
+        (Supabase system_settings → JSON settings → defaults).
+
+        Also creates dashboard alerts and sends Sentry/Telegram notifications
+        for critical and warning equipment.
+
+        Returns:
+            (created_count, deduped_count)
+        """
+        from app.services.health_threshold_service import get_health_thresholds
+        from app.services.lifecycle_orchestrator import get_effective_now
+        import app.services.lifecycle_orchestrator as _orch_mod
+        from app.database.supabase_client import get_supabase_client
+        from app.services.equipment_alert_service import get_equipment_alert_service
+        from app.models.recommendation import (
+            ActionRiskLevel,
+            Recommendation,
+            RecommendationStatus,
+        )
+
+        thresholds = get_health_thresholds()
+        t_healthy = thresholds.get("healthy", 90)
+        t_warning = thresholds.get("warning", 70)
+        t_critical = thresholds.get("critical", 50)
+
+        sb = get_supabase_client()
+        now_eff = get_effective_now()
+        created = 0
+        deduped = 0
+
+        # Maintenance actions by severity
+        ACTIONS = {
+            "critical": {
+                "action": "urgent_inspection",
+                "reason": "Health score below {t_critical}% — schedule urgent inspection and diagnostic. "
+                "Equipment may be at risk of failure. Check sensor readings, vibration, "
+                "and operating parameters.",
+                "risk": ActionRiskLevel.MEDIUM,
+            },
+            "warning": {
+                "action": "scheduled_maintenance",
+                "reason": "Health score below {t_warning}% — schedule preventive maintenance. "
+                "Inspect filters, bearings, connections, and calibration.",
+                "risk": ActionRiskLevel.LOW,
+            },
+        }
+
+        for site_id in site_ids:
+            try:
+                storage_site_id = site_id
+                if site_id.startswith("site-"):
+                    num = site_id.split("-")[1]
+                    storage_site_id = f"S{num}"
+
+                # Get site UUID
+                site_resp = sb.table("sites").select("id").eq("code", site_id).execute()
+                if not site_resp.data:
+                    continue
+                site_uuid = site_resp.data[0]["id"]
+
+                # Get degraded equipment (below healthy threshold)
+                eq_resp = (
+                    sb.table("equipment")
+                    .select("code,type,health_score,status")
+                    .eq("site_id", site_uuid)
+                    .lt("health_score", t_healthy)
+                    .execute()
+                )
+                if not eq_resp.data:
+                    continue
+
+                # Fetch existing PENDING recs for dedup
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    existing_pending = loop.run_until_complete(
+                        recommendation_repo.get_by_status(storage_site_id, RecommendationStatus.PENDING, limit=500)
+                    )
+                finally:
+                    loop.close()
+
+                # Build dedup set: (equipment, action_point)
+                dedup_cutoff = now_eff.replace(tzinfo=None) - timedelta(hours=48)
+                existing_keys: set[tuple[str, str]] = set()
+                for ex in existing_pending:
+                    ts = ex.timestamp
+                    if isinstance(ts, str):
+                        try:
+                            ts = datetime.fromisoformat(ts)
+                        except (ValueError, TypeError):
+                            continue
+                    if hasattr(ts, "tzinfo") and ts.tzinfo is not None:
+                        ts = ts.replace(tzinfo=None)
+                    if ts >= dedup_cutoff:
+                        action_point = ""
+                        if isinstance(ex.action, dict):
+                            action_point = ex.action.get("point", "")
+                        existing_keys.add((ex.target_equipment, action_point))
+
+                for eq in eq_resp.data:
+                    code = eq["code"]
+                    health = eq.get("health_score", 100)
+                    eq_type = eq.get("type", "unknown")
+
+                    # Determine severity
+                    if health < t_critical:
+                        severity = "critical"
+                    elif health < t_warning:
+                        severity = "warning"
+                    else:
+                        continue  # Between warning and healthy — monitor only
+
+                    action_info = ACTIONS[severity]
+                    point_name = f"health_{severity}"
+
+                    # Dedup check
+                    if (code, point_name) in existing_keys:
+                        deduped += 1
+                        continue
+
+                    reason = action_info["reason"].format(t_critical=t_critical, t_warning=t_warning)
+
+                    # Determine sim_hour for traceability
+                    orch = _orch_mod._orchestrator_instance
+                    is_sim = orch is not None and orch.running
+
+                    rec = Recommendation(
+                        site_id=storage_site_id,
+                        timestamp=datetime.utcnow(),
+                        action_type="health_maintenance",
+                        risk_level=action_info["risk"],
+                        target_equipment=code,
+                        action={
+                            "point": point_name,
+                            "value": severity,
+                            "equipment_type": eq_type,
+                            "sim_hour": now_eff.strftime("%Y-%m-%d %H:%M") if is_sim else None,
+                        },
+                        reason=f"{code} ({eq_type}): health={health}% — {reason}",
+                        expected_impact={
+                            "current_health": health,
+                            "threshold": t_critical if severity == "critical" else t_warning,
+                            "severity": severity,
+                        },
+                        confidence=str(0.95),  # Rule-based, high confidence
+                        confidence_score=0.95,
+                        profile="health_rules",
+                        status=RecommendationStatus.PENDING,
+                        requires_approval=True,
+                    )
+
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        loop.run_until_complete(recommendation_repo.create(rec))
+                        created += 1
+                        logger.warning(
+                            f"[HEALTH-REC] {code}: health={health}% [{severity.upper()}] — recommendation created"
+                        )
+                    except Exception as e:
+                        logger.warning(f"[HEALTH-REC] Failed to persist for {code}: {e}")
+                    finally:
+                        loop.close()
+
+                    # === DASHBOARD ALERT + SENTRY/TELEGRAM NOTIFICATION ===
+                    # Critical: immediate Telegram push + dashboard alert
+                    # Warning: dashboard alert + Telegram (cooldown-gated by alert_notifier)
+                    try:
+                        alert_svc = get_equipment_alert_service()
+                        if severity == "critical":
+                            threshold_msg = f"<{t_critical}% CRITICAL"
+                        else:
+                            threshold_msg = f"<{t_warning}% WARNING"
+                        alert_msg = (
+                            f"Health score {health}% (threshold: "
+                            f"{threshold_msg}). "
+                            f"{action_info['action'].replace('_', ' ').title()} recommended."
+                        )
+                        result = alert_svc.create_alert_for_equipment(
+                            equipment_id=code,
+                            site_id=site_id,
+                            severity=severity,
+                            message=alert_msg,
+                            alert_type="health_maintenance",
+                            notify_telegram=True,  # Both critical + warning; cooldown prevents spam
+                        )
+                        if result.get("error"):
+                            logger.warning(f"[HEALTH-REC] Alert creation failed for {code}: {result['error']}")
+                        else:
+                            tg_status = "sent" if result.get("telegram_sent") else "skipped"
+                            logger.warning(
+                                f"[HEALTH-REC] Alert created for {code} [{severity.upper()}], telegram={tg_status}"
+                            )
+                    except Exception as e:
+                        logger.warning(f"[HEALTH-REC] Notification failed for {code}: {e}")
+
+            except Exception as e:
+                logger.warning(f"[HEALTH-REC] Error for {site_id}: {e}")
+
+        if created > 0:
+            logger.warning(f"[HEALTH-REC] {created} health recs created, {deduped} deduped")
+
+        return created, deduped
 
     def add_prediction_generation_job(self, interval_seconds: int = 300):
         """
@@ -439,6 +795,9 @@ class BackgroundSchedulerService:
             self.scheduler.remove_job("generate_predictions")
             logger.info("Removed existing prediction generation job")
 
+        # Delay first run by one full interval to avoid startup burst.
+        first_run = datetime.now() + timedelta(seconds=interval_seconds)
+
         # Add new job
         self.scheduler.add_job(
             func=self._run_prediction_generation,
@@ -446,6 +805,8 @@ class BackgroundSchedulerService:
             id="generate_predictions",
             name="Generate Predictions for At-Risk Equipment",
             replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
         )
         logger.info(f"Added prediction generation job with {interval_seconds}s interval")
 
@@ -484,25 +845,75 @@ class BackgroundSchedulerService:
         """
         Add a job to generate AI recommendations periodically.
 
-        Scans all equipment and generates maintenance recommendations for at-risk equipment.
+        Sim-time aware: polls every 30s, only runs when enough simulated time
+        has elapsed (RECOMMENDATION_SIM_HOURS).
 
         Args:
-            interval_seconds: How often to run (default: 600 seconds = 10 minutes)
+            interval_seconds: Real-time interval when no simulation is running
         """
-        # Remove existing job if it exists
         if self.scheduler.get_job("generate_recommendations"):
             self.scheduler.remove_job("generate_recommendations")
             logger.info("Removed existing recommendation generation job")
 
-        # Add new job
+        self._recommendation_real_interval = interval_seconds
+
+        poll_seconds = 30
+        first_run = datetime.now() + timedelta(seconds=90)  # 90s warmup
+
         self.scheduler.add_job(
-            func=self._run_recommendation_generation,
-            trigger=IntervalTrigger(seconds=interval_seconds),
+            func=self._run_recommendation_generation_gated,
+            trigger=IntervalTrigger(seconds=poll_seconds),
             id="generate_recommendations",
-            name="Generate AI Recommendations for At-Risk Equipment",
+            name="Generate AI Recommendations (sim-aware)",
             replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
         )
-        logger.info(f"Added recommendation generation job with {interval_seconds}s interval")
+        logger.info(
+            f"Added recommendation generation job: poll every {poll_seconds}s, "
+            f"sim-gate={self.RECOMMENDATION_SIM_HOURS}h, "
+            f"real-fallback={interval_seconds}s "
+            f"(first run at {first_run.strftime('%H:%M:%S')})"
+        )
+
+    def _run_recommendation_generation_gated(self):
+        """Sim-time gate wrapper around _run_recommendation_generation."""
+        import app.services.lifecycle_orchestrator as _orch_mod
+
+        now_eff = _orch_mod.get_effective_now()
+        orch = _orch_mod._orchestrator_instance
+        sim_running = orch is not None and orch.running
+
+        if sim_running:
+            if self._last_recommendation_sim_time is not None:
+                elapsed = (now_eff - self._last_recommendation_sim_time).total_seconds()
+                threshold = self.RECOMMENDATION_SIM_HOURS * 3600
+                if elapsed < threshold:
+                    return  # Silent skip
+                logger.warning(
+                    f"[SIM-GATE] Recommendation PASSED: {elapsed / 3600:.1f} sim-hours elapsed, "
+                    f"sim-time={now_eff.strftime('%m-%d %H:%M')}"
+                )
+            else:
+                logger.warning(f"[SIM-GATE] Recommendation first run, sim-time={now_eff.strftime('%m-%d %H:%M')}")
+            self._last_recommendation_sim_time = now_eff
+
+            # Occupied-hours gate: skip during simulated off-hours
+            sim_hour = now_eff.hour
+            sim_weekday = now_eff.weekday()
+            if sim_weekday >= 5 or sim_hour < 6 or sim_hour >= 19:
+                logger.info(
+                    f"[SIM-GATE] Recommendation SKIPPED: simulated off-hours (hour={sim_hour}, weekday={sim_weekday})"
+                )
+                return
+        else:
+            if self._last_recommendation_sim_time is not None:
+                elapsed = (datetime.now() - self._last_recommendation_sim_time).total_seconds()
+                if elapsed < self._recommendation_real_interval:
+                    return
+            self._last_recommendation_sim_time = datetime.now()
+
+        self._run_recommendation_generation()
 
     def _run_recommendation_generation(self):
         """
@@ -524,6 +935,33 @@ class BackgroundSchedulerService:
 
             logger.info("Running scheduled AI recommendation generation...")
 
+            # Site mode gate: build set of site IDs in 'automatic' mode
+            # Equipment belonging to non-automatic sites is skipped
+            automatic_site_ids: set[str] = set()
+            try:
+                from app.services.site_mode_policy_service import SiteModePolicyService
+                from app.core.site_resolver import get_registered_site_ids
+
+                policy_service = SiteModePolicyService()
+                for sid in get_registered_site_ids():
+                    policy = policy_service.load_policy(sid)
+                    if policy:
+                        state = policy_service._load_state(sid, policy)
+                        current_stage = state.get("current_stage", "commissioning")
+                        if current_stage == "automatic":
+                            automatic_site_ids.add(sid)
+                        else:
+                            logger.info(
+                                f"[AI-REC] Skipping recommendations for {sid} "
+                                f"(mode={current_stage}, requires 'automatic')"
+                            )
+                    else:
+                        # No policy file — allow by default (no gate)
+                        automatic_site_ids.add(sid)
+            except Exception as gate_err:
+                logger.debug(f"[AI-REC] Mode gate check failed: {gate_err}")
+                automatic_site_ids = None  # Disable gate on error
+
             client = get_supabase_client()
             recommender = get_maintenance_recommender(client)
             module_registry = ModuleRegistryService()
@@ -532,7 +970,7 @@ class BackgroundSchedulerService:
             response = (
                 client.table("equipment")
                 .select(
-                    "id, code, name, type, health_score, building_id, status, "
+                    "id, code, name, type, health_score, site_id, status, "
                     "install_date, last_service, manufacturer, model"
                 )
                 .execute()
@@ -549,11 +987,18 @@ class BackgroundSchedulerService:
                     equipment_id = eq.get("id")
 
                     # Get building/site code
-                    building_response = (
-                        client.table("buildings").select("code, name").eq("id", eq.get("building_id")).execute()
-                    )
-                    site_code = building_response.data[0]["code"] if building_response.data else "unknown"
-                    building_name = building_response.data[0]["name"] if building_response.data else "Unknown Building"
+                    site_response = client.table("sites").select("code, name").eq("id", eq.get("site_id")).execute()
+                    site_code = site_response.data[0]["code"] if site_response.data else "unknown"
+                    site_name = site_response.data[0]["name"] if site_response.data else "Unknown Building"
+
+                    # Site mode gate: skip equipment belonging to non-automatic sites
+                    if automatic_site_ids is not None:
+                        # Convert site code (e.g. "S002") to site resolver format ("site-002")
+                        resolver_id = site_code
+                        if site_code.startswith("S") and site_code[1:].isdigit():
+                            resolver_id = f"site-{site_code[1:]}"
+                        if resolver_id not in automatic_site_ids:
+                            continue
 
                     # Get recent alerts for this equipment (last 30 days)
                     alerts_response = (
@@ -721,8 +1166,8 @@ class BackgroundSchedulerService:
                             "equipment_id": eq.get("code", eq["id"]),
                             "equipment_type": eq.get("type", "unknown"),
                             "health_score": health,
-                            "building_id": site_code,
-                            "building_name": building_name,
+                            "site_id": site_code,
+                            "site_name": site_name,
                             "manufacturer": eq.get("manufacturer"),
                             "model": eq.get("model"),
                             "install_date": eq.get("install_date"),
@@ -1348,7 +1793,14 @@ class BackgroundSchedulerService:
 
             task = queued_tasks[0]  # FIFO: oldest first
             task_id = str(task["task_id"])
-            logger.info(f"Found queued simulation task: {task_id}, scenario: {task.get('scenario')}")
+            scenario = task.get("scenario", "sentinel_annual")
+            logger.info(f"Found queued simulation task: {task_id}, scenario: {scenario}")
+
+            # Validate task has required fields
+            if not scenario:
+                logger.warning(f"Task {task_id} missing scenario, marking as stopped")
+                store.update_task_progress(task_id, {"status": "stopped", "error_message": "Missing scenario"})
+                return
 
             # Check if already running (prevent double-start)
             if get_simulation_by_task_id(task_id):
@@ -1372,12 +1824,27 @@ class BackgroundSchedulerService:
             await self._run_simulation_task(
                 task_id,
                 orchestrator,
-                scenario=task["scenario"],
+                scenario=scenario,
                 duration_minutes=float(task.get("duration_minutes", 3650.0)),
             )
 
         except Exception as e:
             logger.error(f"Error in simulation queue processor: {e}", exc_info=True)
+            # If we marked a task as "running" but failed to start it, revert to stopped
+            # to prevent stale "running" state that causes frontend looping
+            if queued_tasks:
+                failed_task_id = str(queued_tasks[0].get("task_id", ""))
+                if failed_task_id and store:
+                    try:
+                        task_data = store.get_task_progress(failed_task_id)
+                        if task_data.get("status") == "running":
+                            store.update_task_progress(
+                                failed_task_id,
+                                {"status": "stopped", "error_message": f"Queue processor error: {e}"},
+                            )
+                            logger.info(f"Reverted failed task {failed_task_id} to stopped")
+                    except Exception:
+                        pass
 
     async def _run_simulation_task(self, task_id: str, orchestrator, scenario: str, duration_minutes: float) -> None:
         """
@@ -1404,7 +1871,7 @@ class BackgroundSchedulerService:
                 _fallback_site = _sids[0]
         except Exception:
             pass
-        _orch_site = orchestrator.building_id if hasattr(orchestrator, "building_id") else _fallback_site
+        _orch_site = orchestrator.site_id if hasattr(orchestrator, "site_id") else _fallback_site
         store = get_simulation_store(_orch_site)
         is_recovery = False
 
@@ -2296,6 +2763,86 @@ class BackgroundSchedulerService:
         resolved_count = await health_service.auto_resolve_stale_errors()
         if resolved_count > 0:
             logger.info(f"Auto-resolved {resolved_count} stale errors")
+
+    # -----------------------------------------------------------------
+    # Event Intelligence evaluation
+    # -----------------------------------------------------------------
+
+    def add_event_intelligence_job(self, interval_seconds: int = 120):
+        """Add a periodic job to evaluate all sites for operational events.
+
+        The EventIntelligenceService converts raw telemetry into structured
+        operational events (temperature deviations, energy spikes, sensor failures,
+        comfort violations, etc.) and emits them via the event bus.
+
+        This is read-only: it inspects telemetry and emits events. No control
+        actions are taken.
+
+        Args:
+            interval_seconds: How often to evaluate (default: 120s = 2 minutes).
+        """
+        job_id = "event_intelligence_evaluation"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+        first_run = datetime.now() + timedelta(seconds=90)  # 90s warmup
+
+        self.scheduler.add_job(
+            func=self._run_event_intelligence,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="Event Intelligence Evaluation",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+        )
+        logger.info(
+            "Added event intelligence job: %ds interval (first run at %s)",
+            interval_seconds,
+            first_run.strftime("%H:%M:%S"),
+        )
+
+    def _run_event_intelligence(self):
+        """Sync wrapper for async event intelligence evaluation."""
+        try:
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._run_event_intelligence_async(),
+                    self._main_loop,
+                )
+                future.result(timeout=60)
+            else:
+                asyncio.run(self._run_event_intelligence_async())
+        except Exception as e:
+            logger.error("Event intelligence evaluation failed: %s", e, exc_info=True)
+
+    async def _run_event_intelligence_async(self):
+        """Evaluate all registered sites for operational events."""
+        from app.core.site_resolver import get_registered_site_ids
+        from app.services.event_intelligence_service import get_event_intelligence_service
+
+        site_ids = get_registered_site_ids()
+        if not site_ids:
+            return
+
+        svc = get_event_intelligence_service()
+        total_events = 0
+
+        for site_id in site_ids:
+            try:
+                events = await svc.process_site(site_id)
+                if events:
+                    total_events += len(events)
+                    logger.info(
+                        "Event intelligence: %d events detected for %s",
+                        len(events),
+                        site_id,
+                    )
+            except Exception as e:
+                logger.warning("Event intelligence failed for %s: %s", site_id, e)
+
+        if total_events > 0:
+            logger.info("Event intelligence cycle complete: %d events across %d sites", total_events, len(site_ids))
 
 
 # Global scheduler instance

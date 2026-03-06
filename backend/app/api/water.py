@@ -582,14 +582,14 @@ async def get_zone_trend(
 async def get_zone_vs_building(
     request: Request,
     zone_id: str,
-    building_id: str = Query(..., description="Building/site identifier"),
+    site_id: str = Query(..., description="Building/site identifier"),
     days: int = Query(30, ge=1, le=365, description="Analysis period in days"),
 ):
     """Compare zone consumption to building average.
 
     Args:
         zone_id: Zone identifier
-        building_id: Building/site identifier
+        site_id: Building/site identifier
         days: Analysis period
 
     Returns:
@@ -599,7 +599,7 @@ async def get_zone_vs_building(
         from app.services.water_aggregation_service import get_water_aggregation_service
 
         agg_svc = get_water_aggregation_service()
-        result = agg_svc.zone_vs_building_average(zone_id, building_id, days=days)
+        result = agg_svc.zone_vs_building_average(zone_id, site_id, days=days)
 
         return result
 

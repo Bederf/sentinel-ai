@@ -320,12 +320,12 @@ class ContractManagementService:
             return None
 
     def get_contracts(
-        self, building_id: Optional[str] = None, organization_id: Optional[str] = None, status: Optional[str] = None
+        self, site_id: Optional[str] = None, organization_id: Optional[str] = None, status: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """List contracts with optional filters."""
         self._ensure_repos()
         return self._contract_repo.get_all(
-            building_id=building_id,
+            site_id=site_id,
             organization_id=organization_id,
             status=status,
         )

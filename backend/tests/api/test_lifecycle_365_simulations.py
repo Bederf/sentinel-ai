@@ -156,7 +156,7 @@ def mock_supabase_for_lifecycle():
     mock_orchestrator.pending_repairs = {}
     mock_orchestrator.speed_multiplier = 60.0
     mock_orchestrator.seconds_per_simulated_hour = 60.0
-    mock_orchestrator.building_schedule = None
+    mock_orchestrator.site_schedule = None
     mock_orchestrator._get_sentinel_status = lambda: {"tier1_auto": 0, "tier2_logged": 0, "tier3_escalated": 0}
 
     mock_scenario = Mock()

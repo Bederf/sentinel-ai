@@ -27,8 +27,8 @@ export function PasswordModal({
   isOpen,
   onClose,
   onSuccess,
-  title = "Enter Admin Password",
-  description = "This section requires administrator access to modify.",
+  title = "Enter Admin PIN",
+  description = "Enter the admin PIN to unlock sensitive settings.",
 }: PasswordModalProps) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -52,7 +52,7 @@ export function PasswordModal({
   // Handle password submission - validates server-side (Phase 137-02)
   const handleSubmit = useCallback(async () => {
     if (!password.trim()) {
-      setError("Please enter a password");
+      setError("Please enter a PIN");
       return;
     }
 
@@ -71,7 +71,7 @@ export function PasswordModal({
     } catch (err: unknown) {
       const apiErr = err as { status?: number; message?: string };
       if (apiErr.status === 403) {
-        setError("Incorrect password. Please try again.");
+        setError("Incorrect PIN. Please try again.");
       } else if (apiErr.status === 429) {
         setError("Too many attempts. Please wait and try again.");
       } else {
@@ -201,7 +201,7 @@ export function PasswordModal({
               className="block text-sm font-medium mb-2"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
-              Password
+              Admin PIN
             </label>
             <div className="relative">
               <input
@@ -209,7 +209,7 @@ export function PasswordModal({
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter admin password"
+                placeholder="Enter admin PIN"
                 disabled={isValidating}
                 className="w-full px-3 py-2 pr-10 rounded text-sm"
                 style={{

@@ -679,3 +679,6 @@ flowchart TB
 - [Inspection API](../03-api-reference/inspection.md) - Inspection workflows and priority scoring
 - [Dashboard Generator API](../03-api-reference/dashboard-generator-api.md) - Auto-dashboard generation from discovered equipment
 - [Auto-Dashboard Generator](../04-features/141-auto-dashboard-generator.md) - Equipment classification, card templates, monitoring rules
+- [Brick Ontology Layer](brick-ontology-layer.md) - Semantic building model for equipment/point/location relationships
+- [Hybrid Knowledge Layer](hybrid-knowledge-layer.md) - Context assembly combining RAG + asset graph + telemetry
+- [Drive Intake Pipeline](../05-integrations/drive-intake-pipeline.md) - MRI Evolution document ingestion via Google Drive

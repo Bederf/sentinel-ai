@@ -1080,7 +1080,7 @@ class DashboardGenerator:
             from app.database.repositories.equipment_repository import get_equipment_repository
 
             repo = get_equipment_repository()
-            equipment = repo.get_by_building_code(site_id)
+            equipment = repo.get_by_site_code(site_id)
             if equipment:
                 logger.debug("Loaded %d equipment from repository for %s", len(equipment), site_id)
                 return equipment
@@ -1092,7 +1092,7 @@ class DashboardGenerator:
             from pathlib import Path
             import json
 
-            equipment_dir = Path(__file__).parent.parent / "data" / "buildings" / site_id / "equipment"
+            equipment_dir = Path(__file__).parent.parent / "data" / "sites" / site_id / "equipment"
             if equipment_dir.is_dir():
                 equipment = []
                 for json_file in sorted(equipment_dir.glob("*.json")):

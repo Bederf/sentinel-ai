@@ -5,10 +5,10 @@ Onboarding & Configuration MCP Tools
 1. list_managed_buildings - List buildings in system
 2. create_building - Create new building
 3. activate_building - Mark building as active
-4. get_building_config - Get building configuration
-5. add_building_zones - Add thermal/security zones
+4. get_site_config - Get building configuration
+5. add_site_zones - Add thermal/security zones
 6. add_building_desks - Register desk locations
-7. add_building_devices - Register BMS devices
+7. add_site_devices - Register BMS devices
 8. import_point_list - Import device points from file
 9. import_controller_list - Import BACnet/Modbus controllers
 

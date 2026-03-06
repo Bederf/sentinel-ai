@@ -527,7 +527,7 @@ async def test_monitoring_includes_quality_gate():
     snapshot = MonitoringSnapshot(
         ingestion_mode="simulation",
         is_live=False,
-        building_id="S002",
+        site_id="S002",
         ingestion=IngestionKPIs(
             freshness_hours=1.0,
             error_rate=0.0,

@@ -56,9 +56,9 @@ information in the system" — do NOT guess or fabricate.
 - Report numbers EXACTLY as provided — do not round, estimate, or adjust."""
 
 
-def _build_openai_system_prompt(include_building_context: bool = True) -> str:
+def _build_openai_system_prompt(include_site_context: bool = True) -> str:
     """Build an OpenAI-compatible system prompt with building context."""
-    if not include_building_context:
+    if not include_site_context:
         return OPENAI_SYSTEM_PROMPT_BASE
 
     try:
@@ -155,21 +155,22 @@ class OpenAIService:
         self,
         messages: list[dict],
         system_prompt: str | None = None,
-        include_building_context: bool = True,
+        include_site_context: bool = True,
         tier: int = 1,
+        model_override: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Return a chat completion from OpenAI as a single yielded chunk.
 
         Args:
             messages: Conversation messages.
             system_prompt: Optional override for system prompt.
-            include_building_context: Include BMS data in system prompt.
+            include_site_context: Include BMS data in system prompt.
             tier: Routing tier (1=nano, 2=mini).
         """
         if not self._api_key:
             raise ValueError("OPENAI_API_KEY not configured. Set it in .env or environment variables.")
 
-        system = system_prompt or _build_openai_system_prompt(include_building_context)
+        system = system_prompt or _build_openai_system_prompt(include_site_context)
         model = self.get_model_for_tier(tier)
 
         openai_messages = [{"role": "system", "content": system}]
@@ -221,7 +222,7 @@ class OpenAIService:
         tools: list[dict] | None = None,
         tool_executor: Any = None,
         system_prompt: str | None = None,
-        include_building_context: bool = True,
+        include_site_context: bool = True,
         tier: int = 2,
     ) -> AsyncGenerator[str, None]:
         """Chat completion with iterative tool calling.
@@ -233,13 +234,13 @@ class OpenAIService:
             tools: Anthropic-format tool definitions (auto-converted to OpenAI format).
             tool_executor: Async callable(name, args) -> result.
             system_prompt: Optional override.
-            include_building_context: Include BMS data in prompt.
+            include_site_context: Include BMS data in prompt.
             tier: Routing tier (uses heavy model for tool calls).
         """
         if not self._api_key:
             raise ValueError("OPENAI_API_KEY not configured.")
 
-        system = system_prompt or _build_openai_system_prompt(include_building_context)
+        system = system_prompt or _build_openai_system_prompt(include_site_context)
         model = self.get_model_for_tier(tier)
 
         openai_messages = [{"role": "system", "content": system}]

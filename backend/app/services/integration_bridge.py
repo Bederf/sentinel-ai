@@ -41,10 +41,10 @@ def bridge_discovery_to_integration(
     repo = IntegrationRepository()
     mapping_service = get_mapping_service()
 
-    # Get building_id from site_id (e.g., site-002 -> UUID)
-    building_id = _resolve_building_id(site_id)
-    if not building_id:
-        logger.warning("Could not resolve building_id for site %s", site_id)
+    # Get site_id from site_id (e.g., site-002 -> UUID)
+    site_id = _resolve_site_id(site_id)
+    if not site_id:
+        logger.warning("Could not resolve site_id for site %s", site_id)
         return {"success": False, "error": "Building not found"}
 
     # Load discovery mappings
@@ -68,7 +68,7 @@ def bridge_discovery_to_integration(
     try:
         log_source = repo.create_log_source(
             {
-                "building_id": building_id,
+                "site_id": site_id,
                 "name": vendor_names.get(bms_vendor.lower(), f"{bms_vendor.title()} BMS"),
                 "source_type": "bms_trend",
                 "connection_type": "api",
@@ -132,7 +132,7 @@ def bridge_discovery_to_integration(
 
             point_mappings.append(
                 {
-                    "building_id": building_id,
+                    "site_id": site_id,
                     "bms_point_id": point.get("original_name", point.get("name", "")),
                     "extracted_asset_id": equipment_name,
                     "cafm_asset_id": equipment_id,
@@ -146,7 +146,7 @@ def bridge_discovery_to_integration(
     points_mapped = 0
     if point_mappings:
         try:
-            points_mapped = repo.bulk_upsert_point_mappings(building_id, point_mappings)
+            points_mapped = repo.bulk_upsert_point_mappings(site_id, point_mappings)
         except Exception as e:
             logger.warning("Failed to create point mappings: %s", e)
             # Continue - we've at least created the log source
@@ -170,7 +170,7 @@ def bridge_discovery_to_integration(
     }
 
 
-def _resolve_building_id(site_id: str) -> Optional[str]:
+def _resolve_site_id(site_id: str) -> Optional[str]:
     """Resolve site_id (e.g., site-002) to building UUID.
 
     Args:
@@ -180,14 +180,14 @@ def _resolve_building_id(site_id: str) -> Optional[str]:
         Building UUID or None if not found
     """
     try:
-        from app.database.repositories.building_repository import BuildingRepository
+        from app.database.repositories.site_repository import SiteRepository
 
-        repo = BuildingRepository()
+        repo = SiteRepository()
         # get_by_id uses the 'code' field to look up
         building = repo.get_by_id(site_id)
         return building.get("id") if building else None
     except Exception as e:
-        logger.warning("Failed to resolve building_id for %s: %s", site_id, e)
+        logger.warning("Failed to resolve site_id for %s: %s", site_id, e)
         return None
 
 

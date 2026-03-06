@@ -15,15 +15,15 @@ class IntegrationRepository:
 
     def get_log_sources(
         self,
-        building_id: Optional[str] = None,
+        site_id: Optional[str] = None,
         source_type: Optional[str] = None,
         is_active: Optional[bool] = None,
     ) -> List[Dict[str, Any]]:
         """Get log sources with optional filtering."""
         query = self.client.table("log_sources").select("*")
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
         if source_type:
             query = query.eq("source_type", source_type)
         if is_active is not None:
@@ -104,12 +104,12 @@ class IntegrationRepository:
 
     def get_point_mappings(
         self,
-        building_id: str,
+        site_id: str,
         confidence: Optional[str] = None,
         verified_only: bool = False,
     ) -> List[Dict[str, Any]]:
         """Get point-to-asset mappings for a building."""
-        query = self.client.table("point_asset_mappings").select("*").eq("building_id", building_id)
+        query = self.client.table("point_asset_mappings").select("*").eq("site_id", site_id)
 
         if confidence:
             query = query.eq("match_confidence", confidence)
@@ -121,7 +121,7 @@ class IntegrationRepository:
 
     def get_all_point_mappings(
         self,
-        building_id: Optional[str] = None,
+        site_id: Optional[str] = None,
         confidence: Optional[str] = None,
         verified_only: bool = False,
         limit: int = 100,
@@ -133,8 +133,8 @@ class IntegrationRepository:
         """
         query = self.client.table("point_asset_mappings").select("*", count="exact")
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
         if confidence:
             query = query.eq("match_confidence", confidence)
         if verified_only:
@@ -148,36 +148,34 @@ class IntegrationRepository:
             "total": response.count or len(response.data),
         }
 
-    def get_point_mapping(self, building_id: str, point_id: str) -> Optional[Dict[str, Any]]:
+    def get_point_mapping(self, site_id: str, point_id: str) -> Optional[Dict[str, Any]]:
         """Get mapping for a specific point."""
         response = (
             self.client.table("point_asset_mappings")
             .select("*")
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .eq("bms_point_id", point_id)
             .execute()
         )
         return response.data[0] if response.data else None
 
-    def upsert_point_mapping(self, building_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    def upsert_point_mapping(self, site_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create or update point mapping."""
-        data["building_id"] = building_id
-        response = (
-            self.client.table("point_asset_mappings").upsert(data, on_conflict="building_id,bms_point_id").execute()
-        )
+        data["site_id"] = site_id
+        response = self.client.table("point_asset_mappings").upsert(data, on_conflict="site_id,bms_point_id").execute()
         return response.data[0]
 
     def bulk_upsert_point_mappings(
         self,
-        building_id: str,
+        site_id: str,
         mappings: List[Dict[str, Any]],
     ) -> int:
         """Bulk upsert point mappings."""
         for m in mappings:
-            m["building_id"] = building_id
+            m["site_id"] = site_id
 
         response = (
-            self.client.table("point_asset_mappings").upsert(mappings, on_conflict="building_id,bms_point_id").execute()
+            self.client.table("point_asset_mappings").upsert(mappings, on_conflict="site_id,bms_point_id").execute()
         )
         return len(response.data)
 
@@ -199,7 +197,7 @@ class IntegrationRepository:
 
     def get_unmatched_points(
         self,
-        building_id: Optional[str] = None,
+        site_id: Optional[str] = None,
         limit: int = 10,
         offset: int = 0,
     ) -> Dict[str, Any]:
@@ -215,8 +213,8 @@ class IntegrationRepository:
                 .eq("match_confidence", "unmatched")
             )
 
-            if building_id:
-                query = query.eq("building_id", building_id)
+            if site_id:
+                query = query.eq("site_id", site_id)
 
             query = query.range(offset, offset + limit - 1).order("created_at", desc=True)
             response = query.execute()
@@ -267,12 +265,12 @@ class IntegrationRepository:
 
     def get_recent_alarms(
         self,
-        building_id: str,
+        site_id: str,
         limit: int = 100,
         severity: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Get recent alarms for a building."""
-        query = self.client.table("ingested_alarms").select("*").eq("building_id", building_id)
+        query = self.client.table("ingested_alarms").select("*").eq("site_id", site_id)
 
         if severity:
             query = query.eq("severity", severity)
@@ -342,24 +340,22 @@ class IntegrationRepository:
 
     def upsert_cafm_assets(
         self,
-        building_id: str,
+        site_id: str,
         source_id: str,
         assets: List[Dict[str, Any]],
     ) -> int:
         """Upsert synced CAFM assets."""
         for a in assets:
-            a["building_id"] = building_id
+            a["site_id"] = site_id
             a["log_source_id"] = source_id
             a["last_synced_at"] = datetime.utcnow().isoformat()
 
-        response = self.client.table("cafm_assets").upsert(assets, on_conflict="building_id,cafm_id").execute()
+        response = self.client.table("cafm_assets").upsert(assets, on_conflict="site_id,cafm_id").execute()
         return len(response.data)
 
-    def get_cafm_assets(self, building_id: str) -> List[Dict[str, Any]]:
+    def get_cafm_assets(self, site_id: str) -> List[Dict[str, Any]]:
         """Get CAFM assets for a building."""
-        response = (
-            self.client.table("cafm_assets").select("*").eq("building_id", building_id).order("asset_tag").execute()
-        )
+        response = self.client.table("cafm_assets").select("*").eq("site_id", site_id).order("asset_tag").execute()
         return response.data
 
     # ==================== Reference Data ====================
@@ -381,7 +377,7 @@ class IntegrationRepository:
 
     # ==================== Monitoring Aggregations ====================
 
-    def get_integration_health(self, building_id: Optional[str] = None) -> Dict[str, Any]:
+    def get_integration_health(self, site_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Get integration health summary.
 
@@ -397,8 +393,8 @@ class IntegrationRepository:
         try:
             # Get log sources
             sources_query = self.client.table("log_sources").select("*")
-            if building_id:
-                sources_query = sources_query.eq("building_id", building_id)
+            if site_id:
+                sources_query = sources_query.eq("site_id", site_id)
             sources_response = sources_query.execute()
             sources = sources_response.data or []
         except Exception:
@@ -430,8 +426,8 @@ class IntegrationRepository:
         # Get point mappings count
         try:
             mappings_query = self.client.table("point_asset_mappings").select("id,match_confidence")
-            if building_id:
-                mappings_query = mappings_query.eq("building_id", building_id)
+            if site_id:
+                mappings_query = mappings_query.eq("site_id", site_id)
             mappings_response = mappings_query.execute()
             mappings = mappings_response.data or []
         except Exception:
@@ -447,8 +443,8 @@ class IntegrationRepository:
             failed_jobs_query = (
                 self.client.table("sync_jobs").select("id").eq("status", "failed").gte("started_at", cutoff)
             )
-            if building_id:
-                # Need to filter by log_source building_id via join or subquery
+            if site_id:
+                # Need to filter by log_source site_id via join or subquery
                 # For simplicity, filter sources first then get job IDs
                 source_ids = [s["id"] for s in sources]
                 if source_ids:
@@ -473,7 +469,7 @@ class IntegrationRepository:
             "recent_errors_count": recent_errors_count,
         }
 
-    def get_quality_metrics(self, building_id: str) -> Dict[str, Any]:
+    def get_quality_metrics(self, site_id: str) -> Dict[str, Any]:
         """
         Get data quality metrics for a building.
 
@@ -498,10 +494,7 @@ class IntegrationRepository:
         try:
             # Get point mappings for match coverage
             mappings_response = (
-                self.client.table("point_asset_mappings")
-                .select("id,match_confidence")
-                .eq("building_id", building_id)
-                .execute()
+                self.client.table("point_asset_mappings").select("id,match_confidence").eq("site_id", site_id).execute()
             )
             mappings = mappings_response.data or []
         except Exception:
@@ -513,9 +506,7 @@ class IntegrationRepository:
 
         # Get data freshness from log sources
         try:
-            sources_response = (
-                self.client.table("log_sources").select("last_sync_at").eq("building_id", building_id).execute()
-            )
+            sources_response = self.client.table("log_sources").select("last_sync_at").eq("site_id", site_id).execute()
             sources = sources_response.data or []
         except Exception:
             sources = []
@@ -547,7 +538,7 @@ class IntegrationRepository:
             cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
 
             # Get source IDs for this building
-            source_ids_response = self.client.table("log_sources").select("id").eq("building_id", building_id).execute()
+            source_ids_response = self.client.table("log_sources").select("id").eq("site_id", site_id).execute()
             source_ids = [s["id"] for s in (source_ids_response.data or [])]
 
             if source_ids:
@@ -599,7 +590,7 @@ class IntegrationRepository:
 
     def get_sync_jobs_summary(
         self,
-        building_id: Optional[str] = None,
+        site_id: Optional[str] = None,
         days: int = 7,
     ) -> List[Dict[str, Any]]:
         """
@@ -612,12 +603,10 @@ class IntegrationRepository:
         try:
             cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
 
-            # If building_id specified, get source IDs first
+            # If site_id specified, get source IDs first
             source_ids = None
-            if building_id:
-                sources_response = (
-                    self.client.table("log_sources").select("id").eq("building_id", building_id).execute()
-                )
+            if site_id:
+                sources_response = self.client.table("log_sources").select("id").eq("site_id", site_id).execute()
                 source_ids = [s["id"] for s in (sources_response.data or [])]
                 if not source_ids:
                     return []
@@ -643,30 +632,30 @@ class IntegrationRepository:
     # ==================== Building Status / Go-Live Workflow ====================
 
     # In-memory storage for building status (MVP - no new migration needed)
-    _building_status_store: Dict[str, Dict[str, Any]] = {}
+    _site_status_store: Dict[str, Dict[str, Any]] = {}
 
-    def get_building_status(self, building_id: str) -> Optional[Dict[str, Any]]:
+    def get_site_status(self, site_id: str) -> Optional[Dict[str, Any]]:
         """Get building status record."""
-        return self._building_status_store.get(building_id)
+        return self._site_status_store.get(site_id)
 
-    def update_building_status(
+    def update_site_status(
         self,
-        building_id: str,
+        site_id: str,
         status: str,
         notes: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update building status (upsert)."""
         record = {
-            "building_id": building_id,
+            "site_id": site_id,
             "status": status,
             "last_validated_at": datetime.utcnow().isoformat(),
             "notes": notes,
             "updated_at": datetime.utcnow().isoformat(),
         }
-        self._building_status_store[building_id] = record
+        self._site_status_store[site_id] = record
         return record
 
-    def get_validation_checklist(self, building_id: str) -> Dict[str, Any]:
+    def get_validation_checklist(self, site_id: str) -> Dict[str, Any]:
         """
         Run all validation checks and return a checklist.
 
@@ -683,7 +672,7 @@ class IntegrationRepository:
 
         # Check 1: data_source_configured
         try:
-            sources = self.get_log_sources(building_id=building_id)
+            sources = self.get_log_sources(site_id=site_id)
         except Exception:
             sources = []
 
@@ -760,7 +749,7 @@ class IntegrationRepository:
         # ==================== Point Mapping Checks ====================
 
         try:
-            mappings = self.get_point_mappings(building_id)
+            mappings = self.get_point_mappings(site_id)
         except Exception:
             mappings = []
 
@@ -822,7 +811,7 @@ class IntegrationRepository:
 
         # ==================== Data Quality Checks ====================
 
-        quality_metrics = self.get_quality_metrics(building_id)
+        quality_metrics = self.get_quality_metrics(site_id)
 
         # Check 7: error_rate
         error_rate = quality_metrics.get("error_rate", 0)

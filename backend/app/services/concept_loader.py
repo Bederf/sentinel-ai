@@ -31,8 +31,8 @@ class ConceptJobCard:
     target_date: Optional[datetime]
     completed_date: Optional[datetime]
     sla_met: bool
-    building_code: str
-    building_name: str
+    site_code: str
+    site_name: str
     location_code: str
     location_desc: str
     asset_code: str
@@ -98,8 +98,8 @@ class ConceptAsset:
     manufacturer: str
     model: str
     serial_no: str
-    building_code: str
-    building_name: str
+    site_code: str
+    site_name: str
     location_code: str
     location_desc: str
     install_date: Optional[datetime]
@@ -214,8 +214,8 @@ class ConceptDataLoader:
                         target_date=parse_datetime(row.get("TargetDate", "")),
                         completed_date=parse_datetime(row.get("CompletedDate", "")),
                         sla_met=parse_bool(row.get("SLAMet", "N")),
-                        building_code=row.get("BuildingCode", ""),
-                        building_name=row.get("BuildingName", ""),
+                        site_code=row.get("BuildingCode", ""),
+                        site_name=row.get("BuildingName", ""),
                         location_code=row.get("LocationCode", ""),
                         location_desc=row.get("LocationDesc", ""),
                         asset_code=row.get("AssetCode", ""),
@@ -269,8 +269,8 @@ class ConceptDataLoader:
                         manufacturer=row.get("Manufacturer", ""),
                         model=row.get("Model", ""),
                         serial_no=row.get("SerialNo", ""),
-                        building_code=row.get("BuildingCode", ""),
-                        building_name=row.get("BuildingName", ""),
+                        site_code=row.get("BuildingCode", ""),
+                        site_name=row.get("BuildingName", ""),
                         location_code=row.get("LocationCode", ""),
                         location_desc=row.get("LocationDesc", ""),
                         install_date=parse_datetime(row.get("InstallDate", "")),
@@ -451,9 +451,9 @@ class ConceptDataLoader:
 
         return sorted(at_risk, key=lambda x: x.get("health_score", 100))
 
-    def get_building_summary(self, building_code: str) -> dict:
+    def get_site_summary(self, site_code: str) -> dict:
         """Get health summary for all assets in a building."""
-        building_assets = [a for a in self.assets if a.building_code == building_code]
+        building_assets = [a for a in self.assets if a.site_code == site_code]
 
         if not building_assets:
             return {"error": "Building not found"}
@@ -469,8 +469,8 @@ class ConceptDataLoader:
                 critical_assets.append(health)
 
         return {
-            "building_code": building_code,
-            "building_name": building_assets[0].building_name,
+            "site_code": site_code,
+            "site_name": building_assets[0].site_name,
             "total_assets": len(building_assets),
             "average_health": sum(health_scores) // len(health_scores) if health_scores else 0,
             "critical_assets": len(critical_assets),

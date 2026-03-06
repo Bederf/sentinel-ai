@@ -14,41 +14,41 @@ class HVACZoneRepository:
         """Initialize the repository with a Supabase client."""
         self.client = get_supabase_client()
 
-    def get_all(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_all(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all HVAC zones with optional building filter.
 
         Args:
-            building_id: Filter by building UUID
+            site_id: Filter by building UUID
 
         Returns:
             List of HVAC zones
         """
         query = self.client.table("hvac_zones").select("*")
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
 
         response = query.execute()
         return response.data
 
-    def get_by_building_code(self, building_code: str) -> List[Dict[str, Any]]:
+    def get_by_site_code(self, site_code: str) -> List[Dict[str, Any]]:
         """Get HVAC zones by building code.
 
         Args:
-            building_code: Building code (e.g., 'sandton')
+            site_code: Building code (e.g., 'sandton')
 
         Returns:
             List of HVAC zones
         """
         # First get the building UUID
-        building_response = self.client.table("buildings").select("id").eq("code", building_code).execute()
+        site_response = self.client.table("sites").select("id").eq("code", site_code).execute()
 
-        if not building_response.data:
+        if not site_response.data:
             return []
 
-        building_uuid = building_response.data[0]["id"]
+        site_uuid = site_response.data[0]["id"]
 
-        response = self.client.table("hvac_zones").select("*").eq("building_id", building_uuid).execute()
+        response = self.client.table("hvac_zones").select("*").eq("site_id", site_uuid).execute()
 
         return response.data
 
@@ -82,16 +82,16 @@ class HVACZoneRepository:
             return response.data[0]
         return None
 
-    def get_building_uuid(self, building_code: str) -> Optional[str]:
+    def get_site_uuid(self, site_code: str) -> Optional[str]:
         """Get building UUID from building code.
 
         Args:
-            building_code: Building code (e.g., 'sandton')
+            site_code: Building code (e.g., 'sandton')
 
         Returns:
             Building UUID or None
         """
-        response = self.client.table("buildings").select("id").eq("code", building_code).execute()
+        response = self.client.table("sites").select("id").eq("code", site_code).execute()
 
         if response.data:
             return response.data[0]["id"]
@@ -165,20 +165,20 @@ class HVACZoneRepository:
 
         return len(response.data) > 0
 
-    def delete_by_building(self, building_code: str) -> int:
+    def delete_by_site(self, site_code: str) -> int:
         """Delete all HVAC zones for a building.
 
         Args:
-            building_code: Building code
+            site_code: Building code
 
         Returns:
             Number of zones deleted
         """
-        building_uuid = self.get_building_uuid(building_code)
-        if not building_uuid:
+        site_uuid = self.get_site_uuid(site_code)
+        if not site_uuid:
             return 0
 
-        response = self.client.table("hvac_zones").delete().eq("building_id", building_uuid).execute()
+        response = self.client.table("hvac_zones").delete().eq("site_id", site_uuid).execute()
 
         return len(response.data)
 

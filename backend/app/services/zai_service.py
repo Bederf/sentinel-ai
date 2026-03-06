@@ -51,14 +51,14 @@ information in the system" — do NOT guess or fabricate.
   You do NOT have tools. Answer directly from the context data below."""
 
 
-def _build_zai_system_prompt(include_building_context: bool = True) -> str:
+def _build_zai_system_prompt(include_site_context: bool = True) -> str:
     """Build a Z.ai-compatible system prompt with building context.
 
     Takes the full context from build_system_prompt_with_context() but replaces
     the Claude-specific FM_SYSTEM_PROMPT_BASE (which contains tool instructions)
     with ZAI_SYSTEM_PROMPT_BASE (which tells the model to answer directly).
     """
-    if not include_building_context:
+    if not include_site_context:
         return ZAI_SYSTEM_PROMPT_BASE
 
     try:
@@ -125,7 +125,8 @@ class ZAIService:
         self,
         messages: list[dict],
         system_prompt: str | None = None,
-        include_building_context: bool = True,
+        include_site_context: bool = True,
+        model_override: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Return a completion from Z.ai as a single streamed chunk."""
         if not self._api_key:
@@ -134,7 +135,7 @@ class ZAIService:
         if system_prompt:
             system = system_prompt
         else:
-            system = _build_zai_system_prompt(include_building_context)
+            system = _build_zai_system_prompt(include_site_context)
 
         openai_messages = [{"role": "system", "content": system}]
         openai_messages.extend(messages)

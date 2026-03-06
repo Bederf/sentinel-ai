@@ -65,12 +65,12 @@ class TestColumnSelection:
         assert "device_info" in EquipmentRepository._DETAIL_COLUMNS
 
     def test_building_has_columns(self):
-        """BuildingRepository defines _COLUMNS."""
-        from app.database.repositories.building_repository import BuildingRepository
+        """SiteRepository defines _COLUMNS."""
+        from app.database.repositories.site_repository import SiteRepository
 
-        assert hasattr(BuildingRepository, "_COLUMNS")
-        assert "id" in BuildingRepository._COLUMNS
-        assert "code" in BuildingRepository._COLUMNS
+        assert hasattr(SiteRepository, "_COLUMNS")
+        assert "id" in SiteRepository._COLUMNS
+        assert "code" in SiteRepository._COLUMNS
 
     def test_alert_has_columns(self):
         """AlertRepository defines _COLUMNS."""
@@ -113,22 +113,22 @@ class TestBuildingCache:
     @pytest.fixture
     def mock_supabase(self):
         """Mock Supabase client."""
-        with patch("app.database.repositories.building_repository.get_supabase_client") as mock:
+        with patch("app.database.repositories.site_repository.get_supabase_client") as mock:
             client = MagicMock()
             mock.return_value = client
             yield client
 
     def test_get_by_id_caches_result(self, mock_supabase):
         """get_by_id stores result in cache on miss."""
-        from app.database.repositories.building_repository import BuildingRepository
+        from app.database.repositories.site_repository import SiteRepository
 
         mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
             data=[{"id": "uuid-1", "code": "site-002", "name": "Test"}]
         )
 
-        with patch("app.database.repositories.building_repository.cache") as mock_cache:
+        with patch("app.database.repositories.site_repository.cache") as mock_cache:
             mock_cache.get.return_value = None  # cache miss
-            repo = BuildingRepository()
+            repo = SiteRepository()
             result = repo.get_by_id("site-002")
 
             assert result["code"] == "site-002"
@@ -136,11 +136,11 @@ class TestBuildingCache:
 
     def test_get_by_id_returns_cached(self, mock_supabase):
         """get_by_id returns cached value without DB call."""
-        from app.database.repositories.building_repository import BuildingRepository
+        from app.database.repositories.site_repository import SiteRepository
 
-        with patch("app.database.repositories.building_repository.cache") as mock_cache:
+        with patch("app.database.repositories.site_repository.cache") as mock_cache:
             mock_cache.get.return_value = {"id": "uuid-1", "code": "site-002"}
-            repo = BuildingRepository()
+            repo = SiteRepository()
             result = repo.get_by_id("site-002")
 
             assert result["code"] == "site-002"
@@ -159,8 +159,8 @@ class TestEquipmentCache:
             mock.return_value = client
             yield client
 
-    def test_get_all_by_building_caches(self, mock_supabase):
-        """get_all(building_id=...) caches result."""
+    def test_get_all_by_site_caches(self, mock_supabase):
+        """get_all(site_id=...) caches result."""
         from app.database.repositories.equipment_repository import EquipmentRepository
 
         mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
@@ -170,7 +170,7 @@ class TestEquipmentCache:
         with patch("app.database.repositories.equipment_repository.cache") as mock_cache:
             mock_cache.get.return_value = None
             repo = EquipmentRepository()
-            result = repo.get_all(building_id="uuid-1")
+            result = repo.get_all(site_id="uuid-1")
 
             assert len(result) == 1
             mock_cache.set.assert_called_once()
@@ -194,10 +194,10 @@ class TestCacheInvalidation:
     def test_building_create_invalidates(self):
         """Building create() calls CacheInvalidation."""
         with (
-            patch("app.database.repositories.building_repository.get_supabase_client") as mock_sb,
-            patch("app.database.repositories.building_repository.CacheInvalidation") as mock_inv,
+            patch("app.database.repositories.site_repository.get_supabase_client") as mock_sb,
+            patch("app.database.repositories.site_repository.CacheInvalidation") as mock_inv,
         ):
-            from app.database.repositories.building_repository import BuildingRepository
+            from app.database.repositories.site_repository import SiteRepository
 
             client = MagicMock()
             mock_sb.return_value = client
@@ -205,7 +205,7 @@ class TestCacheInvalidation:
                 data=[{"id": "new-uuid", "code": "site-new"}]
             )
 
-            repo = BuildingRepository()
+            repo = SiteRepository()
             repo.create({"code": "site-new", "name": "New"})
             mock_inv.on_building_change.assert_called_once()
 
@@ -220,9 +220,9 @@ class TestCacheInvalidation:
             client = MagicMock()
             mock_sb.return_value = client
             client.table.return_value.insert.return_value.execute.return_value = MagicMock(
-                data=[{"id": "alert-1", "building_id": "bld-1"}]
+                data=[{"id": "alert-1", "site_id": "bld-1"}]
             )
 
             repo = AlertRepository()
-            repo.create({"title": "Test", "building_id": "bld-1"})
-            mock_inv.on_alert_change.assert_called_once_with(building_id="bld-1")
+            repo.create({"title": "Test", "site_id": "bld-1"})
+            mock_inv.on_alert_change.assert_called_once_with(site_id="bld-1")

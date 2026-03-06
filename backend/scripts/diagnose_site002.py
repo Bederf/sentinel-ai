@@ -21,7 +21,7 @@ def check_building(client):
     print("=" * 60)
 
     try:
-        result = client.table("buildings").select("*").eq("code", "site-002").execute()
+        result = client.table("sites").select("*").eq("code", "site-002").execute()
 
         if result.data:
             building = result.data[0]
@@ -42,7 +42,7 @@ def check_building(client):
         return None
 
 
-def check_equipment(client, building_id):
+def check_equipment(client, site_id):
     """Check equipment records for site-002."""
     print("\n" + "=" * 60)
     print("2️⃣  EQUIPMENT CHECK")
@@ -50,10 +50,7 @@ def check_equipment(client, building_id):
 
     try:
         result = (
-            client.table("equipment")
-            .select("code, name, type, status, health_score")
-            .eq("building_id", building_id)
-            .execute()
+            client.table("equipment").select("code, name, type, status, health_score").eq("site_id", site_id).execute()
         )
 
         count = len(result.data) if result.data else 0
@@ -86,16 +83,14 @@ def check_equipment(client, building_id):
         return 0
 
 
-def check_zones(client, building_id):
+def check_zones(client, site_id):
     """Check zones for site-002."""
     print("\n" + "=" * 60)
     print("3️⃣  ZONES CHECK")
     print("=" * 60)
 
     try:
-        result = (
-            client.table("zones").select("zone_id, floor, zone_type, area_sqm").eq("building_id", building_id).execute()
-        )
+        result = client.table("zones").select("zone_id, floor, zone_type, area_sqm").eq("site_id", site_id).execute()
 
         count = len(result.data) if result.data else 0
         print(f"Zone records found: {count}")
@@ -117,14 +112,14 @@ def check_zones(client, building_id):
         return 0
 
 
-def check_desks(client, building_id):
+def check_desks(client, site_id):
     """Check desks for site-002."""
     print("\n" + "=" * 60)
     print("4️⃣  DESKS CHECK")
     print("=" * 60)
 
     try:
-        result = client.table("desks").select("desk_id, floor, zone_id").eq("building_id", building_id).execute()
+        result = client.table("desks").select("desk_id, floor, zone_id").eq("site_id", site_id).execute()
 
         count = len(result.data) if result.data else 0
         print(f"Desk records found: {count}")
@@ -146,7 +141,7 @@ def check_desks(client, building_id):
         return 0
 
 
-def check_technicians(client, building_id):
+def check_technicians(client, site_id):
     """Check technician assignments for site-002."""
     print("\n" + "=" * 60)
     print("5️⃣  TECHNICIANS CHECK")
@@ -157,7 +152,7 @@ def check_technicians(client, building_id):
         result = (
             client.table("site_technicians")
             .select("id, technician_id, specialty, is_primary")
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .execute()
         )
 
@@ -225,13 +220,13 @@ def main():
         return False
 
     # Run checks
-    building_id = check_building(client)
+    site_id = check_building(client)
 
-    if building_id:
-        eq_count = check_equipment(client, building_id)
-        zone_count = check_zones(client, building_id)
-        desk_count = check_desks(client, building_id)
-        tech_count = check_technicians(client, building_id)
+    if site_id:
+        eq_count = check_equipment(client, site_id)
+        zone_count = check_zones(client, site_id)
+        desk_count = check_desks(client, site_id)
+        tech_count = check_technicians(client, site_id)
     else:
         print("\n⚠️  Skipping equipment/zone/desk checks (building not found)")
         eq_count = zone_count = desk_count = tech_count = 0
@@ -243,8 +238,8 @@ def main():
     print("📊 SUMMARY")
     print("=" * 60)
 
-    if building_id:
-        print(f"✅ Building: EXISTS (ID: {building_id})")
+    if site_id:
+        print(f"✅ Building: EXISTS (ID: {site_id})")
         print(f"{'✅' if eq_count > 0 else '❌'} Equipment: {eq_count} records")
         print(f"{'✅' if zone_count > 0 else '❌'} Zones: {zone_count} records")
         print(f"{'✅' if desk_count > 0 else '❌'} Desks: {desk_count} records")

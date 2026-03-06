@@ -158,7 +158,7 @@ def cli():
         data = {
             "work_order_id": args.wo_id,
             "equipment_id": args.equipment_id,
-            "building_id": args.building_id,
+            "site_id": args.site_id,
             "equipment_name": args.equipment_name,
             "service_type": args.service_type,
             "technician_id": args.technician_id,

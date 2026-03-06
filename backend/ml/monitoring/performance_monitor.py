@@ -21,7 +21,7 @@ class ModelPerformanceMonitor:
     def evaluate_predictions(
         self,
         days_back: int = 7,
-        building_code: str = "site-002",
+        site_code: str = "site-002",
     ) -> Dict[str, Any]:
         """Compare predictions vs actual alerts/faults.
 
@@ -29,7 +29,7 @@ class ModelPerformanceMonitor:
 
         Args:
             days_back: Number of days to look back
-            building_code: Building to evaluate
+            site_code: Building to evaluate
 
         Returns:
             Dict with metrics and details
@@ -45,7 +45,7 @@ class ModelPerformanceMonitor:
             predictions = pred_repo.get_all(status="active") + pred_repo.get_all(status="resolved")
 
             # Get actual alerts from period
-            alerts = alert_repo.get_all(building_code=building_code)
+            alerts = alert_repo.get_all(site_code=site_code)
 
             # Build sets of equipment that had predictions vs actual faults
             predicted_equipment = set()
@@ -79,7 +79,7 @@ class ModelPerformanceMonitor:
             result = {
                 "evaluated_at": datetime.now().isoformat(),
                 "period_days": days_back,
-                "building_code": building_code,
+                "site_code": site_code,
                 "predictions_count": len(predictions),
                 "alerts_count": len(alerts),
                 "metrics": {

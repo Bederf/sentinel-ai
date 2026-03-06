@@ -203,7 +203,7 @@ def _send_telegram_alert(
             "equipment_code": "SENTINEL-SECURITY",
             "equipment_type": "security",
             "equipment_name": "Security Module",
-            "building_name": "SENTINEL",
+            "site_name": "SENTINEL",
             "zone_name": "System",
             "message": (
                 f"Security event: {event_type}\n"

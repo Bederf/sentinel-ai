@@ -204,7 +204,7 @@ class SustainabilityConfig:
 
     site_id: str
     emission_factors: EmissionFactors = field(default_factory=EmissionFactors)
-    building_sqm: float = 4500.0
+    site_sqm: float = 4500.0
     occupancy_capacity: int = 150
     target_reduction_pct: float = 10.0  # Year-on-year reduction target
     monthly_water_kl: float = 45.0  # Estimated monthly water usage
@@ -216,7 +216,7 @@ class SustainabilityConfig:
         return {
             "site_id": self.site_id,
             "emission_factors": self.emission_factors.to_dict(),
-            "building_sqm": self.building_sqm,
+            "site_sqm": self.site_sqm,
             "occupancy_capacity": self.occupancy_capacity,
             "target_reduction_pct": self.target_reduction_pct,
             "monthly_water_kl": self.monthly_water_kl,
@@ -231,7 +231,7 @@ class SustainabilityConfig:
         return cls(
             site_id=data["site_id"],
             emission_factors=EmissionFactors.from_dict(ef_data) if ef_data else EmissionFactors(),
-            building_sqm=data.get("building_sqm", 4500.0),
+            site_sqm=data.get("site_sqm", 4500.0),
             occupancy_capacity=data.get("occupancy_capacity", 150),
             target_reduction_pct=data.get("target_reduction_pct", 10.0),
             monthly_water_kl=data.get("monthly_water_kl", 45.0),
@@ -305,7 +305,7 @@ class DailySustainabilityWrite:
 
     # Metadata
     source: str = "simulation"
-    building_id: Optional[str] = None  # UUID as string for JSON compat
+    site_uuid: Optional[str] = None  # UUID as string for JSON compat
 
     def to_dict(self) -> Dict:
         """Convert to dict for Supabase upsert / JSON write."""
@@ -328,8 +328,8 @@ class DailySustainabilityWrite:
             "scope3_kg_co2": round(self.scope3_kg_co2, 2),
             "source": self.source,
         }
-        if self.building_id:
-            d["building_id"] = self.building_id
+        if self.site_uuid:
+            d["site_uuid"] = self.site_uuid
         return d
 
 
@@ -386,6 +386,6 @@ class DailySustainabilityMetrics(DailySustainabilityWrite):
             scope3_kg_co2=float(data.get("scope3_kg_co2") or 0),
             total_kg_co2=float(data.get("total_kg_co2") or 0),
             source=data.get("source", "simulation"),
-            building_id=data.get("building_id"),
+            site_uuid=data.get("site_uuid"),
             created_at=data.get("created_at"),
         )

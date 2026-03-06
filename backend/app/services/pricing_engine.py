@@ -139,7 +139,7 @@ class PricingEngine:
                 equipment_codes.extend(scenario.add_equipment_codes)
 
             scenario_request = QuoteRequest(
-                building_id=request.building_id,
+                site_id=request.site_id,
                 equipment_codes=equipment_codes,
                 sla_tier=scenario.sla_tier or request.sla_tier,
                 contract_months=request.contract_months,
@@ -281,7 +281,7 @@ class PricingEngine:
 
         # Build quote request for current conditions
         quote_request = QuoteRequest(
-            building_id=contract.get("building_id", ""),
+            site_id=contract.get("site_id", ""),
             equipment_codes=equipment_codes,
             sla_tier=sla_tier,
             contract_months=contract.get("contract_months", 12),
@@ -404,7 +404,7 @@ class PricingEngine:
 
         # Calculate base scenario
         quote_request = QuoteRequest(
-            building_id=contract.get("building_id", ""),
+            site_id=contract.get("site_id", ""),
             equipment_codes=equipment_codes,
             sla_tier=sla_tier,
             contract_months=12,

@@ -271,7 +271,7 @@ class SimulationAnalyzer:
         report = SimulationAnalysisReport(
             run_id=run_id,
             scenario=run.scenario,
-            building_code=run.building_code,
+            site_code=run.site_code,
             analyzed_at=datetime.now().isoformat(),
             metrics=metrics,
             profile_results=profile_results,

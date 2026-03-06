@@ -160,9 +160,11 @@ export function EquipmentMarker({ equipment, position, onClick }: EquipmentMarke
       {/* Equipment ID Label - Matrix Cyberpunk Style */}
       <Html position={[0, 0.6, 0]} scale={0.3} distanceFactor={8}>
         <div
+          onClick={(e) => { e.stopPropagation(); onClick(); }}
           className="matrix-label px-2 py-1 text-xs whitespace-nowrap font-mono"
           style={{
-            pointerEvents: 'none',
+            pointerEvents: 'auto',
+            cursor: 'pointer',
             background: 'rgba(0, 255, 65, 0.15)',
             border: '1px solid rgba(0, 255, 65, 0.4)',
             boxShadow: '0 0 10px rgba(0, 255, 65, 0.3)',

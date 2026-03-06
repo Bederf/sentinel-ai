@@ -18,28 +18,28 @@ class DALIControllerRepository:
         """Initialize the repository with a Supabase client."""
         self.client = get_supabase_client()
 
-    def get_all(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_all(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all DALI controllers with optional building filter.
 
         Args:
-            building_id: Filter by building UUID
+            site_id: Filter by building UUID
 
         Returns:
             List of DALI controllers
         """
         query = self.client.table("dali_controllers").select("*")
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
 
         response = query.execute()
         return response.data
 
-    def get_by_id(self, building_id: str, controller_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, site_id: str, controller_id: str) -> Optional[Dict[str, Any]]:
         """Get controller by building and controller_id composite key.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             controller_id: Controller identifier (e.g., 'DALI-L12-01')
 
         Returns:
@@ -48,7 +48,7 @@ class DALIControllerRepository:
         response = (
             self.client.table("dali_controllers")
             .select("*")
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .eq("controller_id", controller_id)
             .execute()
         )
@@ -82,17 +82,15 @@ class DALIControllerRepository:
             Upserted controller data
         """
         response = (
-            self.client.table("dali_controllers")
-            .upsert(controller_data, on_conflict="building_id,controller_id")
-            .execute()
+            self.client.table("dali_controllers").upsert(controller_data, on_conflict="site_id,controller_id").execute()
         )
         return response.data[0] if response.data else {}
 
-    def update_status(self, building_id: str, controller_id: str, status: str) -> Optional[Dict[str, Any]]:
+    def update_status(self, site_id: str, controller_id: str, status: str) -> Optional[Dict[str, Any]]:
         """Update controller status.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             controller_id: Controller identifier
             status: New status ('online', 'offline', 'degraded')
 
@@ -102,7 +100,7 @@ class DALIControllerRepository:
         response = (
             self.client.table("dali_controllers")
             .update({"status": status, "last_seen": "NOW()"})
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .eq("controller_id", controller_id)
             .execute()
         )
@@ -120,12 +118,12 @@ class DALILuminaireRepository:
         self.client = get_supabase_client()
 
     def get_all(
-        self, building_id: Optional[str] = None, controller_id: Optional[str] = None, zone_id: Optional[str] = None
+        self, site_id: Optional[str] = None, controller_id: Optional[str] = None, zone_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all luminaires with optional filtering.
 
         Args:
-            building_id: Filter by building UUID
+            site_id: Filter by building UUID
             controller_id: Filter by controller UUID
             zone_id: Filter by HVAC zone UUID
 
@@ -134,8 +132,8 @@ class DALILuminaireRepository:
         """
         query = self.client.table("dali_luminaires").select("*")
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
         if controller_id:
             query = query.eq("controller_id", controller_id)
         if zone_id:
@@ -144,11 +142,11 @@ class DALILuminaireRepository:
         response = query.execute()
         return response.data
 
-    def get_by_id(self, building_id: str, luminaire_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, site_id: str, luminaire_id: str) -> Optional[Dict[str, Any]]:
         """Get luminaire by building and luminaire_id composite key.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             luminaire_id: Luminaire identifier (e.g., 'LUM-L12-025')
 
         Returns:
@@ -157,7 +155,7 @@ class DALILuminaireRepository:
         response = (
             self.client.table("dali_luminaires")
             .select("*")
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .eq("luminaire_id", luminaire_id)
             .execute()
         )
@@ -166,38 +164,38 @@ class DALILuminaireRepository:
             return response.data[0]
         return None
 
-    def get_with_zone_info(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_with_zone_info(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get luminaires with enriched zone details.
 
         Uses the v_luminaires_with_zones view.
 
         Args:
-            building_id: Optional filter by building UUID
+            site_id: Optional filter by building UUID
 
         Returns:
             List of enriched luminaire records
         """
         query = self.client.table("v_luminaires_with_zones").select("*")
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
 
         response = query.execute()
         return response.data
 
-    def get_fault_luminaires(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_fault_luminaires(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all luminaires with fault status.
 
         Args:
-            building_id: Optional filter by building UUID
+            site_id: Optional filter by building UUID
 
         Returns:
             List of luminaires in fault state
         """
         query = self.client.table("dali_luminaires").select("*").eq("fault_status", True)
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
 
         response = query.execute()
         return response.data
@@ -212,9 +210,7 @@ class DALILuminaireRepository:
             Upserted luminaire data
         """
         response = (
-            self.client.table("dali_luminaires")
-            .upsert(luminaire_data, on_conflict="building_id,luminaire_id")
-            .execute()
+            self.client.table("dali_luminaires").upsert(luminaire_data, on_conflict="site_id,luminaire_id").execute()
         )
         return response.data[0] if response.data else {}
 
@@ -230,16 +226,14 @@ class DALILuminaireRepository:
         if not luminaires:
             return []
 
-        response = (
-            self.client.table("dali_luminaires").upsert(luminaires, on_conflict="building_id,luminaire_id").execute()
-        )
+        response = self.client.table("dali_luminaires").upsert(luminaires, on_conflict="site_id,luminaire_id").execute()
         return response.data
 
-    def update_level(self, building_id: str, luminaire_id: str, level: int) -> Optional[Dict[str, Any]]:
+    def update_level(self, site_id: str, luminaire_id: str, level: int) -> Optional[Dict[str, Any]]:
         """Update luminaire brightness level.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             luminaire_id: Luminaire identifier
             level: Brightness level (0-100)
 
@@ -249,7 +243,7 @@ class DALILuminaireRepository:
         response = (
             self.client.table("dali_luminaires")
             .update({"current_level": level, "last_updated": "NOW()"})
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .eq("luminaire_id", luminaire_id)
             .execute()
         )
@@ -267,12 +261,12 @@ class DALISensorRepository:
         self.client = get_supabase_client()
 
     def get_all(
-        self, building_id: Optional[str] = None, controller_id: Optional[str] = None, zone_id: Optional[str] = None
+        self, site_id: Optional[str] = None, controller_id: Optional[str] = None, zone_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all sensors with optional filtering.
 
         Args:
-            building_id: Filter by building UUID
+            site_id: Filter by building UUID
             controller_id: Filter by controller UUID
             zone_id: Filter by HVAC zone UUID
 
@@ -281,8 +275,8 @@ class DALISensorRepository:
         """
         query = self.client.table("dali_sensors").select("*")
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
         if controller_id:
             query = query.eq("controller_id", controller_id)
         if zone_id:
@@ -291,22 +285,18 @@ class DALISensorRepository:
         response = query.execute()
         return response.data
 
-    def get_by_id(self, building_id: str, sensor_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, site_id: str, sensor_id: str) -> Optional[Dict[str, Any]]:
         """Get sensor by building and sensor_id composite key.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             sensor_id: Sensor identifier (e.g., 'PIR-L12-025')
 
         Returns:
             Sensor data or None if not found
         """
         response = (
-            self.client.table("dali_sensors")
-            .select("*")
-            .eq("building_id", building_id)
-            .eq("sensor_id", sensor_id)
-            .execute()
+            self.client.table("dali_sensors").select("*").eq("site_id", site_id).eq("sensor_id", sensor_id).execute()
         )
 
         if response.data:
@@ -326,18 +316,16 @@ class DALISensorRepository:
 
         return response.data
 
-    def get_occupied_zones(self, building_id: str) -> List[Dict[str, Any]]:
+    def get_occupied_zones(self, site_id: str) -> List[Dict[str, Any]]:
         """Get all sensors showing occupancy in a building.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
 
         Returns:
             List of sensors with occupancy = TRUE
         """
-        response = (
-            self.client.table("dali_sensors").select("*").eq("building_id", building_id).eq("occupancy", True).execute()
-        )
+        response = self.client.table("dali_sensors").select("*").eq("site_id", site_id).eq("occupancy", True).execute()
 
         return response.data
 
@@ -350,7 +338,7 @@ class DALISensorRepository:
         Returns:
             Upserted sensor data
         """
-        response = self.client.table("dali_sensors").upsert(sensor_data, on_conflict="building_id,sensor_id").execute()
+        response = self.client.table("dali_sensors").upsert(sensor_data, on_conflict="site_id,sensor_id").execute()
         return response.data[0] if response.data else {}
 
 
@@ -361,11 +349,11 @@ class DALIGroupRepository:
         """Initialize the repository with a Supabase client."""
         self.client = get_supabase_client()
 
-    def get_all(self, building_id: Optional[str] = None, controller_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_all(self, site_id: Optional[str] = None, controller_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all groups with optional filtering.
 
         Args:
-            building_id: Filter by building UUID
+            site_id: Filter by building UUID
             controller_id: Filter by controller UUID
 
         Returns:
@@ -373,30 +361,26 @@ class DALIGroupRepository:
         """
         query = self.client.table("dali_groups").select("*")
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
         if controller_id:
             query = query.eq("controller_id", controller_id)
 
         response = query.execute()
         return response.data
 
-    def get_by_id(self, building_id: str, group_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, site_id: str, group_id: str) -> Optional[Dict[str, Any]]:
         """Get group by building and group_id composite key.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             group_id: Group identifier (e.g., 'GRP-L12-N-001')
 
         Returns:
             Group data or None if not found
         """
         response = (
-            self.client.table("dali_groups")
-            .select("*")
-            .eq("building_id", building_id)
-            .eq("group_id", group_id)
-            .execute()
+            self.client.table("dali_groups").select("*").eq("site_id", site_id).eq("group_id", group_id).execute()
         )
 
         if response.data:
@@ -412,21 +396,21 @@ class DALIGroupRepository:
         Returns:
             Upserted group data
         """
-        response = self.client.table("dali_groups").upsert(group_data, on_conflict="building_id,group_id").execute()
+        response = self.client.table("dali_groups").upsert(group_data, on_conflict="site_id,group_id").execute()
         return response.data[0] if response.data else {}
 
-    def add_luminaire(self, building_id: str, group_id: str, luminaire_uuid: str) -> Optional[Dict[str, Any]]:
+    def add_luminaire(self, site_id: str, group_id: str, luminaire_uuid: str) -> Optional[Dict[str, Any]]:
         """Add a luminaire to a group.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             group_id: Group identifier
             luminaire_uuid: Luminaire UUID to add
 
         Returns:
             Updated group or None if not found
         """
-        group = self.get_by_id(building_id, group_id)
+        group = self.get_by_id(site_id, group_id)
         if not group:
             return None
 
@@ -437,7 +421,7 @@ class DALIGroupRepository:
         response = (
             self.client.table("dali_groups")
             .update({"luminaire_ids": luminaire_ids})
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .eq("group_id", group_id)
             .execute()
         )
@@ -446,18 +430,18 @@ class DALIGroupRepository:
             return response.data[0]
         return None
 
-    def remove_luminaire(self, building_id: str, group_id: str, luminaire_uuid: str) -> Optional[Dict[str, Any]]:
+    def remove_luminaire(self, site_id: str, group_id: str, luminaire_uuid: str) -> Optional[Dict[str, Any]]:
         """Remove a luminaire from a group.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             group_id: Group identifier
             luminaire_uuid: Luminaire UUID to remove
 
         Returns:
             Updated group or None if not found
         """
-        group = self.get_by_id(building_id, group_id)
+        group = self.get_by_id(site_id, group_id)
         if not group:
             return None
 
@@ -468,7 +452,7 @@ class DALIGroupRepository:
         response = (
             self.client.table("dali_groups")
             .update({"luminaire_ids": luminaire_ids})
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .eq("group_id", group_id)
             .execute()
         )
@@ -478,12 +462,12 @@ class DALIGroupRepository:
         return None
 
     def update_scene(
-        self, building_id: str, group_id: str, scene_name: str, scene_config: Dict[str, Any]
+        self, site_id: str, group_id: str, scene_name: str, scene_config: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
         """Update a scene configuration in a group.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             group_id: Group identifier
             scene_name: Scene name (e.g., 'full_bright', 'working')
             scene_config: Scene configuration (e.g., {'level': 80, 'color_temp': 4000})
@@ -491,7 +475,7 @@ class DALIGroupRepository:
         Returns:
             Updated group or None if not found
         """
-        group = self.get_by_id(building_id, group_id)
+        group = self.get_by_id(site_id, group_id)
         if not group:
             return None
 
@@ -501,7 +485,7 @@ class DALIGroupRepository:
         response = (
             self.client.table("dali_groups")
             .update({"scene_levels": scene_levels})
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .eq("group_id", group_id)
             .execute()
         )

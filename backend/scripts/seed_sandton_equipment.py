@@ -32,16 +32,16 @@ def load_json(filepath):
 
 def get_or_create_building(client):
     """Get or create the Sandton building record."""
-    result = client.table("buildings").select("id").eq("code", "sandton").execute()
+    result = client.table("sites").select("id").eq("code", "sandton").execute()
 
     if result.data:
         print(f"Building 'sandton' exists with ID: {result.data[0]['id']}")
         return result.data[0]["id"]
 
-    building_id = str(uuid.uuid4())
-    client.table("buildings").insert(
+    site_id = str(uuid.uuid4())
+    client.table("sites").insert(
         {
-            "id": building_id,
+            "id": site_id,
             "code": "sandton",
             "name": "Sandton Office Tower",
             "address": "144 Katherine Street, Sandton, 2196",
@@ -53,11 +53,11 @@ def get_or_create_building(client):
         }
     ).execute()
 
-    print(f"Created building 'sandton' with ID: {building_id}")
-    return building_id
+    print(f"Created building 'sandton' with ID: {site_id}")
+    return site_id
 
 
-def seed_hvac_equipment(client, building_id):
+def seed_hvac_equipment(client, site_id):
     """Seed HVAC equipment from zones.json."""
     zones = load_json(f"{BASE_PATH}/zones.json")
     count = 0
@@ -76,7 +76,7 @@ def seed_hvac_equipment(client, building_id):
                     "code": ahu_id,
                     "name": f"Air Handling Unit {floor}",
                     "type": "ahu",
-                    "building_id": building_id,
+                    "site_id": site_id,
                     "location": f"{floor} Mechanical Room",
                     "status": "normal",
                     "health_score": 92,
@@ -96,7 +96,7 @@ def seed_hvac_equipment(client, building_id):
                 "code": zone["fcu_id"],
                 "name": f"Fan Coil Unit {zone_id}",
                 "type": "fcu",
-                "building_id": building_id,
+                "site_id": site_id,
                 "location": zone["zone_name"],
                 "status": "normal" if zone["status"] == "running" else "warning",
                 "health_score": 88 if zone["status"] == "running" else 65,
@@ -115,7 +115,7 @@ def seed_hvac_equipment(client, building_id):
                 "code": zone["vav_id"],
                 "name": f"Variable Air Volume {zone_id}",
                 "type": "vav",
-                "building_id": building_id,
+                "site_id": site_id,
                 "location": zone["zone_name"],
                 "status": "normal",
                 "health_score": 95,
@@ -134,7 +134,7 @@ def seed_hvac_equipment(client, building_id):
                 "code": zone["temp_sensor"],
                 "name": f"Temperature Sensor {zone_id}",
                 "type": "sensor",
-                "building_id": building_id,
+                "site_id": site_id,
                 "location": zone["zone_name"],
                 "status": "normal",
                 "health_score": 100,
@@ -153,7 +153,7 @@ def seed_hvac_equipment(client, building_id):
                 "code": zone["co2_sensor"],
                 "name": f"CO2 Sensor {zone_id}",
                 "type": "sensor",
-                "building_id": building_id,
+                "site_id": site_id,
                 "location": zone["zone_name"],
                 "status": "normal",
                 "health_score": 100,
@@ -169,7 +169,7 @@ def seed_hvac_equipment(client, building_id):
     return count
 
 
-def seed_generators(client, building_id):
+def seed_generators(client, site_id):
     """Seed generators from generators.json."""
     gen_data = load_json(f"{BASE_PATH}/generators.json")
     count = 0
@@ -181,7 +181,7 @@ def seed_generators(client, building_id):
                 "code": gen["generator_id"],
                 "name": gen["name"],
                 "type": "generator",
-                "building_id": building_id,
+                "site_id": site_id,
                 "location": gen["location"],
                 "status": "normal",
                 "health_score": 90,
@@ -208,7 +208,7 @@ def seed_generators(client, building_id):
                 "code": group["group_id"],
                 "name": group["name"],
                 "type": "generator_group",
-                "building_id": building_id,
+                "site_id": site_id,
                 "location": "Basement Level 2",
                 "status": "normal",
                 "health_score": 95,
@@ -226,7 +226,7 @@ def seed_generators(client, building_id):
                 "code": tank["tank_id"],
                 "name": tank["name"],
                 "type": "diesel_tank",
-                "building_id": building_id,
+                "site_id": site_id,
                 "location": "Basement Level 2",
                 "status": "normal",
                 "health_score": 100,
@@ -245,7 +245,7 @@ def seed_generators(client, building_id):
     return count
 
 
-def seed_energy_centre(client, building_id):
+def seed_energy_centre(client, site_id):
     """Seed energy centre equipment from energy_centre.json."""
     ec = load_json(f"{BASE_PATH}/energy_centre.json")
     count = 0
@@ -258,7 +258,7 @@ def seed_energy_centre(client, building_id):
                 "code": i["incomer_id"],
                 "name": i["name"],
                 "type": "mv_incomer",
-                "building_id": building_id,
+                "site_id": site_id,
                 "location": i["location"],
                 "status": "normal" if i["healthy"] else "critical",
                 "health_score": 95 if i["healthy"] else 50,
@@ -279,7 +279,7 @@ def seed_energy_centre(client, building_id):
                 "code": tx["transformer_id"],
                 "name": tx["name"],
                 "type": "transformer",
-                "building_id": building_id,
+                "site_id": site_id,
                 "location": tx["location"],
                 "status": "normal" if tx["healthy"] else "warning",
                 "health_score": 90 if tx["healthy"] else 70,
@@ -305,7 +305,7 @@ def seed_energy_centre(client, building_id):
                 "code": sb["switchboard_id"],
                 "name": sb["name"],
                 "type": "lv_switchboard",
-                "building_id": building_id,
+                "site_id": site_id,
                 "location": sb["location"],
                 "status": "normal" if sb["healthy"] else "warning",
                 "health_score": 92,
@@ -329,7 +329,7 @@ def seed_energy_centre(client, building_id):
                 "code": ats["ats_id"],
                 "name": ats["name"],
                 "type": "ats",
-                "building_id": building_id,
+                "site_id": site_id,
                 "location": ats["location"],
                 "status": "normal",
                 "health_score": 95,
@@ -354,7 +354,7 @@ def seed_energy_centre(client, building_id):
                 "code": ups["ups_id"],
                 "name": ups["name"],
                 "type": "ups",
-                "building_id": building_id,
+                "site_id": site_id,
                 "location": ups["location"],
                 "status": "normal",
                 "health_score": 95 if ups["battery_health_pct"] > 90 else 80,
@@ -382,7 +382,7 @@ def seed_energy_centre(client, building_id):
                 "code": m["meter_id"],
                 "name": m["name"],
                 "type": "power_meter",
-                "building_id": building_id,
+                "site_id": site_id,
                 "location": m["location"],
                 "status": "normal",
                 "health_score": 100,
@@ -403,7 +403,7 @@ def seed_energy_centre(client, building_id):
                 "code": pfc["pfc_id"],
                 "name": pfc["name"],
                 "type": "pfc_bank",
-                "building_id": building_id,
+                "site_id": site_id,
                 "location": pfc["location"],
                 "status": "normal" if pfc["healthy"] else "warning",
                 "health_score": 95,
@@ -428,7 +428,7 @@ def seed_energy_centre(client, building_id):
                 "code": f["feeder_id"],
                 "name": f["name"],
                 "type": "feeder",
-                "building_id": building_id,
+                "site_id": site_id,
                 "location": "LV Switchroom",
                 "status": "normal" if f["breaker_state"] == "closed" else "offline",
                 "health_score": 100 if f["breaker_state"] == "closed" else 0,
@@ -455,18 +455,18 @@ def main():
     client = get_supabase_client()
     print("Connected to Supabase")
 
-    building_id = get_or_create_building(client)
+    site_id = get_or_create_building(client)
 
     total = 0
-    total += seed_hvac_equipment(client, building_id)
-    total += seed_generators(client, building_id)
-    total += seed_energy_centre(client, building_id)
+    total += seed_hvac_equipment(client, site_id)
+    total += seed_generators(client, site_id)
+    total += seed_energy_centre(client, site_id)
 
     print("=" * 60)
     print(f"Total equipment seeded: {total}")
 
     # Verify
-    result = client.table("equipment").select("id").eq("building_id", building_id).execute()
+    result = client.table("equipment").select("id").eq("site_id", site_id).execute()
     print(f"Verified: {len(result.data)} equipment records in database")
     print("=" * 60)
 

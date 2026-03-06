@@ -287,6 +287,32 @@ curl http://localhost:9095/api/buildings/site-002/equipment | jq '.total_equipme
   - Check browser console for Three.js errors
   - Zoom camera to fit all markers (scroll wheel or controls)
 
+## Visibility & Interaction Improvements (2026-03-02)
+
+### All Floors Auto-Selected on Load
+
+Previously only the ground floor was auto-selected, showing a subset of equipment. Now all floors are selected on initial load so all 83+ equipment items for site-002 are immediately visible.
+
+**File:** `frontend/src/components/digital-twin/DigitalTwin.tsx`
+
+### Clickable Equipment Labels
+
+**3D View (`EquipmentMarker.tsx`):** The Html label overlay changed from `pointerEvents: 'none'` to `pointerEvents: 'auto'` with an `onClick` handler. Clicking the text label now opens the equipment detail panel (same as clicking the 3D mesh).
+
+**2D View (`EquipmentMarker2D.tsx`):** Equipment type + zone labels are now rendered above each circle marker (e.g., `FCU-301`). The parent `<g>` element's existing `onClick` handler handles clicks.
+
+### Unified Floor Extraction
+
+`EquipmentMarkers.tsx` previously had a local `extractFloor` regex that missed zone-based S002 codes (e.g., `S002-FCU-301` where floor is derived from zone 200-299 → L2). Now imports the canonical `extractFloorFromCode` and `getFloorId` from `@/utils/floorExtraction`, which handles:
+
+- Zone-based codes: `001-099` → L0, `100-199` → L1, `200-299` → L2
+- Explicit floor segments: `-B1-`, `-G-`, `-L1-`, `-R-`
+- Site-005 and S012 formats
+
+### Larger Canvas
+
+Canvas height increased from `calc(100vh - 300px)` to `calc(100vh - 180px)` in `SiteDetail.tsx`, gaining 120px of vertical space for the digital twin visualization.
+
 ## Future Enhancements
 
 **Phase 2 Features (Not Implemented):**

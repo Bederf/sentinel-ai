@@ -26,15 +26,15 @@ async def get_integration_health():
 
 @router.get("/assets")
 async def get_assets(
-    building_code: Optional[str] = Query(None, description="Filter by building"),
+    site_code: Optional[str] = Query(None, description="Filter by building"),
     criticality: Optional[str] = Query(None, description="Filter by criticality"),
     condition: Optional[str] = Query(None, description="Filter by condition"),
 ):
     """Get all assets from Concept with optional filters."""
     assets = concept_loader.assets
 
-    if building_code:
-        assets = [a for a in assets if a.building_code == building_code]
+    if site_code:
+        assets = [a for a in assets if a.site_code == site_code]
     if criticality:
         assets = [a for a in assets if a.criticality.lower() == criticality.lower()]
     if condition:
@@ -50,8 +50,8 @@ async def get_assets(
                 "asset_type": a.asset_type,
                 "manufacturer": a.manufacturer,
                 "model": a.model,
-                "building_code": a.building_code,
-                "building_name": a.building_name,
+                "site_code": a.site_code,
+                "site_name": a.site_name,
                 "location": a.location_desc,
                 "install_date": a.install_date.isoformat() if a.install_date else None,
                 "age_years": a.age_years,
@@ -84,8 +84,8 @@ async def get_asset(asset_code: str):
         "manufacturer": asset.manufacturer,
         "model": asset.model,
         "serial_no": asset.serial_no,
-        "building_code": asset.building_code,
-        "building_name": asset.building_name,
+        "site_code": asset.site_code,
+        "site_name": asset.site_name,
         "location_code": asset.location_code,
         "location_desc": asset.location_desc,
         "install_date": asset.install_date.isoformat() if asset.install_date else None,
@@ -166,7 +166,7 @@ async def get_asset_job_cards(
 
 @router.get("/job-cards")
 async def get_job_cards(
-    building_code: Optional[str] = Query(None, description="Filter by building"),
+    site_code: Optional[str] = Query(None, description="Filter by building"),
     asset_code: Optional[str] = Query(None, description="Filter by asset"),
     priority: Optional[str] = Query(None, description="Filter by priority (P1-P4)"),
     status: Optional[str] = Query(None, description="Filter by status"),
@@ -177,8 +177,8 @@ async def get_job_cards(
     """Get job cards with optional filters."""
     job_cards = concept_loader.job_cards
 
-    if building_code:
-        job_cards = [jc for jc in job_cards if jc.building_code == building_code]
+    if site_code:
+        job_cards = [jc for jc in job_cards if jc.site_code == site_code]
     if asset_code:
         job_cards = [jc for jc in job_cards if jc.asset_code == asset_code]
     if priority:
@@ -201,7 +201,7 @@ async def get_job_cards(
                 "priority": jc.priority,
                 "status": jc.status,
                 "logged_date": jc.logged_date.isoformat() if jc.logged_date else None,
-                "building_name": jc.building_name,
+                "site_name": jc.site_name,
                 "asset_code": jc.asset_code,
                 "asset_desc": jc.asset_desc,
                 "fault_desc": jc.fault_desc,
@@ -228,10 +228,10 @@ async def get_assets_at_risk():
     return {"total_at_risk": len(at_risk), "assets": at_risk}
 
 
-@router.get("/buildings/{building_code}/summary")
-async def get_building_summary(building_code: str):
+@router.get("/buildings/{site_code}/summary")
+async def get_site_summary(site_code: str):
     """Get health summary for all assets in a building."""
-    summary = concept_loader.get_building_summary(building_code)
+    summary = concept_loader.get_site_summary(site_code)
 
     if "error" in summary:
         raise HTTPException(status_code=404, detail=summary["error"])

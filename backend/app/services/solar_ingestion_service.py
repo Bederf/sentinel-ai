@@ -128,13 +128,13 @@ class SolarIngestionService:
             # Build UUID → site code mapping via buildings table.
             # solar_plants/bess/meters reference buildings(id) as UUID,
             # but solar_sites uses TEXT site_id (e.g. "site-002").
-            buildings_data = client.table("buildings").select("id, code").execute().data or []
-            building_uuid_to_code = {str(b["id"]): b["code"] for b in buildings_data}
+            buildings_data = client.table("sites").select("id, code").execute().data or []
+            site_uuid_to_code = {str(b["id"]): b["code"] for b in buildings_data}
 
             plants_by_site: Dict[str, List[Dict]] = {}
             for plant in plants:
                 plant_site_uuid = str(plant["site_id"])
-                resolved_site_id = building_uuid_to_code.get(plant_site_uuid, plant_site_uuid)
+                resolved_site_id = site_uuid_to_code.get(plant_site_uuid, plant_site_uuid)
                 plants_by_site.setdefault(resolved_site_id, []).append(plant)
 
             inverters_by_plant: Dict[str, List[Dict]] = {}
@@ -144,13 +144,13 @@ class SolarIngestionService:
             bess_by_site: Dict[str, Dict] = {}
             for b in bess:
                 bess_site_uuid = str(b.get("site_id", ""))
-                resolved_bess_site = building_uuid_to_code.get(bess_site_uuid, bess_site_uuid)
+                resolved_bess_site = site_uuid_to_code.get(bess_site_uuid, bess_site_uuid)
                 bess_by_site[resolved_bess_site] = b
 
             meters_by_site: Dict[str, List[Dict]] = {}
             for m in meters:
                 meter_site_uuid = str(m.get("site_id", ""))
-                resolved_meter_site = building_uuid_to_code.get(meter_site_uuid, meter_site_uuid)
+                resolved_meter_site = site_uuid_to_code.get(meter_site_uuid, meter_site_uuid)
                 meters_by_site.setdefault(resolved_meter_site, []).append(m)
 
             configs: List[Dict] = []
@@ -900,27 +900,26 @@ class SolarIngestionService:
         # Try to fetch building names from repository if available
         building_repo = None
         try:
-            from app.database.repositories.building_repository import BuildingRepository
+            from app.database.repositories.site_repository import SiteRepository
 
-            building_repo = BuildingRepository()
+            building_repo = SiteRepository()
         except Exception as e:
             logger.debug(f"Building repository unavailable: {e}")
 
         for site in self._sites.values():
             # Fetch building name from repository if available
-            building_name = ""
+            site_name = ""
             if building_repo:
                 try:
                     building = building_repo.get_by_id(site.site_id)
-                    building_name = building.get("name", "") if building else ""
+                    site_name = building.get("name", "") if building else ""
                 except Exception as e:
                     logger.debug(f"Could not fetch building {site.site_id}: {e}")
 
             results.append(
                 {
                     "site_id": site.site_id,
-                    "site_name": site.site_name,
-                    "building_name": building_name,
+                    "site_name": site_name,
                     "plants": len(site.plants),
                     "connectors": len(site.connectors),
                     "last_poll": site.last_poll,

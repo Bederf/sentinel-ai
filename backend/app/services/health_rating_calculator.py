@@ -247,7 +247,7 @@ class HealthRatingCalculator:
         Args:
             equipment_id: Equipment code or UUID.
             equipment: Equipment dict with keys: age_years, expected_life_years,
-                health_score, building_id, type, code, etc.
+                health_score, site_id, type, code, etc.
             mode: Ingestion mode string ('simulation', 'shadow_live', 'live_control').
             data_quality_result: Pre-computed HealthDataQualityResult, or None
                 to use default values.

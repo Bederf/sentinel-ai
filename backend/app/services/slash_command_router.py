@@ -1,0 +1,590 @@
+"""Slash command router for web chat.
+
+Intercepts FM workflow commands (/info_, /WO_, /inspect_, /reset_, /note_)
+before the AI pipeline, calling internal APIs directly. Works even when
+Claude credits are exhausted — no AI invocation needed.
+
+Mirrors the Sentry Telegram bot's slash command handling.
+"""
+
+import asyncio
+import logging
+import re
+import subprocess
+from dataclasses import dataclass
+
+import httpx
+
+from app.config.settings import settings
+from app.services.sentry_integration.config import get_sentry_bot_cli
+
+logger = logging.getLogger(__name__)
+
+# Pattern: /command_EQUIPMENT_CODE [optional trailing text]
+# Equipment codes use underscores in chat (S002_FCU_301), converted to dashes for APIs.
+_SLASH_RE = re.compile(
+    r"^/(info|WO|inspect|reset|note)_([A-Za-z0-9][\w-]*)(?:\s+(.+))?$",
+    re.DOTALL,
+)
+
+# Safety-critical equipment types that cannot be remotely reset
+_BLOCKED_RESET_TYPES = {"FIRE", "GEN"}
+
+
+@dataclass
+class CommandResult:
+    """Result from a slash command execution."""
+
+    message: str
+    success: bool = True
+
+
+def parse(message: str) -> tuple[str, str, str | None] | None:
+    """Parse a slash command from a chat message.
+
+    Returns:
+        (command, equipment_code_with_dashes, extra_text) or None if not a command.
+    """
+    m = _SLASH_RE.match(message.strip())
+    if not m:
+        return None
+    command = m.group(1)
+    # Convert underscores to dashes for API calls
+    equipment_code = m.group(2).replace("_", "-").upper()
+    extra_text = m.group(3).strip() if m.group(3) else None
+    return command, equipment_code, extra_text
+
+
+def _code_for_buttons(equipment_code: str) -> str:
+    """Convert dashed equipment code back to underscored form for chat buttons."""
+    return equipment_code.replace("-", "_")
+
+
+def _base_url() -> str:
+    """Internal API base URL."""
+    port = settings.port if hasattr(settings, "port") else 9095
+    return f"http://127.0.0.1:{port}"
+
+
+def _sentry_headers() -> dict[str, str]:
+    """Headers for internal Sentry API calls."""
+    headers: dict[str, str] = {
+        "X-Sentry-Secret": settings.sentry_webhook_secret,
+        "Content-Type": "application/json",
+    }
+    if settings.sentry_bot_api_key:
+        headers["X-Sentry-API-Key"] = settings.sentry_bot_api_key
+    return headers
+
+
+def _parse_assign(extra: str | None) -> tuple[str | None, str | None]:
+    """Extract 'assign:Name' from extra text. Returns (assigned_to, remaining_text)."""
+    if not extra:
+        return None, None
+    m = re.search(r"assign:\s*(.+?)(?:\s*$)", extra, re.IGNORECASE)
+    if m:
+        name = m.group(1).strip()
+        remaining = extra[: m.start()].strip() or None
+        return name, remaining
+    return None, extra
+
+
+def _quick_actions(code: str) -> str:
+    """Render the quick-actions footer with clickable commands."""
+    c = _code_for_buttons(code)
+    return f"\n---\n**Quick Actions:** `/info_{c}` \u00b7 `/reset_{c}` \u00b7 `/WO_{c}` \u00b7 `/note_{c}`"
+
+
+async def _notify_technician(
+    wo_code: str,
+    equipment_code: str,
+    tech_telegram_id: str | None,
+    tech_email: str | None,
+    tech_name: str | None,
+    priority: str = "medium",
+) -> None:
+    """Send Telegram + email notification to the assigned technician.
+
+    Mirrors bms_inspect.py / bms_wo.py: uses ``sentry message send`` CLI
+    for Telegram and the work_order_notifier for email.
+    """
+    code_underscored = equipment_code.replace("-", "_")
+
+    # --- Telegram via sentry CLI ---
+    if tech_telegram_id:
+        msg = (
+            f"\U0001f527 #{wo_code} \u2014 {equipment_code}\n"
+            f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
+            f"/info_{code_underscored} - Equipment details\n"
+            f"/note_{code_underscored} - Add note"
+        )
+        cli = get_sentry_bot_cli()
+        try:
+            await asyncio.to_thread(
+                subprocess.run,
+                [cli, "message", "send", "--target", str(tech_telegram_id), "--message", msg],
+                timeout=15,
+                capture_output=True,
+            )
+            logger.info("Telegram sent to %s for %s", tech_telegram_id, wo_code)
+        except Exception as exc:
+            logger.warning("Telegram notification failed for %s: %s", wo_code, exc)
+
+    # --- Email via SMTP (workorder@sentinel-ai.co.za) ---
+    if tech_email:
+        try:
+            from app.services.email_reply_service import get_email_reply_service
+
+            svc = get_email_reply_service()
+            if svc.is_configured():
+                # Gather equipment context + checklist for the email
+                body_plain = await _build_wo_email_body(
+                    wo_code,
+                    equipment_code,
+                    priority,
+                    tech_name,
+                )
+                subject = f"SENTINEL {wo_code} — {equipment_code}"
+                result = await svc.send_reply(
+                    to_email=tech_email,
+                    to_name=tech_name,
+                    subject=subject,
+                    body_plain=body_plain,
+                    body_html=None,
+                )
+                if result.sent:
+                    logger.info("Email sent to %s for %s", tech_email, wo_code)
+                else:
+                    logger.warning("SMTP send failed for %s: %s", wo_code, result.error)
+            else:
+                logger.warning("Email reply service not configured — email not sent for %s", wo_code)
+        except Exception as exc:
+            logger.warning("Email notification failed for %s: %s", wo_code, exc)
+
+
+async def _build_wo_email_body(
+    wo_code: str,
+    equipment_code: str,
+    priority: str,
+    tech_name: str | None,
+) -> str:
+    """Fetch equipment info + checklist and build a full briefing email."""
+    lines = [
+        f"WORK ORDER: {wo_code}",
+        f"Equipment: {equipment_code}",
+        f"Priority: {priority.upper()}",
+        f"Assigned to: {tech_name or 'Technician'}",
+        "",
+    ]
+
+    # --- Equipment info ---
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                f"{_base_url()}/api/work-orders/equipment-info/{equipment_code}",
+                headers=_sentry_headers(),
+            )
+        if resp.status_code == 200:
+            info = resp.json()
+            lines.append("=" * 50)
+            lines.append("EQUIPMENT DETAILS")
+            lines.append("=" * 50)
+            lines.append(f"Name: {info.get('name', equipment_code)}")
+            lines.append(f"Type: {info.get('type', 'N/A')}")
+            lines.append(f"Status: {info.get('status', 'N/A')}")
+            lines.append(f"Health: {info.get('health_score', 'N/A')}%")
+            lines.append(f"Location: {info.get('location', 'N/A')}")
+            if info.get("manufacturer"):
+                lines.append(f"Manufacturer: {info['manufacturer']}")
+            if info.get("model"):
+                lines.append(f"Model: {info['model']}")
+            if info.get("runtime_hours"):
+                lines.append(f"Runtime: {info['runtime_hours']:,} hrs")
+            if info.get("last_service"):
+                lines.append(f"Last Service: {info['last_service']}")
+            if info.get("notes"):
+                lines.append(f"Notes: {info['notes']}")
+            lines.append("")
+    except Exception as exc:
+        logger.debug("Could not fetch equipment info for email: %s", exc)
+
+    # --- Active alerts ---
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                f"{_base_url()}/api/alerts/active?site_id=site-002",
+                headers=_sentry_headers(),
+            )
+        if resp.status_code == 200:
+            alerts = resp.json()
+            if isinstance(alerts, list):
+                eq_alerts = [a for a in alerts if a.get("equipment_code") == equipment_code]
+                if eq_alerts:
+                    lines.append("=" * 50)
+                    lines.append(f"ACTIVE ALERTS ({len(eq_alerts)})")
+                    lines.append("=" * 50)
+                    for a in eq_alerts[:5]:
+                        sev = (a.get("severity") or "unknown").upper()
+                        msg = a.get("message") or a.get("title", "Alert")
+                        lines.append(f"  [{sev}] {msg}")
+                    lines.append("")
+    except Exception as exc:
+        logger.debug("Could not fetch alerts for email: %s", exc)
+
+    # --- Inspection checklist ---
+    eq_type = equipment_code.split("-")[1].lower() if "-" in equipment_code else ""
+    if eq_type:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(
+                    f"{_base_url()}/api/sentry/inspection-checklist/{eq_type}",
+                    headers=_sentry_headers(),
+                )
+            if resp.status_code == 200:
+                cl = resp.json()
+                if cl.get("found"):
+                    lines.append("=" * 50)
+                    lines.append("INSPECTION CHECKLIST")
+                    lines.append("=" * 50)
+                    tpl = cl.get("template_name", "Inspection")
+                    est = cl.get("estimated_minutes", "")
+                    lines.append(f"{tpl}" + (f" (est. {est} min)" if est else ""))
+                    lines.append("")
+                    for item in cl.get("items", []):
+                        q = item.get("question") or item.get("description", "")
+                        cat = item.get("category", "")
+                        opts = item.get("options")
+                        line = f"  [ ] {q}"
+                        if cat:
+                            line += f"  ({cat})"
+                        if opts:
+                            line += f"  — {' / '.join(opts)}"
+                        lines.append(line)
+                    lines.append("")
+        except Exception as exc:
+            logger.debug("Could not fetch checklist for email: %s", exc)
+
+    lines.append("=" * 50)
+    lines.append("INSTRUCTIONS")
+    lines.append("=" * 50)
+    lines.append("1. Inspect the equipment using the checklist above.")
+    lines.append(f"2. When complete, reply 'done #{wo_code}' in Telegram.")
+    lines.append("3. The bot will guide you through the debrief checklist.")
+    lines.append("")
+    lines.append("-- SENTINEL Work Order System")
+
+    return "\n".join(lines)
+
+
+async def execute(
+    command: str,
+    equipment_code: str,
+    extra_text: str | None,
+    user_email: str | None,
+) -> CommandResult:
+    """Dispatch a parsed slash command to the appropriate handler."""
+    handlers = {
+        "info": _handle_info,
+        "WO": _handle_wo,
+        "inspect": _handle_inspect,
+        "reset": _handle_reset,
+        "note": _handle_note,
+    }
+    handler = handlers.get(command)
+    if not handler:
+        return CommandResult(
+            message=f"Unknown command: `/{command}`",
+            success=False,
+        )
+    try:
+        return await handler(equipment_code, extra_text, user_email)
+    except httpx.ConnectError:
+        logger.error("Slash command failed: cannot reach internal API")
+        return CommandResult(
+            message="Internal API is unreachable. Please try again shortly.",
+            success=False,
+        )
+    except Exception as exc:
+        logger.error("Slash command /%s_%s failed: %s", command, equipment_code, exc, exc_info=True)
+        return CommandResult(
+            message="Command failed: an internal error occurred.",
+            success=False,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Handlers
+# ---------------------------------------------------------------------------
+
+
+async def _handle_info(code: str, _extra: str | None, _user: str | None) -> CommandResult:
+    """GET /api/work-orders/equipment-info/{code} — equipment details."""
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.get(f"{_base_url()}/api/work-orders/equipment-info/{code}")
+
+    if resp.status_code == 404:
+        return CommandResult(
+            message=f"Equipment `{code}` not found.",
+            success=False,
+        )
+    if resp.status_code != 200:
+        return CommandResult(
+            message=f"Failed to fetch info for `{code}` (HTTP {resp.status_code}).",
+            success=False,
+        )
+
+    data = resp.json()
+    lines = [
+        f"## {data.get('name', code)}",
+        "",
+        "| Field | Value |",
+        "|-------|-------|",
+        f"| **Code** | `{data.get('equipment_code', code)}` |",
+        f"| **Type** | {data.get('type', 'unknown')} |",
+        f"| **Status** | {data.get('status', 'unknown')} |",
+        f"| **Health** | {data.get('health_score', 'N/A')}% |",
+        f"| **Location** | {data.get('location', 'N/A')} |",
+    ]
+    if data.get("manufacturer"):
+        lines.append(f"| **Manufacturer** | {data['manufacturer']} |")
+    if data.get("model"):
+        lines.append(f"| **Model** | {data['model']} |")
+    if data.get("runtime_hours"):
+        lines.append(f"| **Runtime** | {data['runtime_hours']:,} hrs |")
+    if data.get("last_service"):
+        lines.append(f"| **Last Service** | {data['last_service']} |")
+    if data.get("notes"):
+        lines.append(f"\n**Notes:** {data['notes']}")
+
+    lines.append(_quick_actions(code))
+    return CommandResult(message="\n".join(lines))
+
+
+async def _handle_wo(code: str, extra: str | None, user: str | None) -> CommandResult:
+    """Create a work order for the equipment + notify technician."""
+    assigned_to, remaining = _parse_assign(extra)
+    title = remaining or f"Work order for {code}"
+
+    payload: dict = {
+        "equipment_code": code,
+        "title": title,
+        "description": f"Web chat work order: {title}",
+        "priority": "medium",
+        "created_by": user or "web-chat",
+    }
+    if assigned_to:
+        payload["assigned_to"] = assigned_to
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        # 1. Create WO
+        wo_resp = await client.post(
+            f"{_base_url()}/api/sentry/create-work-order",
+            json=payload,
+            headers=_sentry_headers(),
+        )
+
+    if wo_resp.status_code != 200:
+        return CommandResult(
+            message=f"Failed to create work order for `{code}` (HTTP {wo_resp.status_code}).",
+            success=False,
+        )
+
+    wo = wo_resp.json()
+    wo_code = wo.get("code", "N/A")
+    assigned = wo.get("assigned_to", "Unassigned")
+    priority = wo.get("priority", "medium")
+    tech_telegram_id = wo.get("technician_telegram_id")
+    tech_email = wo.get("technician_email")
+
+    # 2. Send Telegram + email to the assigned technician (fire-and-forget)
+    asyncio.create_task(_notify_technician(wo_code, code, tech_telegram_id, tech_email, assigned, priority))
+
+    # 3. Fetch inspection checklist
+    eq_type = code.split("-")[1].lower() if "-" in code else "unknown"
+    checklist_text = ""
+    async with httpx.AsyncClient(timeout=10) as client:
+        try:
+            cl_resp = await client.get(
+                f"{_base_url()}/api/sentry/inspection-checklist/{eq_type}",
+                headers=_sentry_headers(),
+            )
+            if cl_resp.status_code == 200:
+                cl = cl_resp.json()
+                if cl.get("found"):
+                    checklist_text = f"\n\n### Inspection Checklist\n{cl.get('checklist_text', '')}"
+        except Exception:
+            pass  # Checklist is optional
+
+    c = _code_for_buttons(code)
+    notified_via = []
+    if tech_telegram_id:
+        notified_via.append("Telegram")
+    if tech_email:
+        notified_via.append(f"email ({tech_email})")
+    notified_str = " + ".join(notified_via) if notified_via else "no contact info on file"
+
+    lines = [
+        "## Work Order Created",
+        "",
+        "| Field | Value |",
+        "|-------|-------|",
+        f"| **WO Code** | `{wo_code}` |",
+        f"| **Equipment** | `{code}` |",
+        f"| **Priority** | {priority} |",
+        f"| **Assigned To** | {assigned} |",
+        f"| **Notified Via** | {notified_str} |",
+        "| **Status** | scheduled |",
+    ]
+    if checklist_text:
+        lines.append(checklist_text)
+
+    lines.append(f"\n---\n**Quick Actions:** `/info_{c}` \u00b7 `/note_{c}`")
+    return CommandResult(message="\n".join(lines))
+
+
+async def _handle_inspect(code: str, extra: str | None, user: str | None) -> CommandResult:
+    """Create a work order + notify tech via Telegram + email."""
+    assigned_to, remaining = _parse_assign(extra)
+    title = remaining or f"Inspection requested for {code}"
+
+    payload: dict = {
+        "equipment_code": code,
+        "title": title,
+        "description": f"Inspection requested via web chat: {title}",
+        "priority": "medium",
+        "created_by": user or "web-chat",
+    }
+    if assigned_to:
+        payload["assigned_to"] = assigned_to
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        wo_resp = await client.post(
+            f"{_base_url()}/api/sentry/create-work-order",
+            json=payload,
+            headers=_sentry_headers(),
+        )
+
+    if wo_resp.status_code != 200:
+        return CommandResult(
+            message=f"Failed to create inspection for `{code}` (HTTP {wo_resp.status_code}).",
+            success=False,
+        )
+
+    wo = wo_resp.json()
+    wo_code = wo.get("code", "N/A")
+    assigned = wo.get("assigned_to", "Unassigned")
+    tech_telegram_id = wo.get("technician_telegram_id")
+    tech_email = wo.get("technician_email")
+
+    # Send Telegram + email to the assigned technician (fire-and-forget)
+    asyncio.create_task(_notify_technician(wo_code, code, tech_telegram_id, tech_email, assigned, "medium"))
+
+    c = _code_for_buttons(code)
+    notified_via = []
+    if tech_telegram_id:
+        notified_via.append("Telegram")
+    if tech_email:
+        notified_via.append(f"email ({tech_email})")
+    notified_str = " + ".join(notified_via) if notified_via else "no contact info on file"
+
+    return CommandResult(
+        message=(
+            f"## Inspection Scheduled\n\n"
+            f"**WO:** `{wo_code}` | **Equipment:** `{code}` | **Assigned:** {assigned}\n\n"
+            f"Technician notified via {notified_str}.\n"
+            f"\n---\n**Quick Actions:** `/info_{c}` \u00b7 `/note_{c}`"
+        )
+    )
+
+
+async def _handle_reset(code: str, extra: str | None, user: str | None) -> CommandResult:
+    """POST /api/sentry/equipment/reset — remote fault reset."""
+    # Safety check: block FIRE and GEN equipment
+    parts = code.split("-")
+    eq_type = parts[1].upper() if len(parts) >= 2 else ""
+    if eq_type in _BLOCKED_RESET_TYPES:
+        c = _code_for_buttons(code)
+        return CommandResult(
+            message=(
+                f"**Reset blocked:** `{eq_type}` equipment cannot be remotely reset for safety reasons.\n\n"
+                f"Create a work order instead: `/WO_{c}`"
+            ),
+            success=False,
+        )
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            f"{_base_url()}/api/sentry/equipment/reset",
+            json={
+                "equipment_code": code,
+                "user_id": f"web-chat:{user or 'anonymous'}",
+                "reason": extra or "Reset via web chat",
+            },
+            headers=_sentry_headers(),
+        )
+
+    if resp.status_code != 200:
+        return CommandResult(
+            message=f"Reset failed for `{code}` (HTTP {resp.status_code}).",
+            success=False,
+        )
+
+    data = resp.json()
+    if data.get("blocked"):
+        c = _code_for_buttons(code)
+        return CommandResult(
+            message=f"**Reset blocked:** {data.get('reason', 'Unknown reason')}\n\n`/WO_{c}`",
+            success=False,
+        )
+
+    prev_health = data.get("previous_health", "?")
+    new_health = data.get("new_health", "?")
+
+    c = _code_for_buttons(code)
+    return CommandResult(
+        message=(
+            f"## Equipment Reset\n\n"
+            f"**Equipment:** `{code}`\n"
+            f"**Health:** {prev_health}% \u2192 {new_health}%\n"
+            f"**Predictions resolved:** {data.get('predictions_resolved', 0)}\n"
+            f"\n---\n**Quick Actions:** `/info_{c}` \u00b7 `/WO_{c}`"
+        )
+    )
+
+
+async def _handle_note(code: str, extra: str | None, user: str | None) -> CommandResult:
+    """PATCH /api/equipment/{code}/notes — add a note."""
+    if not extra:
+        c = _code_for_buttons(code)
+        return CommandResult(
+            message=(
+                f"**Usage:** `/note_{c} <your note text>`\n\nExample: `/note_{c} Filter replaced during inspection`"
+            ),
+            success=False,
+        )
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.patch(
+            f"{_base_url()}/api/equipment/{code}/notes",
+            json={
+                "notes": extra,
+                "changed_by": f"web-chat:{user or 'anonymous'}",
+                "change_reason": "Note added via web chat",
+            },
+        )
+
+    if resp.status_code == 404:
+        return CommandResult(
+            message=f"Equipment `{code}` not found.",
+            success=False,
+        )
+    if resp.status_code != 200:
+        return CommandResult(
+            message=f"Failed to save note for `{code}` (HTTP {resp.status_code}).",
+            success=False,
+        )
+
+    c = _code_for_buttons(code)
+    return CommandResult(
+        message=(f"**Note saved** for `{code}`\n\n> {extra}\n\n---\n**Quick Actions:** `/info_{c}` \u00b7 `/WO_{c}`")
+    )

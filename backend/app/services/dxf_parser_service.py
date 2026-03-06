@@ -84,8 +84,8 @@ class DXFParserService:
     async def parse_dxf_file(
         self,
         dxf_bytes: bytes,
-        building_code: str,
-        building_name: str,
+        site_code: str,
+        site_name: str,
     ) -> Dict[str, Any]:
         """
         Main entry point: parse DXF and return BuildingConfig format.
@@ -95,8 +95,8 @@ class DXFParserService:
 
         Args:
             dxf_bytes: DXF file content (bytes)
-            building_code: Building identifier (e.g., "site-002")
-            building_name: Building name (e.g., "Sandton City")
+            site_code: Building identifier (e.g., "site-002")
+            site_name: Building name (e.g., "Sandton City")
 
         Returns:
             Dict with keys: equipment, floors, zones, extraction_metadata
@@ -112,9 +112,9 @@ class DXFParserService:
 
             # 3. Extract equipment from layers
             equipment = []
-            equipment.extend(self._extract_hvac_equipment(doc, bbox, building_code))
-            equipment.extend(self._extract_electrical_equipment(doc, bbox, building_code))
-            equipment.extend(self._extract_fire_equipment(doc, bbox, building_code))
+            equipment.extend(self._extract_hvac_equipment(doc, bbox, site_code))
+            equipment.extend(self._extract_electrical_equipment(doc, bbox, site_code))
+            equipment.extend(self._extract_fire_equipment(doc, bbox, site_code))
 
             logger.info(f"✓ Extracted {len(equipment)} equipment (HVAC, Electrical, Fire)")
 
@@ -128,8 +128,8 @@ class DXFParserService:
 
             # 6. Return config
             return {
-                "building_code": building_code,
-                "building_name": building_name,
+                "site_code": site_code,
+                "site_name": site_name,
                 "equipment": equipment,
                 "floors": floors,
                 "zones": zones,
@@ -217,7 +217,7 @@ class DXFParserService:
         self,
         doc: Drawing,
         bbox: BoundingBox,
-        building_code: str,
+        site_code: str,
     ) -> List[Dict[str, Any]]:
         """
         Extract HVAC equipment from AE-HVAC layer.
@@ -242,7 +242,7 @@ class DXFParserService:
         Args:
             doc: ezdxf Drawing
             bbox: Bounding box for coordinate normalization
-            building_code: Site code (e.g., "site-002")
+            site_code: Site code (e.g., "site-002")
 
         Returns:
             List of equipment dicts
@@ -260,7 +260,7 @@ class DXFParserService:
 
         for entity in hvac_entities:
             try:
-                eq_data = self._extract_equipment_from_entity(entity, bbox, building_code, "HVAC")
+                eq_data = self._extract_equipment_from_entity(entity, bbox, site_code, "HVAC")
                 if eq_data:
                     equipment.append(eq_data)
             except Exception as e:
@@ -273,7 +273,7 @@ class DXFParserService:
         self,
         doc: Drawing,
         bbox: BoundingBox,
-        building_code: str,
+        site_code: str,
     ) -> List[Dict[str, Any]]:
         """
         Extract electrical equipment from EL-POWER layer.
@@ -293,7 +293,7 @@ class DXFParserService:
         Args:
             doc: ezdxf Drawing
             bbox: Bounding box for coordinate normalization
-            building_code: Site code
+            site_code: Site code
 
         Returns:
             List of equipment dicts
@@ -311,7 +311,7 @@ class DXFParserService:
 
         for entity in power_entities:
             try:
-                eq_data = self._extract_equipment_from_entity(entity, bbox, building_code, "Electrical")
+                eq_data = self._extract_equipment_from_entity(entity, bbox, site_code, "Electrical")
                 if eq_data:
                     equipment.append(eq_data)
             except Exception as e:
@@ -324,7 +324,7 @@ class DXFParserService:
         self,
         doc: Drawing,
         bbox: BoundingBox,
-        building_code: str,
+        site_code: str,
     ) -> List[Dict[str, Any]]:
         """
         Extract fire/safety equipment from FP-LIFE layer.
@@ -338,7 +338,7 @@ class DXFParserService:
         Args:
             doc: ezdxf Drawing
             bbox: Bounding box for coordinate normalization
-            building_code: Site code
+            site_code: Site code
 
         Returns:
             List of equipment dicts
@@ -356,7 +356,7 @@ class DXFParserService:
 
         for entity in fire_entities:
             try:
-                eq_data = self._extract_equipment_from_entity(entity, bbox, building_code, "Fire")
+                eq_data = self._extract_equipment_from_entity(entity, bbox, site_code, "Fire")
                 if eq_data:
                     equipment.append(eq_data)
             except Exception as e:
@@ -369,7 +369,7 @@ class DXFParserService:
         self,
         entity,
         bbox: BoundingBox,
-        building_code: str,
+        site_code: str,
         layer_type: str,
     ) -> Optional[Dict[str, Any]]:
         """
@@ -380,7 +380,7 @@ class DXFParserService:
         Args:
             entity: DXF entity (INSERT, TEXT, MTEXT, etc.)
             bbox: Bounding box for coordinate normalization
-            building_code: Site code
+            site_code: Site code
             layer_type: Layer category (HVAC, Electrical, Fire)
 
         Returns:
@@ -436,7 +436,7 @@ class DXFParserService:
         zone = self._infer_zone(eq_name, x_norm, y_norm, floor)
 
         # Build v2.0 equipment ID
-        equipment_id = self._build_v2_equipment_id(building_code, eq_type, floor, zone)
+        equipment_id = self._build_v2_equipment_id(site_code, eq_type, floor, zone)
 
         return {
             "name": equipment_id,
@@ -587,7 +587,7 @@ class DXFParserService:
 
     def _build_v2_equipment_id(
         self,
-        building_code: str,
+        site_code: str,
         equipment_type: str,
         floor: str,
         zone: str,
@@ -599,7 +599,7 @@ class DXFParserService:
         Example: S002-CHILLER-B1-001
 
         Args:
-            building_code: Site code (e.g., "site-002")
+            site_code: Site code (e.g., "site-002")
             equipment_type: Equipment type (CHILLER, AHU, etc.)
             floor: Floor code (B1, G, L1, etc.)
             zone: Zone identifier (A-Z or 001+)
@@ -607,8 +607,8 @@ class DXFParserService:
         Returns:
             v2.0 format equipment ID
         """
-        # Extract site number from building_code
-        site_match = re.search(r"(\d+)", building_code)
+        # Extract site number from site_code
+        site_match = re.search(r"(\d+)", site_code)
         site_code = f"S{site_match.group(1).zfill(3)}" if site_match else "S999"
 
         return f"{site_code}-{equipment_type}-{floor}-{zone}"

@@ -10,7 +10,7 @@ from app.services.cache_service import cache, CacheKeys, CacheService, CacheInva
 logger = logging.getLogger(__name__)
 
 
-class BuildingRepository:
+class SiteRepository:
     """Repository for building/site database operations."""
 
     _COLUMNS = (
@@ -64,11 +64,11 @@ class BuildingRepository:
         """
         # Only cache unfiltered full list
         if not region and not site_type:
-            cached = cache.get(CacheKeys.buildings_all())
+            cached = cache.get(CacheKeys.sites_all())
             if cached is not None:
                 return cached
 
-        query = self.client.table("buildings").select(self._COLUMNS)
+        query = self.client.table("sites").select(self._COLUMNS)
 
         if region:
             query = query.eq("region", region)
@@ -80,30 +80,30 @@ class BuildingRepository:
         result = response.data
 
         if not region and not site_type:
-            cache.set(CacheKeys.buildings_all(), result, CacheService.TTL_SEMI_STATIC)
+            cache.set(CacheKeys.sites_all(), result, CacheService.TTL_SEMI_STATIC)
 
         return result
 
-    def get_by_id(self, building_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, site_id: str) -> Optional[Dict[str, Any]]:
         """Get a building by its code.
 
         Args:
-            building_id: Building code (e.g., "site-001")
+            site_id: Building code (e.g., "site-001")
 
         Returns:
             Building data or None if not found
         """
-        cached = cache.get(CacheKeys.building(building_id))
+        cached = cache.get(CacheKeys.building(site_id))
         if cached is not None:
             return cached
 
-        query = self.client.table("buildings").select(self._COLUMNS).eq("code", building_id)
+        query = self.client.table("sites").select(self._COLUMNS).eq("code", site_id)
         with track_query("building", "get_by_id"):
             response = self._execute_with_retry(query)
 
         if response.data:
             result = response.data[0]
-            cache.set(CacheKeys.building(building_id), result, CacheService.TTL_SEMI_STATIC)
+            cache.set(CacheKeys.building(site_id), result, CacheService.TTL_SEMI_STATIC)
             return result
         return None
 
@@ -120,7 +120,7 @@ class BuildingRepository:
         if cached is not None:
             return cached
 
-        query = self.client.table("buildings").select(self._COLUMNS).eq("id", uuid)
+        query = self.client.table("sites").select(self._COLUMNS).eq("id", uuid)
         response = self._execute_with_retry(query)
 
         if response.data:
@@ -129,26 +129,26 @@ class BuildingRepository:
             return result
         return None
 
-    def get_equipment_count(self, building_uuid: str) -> int:
+    def get_equipment_count(self, site_uuid: str) -> int:
         """Get the equipment count for a building.
 
         Args:
-            building_uuid: Building UUID
+            site_uuid: Building UUID
 
         Returns:
             Number of equipment items
         """
         # Use the equipment_count column that's maintained by triggers
-        building = self.get_by_uuid(building_uuid)
+        building = self.get_by_uuid(site_uuid)
         if building:
             return building.get("equipment_count", 0)
         return 0
 
-    def get_alert_count(self, building_uuid: str, status: str = "active") -> int:
+    def get_alert_count(self, site_uuid: str, status: str = "active") -> int:
         """Get the alert count for a building.
 
         Args:
-            building_uuid: Building UUID
+            site_uuid: Building UUID
             status: Alert status filter (default: 'active')
 
         Returns:
@@ -157,18 +157,18 @@ class BuildingRepository:
         response = (
             self.client.table("alerts")
             .select("id", count="exact")
-            .eq("building_id", building_uuid)
+            .eq("site_id", site_uuid)
             .eq("status", status)
             .execute()
         )
 
         return response.count or 0
 
-    def get_at_risk_equipment_count(self, building_uuid: str) -> int:
+    def get_at_risk_equipment_count(self, site_uuid: str) -> int:
         """Get the count of at-risk equipment (warning/critical status) for a building.
 
         Args:
-            building_uuid: Building UUID
+            site_uuid: Building UUID
 
         Returns:
             Number of equipment with warning or critical status
@@ -176,110 +176,108 @@ class BuildingRepository:
         response = (
             self.client.table("equipment")
             .select("id", count="exact")
-            .eq("building_id", building_uuid)
+            .eq("site_id", site_uuid)
             .in_("status", ["warning", "critical"])
             .execute()
         )
 
         return response.count or 0
 
-    def get_equipment(self, building_id: str) -> List[Dict[str, Any]]:
+    def get_equipment(self, site_id: str) -> List[Dict[str, Any]]:
         """Get all equipment for a building.
 
         Args:
-            building_id: Building code (e.g., "site-001")
+            site_id: Building code (e.g., "site-001")
 
         Returns:
             List of equipment items for the building
         """
         # Get building UUID from code
-        building = self.get_by_id(building_id)
+        building = self.get_by_id(site_id)
         if not building:
             return []
 
-        # Query equipment table by building_id (includes metadata fields)
+        # Query equipment table by site_id (includes metadata fields)
         response = (
             self.client.table("equipment")
             .select(
-                "id, code, name, status, health_score, type, building_id, "
+                "id, code, name, status, health_score, type, site_id, "
                 "manufacturer, model, install_date, commissioning_date, "
                 "device_info, operating_data, network_info, location"
             )
-            .eq("building_id", building["id"])
+            .eq("site_id", building["id"])
             .execute()
         )
 
         return response.data or []
 
-    def create(self, building_data: Dict[str, Any]) -> Dict[str, Any]:
+    def create(self, site_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new building.
 
         Args:
-            building_data: Building data
+            site_data: Building data
 
         Returns:
             Created building
         """
-        response = self.client.table("buildings").insert(building_data).execute()
+        response = self.client.table("sites").insert(site_data).execute()
         result = response.data[0]
         CacheInvalidation.on_building_change()
         return result
 
-    def update(self, building_id: str, building_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, site_id: str, site_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a building.
 
         Args:
-            building_id: Building code
-            building_data: Data to update
+            site_id: Building code
+            site_data: Data to update
 
         Returns:
             Updated building or None if not found
         """
         # First get the UUID
-        building = self.get_by_id(building_id)
+        building = self.get_by_id(site_id)
         if not building:
             return None
 
-        response = self.client.table("buildings").update(building_data).eq("id", building["id"]).execute()
+        response = self.client.table("sites").update(site_data).eq("id", building["id"]).execute()
 
         if response.data:
-            CacheInvalidation.on_building_change(building_id=building["id"], building_code=building_id)
+            CacheInvalidation.on_building_change(site_id=building["id"], site_code=site_id)
             return response.data[0]
         return None
 
-    def delete(self, building_id: str) -> bool:
+    def delete(self, site_id: str) -> bool:
         """Delete a building.
 
         Args:
-            building_id: Building code
+            site_id: Building code
 
         Returns:
             True if deleted, False if not found
         """
-        building = self.get_by_id(building_id)
+        building = self.get_by_id(site_id)
         if not building:
             return False
 
-        response = self.client.table("buildings").delete().eq("id", building["id"]).execute()
+        response = self.client.table("sites").delete().eq("id", building["id"]).execute()
 
         if len(response.data) > 0:
-            CacheInvalidation.on_building_change(building_id=building["id"], building_code=building_id)
+            CacheInvalidation.on_building_change(site_id=building["id"], site_code=site_id)
             return True
         return False
 
-    def get_asset_summary(self, building_uuid: str) -> Optional[Dict[str, Any]]:
+    def get_asset_summary(self, site_uuid: str) -> Optional[Dict[str, Any]]:
         """Get categorized asset counts from Supabase view.
 
         Args:
-            building_uuid: Building UUID
+            site_uuid: Building UUID
 
         Returns:
             Asset summary dict with counts by category, or None if not found
         """
         try:
-            response = (
-                self.client.table("v_building_asset_summary").select("*").eq("building_id", building_uuid).execute()
-            )
+            response = self.client.table("v_site_asset_summary").select("*").eq("site_id", site_uuid).execute()
 
             if response.data:
                 return response.data[0]
@@ -288,19 +286,17 @@ class BuildingRepository:
             # View may not exist (migrations not applied)
             return None
 
-    def get_asset_summary_by_code(self, building_code: str) -> Optional[Dict[str, Any]]:
+    def get_asset_summary_by_code(self, site_code: str) -> Optional[Dict[str, Any]]:
         """Get categorized asset counts by building code.
 
         Args:
-            building_code: Building code (e.g., 'sandton')
+            site_code: Building code (e.g., 'sandton')
 
         Returns:
             Asset summary dict with counts by category, or None if not found
         """
         try:
-            response = (
-                self.client.table("v_building_asset_summary").select("*").eq("building_code", building_code).execute()
-            )
+            response = self.client.table("v_site_asset_summary").select("*").eq("site_code", site_code).execute()
 
             if response.data:
                 return response.data[0]
@@ -335,17 +331,15 @@ class BuildingRepository:
             email = user_email.lower().strip()
 
             # Get building IDs user has access to
-            access_result = (
-                self.client.table("user_site_access").select("building_id").eq("user_email", email).execute()
-            )
+            access_result = self.client.table("user_site_access").select("site_id").eq("user_email", email).execute()
 
             if not access_result.data:
                 return []
 
-            building_ids = [a["building_id"] for a in access_result.data]
+            site_ids = [a["site_id"] for a in access_result.data]
 
             # Get buildings with those IDs
-            query = self.client.table("buildings").select(self._COLUMNS).in_("id", building_ids)
+            query = self.client.table("sites").select(self._COLUMNS).in_("id", site_ids)
 
             if region:
                 query = query.eq("region", region)

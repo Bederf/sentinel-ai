@@ -260,7 +260,7 @@ async def _verify_wo_create(args: Dict[str, Any]) -> VerificationEvidence:
     t0 = time.monotonic()
     wo_id = args.get("work_order_id", "")
     expected_title = args.get("title", "")
-    expected_building_id = args.get("building_id", "")
+    expected_site_id = args.get("site_id", "")
     expected_priority = args.get("priority", "")
 
     actual: Dict[str, Any] = {}
@@ -298,7 +298,7 @@ async def _verify_wo_create(args: Dict[str, Any]) -> VerificationEvidence:
     actual = {
         "id": wo.get("id", ""),
         "title": wo.get("title", ""),
-        "building_id": wo.get("building_id", ""),
+        "site_id": wo.get("site_id", ""),
         "priority": wo.get("priority", ""),
         "status": wo.get("status", ""),
     }
@@ -306,8 +306,8 @@ async def _verify_wo_create(args: Dict[str, Any]) -> VerificationEvidence:
     mismatches: List[str] = []
     if expected_title and actual["title"] != expected_title:
         mismatches.append(f"title: expected={expected_title!r}, actual={actual['title']!r}")
-    if expected_building_id and actual["building_id"] != expected_building_id:
-        mismatches.append(f"building_id: expected={expected_building_id!r}, actual={actual['building_id']!r}")
+    if expected_site_id and actual["site_id"] != expected_site_id:
+        mismatches.append(f"site_id: expected={expected_site_id!r}, actual={actual['site_id']!r}")
     if expected_priority and actual["priority"] != expected_priority:
         mismatches.append(f"priority: expected={expected_priority!r}, actual={actual['priority']!r}")
     if actual["status"] not in ("open", "scheduled", "pending"):
@@ -319,7 +319,7 @@ async def _verify_wo_create(args: Dict[str, Any]) -> VerificationEvidence:
             target=f"work_order:{wo_id}",
             expected={
                 "title": expected_title,
-                "building_id": expected_building_id,
+                "site_id": expected_site_id,
                 "priority": expected_priority,
                 "status": "open",
             },

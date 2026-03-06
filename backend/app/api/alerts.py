@@ -41,15 +41,15 @@ def load_alerts() -> list[dict]:
 
         # Get equipment and building lookups for enrichment
         client = get_supabase_client()
-        equipment_resp = client.table("equipment").select("id, name, code, building_id, metadata").execute()
-        buildings_resp = client.table("buildings").select("id, name, code").execute()
+        equipment_resp = client.table("equipment").select("id, name, code, site_id, metadata").execute()
+        buildings_resp = client.table("sites").select("id, name, code").execute()
 
         eq_lookup = {eq["id"]: eq for eq in (equipment_resp.data or [])}
         building_lookup = {b["id"]: b for b in (buildings_resp.data or [])}
 
         for da in db_alerts:
             equipment = eq_lookup.get(da.get("equipment_id"), {})
-            building = building_lookup.get(da.get("building_id"), {})
+            building = building_lookup.get(da.get("site_id"), {})
             # Extract device_id from equipment metadata for control navigation
             metadata = equipment.get("metadata") or {}
             device_id = metadata.get("device_id")
@@ -568,30 +568,30 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
     eq = equipment.data[0]
     equipment_id = eq["id"]
 
-    # Get building_id if available (for schema compliance)
-    building_id = None
+    # Get site_id if available (for schema compliance)
+    site_id = None
     try:
-        equipment_with_building = client.table("equipment").select("building_id").eq("id", equipment_id).execute()
+        equipment_with_building = client.table("equipment").select("site_id").eq("id", equipment_id).execute()
         if equipment_with_building.data:
-            building_id = equipment_with_building.data[0].get("building_id")
+            site_id = equipment_with_building.data[0].get("site_id")
     except Exception:
-        pass  # building_id might not exist in this table
+        pass  # site_id might not exist in this table
 
-    # Get building name from buildings table if building_id exists
-    building_name = "Unknown"
-    if building_id:
+    # Get building name from buildings table if site_id exists
+    site_name = "Unknown"
+    if site_id:
         try:
-            building = client.table("buildings").select("name").eq("id", building_id).execute()
+            building = client.table("sites").select("name").eq("id", site_id).execute()
             if building.data:
-                building_name = building.data[0].get("name", "Unknown")
+                site_name = building.data[0].get("name", "Unknown")
         except Exception:
-            building_name = "Unknown"  # Default if query fails
+            site_name = "Unknown"  # Default if query fails
 
-    # Create alert using building_id from equipment foreign key
+    # Create alert using site_id from equipment foreign key
     alert_id = str(uuid.uuid4())
     alert_data = {
         "id": alert_id,
-        "building_id": building_id,
+        "site_id": site_id,
         "equipment_id": equipment_id,
         "type": request.type,
         "severity": request.severity,
@@ -660,7 +660,7 @@ async def create_alert(http_request: Request, request: CreateAlertRequest) -> Cr
     if request.notify_sentry:
         sentry_alert = {
             "id": alert_id,
-            "building_name": building_name,
+            "site_name": site_name,
             "zone_name": request.zone_name or "Unknown",
             "equipment_name": eq["name"],
             "equipment_code": request.equipment_code,
@@ -786,7 +786,7 @@ async def dispatch_work_order(alert_id: str, request: DispatchWorkOrderRequest):
     _work_order = {
         "id": work_order_id,
         "alert_id": alert_id,
-        "building_id": alert["building_id"],
+        "site_id": alert["site_id"],
         "equipment_id": alert["equipment_id"],
         "type": request.service_type,
         "status": "assigned",
@@ -808,7 +808,7 @@ async def dispatch_work_order(alert_id: str, request: DispatchWorkOrderRequest):
     wo_data = {
         "work_order_id": work_order_id,
         "equipment_id": alert["equipment_id"],
-        "building_id": alert["building_id"],
+        "site_id": alert["site_id"],
         "equipment_name": equipment["name"],
         "criticality": "HIGH" if alert["severity"] == "critical" else "MEDIUM",
         "service_type": request.service_type,

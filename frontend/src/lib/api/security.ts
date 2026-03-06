@@ -26,7 +26,7 @@ export interface AccessEvent {
 
 export interface AccessPoint {
   point_id: string;
-  building_id: string;
+  site_id: string;
   zone: string;
   location: string;
   device_type: 'reader' | 'lock' | 'sensor' | 'controller';
@@ -52,7 +52,7 @@ export interface SecurityAlert {
   alert_type: 'forced_entry' | 'tailgating' | 'after_hours' | 'override' | 'card_revoked' | 'multiple_attempts' | 'unauthorized_access';
   timestamp: string;
   location: string;
-  building_id: string;
+  site_id: string;
   severity: 'critical' | 'warning' | 'info';
   status: 'open' | 'acknowledged' | 'resolved';
   description: string;
@@ -260,7 +260,7 @@ export const securityApi = {
   createAlert: async (data: {
     alert_type: string;
     location: string;
-    building_id: string;
+    site_id: string;
     severity: string;
     description: string;
   }): Promise<{ alert_id: string; status: string }> => {

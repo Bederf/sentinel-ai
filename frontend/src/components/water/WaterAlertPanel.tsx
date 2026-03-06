@@ -12,7 +12,6 @@
 import { useState } from "react";
 import { useModules } from "@/contexts/ModuleHooks";
 import {
-  Card,
   Text,
   Badge,
   Button,
@@ -33,14 +32,14 @@ import { waterApi } from "../../lib/waterApi";
 import type { WaterAlert } from "../../lib/waterApi";
 
 interface WaterAlertPanelProps {
-  buildingId: string;
+  siteId: string;
 }
 
 const FILTER_OPTIONS = ["all", "unacknowledged", "critical", "in_progress", "resolved"] as const;
 type FilterStatus = (typeof FILTER_OPTIONS)[number];
 
 export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
-  buildingId,
+  siteId,
 }) => {
   const { isModuleActive } = useModules();
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
@@ -51,16 +50,16 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
 
   // Fetch water alerts
   const { data: alerts, isLoading } = useQuery({
-    queryKey: ["water", "alerts", buildingId],
+    queryKey: ["water", "alerts", siteId],
     queryFn: async () => {
       try {
-        return await waterApi.getActiveAlerts(buildingId);
+        return await waterApi.getActiveAlerts(siteId);
       } catch {
         // Fallback demo data
         return [
           {
             alert_id: "alert-w001",
-            site: buildingId,
+            site: siteId,
             alert_type: "night_flow" as const,
             severity: "critical" as const,
             timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
@@ -73,7 +72,7 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
           } as WaterAlert,
           {
             alert_id: "alert-w002",
-            site: buildingId,
+            site: siteId,
             alert_type: "unusual_pattern" as const,
             severity: "high" as const,
             timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
@@ -85,7 +84,7 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
           } as WaterAlert,
           {
             alert_id: "alert-w003",
-            site: buildingId,
+            site: siteId,
             alert_type: "spike" as const,
             severity: "high" as const,
             timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
@@ -174,7 +173,7 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
     <div className="space-y-4">
       {/* Alert Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Card className="glass-panel p-3" style={{ border: "1px solid var(--glass-border)" }}>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Flex justifyContent="between" alignItems="start">
             <div>
               <Text
@@ -187,9 +186,9 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
             </div>
             <AlertCircle className="h-5 w-5" style={{color: "var(--color-sentinel-blue)"}} />
           </Flex>
-        </Card>
+        </div>
 
-        <Card className="glass-panel p-3" style={{ border: "1px solid var(--glass-border)" }}>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Flex justifyContent="between" alignItems="start">
             <div>
               <Text
@@ -204,9 +203,9 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
             </div>
             <Clock className="h-5 w-5" style={{color: "var(--color-sentinel-amber)"}} />
           </Flex>
-        </Card>
+        </div>
 
-        <Card className="glass-panel p-3" style={{ border: "1px solid var(--glass-border)" }}>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Flex justifyContent="between" alignItems="start">
             <div>
               <Text
@@ -221,7 +220,7 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
             </div>
             <AlertTriangle className="h-5 w-5 text-red-500" />
           </Flex>
-        </Card>
+        </div>
       </div>
 
       {/* Filter Tabs */}
@@ -236,7 +235,7 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
       </TabGroup>
 
       {/* Alert List */}
-      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         {isLoading ? (
           <div className="flex items-center justify-center h-40">
             <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
@@ -378,7 +377,7 @@ export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
               })}
           </div>
         )}
-      </Card>
+      </div>
     </div>
   );
 };

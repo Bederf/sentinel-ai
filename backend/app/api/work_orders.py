@@ -967,7 +967,7 @@ def _map_db_to_technician_work_order(
     """Map work_orders table row into technician API shape expected by frontend."""
     return {
         "id": str(row.get("id", "")),
-        "site_id": fallback_site_id or str(row.get("building_id") or "unknown"),
+        "site_id": fallback_site_id or str(row.get("site_id") or "unknown"),
         "equipment_id": str(row.get("equipment_id") or "unknown"),
         "fault_description": row.get("description") or row.get("title") or "",
         "diagnosis": row.get("findings") or "",

@@ -12,7 +12,7 @@
  */
 
 import { useState, useRef, useEffect } from "react";
-import { Card, Button, Badge, Callout } from "@tremor/react";
+import { Button, Badge, Callout } from "@tremor/react";
 import {
   Thermometer,
   Send,
@@ -348,8 +348,8 @@ export default function ComfortComplaintPanel({ compact = true, onViewDetails }:
   );
 
   return (
-    <Card
-      className="overflow-hidden"
+    <div
+      className="rounded-md overflow-hidden"
       style={{
         background: "var(--color-sentinel-bg-panel)",
         border: "1px solid var(--color-sentinel-border)",
@@ -397,6 +397,6 @@ export default function ComfortComplaintPanel({ compact = true, onViewDetails }:
       <div className="p-4">
         {diagnosis ? renderDiagnosis() : renderForm()}
       </div>
-    </Card>
+    </div>
   );
 }

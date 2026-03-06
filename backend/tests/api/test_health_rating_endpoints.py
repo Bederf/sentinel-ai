@@ -76,7 +76,7 @@ def _make_mock_equipment(code: str = "S002-AHU-001", health: int = 85):
         "health_score": health,
         "health": health,
         "updated_at": datetime.now().isoformat(),
-        "building_id": "test-building",
+        "site_id": "test-building",
     }
 
 

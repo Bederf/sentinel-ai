@@ -319,7 +319,7 @@ class SimulatedHuaweiConnector(SolarConnector):
         solar_factor = _solar_power_factor(sast_hour)
 
         # Building base load ~800 kW
-        building_load = 800 + random.uniform(-50, 50)
+        site_load = 800 + random.uniform(-50, 50)
         # Total solar generation estimate
         total_pv_kw = 297 * solar_factor * 0.95
         # BESS contribution
@@ -328,7 +328,7 @@ class SimulatedHuaweiConnector(SolarConnector):
         if mode == "discharging":
             bess_kw = 100 * random.uniform(0.6, 0.85)
 
-        net_grid = building_load - total_pv_kw - bess_kw
+        net_grid = site_load - total_pv_kw - bess_kw
         import_kw = max(0, net_grid)
         export_kw = max(0, -net_grid)
 
@@ -346,7 +346,7 @@ class SimulatedHuaweiConnector(SolarConnector):
             frequency_hz=round(50.0 + random.uniform(-0.04, 0.04), 2),
             power_factor=round(0.95 + random.uniform(-0.02, 0.04), 3),
             thd_pct=round(random.uniform(2.0, 4.5), 1),
-            daily_import_kwh=round(building_load * sast_hour * 0.6, 0),
+            daily_import_kwh=round(site_load * sast_hour * 0.6, 0),
             daily_export_kwh=round(export_kw * max(0, sast_hour - 9) * 0.3, 0),
         )
 

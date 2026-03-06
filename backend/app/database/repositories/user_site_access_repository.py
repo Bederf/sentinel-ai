@@ -19,7 +19,7 @@ class UserSiteAccessRepository:
     def __init__(self):
         self.client = get_supabase_client()
 
-    def get_accessible_building_ids(self, user_email: str, user_role: SentinelRole) -> List[str]:
+    def get_accessible_site_ids(self, user_email: str, user_role: SentinelRole) -> List[str]:
         """
         Get list of building UUIDs the user can access.
 
@@ -39,7 +39,7 @@ class UserSiteAccessRepository:
         # ADMIN sees all buildings
         if user_role == SentinelRole.ADMIN:
             try:
-                result = self.client.table("buildings").select("id").execute()
+                result = self.client.table("sites").select("id").execute()
                 return [b["id"] for b in (result.data or [])]
             except Exception as e:
                 logger.error(f"Error getting all buildings: {e}")
@@ -48,15 +48,15 @@ class UserSiteAccessRepository:
         # Other roles see only assigned buildings
         try:
             email = user_email.lower().strip()
-            result = self.client.table("user_site_access").select("building_id").eq("user_email", email).execute()
+            result = self.client.table("user_site_access").select("site_id").eq("user_email", email).execute()
 
-            return [a["building_id"] for a in (result.data or [])]
+            return [a["site_id"] for a in (result.data or [])]
 
         except Exception as e:
             logger.error(f"Error getting accessible buildings for {user_email}: {e}")
             return []
 
-    def get_accessible_building_codes(self, user_email: str, user_role: SentinelRole) -> List[str]:
+    def get_accessible_site_codes(self, user_email: str, user_role: SentinelRole) -> List[str]:
         """
         Get list of building codes the user can access.
 
@@ -76,7 +76,7 @@ class UserSiteAccessRepository:
         # ADMIN sees all buildings
         if user_role == SentinelRole.ADMIN:
             try:
-                result = self.client.table("buildings").select("code").execute()
+                result = self.client.table("sites").select("code").execute()
                 return [b["code"] for b in (result.data or [])]
             except Exception as e:
                 logger.error(f"Error getting all building codes: {e}")
@@ -87,14 +87,14 @@ class UserSiteAccessRepository:
             email = user_email.lower().strip()
             result = (
                 self.client.table("user_site_access")
-                .select("building_id, buildings(code)")
+                .select("site_id, buildings(code)")
                 .eq("user_email", email)
                 .execute()
             )
 
             codes = []
             for a in result.data or []:
-                building = a.get("buildings")
+                building = a.get("sites")
                 if building and building.get("code"):
                     codes.append(building["code"])
             return codes
@@ -103,14 +103,14 @@ class UserSiteAccessRepository:
             logger.error(f"Error getting accessible building codes for {user_email}: {e}")
             return []
 
-    def has_access_to_building_id(self, user_email: str, user_role: SentinelRole, building_id: str) -> bool:
+    def has_access_to_site_id(self, user_email: str, user_role: SentinelRole, site_id: str) -> bool:
         """
         Check if user has access to a specific building by UUID.
 
         Args:
             user_email: User's email address
             user_role: User's role
-            building_id: Building UUID
+            site_id: Building UUID
 
         Returns:
             True if user has access
@@ -127,7 +127,7 @@ class UserSiteAccessRepository:
                 self.client.table("user_site_access")
                 .select("id")
                 .eq("user_email", email)
-                .eq("building_id", building_id)
+                .eq("site_id", site_id)
                 .execute()
             )
 
@@ -137,14 +137,14 @@ class UserSiteAccessRepository:
             logger.error(f"Error checking building access: {e}")
             return False
 
-    def has_access_to_building_code(self, user_email: str, user_role: SentinelRole, building_code: str) -> bool:
+    def has_access_to_site_code(self, user_email: str, user_role: SentinelRole, site_code: str) -> bool:
         """
         Check if user has access to a specific building by code.
 
         Args:
             user_email: User's email address
             user_role: User's role
-            building_code: Building code (e.g., 'site-002')
+            site_code: Building code (e.g., 'site-002')
 
         Returns:
             True if user has access
@@ -157,25 +157,25 @@ class UserSiteAccessRepository:
 
         try:
             # Get building UUID first
-            building_result = self.client.table("buildings").select("id").eq("code", building_code).execute()
+            site_result = self.client.table("sites").select("id").eq("code", site_code).execute()
 
-            if not building_result.data:
+            if not site_result.data:
                 return False
 
-            building_id = building_result.data[0]["id"]
-            return self.has_access_to_building_id(user_email, user_role, building_id)
+            site_id = site_result.data[0]["id"]
+            return self.has_access_to_site_id(user_email, user_role, site_id)
 
         except Exception as e:
             logger.error(f"Error checking building access by code: {e}")
             return False
 
-    def grant_access(self, user_email: str, building_id: str, granted_by: str) -> Optional[Dict[str, Any]]:
+    def grant_access(self, user_email: str, site_id: str, granted_by: str) -> Optional[Dict[str, Any]]:
         """
         Grant a user access to a building.
 
         Args:
             user_email: User's email address
-            building_id: Building UUID
+            site_id: Building UUID
             granted_by: Email or identifier of admin granting access
 
         Returns:
@@ -192,16 +192,16 @@ class UserSiteAccessRepository:
                 .upsert(
                     {
                         "user_email": email,
-                        "building_id": building_id,
+                        "site_id": site_id,
                         "granted_by": granted_by,
                     },
-                    on_conflict="user_email,building_id",
+                    on_conflict="user_email,site_id",
                 )
                 .execute()
             )
 
             if result.data:
-                logger.info(f"Granted {email} access to building {building_id}")
+                logger.info(f"Granted {email} access to building {site_id}")
                 return result.data[0]
             return None
 
@@ -209,13 +209,13 @@ class UserSiteAccessRepository:
             logger.error(f"Error granting access: {e}")
             return None
 
-    def revoke_access(self, user_email: str, building_id: str) -> bool:
+    def revoke_access(self, user_email: str, site_id: str) -> bool:
         """
         Revoke a user's access to a building.
 
         Args:
             user_email: User's email address
-            building_id: Building UUID
+            site_id: Building UUID
 
         Returns:
             True if successfully revoked
@@ -227,15 +227,11 @@ class UserSiteAccessRepository:
         try:
             email = user_email.lower().strip()
             result = (
-                self.client.table("user_site_access")
-                .delete()
-                .eq("user_email", email)
-                .eq("building_id", building_id)
-                .execute()
+                self.client.table("user_site_access").delete().eq("user_email", email).eq("site_id", site_id).execute()
             )
 
             if result.data:
-                logger.info(f"Revoked {email} access to building {building_id}")
+                logger.info(f"Revoked {email} access to building {site_id}")
                 return True
             return False
 
@@ -271,12 +267,12 @@ class UserSiteAccessRepository:
             logger.error(f"Error getting user access list: {e}")
             return []
 
-    def get_building_users(self, building_id: str) -> List[Dict[str, Any]]:
+    def get_building_users(self, site_id: str) -> List[Dict[str, Any]]:
         """
         Get all users with access to a building.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
 
         Returns:
             List of access records
@@ -288,7 +284,7 @@ class UserSiteAccessRepository:
             result = (
                 self.client.table("user_site_access")
                 .select("user_email, granted_by, granted_at")
-                .eq("building_id", building_id)
+                .eq("site_id", site_id)
                 .execute()
             )
 
@@ -327,10 +323,10 @@ class UserSiteAccessRepository:
 
             granted_any = False
             for site in sites:
-                building_id = site.get("id")
-                if not building_id:
+                site_id = site.get("id")
+                if not site_id:
                     continue
-                result = self.grant_access(user_email, building_id, granted_by)
+                result = self.grant_access(user_email, site_id, granted_by)
                 if result is not None:
                     granted_any = True
 

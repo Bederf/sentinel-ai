@@ -40,16 +40,16 @@ import { RenewalPricingDashboard } from './RenewalPricingDashboard'
 import { BenchmarkingAnalysis } from './BenchmarkingAnalysis'
 
 interface CommercialIntelligenceDashboardProps {
-  buildingId: string
-  buildingName?: string
+  siteId: string
+  siteName?: string
   onClose?: () => void
 }
 
 type ViewMode = 'quote-tools' | 'renewal-pipeline' | 'renewal-analysis' | 'benchmarks' | 'win-loss'
 
 export default function CommercialIntelligenceDashboard({
-  buildingId,
-  buildingName = 'Building',
+  siteId,
+  siteName = 'Building',
   onClose,
 }: CommercialIntelligenceDashboardProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('quote-tools')
@@ -144,7 +144,7 @@ export default function CommercialIntelligenceDashboard({
                   <TabPanel>
                     <Card>
                       <QuoteGenerator
-                        buildingId={buildingId}
+                        siteId={siteId}
                         onQuoteGenerated={() => {}} // Already generated
                       />
                     </Card>
@@ -160,7 +160,7 @@ export default function CommercialIntelligenceDashboard({
                   <TabPanel>
                     <QuotePreview
                       quote={currentQuote}
-                      buildingName={buildingName}
+                      siteName={siteName}
                       clientName="Client Name"
                       equipmentCodes={equipmentCodes}
                       slaTier={slaTier}
@@ -175,7 +175,7 @@ export default function CommercialIntelligenceDashboard({
               <>
                 <Card>
                   <QuoteGenerator
-                    buildingId={buildingId}
+                    siteId={siteId}
                     onQuoteGenerated={(quote) => {
                       handleQuoteGenerated(quote, [], 'standard', 12)
                     }}

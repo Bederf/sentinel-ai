@@ -13,13 +13,13 @@ import { Paperclip, Loader } from 'lucide-react';
 import { documentsApi } from '@/lib/api/documents';
 
 interface DocumentUploadProps {
-  buildingId: string;
+  siteId: string;
   onUploadComplete?: () => void;
   onError?: (error: string) => void;
 }
 
 export function DocumentUpload({
-  buildingId,
+  siteId,
   onUploadComplete,
   onError,
 }: DocumentUploadProps) {
@@ -65,7 +65,7 @@ export function DocumentUpload({
     setUploading(true);
     try {
       const response = await documentsApi.uploadDocument(
-        buildingId,
+        siteId,
         file,
         undefined, // Use filename as title
         'building_manual'
@@ -106,7 +106,7 @@ export function DocumentUpload({
       {/* Upload button */}
       <button
         onClick={handleFileClick}
-        disabled={uploading || !buildingId}
+        disabled={uploading || !siteId}
         className="px-2 py-1.5 rounded flex items-center gap-2 transition-all hover:brightness-110 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100 disabled:hover:scale-100"
         style={{
           background: uploading
@@ -115,7 +115,7 @@ export function DocumentUpload({
           border: '1px solid var(--color-grafana-border)',
           color: 'var(--color-grafana-text-secondary)',
         }}
-        title={!buildingId ? 'Select a building first' : 'Upload document'}
+        title={!siteId ? 'Select a building first' : 'Upload document'}
         aria-label="Upload document"
       >
         {uploading ? (

@@ -63,6 +63,10 @@
 ✓ Floor filtering, equipment type filtering, individual equipment selection
 ✓ Zone centroids calculated directly from desk positions (accurate)
 ✓ Equipment positioned at zone centroids + small type-specific offsets + jitter
+✓ All floors auto-selected on load — all equipment visible immediately
+✓ Clickable equipment labels in both 2D (text above circle) and 3D (Html overlay)
+✓ Unified floor extraction via `@/utils/floorExtraction` (handles zone-based S002 codes)
+✓ Larger canvas: `calc(100vh - 180px)` for more visualization space
 
 ## Database Schema
 

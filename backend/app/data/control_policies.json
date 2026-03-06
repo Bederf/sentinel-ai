@@ -1,0 +1,80 @@
+{
+  "CHILLER": {
+    "equipment_type": "CHILLER",
+    "setpoint_limits": {
+      "chw_supply_temp": {"min": 5.0, "max": 12.0},
+      "chw_return_temp": {"min": 8.0, "max": 18.0}
+    },
+    "ramp_limits": {"chw_supply_temp": 1.0},
+    "lockout_windows": [],
+    "dependencies": {"start": ["chw_pump_running", "ct_fan_running"]},
+    "max_auto_per_hour": 3,
+    "kill_switch_enabled": true
+  },
+  "AHU": {
+    "equipment_type": "AHU",
+    "setpoint_limits": {
+      "supply_air_temp": {"min": 12.0, "max": 22.0},
+      "supply_air_pressure": {"min": 50, "max": 400}
+    },
+    "ramp_limits": {"supply_air_temp": 2.0},
+    "lockout_windows": [],
+    "dependencies": {"start": ["supply_fan_running"]},
+    "max_auto_per_hour": 5,
+    "kill_switch_enabled": true
+  },
+  "FCU": {
+    "equipment_type": "FCU",
+    "setpoint_limits": {
+      "zone_temp_setpoint": {"min": 16.0, "max": 28.0}
+    },
+    "ramp_limits": {"zone_temp_setpoint": 2.0},
+    "lockout_windows": [],
+    "dependencies": {},
+    "max_auto_per_hour": 10,
+    "kill_switch_enabled": true
+  },
+  "VAV": {
+    "equipment_type": "VAV",
+    "setpoint_limits": {
+      "zone_temp_setpoint": {"min": 18.0, "max": 26.0},
+      "damper_position": {"min": 0, "max": 100}
+    },
+    "ramp_limits": {"zone_temp_setpoint": 2.0},
+    "lockout_windows": [],
+    "dependencies": {},
+    "max_auto_per_hour": 10,
+    "kill_switch_enabled": true
+  },
+  "BESS": {
+    "equipment_type": "BESS",
+    "setpoint_limits": {
+      "charge_power_kw": {"min": -50.0, "max": 50.0}
+    },
+    "ramp_limits": {"charge_power_kw": 10.0},
+    "lockout_windows": [],
+    "dependencies": {},
+    "max_auto_per_hour": 3,
+    "kill_switch_enabled": true
+  },
+  "DALI": {
+    "equipment_type": "DALI",
+    "setpoint_limits": {
+      "brightness": {"min": 0, "max": 100}
+    },
+    "ramp_limits": {"brightness": 50},
+    "lockout_windows": [],
+    "dependencies": {},
+    "max_auto_per_hour": 20,
+    "kill_switch_enabled": true
+  },
+  "GEN": {
+    "equipment_type": "GEN",
+    "setpoint_limits": {},
+    "ramp_limits": {},
+    "lockout_windows": [],
+    "dependencies": {"start": ["ats_available"]},
+    "max_auto_per_hour": 2,
+    "kill_switch_enabled": true
+  }
+}

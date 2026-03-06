@@ -582,7 +582,7 @@ class SolarArbitrageEngine:
         site_id: str,
         current_soc_pct: float = 50.0,
         solar_gen_kw: float = 0.0,
-        building_load_kw: float = 0.0,
+        site_load_kw: float = 0.0,
         load_shedding_active: bool = False,
         timestamp: Optional[datetime] = None,
     ) -> DispatchAction:
@@ -601,7 +601,7 @@ class SolarArbitrageEngine:
 
         # Priority 1: Load shedding -- discharge to sustain building
         if load_shedding_active:
-            discharge_power = min(self.BESS_RATED_POWER_KW, building_load_kw)
+            discharge_power = min(self.BESS_RATED_POWER_KW, site_load_kw)
             if current_soc_pct <= self.BESS_MIN_SOC_PCT:
                 return DispatchAction(
                     action=DispatchActionType.IDLE.value,
@@ -615,7 +615,7 @@ class SolarArbitrageEngine:
             return DispatchAction(
                 action=DispatchActionType.DISCHARGE.value,
                 power_kw=discharge_power,
-                reason=f"Load shedding active; discharging to sustain {building_load_kw:.0f} kW critical load",
+                reason=f"Load shedding active; discharging to sustain {site_load_kw:.0f} kW critical load",
                 tariff_band=band.name,
                 rate_per_kwh=band.total_rate_per_kwh,
                 current_soc_pct=current_soc_pct,
@@ -665,7 +665,7 @@ class SolarArbitrageEngine:
                     rate_per_kwh=band.total_rate_per_kwh,
                     current_soc_pct=current_soc_pct,
                 )
-            discharge_power = min(self.BESS_RATED_POWER_KW, building_load_kw or self.BESS_RATED_POWER_KW)
+            discharge_power = min(self.BESS_RATED_POWER_KW, site_load_kw or self.BESS_RATED_POWER_KW)
             return DispatchAction(
                 action=DispatchActionType.DISCHARGE.value,
                 power_kw=discharge_power,
@@ -677,7 +677,7 @@ class SolarArbitrageEngine:
 
         else:
             # Standard band -- solar priority
-            excess_solar = max(0, solar_gen_kw - building_load_kw)
+            excess_solar = max(0, solar_gen_kw - site_load_kw)
             if excess_solar > 50 and current_soc_pct < self.BESS_MAX_SOC_PCT:
                 charge_power = min(excess_solar, self.BESS_RATED_POWER_KW)
                 return DispatchAction(

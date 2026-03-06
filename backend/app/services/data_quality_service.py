@@ -95,7 +95,7 @@ class DataQualityService:
         self,
         equipment_id: str,
         equipment_type: str = "unknown",
-        building_id: str = "",
+        site_id: str = "",
         lookback_hours: int = 24,
     ) -> EquipmentDataQuality:
         """Compute data quality metrics for an equipment.
@@ -103,7 +103,7 @@ class DataQualityService:
         Args:
             equipment_id: Equipment identifier
             equipment_type: Equipment type (chiller, ahu, generator)
-            building_id: Building identifier
+            site_id: Building identifier
             lookback_hours: Hours to analyze (default: 24)
 
         Returns:
@@ -143,7 +143,7 @@ class DataQualityService:
         return EquipmentDataQuality(
             equipment_id=equipment_id,
             equipment_type=equipment_type,
-            building_id=building_id,
+            site_id=site_id,
             overall_quality=overall_quality,
             quality_score=round(quality_score, 2),
             sensor_health=sensor_health_list,
@@ -310,15 +310,15 @@ class DataQualityService:
 
     def generate_daily_report(
         self,
-        building_id: str,
-        building_name: str = "",
+        site_id: str,
+        site_name: str = "",
         equipment_list: Optional[List[Dict[str, str]]] = None,
     ) -> BuildingDataQualityReport:
         """Generate a daily data quality report for a building.
 
         Args:
-            building_id: Building identifier
-            building_name: Building name
+            site_id: Building identifier
+            site_name: Building name
             equipment_list: List of equipment dicts with equipment_id and equipment_type
 
         Returns:
@@ -326,7 +326,7 @@ class DataQualityService:
         """
         # If no equipment list provided, load from equipment.json
         if equipment_list is None:
-            equipment_list = self._load_equipment_for_building(building_id)
+            equipment_list = self._load_equipment_for_site(site_id)
 
         equipment_quality_list: List[EquipmentDataQuality] = []
         total_score = 0.0
@@ -335,7 +335,7 @@ class DataQualityService:
             quality = self.get_equipment_quality(
                 equipment_id=eq["equipment_id"],
                 equipment_type=eq.get("equipment_type", "unknown"),
-                building_id=building_id,
+                site_id=site_id,
                 lookback_hours=24,
             )
             equipment_quality_list.append(quality)
@@ -349,8 +349,8 @@ class DataQualityService:
         total_gaps = sum(eq.total_gaps for eq in equipment_quality_list)
 
         return BuildingDataQualityReport(
-            building_id=building_id,
-            building_name=building_name,
+            site_id=site_id,
+            site_name=site_name,
             report_date=datetime.utcnow(),
             equipment_count=len(equipment_quality_list),
             overall_quality=overall_quality,
@@ -513,11 +513,11 @@ class DataQualityService:
 
         return (eq_score * 0.3) + (quality_score * 0.4) + (days_score * 0.3)
 
-    def _load_equipment_for_building(self, building_id: str) -> List[Dict[str, str]]:
+    def _load_equipment_for_site(self, site_id: str) -> List[Dict[str, str]]:
         """Load equipment list for a building from equipment.json.
 
         Args:
-            building_id: Building identifier
+            site_id: Building identifier
 
         Returns:
             List of equipment dicts with equipment_id and equipment_type
@@ -527,14 +527,14 @@ class DataQualityService:
             with open(equipment_path, "r") as f:
                 all_equipment = json.load(f)
 
-            # Filter by building_id (site_id in equipment.json)
+            # Filter by site_id (site_id in equipment.json)
             return [
                 {"equipment_id": eq["id"], "equipment_type": eq.get("type", "unknown")}
                 for eq in all_equipment
-                if eq.get("site_id", "") == building_id
+                if eq.get("site_id", "") == site_id
             ]
         except Exception as e:
-            logger.warning(f"Failed to load equipment for building {building_id}: {e}")
+            logger.warning(f"Failed to load equipment for building {site_id}: {e}")
             return []
 
     def _load_equipment_by_type(self, equipment_type: str) -> List[Dict[str, str]]:

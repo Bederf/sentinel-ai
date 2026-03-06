@@ -153,20 +153,20 @@ class ProfileService:
             True if successful, False otherwise
         """
         try:
-            building_path = Path(__file__).parent.parent / "data" / "buildings" / site_id / "building.json"
+            site_path = Path(__file__).parent.parent / "data" / "buildings" / site_id / "building.json"
 
-            if not building_path.exists():
-                logger.warning(f"Building file not found: {building_path}")
+            if not site_path.exists():
+                logger.warning(f"Building file not found: {site_path}")
                 return False
 
-            with open(building_path, "r") as f:
-                building_data = json.load(f)
+            with open(site_path, "r") as f:
+                site_data = json.load(f)
 
             # Update optimization section
-            building_data["optimization"] = config.to_dict()
+            site_data["optimization"] = config.to_dict()
 
-            with open(building_path, "w") as f:
-                json.dump(building_data, f, indent=2)
+            with open(site_path, "w") as f:
+                json.dump(site_data, f, indent=2)
 
             # Update runtime cache
             self.site_configs[site_id] = config
@@ -194,16 +194,16 @@ class ProfileService:
             return self.site_configs[site_id]
 
         try:
-            building_path = Path(__file__).parent.parent / "data" / "buildings" / site_id / "building.json"
+            site_path = Path(__file__).parent.parent / "data" / "buildings" / site_id / "building.json"
 
-            if not building_path.exists():
-                logger.warning(f"Building file not found: {building_path}")
+            if not site_path.exists():
+                logger.warning(f"Building file not found: {site_path}")
                 return None
 
-            with open(building_path, "r") as f:
-                building_data = json.load(f)
+            with open(site_path, "r") as f:
+                site_data = json.load(f)
 
-            optimization_data = building_data.get("optimization", {})
+            optimization_data = site_data.get("optimization", {})
             if not optimization_data:
                 # Return default config if not present
                 config = SiteProfileConfig(

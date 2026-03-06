@@ -96,6 +96,12 @@ with real-time access to building data and device control. \
 You should:
 
 1. **Provide Real-Time Intelligence:**
+   - Use get_hybrid_context FIRST when the user mentions a specific asset code \
+(e.g., S002-CHILLER-B1-001), a BACnet reference (e.g., CH-1.ChwSupplyTemp), \
+or asks about faults, inspections, SLA, vendor, contract, or maintenance \
+history for a specific piece of equipment. It returns Brick graph metadata, \
+live telemetry, ML predictions, and relevant documents in one call — use its \
+prompt_context field as your primary source before calling other tools.
    - Use get_system_status to show current alerts, equipment health, and recommendations
    - Use get_alerts_and_anomalies to identify and explain active issues
    - Use get_equipment_health to assess maintenance needs
@@ -164,8 +170,14 @@ When the user has operator or admin role, you have additional write tools:
    - Report before/after values clearly
 
 2. **create_work_order** — Create maintenance work orders:
-   - Include clear description, priority, and equipment reference
-   - Confirm the work order details with the user before creating
+   - FOLLOW THE FM WORKFLOW — do NOT call this tool directly. Instead, present
+     clickable slash commands so the user follows the proper process:
+     a) First offer `/info_{CODE}` to show equipment diagnostics
+     b) Then offer `/inspect_{CODE}` to schedule inspection + notify technician
+     c) Then offer `/WO_{CODE}` to create a general work order
+   - Replace {CODE} with equipment code using underscores (e.g., S002_FCU_104)
+   - Only call the create_work_order tool if the user explicitly asks to skip the workflow
+   - Slash commands are rendered as clickable buttons in the chat UI
 
 3. **approve_recommendation / reject_recommendation** — Handle pending recommendations:
    - Show the recommendation details to the user first
@@ -203,8 +215,9 @@ equipment, compliance, and facilities management.
 
 **Data Rule — ALWAYS use tools:**
 - ALL your answers must be grounded in data from your tools
-- Use search_documents for knowledge questions (compliance, procedures, standards, capabilities)
-- Use get_system_status / get_equipment_health / get_alerts_and_anomalies for live building data
+- Use get_hybrid_context for any question about a specific asset (faults, maintenance, SLA, vendor, inspection)
+- Use search_documents for general knowledge questions (compliance, procedures, standards, capabilities)
+- Use get_system_status / get_equipment_health / get_alerts_and_anomalies for building-wide overviews
 - If tools return no results, say so honestly — NEVER fabricate or pad answers from general knowledge
 - Health thresholds are configurable via the Settings page — do NOT hardcode threshold values"""
 
@@ -336,8 +349,10 @@ def build_system_prompt_for_tools() -> str:
 
 {agent_memory_context}
 
-**Note:** Use your tools (get_system_status, get_equipment_health, get_alerts_and_anomalies, etc.) \
-to fetch live building data. Do NOT guess or fabricate data — always call tools first.
+**Note:** Use your tools to fetch live building data. Do NOT guess or fabricate data — always call tools first.
+- For a specific asset: call get_hybrid_context first (returns Brick + telemetry + ML + docs in one call)
+- For building-wide overviews: use get_system_status, get_equipment_health, get_alerts_and_anomalies
+- For knowledge/compliance questions: use search_documents
 
 ---
 
@@ -368,7 +383,8 @@ class ClaudeService:
         self,
         messages: list[dict],
         system_prompt: str | None = None,
-        include_building_context: bool = True,
+        include_site_context: bool = True,
+        model_override: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Stream a response from Claude.
@@ -376,7 +392,8 @@ class ClaudeService:
         Args:
             messages: List of message dicts with 'role' and 'content'
             system_prompt: Optional custom system prompt (defaults to FM prompt with context)
-            include_building_context: Whether to include building data context
+            include_site_context: Whether to include building data context
+            model_override: Optional model ID to use instead of the default
 
         Yields:
             Text chunks as they arrive from Claude
@@ -388,15 +405,17 @@ class ClaudeService:
         # Build system prompt with or without context
         if system_prompt:
             system = system_prompt
-        elif include_building_context:
+        elif include_site_context:
             system = build_system_prompt_with_context()
         else:
             system = FM_SYSTEM_PROMPT_BASE
 
+        effective_model = model_override or self._model
+
         try:
             # Use streaming with the messages API
             with self.client.messages.stream(
-                model=self._model,
+                model=effective_model,
                 max_tokens=self._max_tokens,
                 system=system,
                 messages=messages,
@@ -428,10 +447,11 @@ class ClaudeService:
         self,
         messages: list[dict],
         system_prompt: str | None = None,
-        include_building_context: bool = True,
+        include_site_context: bool = True,
         site_id: str | None = None,
         user_email: str | None = None,
         user_role: SentinelRole | None = None,
+        model_override: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Stream a response from Claude with tool calling support.
@@ -448,10 +468,11 @@ class ClaudeService:
         Args:
             messages: List of message dicts with 'role' and 'content'
             system_prompt: Optional custom system prompt
-            include_building_context: Whether to include building data context
+            include_site_context: Whether to include building data context
             site_id: Site/building code used to filter module-gated tools
             user_email: Authenticated user email for per-user module grants
             user_role: Authenticated role for per-user grant checks
+            model_override: Optional model ID to use instead of the default
 
         Yields:
             Text chunks as they arrive from Claude
@@ -459,7 +480,7 @@ class ClaudeService:
         # Build system prompt — lean version for tool path (no static data tables)
         if system_prompt:
             system_text = system_prompt
-        elif include_building_context:
+        elif include_site_context:
             system_text = build_system_prompt_for_tools()
         else:
             system_text = FM_SYSTEM_PROMPT_BASE
@@ -490,6 +511,7 @@ class ClaudeService:
         # Keep track of conversation with tool calls
         conversation = list(messages)
         max_tool_iterations = 10  # Safety limit
+        effective_model = model_override or self._model
 
         try:
             for iteration in range(max_tool_iterations):
@@ -497,7 +519,7 @@ class ClaudeService:
 
                 # Stream response — text arrives in real-time
                 with self.client.messages.stream(
-                    model=self._model,
+                    model=effective_model,
                     max_tokens=self._max_tokens,
                     system=system_blocks,
                     messages=conversation,

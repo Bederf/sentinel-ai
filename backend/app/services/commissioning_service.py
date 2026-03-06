@@ -24,21 +24,21 @@ class CommissioningService:
 
     def __init__(self) -> None:
         self._repo = IntegrationRepository()
-        # building_id → list of {date, all_gates_passed, scorecard_summary}
+        # site_id → list of {date, all_gates_passed, scorecard_summary}
         self._scorecard_history: dict[str, list[dict]] = {}
-        # building_id → latest TruthCheckResult
+        # site_id → latest TruthCheckResult
         self._truth_checks: dict[str, TruthCheckResult] = {}
 
-    async def run_scorecard(self, building_id: str) -> CommissioningScorecard:
+    async def run_scorecard(self, site_id: str) -> CommissioningScorecard:
         """Run all 8 commissioning gates and produce a scorecard."""
         settings = app_settings
         ingestion_mode = settings.resolved_ingestion_mode.value
 
         # Fetch quality metrics once — reused by several gates
-        quality = self._repo.get_quality_metrics(building_id)
+        quality = self._repo.get_quality_metrics(site_id)
 
         # Get sync frequency for freshness target
-        sync_freq_minutes = self._get_sync_frequency(building_id)
+        sync_freq_minutes = self._get_sync_frequency(site_id)
         freshness_target_hours = 2 * sync_freq_minutes / 60
 
         gates: list[CommissioningGate] = []
@@ -114,7 +114,7 @@ class CommissioningService:
         )
 
         # Gate 6: source_provenance — no json/manual sources
-        json_count, prov_detail = self._check_source_provenance(building_id)
+        json_count, prov_detail = self._check_source_provenance(site_id)
         gates.append(
             CommissioningGate(
                 id=CommissioningGateId.SOURCE_PROVENANCE,
@@ -128,7 +128,7 @@ class CommissioningService:
         )
 
         # Gate 7: value_validity — < 0.5% invalid values
-        invalid_pct, val_detail = self._check_value_validity(building_id)
+        invalid_pct, val_detail = self._check_value_validity(site_id)
         gates.append(
             CommissioningGate(
                 id=CommissioningGateId.VALUE_VALIDITY,
@@ -142,7 +142,7 @@ class CommissioningService:
         )
 
         # Gate 8: timestamp_integrity >= 99.9%
-        valid_pct, ts_detail = self._check_timestamp_integrity(building_id)
+        valid_pct, ts_detail = self._check_timestamp_integrity(site_id)
         gates.append(
             CommissioningGate(
                 id=CommissioningGateId.TIMESTAMP_INTEGRITY,
@@ -163,7 +163,7 @@ class CommissioningService:
 
         # Record in history
         today = date.today()
-        history = self._scorecard_history.setdefault(building_id, [])
+        history = self._scorecard_history.setdefault(site_id, [])
         history.append(
             {
                 "date": today.isoformat(),
@@ -172,10 +172,10 @@ class CommissioningService:
             }
         )
 
-        consecutive = self.get_consecutive_pass_days(building_id)
+        consecutive = self.get_consecutive_pass_days(site_id)
 
         # Look up truth check
-        truth_check = self._truth_checks.get(building_id)
+        truth_check = self._truth_checks.get(site_id)
 
         can_promote = all_gates_passed and consecutive >= 2 and truth_check is not None and truth_check.passed
 
@@ -191,7 +191,7 @@ class CommissioningService:
                 blocking.append(f"truth_check_failed ({truth_check.agreement_pct:.1f}%)")
 
         return CommissioningScorecard(
-            building_id=building_id,
+            site_id=site_id,
             ingestion_mode=ingestion_mode,
             checked_at=datetime.utcnow(),
             gates=gates,
@@ -203,20 +203,20 @@ class CommissioningService:
             blocking_gates=blocking,
         )
 
-    def _get_sync_frequency(self, building_id: str) -> int:
+    def _get_sync_frequency(self, site_id: str) -> int:
         """Get the sync frequency in minutes for the building's active sources."""
         try:
-            sources = self._repo.get_log_sources(building_id=building_id, is_active=True)
+            sources = self._repo.get_log_sources(site_id=site_id, is_active=True)
             if sources:
                 return min(s.get("sync_frequency_minutes") or 15 for s in sources)
         except Exception:
             pass
         return 15  # default
 
-    def _check_source_provenance(self, building_id: str) -> tuple[int, str]:
+    def _check_source_provenance(self, site_id: str) -> tuple[int, str]:
         """Count active sources using file_drop or manual_upload connection types."""
         try:
-            sources = self._repo.get_log_sources(building_id=building_id, is_active=True)
+            sources = self._repo.get_log_sources(site_id=site_id, is_active=True)
         except Exception:
             return 0, "No sources found"
 
@@ -227,7 +227,7 @@ class CommissioningService:
         names = ", ".join(s.get("name", s["id"][:8]) for s in json_sources)
         return count, f"{count} file/manual source(s): {names}"
 
-    def _check_value_validity(self, building_id: str) -> tuple[float, str]:
+    def _check_value_validity(self, site_id: str) -> tuple[float, str]:
         """Check ingested_trends for null or out-of-range values (last 48h)."""
         try:
             from datetime import timedelta
@@ -235,7 +235,7 @@ class CommissioningService:
             cutoff = (datetime.utcnow() - timedelta(hours=48)).isoformat()
 
             # Get source IDs for this building
-            sources = self._repo.get_log_sources(building_id=building_id)
+            sources = self._repo.get_log_sources(site_id=site_id)
             source_ids = [s["id"] for s in sources]
             if not source_ids:
                 return 0.0, "No sources — no data to validate"
@@ -272,7 +272,7 @@ class CommissioningService:
             # Table may not exist in demo mode
             return 0.0, f"Could not query trends: {e}"
 
-    def _check_timestamp_integrity(self, building_id: str) -> tuple[float, str]:
+    def _check_timestamp_integrity(self, site_id: str) -> tuple[float, str]:
         """Check ingested_trends for future timestamps (last 48h)."""
         try:
             from datetime import timedelta
@@ -281,7 +281,7 @@ class CommissioningService:
             # 5-minute future tolerance
             future_cutoff = (datetime.utcnow() + timedelta(minutes=5)).isoformat()
 
-            sources = self._repo.get_log_sources(building_id=building_id)
+            sources = self._repo.get_log_sources(site_id=site_id)
             source_ids = [s["id"] for s in sources]
             if not source_ids:
                 return 100.0, "No sources — nothing to check"
@@ -313,7 +313,7 @@ class CommissioningService:
         except Exception as e:
             return 100.0, f"Could not query trends: {e}"
 
-    def submit_truth_check(self, building_id: str, entries: list[TruthCheckEntry]) -> TruthCheckResult:
+    def submit_truth_check(self, site_id: str, entries: list[TruthCheckEntry]) -> TruthCheckResult:
         """Submit and evaluate a truth check (min 20 entries)."""
         if len(entries) < 20:
             raise ValueError(f"Truth check requires >= 20 entries, got {len(entries)}")
@@ -322,7 +322,7 @@ class CommissioningService:
         agreement_pct = (agreeing / len(entries)) * 100
 
         result = TruthCheckResult(
-            building_id=building_id,
+            site_id=site_id,
             checked_at=datetime.utcnow(),
             total_points=len(entries),
             agreeing_points=agreeing,
@@ -330,12 +330,12 @@ class CommissioningService:
             passed=agreement_pct >= 98.0,
             entries=entries,
         )
-        self._truth_checks[building_id] = result
+        self._truth_checks[site_id] = result
         return result
 
-    def get_consecutive_pass_days(self, building_id: str) -> int:
+    def get_consecutive_pass_days(self, site_id: str) -> int:
         """Count consecutive days where all gates passed (walking backward)."""
-        history = self._scorecard_history.get(building_id, [])
+        history = self._scorecard_history.get(site_id, [])
         if not history:
             return 0
 
@@ -354,7 +354,7 @@ class CommissioningService:
                 break
         return count
 
-    async def promote_to_live(self, building_id: str) -> PromotionResult:
+    async def promote_to_live(self, site_id: str) -> PromotionResult:
         """Attempt to promote building from SHADOW_LIVE to LIVE_CONTROL.
 
         Phase 109: Additionally evaluates quality gate with live_control thresholds
@@ -373,14 +373,14 @@ class CommissioningService:
             from app.services.quality_gate_policy import GateStatus
 
             evaluator = QualityGateEvaluator()
-            metrics = await evaluator.collect_metrics(building_id)
+            metrics = await evaluator.collect_metrics(site_id)
             # Evaluate against live_control thresholds (target mode, not current)
             gate_result = evaluator.evaluate("live_control", metrics)
 
             if gate_result.overall == GateStatus.FAIL:
                 return PromotionResult(
                     success=False,
-                    building_id=building_id,
+                    site_id=site_id,
                     previous_mode=current_mode,
                     message=(
                         f"Quality gate failed for live_control thresholds — failed rules: {gate_result.failed_rules}"
@@ -391,15 +391,15 @@ class CommissioningService:
             import logging
 
             logging.getLogger(__name__).warning(
-                f"Quality gate pre-promotion check failed for {building_id}, proceeding with scorecard check: {e}"
+                f"Quality gate pre-promotion check failed for {site_id}, proceeding with scorecard check: {e}"
             )
 
-        scorecard = await self.run_scorecard(building_id)
+        scorecard = await self.run_scorecard(site_id)
 
         if not scorecard.can_promote:
             return PromotionResult(
                 success=False,
-                building_id=building_id,
+                site_id=site_id,
                 previous_mode=current_mode,
                 message="Promotion blocked — see blocking_reasons",
                 scorecard=scorecard,
@@ -407,15 +407,15 @@ class CommissioningService:
             )
 
         # Update per-building status
-        self._repo.update_building_status(
-            building_id,
+        self._repo.update_site_status(
+            site_id,
             BuildingStatus.LIVE_CONTROL.value,
             notes="Promoted via commissioning scorecard",
         )
 
         return PromotionResult(
             success=True,
-            building_id=building_id,
+            site_id=site_id,
             previous_mode=current_mode,
             new_mode=BuildingStatus.LIVE_CONTROL.value,
             message="Building promoted to LIVE_CONTROL. Update INGESTION_MODE env var to complete.",

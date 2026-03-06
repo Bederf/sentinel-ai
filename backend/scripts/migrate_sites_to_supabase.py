@@ -46,14 +46,14 @@ def site_to_building(site: dict) -> dict:
     """Convert legacy site format to Supabase building format"""
     # Generate deterministic UUID from site ID
     site_id = site.get("id", "")
-    building_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"sentinel-bms-{site_id}"))
+    site_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"sentinel-bms-{site_id}"))
 
     # Map all types to 'regional_office' (Supabase constraint limitation)
     # TODO: Update constraint to allow retail, hospital, etc.
     building_type = "regional_office"
 
     return {
-        "id": building_id,
+        "id": site_id,
         "code": site_id,
         "name": site.get("name", ""),
         "address": site.get("address", ""),
@@ -76,12 +76,12 @@ def site_to_building(site: dict) -> dict:
     }
 
 
-def asset_to_equipment(asset: dict, building_id_map: dict) -> dict:
+def asset_to_equipment(asset: dict, site_id_map: dict) -> dict:
     """Convert legacy asset format to Supabase equipment format"""
     site_id = asset.get("site_id", "").lower()
-    building_id = building_id_map.get(site_id)
+    site_id = site_id_map.get(site_id)
 
-    if not building_id:
+    if not site_id:
         print(f"  Warning: No building found for site {site_id}")
         return None
 
@@ -112,7 +112,7 @@ def asset_to_equipment(asset: dict, building_id_map: dict) -> dict:
     return {
         "id": equipment_id,
         "code": asset_id,
-        "building_id": building_id,
+        "site_id": site_id,
         "name": asset.get("asset_tag", ""),
         "type": asset.get("asset_category", "unknown"),
         "manufacturer": asset.get("make", ""),
@@ -146,18 +146,18 @@ def migrate(dry_run: bool = False):
 
     # Get existing buildings
     print("\n2. Checking existing buildings...")
-    existing = client.table("buildings").select("code").execute()
+    existing = client.table("sites").select("code").execute()
     existing_codes = {b["code"] for b in existing.data}
     print(f"   Found {len(existing_codes)} existing buildings: {existing_codes}")
 
     # Convert and filter sites
     buildings_to_insert = []
-    building_id_map = {}  # code -> uuid
+    site_id_map = {}  # code -> uuid
 
     for site in sites:
         building = site_to_building(site)
         code = building["code"]
-        building_id_map[code] = building["id"]
+        site_id_map[code] = building["id"]
 
         if code in existing_codes:
             print(f"   Skipping {code} ({building['name']}) - already exists")
@@ -169,7 +169,7 @@ def migrate(dry_run: bool = False):
     if buildings_to_insert and not dry_run:
         print(f"\n3. Inserting {len(buildings_to_insert)} buildings...")
         try:
-            result = client.table("buildings").insert(buildings_to_insert).execute()
+            result = client.table("sites").insert(buildings_to_insert).execute()
             print(f"   Inserted {len(result.data)} buildings")
         except Exception as e:
             print(f"   Error: {e}")
@@ -187,7 +187,7 @@ def migrate(dry_run: bool = False):
     equipment_to_insert = []
 
     for asset in equipment:
-        eq = asset_to_equipment(asset, building_id_map)
+        eq = asset_to_equipment(asset, site_id_map)
         if not eq:
             continue
 
@@ -213,12 +213,10 @@ def migrate(dry_run: bool = False):
     # Update equipment counts
     if not dry_run:
         print("\n6. Updating equipment counts...")
-        for code, building_id in building_id_map.items():
-            count_result = (
-                client.table("equipment").select("id", count="exact").eq("building_id", building_id).execute()
-            )
+        for code, site_id in site_id_map.items():
+            count_result = client.table("equipment").select("id", count="exact").eq("site_id", site_id).execute()
             count = count_result.count or 0
-            client.table("buildings").update({"equipment_count": count}).eq("id", building_id).execute()
+            client.table("sites").update({"equipment_count": count}).eq("id", site_id).execute()
             print(f"   {code}: {count} items")
 
     print("\n" + "=" * 60)

@@ -13,9 +13,9 @@ class EquipmentRepository:
     """Repository for equipment database operations."""
 
     # Column selection constants to avoid SELECT * overhead
-    _LIST_COLUMNS = "id, code, name, status, health_score, type, building_id, location"
+    _LIST_COLUMNS = "id, code, name, status, health_score, type, site_id, location"
     _DETAIL_COLUMNS = (
-        "id, code, name, status, health_score, type, building_id, "
+        "id, code, name, status, health_score, type, site_id, "
         "manufacturer, model, install_date, commissioning_date, "
         "device_info, operating_data, network_info, location, "
         "service_provider_name, service_provider_email, "
@@ -60,32 +60,32 @@ class EquipmentRepository:
         if last_error:
             raise last_error
 
-    def get_all(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_all(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all equipment with optional filtering.
 
         Args:
-            building_id: Filter by building UUID
+            site_id: Filter by site UUID
 
         Returns:
             List of equipment items
         """
         # Cache equipment-by-building (most common call)
-        if building_id:
-            cached = cache.get(CacheKeys.equipment_by_building(building_id))
+        if site_id:
+            cached = cache.get(CacheKeys.equipment_by_site(site_id))
             if cached is not None:
                 return cached
 
         query = self.client.table("equipment").select(self._LIST_COLUMNS)
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
 
         with track_query("equipment", "get_all"):
             response = query.execute()
         result = response.data
 
-        if building_id:
-            cache.set(CacheKeys.equipment_by_building(building_id), result, CacheService.TTL_SEMI_STATIC)
+        if site_id:
+            cache.set(CacheKeys.equipment_by_site(site_id), result, CacheService.TTL_SEMI_STATIC)
 
         return result
 
@@ -126,26 +126,26 @@ class EquipmentRepository:
             return response.data[0]
         return None
 
-    def get_by_building_code(self, building_code: str) -> List[Dict[str, Any]]:
+    def get_by_site_code(self, site_code: str) -> List[Dict[str, Any]]:
         """Get equipment by building code.
 
         Args:
-            building_code: Building code (e.g., "site-001")
+            site_code: Building code (e.g., "site-001")
 
         Returns:
             List of equipment items
         """
         # First get the building UUID (with retry)
-        building_query = self.client.table("buildings").select("id").eq("code", building_code)
-        building_response = self._execute_with_retry(building_query)
+        building_query = self.client.table("sites").select("id").eq("code", site_code)
+        site_response = self._execute_with_retry(building_query)
 
-        if not building_response.data:
+        if not site_response.data:
             return []
 
-        building_uuid = building_response.data[0]["id"]
+        site_uuid = site_response.data[0]["id"]
 
         # Get equipment for this building (with retry)
-        equipment_query = self.client.table("equipment").select(self._LIST_COLUMNS).eq("building_id", building_uuid)
+        equipment_query = self.client.table("equipment").select(self._LIST_COLUMNS).eq("site_id", site_uuid)
         equipment_response = self._execute_with_retry(equipment_query)
 
         return equipment_response.data
@@ -198,7 +198,7 @@ class EquipmentRepository:
         """
         response = self.client.table("equipment").insert(equipment_data).execute()
         result = response.data[0]
-        CacheInvalidation.on_equipment_change(building_id=equipment_data.get("building_id"))
+        CacheInvalidation.on_equipment_change(site_id=equipment_data.get("site_id"))
         return result
 
     def update(self, equipment_id: str, equipment_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -219,7 +219,7 @@ class EquipmentRepository:
 
         if response.data:
             CacheInvalidation.on_equipment_change(
-                building_id=equipment.get("building_id"),
+                site_id=equipment.get("site_id"),
                 equipment_code=equipment_id,
             )
             return response.data[0]
@@ -296,7 +296,7 @@ class EquipmentRepository:
 
         if len(response.data) > 0:
             CacheInvalidation.on_equipment_change(
-                building_id=equipment.get("building_id"),
+                site_id=equipment.get("site_id"),
                 equipment_code=equipment_id,
             )
             return True

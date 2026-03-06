@@ -99,7 +99,7 @@ class TestModels:
         assert gate.passed is True
         assert gate.actual == 96.0
 
-    def test_building_status_new_values(self):
+    def test_site_status_new_values(self):
         assert BuildingStatus.SHADOW_LIVE == "shadow_live"
         assert BuildingStatus.LIVE_CONTROL == "live_control"
         # Existing values still there
@@ -507,7 +507,7 @@ class TestPromotion:
             result = await svc.promote_to_live("bld-1")
             assert result.success is True
             assert result.new_mode == "live_control"
-            svc._repo.update_building_status.assert_called_once()
+            svc._repo.update_site_status.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_promotion_blocked_by_gate(self, svc):
@@ -581,7 +581,7 @@ class TestAPIEndpoints:
         with patch("app.api.integration.commissioning_service") as mock_svc:
             mock_svc.run_scorecard = AsyncMock(
                 return_value=CommissioningScorecard(
-                    building_id="site-002",
+                    site_id="site-002",
                     ingestion_mode="simulation",
                     checked_at=datetime.utcnow(),
                     gates=[],
@@ -595,7 +595,7 @@ class TestAPIEndpoints:
             resp = client.get("/api/integration/buildings/site-002/commissioning-scorecard")
             assert resp.status_code == 200
             data = resp.json()
-            assert data["building_id"] == "site-002"
+            assert data["site_id"] == "site-002"
 
     def test_truth_check_rejects_too_few_entries(self, client):
         entries = [

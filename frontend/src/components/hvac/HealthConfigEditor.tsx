@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { Card, Title, Text, Badge, Flex, Grid, Button, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@tremor/react";
+import { Text, Badge, Flex, Grid, Button, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@tremor/react";
 import { Save, RotateCcw, AlertTriangle, CheckCircle, Info } from "lucide-react";
 import { healthConfigApi, type EquipmentHealthConfig, type HealthWeights, type HealthThresholds } from "../../lib/hvacApi";
 
@@ -145,13 +145,13 @@ export function HealthConfigEditor({ onConfigChange }: HealthConfigEditorProps) 
 
   if (loading) {
     return (
-      <Card>
-        <Title>Health Calculation Configuration</Title>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Health Calculation Configuration</h3>
         <div className="animate-pulse space-y-4 mt-4">
           <div className="h-32 bg-gray-200 rounded" />
           <div className="h-32 bg-gray-200 rounded" />
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -172,7 +172,7 @@ export function HealthConfigEditor({ onConfigChange }: HealthConfigEditorProps) 
     <div className="space-y-4">
       <Flex justifyContent="between" alignItems="center">
         <div>
-          <Title>Health Calculation Configuration</Title>
+          <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Health Calculation Configuration</h3>
           <Text>Configure how health scores are calculated for each equipment type</Text>
         </div>
         <div className="flex gap-2">
@@ -198,25 +198,25 @@ export function HealthConfigEditor({ onConfigChange }: HealthConfigEditorProps) 
 
       {/* Messages */}
       {error && (
-        <Card className="bg-red-900/20 border-red-500/30">
+        <div className="rounded-md p-4" style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)" }}>
           <Flex alignItems="center" className="gap-2">
             <AlertTriangle className="w-5 h-5 text-red-400" />
             <Text className="text-red-300">{error}</Text>
           </Flex>
-        </Card>
+        </div>
       )}
 
       {successMessage && (
-        <Card className="bg-green-900/20 border-green-500/30">
+        <div className="rounded-md p-4" style={{ background: "rgba(34, 197, 94, 0.1)", border: "1px solid rgba(34, 197, 94, 0.3)" }}>
           <Flex alignItems="center" className="gap-2">
             <CheckCircle className="w-5 h-5 text-green-400" />
             <Text className="text-green-300">{successMessage}</Text>
           </Flex>
-        </Card>
+        </div>
       )}
 
       {/* Equipment Type Selector */}
-      <Card>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <Text className="font-medium mb-3">Equipment Type</Text>
         <Flex className="gap-2 flex-wrap">
           {equipmentTypes.map((type) => (
@@ -230,7 +230,7 @@ export function HealthConfigEditor({ onConfigChange }: HealthConfigEditorProps) 
             </Button>
           ))}
         </Flex>
-      </Card>
+      </div>
 
       {editedConfig && (
         <TabGroup>
@@ -244,7 +244,7 @@ export function HealthConfigEditor({ onConfigChange }: HealthConfigEditorProps) 
           <TabPanels>
             {/* General Settings */}
             <TabPanel>
-              <Card>
+              <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                 <Grid className="grid grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
@@ -299,12 +299,12 @@ export function HealthConfigEditor({ onConfigChange }: HealthConfigEditorProps) 
                     </Text>
                   </div>
                 </Grid>
-              </Card>
+              </div>
             </TabPanel>
 
             {/* Health Weights */}
             <TabPanel>
-              <Card>
+              <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                 <Flex justifyContent="between" alignItems="center" className="mb-4">
                   <Text className="font-medium">Weight Distribution</Text>
                   <Badge color={weightsValid ? "green" : "red"}>
@@ -349,12 +349,12 @@ export function HealthConfigEditor({ onConfigChange }: HealthConfigEditorProps) 
                     They must sum to 100%.
                   </Text>
                 </Flex>
-              </Card>
+              </div>
             </TabPanel>
 
             {/* Thresholds */}
             <TabPanel>
-              <Card>
+              <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                 <Text className="font-medium mb-4">Warning & Critical Thresholds</Text>
 
                 <Grid className="grid grid-cols-2 gap-6">
@@ -392,12 +392,12 @@ export function HealthConfigEditor({ onConfigChange }: HealthConfigEditorProps) 
                       );
                     })}
                 </Grid>
-              </Card>
+              </div>
             </TabPanel>
 
             {/* Fault Weights */}
             <TabPanel>
-              <Card>
+              <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                 <Flex justifyContent="between" alignItems="center" className="mb-4">
                   <Text className="font-medium">Fault Type Weights</Text>
                   <Badge color={faultWeightsValid ? "green" : "red"}>
@@ -443,7 +443,7 @@ export function HealthConfigEditor({ onConfigChange }: HealthConfigEditorProps) 
                     Higher weights mean more severe impact on equipment health.
                   </Text>
                 </Flex>
-              </Card>
+              </div>
             </TabPanel>
           </TabPanels>
         </TabGroup>

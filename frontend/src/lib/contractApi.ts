@@ -376,11 +376,11 @@ export const contractApi = {
 
   // Contracts
   getContracts: (params?: {
-    building_id?: string;
+    site_id?: string;
     status?: string;
   }): Promise<Contract[]> => {
     const searchParams = new URLSearchParams();
-    if (params?.building_id) searchParams.set("building_id", params.building_id);
+    if (params?.site_id) searchParams.set("site_id", params.site_id);
     if (params?.status) searchParams.set("status", params.status);
     const qs = searchParams.toString();
     return fetchJson<{ contracts: any[] }>(`/api/contracts${qs ? `?${qs}` : ""}`)
@@ -411,9 +411,9 @@ export const contractApi = {
     );
   },
 
-  getContractSummary: (buildingId?: string): Promise<ContractSummary> => {
-    const params = buildingId
-      ? `?building_id=${encodeURIComponent(buildingId)}`
+  getContractSummary: (siteId?: string): Promise<ContractSummary> => {
+    const params = siteId
+      ? `?site_id=${encodeURIComponent(siteId)}`
       : "";
     return fetchJson(`/api/contracts/summary${params}`);
   },
@@ -544,10 +544,10 @@ export const contractApi = {
 
   // Assessments
   getAssessments: (
-    buildingId?: string
+    siteId?: string
   ): Promise<ConditionAssessment[]> => {
-    const params = buildingId
-      ? `?building_id=${encodeURIComponent(buildingId)}`
+    const params = siteId
+      ? `?site_id=${encodeURIComponent(siteId)}`
       : "";
     return fetchJson(`/api/contracts/assessments${params}`);
   },

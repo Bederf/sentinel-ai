@@ -2,7 +2,7 @@
   {
     "id": "9d3886b2-1cd7-4731-bf1e-fbb030856f86",
     "code": "site-005-UMH-AHU-L3-TH3.room",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-TH3.room)",
     "type": "AHU",
     "manufacturer": "",
@@ -31,7 +31,7 @@
   {
     "id": "5b87add4-9be6-4d5f-9088-0d85dd4f69eb",
     "code": "S002-FCU-204",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L2 West FCU (S002-FCU-204)",
     "type": "FCU",
     "manufacturer": null,
@@ -60,7 +60,7 @@
   {
     "id": "86da9a81-9a6f-4f11-a877-81e19b857e53",
     "code": "S002-FCU-203",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L2 Central FCU (S002-FCU-203)",
     "type": "FCU",
     "manufacturer": null,
@@ -89,7 +89,7 @@
   {
     "id": "b7d0ea97-d8a6-48de-9fcd-4969f77d3148",
     "code": "S002-FCU-202",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L2 East FCU (S002-FCU-202)",
     "type": "FCU",
     "manufacturer": null,
@@ -118,7 +118,7 @@
   {
     "id": "262b7460-9eaf-4490-9c33-dde22ca0f5bf",
     "code": "S002-FCU-200",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L2 North FCU (S002-FCU-200)",
     "type": "FCU",
     "manufacturer": null,
@@ -147,7 +147,7 @@
   {
     "id": "f3f86bd9-aee3-4e89-a60b-ad74813d77e5",
     "code": "S002-FCU-104",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L1 West FCU (S002-FCU-104)",
     "type": "FCU",
     "manufacturer": null,
@@ -176,7 +176,7 @@
   {
     "id": "2ae9fe40-1203-4c41-b3dc-bd1abcdb8d2e",
     "code": "S002-FCU-103",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L1 Central FCU (S002-FCU-103)",
     "type": "FCU",
     "manufacturer": null,
@@ -205,7 +205,7 @@
   {
     "id": "6e0f434b-60a2-43c2-9d2a-d7aa813a4e01",
     "code": "S002-FCU-102",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L1 East FCU (S002-FCU-102)",
     "type": "FCU",
     "manufacturer": null,
@@ -234,7 +234,7 @@
   {
     "id": "daa24ff9-2de2-430d-8728-1728b921da5e",
     "code": "S002-FCU-101",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L1 North FCU (S002-FCU-101)",
     "type": "FCU",
     "manufacturer": null,
@@ -263,7 +263,7 @@
   {
     "id": "32074d91-b02e-4ac4-bcb8-39fa02713db1",
     "code": "S002-FCU-005",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L0 South FCU (S002-FCU-005)",
     "type": "FCU",
     "manufacturer": null,
@@ -292,7 +292,7 @@
   {
     "id": "a4142c09-5444-4994-9e26-e2ae21099a41",
     "code": "S002-FCU-003",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L0 Central FCU (S002-FCU-003)",
     "type": "FCU",
     "manufacturer": null,
@@ -321,7 +321,7 @@
   {
     "id": "933b7021-5aff-4245-8298-d88e4dd65fb3",
     "code": "S002-FCU-002",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L0 East FCU (S002-FCU-002)",
     "type": "FCU",
     "manufacturer": null,
@@ -350,7 +350,7 @@
   {
     "id": "3130f28a-cda8-4c31-b190-f554b7293807",
     "code": "S002-FCU-001",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L0 North FCU (S002-FCU-001)",
     "type": "FCU",
     "manufacturer": null,
@@ -379,7 +379,7 @@
   {
     "id": "d349b747-573a-43cf-9d0f-6cc860570520",
     "code": "S002-VAV-204",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L2 West VAV (S002-VAV-204)",
     "type": "VAV",
     "manufacturer": null,
@@ -408,7 +408,7 @@
   {
     "id": "21494b7c-901d-4e81-b181-f387cc77b3eb",
     "code": "S002-VAV-203",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L2 Central VAV (S002-VAV-203)",
     "type": "VAV",
     "manufacturer": null,
@@ -437,7 +437,7 @@
   {
     "id": "db8b2886-b4f8-4a06-9a0a-ed8cb36b77c1",
     "code": "S002-VAV-202",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "VAV Zone-202",
     "type": "VAV",
     "manufacturer": null,
@@ -466,7 +466,7 @@
   {
     "id": "fd88c665-b3ce-4706-8166-fbb0c1575e44",
     "code": "S002-VAV-201",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L2 North VAV (S002-VAV-201)",
     "type": "VAV",
     "manufacturer": null,
@@ -495,7 +495,7 @@
   {
     "id": "d74885a4-5e36-4fa6-aaec-99f71ef66402",
     "code": "S002-VAV-104",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "VAV Zone-104",
     "type": "VAV",
     "manufacturer": null,
@@ -524,7 +524,7 @@
   {
     "id": "1bab34f8-8edf-4f6c-b2b9-9b3daa53b251",
     "code": "S002-VAV-103",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "VAV Zone-103",
     "type": "VAV",
     "manufacturer": null,
@@ -553,7 +553,7 @@
   {
     "id": "f3bd3aa5-a28e-4a5f-b09e-0dadeecec3e9",
     "code": "S002-VAV-102",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L1 East VAV (S002-VAV-102)",
     "type": "VAV",
     "manufacturer": null,
@@ -582,7 +582,7 @@
   {
     "id": "e15a8689-09b2-436d-af48-8b5cc05cfe7b",
     "code": "S002-VAV-005",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "VAV Zone-005",
     "type": "VAV",
     "manufacturer": null,
@@ -611,7 +611,7 @@
   {
     "id": "bf44d966-a614-4149-bad1-764e6effa6ee",
     "code": "S002-VAV-004",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "VAV Zone-004",
     "type": "VAV",
     "manufacturer": null,
@@ -640,7 +640,7 @@
   {
     "id": "5152af8e-ca7e-40db-b7f6-fe8df6e81e8a",
     "code": "S002-VAV-003",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "VAV Zone-003",
     "type": "VAV",
     "manufacturer": null,
@@ -669,7 +669,7 @@
   {
     "id": "d0478889-84af-494b-ba06-f1a4a7fc8d6a",
     "code": "S002-VAV-002",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "VAV Zone-002",
     "type": "VAV",
     "manufacturer": null,
@@ -698,7 +698,7 @@
   {
     "id": "f977544b-11c9-40ed-a21d-a801fd967e87",
     "code": "S002-AHU-L2-001",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 AHU",
     "type": "ahu",
     "manufacturer": null,
@@ -727,7 +727,7 @@
   {
     "id": "1d57a018-5585-49b7-b13e-7fd001c44fb8",
     "code": "S002-GEN-B1-005",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Generator Set 5 (Diesel 100kW) - Pilot Case",
     "type": "GEN",
     "manufacturer": "Diesel Electric",
@@ -761,7 +761,7 @@
   {
     "id": "4a5df8a9-bd38-4fc5-b759-7d5dec312921",
     "code": "site-005-UMH-JACE-001.comms",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-JACE-001.comms)",
     "type": "JACE",
     "manufacturer": "",
@@ -790,7 +790,7 @@
   {
     "id": "6792602b-b05f-4bc9-b56f-ab4ea4872b6e",
     "code": "site-005-UMH-JACE-002.comms",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-JACE-002.comms)",
     "type": "JACE",
     "manufacturer": "",
@@ -819,7 +819,7 @@
   {
     "id": "b1e94692-9af6-4e24-bea8-541191c08270",
     "code": "S002-LUM-204-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -852,7 +852,7 @@
   {
     "id": "6503e65c-d1f6-4c8e-a260-1620088ca1f3",
     "code": "site-005-UMH-AHU-L3-TH3.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-TH3.fan)",
     "type": "AHU",
     "manufacturer": "",
@@ -881,7 +881,7 @@
   {
     "id": "b5daee67-2183-4dc0-80ee-8784c81cedc7",
     "code": "S012-SPLIT-G-002",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Office Split Unit 1",
     "type": "SPLIT",
     "manufacturer": "",
@@ -958,7 +958,7 @@
   {
     "id": "e2109184-d731-4946-a63d-cc1d486f97dd",
     "code": "S002-ZONE-100",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Unknown (ZONE-L1)",
     "type": "ZONE",
     "manufacturer": "",
@@ -1005,7 +1005,7 @@
   {
     "id": "828cc1c5-3184-4977-8f29-04f313c939ae",
     "code": "S002-ZONE-200",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Unknown (ZONE-L2)",
     "type": "ZONE",
     "manufacturer": "",
@@ -1052,7 +1052,7 @@
   {
     "id": "b99392d0-d7fe-41ea-8b94-42938187fc7c",
     "code": "S002-DALI-220",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "DALI Controller Level 2 Zone 20",
     "type": "DALI",
     "manufacturer": "Tridonic",
@@ -1104,7 +1104,7 @@
   {
     "id": "5423fd5a-7eeb-4abc-a283-ea4b6a6ae034",
     "code": "site-005-UMH-LIFT-003.door",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-LIFT-003.door)",
     "type": "LIFT",
     "manufacturer": "",
@@ -1133,7 +1133,7 @@
   {
     "id": "70f3f373-7e2a-4b19-9faa-f7107cc33345",
     "code": "site-005-UMH-GEN-B1-002.load",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Generator (UMH-GEN-B1-002.load)",
     "type": "GEN",
     "manufacturer": "",
@@ -1162,7 +1162,7 @@
   {
     "id": "6532071f-fe07-4b88-a106-6cecd06b1e21",
     "code": "site-005-UMH-GEN-B1-002.run",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Generator (UMH-GEN-B1-002.run)",
     "type": "GEN",
     "manufacturer": "",
@@ -1191,7 +1191,7 @@
   {
     "id": "70101136-263b-4253-96a7-01a5fcb77317",
     "code": "site-005-UMH-GEN-B1-003.fuel",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Generator (UMH-GEN-B1-003.fuel)",
     "type": "GEN",
     "manufacturer": "",
@@ -1220,7 +1220,7 @@
   {
     "id": "ce170ed3-8aaa-4fd6-8390-83abfcd76f1d",
     "code": "S012-FCU-G-F",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Ground Floor FCU Zone F",
     "type": "FCU",
     "manufacturer": "",
@@ -1297,7 +1297,7 @@
   {
     "id": "191479dc-a00c-46cb-9f6b-30ee844b3aaa",
     "code": "S002-LUM-204-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -1330,7 +1330,7 @@
   {
     "id": "72ccab80-11fb-4f65-9df6-f84dd038c3b5",
     "code": "S002-LUM-204-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -1363,7 +1363,7 @@
   {
     "id": "59ccd89b-01bf-44d6-86e1-30679ecc2b15",
     "code": "S002-LUM-204-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -1396,7 +1396,7 @@
   {
     "id": "9df0e3ad-bf11-4bf2-a4db-1e1a69ce49d8",
     "code": "S002-LUM-204-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -1429,7 +1429,7 @@
   {
     "id": "66abb821-b98e-4933-adcd-61a34a7764aa",
     "code": "S012-MTR-G-001",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Main Incomer",
     "type": "MTR",
     "manufacturer": "",
@@ -1508,7 +1508,7 @@
   {
     "id": "6db78782-6412-4c7d-9b6a-1f72efb3ecc7",
     "code": "S002-GEN-B1-002",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Standby Generator 2",
     "type": "generator",
     "manufacturer": null,
@@ -1537,7 +1537,7 @@
   {
     "id": "53e1dfa3-2f21-4e12-afc8-34ff4005f6d3",
     "code": "S002-MTR-W-MAIN",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Main Water Meter",
     "type": "meter",
     "manufacturer": null,
@@ -1566,7 +1566,7 @@
   {
     "id": "c758f940-abce-421c-a540-53cb132f8b39",
     "code": "S002-LUM-205-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -1599,7 +1599,7 @@
   {
     "id": "bb16a0b8-d794-4671-b583-bc61464dadf3",
     "code": "S002-LUM-205-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -1632,7 +1632,7 @@
   {
     "id": "cbea1a8d-9a72-4117-93fd-3addb78be6f0",
     "code": "S002-LUM-205-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -1665,7 +1665,7 @@
   {
     "id": "26239a83-bc31-4fa6-91a2-c0de7eeb0c50",
     "code": "site-005-UMH-LIFT-001.current",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-LIFT-001.current)",
     "type": "LIFT",
     "manufacturer": "",
@@ -1694,7 +1694,7 @@
   {
     "id": "71b1a296-8079-4f30-ad43-f77d4f26da0c",
     "code": "site-005-UMH-GEN-B1-002.fuel",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Generator (UMH-GEN-B1-002.fuel)",
     "type": "GEN",
     "manufacturer": "",
@@ -1723,7 +1723,7 @@
   {
     "id": "68c5aade-e4fb-434d-a9fa-4ed47d51decc",
     "code": "site-005-UMH-KEF-B1-001.duct",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-KEF-B1-001.duct)",
     "type": "KEF",
     "manufacturer": "",
@@ -1752,7 +1752,7 @@
   {
     "id": "3c6a0ec1-376a-48f0-92aa-702381e1c305",
     "code": "site-005-UMH-GEN-B1-001.oil",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Generator (UMH-GEN-B1-001.oil)",
     "type": "GEN",
     "manufacturer": "",
@@ -1781,7 +1781,7 @@
   {
     "id": "15467f4a-f56f-498e-95eb-c3e3fcafb088",
     "code": "site-005-UMH-JACE-001.memory",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-JACE-001.memory)",
     "type": "JACE",
     "manufacturer": "",
@@ -1810,7 +1810,7 @@
   {
     "id": "1c31f10c-5737-423f-8e0f-2b03c164abbc",
     "code": "S002-FCU-201",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L2 North FCU (S002-FCU-201)",
     "type": "FCU",
     "manufacturer": "",
@@ -1857,7 +1857,7 @@
   {
     "id": "42cd9939-c04f-4211-8ffe-9f8ee6939f44",
     "code": "S002-FCU-004",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L0 West FCU (S002-FCU-004)",
     "type": "FCU",
     "manufacturer": null,
@@ -1886,7 +1886,7 @@
   {
     "id": "a954dcb5-f662-45a1-b3a3-031219b163ed",
     "code": "S002-VAV-001",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L0 North VAV (S002-VAV-001)",
     "type": "VAV",
     "manufacturer": null,
@@ -1915,7 +1915,7 @@
   {
     "id": "5e4f0113-24a9-4a20-be2d-17ac7a1ac060",
     "code": "site-005-UMH-LIFT-003.current",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-LIFT-003.current)",
     "type": "LIFT",
     "manufacturer": "",
@@ -1944,7 +1944,7 @@
   {
     "id": "730f11bb-d3ab-4011-9f4e-a6a905e7e380",
     "code": "site-005-UMH-LIFT-003.in",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-LIFT-003.in)",
     "type": "LIFT",
     "manufacturer": "",
@@ -1973,7 +1973,7 @@
   {
     "id": "33d4aaa3-6edf-4e7c-8d34-1a7685e409fa",
     "code": "site-005-UMH-LIFT-004.current",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-LIFT-004.current)",
     "type": "LIFT",
     "manufacturer": "",
@@ -2002,7 +2002,7 @@
   {
     "id": "d62a875c-c5a6-43f3-b435-e6223a814de6",
     "code": "site-005-UMH-AHU-L3-TH2.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-TH2.fan)",
     "type": "AHU",
     "manufacturer": "",
@@ -2031,7 +2031,7 @@
   {
     "id": "5e629099-c194-4e7c-b8f4-da987f945cea",
     "code": "site-005-UMH-CT-R-002.cw",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Cooling Tower (UMH-CT-R-002.cw)",
     "type": "CT",
     "manufacturer": "",
@@ -2060,7 +2060,7 @@
   {
     "id": "602f1898-97ff-4321-bd04-e600f5d191fe",
     "code": "S012-SPLIT-G-003",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Office Split Unit 2",
     "type": "SPLIT",
     "manufacturer": "",
@@ -2137,7 +2137,7 @@
   {
     "id": "0a68c19e-2ead-46c0-81f7-ee2abdb96682",
     "code": "S002-LUM-204-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -2170,7 +2170,7 @@
   {
     "id": "a08dfbad-ec32-4049-81bd-cad4fdab675d",
     "code": "S002-LUM-204-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -2203,7 +2203,7 @@
   {
     "id": "d7157a8c-131b-4092-839b-a3117cb72b03",
     "code": "site-005-UMH-JACE-002.cpu",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-JACE-002.cpu)",
     "type": "JACE",
     "manufacturer": "",
@@ -2232,7 +2232,7 @@
   {
     "id": "9d254ea9-7e0a-4f57-865d-6c6636139c3a",
     "code": "site-005-UMH-AHU-L3-TH3.air",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-TH3.air)",
     "type": "AHU",
     "manufacturer": "",
@@ -2261,7 +2261,7 @@
   {
     "id": "5e481c9c-b138-4e8c-95ed-107f5f88b9a1",
     "code": "site-005-UMH-AHU-L3-TH3.hepa",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-TH3.hepa)",
     "type": "AHU",
     "manufacturer": "",
@@ -2290,7 +2290,7 @@
   {
     "id": "c623ff91-30ca-4cfe-8097-ce52ba7aac5f",
     "code": "S012-UPS-G-001",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Critical Loads UPS",
     "type": "UPS",
     "manufacturer": "",
@@ -2376,7 +2376,7 @@
   {
     "id": "1064e96a-bf5b-460b-8217-5d7fd91aeb7f",
     "code": "S002-VAV-205",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L2 South VAV (S002-VAV-205)",
     "type": "VAV",
     "manufacturer": null,
@@ -2405,7 +2405,7 @@
   {
     "id": "e6040db0-48e4-45dc-ab88-22a62d6c371c",
     "code": "S002-LUM-205-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -2438,7 +2438,7 @@
   {
     "id": "0476b700-d3aa-46aa-aea2-17d3cbff4a59",
     "code": "S002-LUM-205-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -2471,7 +2471,7 @@
   {
     "id": "8c913ea7-b6bf-4fb4-9f1c-acd1a809dab4",
     "code": "S002-LUM-205-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -2504,7 +2504,7 @@
   {
     "id": "7617ccf2-9ec3-455e-abe8-ad476644e1dd",
     "code": "S002-LUM-205-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -2537,7 +2537,7 @@
   {
     "id": "4d944173-877e-4dd3-9d8d-c99f8f0550ea",
     "code": "S002-LUM-204-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -2570,7 +2570,7 @@
   {
     "id": "747858b1-5d2d-47e6-b28b-09e41cbfbb10",
     "code": "S002-LUM-204-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -2603,7 +2603,7 @@
   {
     "id": "5d78fa5e-3c43-4b9c-b458-112a83ac8b39",
     "code": "S002-LUM-204-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -2636,7 +2636,7 @@
   {
     "id": "9dfdc70c-e754-49fd-81fe-10b4aacdfbe8",
     "code": "site-005-UMH-CT-R-002.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Cooling Tower (UMH-CT-R-002.fan)",
     "type": "CT",
     "manufacturer": "",
@@ -2665,7 +2665,7 @@
   {
     "id": "2da1fc8a-21b1-4408-8f92-25e54d9b8d46",
     "code": "site-005-UMH-DB-L3-001.total",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-DB-L3-001.total)",
     "type": "DB",
     "manufacturer": "",
@@ -2694,7 +2694,7 @@
   {
     "id": "48cb3fae-8418-4483-b4aa-99716227d625",
     "code": "S002-GEN-B1-001",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Generator (GEN-1)",
     "type": "GEN",
     "manufacturer": "",
@@ -2740,7 +2740,7 @@
   {
     "id": "fe9cc8ab-483c-4e01-a251-ef59645da0ce",
     "code": "site-005-UMH-AHU-L6-001.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L6-001.fan)",
     "type": "AHU",
     "manufacturer": "",
@@ -2769,7 +2769,7 @@
   {
     "id": "d7c69cd8-0bc5-47aa-803a-6b193cdfea17",
     "code": "S002-DALI-201",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "DALI Lighting Zone L2-B",
     "type": "DALI",
     "manufacturer": "",
@@ -2821,7 +2821,7 @@
   {
     "id": "f8418e03-8638-4f26-814b-5f4d53ee8fc8",
     "code": "S012-FCU-G-E",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Ground Floor FCU Zone E",
     "type": "FCU",
     "manufacturer": "",
@@ -2898,7 +2898,7 @@
   {
     "id": "84233029-db88-4aef-829e-0afbe48e08aa",
     "code": "S002-ZONE-201",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Unknown (ZONE-L2)",
     "type": "ZONE",
     "manufacturer": "",
@@ -2945,7 +2945,7 @@
   {
     "id": "c7f5128d-96a4-41a4-bb49-590250ab01c5",
     "code": "S012-MTR-G-003",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Lighting & Sockets Submeter",
     "type": "MTR",
     "manufacturer": "",
@@ -3024,7 +3024,7 @@
   {
     "id": "083031fd-07ce-4a7d-acd6-ee7c762fe1f3",
     "code": "S012-FCU-G-B",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Ground Floor FCU Zone B",
     "type": "FCU",
     "manufacturer": "",
@@ -3101,7 +3101,7 @@
   {
     "id": "400b9029-d7c6-4280-86b4-4d067cfc7781",
     "code": "S002-BESS-B1-001",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Battery Energy Storage (B1)",
     "type": "BESS",
     "manufacturer": "",
@@ -3148,7 +3148,7 @@
   {
     "id": "433be99f-6c40-48d3-898d-7b7dfef1986f",
     "code": "S002-LUM-204-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -3181,7 +3181,7 @@
   {
     "id": "18a2d927-e7fb-411a-80b7-4952704c1339",
     "code": "S002-LUM-204-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -3214,7 +3214,7 @@
   {
     "id": "e6e4293e-e495-4913-93f9-526827cdd736",
     "code": "S002-LUM-204-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -3247,7 +3247,7 @@
   {
     "id": "aeee3457-ba44-4840-9626-92a64b5d0eb9",
     "code": "S002-LUM-204-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -3280,7 +3280,7 @@
   {
     "id": "f2df075d-2949-45dd-94ec-7bd0a48e68ce",
     "code": "S002-LUM-204-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -3313,7 +3313,7 @@
   {
     "id": "2b00efeb-57cd-4c87-a29a-e35eeaa19b10",
     "code": "site-005-UMH-GEN-B1-002.oil",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Generator (UMH-GEN-B1-002.oil)",
     "type": "GEN",
     "manufacturer": "",
@@ -3342,7 +3342,7 @@
   {
     "id": "b9cdd194-4326-4c03-8fd2-f66175cab8ef",
     "code": "site-005-UMH-JACE-001.cpu",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-JACE-001.cpu)",
     "type": "JACE",
     "manufacturer": "",
@@ -3371,7 +3371,7 @@
   {
     "id": "5a8e19b1-6be6-49a3-9ea1-a6a4e060960c",
     "code": "site-005-UMH-GEN-B1-003.oil",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Generator (UMH-GEN-B1-003.oil)",
     "type": "GEN",
     "manufacturer": "",
@@ -3400,7 +3400,7 @@
   {
     "id": "9c9fbc00-b89e-4733-aebb-d06976a8baad",
     "code": "site-005-UMH-MSB-B1-001.total",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-MSB-B1-001.total)",
     "type": "MSB",
     "manufacturer": "",
@@ -3429,7 +3429,7 @@
   {
     "id": "11dc22e0-6058-4269-910b-09eefa41093b",
     "code": "site-005-UMH-PUMP-B1-CHW1.vfd",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Pump (UMH-PUMP-B1-CHW1.vfd)",
     "type": "PUMP",
     "manufacturer": "",
@@ -3458,7 +3458,7 @@
   {
     "id": "498b1ac0-e511-46e0-8f43-3ae09047f3ce",
     "code": "S002-LUM-205-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -3491,7 +3491,7 @@
   {
     "id": "79ed99f0-ff85-4306-8d28-c6c6edb9b210",
     "code": "S002-LUM-205-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -3524,7 +3524,7 @@
   {
     "id": "fbbfe7be-f2d5-4fe8-8e35-60040352c360",
     "code": "S002-LUM-205-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -3557,7 +3557,7 @@
   {
     "id": "a7afc752-579c-4200-bc46-c3589931d611",
     "code": "S002-LUM-205-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -3590,7 +3590,7 @@
   {
     "id": "6337fb51-48d3-4926-919f-5ab12a24f4ec",
     "code": "S002-LUM-205-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -3623,7 +3623,7 @@
   {
     "id": "1730dd87-f03f-461d-bf2a-f6985d9079a1",
     "code": "S002-LUM-205-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -3656,7 +3656,7 @@
   {
     "id": "2c0a4bec-27a6-4875-9dd6-64dd7f392529",
     "code": "S002-LUM-205-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -3689,7 +3689,7 @@
   {
     "id": "8f1ed522-0160-49cf-91d3-ba5e1dedd405",
     "code": "S002-FCU-105",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L1 South FCU (S002-FCU-105)",
     "type": "FCU",
     "manufacturer": null,
@@ -3718,7 +3718,7 @@
   {
     "id": "3ee9d2b4-bea5-4e23-8f99-539b03d4c965",
     "code": "S002-UPS-B1-001",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "UPS (UPS-1)",
     "type": "UPS",
     "manufacturer": "",
@@ -3764,7 +3764,7 @@
   {
     "id": "75ed15eb-9106-438c-932a-647db85fae7f",
     "code": "S002-INV-R-002",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Solar Inverter 2 (Roof)",
     "type": "INV",
     "manufacturer": "",
@@ -3811,7 +3811,7 @@
   {
     "id": "a7d30a5b-351d-4b63-806c-8896a9e1d95e",
     "code": "S002-MTR-R-SOLAR",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Solar Generation Meter (Roof)",
     "type": "MTR",
     "manufacturer": "",
@@ -3857,7 +3857,7 @@
   {
     "id": "e00a4709-77a2-470b-aa39-a3976427d23d",
     "code": "S012-FCU-G-A",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Ground Floor FCU Zone A",
     "type": "FCU",
     "manufacturer": "",
@@ -3934,7 +3934,7 @@
   {
     "id": "20595523-3e83-4048-bdb4-069ad06037b0",
     "code": "site-005-UMH-FIRE-001.battery",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-FIRE-001.battery)",
     "type": "FIRE",
     "manufacturer": "",
@@ -3963,7 +3963,7 @@
   {
     "id": "9508578b-822a-403f-b903-b95c3f70c549",
     "code": "S002-LUM-100-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -3996,7 +3996,7 @@
   {
     "id": "0bdff478-303d-43a7-b634-9eafeb5a801e",
     "code": "S002-FCU-100",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L1 North FCU (S002-FCU-100)",
     "type": "FCU",
     "manufacturer": "",
@@ -4043,7 +4043,7 @@
   {
     "id": "39bea606-e153-4542-8ce3-a1b8f87283d1",
     "code": "S002-CHILLER-B1-002",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Chiller (CH-2)",
     "type": "CHILLER",
     "manufacturer": "",
@@ -4090,7 +4090,7 @@
   {
     "id": "3dd69931-9a8c-4b95-9a53-c46767c70a22",
     "code": "site-005-UMH-JACE-001.uptime",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-JACE-001.uptime)",
     "type": "JACE",
     "manufacturer": "",
@@ -4119,7 +4119,7 @@
   {
     "id": "a7221c8f-b26b-45ac-be5f-84b2ceed87cd",
     "code": "site-005-UMH-FIRE-001.mains",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-FIRE-001.mains)",
     "type": "FIRE",
     "manufacturer": "",
@@ -4148,7 +4148,7 @@
   {
     "id": "41ea80fd-24bc-4ed9-b724-0426b4ad7dc8",
     "code": "site-005-UMH-AHU-L6-001.co2",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L6-001.co2)",
     "type": "AHU",
     "manufacturer": "",
@@ -4177,7 +4177,7 @@
   {
     "id": "8d5da918-1857-4469-be2f-2af8b3d8b914",
     "code": "site-005-UMH-LIFT-004.in",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-LIFT-004.in)",
     "type": "LIFT",
     "manufacturer": "",
@@ -4206,7 +4206,7 @@
   {
     "id": "3a7e45ee-4afd-4a09-b5cc-cd86a52268a8",
     "code": "S002-ZONE-101",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Unknown (ZONE-L1)",
     "type": "ZONE",
     "manufacturer": "",
@@ -4253,7 +4253,7 @@
   {
     "id": "4a4c3373-b899-484f-93d3-66716def0807",
     "code": "S002-INV-R-003",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Solar Inverter 3 (Roof)",
     "type": "INV",
     "manufacturer": "",
@@ -4300,7 +4300,7 @@
   {
     "id": "1c415e4f-2e06-465b-8ac1-547c9c1e8eee",
     "code": "S002-LUM-005-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -4333,7 +4333,7 @@
   {
     "id": "a8486f67-f605-4398-8d80-34942e0469a9",
     "code": "S002-LUM-100-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -4366,7 +4366,7 @@
   {
     "id": "830f1a69-e538-4957-b43c-9b3c2c35d061",
     "code": "S002-LUM-100-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -4399,7 +4399,7 @@
   {
     "id": "03a3cbcb-41b0-4d54-8c19-54e089953e83",
     "code": "S002-LUM-101-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -4432,7 +4432,7 @@
   {
     "id": "5c3dc4e2-a15a-4064-8c13-8c36e4a1c841",
     "code": "S012-SPLIT-G-001",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Split Unit 1",
     "type": "SPLIT",
     "manufacturer": "",
@@ -4509,7 +4509,7 @@
   {
     "id": "9c08281e-be2c-419c-9d93-269409bc454c",
     "code": "site-005-UMH-COLD-L1-002.door",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-COLD-L1-002.door)",
     "type": "COLD",
     "manufacturer": "",
@@ -4538,7 +4538,7 @@
   {
     "id": "489f99af-8062-430f-9b49-4d3c1d70f672",
     "code": "site-005-UMH-CT-R-001.basin",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Cooling Tower (UMH-CT-R-001.basin)",
     "type": "CT",
     "manufacturer": "",
@@ -4567,7 +4567,7 @@
   {
     "id": "a94ad38f-c2ba-4e01-b2ee-3c5dda308847",
     "code": "site-005-UMH-CT-R-002.wet",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Cooling Tower (UMH-CT-R-002.wet)",
     "type": "CT",
     "manufacturer": "",
@@ -4596,7 +4596,7 @@
   {
     "id": "ed8aeeb6-77a1-4d5f-b7db-250308a34537",
     "code": "site-005-UMH-DB-L3-002.total",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-DB-L3-002.total)",
     "type": "DB",
     "manufacturer": "",
@@ -4625,7 +4625,7 @@
   {
     "id": "ffef6372-b109-4e57-8647-882dcdde36a6",
     "code": "site-005-UMH-JACE-002.uptime",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-JACE-002.uptime)",
     "type": "JACE",
     "manufacturer": "",
@@ -4654,7 +4654,7 @@
   {
     "id": "d3715185-dfa7-4017-8724-58cf035fce57",
     "code": "site-005-UMH-JACE-001.bacnet",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-JACE-001.bacnet)",
     "type": "JACE",
     "manufacturer": "",
@@ -4683,7 +4683,7 @@
   {
     "id": "d0beea59-fed7-4451-b08f-d1688744103f",
     "code": "site-005-UMH-AHU-L3-TH1.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-TH1.fan)",
     "type": "AHU",
     "manufacturer": "",
@@ -4712,7 +4712,7 @@
   {
     "id": "5558046f-406c-4795-a7ed-77da67827e44",
     "code": "site-005-UMH-AHU-L3-TH1.hepa",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-TH1.hepa)",
     "type": "AHU",
     "manufacturer": "",
@@ -4741,7 +4741,7 @@
   {
     "id": "eec2833f-21d7-4da1-801f-d29055faefed",
     "code": "site-005-UMH-LIFT-002.current",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-LIFT-002.current)",
     "type": "LIFT",
     "manufacturer": "",
@@ -4770,7 +4770,7 @@
   {
     "id": "b3f44468-86c2-40b0-8cdc-56489f7339a2",
     "code": "site-005-UMH-FIRE-001.system",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-FIRE-001.system)",
     "type": "FIRE",
     "manufacturer": "",
@@ -4799,7 +4799,7 @@
   {
     "id": "6e91fd51-283b-4bbb-85dd-30aa55e1f067",
     "code": "site-005-UMH-LIFT-001.door",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-LIFT-001.door)",
     "type": "LIFT",
     "manufacturer": "",
@@ -4828,7 +4828,7 @@
   {
     "id": "d204e375-a1b8-40f6-b80c-2082db775fd0",
     "code": "S002-CT-R-001",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Cooling Tower (CT-1)",
     "type": "CT",
     "manufacturer": "",
@@ -4875,7 +4875,7 @@
   {
     "id": "010615d3-be2a-4d51-80a5-7fb8a4c5117b",
     "code": "S002-PUMP-B1-CW1",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Pump (PUMP-CW-1)",
     "type": "PUMP",
     "manufacturer": "",
@@ -4922,7 +4922,7 @@
   {
     "id": "8f2b2d5b-1e6b-4c56-9c8f-b9dcca52ca94",
     "code": "site-005-UMH-LIFT-002.door",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-LIFT-002.door)",
     "type": "LIFT",
     "manufacturer": "",
@@ -4951,7 +4951,7 @@
   {
     "id": "4d81014f-76cd-4de1-9817-20bbb7c62f8e",
     "code": "site-005-UMH-LIFT-004.door",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-LIFT-004.door)",
     "type": "LIFT",
     "manufacturer": "",
@@ -4980,7 +4980,7 @@
   {
     "id": "0073fa9f-f37c-475f-acc4-ed57356326c8",
     "code": "site-005-UMH-UPS-L3-001.load",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "UPS (UMH-UPS-L3-001.load)",
     "type": "UPS",
     "manufacturer": "",
@@ -5009,7 +5009,7 @@
   {
     "id": "5b975517-0f96-4328-9e2b-b26afe92eede",
     "code": "site-005-UMH-AHU-L9-001.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L9-001.fan)",
     "type": "AHU",
     "manufacturer": "",
@@ -5038,7 +5038,7 @@
   {
     "id": "1df9f958-93be-43d3-bc11-def7292e5415",
     "code": "S002-LUM-101-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -5071,7 +5071,7 @@
   {
     "id": "94f2d5b8-16ff-45a5-a6e2-8601907935ec",
     "code": "S002-INV-R-004",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Solar Inverter 4 (Roof)",
     "type": "INV",
     "manufacturer": "",
@@ -5118,7 +5118,7 @@
   {
     "id": "75b6ee5e-b5b8-49b4-8606-860ecaf31f46",
     "code": "S012-MTR-G-002",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "HVAC Submeter",
     "type": "MTR",
     "manufacturer": "",
@@ -5197,7 +5197,7 @@
   {
     "id": "fb32043e-20ed-4b01-b349-fa1b55d6e5fb",
     "code": "S002-PUMP-B1-CHW1",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Pump (PUMP-CHW-1)",
     "type": "PUMP",
     "manufacturer": "",
@@ -5244,7 +5244,7 @@
   {
     "id": "e505cbae-9130-41da-b7e0-6f0ce0d008ab",
     "code": "S002-MTR-B1-MAIN",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Power Meter (MTR-MAIN)",
     "type": "MTR",
     "manufacturer": "",
@@ -5290,7 +5290,7 @@
   {
     "id": "0023d0de-f1a6-4ae0-a3b0-64e03698f228",
     "code": "S012-GEN-G-001",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Backup Generator",
     "type": "GEN",
     "manufacturer": "",
@@ -5383,7 +5383,7 @@
   {
     "id": "d52c9960-80bc-4b19-9e6a-a03521bed894",
     "code": "site-005-UMH-COLD-L1-001.door",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-COLD-L1-001.door)",
     "type": "COLD",
     "manufacturer": "",
@@ -5412,7 +5412,7 @@
   {
     "id": "a2758fb7-6d23-4c5c-9b48-d0e49956b138",
     "code": "site-005-UMH-GEN-B1-001.fuel",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Generator (UMH-GEN-B1-001.fuel)",
     "type": "GEN",
     "manufacturer": "",
@@ -5441,7 +5441,7 @@
   {
     "id": "ba8aaae3-078b-4c47-8a36-923f6a62bc70",
     "code": "S002-AHU-201",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Air Handling Unit (AHU-2)",
     "type": "AHU",
     "manufacturer": "",
@@ -5488,7 +5488,7 @@
   {
     "id": "7f0fc24a-9648-4dde-b981-630589c33e3f",
     "code": "site-005-UMH-JACE-002.bacnet",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-JACE-002.bacnet)",
     "type": "JACE",
     "manufacturer": "",
@@ -5517,7 +5517,7 @@
   {
     "id": "13d51236-8788-4a07-859d-a91062a8f4b8",
     "code": "site-005-UMH-JACE-002.memory",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-JACE-002.memory)",
     "type": "JACE",
     "manufacturer": "",
@@ -5546,7 +5546,7 @@
   {
     "id": "31e4de74-8119-46d4-8c91-22075b524c83",
     "code": "site-005-UMH-LIFT-001.in",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-LIFT-001.in)",
     "type": "LIFT",
     "manufacturer": "",
@@ -5575,7 +5575,7 @@
   {
     "id": "09f17b3a-3a1f-40ab-90f7-1be6b4f005dd",
     "code": "S002-LUM-101-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -5608,7 +5608,7 @@
   {
     "id": "3c2bef81-c620-47cf-a5a2-6e1ee7ee6503",
     "code": "S002-LUM-101-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -5641,7 +5641,7 @@
   {
     "id": "e5cdac4a-eeff-42e7-bf7c-35e7f328e54c",
     "code": "site-005-UMH-COLD-B1-001.door",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-COLD-B1-001.door)",
     "type": "COLD",
     "manufacturer": "",
@@ -5670,7 +5670,7 @@
   {
     "id": "a7a4bc19-6c4b-4197-b6de-510b57584df5",
     "code": "S002-CHILLER-B1-001",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Chiller (S002-CHILLER-B1-001)",
     "type": "CHILLER",
     "manufacturer": "",
@@ -5717,7 +5717,7 @@
   {
     "id": "b2e3c8d4-71da-4d4a-81b8-e96bd5017d6f",
     "code": "site-005-UMH-BOILER-B1-001.hw",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Boiler (UMH-BOILER-B1-001.hw)",
     "type": "BOILER",
     "manufacturer": "",
@@ -5746,7 +5746,7 @@
   {
     "id": "c4745c5b-cc98-4cf9-8810-ab746a89af22",
     "code": "site-005-UMH-FIRE-001.zones",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-FIRE-001.zones)",
     "type": "FIRE",
     "manufacturer": "",
@@ -5775,7 +5775,7 @@
   {
     "id": "eaad2649-8613-4d70-9b38-c88936065e92",
     "code": "S002-AHU-R-001",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Air Handling Unit (AHU-1)",
     "type": "AHU",
     "manufacturer": "",
@@ -5822,7 +5822,7 @@
   {
     "id": "146817b8-1fc3-4182-b427-b9a2e4e0ea9b",
     "code": "site-005-UMH-AHU-L3-ICU.air",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-ICU.air)",
     "type": "AHU",
     "manufacturer": "",
@@ -5851,7 +5851,7 @@
   {
     "id": "3315d6cd-7a66-4958-b956-e2b2b7504134",
     "code": "site-005-UMH-AHU-L3-ICU.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-ICU.fan)",
     "type": "AHU",
     "manufacturer": "",
@@ -5880,7 +5880,7 @@
   {
     "id": "b44dbf99-1738-4dd9-885b-374eff5b41a5",
     "code": "S012-CHILLER-R-001",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Roof Chiller Unit 1",
     "type": "CHILLER",
     "manufacturer": "",
@@ -5973,7 +5973,7 @@
   {
     "id": "23690bfc-b2ec-45fb-9b3e-9aa3ae655b75",
     "code": "S002-DALI-B1-CTRL",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "DALI Lighting Controller (DALI-CTRL-L1)",
     "type": "DALI",
     "manufacturer": "",
@@ -6026,7 +6026,7 @@
   {
     "id": "04f07505-cfe9-4c22-b161-f60518b34e35",
     "code": "S002-INV-R-001",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Solar Inverter 1 (Roof)",
     "type": "INV",
     "manufacturer": "",
@@ -6073,7 +6073,7 @@
   {
     "id": "da00a013-40b1-43a2-ac60-711e1a43ac66",
     "code": "S002-VAV-200",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Variable Air Volume Box (VAV-L2-A)",
     "type": "VAV",
     "manufacturer": "",
@@ -6120,7 +6120,7 @@
   {
     "id": "c63b574e-f28b-4ba9-b663-1217b7ef96ed",
     "code": "site-005-UMH-AHU-L3-TH2.air",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-TH2.air)",
     "type": "AHU",
     "manufacturer": "",
@@ -6149,7 +6149,7 @@
   {
     "id": "849b87f4-6a65-4af4-ba26-46cb39086f5f",
     "code": "site-005-UMH-AHU-L3-TH2.hepa",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-TH2.hepa)",
     "type": "AHU",
     "manufacturer": "",
@@ -6178,7 +6178,7 @@
   {
     "id": "4e0d3241-0550-470b-9630-c767804d0a48",
     "code": "S012-AHU-G-002",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Ground Floor AHU 2",
     "type": "AHU",
     "manufacturer": "",
@@ -6262,7 +6262,7 @@
   {
     "id": "3ec624fb-38c7-4e23-bd4f-d02934722d2f",
     "code": "S002-DALI-100",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "DALI Lighting Zone L1-A",
     "type": "DALI",
     "manufacturer": "",
@@ -6314,7 +6314,7 @@
   {
     "id": "db998c59-2e3d-4a08-b7d6-f563f75c2b2a",
     "code": "site-005-UMH-LIFT-002.in",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-LIFT-002.in)",
     "type": "LIFT",
     "manufacturer": "",
@@ -6343,7 +6343,7 @@
   {
     "id": "99992cdc-f17e-48ef-b4f6-8e0e10c55155",
     "code": "site-005-UMH-CT-R-001.cw",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Cooling Tower (UMH-CT-R-001.cw)",
     "type": "CT",
     "manufacturer": "",
@@ -6372,7 +6372,7 @@
   {
     "id": "5b50fd8a-e6b6-4255-89e3-1a70e3d5260f",
     "code": "S012-FCU-G-C",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Ground Floor FCU Zone C",
     "type": "FCU",
     "manufacturer": "",
@@ -6449,7 +6449,7 @@
   {
     "id": "bd138cff-f27b-4f3a-94b5-fc4f58b5c8e1",
     "code": "site-005-UMH-BOILER-B1-002.hw",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Boiler (UMH-BOILER-B1-002.hw)",
     "type": "BOILER",
     "manufacturer": "",
@@ -6478,7 +6478,7 @@
   {
     "id": "30dcd29b-fc60-4cf0-a4e4-5ee8e5d24379",
     "code": "S002-VAV-101",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L1 North VAV (S002-VAV-101)",
     "type": "VAV",
     "manufacturer": "",
@@ -6525,7 +6525,7 @@
   {
     "id": "5fa3ee86-df4c-4069-b247-a51a193d9e28",
     "code": "site-005-UMH-GEN-B1-003.run",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Generator (UMH-GEN-B1-003.run)",
     "type": "GEN",
     "manufacturer": "",
@@ -6554,7 +6554,7 @@
   {
     "id": "119d607c-7b1d-4af7-8600-556473c0987b",
     "code": "site-005-UMH-MEDGAS-B1-001.o2",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-MEDGAS-B1-001.o2)",
     "type": "MEDGAS",
     "manufacturer": "",
@@ -6583,7 +6583,7 @@
   {
     "id": "cc6a2083-993a-43aa-a952-b8fbf72c0300",
     "code": "site-005-UMH-MSB-B1-001.mains",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-MSB-B1-001.mains)",
     "type": "MSB",
     "manufacturer": "",
@@ -6612,7 +6612,7 @@
   {
     "id": "f74aaa33-a066-4c9b-8fa0-3aa56f669051",
     "code": "site-005-UMH-MSB-B1-001.power",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-MSB-B1-001.power)",
     "type": "MSB",
     "manufacturer": "",
@@ -6641,7 +6641,7 @@
   {
     "id": "3a9f8bc9-1a67-460a-955b-14f8e03bb795",
     "code": "site-005-UMH-PUMP-B1-CHW1.dp",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Pump (UMH-PUMP-B1-CHW1.dp)",
     "type": "PUMP",
     "manufacturer": "",
@@ -6670,7 +6670,7 @@
   {
     "id": "553bdeb3-944c-4b17-b030-1efb1d0ba4b3",
     "code": "site-005-UMH-UPS-L3-001.input",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "UPS (UMH-UPS-L3-001.input)",
     "type": "UPS",
     "manufacturer": "",
@@ -6699,7 +6699,7 @@
   {
     "id": "bdb9c352-432c-4c41-90ec-9cdce0f2f6b7",
     "code": "site-005-UMH-PUMP-B1-CW1.dp",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Pump (UMH-PUMP-B1-CW1.dp)",
     "type": "PUMP",
     "manufacturer": "",
@@ -6728,7 +6728,7 @@
   {
     "id": "65c942f7-a20e-44a9-b9fe-117bdb35acb6",
     "code": "site-005-UMH-KEF-B1-001.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-KEF-B1-001.fan)",
     "type": "KEF",
     "manufacturer": "",
@@ -6757,7 +6757,7 @@
   {
     "id": "cbd71a6b-d4b2-4655-b5b6-240490f12ae3",
     "code": "S002-LUM-102-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -6790,7 +6790,7 @@
   {
     "id": "237faac0-ef39-4077-9dcb-5d3be0fc2083",
     "code": "S002-LUM-205-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -6823,7 +6823,7 @@
   {
     "id": "84ee9b14-1b9b-4798-a56b-348e68b71214",
     "code": "S002-LUM-205-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -6856,7 +6856,7 @@
   {
     "id": "021a86dc-ba2b-4001-8b6b-35acfe3a10bc",
     "code": "S002-LUM-205-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -6889,7 +6889,7 @@
   {
     "id": "2e706f96-7a2c-41bd-bcd3-57e972dcb233",
     "code": "S002-ZONE-L1-001",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone Controller",
     "type": "controller",
     "manufacturer": null,
@@ -6918,7 +6918,7 @@
   {
     "id": "710b67f7-6382-426c-9f74-3d2c4df8f1f5",
     "code": "S002-ZONE-L2-001",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone Controller",
     "type": "controller",
     "manufacturer": null,
@@ -6947,7 +6947,7 @@
   {
     "id": "060bfe99-6fdf-4d6b-9889-3b0ff58adf62",
     "code": "S002-DALI-L1-CTRL",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 DALI Controller",
     "type": "dali_controller",
     "manufacturer": null,
@@ -6976,7 +6976,7 @@
   {
     "id": "beef320f-d4a8-4feb-a445-f79a2b48d7c3",
     "code": "S002-DALI-L1-A",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A DALI Lights",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7005,7 +7005,7 @@
   {
     "id": "59556b3b-2eb1-4fd8-8685-dbebfc899248",
     "code": "S002-DALI-L2-B",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B DALI Lights",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7034,7 +7034,7 @@
   {
     "id": "6228b4fe-c560-4ef7-aa51-b9c5bf8bf30c",
     "code": "site-005-UMH-AHU-B1-LAUN.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-B1-LAUN.fan)",
     "type": "AHU",
     "manufacturer": "",
@@ -7063,7 +7063,7 @@
   {
     "id": "6b45d9e6-d9d9-46ad-b459-218496f449b2",
     "code": "site-005-UMH-AHU-L2-001.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L2-001.fan)",
     "type": "AHU",
     "manufacturer": "",
@@ -7092,7 +7092,7 @@
   {
     "id": "62ac3cec-0eee-4ebc-ada5-67f567d3d147",
     "code": "site-005-UMH-AHU-L3-ICU.hepa",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-ICU.hepa)",
     "type": "AHU",
     "manufacturer": "",
@@ -7121,7 +7121,7 @@
   {
     "id": "8a3feb23-43e5-4dcb-9a57-007030a1d945",
     "code": "site-005-UMH-AHU-L3-TH1.air",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-TH1.air)",
     "type": "AHU",
     "manufacturer": "",
@@ -7150,7 +7150,7 @@
   {
     "id": "442b2479-fcbb-4735-9251-91c16a1135be",
     "code": "S002-LUM-205-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -7183,7 +7183,7 @@
   {
     "id": "86d6d1e7-98da-41b9-a28d-5ca41c42ac7e",
     "code": "S002-LUM-205-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -7216,7 +7216,7 @@
   {
     "id": "4be3ef25-55bf-4b75-a301-feaa2a0af02d",
     "code": "S002-LUM-205-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -7249,7 +7249,7 @@
   {
     "id": "10ff413d-1cb1-4ef4-b489-c127d17bf340",
     "code": "S012-AHU-G-001",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Ground Floor AHU 1",
     "type": "AHU",
     "manufacturer": "",
@@ -7333,7 +7333,7 @@
   {
     "id": "5f49a838-ead8-4f10-a152-4266d4aa6d92",
     "code": "S002-DALI-001",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A DALI Luminaires",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7362,7 +7362,7 @@
   {
     "id": "a4997536-6e66-4d23-82fc-3057d752f82f",
     "code": "S002-DALI-002",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B DALI Luminaires",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7391,7 +7391,7 @@
   {
     "id": "ac5e9a6b-0b1f-4daa-9e55-4a0877c4e5da",
     "code": "S002-DALI-003",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C DALI Luminaires",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7420,7 +7420,7 @@
   {
     "id": "0e6f8d35-88a7-4371-adec-5b1c17dd692d",
     "code": "S002-DALI-004",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D DALI Luminaires",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7449,7 +7449,7 @@
   {
     "id": "6d9d9e12-1975-4c6e-aeea-1b84955fd94a",
     "code": "S002-DALI-005",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E DALI Luminaires",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7478,7 +7478,7 @@
   {
     "id": "d6fb0da2-a61b-4d63-97ad-271ebfeec1c9",
     "code": "S002-DALI-101",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B DALI Luminaires",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7507,7 +7507,7 @@
   {
     "id": "ba21e938-1742-4095-aeea-c1cd2bcac6fd",
     "code": "S002-DALI-102",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C DALI Luminaires",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7536,7 +7536,7 @@
   {
     "id": "10bff276-1f37-4012-a063-019c4b1a4e61",
     "code": "S002-DALI-103",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D DALI Luminaires",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7565,7 +7565,7 @@
   {
     "id": "dd045e34-2edc-4c35-871a-dae308758fd3",
     "code": "S002-DALI-104",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E DALI Luminaires",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7594,7 +7594,7 @@
   {
     "id": "1a9ed34a-f99f-41d0-983d-07de41f0f52d",
     "code": "S002-DALI-105",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F DALI Luminaires",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7623,7 +7623,7 @@
   {
     "id": "6db02d9b-d1da-4cd7-bb95-1440ea132488",
     "code": "S002-DALI-200",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A DALI Luminaires",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7652,7 +7652,7 @@
   {
     "id": "e74b3eca-bb3f-4369-881b-598a3172a091",
     "code": "S002-DALI-202",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C DALI Luminaires",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7681,7 +7681,7 @@
   {
     "id": "829c89e4-f119-4e8c-a975-82262e423f0d",
     "code": "S002-DALI-203",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D DALI Luminaires",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7710,7 +7710,7 @@
   {
     "id": "ad047943-0d9a-4e70-b20d-205e353d4363",
     "code": "S002-DALI-204",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E DALI Luminaires",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7739,7 +7739,7 @@
   {
     "id": "235cbf6d-52b1-4a22-8f98-f5e084bbf1ff",
     "code": "S002-DALI-205",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone F DALI Luminaires",
     "type": "dali_luminaire",
     "manufacturer": null,
@@ -7768,7 +7768,7 @@
   {
     "id": "09b462e0-9ed3-42ff-87c8-90e04a33f307",
     "code": "S002-FCU-205",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L2 South FCU (S002-FCU-205)",
     "type": "FCU",
     "manufacturer": null,
@@ -7797,7 +7797,7 @@
   {
     "id": "200159a3-7498-46de-ac8e-560906a84210",
     "code": "S002-VAV-105",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L1 South VAV (S002-VAV-105)",
     "type": "VAV",
     "manufacturer": null,
@@ -7826,7 +7826,7 @@
   {
     "id": "adc0532d-b574-4149-b24b-38347083d92c",
     "code": "S002-LUM-001-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -7859,7 +7859,7 @@
   {
     "id": "854e3a34-9e4c-46b2-acc0-fd83f266ad47",
     "code": "S002-LUM-001-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -7892,7 +7892,7 @@
   {
     "id": "ecfa4f2d-fc44-40aa-b2a2-d5854db7c302",
     "code": "S002-LUM-001-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -7925,7 +7925,7 @@
   {
     "id": "24e09272-eb73-4f48-b69e-2f1266e100bf",
     "code": "S002-LUM-001-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -7958,7 +7958,7 @@
   {
     "id": "d0e8b752-8228-4301-bd26-4a27973e2d50",
     "code": "site-005-UMH-AHU-L5-001.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L5-001.fan)",
     "type": "AHU",
     "manufacturer": "",
@@ -7987,7 +7987,7 @@
   {
     "id": "3ba4d2aa-5f1c-4a9c-9b38-b2472ebf2e37",
     "code": "site-005-UMH-AHU-L8-001.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L8-001.fan)",
     "type": "AHU",
     "manufacturer": "",
@@ -8016,7 +8016,7 @@
   {
     "id": "a9dd2403-a523-48ae-b227-d2b303403b1b",
     "code": "site-005-UMH-AHU-L4-001.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L4-001.fan)",
     "type": "AHU",
     "manufacturer": "",
@@ -8045,7 +8045,7 @@
   {
     "id": "8c62200a-2a15-421a-97bc-67e818f3dceb",
     "code": "S002-LUM-001-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -8078,7 +8078,7 @@
   {
     "id": "5893c695-c3e7-4281-86ee-2888cb1cf55c",
     "code": "S002-LUM-001-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -8111,7 +8111,7 @@
   {
     "id": "18c3cf17-aac0-4d12-ab2d-926a85d25fbd",
     "code": "S002-LUM-001-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -8144,7 +8144,7 @@
   {
     "id": "8f7e838a-ccf1-4537-9d1c-f56d2d0a8c5d",
     "code": "S002-LUM-001-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -8177,7 +8177,7 @@
   {
     "id": "e0064ca9-54eb-4836-a2f3-fd66ce88688e",
     "code": "S002-LUM-001-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -8210,7 +8210,7 @@
   {
     "id": "cd4e0c52-0f5a-4796-ba77-65ee664b5434",
     "code": "S002-LUM-001-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -8243,7 +8243,7 @@
   {
     "id": "ea309617-cbf2-4518-a6c0-b625149d60fa",
     "code": "S002-LUM-001-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -8276,7 +8276,7 @@
   {
     "id": "2cfa0ca0-2ee1-4c7f-b231-a566bece0629",
     "code": "S002-LUM-001-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -8309,7 +8309,7 @@
   {
     "id": "59790602-910e-4549-bfac-2f8b243360b3",
     "code": "S002-LUM-001-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -8342,7 +8342,7 @@
   {
     "id": "bd3a9f7b-e39f-4829-a68a-f1ee805acbd8",
     "code": "S002-LUM-001-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -8375,7 +8375,7 @@
   {
     "id": "eb604018-5c36-4f07-a793-c953bdebc7ca",
     "code": "S002-LUM-001-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -8408,7 +8408,7 @@
   {
     "id": "6f60668f-27df-48bc-a74d-d1eb5161d545",
     "code": "S002-LUM-001-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -8441,7 +8441,7 @@
   {
     "id": "9d9242cf-4d23-4849-9387-e710c4b3868d",
     "code": "S002-LUM-001-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -8474,7 +8474,7 @@
   {
     "id": "ea338029-4386-4f29-8bfd-4f4f23ac9376",
     "code": "S002-LUM-001-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -8507,7 +8507,7 @@
   {
     "id": "d7e09fd7-6fff-4198-83c9-b75901ee199e",
     "code": "S002-LUM-001-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -8540,7 +8540,7 @@
   {
     "id": "9f152c66-9c99-44cd-8d30-bcf4cb55d0e3",
     "code": "S002-LUM-002-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -8573,7 +8573,7 @@
   {
     "id": "78fd8808-b87a-4834-8834-7cc49cdc7098",
     "code": "S002-LUM-002-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -8606,7 +8606,7 @@
   {
     "id": "5437a9c4-7eb7-414e-bf7d-726a98286505",
     "code": "S002-LUM-002-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -8639,7 +8639,7 @@
   {
     "id": "10cb826d-fdf9-434e-974b-ffa2cf25aaed",
     "code": "S002-LUM-002-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -8672,7 +8672,7 @@
   {
     "id": "a7bd33c5-092d-4d21-aa09-1c9f07db2d2f",
     "code": "S002-LUM-002-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -8705,7 +8705,7 @@
   {
     "id": "85044f77-eb0b-4a3f-b7b3-af3e08870c5c",
     "code": "S002-LUM-002-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -8738,7 +8738,7 @@
   {
     "id": "5f141898-d7ce-4e46-bbc9-a0916bf859c9",
     "code": "S002-LUM-002-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -8771,7 +8771,7 @@
   {
     "id": "456f26eb-1088-4d4b-8c57-f537d46dd775",
     "code": "S002-LUM-002-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -8804,7 +8804,7 @@
   {
     "id": "9c088ade-1cc9-4d10-8411-b511bbdc8b89",
     "code": "S002-LUM-002-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -8837,7 +8837,7 @@
   {
     "id": "5586cdf5-5ee8-4be9-a42b-7819e99cb8cf",
     "code": "S002-LUM-002-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -8870,7 +8870,7 @@
   {
     "id": "d60bcc29-ec22-4f3a-a3c6-1d6aea1c4b4a",
     "code": "S002-LUM-002-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -8903,7 +8903,7 @@
   {
     "id": "60fefe93-d6ff-4797-938d-af6ce8c2a469",
     "code": "site-005-UMH-AHU-L3-ICU.room",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-ICU.room)",
     "type": "AHU",
     "manufacturer": "",
@@ -8932,7 +8932,7 @@
   {
     "id": "a985db6b-a781-4b33-8548-d9864941ec3d",
     "code": "site-005-UMH-CT-R-001.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Cooling Tower (UMH-CT-R-001.fan)",
     "type": "CT",
     "manufacturer": "",
@@ -8961,7 +8961,7 @@
   {
     "id": "8963d94d-53f1-40e3-a608-c0574a237948",
     "code": "site-005-UMH-CT-R-001.wet",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Cooling Tower (UMH-CT-R-001.wet)",
     "type": "CT",
     "manufacturer": "",
@@ -8990,7 +8990,7 @@
   {
     "id": "f8d9d93f-51f3-4922-bf41-17dd9874168a",
     "code": "site-005-UMH-CT-R-002.basin",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Cooling Tower (UMH-CT-R-002.basin)",
     "type": "CT",
     "manufacturer": "",
@@ -9019,7 +9019,7 @@
   {
     "id": "54dac981-29e4-4c9b-a5b0-ee1d9a17a1d9",
     "code": "S002-VAV-100",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "L1 North VAV (S002-VAV-100)",
     "type": "VAV",
     "manufacturer": "",
@@ -9066,7 +9066,7 @@
   {
     "id": "65d5f4fe-9126-458f-845f-edb93fc1cbac",
     "code": "S002-LUM-002-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -9099,7 +9099,7 @@
   {
     "id": "79d7a174-a467-48ce-a3c6-b920a601c19a",
     "code": "S002-LUM-002-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -9132,7 +9132,7 @@
   {
     "id": "db8cda60-92ff-4b83-8a4a-4525dd076e2b",
     "code": "S002-LUM-002-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -9165,7 +9165,7 @@
   {
     "id": "89b7ad4e-9b3f-4682-b9b4-684d53e7e4d6",
     "code": "S002-LUM-002-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -9198,7 +9198,7 @@
   {
     "id": "db0ad6e2-e851-452f-b935-9854d95f072f",
     "code": "S002-LUM-002-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -9231,7 +9231,7 @@
   {
     "id": "2dc04c31-df2e-49e5-958c-61e6f9a0c7ec",
     "code": "S002-LUM-002-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -9264,7 +9264,7 @@
   {
     "id": "1c7ec5b7-fd16-49a2-8392-a1a12e3bd3a1",
     "code": "S002-LUM-002-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -9297,7 +9297,7 @@
   {
     "id": "4e7a3b12-318b-4944-9cd9-075c34909178",
     "code": "S002-LUM-002-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -9330,7 +9330,7 @@
   {
     "id": "b1891146-bcbb-47f0-a10a-e10c1c01ec86",
     "code": "S002-LUM-002-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone B Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -9363,7 +9363,7 @@
   {
     "id": "a757ac53-c885-4826-885b-d0e90da14343",
     "code": "S002-LUM-003-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -9396,7 +9396,7 @@
   {
     "id": "882d5025-adc3-469b-972f-dde3cb494ad8",
     "code": "S002-LUM-003-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -9429,7 +9429,7 @@
   {
     "id": "f8f5a17a-509e-4b25-bad0-8e826b53bda2",
     "code": "S002-LUM-003-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -9462,7 +9462,7 @@
   {
     "id": "f9de8bcf-f2d5-4f72-a79e-d9e48f3af528",
     "code": "S002-LUM-003-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -9495,7 +9495,7 @@
   {
     "id": "29cba090-c83f-4a49-98b0-89d640e486b6",
     "code": "S002-LUM-003-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -9528,7 +9528,7 @@
   {
     "id": "b0e44529-6db0-4ce9-bfb3-c6386caed1a7",
     "code": "S002-LUM-003-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -9561,7 +9561,7 @@
   {
     "id": "35bc838b-96a9-4bd1-ba95-1c162e40a476",
     "code": "S002-LUM-003-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -9594,7 +9594,7 @@
   {
     "id": "0a1960cd-849b-49b4-be74-78196a9f1fbf",
     "code": "S002-LUM-003-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -9627,7 +9627,7 @@
   {
     "id": "76cddb5a-8101-4d29-84ab-6a7737185fa9",
     "code": "S002-LUM-003-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -9660,7 +9660,7 @@
   {
     "id": "e71f0e88-8d62-4f3d-a2b7-1114b30d4827",
     "code": "S002-LUM-003-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -9693,7 +9693,7 @@
   {
     "id": "8f9fca6f-6c6a-452b-8cf7-cbe302b45974",
     "code": "S002-LUM-003-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -9726,7 +9726,7 @@
   {
     "id": "d3fd67ba-ea03-4e89-b60a-935a89445d63",
     "code": "site-005-UMH-GEN-B1-003.load",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Generator (UMH-GEN-B1-003.load)",
     "type": "GEN",
     "manufacturer": "",
@@ -9755,7 +9755,7 @@
   {
     "id": "25a91226-146a-4d80-8bfb-e4e7a4145b44",
     "code": "site-005-UMH-SPLIT-L1-001.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Unknown (UMH-SPLIT-L1-001.fan)",
     "type": "SPLIT",
     "manufacturer": "",
@@ -9784,7 +9784,7 @@
   {
     "id": "f63701ec-73b2-4bcf-b81b-9543141d41b7",
     "code": "site-005-UMH-GEN-B1-001.run",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Generator (UMH-GEN-B1-001.run)",
     "type": "GEN",
     "manufacturer": "",
@@ -9813,7 +9813,7 @@
   {
     "id": "e2d07293-6a44-4871-b297-583450ef495c",
     "code": "S002-LUM-201-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -9846,7 +9846,7 @@
   {
     "id": "e9fe2e90-39bf-4c09-9ff6-da9692650cb3",
     "code": "S002-LUM-003-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -9879,7 +9879,7 @@
   {
     "id": "3af2e86a-84e9-4e2c-ac3e-32f4b1e4bccf",
     "code": "S002-LUM-003-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -9912,7 +9912,7 @@
   {
     "id": "3e003c7f-bc2f-4713-900b-c47b0f4f88fd",
     "code": "S002-LUM-003-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -9945,7 +9945,7 @@
   {
     "id": "90e623a2-f503-4ed5-9ddd-eeede16c4f7d",
     "code": "S002-LUM-003-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -9978,7 +9978,7 @@
   {
     "id": "54f85e32-72d4-4af3-b271-d5f6d782a220",
     "code": "S002-LUM-003-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -10011,7 +10011,7 @@
   {
     "id": "95ccba2e-3e43-41e4-b40d-5de7453d0dcf",
     "code": "S002-LUM-003-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -10044,7 +10044,7 @@
   {
     "id": "50a9d66a-a97d-4414-893b-1f35495e1bc5",
     "code": "S002-LUM-003-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -10077,7 +10077,7 @@
   {
     "id": "35b51812-1cbc-4e45-aedc-083cb976a56e",
     "code": "S002-LUM-003-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -10110,7 +10110,7 @@
   {
     "id": "055fb6ce-1d17-497a-bf34-f977e1b0178a",
     "code": "S002-LUM-003-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone C Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -10143,7 +10143,7 @@
   {
     "id": "65c05f91-98d2-438e-982f-51e441e72cac",
     "code": "S002-LUM-004-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -10176,7 +10176,7 @@
   {
     "id": "08f30e1d-1139-4933-9dc0-3b6f8ed072dd",
     "code": "S002-LUM-004-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -10209,7 +10209,7 @@
   {
     "id": "635a38dc-54d7-410d-8fb3-c99665cb3d62",
     "code": "S002-LUM-004-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -10242,7 +10242,7 @@
   {
     "id": "d7f0e450-6e45-4b41-9fa4-9d394e84a639",
     "code": "S002-LUM-004-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -10275,7 +10275,7 @@
   {
     "id": "6d141d66-47a8-4de9-91f1-fcd9cd8e5c58",
     "code": "S002-LUM-004-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -10308,7 +10308,7 @@
   {
     "id": "256f28f8-23f5-441c-9cef-e1a6be2d7a98",
     "code": "S002-LUM-004-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -10341,7 +10341,7 @@
   {
     "id": "e269def4-622c-4ece-adbc-0ae9c5172dee",
     "code": "S002-LUM-004-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -10374,7 +10374,7 @@
   {
     "id": "d3700a1e-7129-44d7-9152-9e24722f7d6c",
     "code": "S002-LUM-004-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -10407,7 +10407,7 @@
   {
     "id": "02cc1c7f-d71d-4662-a653-c2d29cf5ebdf",
     "code": "S002-LUM-004-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -10440,7 +10440,7 @@
   {
     "id": "c6dd6c95-6ced-4306-9e27-bb80157dce3d",
     "code": "S002-LUM-004-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -10473,7 +10473,7 @@
   {
     "id": "ae70fa75-3b9e-4f72-974e-cd5d0275381f",
     "code": "S002-LUM-004-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -10506,7 +10506,7 @@
   {
     "id": "90e1fddf-6297-4afa-8fbd-4d0c0cf19ec2",
     "code": "S002-LUM-004-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -10539,7 +10539,7 @@
   {
     "id": "d7e1195a-0141-4afd-aff1-4b5b02f04c94",
     "code": "S002-LUM-004-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -10572,7 +10572,7 @@
   {
     "id": "8ea3dfc8-ba8c-47c5-943f-5a5e5d5bde10",
     "code": "S002-LUM-004-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -10605,7 +10605,7 @@
   {
     "id": "468fa6d8-a7e6-464b-b9f4-8c6d9e061365",
     "code": "S002-LUM-004-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -10638,7 +10638,7 @@
   {
     "id": "0018a74f-0b60-44b5-80e7-ff4c05c4fe62",
     "code": "S002-LUM-004-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -10671,7 +10671,7 @@
   {
     "id": "76ee38a2-f2b4-4d70-be10-1e350f75996c",
     "code": "site-005-UMH-AHU-L3-TH1.room",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-TH1.room)",
     "type": "AHU",
     "manufacturer": "",
@@ -10700,7 +10700,7 @@
   {
     "id": "717553b5-b5bb-446c-884e-ea19930cdb16",
     "code": "S002-LUM-004-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -10733,7 +10733,7 @@
   {
     "id": "b2ae52da-ad0b-422b-b50b-dee06c0c3357",
     "code": "S002-LUM-004-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -10766,7 +10766,7 @@
   {
     "id": "a1c23231-0063-4a62-9087-84e6f89feb15",
     "code": "S002-LUM-004-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -10799,7 +10799,7 @@
   {
     "id": "b39591b0-981b-404a-b40a-13aa77706e83",
     "code": "S002-LUM-004-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone D Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -10832,7 +10832,7 @@
   {
     "id": "05c1cb0e-1b85-442c-a3ff-ea51e711b42b",
     "code": "S002-LUM-005-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -10865,7 +10865,7 @@
   {
     "id": "098e54ca-36bb-4253-94d1-ade5658b548e",
     "code": "S002-LUM-005-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -10898,7 +10898,7 @@
   {
     "id": "2ee2a3f1-5d50-4e2f-a69a-9dffb3a47c06",
     "code": "S002-LUM-005-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -10931,7 +10931,7 @@
   {
     "id": "0706585f-3f47-4221-bfb5-b561d56827e9",
     "code": "S002-LUM-005-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -10964,7 +10964,7 @@
   {
     "id": "e6d44881-d743-4784-9713-62f9a0811901",
     "code": "S012-AHU-G-003",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Ground Floor AHU 3",
     "type": "AHU",
     "manufacturer": "",
@@ -11048,7 +11048,7 @@
   {
     "id": "f7e6a87e-cb4b-4fcc-9cee-c7bfc0291f87",
     "code": "S012-FCU-G-D",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Ground Floor FCU Zone D",
     "type": "FCU",
     "manufacturer": "",
@@ -11125,7 +11125,7 @@
   {
     "id": "ffafe323-a933-4bd5-b27d-c92403becb80",
     "code": "S002-LUM-005-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -11158,7 +11158,7 @@
   {
     "id": "4a9b96d1-d054-4800-81b5-2bedbe7d91bb",
     "code": "S002-LUM-005-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -11191,7 +11191,7 @@
   {
     "id": "fa6dd7f5-7ca4-49ea-a44c-67e0f4c9f9a2",
     "code": "S002-LUM-005-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -11224,7 +11224,7 @@
   {
     "id": "ad81051c-72be-47ac-b2fb-2a922390013b",
     "code": "S002-LUM-005-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -11257,7 +11257,7 @@
   {
     "id": "3e5d0142-974e-4ffc-94cf-d8c6f01d18e1",
     "code": "S002-LUM-005-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -11290,7 +11290,7 @@
   {
     "id": "ccdf9377-5201-4ed2-a640-a54fe7fd9674",
     "code": "S002-LUM-005-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -11323,7 +11323,7 @@
   {
     "id": "2cf39e82-a109-4cb5-989b-1778f9954177",
     "code": "S002-LUM-005-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -11356,7 +11356,7 @@
   {
     "id": "ce8c73b0-6819-4430-aafb-231605df4ed1",
     "code": "S002-LUM-005-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -11389,7 +11389,7 @@
   {
     "id": "031a0d00-7dce-4f7c-b874-a3ee40ad2c44",
     "code": "S002-LUM-005-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -11422,7 +11422,7 @@
   {
     "id": "12eb9cd9-ea34-4fe3-bc1d-db9c0e3e5a77",
     "code": "S002-LUM-005-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -11455,7 +11455,7 @@
   {
     "id": "5ae85cbf-f527-452f-95d4-c233c70a184d",
     "code": "S002-MTR-B1-WATER",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Main Water Meter (B1)",
     "type": "MTR",
     "manufacturer": "Elster",
@@ -11501,7 +11501,7 @@
   {
     "id": "8fb5a6a1-35c6-45e0-af1f-5963f72872ea",
     "code": "S002-LUM-001-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone A Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -11534,7 +11534,7 @@
   {
     "id": "3470c5df-b1eb-4df4-961c-8e6c33d663e5",
     "code": "site-005-UMH-GEN-B1-001.load",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Generator (UMH-GEN-B1-001.load)",
     "type": "GEN",
     "manufacturer": "",
@@ -11563,7 +11563,7 @@
   {
     "id": "fe4df2a2-5c4a-431a-91ee-dd3a76e44544",
     "code": "S012-CHILLER-R-002",
-    "building_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
+    "site_id": "5a73f160-4c52-4005-b3b5-a3a67aa3fd6f",
     "name": "Roof Chiller Unit 2",
     "type": "CHILLER",
     "manufacturer": "",
@@ -11656,7 +11656,7 @@
   {
     "id": "7a33c8e3-583c-401a-b8d1-a6b2f3c9ef35",
     "code": "S002-LUM-005-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -11689,7 +11689,7 @@
   {
     "id": "de166f9f-f154-430a-b048-91825045679e",
     "code": "S002-LUM-005-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -11722,7 +11722,7 @@
   {
     "id": "b598addf-2a9a-4de2-bef6-36ef814ed4f5",
     "code": "S002-LUM-100-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -11755,7 +11755,7 @@
   {
     "id": "6143ea59-4887-4d14-8c59-cbfe2448bfc1",
     "code": "S002-LUM-100-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -11788,7 +11788,7 @@
   {
     "id": "446cdc81-b221-43d3-b900-522ea0c570aa",
     "code": "S002-LUM-100-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -11821,7 +11821,7 @@
   {
     "id": "db97ba45-e8e7-478f-91f7-ca8585d44611",
     "code": "site-005-UMH-AHU-L3-TH2.room",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L3-TH2.room)",
     "type": "AHU",
     "manufacturer": "",
@@ -11850,7 +11850,7 @@
   {
     "id": "e2a77366-15bc-487f-8b6b-e3718e4b503e",
     "code": "S002-LUM-100-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -11883,7 +11883,7 @@
   {
     "id": "69fa84d1-f477-4ac7-a7e5-17d1b4715fc3",
     "code": "S002-LUM-100-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -11916,7 +11916,7 @@
   {
     "id": "c272a69d-c526-446c-beb1-e324f95aab66",
     "code": "S002-LUM-100-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -11949,7 +11949,7 @@
   {
     "id": "bdb10e4a-20bc-46ae-beba-8f32817f1335",
     "code": "S002-LUM-100-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -11982,7 +11982,7 @@
   {
     "id": "f11b0fa0-44d5-44d7-864f-ea814ab3739b",
     "code": "S002-LUM-100-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -12015,7 +12015,7 @@
   {
     "id": "555211b1-9db5-4be1-b5be-de563f8546ab",
     "code": "S002-LUM-100-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -12048,7 +12048,7 @@
   {
     "id": "f70b6b63-3da2-48fd-abd9-3abbe01e39a3",
     "code": "S002-LUM-100-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -12081,7 +12081,7 @@
   {
     "id": "7d2d8b32-c3d3-4877-b9a5-e144c3d073d7",
     "code": "S002-LUM-100-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -12114,7 +12114,7 @@
   {
     "id": "272a9bce-0889-4a2a-b77c-467e606b805e",
     "code": "S002-LUM-100-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -12147,7 +12147,7 @@
   {
     "id": "b7524964-ee07-4e83-a4a3-c59929edf831",
     "code": "S002-LUM-100-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -12180,7 +12180,7 @@
   {
     "id": "f8e2fadb-f18b-489c-9786-030ac402baaf",
     "code": "S002-LUM-100-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -12213,7 +12213,7 @@
   {
     "id": "362dbe6a-301b-4513-bb47-32263e0b7548",
     "code": "S002-LUM-100-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -12246,7 +12246,7 @@
   {
     "id": "fd213276-2ac9-4d2a-a30d-4ac51d70b4d9",
     "code": "S002-LUM-100-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -12279,7 +12279,7 @@
   {
     "id": "52beb4d0-2b07-4386-9aac-8ab25bec63fd",
     "code": "S002-LUM-100-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone A Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -12312,7 +12312,7 @@
   {
     "id": "1690b687-93d4-46fd-829e-86b92b88bf26",
     "code": "S002-LUM-101-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -12345,7 +12345,7 @@
   {
     "id": "be25e536-7cf7-415b-b4a4-223bdc11702f",
     "code": "S002-LUM-101-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -12378,7 +12378,7 @@
   {
     "id": "8492998a-7f64-4164-85a6-838ceb06e5cf",
     "code": "S002-LUM-101-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -12411,7 +12411,7 @@
   {
     "id": "a68b1064-4eec-47c3-bda3-f8e9ded4a151",
     "code": "S002-LUM-101-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -12444,7 +12444,7 @@
   {
     "id": "62d0615e-2d41-4388-b865-7076ee6503ab",
     "code": "S002-LUM-101-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -12477,7 +12477,7 @@
   {
     "id": "b0889ca1-25b8-415f-a4ce-95164b40384d",
     "code": "S002-LUM-101-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -12510,7 +12510,7 @@
   {
     "id": "3938f316-a08c-49f6-a34f-40ec203cd1e9",
     "code": "S002-LUM-101-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -12543,7 +12543,7 @@
   {
     "id": "6d8f87cc-cca1-437e-8969-8296e70ceb0a",
     "code": "S002-LUM-101-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -12576,7 +12576,7 @@
   {
     "id": "187835c7-4e0c-4326-9254-56c23c31a08e",
     "code": "S002-LUM-101-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -12609,7 +12609,7 @@
   {
     "id": "0242c71e-bb8f-48cc-8cee-80781e93d628",
     "code": "S002-LUM-101-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -12642,7 +12642,7 @@
   {
     "id": "cb215804-c924-4ca8-87f6-25dee31f4eb7",
     "code": "S002-LUM-101-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -12675,7 +12675,7 @@
   {
     "id": "e44b563a-a1d3-4745-b97a-77612fa3fd68",
     "code": "S002-LUM-101-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -12708,7 +12708,7 @@
   {
     "id": "0013c2f3-f7bf-4bd7-8fc0-5e2f9cbcfdb1",
     "code": "S002-LUM-101-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -12741,7 +12741,7 @@
   {
     "id": "a9bebff7-89b5-40ba-907d-3f81df8bbcbf",
     "code": "S002-LUM-101-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -12774,7 +12774,7 @@
   {
     "id": "42a86011-b86e-4a93-849a-43871fc36a08",
     "code": "S002-LUM-101-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -12807,7 +12807,7 @@
   {
     "id": "530f8934-6fd1-48a2-aed1-0e43a7ce3450",
     "code": "S002-LUM-101-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone B Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -12840,7 +12840,7 @@
   {
     "id": "7ecb3139-c2b1-42fd-b63b-80a4c1d4bf83",
     "code": "S002-LUM-102-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -12873,7 +12873,7 @@
   {
     "id": "98ca9a14-092f-4012-b26c-8e22cc5245f4",
     "code": "S002-LUM-102-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -12906,7 +12906,7 @@
   {
     "id": "cb6b09de-8342-40aa-9219-61d3f4b4de58",
     "code": "S002-LUM-102-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -12939,7 +12939,7 @@
   {
     "id": "16a7d754-2b32-4813-8112-4639396d2bc6",
     "code": "S002-LUM-102-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -12972,7 +12972,7 @@
   {
     "id": "5a147fef-5c1f-4dac-98c3-fc17f0bafc3a",
     "code": "S002-LUM-102-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -13005,7 +13005,7 @@
   {
     "id": "758dfbf8-666b-4cc6-9ba6-3c7b7440ad43",
     "code": "S002-LUM-102-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -13038,7 +13038,7 @@
   {
     "id": "1ddb8bb7-cebe-493f-80ab-ab4eac49ba61",
     "code": "S002-LUM-102-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -13071,7 +13071,7 @@
   {
     "id": "e7c95dad-36e1-4433-bec8-d966332b8b3c",
     "code": "S002-LUM-102-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -13104,7 +13104,7 @@
   {
     "id": "1f6e51e9-206f-44ec-9cfb-9259e60398d9",
     "code": "S002-LUM-102-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -13137,7 +13137,7 @@
   {
     "id": "231fc5b8-e624-4758-ae13-13c12e87ae2a",
     "code": "S002-LUM-102-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -13170,7 +13170,7 @@
   {
     "id": "532facc1-85b3-4c0d-8314-86f9fdd0ac29",
     "code": "S002-LUM-102-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -13203,7 +13203,7 @@
   {
     "id": "bd080c70-4b0a-4924-a4ab-52706c2d88b4",
     "code": "S002-LUM-102-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -13236,7 +13236,7 @@
   {
     "id": "557d1fb4-6074-4662-bf02-d606ac727065",
     "code": "S002-LUM-102-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -13269,7 +13269,7 @@
   {
     "id": "a895fc86-d008-4cc6-9756-b8faf0555ece",
     "code": "S002-LUM-102-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -13302,7 +13302,7 @@
   {
     "id": "6e393cb1-f05f-4201-9663-848d0eccf0e9",
     "code": "S002-LUM-102-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -13335,7 +13335,7 @@
   {
     "id": "2329727b-f9fd-45ba-9712-ce35dd559b52",
     "code": "S002-LUM-102-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -13368,7 +13368,7 @@
   {
     "id": "08d17714-86eb-4186-b178-2db625fd432a",
     "code": "S002-LUM-102-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -13401,7 +13401,7 @@
   {
     "id": "295c202d-ceef-4ac8-9bbf-97f53e65ea3d",
     "code": "S002-LUM-102-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -13434,7 +13434,7 @@
   {
     "id": "934575b8-6c74-47c8-b4d2-2f1d293af06c",
     "code": "S002-LUM-102-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone C Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -13467,7 +13467,7 @@
   {
     "id": "3516a54e-4266-42cb-8df7-21ba468e373f",
     "code": "S002-LUM-103-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -13500,7 +13500,7 @@
   {
     "id": "5a8af0f1-5ce1-474e-8f31-c333f0fa8d68",
     "code": "S002-LUM-103-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -13533,7 +13533,7 @@
   {
     "id": "1e90d772-c220-48cd-8d31-e9d97b8ed394",
     "code": "S002-LUM-103-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -13566,7 +13566,7 @@
   {
     "id": "47a2cf9a-3f2e-4ce8-97d5-e126222e8d08",
     "code": "S002-LUM-103-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -13599,7 +13599,7 @@
   {
     "id": "d490679b-473c-4433-accb-0b929d6a6701",
     "code": "S002-LUM-103-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -13632,7 +13632,7 @@
   {
     "id": "236163af-5789-41ba-9676-10112516d377",
     "code": "S002-LUM-103-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -13665,7 +13665,7 @@
   {
     "id": "22293ec2-227c-45b5-87fa-103e6d9b8e6a",
     "code": "S002-LUM-103-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -13698,7 +13698,7 @@
   {
     "id": "6526cc9d-819b-4988-a33a-34515dc83221",
     "code": "S002-LUM-103-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -13731,7 +13731,7 @@
   {
     "id": "568ff1b7-804a-4984-ba44-0b52181eec18",
     "code": "S002-LUM-103-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -13764,7 +13764,7 @@
   {
     "id": "29fbf5a8-967b-42cb-848c-2d6ae0a56932",
     "code": "S002-LUM-103-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -13797,7 +13797,7 @@
   {
     "id": "f83dd417-83d2-4117-ab73-f6ce005e669d",
     "code": "S002-LUM-103-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -13830,7 +13830,7 @@
   {
     "id": "a47ca32b-5614-4016-9079-371dc1441f49",
     "code": "S002-LUM-103-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -13863,7 +13863,7 @@
   {
     "id": "700196a9-0b22-472f-91d2-653c596f4b11",
     "code": "S002-LUM-103-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -13896,7 +13896,7 @@
   {
     "id": "ebe81ed4-8403-4170-a05f-1c31d8280333",
     "code": "S002-LUM-103-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -13929,7 +13929,7 @@
   {
     "id": "9a9dbbd1-4908-436e-8e34-97b77d80cdb3",
     "code": "S002-LUM-103-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -13962,7 +13962,7 @@
   {
     "id": "eadd5452-3708-4ff5-bf25-fcb1e3dc074e",
     "code": "S002-LUM-103-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -13995,7 +13995,7 @@
   {
     "id": "ad7e371c-df9f-4fdf-928d-4324be5757d8",
     "code": "S002-LUM-103-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -14028,7 +14028,7 @@
   {
     "id": "9dc7d2a0-3401-4d27-a8aa-49736c256e83",
     "code": "S002-LUM-103-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -14061,7 +14061,7 @@
   {
     "id": "d9203be0-9286-4365-b5cc-d11bbd3a3e8f",
     "code": "S002-LUM-103-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -14094,7 +14094,7 @@
   {
     "id": "b3960e27-8312-44b7-b22a-40c71b0a64f5",
     "code": "S002-LUM-104-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -14127,7 +14127,7 @@
   {
     "id": "2402ed3b-2722-476f-b29e-d30108ce9c08",
     "code": "S002-LUM-104-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -14160,7 +14160,7 @@
   {
     "id": "6ed22985-b4f7-4034-b09d-796f8417890f",
     "code": "S002-LUM-104-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -14193,7 +14193,7 @@
   {
     "id": "01a790d2-eae8-4771-a8dc-65ee4c3fff1d",
     "code": "S002-LUM-104-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -14226,7 +14226,7 @@
   {
     "id": "305bd382-19c3-448e-ab6d-2584720874e9",
     "code": "S002-LUM-104-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -14259,7 +14259,7 @@
   {
     "id": "6d06f40d-6fc8-41ec-995d-223ef7666475",
     "code": "S002-LUM-104-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -14292,7 +14292,7 @@
   {
     "id": "87d834d2-f7d3-495c-94fc-baf20c23f9d6",
     "code": "S002-LUM-104-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -14325,7 +14325,7 @@
   {
     "id": "e28da9a7-c402-4a1d-a69f-40b996c85736",
     "code": "S002-LUM-104-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -14358,7 +14358,7 @@
   {
     "id": "09e2acaf-dd4d-46b8-8205-11d8afacc7a6",
     "code": "S002-LUM-104-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -14391,7 +14391,7 @@
   {
     "id": "e3d8aa39-832a-4041-a93f-fe47ea913de4",
     "code": "S002-LUM-104-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -14424,7 +14424,7 @@
   {
     "id": "bdf1cb3f-7487-473e-9728-03ee1759dace",
     "code": "S002-LUM-104-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -14457,7 +14457,7 @@
   {
     "id": "8ab49b69-7d36-4194-92a0-b2de735b62ea",
     "code": "S002-LUM-104-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -14490,7 +14490,7 @@
   {
     "id": "462fee0d-927c-4cf4-9393-46817f713445",
     "code": "S002-LUM-104-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -14523,7 +14523,7 @@
   {
     "id": "34181389-4329-4115-9b8b-8d21c7f65828",
     "code": "S002-LUM-104-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -14556,7 +14556,7 @@
   {
     "id": "e48b5128-c361-425e-bf49-0feb35ea76ae",
     "code": "S002-LUM-104-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -14589,7 +14589,7 @@
   {
     "id": "f714f24e-57f4-4d03-9f42-553507303b47",
     "code": "S002-LUM-104-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -14622,7 +14622,7 @@
   {
     "id": "663adb0a-ea73-4b92-ad74-10273e7d0f32",
     "code": "S002-LUM-104-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -14655,7 +14655,7 @@
   {
     "id": "a082f6b1-28b9-4260-8ba1-8426149aff9d",
     "code": "S002-LUM-104-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -14688,7 +14688,7 @@
   {
     "id": "d1edffba-e5d2-487d-9681-d7ee92ffdc1f",
     "code": "S002-LUM-104-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -14721,7 +14721,7 @@
   {
     "id": "84cf68e5-8752-4ea2-b7d9-e597ab3ea534",
     "code": "S002-LUM-104-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone E Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -14754,7 +14754,7 @@
   {
     "id": "8e3e6109-8d21-445a-9e4a-d62355a6c15e",
     "code": "S002-LUM-105-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -14787,7 +14787,7 @@
   {
     "id": "de73570d-e7d4-4d0c-b719-7a6fd5274c9b",
     "code": "S002-LUM-105-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -14820,7 +14820,7 @@
   {
     "id": "8db56402-5b89-4780-b0c4-a7bd3237162f",
     "code": "S002-LUM-105-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -14853,7 +14853,7 @@
   {
     "id": "2c9a27ea-f6b8-42cb-9ede-c1e715370e85",
     "code": "S002-LUM-105-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -14886,7 +14886,7 @@
   {
     "id": "3325949c-bb3a-48e6-bbf2-69b338744fa7",
     "code": "S002-LUM-105-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -14919,7 +14919,7 @@
   {
     "id": "33a9c0c7-e0af-421b-87df-387bda9952b8",
     "code": "S002-LUM-105-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -14952,7 +14952,7 @@
   {
     "id": "cf778d58-774c-4620-8e62-83bf4d966540",
     "code": "S002-LUM-105-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -14985,7 +14985,7 @@
   {
     "id": "d39bfd25-9649-44a6-b202-9a215ff1bda0",
     "code": "S002-LUM-105-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -15018,7 +15018,7 @@
   {
     "id": "f67cfe7d-1fb0-424e-8ac0-4e70b31b5ae2",
     "code": "S002-LUM-105-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -15051,7 +15051,7 @@
   {
     "id": "52baa0f8-3e1a-4590-b91a-bfabcc763833",
     "code": "S002-LUM-105-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -15084,7 +15084,7 @@
   {
     "id": "32a14b06-269b-4c6d-b58e-f5f8a81dab7d",
     "code": "S002-LUM-105-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -15117,7 +15117,7 @@
   {
     "id": "b5740ed5-d77a-4827-b6aa-edc76981bdd4",
     "code": "S002-LUM-105-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -15150,7 +15150,7 @@
   {
     "id": "9da619da-d6dc-4b32-a866-094aa2cfaa8a",
     "code": "S002-LUM-105-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -15183,7 +15183,7 @@
   {
     "id": "00671477-ad7c-4f9d-96e1-efabc402e726",
     "code": "S002-LUM-105-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -15216,7 +15216,7 @@
   {
     "id": "151c01c5-edd1-4379-8476-24063c1afda2",
     "code": "S002-LUM-105-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -15249,7 +15249,7 @@
   {
     "id": "fcb1b696-04a1-4d88-ae04-e2d932b5a354",
     "code": "S002-LUM-105-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -15282,7 +15282,7 @@
   {
     "id": "f2e5e6e3-c8d0-4f95-80f2-93df1e475d1a",
     "code": "S002-LUM-105-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -15315,7 +15315,7 @@
   {
     "id": "254a2db0-daa6-4f29-8cea-8109f5ccf2eb",
     "code": "S002-LUM-105-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -15348,7 +15348,7 @@
   {
     "id": "133d3f6f-59cf-4c23-813d-8386fe2063ba",
     "code": "S002-LUM-105-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -15381,7 +15381,7 @@
   {
     "id": "23c75f3f-49f5-4b8e-9461-32b35e7c3433",
     "code": "S002-LUM-105-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone F Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -15414,7 +15414,7 @@
   {
     "id": "a68c474d-f150-401d-8c7b-efc37a9acfb7",
     "code": "site-005-UMH-AHU-L7-001.fan",
-    "building_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
+    "site_id": "5fa6e324-e55c-47a4-a412-37a97f5b6f64",
     "name": "Air Handling Unit (UMH-AHU-L7-001.fan)",
     "type": "AHU",
     "manufacturer": "",
@@ -15443,7 +15443,7 @@
   {
     "id": "32a7cea0-723e-45e8-b00a-a55b838ea66d",
     "code": "S002-LUM-200-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -15476,7 +15476,7 @@
   {
     "id": "08915d63-29fd-4822-92bc-0b2af2816804",
     "code": "S002-LUM-200-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -15509,7 +15509,7 @@
   {
     "id": "060ea7b7-fbe0-4568-96d6-938557605f5e",
     "code": "S002-LUM-200-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -15542,7 +15542,7 @@
   {
     "id": "0d9f75ca-93d8-4511-9ae8-bcb113330a03",
     "code": "S002-LUM-200-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -15575,7 +15575,7 @@
   {
     "id": "30c13afa-f9d4-4f0c-a7c4-510f678c6be6",
     "code": "S002-LUM-200-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -15608,7 +15608,7 @@
   {
     "id": "93a52281-af0b-4179-925f-a7e7fe309f77",
     "code": "S002-LUM-200-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -15641,7 +15641,7 @@
   {
     "id": "4fa8f035-0657-479f-9ca2-c874e895e43b",
     "code": "S002-LUM-200-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -15674,7 +15674,7 @@
   {
     "id": "f590f518-0014-4d0b-b852-b9e653c74a9a",
     "code": "S002-LUM-200-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -15707,7 +15707,7 @@
   {
     "id": "8cb959fa-a5e8-4a5b-bc7a-9712d6ce8e49",
     "code": "S002-LUM-200-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -15740,7 +15740,7 @@
   {
     "id": "e08d5448-d2a0-4f7e-b4c1-716ef5e2a49d",
     "code": "S002-LUM-200-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -15773,7 +15773,7 @@
   {
     "id": "33a9b055-d7f0-43b3-bb1e-51adad44bee5",
     "code": "S002-LUM-200-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -15806,7 +15806,7 @@
   {
     "id": "f3acc815-40aa-4e12-9d14-52915222cec2",
     "code": "S002-LUM-200-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -15839,7 +15839,7 @@
   {
     "id": "81f3d0e0-f759-41de-88e9-613c35da04eb",
     "code": "S002-LUM-200-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -15872,7 +15872,7 @@
   {
     "id": "07880648-bbdf-4ddb-9a0b-14c12101849f",
     "code": "S002-LUM-200-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -15905,7 +15905,7 @@
   {
     "id": "78185944-980b-404b-a1e8-d9e2ebe7f9b6",
     "code": "S002-LUM-200-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -15938,7 +15938,7 @@
   {
     "id": "1a6b9a99-207b-4ee8-ba81-4226af833f72",
     "code": "S002-LUM-200-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -15971,7 +15971,7 @@
   {
     "id": "a1efcb6f-de6a-4a65-a13c-fd265996c847",
     "code": "S002-LUM-200-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -16004,7 +16004,7 @@
   {
     "id": "f70c95e9-d221-4c9d-82c1-30e393ec5933",
     "code": "S002-LUM-200-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -16037,7 +16037,7 @@
   {
     "id": "2a47b06e-67f1-4b3d-b0cb-2aaf26171d28",
     "code": "S002-LUM-200-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -16070,7 +16070,7 @@
   {
     "id": "1a9abe3e-4f41-4215-8f49-da216c719de5",
     "code": "S002-LUM-200-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone A Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -16103,7 +16103,7 @@
   {
     "id": "c8625d95-7f16-4ab3-8597-2bdfdd95bd63",
     "code": "S002-LUM-201-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -16136,7 +16136,7 @@
   {
     "id": "30441f30-f122-4906-9427-86ec38162a11",
     "code": "S002-LUM-201-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -16169,7 +16169,7 @@
   {
     "id": "5ab476c5-ba3b-4f51-a0d6-2524e445e561",
     "code": "S002-LUM-201-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -16202,7 +16202,7 @@
   {
     "id": "03e40342-5cd6-4c9d-b707-2784a38cb9eb",
     "code": "S002-LUM-201-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -16235,7 +16235,7 @@
   {
     "id": "8699b112-8345-460b-bbc0-56242be29d50",
     "code": "S002-LUM-201-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -16268,7 +16268,7 @@
   {
     "id": "f31dc5d9-9777-4007-b2df-aa0465945648",
     "code": "S002-LUM-201-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -16301,7 +16301,7 @@
   {
     "id": "868bc5e3-91e2-4b93-9321-fcf228b1ca1a",
     "code": "S002-LUM-201-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -16334,7 +16334,7 @@
   {
     "id": "ddc72243-bc5b-40b0-9474-a1e82d1add9d",
     "code": "S002-LUM-201-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -16367,7 +16367,7 @@
   {
     "id": "335c7518-6977-462c-b2e8-8cde1c356e99",
     "code": "S002-LUM-201-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -16400,7 +16400,7 @@
   {
     "id": "c2029fac-3030-40eb-b60d-96cfef812884",
     "code": "S002-LUM-201-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -16433,7 +16433,7 @@
   {
     "id": "fe1a8a9f-4cd3-48bf-8ad5-52b7d22857d7",
     "code": "S002-LUM-201-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -16466,7 +16466,7 @@
   {
     "id": "113f4c9c-b6ee-48e0-9370-4c108037bc39",
     "code": "S002-LUM-201-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -16499,7 +16499,7 @@
   {
     "id": "de871df5-9586-4323-bb65-5bd148a696fd",
     "code": "S002-LUM-201-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -16532,7 +16532,7 @@
   {
     "id": "5a571aed-e928-427c-90a9-7bf7a2765db3",
     "code": "S002-LUM-201-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -16565,7 +16565,7 @@
   {
     "id": "8b14dc9a-be97-43fc-a036-3ca662f7a47b",
     "code": "S002-LUM-201-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -16598,7 +16598,7 @@
   {
     "id": "66c9a224-e510-4637-994b-1a40db14aed7",
     "code": "S002-LUM-201-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -16631,7 +16631,7 @@
   {
     "id": "949eaafa-5a5e-4b7a-90c8-2aa4210a2b7d",
     "code": "S002-LUM-201-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -16664,7 +16664,7 @@
   {
     "id": "204d89ff-b9fe-4dca-9859-4adbfe6bcf75",
     "code": "S002-LUM-201-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -16697,7 +16697,7 @@
   {
     "id": "b99be45c-6872-4f83-bbb3-fb374bd5f98f",
     "code": "S002-LUM-201-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone B Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -16730,7 +16730,7 @@
   {
     "id": "c1aa3fad-f7d8-4b31-b349-7e20933e4f39",
     "code": "S002-LUM-202-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -16763,7 +16763,7 @@
   {
     "id": "52a0a8e7-4624-4854-9620-166dbd09207c",
     "code": "S002-LUM-202-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -16796,7 +16796,7 @@
   {
     "id": "f5315845-3bbd-4396-8475-42f505dc8a87",
     "code": "S002-LUM-202-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -16829,7 +16829,7 @@
   {
     "id": "147beec0-affb-4748-ae81-07fcd9e6fb4c",
     "code": "S002-LUM-202-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -16862,7 +16862,7 @@
   {
     "id": "4f171477-d071-4707-847e-18911001aa41",
     "code": "S002-LUM-202-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -16895,7 +16895,7 @@
   {
     "id": "5a2c45b4-be2b-4c0d-9224-86f025640658",
     "code": "S002-LUM-202-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -16928,7 +16928,7 @@
   {
     "id": "cab798b2-d339-4f66-91be-e623d868d61a",
     "code": "S002-LUM-202-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -16961,7 +16961,7 @@
   {
     "id": "8aded3b8-ee9b-46f2-a588-75a6ed10ed7e",
     "code": "S002-LUM-202-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -16994,7 +16994,7 @@
   {
     "id": "83786757-4985-4d07-9458-66a2f924ee02",
     "code": "S002-LUM-202-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -17027,7 +17027,7 @@
   {
     "id": "2f3cf8c8-18a2-4c2e-b6f9-50e152b50ad9",
     "code": "S002-LUM-202-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -17060,7 +17060,7 @@
   {
     "id": "85259cf2-5eb3-4393-a148-322bf2955465",
     "code": "S002-LUM-202-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -17093,7 +17093,7 @@
   {
     "id": "8926963a-b792-423e-8260-2cb1cc4a2e56",
     "code": "S002-LUM-202-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -17126,7 +17126,7 @@
   {
     "id": "888aa522-bbed-4988-a16d-9a0e1622ce17",
     "code": "S002-LUM-202-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -17159,7 +17159,7 @@
   {
     "id": "647c6196-1d43-4798-a7bf-3c2b07ffc911",
     "code": "S002-LUM-202-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -17192,7 +17192,7 @@
   {
     "id": "98e4e034-c1aa-415e-9ac4-bd0e7535472e",
     "code": "S002-LUM-202-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -17225,7 +17225,7 @@
   {
     "id": "40b89d05-1ed8-412b-9455-ff6bbe946afe",
     "code": "S002-LUM-202-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -17258,7 +17258,7 @@
   {
     "id": "b707e8eb-e30e-4ca9-8212-fbf1db471180",
     "code": "S002-LUM-202-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -17291,7 +17291,7 @@
   {
     "id": "622fb1b6-4679-4f4b-a71b-f21b93947fbc",
     "code": "S002-LUM-202-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -17324,7 +17324,7 @@
   {
     "id": "7c98b183-3095-4b44-bc8c-9bd56bd88c46",
     "code": "S002-LUM-202-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -17357,7 +17357,7 @@
   {
     "id": "a51c91d8-1a92-4137-b8e0-77fe547c0c5c",
     "code": "S002-LUM-202-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone C Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -17390,7 +17390,7 @@
   {
     "id": "7a01d261-5a28-4de3-b3f1-bcab8c3b4b9b",
     "code": "S002-LUM-203-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -17423,7 +17423,7 @@
   {
     "id": "90a98ac9-e085-48e9-ace4-83a7868afadc",
     "code": "S002-LUM-203-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -17456,7 +17456,7 @@
   {
     "id": "d575d14d-292c-4f4e-a7d0-3ebfd08bf0c5",
     "code": "S002-LUM-203-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -17489,7 +17489,7 @@
   {
     "id": "89fbb5a9-8b26-47c1-8fc3-501e7b9e21da",
     "code": "S002-LUM-203-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -17522,7 +17522,7 @@
   {
     "id": "7eefa714-72ed-473c-b892-c654a5b7a8eb",
     "code": "S002-LUM-203-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -17555,7 +17555,7 @@
   {
     "id": "059f6c92-3d50-4d26-8488-3520b806bfee",
     "code": "S002-LUM-203-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -17588,7 +17588,7 @@
   {
     "id": "4a465262-a041-43dc-b806-bb564d64de4d",
     "code": "S002-LUM-203-19",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 19",
     "type": "luminaire",
     "manufacturer": null,
@@ -17621,7 +17621,7 @@
   {
     "id": "beb8f072-aefd-4601-8c83-cb7705851fd1",
     "code": "S002-LUM-203-20",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 20",
     "type": "luminaire",
     "manufacturer": null,
@@ -17654,7 +17654,7 @@
   {
     "id": "2e804120-64d2-48cb-b0dc-f948c1e7421f",
     "code": "S002-LUM-204-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -17687,7 +17687,7 @@
   {
     "id": "af76e431-d2ac-426c-80e5-0c0c2eea6209",
     "code": "S002-LUM-204-02",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 2",
     "type": "luminaire",
     "manufacturer": null,
@@ -17720,7 +17720,7 @@
   {
     "id": "424708b2-a812-4633-95cc-ef4324cd1e89",
     "code": "S002-LUM-204-03",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 3",
     "type": "luminaire",
     "manufacturer": null,
@@ -17753,7 +17753,7 @@
   {
     "id": "280fa526-ff16-43ba-b0b9-92429221bcc3",
     "code": "S002-LUM-204-04",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 4",
     "type": "luminaire",
     "manufacturer": null,
@@ -17786,7 +17786,7 @@
   {
     "id": "597a0954-fb13-481f-a717-55747628e3b7",
     "code": "S002-LUM-204-05",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone E Luminaire 5",
     "type": "luminaire",
     "manufacturer": null,
@@ -17819,7 +17819,7 @@
   {
     "id": "7a786f8e-4620-487c-89e0-ef30032339af",
     "code": "S002-LUM-005-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -17852,7 +17852,7 @@
   {
     "id": "4cc041cc-69da-4d0d-84da-f7987409f7a7",
     "code": "S002-LUM-005-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,
@@ -17885,7 +17885,7 @@
   {
     "id": "ecfc17a9-0413-412a-9626-633c11a9f3bb",
     "code": "S002-LUM-005-18",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 0 Zone E Luminaire 18",
     "type": "luminaire",
     "manufacturer": null,
@@ -17918,7 +17918,7 @@
   {
     "id": "e4eabc52-3d9a-45dc-9482-97ad639be2b2",
     "code": "S002-LUM-103-01",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 1 Zone D Luminaire 1",
     "type": "luminaire",
     "manufacturer": null,
@@ -17951,7 +17951,7 @@
   {
     "id": "175892d0-94be-4a30-af0e-492657642391",
     "code": "S002-LUM-203-06",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 6",
     "type": "luminaire",
     "manufacturer": null,
@@ -17984,7 +17984,7 @@
   {
     "id": "20596e66-a891-4c10-bcc0-65280499191d",
     "code": "S002-LUM-203-07",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 7",
     "type": "luminaire",
     "manufacturer": null,
@@ -18017,7 +18017,7 @@
   {
     "id": "22b0e2ac-7cd2-40d4-987f-eaf1a3c8c472",
     "code": "S002-LUM-203-08",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 8",
     "type": "luminaire",
     "manufacturer": null,
@@ -18050,7 +18050,7 @@
   {
     "id": "2e760cac-b911-44da-98d1-c136c256eb1f",
     "code": "S002-LUM-203-09",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 9",
     "type": "luminaire",
     "manufacturer": null,
@@ -18083,7 +18083,7 @@
   {
     "id": "dd46e2c8-c875-44d6-8d87-a2bb4a98d05c",
     "code": "S002-LUM-203-10",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 10",
     "type": "luminaire",
     "manufacturer": null,
@@ -18116,7 +18116,7 @@
   {
     "id": "0d52ed75-a878-4be3-8e48-e02f5239c92e",
     "code": "S002-LUM-203-11",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 11",
     "type": "luminaire",
     "manufacturer": null,
@@ -18149,7 +18149,7 @@
   {
     "id": "e9d8e7da-9437-4ad6-b9fb-c9a73a6518da",
     "code": "S002-LUM-203-12",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 12",
     "type": "luminaire",
     "manufacturer": null,
@@ -18182,7 +18182,7 @@
   {
     "id": "b843e449-ff2b-4d37-80b6-2c19007dd1e7",
     "code": "S002-LUM-203-13",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 13",
     "type": "luminaire",
     "manufacturer": null,
@@ -18215,7 +18215,7 @@
   {
     "id": "225f2b02-fb48-4e95-aade-d442775b43a2",
     "code": "S002-LUM-203-14",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 14",
     "type": "luminaire",
     "manufacturer": null,
@@ -18248,7 +18248,7 @@
   {
     "id": "2687a0fe-192e-48e7-8966-fbe23eefaae6",
     "code": "S002-LUM-203-15",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 15",
     "type": "luminaire",
     "manufacturer": null,
@@ -18281,7 +18281,7 @@
   {
     "id": "6e54a9c3-baee-46c6-a1bf-6b0b4a60710d",
     "code": "S002-LUM-203-16",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 16",
     "type": "luminaire",
     "manufacturer": null,
@@ -18314,7 +18314,7 @@
   {
     "id": "68cb15cf-0231-46bd-82a0-b71058769ef9",
     "code": "S002-LUM-203-17",
-    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+    "site_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
     "name": "Level 2 Zone D Luminaire 17",
     "type": "luminaire",
     "manufacturer": null,

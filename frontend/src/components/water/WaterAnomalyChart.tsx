@@ -12,10 +12,7 @@
 
 import { useState } from "react";
 import {
-  Card,
-  Title,
   Text,
-  Metric,
   Flex,
   LineChart,
 } from "@tremor/react";
@@ -81,13 +78,13 @@ export const WaterAnomalyChart: React.FC<WaterAnomalyChartProps> = ({
 
   if (isLoading || !anomalies) {
     return (
-      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <div className="flex items-center justify-center h-64">
           <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Loading anomaly data...
           </Text>
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -111,9 +108,9 @@ export const WaterAnomalyChart: React.FC<WaterAnomalyChartProps> = ({
   return (
     <div className="space-y-6">
       {/* Time Range Selector */}
-      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <Flex justifyContent="between" alignItems="center">
-          <Title>Flow Rate Anomaly Detection</Title>
+          <h4 className="font-medium text-base" style={{ color: "var(--color-sentinel-text-primary)" }}>Flow Rate Anomaly Detection</h4>
           <div className="flex gap-2">
             {(["24h", "7d", "30d"] as const).map((range) => (
               <button
@@ -136,10 +133,10 @@ export const WaterAnomalyChart: React.FC<WaterAnomalyChartProps> = ({
             ))}
           </div>
         </Flex>
-      </Card>
+      </div>
 
       {/* Main Chart */}
-      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <Text className="text-xs mb-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
           Flow rate in liters per minute with baseline and threshold indicators
         </Text>
@@ -163,57 +160,57 @@ export const WaterAnomalyChart: React.FC<WaterAnomalyChartProps> = ({
             </Text>
           </div>
         )}
-      </Card>
+      </div>
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Text
             style={{ color: "var(--color-sentinel-text-secondary)" }}
             className="text-xs"
           >
             Mean Flow Rate
           </Text>
-          <Metric className="mt-2">
+          <p className="text-xl font-semibold mt-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
             {anomalies.baseline_flow_lpm.toFixed(1)} LPM
-          </Metric>
+          </p>
           <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Baseline (standard deviation: {anomalies.std_dev_lpm.toFixed(2)})
           </Text>
-        </Card>
+        </div>
 
-        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Text
             style={{ color: "var(--color-sentinel-text-secondary)" }}
             className="text-xs"
           >
             Observed Range
           </Text>
-          <Metric className="mt-2">
+          <p className="text-xl font-semibold mt-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
             {anomalies.min_observed_lpm.toFixed(1)} - {anomalies.max_observed_lpm.toFixed(1)} LPM
-          </Metric>
+          </p>
           <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Min / Max in period
           </Text>
-        </Card>
+        </div>
 
-        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Text
             style={{ color: "var(--color-sentinel-text-secondary)" }}
             className="text-xs"
           >
             Anomalies Detected
           </Text>
-          <Metric className="mt-2">{anomalies.anomaly_count}</Metric>
+          <p className="text-xl font-semibold mt-2" style={{ color: "var(--color-sentinel-text-primary)" }}>{anomalies.anomaly_count}</p>
           <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             {anomalies.warning_count} warning, {anomalies.critical_count} critical
           </Text>
-        </Card>
+        </div>
       </div>
 
       {/* Threshold Information */}
-      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
-        <Title className="mb-4">Threshold Configuration</Title>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h4 className="font-medium text-base mb-4" style={{ color: "var(--color-sentinel-text-primary)" }}>Threshold Configuration</h4>
         <div className="space-y-3">
           <div className="flex items-center justify-between p-3 rounded" style={{background: "rgba(34, 197, 94, 0.1)"}}>
             <div>
@@ -251,11 +248,11 @@ export const WaterAnomalyChart: React.FC<WaterAnomalyChartProps> = ({
             </Text>
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* Detected Anomalies List */}
-      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
-        <Title className="mb-4">Detected Anomalies</Title>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h4 className="font-medium text-base mb-4" style={{ color: "var(--color-sentinel-text-primary)" }}>Detected Anomalies</h4>
         {anomalies.data.filter((d) => d.is_anomaly).length === 0 ? (
           <div className="text-center py-6">
             <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
@@ -326,7 +323,7 @@ export const WaterAnomalyChart: React.FC<WaterAnomalyChartProps> = ({
               })}
           </div>
         )}
-      </Card>
+      </div>
     </div>
   );
 };

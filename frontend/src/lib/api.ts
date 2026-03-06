@@ -333,8 +333,8 @@ export interface EquipmentBreakdown {
 
 // Equipment summary response (from /api/buildings/{id}/equipment-summary)
 export interface EquipmentSummary {
-  building_id: string;
-  building_name: string;
+  site_id: string;
+  site_name: string;
   total_assets: number;
   categories: {
     equipment: number;
@@ -376,9 +376,8 @@ export interface BuildingEquipmentItem {
   status: "normal" | "warning" | "critical" | "unknown";
   health: number;
   location: string;
-  building_id: string;
-  building_name: string;
   site_id: string;
+  site_name: string;
   details: Record<string, any>;
   controllable: boolean;
   health_factors?: {
@@ -401,8 +400,8 @@ export interface CategoryStatus {
 // NOTE: This is deprecated - use the version from lib/api/sites.ts instead
 // Keeping for backward compatibility but should use Equipment[] not BuildingEquipmentItem[]
 export interface BuildingEquipmentResponse {
-  building_id: string;
-  building_name: string;
+  site_id: string;
+  site_name: string;
   total_equipment: number;
   categories: Record<string, CategoryStatus>;
   // Use Equipment array (from modular API) instead of BuildingEquipmentItem
@@ -552,8 +551,6 @@ export interface Equipment {
   site_name: string;
   status: "online" | "offline" | "maintenance" | "normal" | "warning" | "critical" | "unknown";
   location?: string;
-  building_id?: string;
-  building_name?: string;
   last_reading?: {
     timestamp: string;
     value: number;
@@ -1323,18 +1320,18 @@ export const api = {
 
   /**
    * Get equipment summary breakdown for a building
-   * @param buildingId - Building ID (e.g., 'sandton')
+   * @param siteId - Building ID (e.g., 'sandton')
    */
-  async getEquipmentSummary(buildingId: string): Promise<EquipmentSummary> {
-    return fetchApi<EquipmentSummary>(`/api/buildings/${buildingId}/equipment-summary`);
+  async getEquipmentSummary(siteId: string): Promise<EquipmentSummary> {
+    return fetchApi<EquipmentSummary>(`/api/buildings/${siteId}/equipment-summary`);
   },
 
   /**
    * Get all equipment for a building with status
-   * @param buildingId - Building ID (e.g., 'sandton')
+   * @param siteId - Building ID (e.g., 'sandton')
    */
-  async getBuildingEquipment(buildingId: string): Promise<BuildingEquipmentResponse> {
-    return fetchApi<BuildingEquipmentResponse>(`/api/buildings/${buildingId}/equipment`);
+  async getSiteEquipment(siteId: string): Promise<BuildingEquipmentResponse> {
+    return fetchApi<BuildingEquipmentResponse>(`/api/buildings/${siteId}/equipment`);
   },
 
   /**
@@ -2586,8 +2583,8 @@ export interface ChecklistItem {
 
 // Complete validation checklist
 export interface ValidationChecklist {
-  building_id: string;
-  building_name?: string;
+  site_id: string;
+  site_name?: string;
   status: BuildingStatus;
   checked_at: string;
   items: ChecklistItem[];
@@ -2603,7 +2600,7 @@ export interface ValidationChecklist {
 // Activation result
 export interface ActivationResult {
   success: boolean;
-  building_id: string;
+  site_id: string;
   new_status: BuildingStatus;
   message: string;
   validation_errors: string[];
@@ -2690,11 +2687,11 @@ export interface PointMatch {
 export const monitoringApi = {
   /**
    * Get integration health summary
-   * @param buildingId - Optional building ID filter
+   * @param siteId - Optional building ID filter
    */
-  getIntegrationHealth: async (buildingId?: string): Promise<IntegrationHealthSummary> => {
+  getIntegrationHealth: async (siteId?: string): Promise<IntegrationHealthSummary> => {
     const params = new URLSearchParams();
-    if (buildingId) params.set("building_id", buildingId);
+    if (siteId) params.set("site_id", siteId);
     const endpoint = `/api/integration/health${params.toString() ? `?${params.toString()}` : ""}`;
     try {
       return await fetchApi<IntegrationHealthSummary>(endpoint);
@@ -2717,11 +2714,11 @@ export const monitoringApi = {
 
   /**
    * Get data quality metrics for a building
-   * @param buildingId - Building ID (required)
+   * @param siteId - Building ID (required)
    */
-  getDataQualityMetrics: async (buildingId: string): Promise<DataQualityMetrics> => {
+  getDataQualityMetrics: async (siteId: string): Promise<DataQualityMetrics> => {
     try {
-      return await fetchApi<DataQualityMetrics>(`/api/integration/quality-metrics/${buildingId}`);
+      return await fetchApi<DataQualityMetrics>(`/api/integration/quality-metrics/${siteId}`);
     } catch (error) {
       if (isExpectedApiError(error)) {
         return {
@@ -2739,12 +2736,12 @@ export const monitoringApi = {
 
   /**
    * Get sync job history
-   * @param buildingId - Optional building ID filter
+   * @param siteId - Optional building ID filter
    * @param days - Number of days of history (default: 7)
    */
-  getSyncJobs: async (buildingId?: string, days: number = 7): Promise<SyncJobSummary[]> => {
+  getSyncJobs: async (siteId?: string, days: number = 7): Promise<SyncJobSummary[]> => {
     const params = new URLSearchParams({ days: days.toString() });
-    if (buildingId) params.set('building_id', buildingId);
+    if (siteId) params.set('site_id', siteId);
     try {
       return await fetchApi<SyncJobSummary[]>(`/api/integration/sync-jobs?${params.toString()}`);
     } catch (error) {
@@ -2755,11 +2752,11 @@ export const monitoringApi = {
 
   /**
    * Get unmatched points for point matching review
-   * @param buildingId - Building ID
+   * @param siteId - Building ID
    * @param limit - Maximum number of points to return (default: 10)
    * @param offset - Pagination offset (default: 0)
    */
-  getUnmatchedPoints: async (buildingId?: string, limit: number = 10, offset: number = 0): Promise<{
+  getUnmatchedPoints: async (siteId?: string, limit: number = 10, offset: number = 0): Promise<{
     points: Array<{
       point_id: string;
       point_name: string;
@@ -2772,7 +2769,7 @@ export const monitoringApi = {
       limit: limit.toString(),
       offset: offset.toString(),
     });
-    if (buildingId) params.set('building_id', buildingId);
+    if (siteId) params.set('site_id', siteId);
     try {
       return await fetchApi<{
         points: Array<{
@@ -2818,11 +2815,11 @@ export const integrationApi = {
 
   /**
    * Save column mappings for log source
-   * @param buildingId - Building ID
+   * @param siteId - Building ID
    * @param logSourceId - Log source ID
    * @param mappings - Column mappings to save
    */
-  saveColumnMappings: async (buildingId: string, logSourceId: string, mappings: ColumnMapping[]): Promise<void> => {
+  saveColumnMappings: async (siteId: string, logSourceId: string, mappings: ColumnMapping[]): Promise<void> => {
     const token = localStorage.getItem("sentinel_token");
     const response = await fetch(`${API_BASE_URL}/api/integration/mappings`, {
       method: 'POST',
@@ -2830,7 +2827,7 @@ export const integrationApi = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ building_id: buildingId, log_source_id: logSourceId, mappings })
+      body: JSON.stringify({ site_id: siteId, log_source_id: logSourceId, mappings })
     });
 
     if (!response.ok) {
@@ -2840,11 +2837,11 @@ export const integrationApi = {
 
   /**
    * Match BMS points to CAFM assets
-   * @param buildingId - Building ID
+   * @param siteId - Building ID
    * @param logSourceId - Log source ID
    * @param bmsPoints - List of BMS point IDs
    */
-  matchPoints: async (buildingId: string, logSourceId: string, bmsPoints: string[]): Promise<PointMatch[]> => {
+  matchPoints: async (siteId: string, logSourceId: string, bmsPoints: string[]): Promise<PointMatch[]> => {
     const token = localStorage.getItem("sentinel_token");
     const response = await fetch(`${API_BASE_URL}/api/integration/match-points`, {
       method: 'POST',
@@ -2852,7 +2849,7 @@ export const integrationApi = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ building_id: buildingId, log_source_id: logSourceId, bms_points: bmsPoints })
+      body: JSON.stringify({ site_id: siteId, log_source_id: logSourceId, bms_points: bmsPoints })
     });
 
     if (!response.ok) {
@@ -2864,11 +2861,11 @@ export const integrationApi = {
 
   /**
    * Ingest log file data
-   * @param buildingId - Building ID
+   * @param siteId - Building ID
    * @param logSourceId - Log source ID
    * @param dryRun - If true, validate without processing
    */
-  ingestLogs: async (buildingId: string, logSourceId: string, dryRun: boolean = false): Promise<void> => {
+  ingestLogs: async (siteId: string, logSourceId: string, dryRun: boolean = false): Promise<void> => {
     const token = localStorage.getItem("sentinel_token");
     const response = await fetch(`${API_BASE_URL}/api/integration/ingest`, {
       method: 'POST',
@@ -2876,7 +2873,7 @@ export const integrationApi = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ building_id: buildingId, log_source_id: logSourceId, dry_run: dryRun })
+      body: JSON.stringify({ site_id: siteId, log_source_id: logSourceId, dry_run: dryRun })
     });
 
     if (!response.ok) {
@@ -2889,49 +2886,49 @@ export const integrationApi = {
 export const validationApi = {
   /**
    * Get validation checklist for a building
-   * @param buildingId - Building ID
+   * @param siteId - Building ID
    */
-  getChecklist: async (buildingId: string): Promise<ValidationChecklist> => {
-    return fetchApi<ValidationChecklist>(`/api/integration/buildings/${buildingId}/validation-checklist`);
+  getChecklist: async (siteId: string): Promise<ValidationChecklist> => {
+    return fetchApi<ValidationChecklist>(`/api/integration/buildings/${siteId}/validation-checklist`);
   },
 
   /**
    * Get current building status
-   * @param buildingId - Building ID
+   * @param siteId - Building ID
    */
-  getStatus: async (buildingId: string): Promise<{ status: BuildingStatus; last_validated?: string }> => {
+  getStatus: async (siteId: string): Promise<{ status: BuildingStatus; last_validated?: string }> => {
     return fetchApi<{ status: BuildingStatus; last_validated?: string }>(
-      `/api/integration/buildings/${buildingId}/status`
+      `/api/integration/buildings/${siteId}/status`
     );
   },
 
   /**
    * Run validation and update building status
-   * @param buildingId - Building ID
+   * @param siteId - Building ID
    */
-  validate: async (buildingId: string): Promise<ValidationChecklist> => {
-    return fetchApi<ValidationChecklist>(`/api/integration/buildings/${buildingId}/validate`, {
+  validate: async (siteId: string): Promise<ValidationChecklist> => {
+    return fetchApi<ValidationChecklist>(`/api/integration/buildings/${siteId}/validate`, {
       method: "POST",
     });
   },
 
   /**
    * Activate a building after successful validation
-   * @param buildingId - Building ID
+   * @param siteId - Building ID
    */
-  activate: async (buildingId: string): Promise<ActivationResult> => {
-    return fetchApi<ActivationResult>(`/api/integration/buildings/${buildingId}/activate`, {
+  activate: async (siteId: string): Promise<ActivationResult> => {
+    return fetchApi<ActivationResult>(`/api/integration/buildings/${siteId}/activate`, {
       method: "POST",
     });
   },
 
   /**
    * Suspend (deactivate) a building
-   * @param buildingId - Building ID
+   * @param siteId - Building ID
    */
-  suspend: async (buildingId: string): Promise<{ status: BuildingStatus }> => {
+  suspend: async (siteId: string): Promise<{ status: BuildingStatus }> => {
     return fetchApi<{ status: BuildingStatus }>(
-      `/api/integration/buildings/${buildingId}/suspend`,
+      `/api/integration/buildings/${siteId}/suspend`,
       { method: "POST" }
     );
   },
@@ -3026,8 +3023,8 @@ export interface FloorSummary {
 
 // Building Occupancy overview
 export interface BuildingOccupancy {
-  building_id: string;
-  building_name: string;
+  site_id: string;
+  site_name: string;
   total_floors: number;
   total_zones: number;
   total_sensors: number;
@@ -3133,15 +3130,15 @@ export const lightingApi = {
   /**
    * Get building occupancy overview
    */
-  getBuildingOccupancy: async (siteId?: string): Promise<BuildingOccupancy> => {
+  getSiteOccupancy: async (siteId?: string): Promise<BuildingOccupancy> => {
     try {
       const params = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
       return await fetchApi<BuildingOccupancy>(`/api/lighting/building/occupancy${params}`);
     } catch (error) {
       if (isExpectedApiError(error)) {
         return {
-          building_id: "unknown",
-          building_name: "Unknown",
+          site_id: "unknown",
+          site_name: "Unknown",
           total_floors: 0,
           total_zones: 0,
           total_sensors: 0,
@@ -3963,7 +3960,7 @@ export interface NextSiteIdResponse {
 
 // NOTE: sitesApi removed (conflicting with modular sites.ts version)
 // Use modular import: import { sitesApi } from '@/lib/api/sites'
-// Modular version has: getSites(), getSite(), getBuildings(), getEquipment(), getDesks(), etc.
+// Modular version has: getSites(), getSite(), getSites(), getEquipment(), getDesks(), etc.
 
 // ============= Security Module Interfaces (Phase 58) =============
 

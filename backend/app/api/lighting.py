@@ -839,7 +839,7 @@ async def get_building_occupancy(site_id: str = Query(None, description="Site ID
 
     building_occupancy = BuildingOccupancy(
         site_id=site_id,
-        building_name="Sandton Office Complex",
+        site_name="Sandton Office Complex",
         timestamp=timestamp,
         total_occupancy_percent=round(sum(z.occupancy_percent for z in all_zones) / len(all_zones), 1),
         total_zones=len(all_zones),
@@ -1049,9 +1049,9 @@ async def get_lighting_stats(site_id: str = Query(None, description="Site ID")):
 # ============================================================================
 
 
-@router.get("/building/{building_id}/occupancy/detailed")
+@router.get("/building/{site_id}/occupancy/detailed")
 async def get_detailed_occupancy(
-    building_id: str, time: str | None = Query(None, description="ISO timestamp for simulation time")
+    site_id: str, time: str | None = Query(None, description="ISO timestamp for simulation time")
 ):
     """
     Get per-zone occupancy with display coordinates and persona breakdown.
@@ -1092,7 +1092,7 @@ async def get_detailed_occupancy(
             # Try Supabase first in production
             try:
                 supabase = get_supabase_client()
-                zone_mappings = supabase.table("zone_display_mappings").select("*").eq("site_id", building_id).execute()
+                zone_mappings = supabase.table("zone_display_mappings").select("*").eq("site_id", site_id).execute()
                 zones_data = zone_mappings.data if zone_mappings.data else []
             except Exception as db_error:
                 logger.debug(f"Supabase zone lookup failed: {db_error}, using JSON fallback")
@@ -1100,9 +1100,9 @@ async def get_detailed_occupancy(
         # If zones still empty (or DEMO_MODE), try JSON fallback
         if not zones_data:
             try:
-                # Map building_id to site_id for file path
-                site_id = building_id.replace("-", "_")
-                if building_id == "gateway-centre":  # Legacy mapping
+                # Map site_id to site_id for file path
+                site_id = site_id.replace("-", "_")
+                if site_id == "gateway-centre":  # Legacy mapping
                     site_id = get_primary_site() or "unknown"
 
                 zones_json_path = f"/opt/bms-intelligence/backend/app/data/buildings/{site_id}/zones.json"
@@ -1165,7 +1165,7 @@ async def get_detailed_occupancy(
             )
 
         return {
-            "building_id": building_id,
+            "site_id": site_id,
             "timestamp": sim_time.isoformat(),
             "day_type": "weekend" if is_weekend else "weekday",
             "zones": occupancy_data,
@@ -1177,7 +1177,7 @@ async def get_detailed_occupancy(
         # Return empty response on error
         logger.error(f"Error in get_detailed_occupancy: {e}")
         return {
-            "building_id": building_id,
+            "site_id": site_id,
             "timestamp": datetime.now().isoformat(),
             "zones": [],
             "total_occupancy": 0,

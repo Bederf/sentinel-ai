@@ -14,7 +14,7 @@ import { Card } from '@/components/Card';
 import { TrendingUp, AlertCircle } from 'lucide-react';
 
 interface OccupancyTrendData {
-  building_id: string;
+  site_id: string;
   days: number;
   timestamp: string;
   hours: number[];
@@ -35,7 +35,7 @@ interface OccupancyTrendData {
 }
 
 interface ZoneUtilizationData {
-  building_id: string;
+  site_id: string;
   timestamp: string;
   zones: Array<{
     zone_id: string;
@@ -51,7 +51,7 @@ interface ZoneUtilizationData {
 }
 
 interface PeakHoursData {
-  building_id: string;
+  site_id: string;
   timestamp: string;
   peak_hours: number[];
   offpeak_hours: number[];
@@ -64,7 +64,7 @@ interface PeakHoursData {
 
 export function OccupancyAnalyticsPage() {
   const { siteId: contextSiteId } = useModules();
-  const [buildingId] = useState(contextSiteId || '');
+  const [siteId] = useState(contextSiteId || '');
   const [days, setDays] = useState<1 | 7 | 30>(1);
 
   // Get simulation context
@@ -72,9 +72,9 @@ export function OccupancyAnalyticsPage() {
 
   // Fetch occupancy trend
   const { data: trendData, isLoading: trendLoading } = useQuery<OccupancyTrendData>({
-    queryKey: ['occupancy-trend', buildingId, days],
+    queryKey: ['occupancy-trend', siteId, days],
     queryFn: async () => {
-      const response = await fetch(`/api/occupancy/analytics/hourly-trend?building_id=${buildingId}&days=${days}`);
+      const response = await fetch(`/api/occupancy/analytics/hourly-trend?site_id=${siteId}&days=${days}`);
       if (!response.ok) throw new Error('Failed to fetch occupancy trend');
       return response.json();
     },
@@ -82,9 +82,9 @@ export function OccupancyAnalyticsPage() {
 
   // Fetch zone utilization
   const { data: utilizationData, isLoading: utilizationLoading } = useQuery<ZoneUtilizationData>({
-    queryKey: ['zone-utilization', buildingId],
+    queryKey: ['zone-utilization', siteId],
     queryFn: async () => {
-      const response = await fetch(`/api/occupancy/analytics/zone-utilization?building_id=${buildingId}`);
+      const response = await fetch(`/api/occupancy/analytics/zone-utilization?site_id=${siteId}`);
       if (!response.ok) throw new Error('Failed to fetch zone utilization');
       return response.json();
     },
@@ -92,9 +92,9 @@ export function OccupancyAnalyticsPage() {
 
   // Fetch peak hours analysis
   const { data: peakHoursData, isLoading: peakHoursLoading } = useQuery<PeakHoursData>({
-    queryKey: ['peak-hours', buildingId],
+    queryKey: ['peak-hours', siteId],
     queryFn: async () => {
-      const response = await fetch(`/api/occupancy/analytics/peak-hours?building_id=${buildingId}`);
+      const response = await fetch(`/api/occupancy/analytics/peak-hours?site_id=${siteId}`);
       if (!response.ok) throw new Error('Failed to fetch peak hours');
       return response.json();
     },

@@ -1,6 +1,6 @@
 """Repository layer for database operations."""
 
-from app.database.repositories.building_repository import BuildingRepository
+from app.database.repositories.site_repository import SiteRepository
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.sensor_repository import SensorRepository
 from app.database.repositories.alert_repository import AlertRepository
@@ -39,7 +39,7 @@ from app.database.repositories.reporter_location_repository import (
 )
 
 __all__ = [
-    "BuildingRepository",
+    "SiteRepository",
     "EquipmentRepository",
     "SensorRepository",
     "AlertRepository",

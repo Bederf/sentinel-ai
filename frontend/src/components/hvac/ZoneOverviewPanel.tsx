@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Badge, Flex, Grid, Button } from "@tremor/react";
+import { Badge, Flex, Grid, Button, Text } from "@tremor/react";
 import { Thermometer, AlertTriangle, Fan, Settings } from "lucide-react";
 import { hvacApi, type HVACZone } from "../../lib/hvacApi";
 import TemperatureControl from "../TemperatureControl";

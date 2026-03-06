@@ -48,14 +48,14 @@ equipment_repo = EquipmentRepository()
 
 @router.get("/equipment")
 async def list_controllable_equipment(
-    building_id: Optional[str] = Query(None),
+    site_id: Optional[str] = Query(None),
     zone_id: Optional[str] = Query(None),
 ) -> Dict[str, Any]:
     """
     List all controllable equipment in the system.
 
     Query Parameters:
-    - building_id: Filter by building (e.g., "site-002")
+    - site_id: Filter by building (e.g., "site-002")
     - zone_id: Filter by zone (e.g., "Zone-203")
 
     Returns:
@@ -72,8 +72,8 @@ async def list_controllable_equipment(
     all_equipment = equipment_repo.get_all()
 
     # Filter by building
-    if building_id:
-        all_equipment = [eq for eq in all_equipment if eq.get("building_id") == building_id]
+    if site_id:
+        all_equipment = [eq for eq in all_equipment if eq.get("site_id") == site_id]
 
     # Filter by zone (via name/location)
     if zone_id:

@@ -45,19 +45,19 @@ def test_create_alert_resolves_code_inputs_to_uuid(monkeypatch):
         "code": "S002-FCU-L1-A",
         "name": "Level 1 Zone A FCU",
         "type": "fcu",
-        "building_id": "bld-uuid-1",
+        "site_id": "bld-uuid-1",
         "zone_name": "Level 1 Zone A",
     }
     building = {"id": "bld-uuid-1", "code": "site-002", "name": "Sandton Data Centre"}
 
     svc._get_equipment = MagicMock(return_value=equipment)
-    svc._get_building = MagicMock(side_effect=lambda bid: building if bid in ("site-002", "bld-uuid-1") else None)
+    svc._get_site = MagicMock(side_effect=lambda bid: building if bid in ("site-002", "bld-uuid-1") else None)
     svc.alert_repo.create.return_value = {"id": "alert-1"}
     monkeypatch.setattr(equipment_alert_module.alert_notifier, "send_alert_sync", lambda _payload: True)
 
     result = svc.create_alert_for_equipment(
         equipment_id="S002-FCU-L1-A",
-        building_id="site-002",
+        site_id="site-002",
         severity="warning",
         message="Health degraded",
     )
@@ -65,10 +65,10 @@ def test_create_alert_resolves_code_inputs_to_uuid(monkeypatch):
     assert result["telegram_sent"] is True
     payload = svc.alert_repo.create.call_args.args[0]
     assert payload["equipment_id"] == "eq-uuid-1"
-    assert payload["building_id"] == "bld-uuid-1"
+    assert payload["site_id"] == "bld-uuid-1"
 
 
-def test_create_alert_falls_back_to_equipment_building_id(monkeypatch):
+def test_create_alert_falls_back_to_equipment_site_id(monkeypatch):
     svc = EquipmentAlertService.__new__(EquipmentAlertService)
     svc.alert_repo = MagicMock()
     svc.supabase = MagicMock()
@@ -78,18 +78,18 @@ def test_create_alert_falls_back_to_equipment_building_id(monkeypatch):
         "code": "S002-FCU-L2-B",
         "name": "Level 2 Zone B FCU",
         "type": "fcu",
-        "building_id": "bld-uuid-2",
+        "site_id": "bld-uuid-2",
         "zone_name": "Level 2 Zone B",
     }
 
     svc._get_equipment = MagicMock(return_value=equipment)
-    svc._get_building = MagicMock(return_value=None)
+    svc._get_site = MagicMock(return_value=None)
     svc.alert_repo.create.return_value = {"id": "alert-2"}
     monkeypatch.setattr(equipment_alert_module.alert_notifier, "send_alert_sync", lambda _payload: False)
 
     result = svc.create_alert_for_equipment(
         equipment_id="S002-FCU-L2-B",
-        building_id="site-002",
+        site_id="site-002",
         severity="warning",
         message="Health degraded",
     )
@@ -97,7 +97,7 @@ def test_create_alert_falls_back_to_equipment_building_id(monkeypatch):
     assert result["telegram_sent"] is False
     payload = svc.alert_repo.create.call_args.args[0]
     assert payload["equipment_id"] == "eq-uuid-2"
-    assert payload["building_id"] == "bld-uuid-2"
+    assert payload["site_id"] == "bld-uuid-2"
 
 
 def test_get_equipment_falls_back_to_code_lookup():
@@ -123,14 +123,14 @@ def test_get_equipment_falls_back_to_code_lookup():
 def test_get_building_falls_back_to_code_lookup():
     svc = EquipmentAlertService.__new__(EquipmentAlertService)
     svc.supabase = _FakeSupabase(
-        "buildings",
+        "sites",
         {
             ("id", "site-002"): [],
             ("code", "site-002"): [{"id": "bld-uuid-3", "code": "site-002", "name": "Sandton Data Centre"}],
         },
     )
 
-    building = svc._get_building("site-002")
+    building = svc._get_site("site-002")
 
     assert building is not None
     assert building["id"] == "bld-uuid-3"

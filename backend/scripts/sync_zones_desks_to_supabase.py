@@ -47,17 +47,17 @@ ZONE_CENTERS = {
 }
 
 
-def load_zones_json(building_code: str) -> List[Dict[str, Any]]:
+def load_zones_json(site_code: str) -> List[Dict[str, Any]]:
     """Load zones from zones.json."""
-    data_path = Path(__file__).parent.parent / "app" / "data" / "buildings" / building_code / "zones.json"
+    data_path = Path(__file__).parent.parent / "app" / "data" / "sites" / site_code / "zones.json"
     with open(data_path) as f:
         data = json.load(f)
     return data.get("zones", [])
 
 
-def load_desks_json(building_code: str) -> List[Dict[str, Any]]:
+def load_desks_json(site_code: str) -> List[Dict[str, Any]]:
     """Load desks from desks.json.bak."""
-    data_path = Path(__file__).parent.parent / "app" / "data" / "buildings" / building_code / "desks.json.bak"
+    data_path = Path(__file__).parent.parent / "app" / "data" / "sites" / site_code / "desks.json.bak"
     with open(data_path) as f:
         # File starts with [ not { so wrap it
         content = f.read()
@@ -69,15 +69,15 @@ def load_desks_json(building_code: str) -> List[Dict[str, Any]]:
     return desks
 
 
-def get_building_uuid(client, building_code: str) -> str:
+def get_site_uuid(client, site_code: str) -> str:
     """Get building UUID from building code."""
-    response = client.table("buildings").select("id").eq("code", building_code).execute()
+    response = client.table("sites").select("id").eq("code", site_code).execute()
     if response.data:
         return response.data[0]["id"]
-    raise ValueError(f"Building {building_code} not found")
+    raise ValueError(f"Building {site_code} not found")
 
 
-def transform_desks(desks: List[Dict], building_id: str) -> List[Dict]:
+def transform_desks(desks: List[Dict], site_id: str) -> List[Dict]:
     """
     Transform desks:
     - Correct floor names
@@ -117,7 +117,7 @@ def transform_desks(desks: List[Dict], building_id: str) -> List[Dict]:
             transformed.append(
                 {
                     "id": str(uuid.uuid4()),
-                    "building_id": building_id,
+                    "site_id": site_id,
                     "desk_id": desk["desk_id"],
                     "desk_name": desk.get("desk_name", f"Desk {desk['desk_id']}"),
                     "floor": floor,
@@ -132,7 +132,7 @@ def transform_desks(desks: List[Dict], building_id: str) -> List[Dict]:
     return transformed
 
 
-def transform_zones(zones: List[Dict], building_id: str) -> List[Dict]:
+def transform_zones(zones: List[Dict], site_id: str) -> List[Dict]:
     """Transform zones for Supabase."""
     transformed = []
     for zone in zones:
@@ -140,7 +140,7 @@ def transform_zones(zones: List[Dict], building_id: str) -> List[Dict]:
         transformed.append(
             {
                 "id": str(uuid.uuid4()),
-                "building_id": building_id,
+                "site_id": site_id,
                 "zone_id": zone_id,
                 "zone_name": zone.get("zone_name", zone_id),
                 "floor": zone["floor"],
@@ -153,42 +153,42 @@ def transform_zones(zones: List[Dict], building_id: str) -> List[Dict]:
     return transformed
 
 
-def sync_to_supabase(building_code: str):
+def sync_to_supabase(site_code: str):
     """Main sync function."""
     client = get_supabase_client()
 
-    print(f"🔄 Syncing zones and desks for {building_code}...")
+    print(f"🔄 Syncing zones and desks for {site_code}...")
 
     # Get building UUID
     try:
-        building_id = get_building_uuid(client, building_code)
-        print(f"✓ Found building: {building_id}")
+        site_id = get_site_uuid(client, site_code)
+        print(f"✓ Found building: {site_id}")
     except ValueError as e:
         print(f"✗ Error: {e}")
         return False
 
     # Load JSON data
     print("📂 Loading zones from zones.json...")
-    zones = load_zones_json(building_code)
+    zones = load_zones_json(site_code)
     print(f"  → Found {len(zones)} zones")
 
     print("📂 Loading desks from desks.json.bak...")
-    desks_raw = load_desks_json(building_code)
+    desks_raw = load_desks_json(site_code)
     print(f"  → Found {len(desks_raw)} desks")
 
     # Transform data
     print("🔄 Transforming zones...")
-    zones_transformed = transform_zones(zones, building_id)
+    zones_transformed = transform_zones(zones, site_id)
     print(f"  → Prepared {len(zones_transformed)} zone records")
 
     print("🔄 Transforming desks (correcting floors, generating coordinates)...")
-    desks_transformed = transform_desks(desks_raw, building_id)
+    desks_transformed = transform_desks(desks_raw, site_id)
     print(f"  → Prepared {len(desks_transformed)} desk records")
 
     # Upsert to Supabase
     try:
         print("📤 Upserting zones to Supabase...")
-        response = client.table("zones").upsert(zones_transformed, on_conflict="building_id,zone_id").execute()
+        response = client.table("zones").upsert(zones_transformed, on_conflict="site_id,zone_id").execute()
         print(f"  ✓ {len(response.data)} zones synced")
 
         print("📤 Upserting desks to Supabase...")
@@ -215,6 +215,6 @@ def sync_to_supabase(building_code: str):
 
 
 if __name__ == "__main__":
-    building_code = "site-002"
-    success = sync_to_supabase(building_code)
+    site_code = "site-002"
+    success = sync_to_supabase(site_code)
     sys.exit(0 if success else 1)

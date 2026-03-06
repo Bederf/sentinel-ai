@@ -6,6 +6,10 @@ from pydantic import ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings
 
 
+BACKGROUND_AI_MODEL = "claude-haiku-4-5-20251001"  # Cost-optimised for scheduled jobs
+INTERACTIVE_AI_MODEL = "claude-sonnet-4-20250514"  # Full capability for chat
+
+
 def _parse_csv_list(value):
     if isinstance(value, list):
         return value
@@ -236,6 +240,11 @@ class Settings(BaseSettings):
     # Sprint 0 hard safety limits (enforced in code, not just config)
     sprint0_max_power_kw: float = 5.0  # Max power per command during Sprint 0
     sprint0_max_duration_min: int = 10  # Max duration per command during Sprint 0
+
+    # Background optimization model (cheaper than interactive chat)
+    # Empty = use claude_model; set to e.g. "claude-haiku-4-5-20251001" for cost savings
+    optimization_model: str = ""
+    optimization_max_tokens: int = 1536
 
     # Lifecycle simulation optimization mode
     # IMPORTANT: Simulation MUST NOT consume LLM tokens. It uses rule-based

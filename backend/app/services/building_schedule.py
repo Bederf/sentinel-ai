@@ -116,7 +116,7 @@ class ChilledWaterModel:
         return self.supply_temp
 
 
-class BuildingSchedule:
+class SiteSchedule:
     """Daily operating schedule for Site 002."""
 
     COMFORT_SETPOINT = 22.0  # deg C

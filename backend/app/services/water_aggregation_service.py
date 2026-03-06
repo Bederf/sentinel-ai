@@ -142,7 +142,7 @@ class WaterAggregationService:
 
     def get_consumption_by_floor(
         self,
-        building_id: str,
+        site_id: str,
         floor: str,
         start: Optional[date] = None,
         end: Optional[date] = None,
@@ -150,7 +150,7 @@ class WaterAggregationService:
         """Get aggregated consumption for all zones on a floor.
 
         Args:
-            building_id: Building/site identifier (e.g., "site-002")
+            site_id: Building/site identifier (e.g., "site-002")
             floor: Floor identifier (e.g., "L2", "101-199")
             start: Start date
             end: End date
@@ -158,7 +158,7 @@ class WaterAggregationService:
         Returns:
             {
                 "floor": str,
-                "building_id": str,
+                "site_id": str,
                 "start_date": str,
                 "end_date": str,
                 "total_liters": float,
@@ -174,8 +174,8 @@ class WaterAggregationService:
             start = end - timedelta(days=30)
 
         # Get all consumption for building
-        building_records = self.repository.get_consumption_by_site(
-            site=building_id,
+        site_records = self.repository.get_consumption_by_site(
+            site=site_id,
             start_date=start,
             end_date=end,
             limit=100000,
@@ -183,12 +183,12 @@ class WaterAggregationService:
 
         # Filter records by floor based on zone_id pattern
         # Assumption: floor can be encoded in zone_id (e.g., L1, L2, or 100-199, 200-299)
-        floor_records = [r for r in building_records if self._zone_is_on_floor(r.get("zone_id"), floor)]
+        floor_records = [r for r in site_records if self._zone_is_on_floor(r.get("zone_id"), floor)]
 
         if not floor_records:
             return {
                 "floor": floor,
-                "building_id": building_id,
+                "site_id": site_id,
                 "start_date": start.isoformat(),
                 "end_date": end.isoformat(),
                 "total_liters": 0,
@@ -240,7 +240,7 @@ class WaterAggregationService:
 
         return {
             "floor": floor,
-            "building_id": building_id,
+            "site_id": site_id,
             "start_date": start.isoformat(),
             "end_date": end.isoformat(),
             "total_liters": round(total_volume, 2),
@@ -252,14 +252,14 @@ class WaterAggregationService:
 
     def get_top_consuming_zones(
         self,
-        building_id: str,
+        site_id: str,
         limit: int = 10,
         days: int = 30,
     ) -> List[Dict[str, Any]]:
         """Get top N zones by consumption.
 
         Args:
-            building_id: Building/site identifier
+            site_id: Building/site identifier
             limit: Number of top zones to return
             days: Look-back period (default: 30 days)
 
@@ -272,7 +272,7 @@ class WaterAggregationService:
 
         # Get all consumption records for building
         records = self.repository.get_consumption_by_site(
-            site=building_id,
+            site=site_id,
             start_date=start,
             end_date=end,
             limit=100000,
@@ -418,21 +418,21 @@ class WaterAggregationService:
     def zone_vs_building_average(
         self,
         zone_id: str,
-        building_id: str,
+        site_id: str,
         days: int = 30,
     ) -> Dict[str, Any]:
         """Compare zone consumption to building average.
 
         Args:
             zone_id: Zone identifier
-            building_id: Building/site identifier
+            site_id: Building/site identifier
             days: Analysis period
 
         Returns:
             {
                 "zone_id": str,
                 "zone_name": str,
-                "building_id": str,
+                "site_id": str,
                 "zone_daily_avg": float,
                 "building_daily_avg": float,
                 "difference_percent": float,
@@ -449,18 +449,18 @@ class WaterAggregationService:
         zone_name = zone_result["zone_name"]
 
         # Get building data
-        building_records = self.repository.get_consumption_by_site(
-            site=building_id,
+        site_records = self.repository.get_consumption_by_site(
+            site=site_id,
             start_date=start,
             end_date=end,
             limit=100000,
         )
 
-        if not building_records:
+        if not site_records:
             return {
                 "zone_id": zone_id,
                 "zone_name": zone_name,
-                "building_id": building_id,
+                "site_id": site_id,
                 "zone_daily_avg": 0,
                 "building_daily_avg": 0,
                 "difference_percent": 0,
@@ -469,7 +469,7 @@ class WaterAggregationService:
             }
 
         # Calculate building total
-        building_volumes = [r.get("volume_liters", 0) for r in building_records]
+        building_volumes = [r.get("volume_liters", 0) for r in site_records]
         building_liters = max(building_volumes) - min(building_volumes) if building_volumes else 0
 
         # Calculate daily averages
@@ -493,7 +493,7 @@ class WaterAggregationService:
         return {
             "zone_id": zone_id,
             "zone_name": zone_name,
-            "building_id": building_id,
+            "site_id": site_id,
             "zone_daily_avg": round(zone_daily_avg, 2),
             "building_daily_avg": round(building_daily_avg, 2),
             "difference_percent": round(difference_percent, 1),

@@ -102,13 +102,13 @@ class ToolPolicyEngine:
         tool: AgentToolName,
         action: str,
         target: str,
-        building_id: Optional[str] = None,
+        site_id: Optional[str] = None,
     ) -> PolicyResult:
         """Evaluate a tool invocation against session scope and permission matrix.
 
         Checks are applied in order (first failure wins):
         1. Session expiry
-        2. Building scope (if building_id provided)
+        2. Building scope (if site_id provided)
         3. Permission matrix lookup (role x tool)
         4. Write-action downgrade (READ_ONLY + write method -> DENY)
 
@@ -117,7 +117,7 @@ class ToolPolicyEngine:
             tool: Tool category being invoked.
             action: HTTP method or action descriptor (e.g. "GET", "POST").
             target: Resource path or identifier.
-            building_id: Optional building scope check.
+            site_id: Optional building scope check.
 
         Returns:
             PolicyResult with decision, reason, and optional confirmation token.
@@ -140,10 +140,10 @@ class ToolPolicyEngine:
             return result
 
         # Check 2: Building scope
-        if building_id and not session.has_building_access(building_id):
+        if site_id and not session.has_site_access(site_id):
             result = self._make_result(
                 PolicyDecision.DENY,
-                f"Building {building_id} not in session scope",
+                f"Building {site_id} not in session scope",
                 session,
                 tool,
                 action,
@@ -152,7 +152,7 @@ class ToolPolicyEngine:
             logger.warning(
                 "agent_security.deny building_scope session_id=%s building=%s",
                 session.session_id,
-                building_id,
+                site_id,
             )
             return result
 

@@ -202,17 +202,17 @@ class TestProfileService:
 class TestProfileBuildingJsonIntegration:
     """Test integration with building.json files."""
 
-    def test_all_buildings_have_optimization_section(self):
+    def test_all_sites_have_optimization_section(self):
         """Test that all building.json files have optimization section."""
         buildings_dir = Path(__file__).parent.parent.parent / "app" / "data" / "buildings"
 
-        building_files = list(buildings_dir.glob("*/building.json"))
-        assert len(building_files) > 0, "No building.json files found"
+        site_files = list(buildings_dir.glob("*/building.json"))
+        assert len(site_files) > 0, "No building.json files found"
 
-        for building_file in building_files:
-            with open(building_file) as f:
+        for site_file in site_files:
+            with open(site_file) as f:
                 data = json.load(f)
-                assert "optimization" in data, f"Missing optimization section in {building_file}"
+                assert "optimization" in data, f"Missing optimization section in {site_file}"
 
                 opt = data["optimization"]
                 assert "active_profile" in opt
@@ -223,9 +223,9 @@ class TestProfileBuildingJsonIntegration:
     def test_site_002_has_server_room_override(self):
         """Test that site-002 has the server-room override."""
         buildings_dir = Path(__file__).parent.parent.parent / "app" / "data" / "buildings"
-        building_file = buildings_dir / "site-002" / "building.json"
+        site_file = buildings_dir / "site-002" / "building.json"
 
-        with open(building_file) as f:
+        with open(site_file) as f:
             data = json.load(f)
 
             opt = data["optimization"]

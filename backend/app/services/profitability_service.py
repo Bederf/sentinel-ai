@@ -164,8 +164,8 @@ class ProfitabilityService:
         return ContractProfitabilityDetail(
             contract_id=contract["id"],
             contract_name=contract.get("code", "Unknown"),
-            building_id=contract.get("building_id", ""),
-            building_name=contract.get("buildings", {}).get("name") if contract.get("buildings") else None,
+            site_id=contract.get("site_id", ""),
+            site_name=contract.get("sites", {}).get("name") if contract.get("sites") else None,
             monthly_revenue_zar=round(monthly_revenue, 2),
             clawbacks_zar=round(clawbacks, 2),
             net_revenue_zar=round(net_revenue, 2),
@@ -442,7 +442,7 @@ class ProfitabilityService:
                 "organization_name": contract.get("organizations", {}).get("name")
                 if contract.get("organizations")
                 else None,
-                "building_name": contract.get("buildings", {}).get("name") if contract.get("buildings") else None,
+                "site_name": contract.get("sites", {}).get("name") if contract.get("sites") else None,
             },
             "period": {
                 "start": period_start.isoformat(),

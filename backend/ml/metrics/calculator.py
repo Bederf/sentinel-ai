@@ -235,7 +235,7 @@ class MetricsCalculator:
             from app.database.repositories.alert_repository import AlertRepository
 
             repo = AlertRepository()
-            alerts = repo.get_all(building_code="site-002")
+            alerts = repo.get_all(site_code="site-002")
 
             total_failures = sum(1 for a in alerts if a.get("severity") in ("high", "critical"))
             predicted_failures = sum(

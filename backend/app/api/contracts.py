@@ -126,7 +126,7 @@ async def update_organization(org_id: str, data: OrganizationUpdate):
 
 @router.get("/")
 async def list_contracts(
-    building_id: Optional[str] = Query(None, description="Filter by building UUID"),
+    site_id: Optional[str] = Query(None, description="Filter by building UUID"),
     organization_id: Optional[str] = Query(None, description="Filter by organization UUID"),
     status: Optional[str] = Query(None, description="Filter by status (draft, active, expired, etc.)"),
     limit: int = Query(100, ge=1, le=500, description="Maximum results"),
@@ -138,7 +138,7 @@ async def list_contracts(
     """
     svc = get_contract_service()
     contracts = svc.get_contracts(
-        building_id=building_id,
+        site_id=site_id,
         organization_id=organization_id,
         status=status,
     )
@@ -158,7 +158,7 @@ async def create_contract(data: ContractCreate):
     if result is None:
         raise HTTPException(
             status_code=400,
-            detail="Failed to create contract. Verify organization_id and building_id exist.",
+            detail="Failed to create contract. Verify organization_id and site_id exist.",
         )
     return result
 
@@ -711,7 +711,7 @@ async def create_budget_from_template(
 
 @router.get("/assessments")
 async def list_assessments(
-    building_id: Optional[str] = Query(None, description="Filter by building UUID"),
+    site_id: Optional[str] = Query(None, description="Filter by building UUID"),
 ):
     """
     List all condition assessments.
@@ -721,7 +721,7 @@ async def list_assessments(
     svc = get_contract_service()
     svc._ensure_repos()
 
-    assessments = svc._assessment_repo.get_all(building_id=building_id)
+    assessments = svc._assessment_repo.get_all(site_id=site_id)
     return {"assessments": assessments, "count": len(assessments)}
 
 

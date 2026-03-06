@@ -353,6 +353,122 @@ async def main():
     except Exception as e:
         print(f"Error getting counts: {e}")
 
+    # ---------------------------------------------------------------
+    # Phase 2: Ingest inspection checklist templates as documents
+    # ---------------------------------------------------------------
+    print(f"\n{'=' * 55}")
+    print("Phase 2: Ingesting inspection checklist templates...")
+
+    checklist_path = Path(__file__).parent.parent / "app" / "data" / "inspection_checklist_templates.json"
+    if checklist_path.exists():
+        import json
+
+        with open(checklist_path, encoding="utf-8") as f:
+            checklist_data = json.load(f)
+
+        templates = checklist_data.get("templates", checklist_data)
+        if not isinstance(templates, dict):
+            print("  WARN: unexpected checklist structure, skipping")
+        else:
+            for template_key, template in templates.items():
+                code = f"DOC-CHECKLIST-{template_key.upper()}"
+                equipment_type = template.get("equipment_type", "general")
+                template_name = template.get("template_name", template_key)
+                items = template.get("checklist_items", [])
+
+                if not items:
+                    continue
+
+                # Check if already exists
+                if not force:
+                    try:
+                        existing = client.table("documents").select("id").eq("code", code).execute()
+                        if existing.data:
+                            print(f"  SKIP (exists): {template_key}")
+                            skipped += 1
+                            continue
+                    except Exception:
+                        pass
+
+                # Convert checklist to markdown prose for RAG
+                md_lines = [
+                    f"# {template_name}",
+                    "",
+                    f"Equipment type: {equipment_type}",
+                    f"Items: {len(items)}",
+                    "",
+                    "## Checklist Items",
+                    "",
+                ]
+                for item in items:
+                    question = item.get("question", item.get("item_id", ""))
+                    category = item.get("category", "")
+                    item_type = item.get("item_type", "checklist")
+                    unit = item.get("unit", "")
+                    tol_min = item.get("tolerance_min")
+                    tol_max = item.get("tolerance_max")
+
+                    line = f"- **{question}**"
+                    if category:
+                        line += f" (Category: {category})"
+                    if item_type == "measurement" and unit:
+                        line += f" — Measurement in {unit}"
+                        if tol_min is not None and tol_max is not None:
+                            line += f", acceptable range {tol_min}–{tol_max} {unit}"
+                    if item.get("options"):
+                        opts = ", ".join(o.get("label", "") for o in item["options"])
+                        line += f" — Options: {opts}"
+                    md_lines.append(line)
+
+                full_text = "\n".join(md_lines)
+                summary = f"Inspection checklist for {equipment_type}: {template_name} ({len(items)} items)"
+                keywords = [equipment_type, "inspection", "checklist", "maintenance", template_key]
+
+                try:
+                    doc_data = {
+                        "code": code,
+                        "title": template_name,
+                        "document_type": "maintenance_procedure",
+                        "equipment_type": equipment_type,
+                        "full_text": full_text,
+                        "source": "system_docs",
+                        "summary": summary,
+                        "keywords": keywords,
+                        "indexing_status": "pending",
+                    }
+
+                    result = client.table("documents").insert(doc_data).execute()
+                    if result.data:
+                        doc_id = result.data[0]["id"]
+                        chunk_count = vector_db.chunk_and_embed_markdown(
+                            doc_id,
+                            doc_title=template_name,
+                            doc_type="maintenance_procedure",
+                        )
+                        print(f"  ADD: {template_key} ({chunk_count} chunks, type={equipment_type})")
+                        added += 1
+                    else:
+                        print(f"  ERROR (no data): {template_key}")
+                        errors += 1
+                except Exception as e:
+                    error_msg = str(e)
+                    if "duplicate key" in error_msg:
+                        print(f"  SKIP (duplicate): {template_key}")
+                        skipped += 1
+                    else:
+                        print(f"  ERROR: {template_key}: {error_msg[:100]}")
+                        errors += 1
+    else:
+        print(f"  WARN: checklist file not found at {checklist_path}")
+
+    # Updated totals
+    try:
+        doc_count = client.table("documents").select("id", count="exact").execute().count or 0
+        chunk_count_total = client.table("document_chunks").select("id", count="exact").execute().count or 0
+        print(f"\nUpdated RAG totals: {doc_count} documents, {chunk_count_total} chunks")
+    except Exception as e:
+        print(f"Error getting updated counts: {e}")
+
     # Test search with system docs
     print(f"\n{'=' * 55}")
     print("Testing system documentation search...")
@@ -368,6 +484,10 @@ async def main():
         ("data privacy POPIA compliance", None),
         ("FirstRand supplier security assessment", None),
         ("business continuity disaster recovery", None),
+        # Checklist-specific queries
+        ("chiller inspection vibration compressor", None),
+        ("generator weekly maintenance checklist", None),
+        ("UPS battery inspection Eaton", None),
     ]
 
     for query, eq_type in test_queries:

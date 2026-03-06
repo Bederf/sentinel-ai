@@ -23,7 +23,7 @@ control_router = APIRouter(prefix="/occupancy/control", tags=["occupancy-control
 
 @router.get("/hourly-trend")
 async def get_hourly_occupancy_trend(
-    building_id: str = Query(..., description="Building ID"),
+    site_id: str = Query(..., description="Building ID"),
     days: int = Query(1, ge=1, le=30, description="Number of days to return (1-30)"),
 ):
     """
@@ -33,12 +33,12 @@ async def get_hourly_occupancy_trend(
     Data is generated based on time-of-day heuristics (Phase 4).
 
     Args:
-        building_id: Building ID (e.g., 'site-002' or registered building code)
+        site_id: Building ID (e.g., 'site-002' or registered building code)
         days: Number of days of historical data (1, 7, 30)
 
     Returns:
         {
-            "building_id": "<building-id>",
+            "site_id": "<building-id>",
             "days": 7,
             "hours": [0, 1, 2, ..., 23],
             "zones": {
@@ -90,7 +90,7 @@ async def get_hourly_occupancy_trend(
     offpeak_avg = sum(office_occupancy[h] for h in offpeak_hours) / len(offpeak_hours) if offpeak_hours else 0
 
     return {
-        "building_id": building_id,
+        "site_id": site_id,
         "days": days,
         "timestamp": datetime.now().isoformat(),
         "hours": hours,
@@ -106,18 +106,18 @@ async def get_hourly_occupancy_trend(
 
 
 @router.get("/zone-utilization")
-async def get_zone_utilization(building_id: str = Query(..., description="Building ID")):
+async def get_zone_utilization(site_id: str = Query(..., description="Building ID")):
     """
     Get current zone utilization metrics.
 
     Returns current occupancy as percentage of max capacity for each zone.
 
     Args:
-        building_id: Building ID
+        site_id: Building ID
 
     Returns:
         {
-            "building_id": "<building-id>",
+            "site_id": "<building-id>",
             "timestamp": "2026-02-16T14:30:00Z",
             "zones": [
                 {
@@ -184,7 +184,7 @@ async def get_zone_utilization(building_id: str = Query(..., description="Buildi
         )
 
     return {
-        "building_id": building_id,
+        "site_id": site_id,
         "timestamp": now.isoformat(),
         "zones": zones_data,
         "total_occupancy": sum(z["current_occupancy"] for z in zones_data),
@@ -193,7 +193,7 @@ async def get_zone_utilization(building_id: str = Query(..., description="Buildi
 
 
 @router.get("/peak-hours")
-async def get_peak_hours(building_id: str = Query(..., description="Building ID")):
+async def get_peak_hours(site_id: str = Query(..., description="Building ID")):
     """
     Get peak hour analysis for the building.
 
@@ -201,7 +201,7 @@ async def get_peak_hours(building_id: str = Query(..., description="Building ID"
 
     Returns:
         {
-            "building_id": "<building-id>",
+            "site_id": "<building-id>",
             "peak_hours": [9, 10, 11, 14, 15, 16],
             "offpeak_hours": [0-8, 17-23],
             "peak_occupancy_avg": 82,
@@ -214,7 +214,7 @@ async def get_peak_hours(building_id: str = Query(..., description="Building ID"
         }
     """
     # Get hourly trend to analyze peaks
-    trend_response = await get_hourly_occupancy_trend(building_id=building_id, days=1)
+    trend_response = await get_hourly_occupancy_trend(site_id=site_id, days=1)
 
     peak_hours = trend_response["daily_pattern"]["peak_hours"]
     offpeak_hours = trend_response["daily_pattern"]["offpeak_hours"]
@@ -237,7 +237,7 @@ async def get_peak_hours(building_id: str = Query(..., description="Building ID"
     recommendations.append("Schedule maintenance during lowest occupancy hours (nights/weekends)")
 
     return {
-        "building_id": building_id,
+        "site_id": site_id,
         "timestamp": datetime.now().isoformat(),
         "peak_hours": peak_hours,
         "offpeak_hours": offpeak_hours,

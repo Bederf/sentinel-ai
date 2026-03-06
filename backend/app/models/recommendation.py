@@ -86,6 +86,9 @@ class Recommendation:
     execution_result: Optional[Dict[str, Any]] = None
     rejection_reason: Optional[str] = None
     correlation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    outcome_validated: Optional[bool] = None
+    outcome_notes: Optional[str] = None
+    outcome_validated_at: Optional[datetime] = None
 
     def get_numeric_confidence(self) -> float:
         """Return numeric confidence, converting string if needed.
@@ -131,6 +134,13 @@ class Recommendation:
             "executed_at": self.executed_at.isoformat() if isinstance(self.executed_at, datetime) else self.executed_at,
             "execution_result": self.execution_result,
             "rejection_reason": self.rejection_reason,
+            "outcome_validated": self.outcome_validated,
+            "outcome_notes": self.outcome_notes,
+            "outcome_validated_at": (
+                self.outcome_validated_at.isoformat()
+                if isinstance(self.outcome_validated_at, datetime)
+                else self.outcome_validated_at
+            ),
         }
 
     @classmethod
@@ -155,6 +165,13 @@ class Recommendation:
                 executed_at = datetime.fromisoformat(executed_at)
             except (ValueError, TypeError):
                 executed_at = None
+
+        outcome_validated_at = data.get("outcome_validated_at")
+        if isinstance(outcome_validated_at, str) and outcome_validated_at:
+            try:
+                outcome_validated_at = datetime.fromisoformat(outcome_validated_at)
+            except (ValueError, TypeError):
+                outcome_validated_at = None
 
         # Parse enums
         risk_level = data.get("risk_level", "medium")
@@ -192,4 +209,7 @@ class Recommendation:
             executed_at=executed_at,
             execution_result=data.get("execution_result"),
             rejection_reason=data.get("rejection_reason"),
+            outcome_validated=data.get("outcome_validated"),
+            outcome_notes=data.get("outcome_notes"),
+            outcome_validated_at=outcome_validated_at,
         )

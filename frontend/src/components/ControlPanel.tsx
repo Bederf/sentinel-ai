@@ -42,6 +42,10 @@ interface ControlPanelProps {
     message?: string;
     rules?: Array<{ rule: string; status: string }>;
   };
+  equipmentHealth?: {
+    score: number;
+    status: "normal" | "warning" | "critical";
+  };
   refreshInterval?: number;
 }
 
@@ -151,6 +155,7 @@ export function ControlPanel({
   device,
   onControl,
   safetyStatus,
+  equipmentHealth,
   refreshInterval: _refreshInterval = 10000,
 }: ControlPanelProps) {
   const [expanded, setExpanded] = useState(true);
@@ -400,8 +405,24 @@ export function ControlPanel({
               </div>
             </div>
 
-            {/* Safety status badge */}
+            {/* Safety + Health badges */}
             <div className="flex items-center gap-2">
+              {equipmentHealth && (
+                <div
+                  className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
+                  style={{
+                    background: equipmentHealth.status === "critical" ? "rgba(220, 38, 38, 0.15)"
+                      : equipmentHealth.status === "warning" ? "rgba(245, 158, 11, 0.15)"
+                      : "rgba(16, 185, 129, 0.15)",
+                    color: equipmentHealth.status === "critical" ? "var(--color-sentinel-red)"
+                      : equipmentHealth.status === "warning" ? "var(--color-sentinel-amber)"
+                      : "var(--color-sentinel-green)",
+                  }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                  Health {equipmentHealth.score}%
+                </div>
+              )}
               <div
                 className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
                 style={{

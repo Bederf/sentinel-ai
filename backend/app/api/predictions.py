@@ -76,9 +76,8 @@ def format_prediction_for_frontend(pred: dict) -> dict:
         "equipment_id": equipment.get("code", pred["equipment_id"]),
         "equipment_name": equipment.get("name", "Unknown"),
         "equipment_type": equipment.get("type", "unknown"),
-        "site_id": building.get("code", pred["building_id"]),
+        "site_id": building.get("code", pred["site_id"]),
         "site_name": building.get("name", "Unknown"),
-        "building_id": pred["building_id"],
         # Prediction details
         "prediction_type": pred["prediction_type"],
         "probability_percent": pred["probability_percent"],
@@ -103,7 +102,7 @@ def format_prediction_for_frontend(pred: dict) -> dict:
 @router.get("/predictions")
 async def list_predictions(
     request: Request,
-    building_code: Optional[str] = Query(None, description="Filter by building code (e.g., site-002)"),
+    site_code: Optional[str] = Query(None, description="Filter by building code (e.g., site-002)"),
     equipment_type: Optional[str] = Query(None, description="Filter by equipment type"),
     severity: Optional[str] = Query(None, description="Filter by severity (critical/warning/healthy)"),
     min_probability: Optional[int] = Query(None, description="Minimum probability percentage"),
@@ -114,7 +113,7 @@ async def list_predictions(
     Returns predictions with building and equipment information joined.
 
     Query Parameters:
-    - building_code: Filter by building code (e.g., site-002)
+    - site_code: Filter by building code (e.g., site-002)
     - equipment_type: Filter by equipment type (chiller, ahu, ups, etc.)
     - severity: Filter by severity level (critical, warning, healthy)
     - min_probability: Show only predictions above this probability
@@ -136,11 +135,11 @@ async def list_predictions(
     )  # Only active predictions
 
     # Apply filters
-    if building_code:
+    if site_code:
         # First get building UUID by code
-        building_result = repo.client.table("buildings").select("id").eq("code", building_code).execute()
-        if building_result.data:
-            query = query.eq("building_id", building_result.data[0]["id"])
+        site_result = repo.client.table("sites").select("id").eq("code", site_code).execute()
+        if site_result.data:
+            query = query.eq("site_id", site_result.data[0]["id"])
         else:
             # Building not found, return empty results
             return {

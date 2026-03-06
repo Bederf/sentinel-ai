@@ -13,8 +13,6 @@
 
 import { useContext, useState, useEffect, useCallback, type ReactElement } from "react";
 import {
-  Card,
-  Title,
   Text,
   Badge,
   Flex,
@@ -141,9 +139,9 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
   if (loading) {
     return (
       <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-        <Title>Security Module</Title>
+        <h3 className="font-medium text-lg" style={{ color: "var(--color-sentinel-text-primary)" }}>Security Module</h3>
         <div className="animate-pulse h-96 bg-gray-100 dark:bg-gray-800 rounded mt-4" />
-      </Card>
+      </div>
     );
   }
 
@@ -267,7 +265,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
 
         {/* Floor Occupancy Cards */}
         <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <Title className="text-sm mb-3">Zone Occupancy</Title>
+          <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Zone Occupancy</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {zoneOccupancies.map((zone) => {
               const pct = zone.percent_full || 0;
@@ -311,7 +309,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
               );
             })}
           </div>
-        </Card>
+        </div>
       </div>
     </TabPanel>,
 
@@ -326,7 +324,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
     <TabPanel key="cameras">
       <div className="space-y-4 mt-4">
         <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <Title className="text-sm mb-3">CCTV Camera Status</Title>
+          <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>CCTV Camera Status</h4>
           <div className="space-y-2">
             {demoCameras.map((cam) => (
               <div
@@ -368,7 +366,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
               </div>
             ))}
           </div>
-        </Card>
+        </div>
       </div>
     </TabPanel>,
 
@@ -377,7 +375,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
       <div className="space-y-4 mt-4">
         {/* 24-hour trend chart */}
         <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <Title className="text-sm mb-3">24-Hour Occupancy Trend</Title>
+          <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>24-Hour Occupancy Trend</h4>
           <AreaChart
             className="h-64"
             data={demoTrendData.map((d) => ({
@@ -393,12 +391,12 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
             showGridLines={false}
             curveType="monotone"
           />
-        </Card>
+        </div>
 
         {/* Peak hours and floor breakdown */}
         <Grid className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-            <Title className="text-sm mb-3">Peak Hours</Title>
+            <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Peak Hours</h4>
             <div className="space-y-3">
               {[
                 { time: "08:00-09:00", label: "Morning Arrival", occupancy: 35, icon: <ArrowUpRight className="w-4 h-4 text-green-400" /> },
@@ -417,10 +415,10 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
                 </div>
               ))}
             </div>
-          </Card>
+          </div>
 
           <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-            <Title className="text-sm mb-3">Floor-by-Floor Breakdown</Title>
+            <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Floor-by-Floor Breakdown</h4>
             <BarChart
               className="h-48"
               data={zoneOccupancies.map((z) => ({
@@ -435,7 +433,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
               showGridLines={false}
               layout="vertical"
             />
-          </Card>
+          </div>
         </Grid>
 
         {/* Occupancy panel with cross-module recommendations */}
@@ -450,7 +448,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
         <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Flex alignItems="center" className="gap-2 mb-4">
             <Thermometer className="w-5 h-5 text-blue-400" />
-            <Title className="text-sm">Security + HVAC Integration</Title>
+            <h4 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Security + HVAC Integration</h4>
             <Badge color="green" size="xs">Active</Badge>
           </Flex>
           <div className="space-y-3">
@@ -479,13 +477,13 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
               </div>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Lighting Integration */}
         <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Flex alignItems="center" className="gap-2 mb-4">
             <Sun className="w-5 h-5 text-amber-400" />
-            <Title className="text-sm">Security + Lighting Integration</Title>
+            <h4 className="font-medium text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>Security + Lighting Integration</h4>
             <Badge color="green" size="xs">Active</Badge>
           </Flex>
           <div className="space-y-3">
@@ -514,11 +512,11 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
               </div>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Integration Status Summary */}
         <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
-          <Title className="text-sm mb-3">Cross-Module Integration Status</Title>
+          <h4 className="font-medium text-sm mb-3" style={{ color: "var(--color-sentinel-text-primary)" }}>Cross-Module Integration Status</h4>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="text-center p-4 rounded-lg border border-green-500/30 bg-green-500/5">
               <Text className="text-2xl font-bold text-green-400">2</Text>
@@ -533,7 +531,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
               <Text className="text-xs text-gray-400">Est. Energy Savings</Text>
             </div>
           </div>
-        </Card>
+        </div>
       </div>
     </TabPanel>,
   ];

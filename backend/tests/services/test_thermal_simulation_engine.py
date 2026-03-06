@@ -19,7 +19,7 @@ from app.services.thermal_simulation_engine import (
 @pytest.fixture
 def thermal_engine():
     """Create a thermal engine instance for testing."""
-    return ThermalSimulationEngine(building_id="test-building-001")
+    return ThermalSimulationEngine(site_id="test-building-001")
 
 
 @pytest.fixture

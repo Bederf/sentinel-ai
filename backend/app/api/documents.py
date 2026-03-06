@@ -52,7 +52,7 @@ class DocumentUploadResponse:
 async def upload_document(
     request: Request,
     file: UploadFile = File(...),
-    building_id: str = Form(...),
+    site_id: str = Form(...),
     title: Optional[str] = Form(None),
     document_type: str = Form("building_manual"),
 ) -> dict:
@@ -68,7 +68,7 @@ async def upload_document(
 
     Args:
         file: Document file (PDF, DOCX, or TXT)
-        building_id: Building UUID (user must have access to this building)
+        site_id: Building UUID (user must have access to this building)
         title: Optional document title (defaults to filename)
         document_type: Document classification (default: "building_manual")
 
@@ -85,7 +85,7 @@ async def upload_document(
     # 1. Validate building exists and user has access
     # TODO: Add user access check via user_site_access table
     try:
-        building = client.table("buildings").select("id, code").eq("id", building_id).single().execute()
+        building = client.table("sites").select("id, code").eq("id", site_id).single().execute()
         if not building.data:
             raise HTTPException(status_code=404, detail="Building not found")
     except Exception as e:
@@ -109,7 +109,7 @@ async def upload_document(
         filename=file.filename,
         user_id=user_id,
         user_role=user_role,
-        site_id=building_id,
+        site_id=site_id,
     )
 
     if not scan_result.allowed:
@@ -146,7 +146,7 @@ async def upload_document(
     # 4. Upload to storage
     storage_service = get_storage_service(client)
     try:
-        storage_path = await storage_service.upload_document(building_id, file)
+        storage_path = await storage_service.upload_document(site_id, file)
     except Exception as e:
         logger.error(f"Storage upload failed: {e}")
         raise HTTPException(status_code=500, detail="Failed to upload file to storage")
@@ -154,7 +154,7 @@ async def upload_document(
     # 5. Create document record in database
     document_id = str(uuid.uuid4())
     doc_title = title or file.filename
-    document_code = f"USER-DOC-{building_id[:8]}-{uuid.uuid4().hex[:8]}".upper()
+    document_code = f"USER-DOC-{site_id[:8]}-{uuid.uuid4().hex[:8]}".upper()
 
     try:
         doc_record = (
@@ -171,7 +171,7 @@ async def upload_document(
                     "full_text": extracted_text,
                     "summary": extracted_text[:500],  # First 500 chars as summary
                     "file_size_bytes": metadata["size_bytes"],
-                    "building_id": building_id,
+                    "site_id": site_id,
                     "indexing_status": "pending",
                 }
             )
@@ -195,10 +195,10 @@ async def upload_document(
             max_chunk_size=800,
         )
 
-        # Update chunks with building_id
-        client.table("document_chunks").update({"building_id": building_id}).eq("document_id", document_id).execute()
+        # Update chunks with site_id
+        client.table("document_chunks").update({"site_id": site_id}).eq("document_id", document_id).execute()
 
-        logger.info(f"Successfully indexed document {document_id} with {chunk_count} chunks for building {building_id}")
+        logger.info(f"Successfully indexed document {document_id} with {chunk_count} chunks for building {site_id}")
 
     except Exception as e:
         logger.error(f"Error indexing document: {e}")

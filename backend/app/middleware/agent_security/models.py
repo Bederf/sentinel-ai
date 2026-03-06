@@ -130,7 +130,7 @@ class AgentSession(BaseModel):
     owner_id: str
     role: str  # SentinelRole value (including "bot_agent")
     tenant_id: str
-    building_ids: List[str] = Field(default_factory=list)
+    site_ids: List[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(hours=1))
 
@@ -139,15 +139,15 @@ class AgentSession(BaseModel):
         """Check whether this session has passed its expiry time."""
         return datetime.utcnow() > self.expires_at
 
-    def has_building_access(self, building_id: str) -> bool:
+    def has_site_access(self, site_id: str) -> bool:
         """Check if the session grants access to a specific building.
 
         Admins have implicit access to all buildings within their tenant.
-        All other roles are restricted to the explicit building_ids list.
+        All other roles are restricted to the explicit site_ids list.
         """
         if self.role == SentinelRole.ADMIN.value or self.role == SentinelRole.ADMIN:
             return True
-        return building_id in self.building_ids
+        return site_id in self.site_ids
 
 
 # ---------------------------------------------------------------------------

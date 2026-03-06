@@ -30,13 +30,13 @@ logger = logging.getLogger(__name__)
 class ThermalSimulationEngine:
     """Calculates and updates zone temperatures during simulation."""
 
-    def __init__(self, building_id: str, consider_equipment_health: bool = False):
-        self.building_id = building_id
+    def __init__(self, site_id: str, consider_equipment_health: bool = False):
+        self.site_id = site_id
         self.supabase = get_supabase_client()
-        self.sim_store = get_simulation_store(building_id)
+        self.sim_store = get_simulation_store(site_id)
 
         # Initialize cost service for tariff calculations
-        self.cost_service = EnergyCostService(building_id=building_id)
+        self.cost_service = EnergyCostService(site_id=site_id)
 
         # Thermal parameters (building-specific, can be customized)
         self.OCCUPANT_HEAT_GAIN = 100  # Watts per person
@@ -202,7 +202,7 @@ class ThermalSimulationEngine:
             )
 
             await update_simulation_lighting(
-                building_id=self.building_id,
+                site_id=self.site_id,
                 simulated_hour=simulated_hour,
                 occupancy_data=occupancy_data,
                 daylight_lux=daylight_lux,
@@ -212,7 +212,7 @@ class ThermalSimulationEngine:
             )
 
             await update_simulation_water(
-                building_id=self.building_id,
+                site_id=self.site_id,
                 simulated_hour=simulated_hour,
                 occupancy_data=occupancy_data,
                 cloud_cover_pct=getattr(self, "_current_cloud_cover", 0.0),
@@ -540,14 +540,12 @@ class ThermalSimulationEngine:
     async def _load_zone_metadata(self) -> None:
         """Load zone configuration (setpoint, occupancy, fan speed) from database."""
         try:
-            # Resolve building code to UUID if needed (hvac_zones.building_id is UUID)
-            building_uuid = self.building_id
+            # Resolve building code to UUID if needed (hvac_zones.site_id is UUID)
+            site_uuid = self.site_id
             try:
-                bldg = (
-                    self.supabase.table("buildings").select("id").eq("code", self.building_id).maybe_single().execute()
-                )
+                bldg = self.supabase.table("sites").select("id").eq("code", self.site_id).maybe_single().execute()
                 if bldg and bldg.data:
-                    building_uuid = bldg.data["id"]
+                    site_uuid = bldg.data["id"]
             except Exception:
                 pass  # Fall through with original value
 
@@ -558,7 +556,7 @@ class ThermalSimulationEngine:
                     "area_sqm, setpoint, heating_setpoint, cooling_setpoint, "
                     "fan_speed, status, fcu_id"
                 )
-                .eq("building_id", building_uuid)
+                .eq("site_id", site_uuid)
                 .execute()
             )
 
@@ -587,7 +585,7 @@ class ThermalSimulationEngine:
             if self.CONSIDER_EQUIPMENT_HEALTH:
                 await self._load_equipment_health()
 
-            logger.info(f"[THERMAL] Loaded metadata for {len(self._zone_cache)} zones in {self.building_id}")
+            logger.info(f"[THERMAL] Loaded metadata for {len(self._zone_cache)} zones in {self.site_id}")
         except Exception as e:
             logger.error(f"[THERMAL] Failed to load zone metadata: {e}", exc_info=True)
 
@@ -605,14 +603,12 @@ class ThermalSimulationEngine:
         - <50% = Significant performance loss
         """
         try:
-            # Resolve building code to UUID if needed (equipment.building_id is UUID)
-            building_uuid = self.building_id
+            # Resolve building code to UUID if needed (equipment.site_id is UUID)
+            site_uuid = self.site_id
             try:
-                bldg = (
-                    self.supabase.table("buildings").select("id").eq("code", self.building_id).maybe_single().execute()
-                )
+                bldg = self.supabase.table("sites").select("id").eq("code", self.site_id).maybe_single().execute()
                 if bldg and bldg.data:
-                    building_uuid = bldg.data["id"]
+                    site_uuid = bldg.data["id"]
             except Exception:
                 pass
 
@@ -620,7 +616,7 @@ class ThermalSimulationEngine:
             response = (
                 self.supabase.table("equipment")
                 .select("id, code, type, health_score")
-                .eq("building_id", building_uuid)
+                .eq("site_id", site_uuid)
                 .in_("type", ["FCU", "AHU", "CHILLER", "VAV", "fcu", "ahu", "chiller", "vav"])
                 .execute()
             )
@@ -897,7 +893,7 @@ class ThermalSimulationEngine:
                 # After writing daily cost summary, run validation engines
                 try:
                     # A.3: Validate power meter readings against baseline
-                    pmv_engine = get_power_meter_validation_engine(self.building_id)
+                    pmv_engine = get_power_meter_validation_engine(self.site_id)
                     validation_result = await pmv_engine.validate_daily_power(
                         simulated_date=simulated_date,
                         hourly_power_data=self._daily_hourly_power,
@@ -912,7 +908,7 @@ class ThermalSimulationEngine:
 
                 try:
                     # A.4: Validate cost against expected (monthly boundary check)
-                    cv_engine = get_cost_validation_engine(self.building_id)
+                    cv_engine = get_cost_validation_engine(self.site_id)
                     cost_validation = await cv_engine.validate_daily_cost(
                         simulated_date=simulated_date,
                         daily_cost=daily_cost,
@@ -933,27 +929,27 @@ class ThermalSimulationEngine:
 _thermal_engines: Dict[str, ThermalSimulationEngine] = {}
 
 
-def get_thermal_engine(building_id: str, consider_equipment_health: bool = False) -> ThermalSimulationEngine:
+def get_thermal_engine(site_id: str, consider_equipment_health: bool = False) -> ThermalSimulationEngine:
     """
     Get or create thermal engine for building.
 
     Args:
-        building_id: Building identifier
+        site_id: Building identifier
         consider_equipment_health: If True, HVAC response degrades with equipment health
                                   Set to True for maintenance/fault simulations
                                   Default False for normal simulations
     """
     # Create new engine if needed or if health consideration changes
-    if building_id not in _thermal_engines:
-        _thermal_engines[building_id] = ThermalSimulationEngine(
-            building_id, consider_equipment_health=consider_equipment_health
+    if site_id not in _thermal_engines:
+        _thermal_engines[site_id] = ThermalSimulationEngine(
+            site_id, consider_equipment_health=consider_equipment_health
         )
 
-    return _thermal_engines[building_id]
+    return _thermal_engines[site_id]
 
 
 async def update_simulation_temperatures(
-    building_id: str,
+    site_id: str,
     simulated_hour: int,
     occupancy_data: Dict[str, float],
     ambient_temp: float,
@@ -965,7 +961,7 @@ async def update_simulation_temperatures(
     Public API to update zone temperatures during simulation.
 
     Args:
-        building_id: Building ID
+        site_id: Building ID
         simulated_hour: Hour (0-23)
         occupancy_data: Zone occupancy percentages
         ambient_temp: Ambient temperature
@@ -980,7 +976,7 @@ async def update_simulation_temperatures(
 
         # Normal simulation (equipment healthy):
         temps = await update_simulation_temperatures(
-            building_id=self.building_id,
+            site_id=self.site_id,
             simulated_hour=hour,
             occupancy_data={"Zone-001": 75, "Zone-101": 50, ...},
             ambient_temp=18.5,
@@ -990,7 +986,7 @@ async def update_simulation_temperatures(
 
         # Maintenance/Fault simulation (equipment can degrade):
         temps = await update_simulation_temperatures(
-            building_id=self.building_id,
+            site_id=self.site_id,
             simulated_hour=hour,
             occupancy_data=occupancy_data,
             ambient_temp=ambient_temp,
@@ -998,7 +994,7 @@ async def update_simulation_temperatures(
             consider_equipment_health=True  # Enable health degradation
         )
     """
-    engine = get_thermal_engine(building_id, consider_equipment_health=consider_equipment_health)
+    engine = get_thermal_engine(site_id, consider_equipment_health=consider_equipment_health)
     return await engine.update_zone_temperatures(
         simulated_hour=simulated_hour,
         occupancy_data=occupancy_data,

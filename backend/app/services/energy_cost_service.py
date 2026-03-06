@@ -58,8 +58,8 @@ class HourlyCost:
 class EnergyCostService:
     """Calculate energy costs from simulated power consumption."""
 
-    def __init__(self, building_id: str | None = None, municipality: str = "City Power Johannesburg"):
-        self.building_id = building_id or get_primary_site() or "unknown"
+    def __init__(self, site_id: str | None = None, municipality: str = "City Power Johannesburg"):
+        self.site_id = site_id or get_primary_site() or "unknown"
         self.municipality = municipality
         self.supabase = get_supabase_client()
         self.tariff_svc = TariffScheduleService()
@@ -301,7 +301,7 @@ class EnergyCostService:
         """
         try:
             record = {
-                "building_id": self.building_id,
+                "site_id": self.site_id,
                 "date": simulated_date.isoformat()[:10],  # YYYY-MM-DD
                 "simulated_date": simulated_date.isoformat(),
                 "total_energy_kwh": daily_cost["total_energy_kwh"],
@@ -316,7 +316,7 @@ class EnergyCostService:
             }
 
             # Upsert into energy_cost_summary table
-            self.supabase.table("energy_cost_summary").upsert(record, on_conflict="building_id,date").execute()
+            self.supabase.table("energy_cost_summary").upsert(record, on_conflict="site_id,date").execute()
 
             logger.debug(
                 f"[COST] Daily cost recorded for {simulated_date.date()}: "
@@ -330,7 +330,7 @@ class EnergyCostService:
 
     async def get_monthly_summary(
         self,
-        building_id: str,
+        site_id: str,
         year: int,
         month: int,
     ) -> Dict[str, Any]:
@@ -341,7 +341,7 @@ class EnergyCostService:
         """
         try:
             # Query energy_cost_summary for the month
-            response = self.supabase.table("energy_cost_summary").select("*").eq("building_id", building_id).execute()
+            response = self.supabase.table("energy_cost_summary").select("*").eq("site_id", site_id).execute()
 
             if not response.data:
                 return {"days": 0, "total_energy_kwh": 0, "total_cost_r": 0}

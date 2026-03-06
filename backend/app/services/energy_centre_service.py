@@ -44,7 +44,7 @@ class EnergyCentreService:
     def _load_mock_data(self):
         """Load energy centre data from JSON."""
         data_paths = [
-            Path(__file__).parent.parent / "data" / "buildings" / "sandton" / "energy_centre.json",
+            Path(__file__).parent.parent / "data" / "sites" / "sandton" / "energy_centre.json",
         ]
 
         for data_path in data_paths:

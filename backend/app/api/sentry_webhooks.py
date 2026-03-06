@@ -195,7 +195,7 @@ async def notify_technician_of_work_order(
     Request body:
         - work_order_id: UUID
         - equipment_id: UUID
-        - building_id: UUID
+        - site_id: UUID
         - equipment_name: str
         - criticality: str (HIGH/MEDIUM/LOW)
         - service_type: str (minor/major/breakdown/callout)
@@ -213,7 +213,7 @@ async def notify_technician_of_work_order(
     required_fields = [
         "work_order_id",
         "equipment_id",
-        "building_id",
+        "site_id",
         "equipment_name",
         "service_type",
         "technician_id",
@@ -570,7 +570,7 @@ async def get_pending_work_orders(
                     "technician_id": sr.get("technician_id"),
                     "technician_name": sr.get("technician_name"),
                     "equipment_id": sr.get("equipment_id"),
-                    "building_id": sr.get("building_id"),
+                    "site_id": sr.get("site_id"),
                     "service_type": sr.get("service_type"),
                     "created_at": sr.get("created_at"),
                 }
@@ -905,6 +905,7 @@ class SentryWorkOrderRequest(BaseModel):
     priority: str = Field("medium", description="low, medium, high, urgent, critical")
     created_by: str = Field("SENTINEL", description="Creator identifier")
     telegram_user_id: Optional[str] = Field(None, description="Telegram user ID for audit provenance")
+    assigned_to: Optional[str] = Field(None, description="Override auto-assignment: technician name")
 
 
 @router.post("/create-work-order", status_code=status.HTTP_200_OK)
@@ -926,8 +927,25 @@ async def sentry_create_work_order(
         wo_repo = get_work_order_repository()
         tech_repo = get_technician_repository()
 
-        # Get technician for this equipment
-        tech = await tech_repo.get_technician_for_equipment_code(req.equipment_code)
+        tech = None
+        if req.assigned_to:
+            # Manual override: look up technician by name
+            all_techs = await tech_repo.get_all_technicians(active_only=True)
+            needle = req.assigned_to.strip().lower()
+            tech = next(
+                (t for t in all_techs if t.get("name", "").lower() == needle),
+                None,
+            )
+            if not tech:
+                # Fuzzy: partial match
+                tech = next(
+                    (t for t in all_techs if needle in t.get("name", "").lower()),
+                    None,
+                )
+
+        if not tech:
+            # Auto-assign by equipment specialty
+            tech = await tech_repo.get_technician_for_equipment_code(req.equipment_code)
 
         # Build provenance: include Telegram user_id when available
         who = req.created_by
@@ -1066,14 +1084,14 @@ async def sentry_call_log(
 
             sb = get_supabase_client()
             if sb:
-                # Get building_id from site code
-                bld = sb.table("buildings").select("id").eq("code", req.site_id).execute()
+                # Get site_id from site code
+                bld = sb.table("sites").select("id").eq("code", req.site_id).execute()
                 if bld.data:
-                    building_id = bld.data[0]["id"]
+                    site_id = bld.data[0]["id"]
                     tech_result = (
                         sb.table("site_technicians")
                         .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                        .eq("building_id", building_id)
+                        .eq("site_id", site_id)
                         .eq("specialty", req.specialty)
                         .eq("is_primary", True)
                         .execute()
@@ -1086,7 +1104,7 @@ async def sentry_call_log(
                         tech_result = (
                             sb.table("site_technicians")
                             .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                            .eq("building_id", building_id)
+                            .eq("site_id", site_id)
                             .eq("specialty", "general")
                             .eq("is_primary", True)
                             .execute()
@@ -1136,7 +1154,7 @@ async def sentry_call_log(
                     work_order_id=wo_code,
                     equipment_id=f"ZONE-{req.zone_id}" if req.zone_id else req.site_id,
                     equipment_name=req.title,
-                    building_id=req.site_id,
+                    site_id=req.site_id,
                     technician_id=tech.get("telegram_id"),
                     technician_name=tech.get("name"),
                     service_type="callout",

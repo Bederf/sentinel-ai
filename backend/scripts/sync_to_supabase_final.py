@@ -26,10 +26,10 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
-def get_building_uuid(client, building_code: str) -> Optional[str]:
+def get_site_uuid(client, site_code: str) -> Optional[str]:
     """Get building UUID from building code."""
     try:
-        response = client.table("buildings").select("id").eq("code", building_code).execute()
+        response = client.table("sites").select("id").eq("code", site_code).execute()
         if response.data:
             return response.data[0]["id"]
     except Exception as e:
@@ -37,29 +37,29 @@ def get_building_uuid(client, building_code: str) -> Optional[str]:
     return None
 
 
-def load_zones_json(building_code: str) -> List[Dict]:
+def load_zones_json(site_code: str) -> List[Dict]:
     """Load zones from corrected zones.json."""
-    path = Path(__file__).parent.parent / "app/data/buildings" / building_code / "zones.json"
+    path = Path(__file__).parent.parent / "app/data/buildings" / site_code / "zones.json"
     with open(path) as f:
         data = json.load(f)
     return data.get("zones", [])
 
 
-def load_desks_json(building_code: str) -> List[Dict]:
+def load_desks_json(site_code: str) -> List[Dict]:
     """Load desks from corrected desks.json."""
-    path = Path(__file__).parent.parent / "app/data/buildings" / building_code / "desks.json"
+    path = Path(__file__).parent.parent / "app/data/buildings" / site_code / "desks.json"
     with open(path) as f:
         return json.load(f)
 
 
-def prepare_zones(zones: List[Dict], building_id: str) -> List[Dict]:
+def prepare_zones(zones: List[Dict], site_id: str) -> List[Dict]:
     """Prepare zones for Supabase insert."""
     result = []
     for zone in zones:
         result.append(
             {
                 "id": str(uuid.uuid4()),
-                "building_id": building_id,
+                "site_id": site_id,
                 "zone_id": zone["zone_id"],
                 "zone_name": zone.get("zone_name", zone["zone_id"]),
                 "floor": zone["floor"],
@@ -72,14 +72,14 @@ def prepare_zones(zones: List[Dict], building_id: str) -> List[Dict]:
     return result
 
 
-def prepare_desks(desks: List[Dict], building_id: str) -> List[Dict]:
+def prepare_desks(desks: List[Dict], site_id: str) -> List[Dict]:
     """Prepare desks for Supabase insert."""
     result = []
     for desk in desks:
         result.append(
             {
                 "desk_id": desk["desk_id"],
-                "building_id": building_id,
+                "site_id": site_id,
                 "floor": desk["floor"],
                 "zone_id": desk["zone_id"],
                 "context": desk.get("context", "open_plan"),
@@ -91,9 +91,9 @@ def prepare_desks(desks: List[Dict], building_id: str) -> List[Dict]:
     return result
 
 
-def sync_to_supabase(building_code: str, dry_run: bool = False):
+def sync_to_supabase(site_code: str, dry_run: bool = False):
     """Main sync function."""
-    print(f"🚀 Syncing zones and desks for {building_code}")
+    print(f"🚀 Syncing zones and desks for {site_code}")
 
     # Check for Supabase credentials
     supabase_url = os.getenv("SUPABASE_URL")
@@ -118,24 +118,24 @@ def sync_to_supabase(building_code: str, dry_run: bool = False):
     client = get_supabase_client()
 
     # Get building UUID
-    print(f"\n📍 Looking up building {building_code}...")
-    building_id = get_building_uuid(client, building_code)
-    if not building_id:
-        print(f"  ✗ Building {building_code} not found in Supabase")
+    print(f"\n📍 Looking up building {site_code}...")
+    site_id = get_site_uuid(client, site_code)
+    if not site_id:
+        print(f"  ✗ Building {site_code} not found in Supabase")
         return False
-    print(f"  ✓ Found building ID: {building_id}")
+    print(f"  ✓ Found building ID: {site_id}")
 
     # Load JSON data
     print("\n📂 Loading data files...")
-    zones = load_zones_json(building_code)
-    desks = load_desks_json(building_code)
+    zones = load_zones_json(site_code)
+    desks = load_desks_json(site_code)
     print(f"  ✓ Loaded {len(zones)} zones")
     print(f"  ✓ Loaded {len(desks)} desks (with corrected floors L0, L1, L2)")
 
     # Prepare data
     print("\n📋 Preparing records...")
-    zones_prepared = prepare_zones(zones, building_id)
-    desks_prepared = prepare_desks(desks, building_id)
+    zones_prepared = prepare_zones(zones, site_id)
+    desks_prepared = prepare_desks(desks, site_id)
     print(f"  ✓ {len(zones_prepared)} zone records ready")
     print(f"  ✓ {len(desks_prepared)} desk records ready")
 
@@ -150,7 +150,7 @@ def sync_to_supabase(building_code: str, dry_run: bool = False):
         print("\n📤 Syncing to Supabase...")
 
         print(f"   Upserting {len(zones_prepared)} zones...")
-        response = client.table("zones").upsert(zones_prepared, on_conflict="building_id,zone_id").execute()
+        response = client.table("zones").upsert(zones_prepared, on_conflict="site_id,zone_id").execute()
         zones_synced = len(response.data) if response.data else 0
         print(f"   ✓ {zones_synced} zones synced")
 

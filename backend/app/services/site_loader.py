@@ -23,8 +23,8 @@ Structure:
         └── ...
 
 Usage:
-    loader = get_building_loader()
-    building = loader.get_building("sandton")
+    loader = get_site_loader()
+    building = loader.get_site("sandton")
     desks = loader.get_desks("sandton")
     all_desks = loader.get_all_desks()  # Merged from all active buildings
 """
@@ -95,12 +95,12 @@ class BuildingDataLoader:
 
     def __init__(self, data_path: Optional[Path] = None):
         self._data_path = data_path or Path(__file__).parent.parent / "data"
-        self._buildings_path = self._data_path / "buildings"
+        self._buildings_path = self._data_path / "sites"
         self._registry: Dict[str, Any] = {}
         self._buildings: Dict[str, Building] = {}
-        self._desks: Dict[str, List[dict]] = {}  # building_id -> desks
-        self._zones: Dict[str, List[dict]] = {}  # building_id -> zones
-        self._devices: Dict[str, List[dict]] = {}  # building_id -> devices
+        self._desks: Dict[str, List[dict]] = {}  # site_id -> desks
+        self._zones: Dict[str, List[dict]] = {}  # site_id -> zones
+        self._devices: Dict[str, List[dict]] = {}  # site_id -> devices
         self._loaded = False
 
     def _load_registry(self) -> Dict[str, Any]:
@@ -109,21 +109,21 @@ class BuildingDataLoader:
         if registry_path.exists():
             with open(registry_path) as f:
                 return json.load(f)
-        return {"active_buildings": [], "default_building": None}
+        return {"active_sites": [], "default_building": None}
 
-    def _load_building(self, building_id: str) -> Optional[Building]:
+    def _load_building(self, site_id: str) -> Optional[Building]:
         """Load a single building's metadata."""
-        building_path = self._buildings_path / building_id / "building.json"
-        if building_path.exists():
-            with open(building_path) as f:
+        site_path = self._buildings_path / site_id / "building.json"
+        if site_path.exists():
+            with open(site_path) as f:
                 data = json.load(f)
-                data["id"] = building_id  # Ensure ID matches folder
+                data["id"] = site_id  # Ensure ID matches folder
                 return Building.from_dict(data)
         return None
 
-    def _load_building_data(self, building_id: str, filename: str) -> List[dict]:
+    def _load_site_data(self, site_id: str, filename: str) -> List[dict]:
         """Load a data file for a building (desks, zones, devices)."""
-        file_path = self._buildings_path / building_id / filename
+        file_path = self._buildings_path / site_id / filename
         if file_path.exists():
             with open(file_path) as f:
                 data = json.load(f)
@@ -144,10 +144,10 @@ class BuildingDataLoader:
                 if not isinstance(data, list):
                     return []
 
-                # Add building_id to each record
+                # Add site_id to each record
                 for record in data:
                     if isinstance(record, dict):
-                        record["building_id"] = building_id
+                        record["site_id"] = site_id
                 return data
         return []
 
@@ -157,29 +157,29 @@ class BuildingDataLoader:
             return
 
         self._registry = self._load_registry()
-        active_buildings = self._registry.get("active_buildings", [])
+        active_sites = self._registry.get("active_sites", [])
 
-        logger.info(f"Loading {len(active_buildings)} buildings from registry")
+        logger.info(f"Loading {len(active_sites)} buildings from registry")
 
-        for building_id in active_buildings:
+        for site_id in active_sites:
             # Load building metadata
-            building = self._load_building(building_id)
+            building = self._load_building(site_id)
             if building:
-                self._buildings[building_id] = building
-                logger.info(f"Loaded building: {building.name} ({building_id})")
+                self._buildings[site_id] = building
+                logger.info(f"Loaded building: {building.name} ({site_id})")
 
                 # Load building data
-                self._desks[building_id] = self._load_building_data(building_id, "desks.json")
-                self._zones[building_id] = self._load_building_data(building_id, "zones.json")
-                self._devices[building_id] = self._load_building_data(building_id, "devices.json")
+                self._desks[site_id] = self._load_site_data(site_id, "desks.json")
+                self._zones[site_id] = self._load_site_data(site_id, "zones.json")
+                self._devices[site_id] = self._load_site_data(site_id, "devices.json")
 
                 logger.info(
-                    f"  - {len(self._desks[building_id])} desks, "
-                    f"{len(self._zones[building_id])} zones, "
-                    f"{len(self._devices[building_id])} devices"
+                    f"  - {len(self._desks[site_id])} desks, "
+                    f"{len(self._zones[site_id])} zones, "
+                    f"{len(self._devices[site_id])} devices"
                 )
             else:
-                logger.warning(f"Building '{building_id}' in registry but not found")
+                logger.warning(f"Building '{site_id}' in registry but not found")
 
         # Fallback: Load from flat files if no modular data
         if not self._buildings:
@@ -205,7 +205,7 @@ class BuildingDataLoader:
             with open(desks_path) as f:
                 desks = json.load(f)
                 for desk in desks:
-                    desk["building_id"] = default_id
+                    desk["site_id"] = default_id
                 self._desks[default_id] = desks
 
         # Load zones
@@ -214,7 +214,7 @@ class BuildingDataLoader:
             with open(zones_path) as f:
                 zones = json.load(f)
                 for zone in zones:
-                    zone["building_id"] = default_id
+                    zone["site_id"] = default_id
                 self._zones[default_id] = zones
 
     def get_registry(self) -> Dict[str, Any]:
@@ -222,27 +222,27 @@ class BuildingDataLoader:
         self.load()
         return self._registry
 
-    def get_default_building_id(self) -> Optional[str]:
+    def get_default_site_id(self) -> Optional[str]:
         """Get the default building ID."""
         self.load()
         return self._registry.get("default_building")
 
-    def get_active_building_ids(self) -> List[str]:
+    def get_active_site_ids(self) -> List[str]:
         """Get list of active building IDs."""
         self.load()
-        return self._registry.get("active_buildings", [])
+        return self._registry.get("active_sites", [])
 
-    def get_building(self, building_id: str) -> Optional[Building]:
+    def get_site(self, site_id: str) -> Optional[Building]:
         """Get a building by ID."""
         self.load()
-        return self._buildings.get(building_id)
+        return self._buildings.get(site_id)
 
-    def get_all_buildings(self) -> List[Building]:
+    def get_all_sites(self) -> List[Building]:
         """Get all active buildings."""
         self.load()
         return list(self._buildings.values())
 
-    def get_desks(self, building_id: str) -> List[dict]:
+    def get_desks(self, site_id: str) -> List[dict]:
         """Get desks for a building.
 
         Tries Supabase first, then falls back to JSON files.
@@ -255,10 +255,10 @@ class BuildingDataLoader:
                 from app.database.repositories import DeskRepository
 
                 repo = DeskRepository()
-                supabase_desks = repo.get_by_building_code(building_id)
+                supabase_desks = repo.get_by_site_code(site_id)
                 if supabase_desks and isinstance(supabase_desks, list):
                     # Add building name to each desk (ensure each item is a dict)
-                    building = self._buildings.get(building_id)
+                    building = self._buildings.get(site_id)
                     desks_with_building = []
                     for desk in supabase_desks:
                         if isinstance(desk, dict):
@@ -269,15 +269,15 @@ class BuildingDataLoader:
                         else:
                             logger.warning(f"Skipping non-dict desk record: {type(desk).__name__}")
                     if desks_with_building:
-                        logger.debug(f"Loaded {len(desks_with_building)} desks from Supabase for {building_id}")
+                        logger.debug(f"Loaded {len(desks_with_building)} desks from Supabase for {site_id}")
                         return desks_with_building
             except Exception as e:
                 logger.debug(f"Supabase desk query failed, using JSON: {e}")
 
         # Fall back to JSON
-        desks = self._desks.get(building_id, [])
+        desks = self._desks.get(site_id, [])
         # Add building name to each desk for display
-        building = self._buildings.get(building_id)
+        building = self._buildings.get(site_id)
         desks_with_building = []
         for desk in desks:
             if isinstance(desk, dict):
@@ -291,11 +291,11 @@ class BuildingDataLoader:
         """Get all desks across all active buildings."""
         self.load()
         all_desks = []
-        for building_id in self._buildings:
-            all_desks.extend(self.get_desks(building_id))
+        for site_id in self._buildings:
+            all_desks.extend(self.get_desks(site_id))
         return all_desks
 
-    def get_zones(self, building_id: str) -> List[dict]:
+    def get_zones(self, site_id: str) -> List[dict]:
         """Get zones for a building (from zones table, not hvac_zones).
 
         Tries Supabase first, then falls back to JSON files.
@@ -309,13 +309,13 @@ class BuildingDataLoader:
                 from app.database.repositories import ZoneRepository
 
                 repo = ZoneRepository()
-                supabase_zones = repo.get_by_building(
+                supabase_zones = repo.get_by_site(
                     # Get building UUID from building code
-                    self._get_building_uuid(building_id)
+                    self._get_site_uuid(site_id)
                 )
                 if supabase_zones and isinstance(supabase_zones, list):
                     # Add building name to each zone (ensure each item is a dict)
-                    building = self._buildings.get(building_id)
+                    building = self._buildings.get(site_id)
                     zones_with_building = []
                     for zone in supabase_zones:
                         if isinstance(zone, dict):
@@ -326,16 +326,14 @@ class BuildingDataLoader:
                         else:
                             logger.warning(f"Skipping non-dict zone record: {type(zone).__name__}")
                     if zones_with_building:
-                        logger.debug(
-                            f"Loaded {len(zones_with_building)} zones from Supabase zones table for {building_id}"
-                        )
+                        logger.debug(f"Loaded {len(zones_with_building)} zones from Supabase zones table for {site_id}")
                         return zones_with_building
             except Exception as e:
                 logger.debug(f"Supabase zone query failed, using JSON: {e}")
 
         # Fall back to JSON
-        zones = self._zones.get(building_id, [])
-        building = self._buildings.get(building_id)
+        zones = self._zones.get(site_id, [])
+        building = self._buildings.get(site_id)
         zones_with_building = []
         for zone in zones:
             if isinstance(zone, dict):
@@ -345,11 +343,11 @@ class BuildingDataLoader:
                 zones_with_building.append(zone_copy)
         return zones_with_building
 
-    def _get_building_uuid(self, building_id: str) -> Optional[str]:
+    def _get_site_uuid(self, site_id: str) -> Optional[str]:
         """Get building UUID from building ID using Supabase.
 
         Args:
-            building_id: Building code (e.g., 'sandton')
+            site_id: Building code (e.g., 'sandton')
 
         Returns:
             Building UUID or None
@@ -361,35 +359,35 @@ class BuildingDataLoader:
             from app.database.supabase_client import get_supabase_client
 
             client = get_supabase_client()
-            response = client.table("buildings").select("id").eq("code", building_id).execute()
+            response = client.table("sites").select("id").eq("code", site_id).execute()
             if response.data:
                 return response.data[0]["id"]
         except Exception as e:
-            logger.debug(f"Failed to get building UUID for {building_id}: {e}")
+            logger.debug(f"Failed to get building UUID for {site_id}: {e}")
         return None
 
     def get_all_zones(self) -> List[dict]:
         """Get all zones across all active buildings."""
         self.load()
         all_zones = []
-        for building_id in self._buildings:
-            all_zones.extend(self.get_zones(building_id))
+        for site_id in self._buildings:
+            all_zones.extend(self.get_zones(site_id))
         return all_zones
 
-    def get_devices(self, building_id: str) -> List[dict]:
+    def get_devices(self, site_id: str) -> List[dict]:
         """Get devices for a building."""
         self.load()
-        return self._devices.get(building_id, [])
+        return self._devices.get(site_id, [])
 
     def get_all_devices(self) -> List[dict]:
         """Get all devices across all active buildings."""
         self.load()
         all_devices = []
-        for building_id in self._buildings:
-            all_devices.extend(self.get_devices(building_id))
+        for site_id in self._buildings:
+            all_devices.extend(self.get_devices(site_id))
         return all_devices
 
-    def find_desk(self, desk_id: str, building_id: Optional[str] = None) -> Optional[dict]:
+    def find_desk(self, desk_id: str, site_id: Optional[str] = None) -> Optional[dict]:
         """Find a desk by ID, optionally filtered by building.
 
         Tries Supabase first, then falls back to JSON files.
@@ -402,14 +400,14 @@ class BuildingDataLoader:
                 from app.database.repositories import DeskRepository
 
                 repo = DeskRepository()
-                desk = repo.find_desk(desk_id, building_id)
+                desk = repo.find_desk(desk_id, site_id)
                 if desk:
                     # Add building name
-                    bid = desk.get("building_id")
+                    bid = desk.get("site_id")
                     if bid:
                         # Look up building name from our cache
                         for b_id, building in self._buildings.items():
-                            if b_id == building_id or building_id is None:
+                            if b_id == site_id or site_id is None:
                                 desk["building"] = building.name
                                 break
                     logger.debug(f"Found desk {desk_id} in Supabase")
@@ -422,7 +420,7 @@ class BuildingDataLoader:
         normalized = normalized.replace("desk ", "").strip()
 
         # Search in specific building or all buildings
-        buildings_to_search = [building_id] if building_id else list(self._buildings.keys())
+        buildings_to_search = [site_id] if site_id else list(self._buildings.keys())
 
         for bid in buildings_to_search:
             for desk in self.get_desks(bid):
@@ -434,7 +432,7 @@ class BuildingDataLoader:
 
         return None
 
-    def find_zone(self, zone_id: str, building_id: Optional[str] = None) -> Optional[dict]:
+    def find_zone(self, zone_id: str, site_id: Optional[str] = None) -> Optional[dict]:
         """Find a zone by ID, optionally filtered by building.
 
         Tries Supabase first, then falls back to JSON files.
@@ -451,7 +449,7 @@ class BuildingDataLoader:
                 if zone:
                     # Add building name
                     for b_id, building in self._buildings.items():
-                        if b_id == building_id or building_id is None:
+                        if b_id == site_id or site_id is None:
                             zone["building"] = building.name
                             break
                     logger.debug(f"Found zone {zone_id} in Supabase")
@@ -460,7 +458,7 @@ class BuildingDataLoader:
                 logger.debug(f"Supabase zone find failed, using JSON: {e}")
 
         # Fall back to JSON
-        buildings_to_search = [building_id] if building_id else list(self._buildings.keys())
+        buildings_to_search = [site_id] if site_id else list(self._buildings.keys())
 
         for bid in buildings_to_search:
             for zone in self.get_zones(bid):
@@ -474,7 +472,7 @@ class BuildingDataLoader:
 _loader: Optional[BuildingDataLoader] = None
 
 
-def get_building_loader() -> BuildingDataLoader:
+def get_site_loader() -> BuildingDataLoader:
     """Get singleton BuildingDataLoader instance."""
     global _loader
     if _loader is None:

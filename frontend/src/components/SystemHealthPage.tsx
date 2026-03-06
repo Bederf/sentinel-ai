@@ -11,14 +11,14 @@
 import { useState, useEffect } from 'react';
 import { useServerEvents } from '@/hooks/useServerEvents';
 import {
+  Card,
+  Metric,
   TabGroup,
   TabList,
   Tab,
   TabPanels,
   TabPanel,
-  Card,
   Text,
-  Metric,
   ProgressBar,
   LineChart,
   BarChart,
@@ -222,7 +222,7 @@ export default function SystemHealthPage() {
             {currentHealth && (
               <>
                 {/* Overall Health Card */}
-                <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                   <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div className="space-y-2">
                       <p
@@ -273,7 +273,7 @@ export default function SystemHealthPage() {
                 </Card>
 
                 {/* Integration Status */}
-                <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                   <div className="flex items-start justify-between">
                     <div>
                       <p
@@ -349,7 +349,7 @@ export default function SystemHealthPage() {
                         device_manager: "Device Manager",
                       };
                       return (
-                        <Card key={key} className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                        <Card key={key} className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
@@ -384,28 +384,28 @@ export default function SystemHealthPage() {
               <>
                 {/* Uptime Metrics */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                  <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                     <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Average Health Score</Text>
                     <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{history.metrics?.avg_score || 0}</Metric>
                   </Card>
-                  <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                  <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                     <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Uptime ({history.range})</Text>
                     <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>
                       {history.metrics?.uptime_percentage || 0}%
                     </Metric>
                   </Card>
-                  <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                  <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                     <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Min Score</Text>
                     <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{history.metrics?.min_score || 0}</Metric>
                   </Card>
-                  <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                  <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                     <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Max Score</Text>
                     <Metric style={{ color: "var(--color-sentinel-text-primary)" }}>{history.metrics?.max_score || 0}</Metric>
                   </Card>
                 </div>
 
                 {/* Trend Analysis */}
-                <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                   <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Trend</Text>
                   <div className="flex items-center gap-2 mt-2">
                     {history.metrics?.trend === 'improving' && (
@@ -431,7 +431,7 @@ export default function SystemHealthPage() {
 
                 {/* Health Score Chart */}
                 {history.snapshots && history.snapshots.length > 0 && (
-                  <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+                  <Card className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                     <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>Health Score Trend</Text>
                     <LineChart
                       className="mt-6"

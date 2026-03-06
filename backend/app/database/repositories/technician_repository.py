@@ -152,8 +152,8 @@ class TechnicianRepository:
             return None
 
         try:
-            # First get equipment ID and building_id from code
-            eq_result = self.client.table("equipment").select("id, building_id").eq("code", equipment_code).execute()
+            # First get equipment ID and site_id from code
+            eq_result = self.client.table("equipment").select("id, site_id").eq("code", equipment_code).execute()
 
             if not eq_result.data or len(eq_result.data) == 0:
                 logger.warning(f"Equipment not found: {equipment_code}")
@@ -161,7 +161,7 @@ class TechnicianRepository:
 
             equipment = eq_result.data[0]
             _equipment_id = equipment["id"]
-            building_id = equipment["building_id"]
+            site_id = equipment["site_id"]
 
             # Parse code to determine specialty (supports both site-002 and site-005 formats)
             specialty = self._parse_specialty_from_code(equipment_code)
@@ -171,7 +171,7 @@ class TechnicianRepository:
             result = (
                 self.client.table("site_technicians")
                 .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                .eq("building_id", building_id)
+                .eq("site_id", site_id)
                 .eq("specialty", specialty)
                 .eq("is_primary", True)
                 .execute()
@@ -205,7 +205,7 @@ class TechnicianRepository:
                 result = (
                     self.client.table("site_technicians")
                     .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                    .eq("building_id", building_id)
+                    .eq("site_id", site_id)
                     .eq("specialty", "general")
                     .eq("is_primary", True)
                     .execute()
@@ -246,7 +246,7 @@ class TechnicianRepository:
             logger.error(f"Error getting technicians: {e}")
             return []
 
-    async def get_site_assignments(self, building_id: str) -> List[Dict[str, Any]]:
+    async def get_site_assignments(self, site_id: str) -> List[Dict[str, Any]]:
         """Get all technician assignments for a site."""
         if not self.client:
             return []
@@ -255,7 +255,7 @@ class TechnicianRepository:
             result = (
                 self.client.table("site_technicians")
                 .select("*, technicians(id, code, name, email, phone)")
-                .eq("building_id", building_id)
+                .eq("site_id", site_id)
                 .execute()
             )
 

@@ -9,7 +9,7 @@ import pytest
 from app.models.load_forecast import LoadForecast, LoadInterval
 from app.services.load_forecast_service import (
     LoadForecastService,
-    _simulated_building_load,
+    _simulated_site_load,
     _synthetic_solar_kw,
     _SEASONAL_TEMPS,
 )
@@ -38,30 +38,30 @@ class TestSimulatedBuildingLoad:
         import random
 
         rng = random.Random(42)
-        load = _simulated_building_load(2.0, rng)
+        load = _simulated_site_load(2.0, rng)
         assert 850 <= load <= 950, f"Overnight load should be ~900 kW, got {load}"
 
     def test_morning_ramp(self):
         import random
 
         rng = random.Random(42)
-        load_6am = _simulated_building_load(6.5, rng)
-        load_3am = _simulated_building_load(3.0, rng)
+        load_6am = _simulated_site_load(6.5, rng)
+        load_3am = _simulated_site_load(3.0, rng)
         assert load_6am > load_3am, "Morning ramp should increase load"
 
     def test_afternoon_peak(self):
         import random
 
         rng = random.Random(42)
-        load = _simulated_building_load(14.5, rng)
+        load = _simulated_site_load(14.5, rng)
         assert 1700 <= load <= 1950, f"Afternoon peak should be ~1850 kW, got {load}"
 
     def test_evening_decline(self):
         import random
 
         rng = random.Random(42)
-        load_8pm = _simulated_building_load(20.0, rng)
-        load_2pm = _simulated_building_load(14.0, random.Random(42))
+        load_8pm = _simulated_site_load(20.0, rng)
+        load_2pm = _simulated_site_load(14.0, random.Random(42))
         assert load_8pm < load_2pm, "Evening load should be less than afternoon"
 
     def test_no_negative_loads(self):
@@ -69,7 +69,7 @@ class TestSimulatedBuildingLoad:
 
         for hour_int in range(96):
             hour = hour_int / 4.0
-            load = _simulated_building_load(hour, random.Random(hour_int))
+            load = _simulated_site_load(hour, random.Random(hour_int))
             assert load >= 0, f"Load at hour {hour} should not be negative"
 
     def test_reproducible_with_rng(self):
@@ -77,7 +77,7 @@ class TestSimulatedBuildingLoad:
 
         rng1 = random.Random(123)
         rng2 = random.Random(123)
-        assert _simulated_building_load(10.0, rng1) == _simulated_building_load(10.0, rng2)
+        assert _simulated_site_load(10.0, rng1) == _simulated_site_load(10.0, rng2)
 
 
 # ---------------------------------------------------------------------------

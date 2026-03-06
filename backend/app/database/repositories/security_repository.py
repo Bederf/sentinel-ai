@@ -64,7 +64,7 @@ class SecurityRepository:
     ) -> List[Dict[str, Any]]:
         """List access events for a site."""
         try:
-            query = self.client.table("access_events").select("*").eq("building_id", site)
+            query = self.client.table("access_events").select("*").eq("site_id", site)
 
             if location:
                 query = query.eq("location", location)
@@ -119,10 +119,10 @@ class SecurityRepository:
 
             # Backup
             backup = self._load_json_backup("access_events")
-            building_id = event.location.split("-")[0]
-            if building_id not in backup:
-                backup[building_id] = []
-            backup[building_id].append(record)
+            site_id = event.location.split("-")[0]
+            if site_id not in backup:
+                backup[site_id] = []
+            backup[site_id].append(record)
             self._save_json_backup("access_events", backup)
 
             return record
@@ -130,10 +130,10 @@ class SecurityRepository:
             logger.warning(f"Failed to create event in Supabase: {e}")
             # Fallback to JSON only
             backup = self._load_json_backup("access_events")
-            building_id = event.location.split("-")[0]
-            if building_id not in backup:
-                backup[building_id] = []
-            backup[building_id].append(event_data)
+            site_id = event.location.split("-")[0]
+            if site_id not in backup:
+                backup[site_id] = []
+            backup[site_id].append(event_data)
             self._save_json_backup("access_events", backup)
             return event_data
 
@@ -144,7 +144,7 @@ class SecurityRepository:
     def get_access_points(self, site: str) -> List[Dict[str, Any]]:
         """List all access points for a site."""
         try:
-            response = self.client.table("access_points").select("*").eq("building_id", site).execute()
+            response = self.client.table("access_points").select("*").eq("site_id", site).execute()
             points = response.data
 
             # Backup
@@ -243,7 +243,7 @@ class SecurityRepository:
     ) -> List[Dict[str, Any]]:
         """Get security alerts."""
         try:
-            query = self.client.table("security_alerts").select("*").eq("building_id", site)
+            query = self.client.table("security_alerts").select("*").eq("site_id", site)
 
             if severity:
                 query = query.eq("severity", severity)
@@ -278,10 +278,10 @@ class SecurityRepository:
 
             # Backup
             backup = self._load_json_backup("security_alerts")
-            building_id = alert.building_id
-            if building_id not in backup:
-                backup[building_id] = []
-            backup[building_id].append(record)
+            site_id = alert.site_id
+            if site_id not in backup:
+                backup[site_id] = []
+            backup[site_id].append(record)
             self._save_json_backup("security_alerts", backup)
 
             return record
@@ -289,10 +289,10 @@ class SecurityRepository:
             logger.warning(f"Failed to create alert in Supabase: {e}")
             # Fallback to JSON
             backup = self._load_json_backup("security_alerts")
-            building_id = alert.building_id
-            if building_id not in backup:
-                backup[building_id] = []
-            backup[building_id].append(alert_data)
+            site_id = alert.site_id
+            if site_id not in backup:
+                backup[site_id] = []
+            backup[site_id].append(alert_data)
             self._save_json_backup("security_alerts", backup)
             return alert_data
 
@@ -330,7 +330,7 @@ class SecurityRepository:
             response = (
                 self.client.table("access_events")
                 .select("*")
-                .eq("building_id", site)
+                .eq("site_id", site)
                 .gte("timestamp", thirty_min_ago)
                 .eq("status", AccessStatus.GRANTED)
                 .execute()

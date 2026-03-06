@@ -135,7 +135,7 @@ class TestResponseParsing:
 class TestValidation:
     def test_valid_result(self, agent, good_llm_response):
         parsed = json.loads(good_llm_response)
-        result = agent._validate(parsed)
+        result = agent._validate(parsed, used_model="test")
         assert isinstance(result, AgentResult)
         assert result.discipline == "Electrical"
         assert result.sub_category == "Power outlet not working"
@@ -155,7 +155,7 @@ class TestValidation:
             "priority": "medium",
             "completeness": 0.5,
         }
-        result = agent._validate(parsed)
+        result = agent._validate(parsed, used_model="test")
         assert result.discipline == "General"
         assert result.sub_category == "Unclassified"
 
@@ -167,7 +167,7 @@ class TestValidation:
             "priority": "medium",
             "completeness": 0.7,
         }
-        result = agent._validate(parsed)
+        result = agent._validate(parsed, used_model="test")
         assert result.discipline == "Electrical"
         # Should pick first valid sub_category for Electrical
         assert result.sub_category == "Power outlet not working"
@@ -180,7 +180,7 @@ class TestValidation:
             "priority": "super_urgent",
             "completeness": 0.5,
         }
-        result = agent._validate(parsed)
+        result = agent._validate(parsed, used_model="test")
         assert result.priority == "medium"
 
     def test_completeness_clamped(self, agent):
@@ -191,7 +191,7 @@ class TestValidation:
             "priority": "medium",
             "completeness": 1.5,
         }
-        result = agent._validate(parsed)
+        result = agent._validate(parsed, used_model="test")
         assert result.completeness == 1.0
 
     def test_action_derived_from_completeness(self, agent):
@@ -204,7 +204,7 @@ class TestValidation:
             "completeness": 0.50,
             "action": "auto_submit",
         }
-        result = agent._validate(parsed)
+        result = agent._validate(parsed, used_model="test")
         assert result.action == "manual_review"  # 0.50 < 0.60
 
 
@@ -319,7 +319,7 @@ class TestClassifyAndReply:
     @pytest.mark.asyncio
     async def test_bms_context_in_prompt(self, agent):
         bms_context = {
-            "building_name": "Centre Court",
+            "site_name": "Centre Court",
             "active_alerts": [{"severity": "warning", "message": "FCU-101 high temp"}],
             "recent_work_orders": [{"code": "WO-2026-001", "title": "Fix AC", "status": "scheduled"}],
         }

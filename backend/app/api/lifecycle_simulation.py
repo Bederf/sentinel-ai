@@ -341,6 +341,105 @@ async def change_simulation_speed(task_id: str, request: SpeedChangeRequest):
         raise HTTPException(status_code=500, detail=f"Failed to change speed: {str(e)}")
 
 
+@router.post("/stop")
+async def stop_default_simulation():
+    """
+    Stop the currently running simulation (no task_id needed).
+    Auto-resolves the active simulation.
+    """
+    try:
+        from app.services.simulation_orchestrator import get_all_active_simulations
+
+        active = get_all_active_simulations()
+        orchestrator = None
+        for _tid, orch in active.items():
+            if orch.running:
+                orchestrator = orch
+                break
+
+        if not orchestrator:
+            from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
+
+            orchestrator = get_lifecycle_orchestrator()
+
+        if not orchestrator or not orchestrator.running:
+            raise HTTPException(status_code=400, detail="No simulation running")
+
+        await orchestrator.stop()
+        return {"success": True, "status": "stopped", "message": "Simulation stopped"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to stop simulation: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to stop: {str(e)}")
+
+
+@router.post("/pause")
+async def pause_default_simulation():
+    """
+    Pause the currently running simulation (no task_id needed).
+    Auto-resolves the active simulation.
+    """
+    try:
+        from app.services.simulation_orchestrator import get_all_active_simulations
+
+        active = get_all_active_simulations()
+        orchestrator = None
+        for _tid, orch in active.items():
+            if orch.running:
+                orchestrator = orch
+                break
+
+        if not orchestrator:
+            from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
+
+            orchestrator = get_lifecycle_orchestrator()
+
+        if not orchestrator or not orchestrator.running:
+            raise HTTPException(status_code=400, detail="No simulation running")
+
+        orchestrator.pause()
+        return {"success": True, "status": "paused", "message": "Simulation paused"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to pause simulation: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to pause: {str(e)}")
+
+
+@router.post("/resume")
+async def resume_default_simulation():
+    """
+    Resume a paused simulation (no task_id needed).
+    Auto-resolves the active simulation.
+    """
+    try:
+        from app.services.simulation_orchestrator import get_all_active_simulations
+
+        active = get_all_active_simulations()
+        orchestrator = None
+        for _tid, orch in active.items():
+            if orch.running:
+                orchestrator = orch
+                break
+
+        if not orchestrator:
+            from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
+
+            orchestrator = get_lifecycle_orchestrator()
+
+        if not orchestrator or not orchestrator.running:
+            raise HTTPException(status_code=400, detail="No simulation running")
+
+        orchestrator.resume()
+        return {"success": True, "status": "running", "message": "Simulation resumed"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to resume simulation: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to resume: {str(e)}")
+
+
 @router.post("/speed")
 async def change_default_speed(request: SpeedChangeRequest):
     """
@@ -416,17 +515,29 @@ async def get_simulation_status(task_id: str):
     # If this looks like a site_id (e.g., "site-002"), find the most recent running/queued task
     if task_id.startswith("site-"):
         try:
-            store = get_simulation_store(task_id)
-            all_tasks = store._task_progress  # Direct access to find running tasks
-            running_task = None
-            for tid, tdata in all_tasks.items():
-                if tdata.get("status") in ("running", "queued"):
-                    running_task = tid
+            # First check if there's a live orchestrator (preferred — real-time data)
+            from app.services.simulation_orchestrator import _active_simulations
+
+            resolved = False
+            for active_tid, active_orch in _active_simulations.items():
+                if active_orch.running:
+                    task_id = active_tid
+                    resolved = True
+                    logger.debug(f"Resolved site to live orchestrator: {task_id}")
                     break
-            if running_task:
-                task_id = running_task
-                logger.info(f"Resolved site to running task: {task_id}")
-            else:
+
+            if not resolved:
+                # Fallback: find a running/queued task in the store
+                store = get_simulation_store(task_id)
+                all_tasks = store._task_progress  # Direct access to find running tasks
+                for tid, tdata in all_tasks.items():
+                    if tdata.get("status") in ("running", "queued"):
+                        task_id = tid
+                        resolved = True
+                        logger.info(f"Resolved site to store task: {task_id}")
+                        break
+
+            if not resolved:
                 return SimulationStatusResponse(
                     running=False,
                     paused=False,
@@ -497,7 +608,7 @@ async def get_simulation_status(task_id: str):
             target_occupancy_val = None
             lighting_mode_str = None
             try:
-                sched = orchestrator.building_schedule.get_state(
+                sched = orchestrator.site_schedule.get_state(
                     orchestrator.simulated_time.hour,
                     orchestrator.simulated_time.weekday(),
                 )
@@ -756,6 +867,9 @@ async def get_site_simulation_status(site_id: str):
                     # Energy consumption fields
                     total_energy_kwh=status.get("total_energy_kwh"),
                     current_hour_power_kw=status.get("current_hour_power_kw"),
+                    # Speed control
+                    speed_multiplier=orchestrator.speed_multiplier,
+                    seconds_per_hour=orchestrator.seconds_per_simulated_hour,
                 )
     except Exception as e:
         logger.debug(f"Error getting simulation status: {e}")

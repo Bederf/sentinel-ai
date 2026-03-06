@@ -17,8 +17,8 @@ import type { ZoneConfig, DeskConfig } from '@/lib/api/zone_ingestion';
 import { zoneIngestionApi } from '@/lib/api/zone_ingestion';
 
 interface ZoneIngestionWizardProps {
-  buildingId: string;
-  buildingName?: string;
+  siteId: string;
+  siteName?: string;
   onComplete?: (zones: ZoneConfig[], desks: DeskConfig[]) => void;
   onSkip?: () => void;
   onCancel?: () => void;
@@ -54,8 +54,8 @@ interface IngestionWizardState {
 }
 
 export function ZoneIngestionWizard({
-  buildingId,
-  buildingName,
+  siteId,
+  siteName,
   onComplete,
   onCancel,
 }: ZoneIngestionWizardProps) {
@@ -192,14 +192,14 @@ export function ZoneIngestionWizard({
 
     try {
       // Submit zones
-      const zonesResponse = await zoneIngestionApi.ingestZones(buildingId, { zones: state.zones });
+      const zonesResponse = await zoneIngestionApi.ingestZones(siteId, { zones: state.zones });
       if (zonesResponse.status !== 'success') {
         throw new Error(zonesResponse.message || 'Failed to ingest zones');
       }
 
       // Submit desks (if any)
       if (state.desks.length > 0) {
-        const desksResponse = await zoneIngestionApi.ingestDesks(buildingId, { desks: state.desks });
+        const desksResponse = await zoneIngestionApi.ingestDesks(siteId, { desks: state.desks });
         if (desksResponse.status !== 'success') {
           throw new Error(desksResponse.message || 'Failed to ingest desks');
         }
@@ -259,7 +259,7 @@ export function ZoneIngestionWizard({
         {/* Header */}
         <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 border-b">
           <h1 className="text-2xl font-bold mb-1">Zone Configuration Wizard</h1>
-          <p className="text-blue-100">{buildingName} • Step {state.step} of 5</p>
+          <p className="text-blue-100">{siteName} • Step {state.step} of 5</p>
           <div className="mt-4 flex gap-1 h-1">
             {[1, 2, 3, 4, 5].map((step) => (
               <div
@@ -615,7 +615,7 @@ export function ZoneIngestionWizard({
 
               <div className="bg-green-50 p-4 rounded-lg border border-green-200 mb-4">
                 <p className="text-green-800">
-                  Ready to save configuration for <strong>{buildingName}</strong>
+                  Ready to save configuration for <strong>{siteName}</strong>
                 </p>
               </div>
 

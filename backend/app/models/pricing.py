@@ -48,7 +48,7 @@ class PricingCalculation(BaseModel):
     """Complete pricing calculation with all adjustments and breakdowns."""
 
     contract_id: Optional[str] = None
-    building_id: str
+    site_id: str
     equipment_list: List[str]
     sla_tier: SLATier
 
@@ -76,7 +76,7 @@ class PricingCalculation(BaseModel):
 class QuoteRequest(BaseModel):
     """Request for pricing quote calculation."""
 
-    building_id: str
+    site_id: str
     equipment_codes: List[str] = Field(..., min_length=1, description="List of equipment codes to quote")
     sla_tier: SLATier
     contract_months: int = Field(default=12, ge=1, le=60, description="Contract duration in months")

@@ -149,7 +149,7 @@ class TestSearchDocumentation:
             query="chiller health scoring",
             n_results=5,
             equipment_type=None,
-            building_id=None,
+            site_id=None,
             keyword_weight=0.4,
             semantic_weight=0.6,
         )
@@ -160,7 +160,7 @@ class TestSearchDocumentation:
     @pytest.mark.asyncio
     @patch("app.services.doc_rag_service.get_vector_db_service")
     @patch("app.services.doc_rag_service.get_supabase_client")
-    async def test_building_id_passed_through(self, mock_client, mock_vdb_factory):
+    async def test_site_id_passed_through(self, mock_client, mock_vdb_factory):
         """Building ID is forwarded to hybrid_search."""
         mock_vdb = MagicMock()
         mock_vdb.hybrid_search.return_value = [
@@ -168,11 +168,11 @@ class TestSearchDocumentation:
         ]
         mock_vdb_factory.return_value = mock_vdb
 
-        results = await search_documentation("chiller fault", building_id="site-002-uuid")
+        results = await search_documentation("chiller fault", site_id="site-002-uuid")
 
         mock_vdb.hybrid_search.assert_called_once()
         call_kwargs = mock_vdb.hybrid_search.call_args
-        assert call_kwargs[1]["building_id"] == "site-002-uuid"
+        assert call_kwargs[1]["site_id"] == "site-002-uuid"
         assert len(results) == 1
 
     @pytest.mark.asyncio

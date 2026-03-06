@@ -94,10 +94,10 @@ class LightingSimulationEngine:
     FAULT_PROBABILITY_PER_HOUR = 0.0001  # ~0.01% per luminaire per hour (~2.4% pa)
     FAULT_TYPES = ["lamp_failure", "driver_overtemp", "ballast_fault", "comm_error"]
 
-    def __init__(self, building_id: str):
-        self.building_id = building_id
+    def __init__(self, site_id: str):
+        self.site_id = site_id
         self.supabase = get_supabase_client()
-        self.sim_store = get_simulation_store(building_id)
+        self.sim_store = get_simulation_store(site_id)
 
         # Cache zone metadata
         self._zone_cache: Dict[str, Dict[str, Any]] = {}
@@ -114,7 +114,7 @@ class LightingSimulationEngine:
         # Zone-to-luminaire mapping: {zone_id: [luminaire_ids]}
         self._zone_luminaires: Dict[str, List[str]] = {}
         # Deterministic RNG seeded per building for reproducible faults
-        self._rng = random.Random(int(hashlib.md5(building_id.encode()).hexdigest()[:8], 16))
+        self._rng = random.Random(int(hashlib.md5(site_id.encode()).hexdigest()[:8], 16))
 
     async def calculate_lighting_power(
         self,
@@ -365,7 +365,7 @@ class LightingSimulationEngine:
             # Assign zone to a sceneCOM controller (1 per floor)
             zone_config = self._zone_cache.get(zone_id, {})
             floor = zone_config.get("floor", "L0")
-            ctrl_id = f"SCOM-{self.building_id}-{floor}"
+            ctrl_id = f"SCOM-{self.site_id}-{floor}"
             controller_zones.setdefault(ctrl_id, []).append(zone_id)
 
             for lum_id in lum_ids:
@@ -518,7 +518,7 @@ class LightingSimulationEngine:
             controller_records.append(
                 {
                     "controller_id": ctrl_id,
-                    "building_id": self.building_id,
+                    "site_id": self.site_id,
                     "zones_served": zones,
                     "luminaire_count": lum_count,
                     "fault_count": fault_count,
@@ -532,7 +532,7 @@ class LightingSimulationEngine:
 
         self._latest_telemetry = {
             "timestamp": now_iso,
-            "building_id": self.building_id,
+            "site_id": self.site_id,
             "luminaires": luminaire_records,
             "sensors": sensor_records,
             "controllers": controller_records,
@@ -556,21 +556,19 @@ class LightingSimulationEngine:
     async def _load_zone_metadata(self) -> None:
         """Load zone configuration from database."""
         try:
-            # Resolve building code to UUID if needed (hvac_zones.building_id is UUID)
-            building_uuid = self.building_id
+            # Resolve building code to UUID if needed (hvac_zones.site_id is UUID)
+            site_uuid = self.site_id
             try:
-                bldg = (
-                    self.supabase.table("buildings").select("id").eq("code", self.building_id).maybe_single().execute()
-                )
+                bldg = self.supabase.table("sites").select("id").eq("code", self.site_id).maybe_single().execute()
                 if bldg and bldg.data:
-                    building_uuid = bldg.data["id"]
+                    site_uuid = bldg.data["id"]
             except Exception:
                 pass  # Fall through with original value
 
             response = (
                 self.supabase.table("hvac_zones")
                 .select("id, zone_id, zone_name, floor, typical_occupancy, area_sqm")
-                .eq("building_id", building_uuid)
+                .eq("site_id", site_uuid)
                 .execute()
             )
 
@@ -625,7 +623,7 @@ class LightingSimulationEngine:
         try:
             from app.services.energy_cost_service import EnergyCostService
 
-            cost_svc = EnergyCostService(building_id=self.building_id)
+            cost_svc = EnergyCostService(site_id=self.site_id)
 
             # Sum all hourly lighting power
             total_daily_kwh = sum(self._daily_hourly_lighting.values())
@@ -660,15 +658,15 @@ class LightingSimulationEngine:
 _lighting_engines: Dict[str, LightingSimulationEngine] = {}
 
 
-def get_lighting_engine(building_id: str) -> LightingSimulationEngine:
+def get_lighting_engine(site_id: str) -> LightingSimulationEngine:
     """Get or create lighting engine for building."""
-    if building_id not in _lighting_engines:
-        _lighting_engines[building_id] = LightingSimulationEngine(building_id)
-    return _lighting_engines[building_id]
+    if site_id not in _lighting_engines:
+        _lighting_engines[site_id] = LightingSimulationEngine(site_id)
+    return _lighting_engines[site_id]
 
 
 async def update_simulation_lighting(
-    building_id: str,
+    site_id: str,
     simulated_hour: int,
     occupancy_data: Dict[str, float],
     daylight_lux: float,
@@ -680,7 +678,7 @@ async def update_simulation_lighting(
     Public API to calculate lighting power during simulation.
 
     Args:
-        building_id: Building ID
+        site_id: Building ID
         simulated_hour: Hour (0-23)
         occupancy_data: Zone occupancy percentages
         daylight_lux: Available daylight in lux
@@ -693,7 +691,7 @@ async def update_simulation_lighting(
 
     Example:
         lighting_power = await update_simulation_lighting(
-            building_id="<site-id>",
+            site_id="<site-id>",
             simulated_hour=11,
             occupancy_data={"Zone-001": 85, "Zone-101": 60, ...},
             daylight_lux=750,
@@ -702,7 +700,7 @@ async def update_simulation_lighting(
             simulated_date=datetime.now()
         )
     """
-    engine = get_lighting_engine(building_id)
+    engine = get_lighting_engine(site_id)
     return await engine.calculate_lighting_power(
         simulated_hour=simulated_hour,
         occupancy_data=occupancy_data,

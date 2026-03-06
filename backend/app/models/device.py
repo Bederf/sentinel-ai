@@ -413,11 +413,11 @@ def create_device_from_dict(data: Dict[str, Any]) -> Device:
     data.setdefault("protocol", ProtocolType.MOCK.value)
     data.setdefault("status", DeviceStatus.ONLINE.value)
 
-    # Extract site_id from metadata.building_id if not provided directly
+    # Extract site_id from metadata.site_id if not provided directly
     if "site_id" not in data and "metadata" in data:
         metadata = data.get("metadata", {})
-        if "building_id" in metadata:
-            data["site_id"] = metadata["building_id"]
+        if "site_id" in metadata:
+            data["site_id"] = metadata["site_id"]
 
     # Handle device_location (new structured format)
     if "device_location" in data and isinstance(data["device_location"], dict):

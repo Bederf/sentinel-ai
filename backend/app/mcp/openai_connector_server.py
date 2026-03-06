@@ -33,7 +33,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 DEVICES_FILE = Path(__file__).parent.parent / "services" / "bms_simulator" / "data" / "reference_devices.json"
 EQUIPMENT_FILE = DATA_DIR / "equipment.json"
 ALERTS_FILE = DATA_DIR / "alerts.json"
-BUILDINGS_DIR = DATA_DIR / "buildings"
+SITES_DIR = DATA_DIR / "sites"
 
 # Base URL for document links
 BASE_URL = "https://bms.sentinel.local"
@@ -69,7 +69,7 @@ class SupabaseDataLoader:
     def load_buildings(self) -> List[Dict[str, Any]]:
         """Load buildings from Supabase."""
         try:
-            response = self.client.table("buildings").select("*").execute()
+            response = self.client.table("sites").select("*").execute()
             return response.data or []
         except Exception as e:
             logger.error(f"Failed to load buildings from Supabase: {e}")
@@ -188,11 +188,11 @@ class SupabaseDataLoader:
 
 def _build_building_document(building: Dict, source: str = "supabase") -> Dict[str, Any]:
     """Build searchable document for a building."""
-    building_id = building.get("code") or building.get("id", "unknown")
+    site_id = building.get("code") or building.get("id", "unknown")
 
     text_parts = [
         f"Building: {building.get('name', 'Unknown')}",
-        f"Code: {building_id}",
+        f"Code: {site_id}",
         f"Address: {building.get('address', 'N/A')}",
         f"Region: {building.get('region', 'N/A')}",
         f"Type: {building.get('type', 'N/A')}",
@@ -212,13 +212,13 @@ def _build_building_document(building: Dict, source: str = "supabase") -> Dict[s
         text_parts.append("Remote Control: Enabled")
 
     return {
-        "id": f"building-{building_id}",
-        "title": f"Building: {building.get('name', building_id)}",
+        "id": f"building-{site_id}",
+        "title": f"Building: {building.get('name', site_id)}",
         "text": "\n".join(text_parts),
-        "url": f"{BASE_URL}/buildings/{building_id}",
+        "url": f"{BASE_URL}/buildings/{site_id}",
         "doc_type": "building",
         "metadata": {
-            "building_id": building_id,
+            "site_id": site_id,
             "region": building.get("region"),
             "type": building.get("type"),
             "sqm": building.get("sqm"),
@@ -230,9 +230,9 @@ def _build_building_document(building: Dict, source: str = "supabase") -> Dict[s
 def _build_equipment_document(equipment: Dict, source: str = "supabase") -> Dict[str, Any]:
     """Build searchable document for equipment."""
     equip_id = equipment.get("code") or equipment.get("id", "unknown")
-    building_name = ""
-    if equipment.get("buildings"):
-        building_name = equipment["buildings"].get("name", "")
+    site_name = ""
+    if equipment.get("sites"):
+        site_name = equipment["sites"].get("name", "")
 
     text_parts = [
         f"Equipment: {equipment.get('name', equip_id)}",
@@ -240,8 +240,8 @@ def _build_equipment_document(equipment: Dict, source: str = "supabase") -> Dict
         f"Type: {equipment.get('type', 'N/A')}",
     ]
 
-    if building_name:
-        text_parts.append(f"Building: {building_name}")
+    if site_name:
+        text_parts.append(f"Building: {site_name}")
     if equipment.get("location"):
         text_parts.append(f"Location: {equipment['location']}")
     if equipment.get("manufacturer"):
@@ -283,12 +283,12 @@ def _build_alert_document(alert: Dict, source: str = "supabase") -> Dict[str, An
     """Build searchable document for an alert."""
     alert_id = alert.get("id", "unknown")
     equipment_name = ""
-    building_name = ""
+    site_name = ""
 
     if alert.get("equipment"):
         equipment_name = alert["equipment"].get("name", "")
-    if alert.get("buildings"):
-        building_name = alert["buildings"].get("name", "")
+    if alert.get("sites"):
+        site_name = alert["sites"].get("name", "")
 
     text_parts = [
         f"Alert: {alert.get('title', 'Unknown Alert')}",
@@ -299,8 +299,8 @@ def _build_alert_document(alert: Dict, source: str = "supabase") -> Dict[str, An
 
     if equipment_name:
         text_parts.append(f"Equipment: {equipment_name}")
-    if building_name:
-        text_parts.append(f"Building: {building_name}")
+    if site_name:
+        text_parts.append(f"Building: {site_name}")
     if alert.get("message"):
         text_parts.append(f"Message: {alert['message']}")
     if alert.get("created_at"):
@@ -329,13 +329,13 @@ def _build_prediction_document(prediction: Dict, source: str = "supabase") -> Di
     pred_id = prediction.get("code") or prediction.get("id", "unknown")
     equipment_name = ""
     equipment_type = ""
-    building_name = ""
+    site_name = ""
 
     if prediction.get("equipment"):
         equipment_name = prediction["equipment"].get("name", "")
         equipment_type = prediction["equipment"].get("type", "")
-    if prediction.get("buildings"):
-        building_name = prediction["buildings"].get("name", "")
+    if prediction.get("sites"):
+        site_name = prediction["sites"].get("name", "")
 
     text_parts = [
         f"Prediction: {prediction.get('prediction_type', 'Unknown')}",
@@ -349,8 +349,8 @@ def _build_prediction_document(prediction: Dict, source: str = "supabase") -> Di
         text_parts.append(f"Equipment: {equipment_name}")
     if equipment_type:
         text_parts.append(f"Equipment Type: {equipment_type}")
-    if building_name:
-        text_parts.append(f"Building: {building_name}")
+    if site_name:
+        text_parts.append(f"Building: {site_name}")
     if prediction.get("predicted_failure_date"):
         text_parts.append(f"Predicted Failure Date: {prediction['predicted_failure_date']}")
     if prediction.get("timeframe_days"):
@@ -398,12 +398,12 @@ def _build_work_order_document(wo: Dict, source: str = "supabase") -> Dict[str, 
     """Build searchable document for a work order."""
     wo_id = wo.get("code") or wo.get("id", "unknown")
     equipment_name = ""
-    building_name = ""
+    site_name = ""
 
     if wo.get("equipment"):
         equipment_name = wo["equipment"].get("name", "")
-    if wo.get("buildings"):
-        building_name = wo["buildings"].get("name", "")
+    if wo.get("sites"):
+        site_name = wo["sites"].get("name", "")
 
     text_parts = [
         f"Work Order: {wo.get('title', 'Unknown')}",
@@ -413,8 +413,8 @@ def _build_work_order_document(wo: Dict, source: str = "supabase") -> Dict[str, 
 
     if equipment_name:
         text_parts.append(f"Equipment: {equipment_name}")
-    if building_name:
-        text_parts.append(f"Building: {building_name}")
+    if site_name:
+        text_parts.append(f"Building: {site_name}")
     if wo.get("description"):
         text_parts.append(f"Description: {wo['description']}")
     if wo.get("assigned_to"):

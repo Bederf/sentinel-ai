@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 async def search_documentation(
-    query: str, n_results: int = 5, building_id: str | None = None, similarity_threshold: float = 0.3
+    query: str, n_results: int = 5, site_id: str | None = None, similarity_threshold: float = 0.3
 ) -> list[dict[str, Any]]:
     """
     Search indexed documentation for relevant content using hybrid search.
@@ -29,7 +29,7 @@ async def search_documentation(
     Args:
         query: User's question or search query
         n_results: Maximum number of results to return
-        building_id: Optional building UUID for building-scoped documents
+        site_id: Optional building UUID for building-scoped documents
         similarity_threshold: Minimum similarity score (0-1) - not used in hybrid
 
     Returns:
@@ -46,7 +46,7 @@ async def search_documentation(
             query=query,
             n_results=n_results,
             equipment_type=None,  # Search all documentation
-            building_id=building_id,  # Filter to building or include system docs
+            site_id=site_id,  # Filter to building or include system docs
             keyword_weight=0.4,  # Give keyword matching significant weight
             semantic_weight=0.6,  # Still favor semantic for natural language queries
         )
@@ -55,8 +55,7 @@ async def search_documentation(
         # Note: hybrid_search doesn't filter by document_type, so we include all results
 
         logger.info(
-            f"Documentation search for '{query[:50]}...' in building "
-            f"{building_id or 'all'} returned {len(results)} results"
+            f"Documentation search for '{query[:50]}...' in building {site_id or 'all'} returned {len(results)} results"
         )
         return results
 
@@ -79,7 +78,7 @@ def get_doc_rag_system_prompt(doc_results: list[dict[str, Any]]) -> str:
         System prompt with documentation context for Claude
     """
     # Get building context for reference
-    building_context = fm_context_service.get_full_context()
+    site_context = fm_context_service.get_full_context()
 
     # Format documentation results
     if doc_results:
@@ -162,7 +161,7 @@ The following documentation sections are most relevant to your question:
 
 For reference, here is the current building data that SENTINEL is monitoring:
 
-{building_context}
+{site_context}
 
 ---
 

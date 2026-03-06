@@ -67,7 +67,7 @@ class HealthSnapshotService:
     async def store_snapshot(
         self,
         rating: HealthRating,
-        building_id: Optional[str] = None,
+        site_id: Optional[str] = None,
     ) -> str:
         """Store a health rating snapshot.
 
@@ -75,14 +75,14 @@ class HealthSnapshotService:
 
         Args:
             rating: The computed HealthRating.
-            building_id: Optional building UUID for the index.
+            site_id: Optional building UUID for the index.
 
         Returns:
             Snapshot ID (UUID string).
         """
         snapshot_data = {
             "equipment_id": rating.equipment_id,
-            "building_id": building_id,
+            "site_id": site_id,
             "snapshot_at": rating.snapshot_at,
             "health_score": rating.health_score,
             "health_status": rating.health_status,
@@ -395,8 +395,8 @@ class HealthSnapshotService:
                     equipment=equip,
                     mode=mode,
                 )
-                building_id = equip.get("building_id")
-                await self.store_snapshot(rating, building_id=building_id)
+                site_id = equip.get("site_id")
+                await self.store_snapshot(rating, site_id=site_id)
 
                 # Update daily rollup for today
                 today = datetime.utcnow().strftime("%Y-%m-%d")
@@ -456,7 +456,7 @@ class HealthSnapshotService:
 
             repo = EquipmentRepository()
             if scope == "site" and site_id:
-                return repo.get_all(building_id=site_id)
+                return repo.get_all(site_id=site_id)
             return repo.get_all()
         except Exception as e:
             logger.error(f"Could not get equipment list: {e}")

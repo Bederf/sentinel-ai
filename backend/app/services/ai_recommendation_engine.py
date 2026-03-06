@@ -62,13 +62,13 @@ DIFFICULTY_OCCUPANCY_OPTIMIZATION = 2  # Software/scheduling
 class AIRecommendationEngine:
     """Engine for generating AI-powered financial recommendations."""
 
-    def __init__(self, building_id: str):
+    def __init__(self, site_id: str):
         """Initialize recommendation engine.
 
         Args:
-            building_id: Building/site identifier (e.g., 'site-002')
+            site_id: Building/site identifier (e.g., 'site-002')
         """
-        self.building_id = building_id
+        self.site_id = site_id
         self.simulated_date = datetime.now()
 
     async def generate_recommendations(
@@ -123,7 +123,7 @@ class AIRecommendationEngine:
             rec["priority"] = self._get_priority(idx, len(recommendations))
 
         return {
-            "building_id": self.building_id,
+            "site_id": self.site_id,
             "generated_date": datetime.now().isoformat(),
             "recommendation_count": len(recommendations),
             "total_annual_savings_r": round(sum(r["annual_savings_r"] for r in recommendations), 2),
@@ -449,7 +449,7 @@ class AIRecommendationEngine:
 
 
 async def generate_ai_recommendations(
-    building_id: str,
+    site_id: str,
     lighting_kwh_current: float = 185.0,
     water_liters_current: float = 6847.0,
     hvac_cop_current: float = 3.5,
@@ -459,7 +459,7 @@ async def generate_ai_recommendations(
     """Public API for AI recommendation generation.
 
     Args:
-        building_id: Building/site ID
+        site_id: Building/site ID
         lighting_kwh_current: Current daily lighting energy
         water_liters_current: Current daily water consumption
         hvac_cop_current: Current chiller COP
@@ -469,7 +469,7 @@ async def generate_ai_recommendations(
     Returns:
         Ranked recommendations with ROI and messaging
     """
-    engine = AIRecommendationEngine(building_id)
+    engine = AIRecommendationEngine(site_id)
     return await engine.generate_recommendations(
         lighting_kwh_current=lighting_kwh_current,
         water_liters_current=water_liters_current,
@@ -479,13 +479,13 @@ async def generate_ai_recommendations(
     )
 
 
-def get_ai_recommendation_engine(building_id: str) -> AIRecommendationEngine:
+def get_ai_recommendation_engine(site_id: str) -> AIRecommendationEngine:
     """Get singleton instance of AIRecommendationEngine.
 
     Args:
-        building_id: Building identifier
+        site_id: Building identifier
 
     Returns:
         AIRecommendationEngine instance
     """
-    return AIRecommendationEngine(building_id)
+    return AIRecommendationEngine(site_id)

@@ -34,9 +34,7 @@ class ToolSecurityProfile:
     rate_class: str = "read"  # "read", "mutate", "search"
     min_role: SentinelRole | None = None
     required_module: ModuleType | None = None
-    audit_fields: frozenset = field(
-        default_factory=lambda: frozenset({"building_id", "site_id", "device_id", "asset_id"})
-    )
+    audit_fields: frozenset = field(default_factory=lambda: frozenset({"site_id", "site_id", "device_id", "asset_id"}))
     output_allowed_fields: frozenset | None = None  # None = no output filter
     secret_zero_risk: bool = False
 
@@ -67,7 +65,7 @@ _r(
 _r(
     ToolSecurityProfile(
         name="get_assets",
-        audit_fields=frozenset({"building_id", "asset_type", "criticality"}),
+        audit_fields=frozenset({"site_id", "asset_type", "criticality"}),
     )
 )
 
@@ -95,7 +93,7 @@ _r(
 _r(
     ToolSecurityProfile(
         name="get_alarms",
-        audit_fields=frozenset({"building_id", "asset_id", "severity", "state", "limit"}),
+        audit_fields=frozenset({"site_id", "asset_id", "severity", "state", "limit"}),
     )
 )
 
@@ -109,14 +107,14 @@ _r(
 _r(
     ToolSecurityProfile(
         name="get_health_score",
-        audit_fields=frozenset({"asset_id", "building_id"}),
+        audit_fields=frozenset({"asset_id", "site_id"}),
     )
 )
 
 _r(
     ToolSecurityProfile(
         name="get_work_orders",
-        audit_fields=frozenset({"building_id", "asset_id", "status", "limit"}),
+        audit_fields=frozenset({"site_id", "asset_id", "status", "limit"}),
     )
 )
 
@@ -129,15 +127,15 @@ _r(
 
 _r(
     ToolSecurityProfile(
-        name="get_building_config",
-        audit_fields=frozenset({"building_id"}),
+        name="get_site_config",
+        audit_fields=frozenset({"site_id"}),
     )
 )
 
 _r(
     ToolSecurityProfile(
         name="get_asset_metrics_template",
-        audit_fields=frozenset({"building_id", "equipment_types"}),
+        audit_fields=frozenset({"site_id", "equipment_types"}),
     )
 )
 
@@ -181,14 +179,14 @@ _r(
 _r(
     ToolSecurityProfile(
         name="get_contracts",
-        audit_fields=frozenset({"building_id", "organization_code", "status"}),
+        audit_fields=frozenset({"site_id", "organization_code", "status"}),
     )
 )
 
 _r(
     ToolSecurityProfile(
         name="get_contract_profitability",
-        audit_fields=frozenset({"building_code", "year", "month"}),
+        audit_fields=frozenset({"site_code", "year", "month"}),
     )
 )
 
@@ -196,7 +194,7 @@ _r(
 _r(
     ToolSecurityProfile(
         name="get_utility_costs",
-        audit_fields=frozenset({"building_id", "period_start", "period_end"}),
+        audit_fields=frozenset({"site_id", "period_start", "period_end"}),
     )
 )
 
@@ -208,7 +206,7 @@ _r(
     ToolSecurityProfile(
         name="search_alarms",
         rate_class="search",
-        audit_fields=frozenset({"query", "building_id", "limit"}),
+        audit_fields=frozenset({"query", "site_id", "limit"}),
     )
 )
 
@@ -261,7 +259,7 @@ _r(
         rate_class="mutate",
         min_role=SentinelRole.OPERATOR,
         required_module=ModuleType.MAINTENANCE,
-        audit_fields=frozenset({"building_id", "equipment_id", "priority", "description"}),
+        audit_fields=frozenset({"site_id", "equipment_id", "priority", "description"}),
     )
 )
 
@@ -273,7 +271,7 @@ _r(
         rate_class="mutate",
         min_role=SentinelRole.ADMIN,
         required_module=ModuleType.SIMBIOT,
-        audit_fields=frozenset({"building_id", "name"}),
+        audit_fields=frozenset({"site_id", "name"}),
     )
 )
 
@@ -285,18 +283,18 @@ _r(
         rate_class="mutate",
         min_role=SentinelRole.ADMIN,
         required_module=ModuleType.SIMBIOT,
-        audit_fields=frozenset({"building_id"}),
+        audit_fields=frozenset({"site_id"}),
     )
 )
 
 _r(
     ToolSecurityProfile(
-        name="add_building_zones",
+        name="add_site_zones",
         mutating=True,
         rate_class="mutate",
         min_role=SentinelRole.ADMIN,
         required_module=ModuleType.SIMBIOT,
-        audit_fields=frozenset({"building_id"}),
+        audit_fields=frozenset({"site_id"}),
     )
 )
 
@@ -307,18 +305,18 @@ _r(
         rate_class="mutate",
         min_role=SentinelRole.ADMIN,
         required_module=ModuleType.SIMBIOT,
-        audit_fields=frozenset({"building_id"}),
+        audit_fields=frozenset({"site_id"}),
     )
 )
 
 _r(
     ToolSecurityProfile(
-        name="add_building_devices",
+        name="add_site_devices",
         mutating=True,
         rate_class="mutate",
         min_role=SentinelRole.ADMIN,
         required_module=ModuleType.SIMBIOT,
-        audit_fields=frozenset({"building_id"}),
+        audit_fields=frozenset({"site_id"}),
     )
 )
 
@@ -329,7 +327,7 @@ _r(
         rate_class="mutate",
         min_role=SentinelRole.ADMIN,
         required_module=ModuleType.SIMBIOT,
-        audit_fields=frozenset({"building_id"}),
+        audit_fields=frozenset({"site_id"}),
     )
 )
 
@@ -340,7 +338,7 @@ _r(
         rate_class="mutate",
         min_role=SentinelRole.ADMIN,
         required_module=ModuleType.SIMBIOT,
-        audit_fields=frozenset({"building_id"}),
+        audit_fields=frozenset({"site_id"}),
     )
 )
 
@@ -363,7 +361,7 @@ _r(
         min_role=SentinelRole.OPERATOR,
         required_module=ModuleType.SIMBIOT,
         secret_zero_risk=True,  # Accepts username/password for gateway auth
-        audit_fields=frozenset({"building_id", "gateway_ip", "gateway_type"}),
+        audit_fields=frozenset({"site_id", "gateway_ip", "gateway_type"}),
         # NEVER log username/password — handled by _ALWAYS_REDACTED in audit.py
     )
 )
@@ -375,7 +373,7 @@ _r(
         rate_class="mutate",
         min_role=SentinelRole.OPERATOR,
         required_module=ModuleType.ASSETS,
-        audit_fields=frozenset({"building_id"}),
+        audit_fields=frozenset({"site_id"}),
     )
 )
 
@@ -386,7 +384,7 @@ _r(
         rate_class="mutate",
         min_role=SentinelRole.ADMIN,
         required_module=ModuleType.FINANCIAL,
-        audit_fields=frozenset({"building_code", "contract_type"}),
+        audit_fields=frozenset({"site_code", "contract_type"}),
     )
 )
 
@@ -397,7 +395,7 @@ _r(
         rate_class="mutate",
         min_role=SentinelRole.OPERATOR,
         required_module=ModuleType.ENERGY,
-        audit_fields=frozenset({"building_id", "municipality", "utility_type"}),
+        audit_fields=frozenset({"site_id", "municipality", "utility_type"}),
     )
 )
 
@@ -435,7 +433,7 @@ def get_audit_fields(tool_name: str) -> set[str]:
     profile = TOOL_REGISTRY.get(tool_name)
     if profile:
         return set(profile.audit_fields)
-    return {"building_id", "site_id", "device_id", "asset_id"}
+    return {"site_id", "site_id", "device_id", "asset_id"}
 
 
 def is_secret_zero_risk(tool_name: str) -> bool:

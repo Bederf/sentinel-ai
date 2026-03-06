@@ -1,7 +1,7 @@
 {
   "run_id": "sim_20260214_203950_d26a482c",
   "scenario": "grant_hvac_dali_ai_annual",
-  "building_code": "site-002",
+  "site_code": "site-002",
   "started_at": "2026-02-14T20:39:50.592343",
   "ended_at": null,
   "duration_minutes": null,

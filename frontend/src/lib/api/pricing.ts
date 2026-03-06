@@ -18,7 +18,7 @@ export type SLATier = 'basic' | 'standard' | 'premium' | 'enterprise'
  * Request for calculating a pricing quote
  */
 export interface QuoteRequest {
-  building_id: string
+  site_id: string
   equipment_codes: string[] // List of equipment codes to quote
   sla_tier: SLATier
   contract_months?: number // Default 12, range 1-60

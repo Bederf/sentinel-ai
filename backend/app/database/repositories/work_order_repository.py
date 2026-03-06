@@ -15,7 +15,7 @@ class WorkOrderRepository:
 
     _LIST_COLUMNS = (
         "id, code, title, description, priority, status, "
-        "assigned_to, assigned_team, equipment_id, building_id, "
+        "assigned_to, assigned_team, equipment_id, site_id, "
         "scheduled_date, completed_at, created_at, created_by, "
         "estimated_duration_hours"
     )
@@ -44,21 +44,21 @@ class WorkOrderRepository:
             return None
 
         try:
-            # If equipment_code provided, resolve to equipment_id and building_id
+            # If equipment_code provided, resolve to equipment_id and site_id
             equipment_id = work_order.get("equipment_id")
-            building_id = work_order.get("building_id")
+            site_id = work_order.get("site_id")
 
             if not equipment_id and work_order.get("equipment_code"):
                 eq_result = (
                     self.client.table("equipment")
-                    .select("id, building_id")
+                    .select("id, site_id")
                     .eq("code", work_order["equipment_code"])
                     .execute()
                 )
 
                 if eq_result.data and len(eq_result.data) > 0:
                     equipment_id = eq_result.data[0]["id"]
-                    building_id = eq_result.data[0]["building_id"]
+                    site_id = eq_result.data[0]["site_id"]
 
             # Build insert payload
             payload = {
@@ -75,8 +75,8 @@ class WorkOrderRepository:
 
             if equipment_id:
                 payload["equipment_id"] = equipment_id
-            if building_id:
-                payload["building_id"] = building_id
+            if site_id:
+                payload["site_id"] = site_id
 
             # Insert with retry on duplicate code collision (DB trigger generates code)
             max_retries = 3

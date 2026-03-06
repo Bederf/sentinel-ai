@@ -91,7 +91,7 @@ class TestCloudFallback:
         """When primary fails, fallback provider responds."""
         call_count = 0
 
-        async def _mock_stream(provider, messages, include_building_context=True, tier=2):
+        async def _mock_stream(provider, messages, include_site_context=True, tier=2):
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -110,7 +110,7 @@ class TestCloudFallback:
     async def test_all_providers_fail_graceful_message(self, hybrid_ai):
         """When ALL providers fail, user sees a friendly error."""
 
-        async def _always_fail(provider, messages, include_building_context=True, tier=2):
+        async def _always_fail(provider, messages, include_site_context=True, tier=2):
             raise Exception(f"{provider} unavailable")
             yield  # Make it an async generator  # noqa: E501  (unreachable but needed for type)
 
@@ -300,7 +300,7 @@ class TestRateLimitTracking:
         # Simulate Claude rate limit via _try_cloud_with_fallback
         call_count = 0
 
-        async def _mock_stream(provider, messages, include_building_context=True, tier=2):
+        async def _mock_stream(provider, messages, include_site_context=True, tier=2):
             nonlocal call_count
             call_count += 1
             if call_count == 1:

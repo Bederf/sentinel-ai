@@ -447,6 +447,8 @@ Sentry uses AI-driven slash commands (not hardcoded handlers). The bot reads `SO
 
 Each response ends with clickable next-step buttons (excluding the command just used).
 
+**Web Chat Integration:** The same FM workflow is enforced in the SENTINEL web chat. Claude presents `/info_`, `/inspect_`, `/WO_`, `/note_` as clickable buttons (rendered via `COMMAND_RE` regex in `ChatMessage.tsx`). Claude's system prompt and tool description instruct it to follow the FM process rather than calling `create_work_order` directly. When the tool is called, it routes through `POST /api/sentry/create-work-order` (same as `/WO_` slash command) to persist to Supabase.
+
 ### Command Reference
 
 | Command | Purpose | Response to FM |

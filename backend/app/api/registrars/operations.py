@@ -27,6 +27,9 @@ from app.api import servicenow
 from app.api import event_bus_monitor
 from app.api import n8n
 from app.api import notification_router
+from app.api import event_intelligence
+from app.api import control_policy
+from app.api import decision_memory
 
 
 def register_operations_routers(app: FastAPI) -> None:
@@ -136,3 +139,12 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Sentry notification router — importance-based delivery (Phase 140)
     app.include_router(notification_router.router, tags=["notification-router"])
+
+    # Operational Event Intelligence (Phase 145)
+    app.include_router(event_intelligence.router, tags=["event-intelligence"])
+
+    # Control Policy Engine (Phase 145)
+    app.include_router(control_policy.router, tags=["control-policy"])
+
+    # Decision Memory (Phase 145)
+    app.include_router(decision_memory.router, tags=["decision-memory"])

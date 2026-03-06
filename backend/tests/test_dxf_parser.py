@@ -292,8 +292,8 @@ class TestDXFParserIntegration:
         assert "equipment" in config
         assert "floors" in config
         assert "zones" in config
-        assert config["building_code"] == "site-002"
-        assert config["building_name"] == "Test Building"
+        assert config["site_code"] == "site-002"
+        assert config["site_name"] == "Test Building"
 
     @pytest.mark.asyncio
     async def test_parse_dxf_extracts_equipment(self, sample_dxf_bytes):

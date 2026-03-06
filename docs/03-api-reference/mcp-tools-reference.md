@@ -445,31 +445,26 @@ List work orders with filtering.
 ```
 
 #### `create_work_order`
-Create new work order.
+Create maintenance work order. **Important:** Claude is instructed to follow the FM workflow rather than calling this tool directly. It presents clickable slash commands (`/info_`, `/inspect_`, `/WO_`) so the user follows the proper process.
+
+When called, the tool routes through `POST /api/sentry/create-work-order` (same endpoint as the `/WO_` slash command) to persist to Supabase and auto-assign a technician. Falls back to in-memory storage if the Sentry API is unreachable.
 
 **Parameters:**
-- `building_id` (string, required): Building identifier
-- `asset_id` (string, required): Asset identifier
+- `equipment_code` (string, required): Equipment code (e.g., `S002-FCU-301`)
 - `title` (string, required): Work order title
 - `description` (string, required): Detailed description
 - `priority` (string, required): "critical", "high", "medium", "low"
-- `assigned_to` (string, optional): Technician ID
 
 **Returns:**
 ```json
 {
   "success": true,
-  "work_order": {
-    "id": "WO-2026-00124",
-    "building_id": "001",
-    "asset_id": "S001-CHILLER-B1-001",
-    "title": "Inspect Chiller Refrigerant Leak",
-    "priority": "high",
-    "status": "open",
-    "created_at": "2026-02-02T10:30:00Z",
-    "created_by": "simbiot-mcp"
-  },
-  "audit_id": "audit-20260202-103000"
+  "code": "WO-20260302-A1B2C3D4",
+  "equipment_code": "S002-FCU-301",
+  "assigned_to": "Mike Johnson",
+  "technician_email": "mike@example.com",
+  "priority": "medium",
+  "status": "scheduled"
 }
 ```
 

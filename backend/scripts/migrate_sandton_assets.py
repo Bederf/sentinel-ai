@@ -35,8 +35,8 @@ load_dotenv()
 
 # Data directory
 DATA_DIR = Path(__file__).parent.parent / "app" / "data"
-BUILDINGS_DIR = DATA_DIR / "buildings"
-SANDTON_DIR = BUILDINGS_DIR / "sandton"
+SITES_DIR = DATA_DIR / "sites"
+SANDTON_DIR = SITES_DIR / "sandton"
 
 
 def get_supabase() -> Client:
@@ -66,16 +66,16 @@ def get_or_create_building(supabase: Client) -> str:
     print("\n🏢 Checking Sandton building...")
 
     # Check if exists
-    response = supabase.table("buildings").select("id").eq("code", "sandton").execute()
+    response = supabase.table("sites").select("id").eq("code", "sandton").execute()
     if response.data:
-        building_id = response.data[0]["id"]
-        print(f"  ✓ Found existing building: {building_id}")
-        return building_id
+        site_id = response.data[0]["id"]
+        print(f"  ✓ Found existing building: {site_id}")
+        return site_id
 
     # Create if not exists
-    building_id = generate_uuid("building")
+    site_id = generate_uuid("building")
     record = {
-        "id": building_id,
+        "id": site_id,
         "code": "sandton",
         "name": "Sandton Office Tower",
         "address": "Sandton City, Johannesburg",
@@ -87,16 +87,16 @@ def get_or_create_building(supabase: Client) -> str:
     }
 
     try:
-        supabase.table("buildings").insert(record).execute()
-        print(f"  ✓ Created building: {building_id}")
+        supabase.table("sites").insert(record).execute()
+        print(f"  ✓ Created building: {site_id}")
     except Exception as e:
         print(f"  ✗ Failed to create building: {e}")
         raise
 
-    return building_id
+    return site_id
 
 
-def migrate_hvac_zones(supabase: Client, building_id: str) -> dict:
+def migrate_hvac_zones(supabase: Client, site_id: str) -> dict:
     """Migrate zones.json to hvac_zones table. Returns zone_id -> UUID mapping."""
     print("\n🌡️ Migrating HVAC zones...")
     zones = load_json(SANDTON_DIR / "zones.json")
@@ -114,7 +114,7 @@ def migrate_hvac_zones(supabase: Client, building_id: str) -> dict:
             "id": zone_uuid,
             "zone_id": zone["zone_id"],
             "zone_name": zone["zone_name"],
-            "building_id": building_id,
+            "site_id": site_id,
             "floor": zone["floor"],
             "fcu_id": zone.get("fcu_id"),
             "vav_id": zone.get("vav_id"),
@@ -138,7 +138,7 @@ def migrate_hvac_zones(supabase: Client, building_id: str) -> dict:
     return id_map
 
 
-def migrate_desks(supabase: Client, building_id: str, zone_map: dict) -> int:
+def migrate_desks(supabase: Client, site_id: str, zone_map: dict) -> int:
     """Migrate desks.json to desks table. Returns count."""
     print("\n🪑 Migrating desks...")
     desks = load_json(SANDTON_DIR / "desks.json")
@@ -157,7 +157,7 @@ def migrate_desks(supabase: Client, building_id: str, zone_map: dict) -> int:
         record = {
             "id": desk_uuid,
             "desk_id": desk["desk_id"],
-            "building_id": building_id,
+            "site_id": site_id,
             "hvac_zone_id": hvac_zone_id,
             "floor": desk.get("floor", "Unknown"),
             "x_coord": desk.get("x_coord"),
@@ -186,7 +186,7 @@ def migrate_desks(supabase: Client, building_id: str, zone_map: dict) -> int:
     return count
 
 
-def migrate_diesel_tanks(supabase: Client, building_id: str, data: dict) -> dict:
+def migrate_diesel_tanks(supabase: Client, site_id: str, data: dict) -> dict:
     """Migrate diesel_tanks from generators.json. Returns tank_id -> UUID mapping."""
     tanks = data.get("diesel_tanks", [])
     id_map = {}
@@ -199,7 +199,7 @@ def migrate_diesel_tanks(supabase: Client, building_id: str, data: dict) -> dict
             "id": tank_uuid,
             "tank_id": tank["tank_id"],
             "name": tank.get("name", tank["tank_id"]),
-            "building_id": building_id,
+            "site_id": site_id,
             "capacity_liters": tank.get("capacity_liters"),
             "current_level_liters": tank.get("current_level_liters"),
             "current_level_pct": tank.get("current_level_pct"),
@@ -221,7 +221,7 @@ def migrate_diesel_tanks(supabase: Client, building_id: str, data: dict) -> dict
     return id_map
 
 
-def migrate_generator_groups(supabase: Client, building_id: str, data: dict, tank_map: dict) -> dict:
+def migrate_generator_groups(supabase: Client, site_id: str, data: dict, tank_map: dict) -> dict:
     """Migrate groups from generators.json. Returns group_id -> UUID mapping."""
     groups = data.get("groups", [])
     id_map = {}
@@ -240,7 +240,7 @@ def migrate_generator_groups(supabase: Client, building_id: str, data: dict, tan
             "id": group_uuid,
             "group_id": group["group_id"],
             "name": group.get("name", group["group_id"]),
-            "building_id": building_id,
+            "site_id": site_id,
             "diesel_tank_id": diesel_tank_id,
             "total_generators": group.get("total_generators"),
             "required_running": group.get("required_running"),
@@ -266,7 +266,7 @@ def migrate_generator_groups(supabase: Client, building_id: str, data: dict, tan
     return id_map
 
 
-def migrate_generators(supabase: Client, building_id: str, data: dict, group_map: dict, tank_map: dict) -> int:
+def migrate_generators(supabase: Client, site_id: str, data: dict, group_map: dict, tank_map: dict) -> int:
     """Migrate generators from generators.json. Returns count."""
     generators = data.get("generators", [])
     count = 0
@@ -285,7 +285,7 @@ def migrate_generators(supabase: Client, building_id: str, data: dict, group_map
             "id": gen_uuid,
             "generator_id": gen["generator_id"],
             "name": gen.get("name", gen["generator_id"]),
-            "building_id": building_id,
+            "site_id": site_id,
             "group_id": group_id,
             "diesel_tank_id": diesel_tank_id,
             "location": gen.get("location"),
@@ -328,7 +328,7 @@ def migrate_generators(supabase: Client, building_id: str, data: dict, group_map
     return count
 
 
-def migrate_generators_all(supabase: Client, building_id: str) -> dict:
+def migrate_generators_all(supabase: Client, site_id: str) -> dict:
     """Migrate all generator-related data. Returns counts."""
     print("\n⚡ Migrating generators...")
     data = load_json(SANDTON_DIR / "generators.json")
@@ -338,9 +338,9 @@ def migrate_generators_all(supabase: Client, building_id: str) -> dict:
         return {"tanks": 0, "groups": 0, "generators": 0}
 
     # Migrate in dependency order
-    tank_map = migrate_diesel_tanks(supabase, building_id, data)
-    group_map = migrate_generator_groups(supabase, building_id, data, tank_map)
-    gen_count = migrate_generators(supabase, building_id, data, group_map, tank_map)
+    tank_map = migrate_diesel_tanks(supabase, site_id, data)
+    group_map = migrate_generator_groups(supabase, site_id, data, tank_map)
+    gen_count = migrate_generators(supabase, site_id, data, group_map, tank_map)
 
     return {
         "tanks": len(tank_map),
@@ -349,7 +349,7 @@ def migrate_generators_all(supabase: Client, building_id: str) -> dict:
     }
 
 
-def migrate_energy_centre(supabase: Client, building_id: str) -> dict:
+def migrate_energy_centre(supabase: Client, site_id: str) -> dict:
     """Migrate energy centre and all components. Returns counts."""
     print("\n🔌 Migrating energy centre...")
     data = load_json(SANDTON_DIR / "energy_centre.json")
@@ -368,7 +368,7 @@ def migrate_energy_centre(supabase: Client, building_id: str) -> dict:
         "id": ec_uuid,
         "centre_id": ec.get("centre_id", "SAN-EC-001"),
         "name": ec.get("name", "Sandton Energy Centre"),
-        "building_id": building_id,
+        "site_id": site_id,
         "location": ec.get("location"),
         "mains_healthy": ec.get("mains_healthy", True),
         "on_generator": ec.get("on_generator", False),
@@ -688,16 +688,16 @@ def migrate_energy_centre(supabase: Client, building_id: str) -> dict:
     return counts
 
 
-def verify_asset_summary(supabase: Client, building_id: str):
+def verify_asset_summary(supabase: Client, site_id: str):
     """Verify asset counts by querying the view."""
     print("\n📊 Verifying asset summary...")
 
     try:
-        response = supabase.table("v_building_asset_summary").select("*").eq("building_id", building_id).execute()
+        response = supabase.table("v_site_asset_summary").select("*").eq("site_id", site_id).execute()
 
         if response.data:
             summary = response.data[0]
-            print(f"\n  Asset Summary for {summary['building_name']}:")
+            print(f"\n  Asset Summary for {summary['site_name']}:")
             print("  ────────────────────────────────────")
             print(f"  Equipment:       {summary.get('equipment_count', 0):>5}")
             print(f"  HVAC Zones:      {summary.get('hvac_zone_count', 0):>5}")
@@ -738,16 +738,16 @@ def main():
     print(f"\n✓ Connected to Supabase at {os.getenv('SUPABASE_URL')}")
 
     # Get or create building
-    building_id = get_or_create_building(supabase)
+    site_id = get_or_create_building(supabase)
 
     # Migrate in dependency order
-    zone_map = migrate_hvac_zones(supabase, building_id)
-    migrate_desks(supabase, building_id, zone_map)
-    _gen_counts = migrate_generators_all(supabase, building_id)
-    _ec_counts = migrate_energy_centre(supabase, building_id)
+    zone_map = migrate_hvac_zones(supabase, site_id)
+    migrate_desks(supabase, site_id, zone_map)
+    _gen_counts = migrate_generators_all(supabase, site_id)
+    _ec_counts = migrate_energy_centre(supabase, site_id)
 
     # Verify
-    verify_asset_summary(supabase, building_id)
+    verify_asset_summary(supabase, site_id)
 
     print("\n" + "=" * 60)
     print("✅ Sandton migration complete!")

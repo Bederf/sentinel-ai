@@ -64,7 +64,7 @@ export interface LiveEvent {
 export interface SimulationRunRecord {
   run_id: string;
   scenario: string;
-  building_code: string;
+  site_code: string;
   started_at: string;
   ended_at: string | null;
   duration_minutes: number | null;
@@ -111,7 +111,7 @@ export interface ProfileAnalysisResult {
 export interface SimulationAnalysisReport {
   run_id: string;
   scenario: string;
-  building_code: string;
+  site_code: string;
   analyzed_at: string;
   metrics: SimulationMetrics;
   profile_results: Record<string, ProfileAnalysisResult>;
@@ -207,7 +207,7 @@ export interface PerformanceMetrics {
 export interface PerformanceEvaluation {
   evaluated_at: string;
   period_days: number;
-  building_code: string;
+  site_code: string;
   predictions_count: number;
   alerts_count: number;
   metrics: PerformanceMetrics;
@@ -257,11 +257,11 @@ export async function fetchModelHealth(): Promise<ModelHealthSummary> {
 
 export async function fetchPerformance(opts?: {
   days_back?: number;
-  building_code?: string;
+  site_code?: string;
 }): Promise<PerformanceEvaluation> {
   const params = new URLSearchParams();
   if (opts?.days_back) params.set("days_back", String(opts.days_back));
-  if (opts?.building_code) params.set("building_code", opts.building_code);
+  if (opts?.site_code) params.set("site_code", opts.site_code);
   const qs = params.toString();
   return fetchJson(`/api/ml-retraining/performance${qs ? `?${qs}` : ""}`);
 }

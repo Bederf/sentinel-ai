@@ -54,7 +54,7 @@ import {
 } from '@/lib/api/pricing'
 
 interface QuoteGeneratorProps {
-  buildingId: string
+  siteId: string
   onQuoteGenerated?: (quote: QuoteResponse, equipmentCodes: string[], slaTier: string, contractMonths: number) => void
 }
 
@@ -74,7 +74,7 @@ interface SLATierDisplay {
 }
 
 export default function QuoteGenerator({
-  buildingId,
+  siteId,
   onQuoteGenerated,
 }: QuoteGeneratorProps) {
   // Form state
@@ -152,7 +152,7 @@ export default function QuoteGenerator({
 
     try {
       const request: QuoteRequest = {
-        building_id: buildingId,
+        site_id: siteId,
         equipment_codes: formData.equipmentCodes,
         sla_tier: formData.slaTier as SLATier,
         contract_months: formData.contractMonths,

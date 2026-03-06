@@ -1,14 +1,14 @@
 """
-SIMBIOT MCP Server for Building Data and Device Control
+SIMBIOT MCP Server for Site Data and Device Control
 
-Provides tools for AI chat integration with building data, asset management,
+Provides tools for AI chat integration with site data, asset management,
 and BMS device control through a standardized MCP interface.
 
 Usage:
     from app.mcp import SIMBIOTMCPServer
 
     server = SIMBIOTMCPServer()
-    result = await server.call_tool("get_buildings")
+    result = await server.call_tool("get_sites")
     result = await server.call_tool("read_device_point", device_id="S001-CHILLER-B1-001", point_name="chw_supply_temp")
 """
 
@@ -26,7 +26,7 @@ from collections import defaultdict
 
 from app.core.site_resolver import get_primary_site
 from app.services.device_abstraction import device_manager
-from app.services.building_loader import get_building_loader
+from app.services.site_loader import get_site_loader
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +82,8 @@ def _load_alerts() -> List[Dict[str, Any]]:
         return []
 
 
-def _calculate_building_health(devices: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Calculate building health metrics from devices."""
+def _calculate_site_health(devices: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Calculate site health metrics from devices."""
     if not devices:
         return {"health_score": 100, "critical_alarms": 0, "warnings": 0}
 
@@ -114,11 +114,11 @@ def _calculate_building_health(devices: List[Dict[str, Any]]) -> Dict[str, Any]:
 # ============================================================================
 
 
-async def get_buildings_tool(status_filter: str = "all", region: Optional[str] = None) -> Dict[str, Any]:
+async def get_sites_tool(status_filter: str = "all", region: Optional[str] = None) -> Dict[str, Any]:
     """
-    List buildings with status summary.
+    List sites with status summary.
 
-    MCP Tool: get_buildings
+    MCP Tool: get_sites
 
     Args:
         status_filter: Filter by status - "all", "critical", "warning", "healthy"
@@ -126,12 +126,12 @@ async def get_buildings_tool(status_filter: str = "all", region: Optional[str] =
 
     Returns:
         Dictionary with:
-        - buildings: Array of building objects with id, name, address, asset_count, health_score, critical_alarms
-        - total: Total number of buildings
-        - filtered: Number of buildings after filtering
+        - sites: Array of site objects with id, name, address, asset_count, health_score, critical_alarms
+        - total: Total number of sites
+        - filtered: Number of sites after filtering
     """
     # Block JSON-only path in live modes
-    guard = _live_mode_guard("get_buildings")
+    guard = _live_mode_guard("get_sites")
     if guard:
         return guard
 
@@ -146,13 +146,13 @@ async def get_buildings_tool(status_filter: str = "all", region: Optional[str] =
             devices_by_site[site_id] = []
         devices_by_site[site_id].append(device)
 
-    buildings = []
+    sites = []
     for site in sites:
         site_id = site.get("id")
         site_devices = devices_by_site.get(site_id, [])
-        health_metrics = _calculate_building_health(site_devices)
+        health_metrics = _calculate_site_health(site_devices)
 
-        building = {
+        site = {
             "id": site_id,
             "name": site.get("name"),
             "address": site.get("address"),
@@ -180,37 +180,37 @@ async def get_buildings_tool(status_filter: str = "all", region: Optional[str] =
         elif status_filter == "healthy" and (health_metrics["critical_alarms"] > 0 or health_metrics["warnings"] > 0):
             continue
 
-        buildings.append(building)
+        sites.append(site)
 
-    return {"buildings": buildings, "total": len(sites), "filtered": len(buildings)}
+    return {"sites": sites, "total": len(sites), "filtered": len(sites)}
 
 
 async def get_assets_tool(
-    building_id: str, asset_type: Optional[str] = None, criticality: Optional[str] = None
+    site_id: str, asset_type: Optional[str] = None, criticality: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    List assets for a building.
+    List assets for a site.
 
     MCP Tool: get_assets
 
     Args:
-        building_id: Building/site ID (required)
+        site_id: Site/site ID (required)
         asset_type: Filter by asset type (AHU, Chiller, FCU, VAV, etc.)
         criticality: Filter by criticality level
 
     Returns:
         Dictionary with:
         - assets: Array of asset objects with id, name, type, location, health_score, status, active_alarms
-        - building_id: The building ID queried
-        - total: Total number of assets for the building
+        - site_id: The site ID queried
+        - total: Total number of assets for the site
     """
     devices = _load_devices()
 
-    # Filter devices by site_id (building_id)
-    building_devices = [d for d in devices if d.get("site_id") == building_id]
+    # Filter devices by site_id (site_id)
+    site_devices = [d for d in devices if d.get("site_id") == site_id]
 
     assets = []
-    for device in building_devices:
+    for device in site_devices:
         hvac_type = device.get("hvac_type", device.get("device_type", "unknown"))
         metadata = device.get("metadata", {})
         safety_status = metadata.get("safety_status", "safe")
@@ -235,7 +235,7 @@ async def get_assets_tool(
             "type": hvac_type.upper() if hvac_type else device.get("device_type", "unknown").upper(),
             "device_type": device.get("device_type"),
             "location": {
-                "building": location.get("building"),
+                "site": location.get("site"),
                 "floor": location.get("floor"),
                 "zone": location.get("zone"),
                 "room": location.get("room"),
@@ -260,7 +260,7 @@ async def get_assets_tool(
 
         assets.append(asset)
 
-    return {"assets": assets, "building_id": building_id, "total": len(assets)}
+    return {"assets": assets, "site_id": site_id, "total": len(assets)}
 
 
 async def get_asset_detail_tool(asset_id: str, include: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -632,7 +632,7 @@ async def write_device_point_tool(
 
 
 async def get_alarms_tool(
-    building_id: Optional[str] = None,
+    site_id: Optional[str] = None,
     asset_id: Optional[str] = None,
     severity: Optional[List[str]] = None,
     state: str = "all",
@@ -646,7 +646,7 @@ async def get_alarms_tool(
     MCP Tool: get_alarms
 
     Args:
-        building_id: Filter by building/site ID
+        site_id: Filter by site ID
         asset_id: Filter by asset/equipment ID
         severity: Filter by severity levels (array of: critical, warning, info)
         state: Filter by alarm state - active, acknowledged, cleared, all (default)
@@ -678,8 +678,8 @@ async def get_alarms_tool(
 
     filtered_alarms = []
     for alert in alerts:
-        # Apply building_id filter
-        if building_id and alert.get("site_id") != building_id:
+        # Apply site_id filter
+        if site_id and alert.get("site_id") != site_id:
             continue
 
         # Apply asset_id filter
@@ -739,7 +739,7 @@ async def get_alarms_tool(
     return {"alarms": limited_alarms, "total": total, "filtered": len(limited_alarms)}
 
 
-async def search_alarms_tool(query: str, building_id: Optional[str] = None, limit: int = 20) -> Dict[str, Any]:
+async def search_alarms_tool(query: str, site_id: Optional[str] = None, limit: int = 20) -> Dict[str, Any]:
     """
     Natural language alarm search with pattern analysis.
 
@@ -749,7 +749,7 @@ async def search_alarms_tool(query: str, building_id: Optional[str] = None, limi
 
     Args:
         query: Natural language search query (e.g., "chiller alarms", "temperature issues")
-        building_id: Optional building/site ID filter
+        site_id: Optional site ID filter
         limit: Maximum number of results (default 20)
 
     Returns:
@@ -798,8 +798,8 @@ async def search_alarms_tool(query: str, building_id: Optional[str] = None, limi
     else:
         interpretation_parts.append(f"Searching for alarms matching: {query}")
 
-    if building_id:
-        interpretation_parts.append(f"in building {building_id}")
+    if site_id:
+        interpretation_parts.append(f"in site {site_id}")
 
     # Time detection
     time_range_days = 14  # Default
@@ -817,8 +817,8 @@ async def search_alarms_tool(query: str, building_id: Optional[str] = None, limi
     # Filter and search alerts
     matched_alerts = []
     for alert in alerts:
-        # Apply building filter
-        if building_id and alert.get("site_id") != building_id:
+        # Apply site filter
+        if site_id and alert.get("site_id") != site_id:
             continue
 
         # Search in title and message
@@ -1022,15 +1022,15 @@ async def get_trends_tool(
     }
 
 
-async def get_health_score_tool(asset_id: Optional[str] = None, building_id: Optional[str] = None) -> Dict[str, Any]:
+async def get_health_score_tool(asset_id: Optional[str] = None, site_id: Optional[str] = None) -> Dict[str, Any]:
     """
-    Get health score breakdown for an asset or building.
+    Get health score breakdown for an asset or site.
 
     MCP Tool: get_health_score
 
     Args:
-        asset_id: Asset/device ID (one of asset_id or building_id required)
-        building_id: Building/site ID (one of asset_id or building_id required)
+        asset_id: Asset/device ID (one of asset_id or site_id required)
+        site_id: Site/site ID (one of asset_id or site_id required)
 
     Returns:
         Dictionary with:
@@ -1040,8 +1040,8 @@ async def get_health_score_tool(asset_id: Optional[str] = None, building_id: Opt
         - trend: improving, stable, declining
         - factors: Contributing factors
     """
-    if not asset_id and not building_id:
-        return {"error": "Either asset_id or building_id is required"}
+    if not asset_id and not site_id:
+        return {"error": "Either asset_id or site_id is required"}
 
     devices = _load_devices()
     alerts = _load_alerts()
@@ -1123,18 +1123,18 @@ async def get_health_score_tool(asset_id: Optional[str] = None, building_id: Opt
         }
 
     else:
-        # Building health score (aggregate)
-        building_devices = [d for d in devices if d.get("site_id") == building_id]
+        # Site health score (aggregate)
+        site_devices = [d for d in devices if d.get("site_id") == site_id]
 
-        if not building_devices:
-            return {"error": f"No devices found for building {building_id}"}
+        if not site_devices:
+            return {"error": f"No devices found for site {site_id}"}
 
         # Calculate per-device scores
         device_scores = []
         critical_count = 0
         warning_count = 0
 
-        for device in building_devices:
+        for device in site_devices:
             metadata = device.get("metadata", {})
             safety_status = metadata.get("safety_status", "safe")
 
@@ -1149,8 +1149,8 @@ async def get_health_score_tool(asset_id: Optional[str] = None, building_id: Opt
 
         overall_score = round(sum(device_scores) / len(device_scores)) if device_scores else 100
 
-        # Count building alarms
-        building_alarms = [a for a in alerts if a.get("site_id") == building_id]
+        # Count site alarms
+        site_alarms = [a for a in alerts if a.get("site_id") == site_id]
 
         # Determine status
         if critical_count > 0 or overall_score < 40:
@@ -1163,28 +1163,28 @@ async def get_health_score_tool(asset_id: Optional[str] = None, building_id: Opt
             status = "healthy"
 
         return {
-            "building_id": building_id,
+            "site_id": site_id,
             "score": overall_score,
             "status": status,
             "trend": "stable",
             "breakdown": {
-                "device_count": len(building_devices),
+                "device_count": len(site_devices),
                 "healthy_devices": len([s for s in device_scores if s >= 80]),
                 "warning_devices": warning_count,
                 "critical_devices": critical_count,
             },
-            "active_alarms": len(building_alarms),
+            "active_alarms": len(site_alarms),
             "factors": [
-                f"Total devices: {len(building_devices)}",
+                f"Total devices: {len(site_devices)}",
                 f"Critical devices: {critical_count}",
                 f"Warning devices: {warning_count}",
-                f"Active alarms: {len(building_alarms)}",
+                f"Active alarms: {len(site_alarms)}",
             ],
         }
 
 
 async def get_work_orders_tool(
-    building_id: Optional[str] = None, asset_id: Optional[str] = None, status: str = "all", limit: int = 50
+    site_id: Optional[str] = None, asset_id: Optional[str] = None, status: str = "all", limit: int = 50
 ) -> Dict[str, Any]:
     """
     Get work orders.
@@ -1192,7 +1192,7 @@ async def get_work_orders_tool(
     MCP Tool: get_work_orders
 
     Args:
-        building_id: Filter by building/site ID
+        site_id: Filter by site ID
         asset_id: Filter by asset ID
         status: Filter by status - open, completed, all (default)
         limit: Maximum number of work orders (default 50)
@@ -1224,7 +1224,7 @@ async def get_work_orders_tool(
     # Add technician work orders
     for wo in technician_wos:
         # Apply filters
-        if building_id and wo.get("site_id") != building_id:
+        if site_id and wo.get("site_id") != site_id:
             continue
         if asset_id and wo.get("equipment_id") != asset_id:
             continue
@@ -1254,7 +1254,7 @@ async def get_work_orders_tool(
     # Add CSV work orders
     for wo in csv_work_orders:
         # Apply filters
-        if building_id and wo.get("site_id") != building_id:
+        if site_id and wo.get("site_id") != site_id:
             continue
         if asset_id and wo.get("asset_id") != asset_id:
             continue
@@ -1294,7 +1294,7 @@ async def get_work_orders_tool(
 
 
 async def create_work_order_tool(
-    building_id: str,
+    site_id: str,
     asset_id: str,
     description: str,
     priority: str = "medium",
@@ -1309,7 +1309,7 @@ async def create_work_order_tool(
     This operation creates a work order and logs the action for audit purposes.
 
     Args:
-        building_id: Building/site ID (required)
+        site_id: Site/site ID (required)
         asset_id: Asset/device ID (required)
         description: Fault description (required)
         priority: Priority level - low, medium, high, critical (default: medium)
@@ -1332,7 +1332,7 @@ async def create_work_order_tool(
     # Create work order
     work_order = {
         "id": wo_number,
-        "site_id": building_id,
+        "site_id": site_id,
         "equipment_id": asset_id,
         "fault_description": description,
         "diagnosis": f"AI-generated work order for {asset_id}",
@@ -1369,7 +1369,7 @@ async def create_work_order_tool(
             resource_type="work_order",
             resource_id=wo_number,
             details={
-                "building_id": building_id,
+                "site_id": site_id,
                 "asset_id": asset_id,
                 "description": description,
                 "priority": priority,
@@ -1383,7 +1383,7 @@ async def create_work_order_tool(
         "wo_number": wo_number,
         "status": "draft",
         "created_at": work_order["created_at"].isoformat(),
-        "building_id": building_id,
+        "site_id": site_id,
         "asset_id": asset_id,
         "description": description,
         "priority": priority,
@@ -1399,7 +1399,7 @@ async def create_work_order_tool(
 
 
 async def get_contracts_tool(
-    building_id: Optional[str] = None,
+    site_id: Optional[str] = None,
     organization_code: Optional[str] = None,
     status: Optional[str] = None,
     include_sla: bool = False,
@@ -1410,7 +1410,7 @@ async def get_contracts_tool(
     MCP Tool: get_contracts
 
     Args:
-        building_id: Filter by building/site ID
+        site_id: Filter by site ID
         organization_code: Filter by organization code (e.g., ORG-SITE-002)
         status: Filter by status - active, expired, draft
         include_sla: Include SLA terms in response (default false)
@@ -1418,20 +1418,20 @@ async def get_contracts_tool(
     Returns:
         Dictionary with contracts list and total count
     """
-    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
+    sites_path = Path(__file__).parent.parent / "data" / "sites"
     contracts = []
 
-    # Scan all building directories for contract.json files
-    if buildings_path.exists():
-        for building_dir in sorted(buildings_path.iterdir()):
-            if not building_dir.is_dir() or building_dir.name.startswith("_"):
+    # Scan all site directories for contract.json files
+    if sites_path.exists():
+        for site_dir in sorted(sites_path.iterdir()):
+            if not site_dir.is_dir() or site_dir.name.startswith("_"):
                 continue
 
-            # Filter by building_id if specified
-            if building_id and building_dir.name != building_id:
+            # Filter by site_id if specified
+            if site_id and site_dir.name != site_id:
                 continue
 
-            contract_file = building_dir / "contract.json"
+            contract_file = site_dir / "contract.json"
             if not contract_file.exists():
                 continue
 
@@ -1439,7 +1439,7 @@ async def get_contracts_tool(
                 with open(contract_file, "r") as f:
                     contract_data = json.load(f)
             except Exception as e:
-                logger.warning(f"Failed to load contract for {building_dir.name}: {e}")
+                logger.warning(f"Failed to load contract for {site_dir.name}: {e}")
                 continue
 
             # Filter by organization_code
@@ -1455,7 +1455,7 @@ async def get_contracts_tool(
 
             # Build summary
             summary = {
-                "building_id": building_dir.name,
+                "site_id": site_dir.name,
                 "contract_code": contract_data.get("contract_code"),
                 "organization": contract_data.get("organization", {}).get("name"),
                 "organization_code": contract_data.get("organization", {}).get("code"),
@@ -1475,8 +1475,8 @@ async def get_contracts_tool(
     return {"contracts": contracts, "total": len(contracts)}
 
 
-async def add_building_contract_tool(
-    building_code: str,
+async def add_site_contract_tool(
+    site_code: str,
     organization_name: str,
     organization_code: str,
     contract_type: str,
@@ -1488,15 +1488,15 @@ async def add_building_contract_tool(
     condition_assessment: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Create a detailed contract for a building.
+    Create a detailed contract for a site.
 
-    MCP Tool: add_building_contract
+    MCP Tool: add_site_contract
 
-    Writes contract.json to the building directory and updates building.json
+    Writes contract.json to the site directory and updates site.json
     with basic contract fields (dual-write pattern).
 
     Args:
-        building_code: Building/site ID (e.g., site-002)
+        site_code: Site/site ID (e.g., site-002)
         organization_name: Client organization name
         organization_code: Organization code (e.g., ORG-SITE-002)
         contract_type: Contract type (full_maintenance, preventive_only, ad_hoc, consulting)
@@ -1510,16 +1510,16 @@ async def add_building_contract_tool(
     Returns:
         Success status with contract code
     """
-    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
-    building_path = buildings_path / building_code
+    sites_path = Path(__file__).parent.parent / "data" / "sites"
+    site_path = sites_path / site_code
 
-    if not building_path.exists():
-        return {"success": False, "error": f"Building '{building_code}' not found"}
+    if not site_path.exists():
+        return {"success": False, "error": f"Site '{site_code}' not found"}
 
     # Generate contract code
     year = start_date[:4] if start_date else str(datetime.now().year)
     org_short = organization_code.replace("ORG-", "") if organization_code.startswith("ORG-") else organization_code
-    contract_code = f"CON-{org_short}-{building_code.upper()}-{year}"
+    contract_code = f"CON-{org_short}-{site_code.upper()}-{year}"
 
     # Build contract data
     contract_data = {
@@ -1557,41 +1557,41 @@ async def add_building_contract_tool(
     }
 
     # Write contract.json
-    contract_file = building_path / "contract.json"
+    contract_file = site_path / "contract.json"
     with open(contract_file, "w") as f:
         json.dump(contract_data, f, indent=2)
 
-    # Update building.json with basic contract fields
-    building_file = building_path / "building.json"
-    if building_file.exists():
+    # Update site.json with basic contract fields
+    site_file = site_path / "site.json"
+    if site_file.exists():
         try:
-            with open(building_file, "r") as f:
-                building_data = json.load(f)
+            with open(site_file, "r") as f:
+                site_data = json.load(f)
 
-            building_data["client_name"] = organization_name
-            building_data["organization_code"] = organization_code
-            building_data["monthly_fee_zar"] = monthly_fee_zar
-            building_data["contract_start"] = start_date
-            building_data["contract_end"] = end_date
-            building_data["contract_type"] = contract_type
+            site_data["client_name"] = organization_name
+            site_data["organization_code"] = organization_code
+            site_data["monthly_fee_zar"] = monthly_fee_zar
+            site_data["contract_start"] = start_date
+            site_data["contract_end"] = end_date
+            site_data["contract_type"] = contract_type
 
-            with open(building_file, "w") as f:
-                json.dump(building_data, f, indent=2)
+            with open(site_file, "w") as f:
+                json.dump(site_data, f, indent=2)
         except Exception as e:
-            logger.warning(f"Failed to update building.json for {building_code}: {e}")
+            logger.warning(f"Failed to update site.json for {site_code}: {e}")
 
-    logger.info(f"Created contract {contract_code} for building {building_code}")
+    logger.info(f"Created contract {contract_code} for site {site_code}")
 
     return {
         "success": True,
         "contract_code": contract_code,
-        "building_code": building_code,
-        "message": f"Contract created for building {building_code}",
+        "site_code": site_code,
+        "message": f"Contract created for site {site_code}",
     }
 
 
 async def get_contract_profitability_tool(
-    building_code: Optional[str] = None, year: Optional[int] = None, month: Optional[int] = None
+    site_code: Optional[str] = None, year: Optional[int] = None, month: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Get contract profitability snapshot.
@@ -1599,14 +1599,14 @@ async def get_contract_profitability_tool(
     MCP Tool: get_contract_profitability
 
     Args:
-        building_code: Filter by building (all buildings if not specified)
+        site_code: Filter by site (all sites if not specified)
         year: Filter by year (default: current year)
         month: Filter by month (optional)
 
     Returns:
         Profitability data with portfolio summary
     """
-    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
+    sites_path = Path(__file__).parent.parent / "data" / "sites"
     profitability = []
     total_revenue = 0
     total_costs = 0
@@ -1614,15 +1614,15 @@ async def get_contract_profitability_tool(
 
     target_year = year or datetime.now().year
 
-    if buildings_path.exists():
-        for building_dir in sorted(buildings_path.iterdir()):
-            if not building_dir.is_dir() or building_dir.name.startswith("_"):
+    if sites_path.exists():
+        for site_dir in sorted(sites_path.iterdir()):
+            if not site_dir.is_dir() or site_dir.name.startswith("_"):
                 continue
 
-            if building_code and building_dir.name != building_code:
+            if site_code and site_dir.name != site_code:
                 continue
 
-            contract_file = building_dir / "contract.json"
+            contract_file = site_dir / "contract.json"
             if not contract_file.exists():
                 continue
 
@@ -1630,7 +1630,7 @@ async def get_contract_profitability_tool(
                 with open(contract_file, "r") as f:
                     contract_data = json.load(f)
             except Exception as e:
-                logger.warning(f"Failed to load contract for {building_dir.name}: {e}")
+                logger.warning(f"Failed to load contract for {site_dir.name}: {e}")
                 continue
 
             snapshot = contract_data.get("profitability_snapshot", {})
@@ -1649,7 +1649,7 @@ async def get_contract_profitability_tool(
             is_at_risk = net_margin < 10.0
 
             entry = {
-                "building_id": building_dir.name,
+                "site_id": site_dir.name,
                 "organization": org.get("name"),
                 "contract_code": contract_data.get("contract_code"),
                 "contract_type": contract_info.get("type"),
@@ -1690,7 +1690,7 @@ async def get_contract_profitability_tool(
 
 
 async def process_municipal_bill_tool(
-    building_id: str,
+    site_id: str,
     pdf_file_path: str,
     municipality: str,
     utility_type: str,
@@ -1705,7 +1705,7 @@ async def process_municipal_bill_tool(
     MCP Tool: process_municipal_bill
 
     Args:
-        building_id: Building/site ID (e.g., the registered building code)
+        site_id: Site/site ID (e.g., the registered site code)
         pdf_file_path: Absolute path to PDF file
         municipality: Municipality name (e.g., "city_of_johannesburg")
         utility_type: "electricity" or "water"
@@ -1734,7 +1734,7 @@ async def process_municipal_bill_tool(
         repo = MunicipalInvoiceRepository()
 
         account = repo.get_or_create_account(
-            site_id=building_id,
+            site_id=site_id,
             municipality=municipality,
             utility_type=utility_type,
             account_number=account_number,
@@ -1742,17 +1742,17 @@ async def process_municipal_bill_tool(
         )
 
         if not account:
-            logger.error(f"Failed to create municipal account for {building_id}")
+            logger.error(f"Failed to create municipal account for {site_id}")
             return {
                 "error": "account_creation_failed",
-                "message": f"Failed to create municipal account for {building_id}",
+                "message": f"Failed to create municipal account for {site_id}",
                 "extracted_data": extracted_data,
             }
 
         # Create invoice record
         invoice_payload = {
             "account_id": account.get("id"),
-            "site_id": building_id,
+            "site_id": site_id,
             "municipality": municipality,
             "utility_type": utility_type,
             "invoice_number": extracted_data.get("invoice_number"),
@@ -1770,13 +1770,13 @@ async def process_municipal_bill_tool(
 
         invoice = repo.create_invoice(invoice_payload)
 
-        # ===== PHASE 081: Update buildings table with extracted NMD =====
-        # If electricity bill, extract NMD and update building record
+        # ===== PHASE 081: Update sites table with extracted NMD =====
+        # If electricity bill, extract NMD and update site record
         if utility_type == "electricity" and invoice:
             try:
-                from app.database.repositories.building_repository import BuildingRepository
+                from app.database.repositories.site_repository import SiteRepository
 
-                building_repo = BuildingRepository()
+                site_repo = SiteRepository()
 
                 # Extract NMD and demand charge from bill
                 extracted_nmd_kva = extracted_data.get("demand_kva")
@@ -1784,8 +1784,8 @@ async def process_municipal_bill_tool(
                 billing_end = extracted_data.get("billing_period_end")
 
                 if extracted_nmd_kva:
-                    # Update building with real NMD from bill
-                    building_update = {
+                    # Update site with real NMD from bill
+                    site_update = {
                         "nmd_limit_kva": float(extracted_nmd_kva),
                         "demand_charge_per_kva": 395.48,  # City Power LPU-TOU 2025/26 verified
                         "electricity_provider": municipality,
@@ -1797,23 +1797,23 @@ async def process_municipal_bill_tool(
 
                     # Add billing cycle dates if extracted
                     if billing_start:
-                        building_update["billing_cycle_start_date"] = billing_start
+                        site_update["billing_cycle_start_date"] = billing_start
                     if billing_end:
-                        building_update["billing_cycle_end_date"] = billing_end
+                        site_update["billing_cycle_end_date"] = billing_end
 
-                    # Update the building
-                    await building_repo.update(building_id, building_update)
+                    # Update the site
+                    await site_repo.update(site_id, site_update)
 
                     logger.info(
-                        f"Updated building {building_id} NMD from bill: {extracted_nmd_kva} kVA "
+                        f"Updated site {site_id} NMD from bill: {extracted_nmd_kva} kVA "
                         f"(confidence: {extracted_data.get('confidence', 0.0)})"
                     )
             except Exception as exc:
-                logger.warning(f"Failed to update building NMD from bill: {exc}")
+                logger.warning(f"Failed to update site NMD from bill: {exc}")
         # ===== END PHASE 081 =====
 
         return {
-            "building_id": building_id,
+            "site_id": site_id,
             "municipality": municipality,
             "utility_type": utility_type,
             "account_number": account_number,
@@ -1832,23 +1832,23 @@ async def process_municipal_bill_tool(
         return {
             "error": "processing_failed",
             "message": f"Failed to process PDF: {str(exc)}",
-            "building_id": building_id,
+            "site_id": site_id,
             "pdf_file": pdf_file_path,
         }
 
 
 async def get_utility_costs_tool(
-    building_id: str, period_start: Optional[str] = None, period_end: Optional[str] = None
+    site_id: str, period_start: Optional[str] = None, period_end: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Get utility cost analysis for a building from municipal bills.
+    Get utility cost analysis for a site from municipal bills.
 
     Returns total costs, averages, and trends for electricity and water.
 
     MCP Tool: get_utility_costs
 
     Args:
-        building_id: Building/site ID
+        site_id: Site/site ID
         period_start: Period start ISO date (default: current month start)
         period_end: Period end ISO date (default: current month end)
 
@@ -1877,7 +1877,7 @@ async def get_utility_costs_tool(
         end = date.fromisoformat(period_end) if isinstance(period_end, str) else period_end
 
         invoices = repo.list_invoices(
-            site_id=building_id,
+            site_id=site_id,
             limit=1000,  # Large limit to get all invoices for period
         )
 
@@ -1911,7 +1911,7 @@ async def get_utility_costs_tool(
         water_count = sum(1 for inv in filtered_invoices if inv.get("utility_type") == "water")
 
         return {
-            "building_id": building_id,
+            "site_id": site_id,
             "period": {"start": period_start, "end": period_end},
             "electricity_cost_zar": round(electricity_total, 2),
             "water_cost_zar": round(water_total, 2),
@@ -1930,41 +1930,41 @@ async def get_utility_costs_tool(
         return {
             "error": "query_failed",
             "message": f"Failed to query utility costs: {str(exc)}",
-            "building_id": building_id,
+            "site_id": site_id,
         }
 
 
 # ============================================================================
-# Building Management Tools (for onboarding)
+# Site Management Tools (for onboarding)
 # ============================================================================
 
 
-async def list_managed_buildings_tool() -> Dict[str, Any]:
-    """List all managed buildings."""
-    loader = get_building_loader()
+async def list_managed_sites_tool() -> Dict[str, Any]:
+    """List all managed sites."""
+    loader = get_site_loader()
     loader.load(force=True)
 
     registry = loader.get_registry()
-    active_ids = set(registry.get("active_buildings", []))
+    active_ids = set(registry.get("active_sites", []))
 
-    buildings = []
-    for building in loader.get_all_buildings():
-        info = building.to_dict()
-        info["is_active"] = building.id in active_ids
-        info["desk_count"] = len(loader.get_desks(building.id))
-        info["zone_count"] = len(loader.get_zones(building.id))
-        buildings.append(info)
+    sites = []
+    for site in loader.get_all_sites():
+        info = site.to_dict()
+        info["is_active"] = site.id in active_ids
+        info["desk_count"] = len(loader.get_desks(site.id))
+        info["zone_count"] = len(loader.get_zones(site.id))
+        sites.append(info)
 
     return {
-        "buildings": buildings,
-        "total": len(buildings),
+        "sites": sites,
+        "total": len(sites),
         "active_count": len(active_ids),
-        "default_building": registry.get("default_building"),
+        "default_site": registry.get("default_site"),
     }
 
 
-async def create_building_tool(
-    building_id: str,
+async def create_site_tool(
+    site_id: str,
     name: str,
     address: str = "",
     floors: List[str] = None,
@@ -1974,7 +1974,7 @@ async def create_building_tool(
     contract_start: Optional[str] = None,
     contract_end: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Create a new building configuration.
+    """Create a new site configuration.
 
     Writes to both Supabase (primary) and JSON files (backup).
     When contract fields (client_name, monthly_fee_zar, contract_start, contract_end)
@@ -1984,21 +1984,21 @@ async def create_building_tool(
     import uuid
     from pathlib import Path
 
-    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
-    building_path = buildings_path / building_id
+    sites_path = Path(__file__).parent.parent / "data" / "sites"
+    site_path = sites_path / site_id
 
-    if building_path.exists():
+    if site_path.exists():
         return {
             "success": False,
-            "error": f"Building '{building_id}' already exists",
+            "error": f"Site '{site_id}' already exists",
         }
 
-    # Generate deterministic UUID from building_id
-    building_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"building-{building_id}"))
+    # Generate deterministic UUID from site_id
+    site_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"site-{site_id}"))
 
-    # Prepare building data
-    building_data = {
-        "id": building_id,
+    # Prepare site data
+    site_data = {
+        "id": site_id,
         "name": name,
         "display_name": name,
         "address": address,
@@ -2013,15 +2013,15 @@ async def create_building_tool(
         "metadata": {},
     }
 
-    # Add contract fields to building data if provided
+    # Add contract fields to site data if provided
     if client_name:
-        building_data["client_name"] = client_name
+        site_data["client_name"] = client_name
     if monthly_fee_zar is not None:
-        building_data["monthly_fee_zar"] = monthly_fee_zar
+        site_data["monthly_fee_zar"] = monthly_fee_zar
     if contract_start:
-        building_data["contract_start"] = contract_start
+        site_data["contract_start"] = contract_start
     if contract_end:
-        building_data["contract_end"] = contract_end
+        site_data["contract_end"] = contract_end
 
     supabase_written = False
 
@@ -2030,22 +2030,22 @@ async def create_building_tool(
         from app.config.settings import settings
 
         if settings.supabase_url and settings.supabase_service_role_key:
-            from app.database.repositories import BuildingRepository
+            from app.database.repositories import SiteRepository
 
-            repo = BuildingRepository()
+            repo = SiteRepository()
 
-            # Check if building already exists in Supabase
-            existing = repo.get_by_id(building_id)
+            # Check if site already exists in Supabase
+            existing = repo.get_by_id(site_id)
             if existing:
                 return {
                     "success": False,
-                    "error": f"Building '{building_id}' already exists in database",
+                    "error": f"Site '{site_id}' already exists in database",
                 }
 
             # Create in Supabase
             supabase_record = {
-                "id": building_uuid,
-                "code": building_id,
+                "id": site_uuid,
+                "code": site_id,
                 "name": name,
                 "address": address,
                 "type": "branch",
@@ -2053,20 +2053,20 @@ async def create_building_tool(
             }
             repo.create(supabase_record)
             supabase_written = True
-            logger.info(f"Created building in Supabase: {building_id}")
+            logger.info(f"Created site in Supabase: {site_id}")
     except Exception as e:
         logger.warning(f"Supabase write failed, will use JSON only: {e}")
 
     # 2. Always write to JSON files (backup + offline mode)
-    building_path.mkdir(parents=True, exist_ok=True)
+    site_path.mkdir(parents=True, exist_ok=True)
 
-    with open(building_path / "building.json", "w") as f:
-        json.dump(building_data, f, indent=2)
+    with open(site_path / "site.json", "w") as f:
+        json.dump(site_data, f, indent=2)
 
     # Create empty data files
-    with open(building_path / "desks.json", "w") as f:
+    with open(site_path / "desks.json", "w") as f:
         json.dump([], f, indent=2)
-    with open(building_path / "zones.json", "w") as f:
+    with open(site_path / "zones.json", "w") as f:
         json.dump([], f, indent=2)
 
     # 3. Auto-create contract.json if contract fields provided
@@ -2074,7 +2074,7 @@ async def create_building_tool(
     if client_name and monthly_fee_zar and contract_start and contract_end:
         year = contract_start[:4]
         contract_data = {
-            "contract_code": f"CON-{building_id.upper()}-{year}",
+            "contract_code": f"CON-{site_id.upper()}-{year}",
             "organization": {
                 "code": "",
                 "name": client_name,
@@ -2106,48 +2106,48 @@ async def create_building_tool(
                 "net_margin_percent": 0,
             },
         }
-        with open(building_path / "contract.json", "w") as f:
+        with open(site_path / "contract.json", "w") as f:
             json.dump(contract_data, f, indent=2)
         contract_created = True
 
-    logger.info(f"Created building via MCP: {building_id}")
+    logger.info(f"Created site via MCP: {site_id}")
 
     result = {
         "success": True,
-        "building_id": building_id,
+        "site_id": site_id,
         "name": name,
         "status": "created",
         "storage": "supabase+json" if supabase_written else "json",
-        "message": f"Building '{name}' created. Add desks/zones, then activate.",
+        "message": f"Site '{name}' created. Add desks/zones, then activate.",
         "next_steps": [
-            "Add desks to the building",
-            "Add HVAC zones to the building",
-            f"Call activate_building with building_id='{building_id}'",
+            "Add desks to the site",
+            "Add HVAC zones to the site",
+            f"Call activate_site with site_id='{site_id}'",
         ],
     }
     if contract_created:
         result["contract_created"] = True
-        result["message"] = f"Building '{name}' created with contract. Add desks/zones, then activate."
+        result["message"] = f"Site '{name}' created with contract. Add desks/zones, then activate."
 
     return result
 
 
-async def activate_building_tool(
-    building_id: str,
+async def activate_site_tool(
+    site_id: str,
     set_default: bool = False,
 ) -> Dict[str, Any]:
-    """Activate a building (add to registry)."""
+    """Activate a site (add to registry)."""
     import json
     from pathlib import Path
 
-    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
-    building_path = buildings_path / building_id
-    registry_path = buildings_path / "_registry.json"
+    sites_path = Path(__file__).parent.parent / "data" / "sites"
+    site_path = sites_path / site_id
+    registry_path = sites_path / "_registry.json"
 
-    if not building_path.exists():
+    if not site_path.exists():
         return {
             "success": False,
-            "error": f"Building '{building_id}' not found",
+            "error": f"Site '{site_id}' not found",
         }
 
     # Load/create registry
@@ -2155,55 +2155,55 @@ async def activate_building_tool(
         with open(registry_path) as f:
             registry = json.load(f)
     else:
-        registry = {"active_buildings": [], "default_building": None}
+        registry = {"active_sites": [], "default_site": None}
 
     # Add to active
-    if building_id not in registry["active_buildings"]:
-        registry["active_buildings"].append(building_id)
+    if site_id not in registry["active_sites"]:
+        registry["active_sites"].append(site_id)
 
-    if set_default or not registry.get("default_building"):
-        registry["default_building"] = building_id
+    if set_default or not registry.get("default_site"):
+        registry["default_site"] = site_id
 
     # Save registry
     with open(registry_path, "w") as f:
         json.dump(registry, f, indent=2)
 
     # Reload
-    loader = get_building_loader()
+    loader = get_site_loader()
     loader.load(force=True)
 
-    logger.info(f"Activated building via MCP: {building_id}")
+    logger.info(f"Activated site via MCP: {site_id}")
 
     return {
         "success": True,
-        "building_id": building_id,
+        "site_id": site_id,
         "status": "active",
-        "is_default": registry["default_building"] == building_id,
-        "message": f"Building '{building_id}' is now active",
+        "is_default": registry["default_site"] == site_id,
+        "message": f"Site '{site_id}' is now active",
     }
 
 
-async def get_building_config_tool(building_id: str) -> Dict[str, Any]:
-    """Get a building's full configuration."""
-    # Resolve to primary registered building if not specified
-    building_id = building_id or get_primary_site() or "unknown"
+async def get_site_config_tool(site_id: str) -> Dict[str, Any]:
+    """Get a site's full configuration."""
+    # Resolve to primary registered site if not specified
+    site_id = site_id or get_primary_site() or "unknown"
 
-    loader = get_building_loader()
-    building = loader.get_building(building_id)
+    loader = get_site_loader()
+    site = loader.get_site(site_id)
 
-    if not building:
+    if not site:
         return {
             "success": False,
-            "error": f"Building '{building_id}' not found",
+            "error": f"Site '{site_id}' not found",
         }
 
-    desks = loader.get_desks(building_id)
-    zones = loader.get_zones(building_id)
+    desks = loader.get_desks(site_id)
+    zones = loader.get_zones(site_id)
 
     return {
         "success": True,
-        "building": building.to_dict(),
-        "is_active": building_id in loader.get_active_building_ids(),
+        "site": site.to_dict(),
+        "is_active": site_id in loader.get_active_site_ids(),
         "desks": {
             "count": len(desks),
             "sample": desks[:5] if desks else [],
@@ -2220,12 +2220,12 @@ async def get_building_config_tool(building_id: str) -> Dict[str, Any]:
 # ============================================================================
 
 
-async def add_building_zones_tool(
-    building_id: str,
+async def add_site_zones_tool(
+    site_id: str,
     zones: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """
-    Add HVAC zones to a building with equipment mappings.
+    Add HVAC zones to a site with equipment mappings.
 
     Writes to both Supabase (primary) and JSON files (backup).
 
@@ -2246,14 +2246,14 @@ async def add_building_zones_tool(
     import uuid
     from pathlib import Path
 
-    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
-    building_path = buildings_path / building_id
-    zones_file = building_path / "zones.json"
+    sites_path = Path(__file__).parent.parent / "data" / "sites"
+    site_path = sites_path / site_id
+    zones_file = site_path / "zones.json"
 
-    if not building_path.exists():
+    if not site_path.exists():
         return {
             "success": False,
-            "error": f"Building '{building_id}' not found. Create it first with create_building.",
+            "error": f"Site '{site_id}' not found. Create it first with create_site.",
         }
 
     # Validate and normalize zone data
@@ -2294,9 +2294,9 @@ async def add_building_zones_tool(
 
             repo = HVACZoneRepository()
 
-            # Get building UUID
-            building_uuid = repo.get_building_uuid(building_id)
-            if building_uuid:
+            # Get site UUID
+            site_uuid = repo.get_site_uuid(site_id)
+            if site_uuid:
                 # Prepare Supabase records
                 supabase_zones = []
                 for zone in normalized_zones:
@@ -2305,7 +2305,7 @@ async def add_building_zones_tool(
                         "id": zone_uuid,
                         "zone_id": zone["zone_id"],
                         "zone_name": zone["zone_name"],
-                        "building_id": building_uuid,
+                        "site_id": site_uuid,
                         "floor": zone["floor"],
                         "fcu_id": zone.get("fcu_id"),
                         "vav_id": zone.get("vav_id"),
@@ -2322,7 +2322,7 @@ async def add_building_zones_tool(
 
                 repo.upsert_many(supabase_zones)
                 supabase_written = True
-                logger.info(f"Wrote {len(supabase_zones)} zones to Supabase for {building_id}")
+                logger.info(f"Wrote {len(supabase_zones)} zones to Supabase for {site_id}")
     except Exception as e:
         logger.warning(f"Supabase zone write failed, will use JSON only: {e}")
 
@@ -2344,29 +2344,29 @@ async def add_building_zones_tool(
     with open(zones_file, "w") as f:
         json.dump(existing_zones, f, indent=2)
 
-    # Reload building data
-    loader = get_building_loader()
+    # Reload site data
+    loader = get_site_loader()
     loader.load(force=True)
 
-    logger.info(f"Added {len(normalized_zones)} zones to building {building_id}")
+    logger.info(f"Added {len(normalized_zones)} zones to site {site_id}")
 
     return {
         "success": True,
-        "building_id": building_id,
+        "site_id": site_id,
         "zones_added": len(normalized_zones),
         "total_zones": len(existing_zones),
         "zone_ids": [z["zone_id"] for z in normalized_zones],
         "storage": "supabase+json" if supabase_written else "json",
-        "message": f"Added {len(normalized_zones)} zones to '{building_id}'",
+        "message": f"Added {len(normalized_zones)} zones to '{site_id}'",
     }
 
 
-async def add_building_desks_tool(
-    building_id: str,
+async def add_site_desks_tool(
+    site_id: str,
     desks: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """
-    Add desks to a building with zone mappings, DALI lighting, and environmental context.
+    Add desks to a site with zone mappings, DALI lighting, and environmental context.
 
     Each desk should include:
     - desk_id: Unique desk identifier (e.g., "201", "L12-D001")
@@ -2387,14 +2387,14 @@ async def add_building_desks_tool(
     import json
     from pathlib import Path
 
-    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
-    building_path = buildings_path / building_id
-    desks_file = building_path / "desks.json"
+    sites_path = Path(__file__).parent.parent / "data" / "sites"
+    site_path = sites_path / site_id
+    desks_file = site_path / "desks.json"
 
-    if not building_path.exists():
+    if not site_path.exists():
         return {
             "success": False,
-            "error": f"Building '{building_id}' not found. Create it first with create_building.",
+            "error": f"Site '{site_id}' not found. Create it first with create_site.",
         }
 
     # Validate and normalize desk data
@@ -2440,9 +2440,9 @@ async def add_building_desks_tool(
 
             repo = DeskRepository()
 
-            # Get building UUID
-            building_uuid = repo.get_building_uuid(building_id)
-            if building_uuid:
+            # Get site UUID
+            site_uuid = repo.get_site_uuid(site_id)
+            if site_uuid:
                 # Prepare Supabase records
                 supabase_desks = []
                 for desk in normalized_desks:
@@ -2456,7 +2456,7 @@ async def add_building_desks_tool(
                     supabase_desk = {
                         "id": desk_uuid,
                         "desk_id": desk["desk_id"],
-                        "building_id": building_uuid,
+                        "site_id": site_uuid,
                         "hvac_zone_id": hvac_zone_uuid,
                         "floor": desk.get("floor", ""),
                         "window_facing": desk.get("orientation"),
@@ -2473,7 +2473,7 @@ async def add_building_desks_tool(
 
                 repo.upsert_many(supabase_desks)
                 supabase_written = True
-                logger.info(f"Wrote {len(supabase_desks)} desks to Supabase for {building_id}")
+                logger.info(f"Wrote {len(supabase_desks)} desks to Supabase for {site_id}")
     except Exception as e:
         logger.warning(f"Supabase desk write failed, will use JSON only: {e}")
 
@@ -2495,33 +2495,33 @@ async def add_building_desks_tool(
     with open(desks_file, "w") as f:
         json.dump(existing_desks, f, indent=2)
 
-    # Reload building data
-    loader = get_building_loader()
+    # Reload site data
+    loader = get_site_loader()
     loader.load(force=True)
 
-    logger.info(f"Added {len(normalized_desks)} desks to building {building_id}")
+    logger.info(f"Added {len(normalized_desks)} desks to site {site_id}")
 
     return {
         "success": True,
-        "building_id": building_id,
+        "site_id": site_id,
         "desks_added": len(normalized_desks),
         "total_desks": len(existing_desks),
         "desk_ids": [d["desk_id"] for d in normalized_desks[:10]],
         "storage": "supabase+json" if supabase_written else "json",
-        "message": f"Added {len(normalized_desks)} desks to '{building_id}'",
+        "message": f"Added {len(normalized_desks)} desks to '{site_id}'",
     }
 
 
-async def add_building_devices_tool(
-    building_id: str,
+async def add_site_devices_tool(
+    site_id: str,
     devices: List[Dict[str, Any]],
     site_code: str = None,
 ) -> Dict[str, Any]:
     """
-    Add BMS devices to the system for a building.
+    Add BMS devices to the system for a site.
 
     Each device should include:
-    - device_id: Unique device ID (following naming convention: {site}-{building}-{type}-{seq})
+    - device_id: Unique device ID (following naming convention: {site}-{site}-{type}-{seq})
     - device_type: Type (chiller, ahu, fcu, vav, etc.)
     - name: Display name
     - location: Location description
@@ -2549,9 +2549,9 @@ async def add_building_devices_tool(
         dtype = d.get("device_type", "unknown")
         type_counts[dtype] += 1
 
-    # Use site code from building_id if not provided
+    # Use site code from site_id if not provided
     if not site_code:
-        site_code = building_id[:3] if len(building_id) >= 3 else building_id
+        site_code = site_id[:3] if len(site_id) >= 3 else site_id
 
     # Normalize devices
     new_devices = []
@@ -2561,7 +2561,7 @@ async def add_building_devices_tool(
         # Auto-generate device_id if not provided
         if not device.get("device_id"):
             type_counts[device_type] += 1
-            device_id = f"{site_code}-{building_id[:3]}-{device_type}-{type_counts[device_type]:03d}"
+            device_id = f"{site_code}-{site_id[:3]}-{device_type}-{type_counts[device_type]:03d}"
         else:
             device_id = device["device_id"]
 
@@ -2569,10 +2569,10 @@ async def add_building_devices_tool(
             "device_id": device_id,
             "device_type": device_type,
             "name": device.get("name", f"{device_type.upper()} {device_id}"),
-            "location": device.get("location", building_id),
+            "location": device.get("location", site_id),
             "protocol": device.get("protocol", "mock"),
             "status": device.get("status", "online"),
-            "building_id": building_id,
+            "site_id": site_id,
             "points": device.get("points", {}),
             "metadata": device.get("metadata", {}),
         }
@@ -2590,20 +2590,20 @@ async def add_building_devices_tool(
     with open(devices_file, "w") as f:
         json.dump(existing_devices, f, indent=2)
 
-    logger.info(f"Added {len(new_devices)} devices for building {building_id}")
+    logger.info(f"Added {len(new_devices)} devices for site {site_id}")
 
     return {
         "success": True,
-        "building_id": building_id,
+        "site_id": site_id,
         "devices_added": len(new_devices),
         "total_devices": len(existing_devices),
         "device_ids": [d["device_id"] for d in new_devices],
-        "message": f"Added {len(new_devices)} devices for '{building_id}'",
+        "message": f"Added {len(new_devices)} devices for '{site_id}'",
     }
 
 
 async def import_point_list_tool(
-    building_id: str,
+    site_id: str,
     point_list: List[Dict[str, Any]],
     site_code: str = None,
     bms_vendor: str = None,
@@ -2618,7 +2618,7 @@ async def import_point_list_tool(
     - "desigo" or "siemens": Siemens Desigo CC (e.g., AHU-L12-01.SupplyAirTemp)
     - "metasys" or "jci": Johnson Controls Metasys (e.g., NAE-1/AHU-1.SAT)
     - "ebi" or "honeywell": Honeywell EBI (e.g., AHU_01_SAT)
-    - "ecostruxure" or "schneider": Schneider EcoStruxure (e.g., Building/Floor12/AHU01/SAT)
+    - "ecostruxure" or "schneider": Schneider EcoStruxure (e.g., Site/Floor12/AHU01/SAT)
     - "niagara" or "tridium": Tridium Niagara (e.g., station/Drivers/BACnet/AHU_01/SAT)
     - "trend": Trend Controls (e.g., AHU1.SAT)
     - "auto" (default): Auto-detect from naming patterns
@@ -2646,9 +2646,9 @@ async def import_point_list_tool(
             "error": "Point list is empty",
         }
 
-    # Use site code from building_id if not provided
+    # Use site code from site_id if not provided
     if not site_code:
-        site_code = building_id[:3] if len(building_id) >= 3 else building_id
+        site_code = site_id[:3] if len(site_id) >= 3 else site_id
 
     # Normalize vendor name
     vendor = (bms_vendor or "auto").lower()
@@ -2699,7 +2699,7 @@ async def import_point_list_tool(
         return parts[0], "_".join(parts[1:]) if len(parts) > 1 else ""
 
     def extract_ecostruxure(point_name: str) -> tuple:
-        """Schneider EcoStruxure: Building/Floor12/AHU01/SupplyAirTemp"""
+        """Schneider EcoStruxure: Site/Floor12/AHU01/SupplyAirTemp"""
         parts = point_name.split("/")
         if len(parts) >= 3:
             # Find the device part (usually contains AHU, FCU, etc.)
@@ -2817,7 +2817,7 @@ async def import_point_list_tool(
 
         # Generate device_id
         seq = len([d for d in generated_devices if d["device_type"] == device_type]) + 1
-        device_id = f"{site_code}-{building_id[:3]}-{device_type}-{seq:03d}"
+        device_id = f"{site_code}-{site_id[:3]}-{device_type}-{seq:03d}"
 
         # Simplify points to just values
         simple_points = {}
@@ -2835,10 +2835,10 @@ async def import_point_list_tool(
             "device_id": device_id,
             "device_type": device_type,
             "name": device_name,
-            "location": f"{building_id} {floor}".strip(),
+            "location": f"{site_id} {floor}".strip(),
             "protocol": "bacnet",
             "status": "online",
-            "building_id": building_id,
+            "site_id": site_id,
             "floor": floor,
             "points": simple_points,
             "metadata": {
@@ -2889,7 +2889,7 @@ async def import_point_list_tool(
     # Save the generated structures
     result = {
         "success": True,
-        "building_id": building_id,
+        "site_id": site_id,
         "bms_vendor": vendor,
         "analysis": {
             "total_points": len(point_list),
@@ -2908,9 +2908,9 @@ async def import_point_list_tool(
         ),
         "next_steps": [
             "Review the generated devices and zones",
-            "Call add_building_devices to save devices",
-            "Call add_building_zones to save zones",
-            "Call activate_building to make the building active",
+            "Call add_site_devices to save devices",
+            "Call add_site_zones to save zones",
+            "Call activate_site to make the site active",
         ],
     }
 
@@ -2920,13 +2920,13 @@ async def import_point_list_tool(
             result["analysis"]["device_types"].get(d["device_type"], 0) + 1
         )
 
-    logger.info(f"Imported point list for {building_id}: {len(point_list)} points -> {len(generated_devices)} devices")
+    logger.info(f"Imported point list for {site_id}: {len(point_list)} points -> {len(generated_devices)} devices")
 
     return result
 
 
 async def import_controller_list_tool(
-    building_id: str,
+    site_id: str,
     controllers: List[Dict[str, Any]],
     site_code: str = None,
 ) -> Dict[str, Any]:
@@ -2951,9 +2951,9 @@ async def import_controller_list_tool(
             "error": "Controller list is empty",
         }
 
-    # Use site code from building_id if not provided
+    # Use site code from site_id if not provided
     if not site_code:
-        site_code = building_id[:3] if len(building_id) >= 3 else building_id
+        site_code = site_id[:3] if len(site_id) >= 3 else site_id
 
     # Generate controller devices
     generated_controllers = []
@@ -2961,13 +2961,13 @@ async def import_controller_list_tool(
         name = ctrl.get("name", f"Controller-{idx + 1}")
 
         device = {
-            "device_id": f"{site_code}-{building_id[:3]}-ctrl-{idx + 1:03d}",
+            "device_id": f"{site_code}-{site_id[:3]}-ctrl-{idx + 1:03d}",
             "device_type": "controller",
             "name": name,
-            "location": ctrl.get("area_served", building_id),
+            "location": ctrl.get("area_served", site_id),
             "protocol": "bacnet",
             "status": "online",
-            "building_id": building_id,
+            "site_id": site_id,
             "points": {},
             "metadata": {
                 "ip_address": ctrl.get("ip_address", ""),
@@ -2980,17 +2980,17 @@ async def import_controller_list_tool(
         }
         generated_controllers.append(device)
 
-    logger.info(f"Imported {len(generated_controllers)} controllers for {building_id}")
+    logger.info(f"Imported {len(generated_controllers)} controllers for {site_id}")
 
     return {
         "success": True,
-        "building_id": building_id,
+        "site_id": site_id,
         "controllers_parsed": len(generated_controllers),
         "controllers": generated_controllers,
-        "message": f"Parsed {len(controllers)} controllers for '{building_id}'",
+        "message": f"Parsed {len(controllers)} controllers for '{site_id}'",
         "next_steps": [
             "Review the generated controller devices",
-            "Call add_building_devices to save controllers",
+            "Call add_site_devices to save controllers",
             "Import point list to add equipment under each controller",
         ],
     }
@@ -3124,7 +3124,7 @@ async def control_dali_device_tool(
 
 
 async def discover_tridonic_gateway_tool(
-    building_id: str,
+    site_id: str,
     gateway_ip: str,
     gateway_type: str = "tridonic",
     username: Optional[str] = None,
@@ -3144,7 +3144,7 @@ async def discover_tridonic_gateway_tool(
     full metadata and save to database.
 
     Args:
-        building_id: Building/site ID (e.g., the registered building code)
+        site_id: Site/site ID (e.g., the registered site code)
         gateway_ip: IP address of DALI gateway (e.g., "192.168.10.50")
         gateway_type: Gateway type - "tridonic", "philips", "helvar", "generic"
         username: Optional HTTP Basic Auth username for gateway API
@@ -3166,7 +3166,7 @@ async def discover_tridonic_gateway_tool(
 
     result = {
         "success": False,
-        "building_id": building_id,
+        "site_id": site_id,
         "gateway_ip": gateway_ip,
         "gateway_type": gateway_type,
         "gateway": None,
@@ -3183,13 +3183,13 @@ async def discover_tridonic_gateway_tool(
         "error": None,
     }
 
-    # Extract site code from building_id (e.g., "site-XXX" -> "SXXX")
-    match = re.match(r"^site-(\d+)", building_id, re.IGNORECASE)
+    # Extract site code from site_id (e.g., "site-XXX" -> "SXXX")
+    match = re.match(r"^site-(\d+)", site_id, re.IGNORECASE)
     if match:
         site_num = match.group(1).zfill(3)
         site_code = f"S{site_num}"
     else:
-        site_code = building_id[:3].upper() if len(building_id) >= 3 else building_id.upper()
+        site_code = site_id[:3].upper() if len(site_id) >= 3 else site_id.upper()
 
     try:
         # Initialize discovery service
@@ -3328,11 +3328,11 @@ async def discover_tridonic_gateway_tool(
         # Generate next steps
         result["next_steps"] = [
             f"Review {len(all_devices)} discovered devices and equipment codes",
-            "Update building features: set dali=true in building.json",
-            f"Save gateway IP ({gateway_ip}) to building config",
+            "Update site features: set dali=true in site.json",
+            f"Save gateway IP ({gateway_ip}) to site config",
             "Call bulk_discover with equipment_list to fetch full metadata",
-            "Call add_building_zones with dali_zone mappings for cross-system coordination",
-            f"Register site with DALI service: register_niagara_site('{building_id}', gateway_ip)",
+            "Call add_site_zones with dali_zone mappings for cross-system coordination",
+            f"Register site with DALI service: register_niagara_site('{site_id}', gateway_ip)",
         ]
 
         logger.info(
@@ -3358,7 +3358,7 @@ async def discover_tridonic_gateway_tool(
 # ============================================================================
 
 # Asset metric templates library for predictive maintenance
-# These templates are used when onboarding a new building to auto-generate
+# These templates are used when onboarding a new site to auto-generate
 # metric configurations based on equipment types present.
 
 ASSET_METRIC_TEMPLATES = {
@@ -4217,19 +4217,19 @@ ASSET_METRIC_TEMPLATES = {
 
 
 async def get_asset_metrics_template_tool(
-    building_id: str,
+    site_id: str,
     equipment_types: List[str] = None,
 ) -> Dict[str, Any]:
     """
-    Get asset metric templates for a building during onboarding.
+    Get asset metric templates for a site during onboarding.
 
-    Returns metric templates based on equipment types present in the building.
+    Returns metric templates based on equipment types present in the site.
     Engineers can review and configure these templates before activation.
 
     Args:
-        building_id: Building/site ID
+        site_id: Site/site ID
         equipment_types: Optional list of equipment types to filter (e.g., ["generator", "chiller", "ahu"])
-                      If not provided, will auto-detect from building's devices
+                      If not provided, will auto-detect from site's devices
 
     Returns:
         Metric templates for each equipment type with configurable parameters
@@ -4237,21 +4237,21 @@ async def get_asset_metrics_template_tool(
     import json
     from pathlib import Path
 
-    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
-    building_path = buildings_path / building_id
+    sites_path = Path(__file__).parent.parent / "data" / "sites"
+    site_path = sites_path / site_id
 
-    if not building_path.exists():
+    if not site_path.exists():
         return {
             "success": False,
-            "error": f"Building '{building_id}' not found. Create it first with create_building.",
+            "error": f"Site '{site_id}' not found. Create it first with create_site.",
         }
 
-    # If equipment_types not provided, detect from building's devices/zones
+    # If equipment_types not provided, detect from site's devices/zones
     if not equipment_types:
         equipment_types = set()
 
         # Check zones for equipment references
-        zones_file = building_path / "zones.json"
+        zones_file = site_path / "zones.json"
         if zones_file.exists():
             with open(zones_file) as f:
                 zones = json.load(f)
@@ -4273,7 +4273,7 @@ async def get_asset_metrics_template_tool(
             with open(devices_file) as f:
                 devices = json.load(f)
                 for device in devices:
-                    if device.get("building_id") == building_id:
+                    if device.get("site_id") == site_id:
                         device_type = device.get("device_type", "").lower()
                         # Map device types to templates
                         for template_type in ASSET_METRIC_TEMPLATES.keys():
@@ -4292,7 +4292,7 @@ async def get_asset_metrics_template_tool(
 
     return {
         "success": True,
-        "building_id": building_id,
+        "site_id": site_id,
         "equipment_types_detected": equipment_types,
         "metric_templates": templates,
         "total_metrics": sum(len(t.get("metrics", [])) for t in templates.values()),
@@ -4310,12 +4310,12 @@ async def get_asset_metrics_template_tool(
 
 
 async def configure_asset_metrics_tool(
-    building_id: str,
+    site_id: str,
     metric_config: Dict[str, Any],
     save_to_file: bool = True,
 ) -> Dict[str, Any]:
     """
-    Configure asset metrics for a building after onboarding.
+    Configure asset metrics for a site after onboarding.
 
     Engineers can customize:
     - Thresholds (normal/warning/critical ranges)
@@ -4324,7 +4324,7 @@ async def configure_asset_metrics_tool(
     - Which metrics use mobile phone vs BMS sensors
 
     Args:
-        building_id: Building/site ID
+        site_id: Site/site ID
         metric_config: Configuration dictionary with structure:
             {
                 "equipment_type": {
@@ -4348,7 +4348,7 @@ async def configure_asset_metrics_tool(
                     }
                 }
             }
-        save_to_file: If true, saves configuration to building's asset_metrics.json
+        save_to_file: If true, saves configuration to site's asset_metrics.json
 
     Returns:
         Configuration summary with next steps
@@ -4357,13 +4357,13 @@ async def configure_asset_metrics_tool(
     from pathlib import Path
     from datetime import datetime
 
-    buildings_path = Path(__file__).parent.parent / "data" / "buildings"
-    building_path = buildings_path / building_id
+    sites_path = Path(__file__).parent.parent / "data" / "sites"
+    site_path = sites_path / site_id
 
-    if not building_path.exists():
+    if not site_path.exists():
         return {
             "success": False,
-            "error": f"Building '{building_id}' not found. Create it first with create_building.",
+            "error": f"Site '{site_id}' not found. Create it first with create_site.",
         }
 
     # Merge with templates and validate
@@ -4424,15 +4424,15 @@ async def configure_asset_metrics_tool(
 
     # Save to file if requested
     if save_to_file:
-        metrics_file = building_path / "asset_metrics.json"
+        metrics_file = site_path / "asset_metrics.json"
         with open(metrics_file, "w") as f:
             json.dump(configured_metrics, f, indent=2)
 
-        logger.info(f"Configured {total_enabled} metrics for building {building_id}")
+        logger.info(f"Configured {total_enabled} metrics for site {site_id}")
 
     return {
         "success": True,
-        "building_id": building_id,
+        "site_id": site_id,
         "metrics_configured": total_enabled,
         "equipment_types": list(configured_metrics.keys()),
         "configuration": configured_metrics,
@@ -4578,9 +4578,9 @@ async def get_solar_diagnostics_tool(site_id: str | None = None) -> Dict[str, An
 
 MCP_TOOLS = [
     {
-        "name": "get_buildings",
+        "name": "get_sites",
         "description": (
-            "List buildings with status summary. Returns building information including health scores, "
+            "List sites with status summary. Returns site information including health scores, "
             "asset counts, and alarm status. Supports filtering by status (all/critical/warning/healthy) and region."
         ),
         "input_schema": {
@@ -4590,7 +4590,7 @@ MCP_TOOLS = [
                     "type": "string",
                     "enum": ["all", "critical", "warning", "healthy"],
                     "description": (
-                        "Filter buildings by status - all (default), critical (has critical alarms), "
+                        "Filter sites by status - all (default), critical (has critical alarms), "
                         "warning (has warnings), healthy (no issues)"
                     ),
                 },
@@ -4605,13 +4605,13 @@ MCP_TOOLS = [
     {
         "name": "get_assets",
         "description": (
-            "List assets for a building. Returns all BMS-connected assets (HVAC equipment, lighting, security) "
-            "for a specific building with health scores and alarm status."
+            "List assets for a site. Returns all BMS-connected assets (HVAC equipment, lighting, security) "
+            "for a specific site with health scores and alarm status."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Building/site ID (e.g., site-001)"},
+                "site_id": {"type": "string", "description": "Site/site ID (e.g., site-001)"},
                 "asset_type": {
                     "type": "string",
                     "description": "Filter by asset type (AHU, Chiller, FCU, VAV, zone_controller, chw_system)",
@@ -4622,7 +4622,7 @@ MCP_TOOLS = [
                     "description": "Filter by criticality level - critical (only critical assets) or all (default)",
                 },
             },
-            "required": ["building_id"],
+            "required": ["site_id"],
         },
     },
     {
@@ -4705,13 +4705,13 @@ MCP_TOOLS = [
     {
         "name": "get_alarms",
         "description": (
-            "Get alarms with filtering. Returns alarm history with support for filtering by building, "
+            "Get alarms with filtering. Returns alarm history with support for filtering by site, "
             "asset, severity, state, and time range."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Filter by building/site ID"},
+                "site_id": {"type": "string", "description": "Filter by site ID"},
                 "asset_id": {"type": "string", "description": "Filter by asset/equipment ID"},
                 "severity": {
                     "type": "array",
@@ -4750,7 +4750,7 @@ MCP_TOOLS = [
                         "Natural language search query (e.g., 'chiller alarms', 'temperature issues last week')"
                     ),
                 },
-                "building_id": {"type": "string", "description": "Optional building/site ID filter"},
+                "site_id": {"type": "string", "description": "Optional site ID filter"},
                 "limit": {
                     "type": "integer",
                     "minimum": 1,
@@ -4789,7 +4789,7 @@ MCP_TOOLS = [
     {
         "name": "get_health_score",
         "description": (
-            "Get health score breakdown for an asset or building. Returns overall score, status, "
+            "Get health score breakdown for an asset or site. Returns overall score, status, "
             "breakdown by category, and contributing factors."
         ),
         "input_schema": {
@@ -4797,11 +4797,11 @@ MCP_TOOLS = [
             "properties": {
                 "asset_id": {
                     "type": "string",
-                    "description": "Asset/device ID (provide either asset_id or building_id)",
+                    "description": "Asset/device ID (provide either asset_id or site_id)",
                 },
-                "building_id": {
+                "site_id": {
                     "type": "string",
-                    "description": "Building/site ID (provide either asset_id or building_id)",
+                    "description": "Site/site ID (provide either asset_id or site_id)",
                 },
             },
             "required": [],
@@ -4809,11 +4809,11 @@ MCP_TOOLS = [
     },
     {
         "name": "get_work_orders",
-        "description": "Get work orders. Returns work order history with filtering by building, asset, and status.",
+        "description": "Get work orders. Returns work order history with filtering by site, asset, and status.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Filter by building/site ID"},
+                "site_id": {"type": "string", "description": "Filter by site ID"},
                 "asset_id": {"type": "string", "description": "Filter by asset ID"},
                 "status": {
                     "type": "string",
@@ -4839,7 +4839,7 @@ MCP_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Building/site ID"},
+                "site_id": {"type": "string", "description": "Site/site ID"},
                 "asset_id": {"type": "string", "description": "Asset/device ID"},
                 "description": {"type": "string", "description": "Fault description"},
                 "priority": {
@@ -4853,33 +4853,32 @@ MCP_TOOLS = [
                     "description": "List of suggested parts for the repair",
                 },
             },
-            "required": ["building_id", "asset_id", "description"],
+            "required": ["site_id", "asset_id", "description"],
         },
     },
-    # Building Management Tools (for onboarding new buildings)
+    # Site Management Tools (for onboarding new sites)
     {
-        "name": "list_managed_buildings",
+        "name": "list_managed_sites",
         "description": (
-            "List all managed buildings (active and inactive). "
-            "Use this to see what buildings are configured in the system."
+            "List all managed sites (active and inactive). Use this to see what sites are configured in the system."
         ),
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
-        "name": "create_building",
+        "name": "create_site",
         "description": (
-            "Create a new building configuration. Creates the building folder structure and config files. "
-            "Building is NOT activated by default."
+            "Create a new site configuration. Creates the site folder structure and config files. "
+            "Site is NOT activated by default."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {
+                "site_id": {
                     "type": "string",
-                    "description": "Unique building ID (lowercase, no spaces, e.g., 'sandton', 'gateway-centre')",
+                    "description": "Unique site ID (lowercase, no spaces, e.g., 'sandton', 'gateway-centre')",
                 },
-                "name": {"type": "string", "description": "Building display name (e.g., 'Sandton Office Park')"},
-                "address": {"type": "string", "description": "Building address"},
+                "name": {"type": "string", "description": "Site display name (e.g., 'Sandton Office Park')"},
+                "address": {"type": "string", "description": "Site address"},
                 "floors": {
                     "type": "array",
                     "items": {"type": "string"},
@@ -4910,41 +4909,41 @@ MCP_TOOLS = [
                     ),
                 },
             },
-            "required": ["building_id", "name"],
+            "required": ["site_id", "name"],
         },
     },
     {
-        "name": "activate_building",
-        "description": "Activate a building so it appears in the system. Call this after setting up desks and zones.",
+        "name": "activate_site",
+        "description": "Activate a site so it appears in the system. Call this after setting up desks and zones.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Building ID to activate"},
-                "set_default": {"type": "boolean", "description": "Set as the default building (default: false)"},
+                "site_id": {"type": "string", "description": "Site ID to activate"},
+                "set_default": {"type": "boolean", "description": "Set as the default site (default: false)"},
             },
-            "required": ["building_id"],
+            "required": ["site_id"],
         },
     },
     {
-        "name": "get_building_config",
-        "description": "Get a building's configuration including desks, zones, and features.",
+        "name": "get_site_config",
+        "description": "Get a site's configuration including desks, zones, and features.",
         "input_schema": {
             "type": "object",
-            "properties": {"building_id": {"type": "string", "description": "Building ID to get config for"}},
-            "required": ["building_id"],
+            "properties": {"site_id": {"type": "string", "description": "Site ID to get config for"}},
+            "required": ["site_id"],
         },
     },
     # AI-Assisted Onboarding Tools (for ingesting BMS export data)
     {
-        "name": "add_building_zones",
+        "name": "add_site_zones",
         "description": (
-            "Add HVAC zones to a building with equipment mappings (FCU, VAV, AHU). "
+            "Add HVAC zones to a site with equipment mappings (FCU, VAV, AHU). "
             "Use after importing point list or when manually configuring zones."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Building ID to add zones to"},
+                "site_id": {"type": "string", "description": "Site ID to add zones to"},
                 "zones": {
                     "type": "array",
                     "items": {
@@ -4963,19 +4962,19 @@ MCP_TOOLS = [
                     "description": "Array of zone definitions with equipment mappings",
                 },
             },
-            "required": ["building_id", "zones"],
+            "required": ["site_id", "zones"],
         },
     },
     {
-        "name": "add_building_desks",
+        "name": "add_site_desks",
         "description": (
-            "Add desks to a building with zone mappings, DALI lighting, and environmental context. "
+            "Add desks to a site with zone mappings, DALI lighting, and environmental context. "
             "Enables desk-to-zone comfort diagnosis with solar/HVAC/lighting integration."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Building ID to add desks to"},
+                "site_id": {"type": "string", "description": "Site ID to add desks to"},
                 "desks": {
                     "type": "array",
                     "items": {
@@ -5024,22 +5023,22 @@ MCP_TOOLS = [
                     "description": "Array of desk definitions with HVAC and DALI context",
                 },
             },
-            "required": ["building_id", "desks"],
+            "required": ["site_id", "desks"],
         },
     },
     {
-        "name": "add_building_devices",
+        "name": "add_site_devices",
         "description": (
             "Add BMS devices (chillers, AHUs, FCUs, VAVs, etc.) to the system. "
-            "Devices are added to the building device store."
+            "Devices are added to the site device store."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Building ID to add devices to"},
+                "site_id": {"type": "string", "description": "Site ID to add devices to"},
                 "site_code": {
                     "type": "string",
-                    "description": "Site code for device ID generation (default: first 3 chars of building_id)",
+                    "description": "Site code for device ID generation (default: first 3 chars of site_id)",
                 },
                 "devices": {
                     "type": "array",
@@ -5065,7 +5064,7 @@ MCP_TOOLS = [
                     "description": "Array of device definitions",
                 },
             },
-            "required": ["building_id", "devices"],
+            "required": ["site_id", "devices"],
         },
     },
     {
@@ -5077,10 +5076,10 @@ MCP_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Building ID to import points for"},
+                "site_id": {"type": "string", "description": "Site ID to import points for"},
                 "site_code": {
                     "type": "string",
-                    "description": "Site code for device ID generation (default: first 3 chars of building_id)",
+                    "description": "Site code for device ID generation (default: first 3 chars of site_id)",
                 },
                 "bms_vendor": {
                     "type": "string",
@@ -5126,7 +5125,7 @@ MCP_TOOLS = [
                     "description": "Array of BACnet points from BMS export",
                 },
             },
-            "required": ["building_id", "point_list"],
+            "required": ["site_id", "point_list"],
         },
     },
     {
@@ -5138,10 +5137,10 @@ MCP_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Building ID to import controllers for"},
+                "site_id": {"type": "string", "description": "Site ID to import controllers for"},
                 "site_code": {
                     "type": "string",
-                    "description": "Site code for device ID generation (default: first 3 chars of building_id)",
+                    "description": "Site code for device ID generation (default: first 3 chars of site_id)",
                 },
                 "controllers": {
                     "type": "array",
@@ -5164,7 +5163,7 @@ MCP_TOOLS = [
                     "description": "Array of controller definitions",
                 },
             },
-            "required": ["building_id", "controllers"],
+            "required": ["site_id", "controllers"],
         },
     },
     {
@@ -5222,7 +5221,7 @@ MCP_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Building/site ID (e.g., 'site-002')"},
+                "site_id": {"type": "string", "description": "Site/site ID (e.g., 'site-002')"},
                 "gateway_ip": {"type": "string", "description": "IP address of DALI gateway (e.g., '192.168.10.50')"},
                 "gateway_type": {
                     "type": "string",
@@ -5238,20 +5237,20 @@ MCP_TOOLS = [
                     "default": False,
                 },
             },
-            "required": ["building_id", "gateway_ip"],
+            "required": ["site_id", "gateway_ip"],
         },
     },
     {
         "name": "get_asset_metrics_template",
         "description": (
-            "Get asset metric templates for AI/ML predictive maintenance during building onboarding. Returns "
-            "metric templates based on equipment types present in the building. Engineers can review and "
+            "Get asset metric templates for AI/ML predictive maintenance during site onboarding. Returns "
+            "metric templates based on equipment types present in the site. Engineers can review and "
             "configure thresholds, weights, and data sources (BMS sensor, mobile phone, manual) before activation."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Building/site ID to get metric templates for"},
+                "site_id": {"type": "string", "description": "Site/site ID to get metric templates for"},
                 "equipment_types": {
                     "type": "array",
                     "items": {
@@ -5260,11 +5259,11 @@ MCP_TOOLS = [
                     },
                     "description": (
                         "Optional list of equipment types to filter. "
-                        "If not provided, will auto-detect from building's devices and zones"
+                        "If not provided, will auto-detect from site's devices and zones"
                     ),
                 },
             },
-            "required": ["building_id"],
+            "required": ["site_id"],
         },
     },
     {
@@ -5276,7 +5275,7 @@ MCP_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Building/site ID to configure metrics for"},
+                "site_id": {"type": "string", "description": "Site/site ID to configure metrics for"},
                 "metric_config": {
                     "type": "object",
                     "description": (
@@ -5335,10 +5334,10 @@ MCP_TOOLS = [
                 },
                 "save_to_file": {
                     "type": "boolean",
-                    "description": "Save configuration to building asset metrics store (default: true)",
+                    "description": "Save configuration to site asset metrics store (default: true)",
                 },
             },
-            "required": ["building_id", "metric_config"],
+            "required": ["site_id", "metric_config"],
         },
     },
     # Solar MCP Tools (34-09)
@@ -5351,7 +5350,7 @@ MCP_TOOLS = [
         ),
         "input_schema": {
             "type": "object",
-            "properties": {"site_id": {"type": "string", "description": "Site ID (resolved from registered building)"}},
+            "properties": {"site_id": {"type": "string", "description": "Site ID (resolved from registered site)"}},
             "required": [],
         },
     },
@@ -5364,7 +5363,7 @@ MCP_TOOLS = [
         ),
         "input_schema": {
             "type": "object",
-            "properties": {"site_id": {"type": "string", "description": "Site ID (resolved from registered building)"}},
+            "properties": {"site_id": {"type": "string", "description": "Site ID (resolved from registered site)"}},
             "required": [],
         },
     },
@@ -5381,7 +5380,7 @@ MCP_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Site ID (resolved from registered building)",
+                    "description": "Site ID (resolved from registered site)",
                 },
                 "period": {
                     "type": "string",
@@ -5406,7 +5405,7 @@ MCP_TOOLS = [
             "properties": {
                 "site_id": {
                     "type": "string",
-                    "description": "Site ID (resolved from registered building)",
+                    "description": "Site ID (resolved from registered site)",
                 },
                 "hours": {
                     "type": "integer",
@@ -5427,7 +5426,7 @@ MCP_TOOLS = [
         ),
         "input_schema": {
             "type": "object",
-            "properties": {"site_id": {"type": "string", "description": "Site ID (resolved from registered building)"}},
+            "properties": {"site_id": {"type": "string", "description": "Site ID (resolved from registered site)"}},
             "required": [],
         },
     },
@@ -5435,14 +5434,14 @@ MCP_TOOLS = [
     {
         "name": "get_contracts",
         "description": (
-            "Get contracts for managed buildings. Returns contract details including organization, type, fees, "
+            "Get contracts for managed sites. Returns contract details including organization, type, fees, "
             "and dates. Optionally includes SLA terms. Use this when someone asks about contracts, SLAs, client "
-            "agreements, or 'what is our SLA for building X'."
+            "agreements, or 'what is our SLA for site X'."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Filter by building/site ID (e.g., site-002)"},
+                "site_id": {"type": "string", "description": "Filter by site ID (e.g., site-002)"},
                 "organization_code": {
                     "type": "string",
                     "description": "Filter by organization code (e.g., ORG-SITE-002)",
@@ -5462,16 +5461,16 @@ MCP_TOOLS = [
         },
     },
     {
-        "name": "add_building_contract",
+        "name": "add_site_contract",
         "description": (
-            "Create a detailed contract for a building. Writes contract data and updates building "
-            "configuration with contract fields. Use this during building onboarding to set up "
+            "Create a detailed contract for a site. Writes contract data and updates site "
+            "configuration with contract fields. Use this during site onboarding to set up "
             "commercial agreements."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_code": {"type": "string", "description": "Building/site ID (e.g., site-002)"},
+                "site_code": {"type": "string", "description": "Site/site ID (e.g., site-002)"},
                 "organization_name": {
                     "type": "string",
                     "description": "Client organization name (e.g., SITE-002 Commercial Property)",
@@ -5502,7 +5501,7 @@ MCP_TOOLS = [
                 },
             },
             "required": [
-                "building_code",
+                "site_code",
                 "organization_name",
                 "organization_code",
                 "contract_type",
@@ -5515,16 +5514,16 @@ MCP_TOOLS = [
     {
         "name": "get_contract_profitability",
         "description": (
-            "Get contract profitability snapshot for one or all buildings. Returns revenue, costs, margins, "
+            "Get contract profitability snapshot for one or all sites. Returns revenue, costs, margins, "
             "and at-risk flags. Use this when someone asks about contract profitability, margins, financial "
-            "performance, or 'how profitable is building X'."
+            "performance, or 'how profitable is site X'."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_code": {
+                "site_code": {
                     "type": "string",
-                    "description": "Filter by building/site ID (all buildings if not specified)",
+                    "description": "Filter by site ID (all sites if not specified)",
                 },
                 "year": {"type": "integer", "description": "Filter by year (default: current year)"},
                 "month": {"type": "integer", "description": "Filter by month (optional)"},
@@ -5537,14 +5536,14 @@ MCP_TOOLS = [
         "name": "process_municipal_bill",
         "description": (
             "Process South African municipal utility bill PDF (Johannesburg, Cape Town, Ekurhuleni, eThekwini) "
-            "for building cost tracking. Extracts invoice data, consumption, and amounts from PDF using "
-            "PyMuPDF/pdfplumber with OCR fallback. Use this during building onboarding to establish cost "
+            "for site cost tracking. Extracts invoice data, consumption, and amounts from PDF using "
+            "PyMuPDF/pdfplumber with OCR fallback. Use this during site onboarding to establish cost "
             "baselines or monthly to track utility costs."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Building/site ID (e.g., site-002)"},
+                "site_id": {"type": "string", "description": "Site/site ID (e.g., site-002)"},
                 "pdf_file_path": {"type": "string", "description": "Absolute path to PDF file"},
                 "municipality": {
                     "type": "string",
@@ -5560,27 +5559,27 @@ MCP_TOOLS = [
                     "enum": ["residential", "commercial", "industrial"],
                 },
             },
-            "required": ["building_id", "pdf_file_path", "municipality", "utility_type", "account_number"],
+            "required": ["site_id", "pdf_file_path", "municipality", "utility_type", "account_number"],
         },
     },
     {
         "name": "get_utility_costs",
         "description": (
-            "Get utility cost analysis for a building from processed municipal bills. Returns electricity and "
+            "Get utility cost analysis for a site from processed municipal bills. Returns electricity and "
             "water costs with totals and averages for specified period. Use this when someone asks about utility "
-            "costs, municipal bills, electricity/water expenses, or 'what are our utility costs for building X'."
+            "costs, municipal bills, electricity/water expenses, or 'what are our utility costs for site X'."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "building_id": {"type": "string", "description": "Building/site ID (e.g., site-002)"},
+                "site_id": {"type": "string", "description": "Site/site ID (e.g., site-002)"},
                 "period_start": {
                     "type": "string",
                     "description": "Period start ISO date (default: current month start)",
                 },
                 "period_end": {"type": "string", "description": "Period end ISO date (default: current month end)"},
             },
-            "required": ["building_id"],
+            "required": ["site_id"],
         },
     },
 ]
@@ -5593,15 +5592,15 @@ MCP_TOOLS = [
 
 class SIMBIOTMCPServer:
     """
-    SIMBIOT MCP Server for building data and device control.
+    SIMBIOT MCP Server for site data and device control.
 
-    Provides a unified interface for AI chat to query building information,
+    Provides a unified interface for AI chat to query site information,
     assets, and control BMS devices through standardized MCP tools.
 
     Usage:
         server = SIMBIOTMCPServer()
         tools = server.list_tools()  # Get available tools
-        result = await server.call_tool("get_buildings")
+        result = await server.call_tool("get_sites")
         result = await server.call_tool(
             "read_device_point", device_id="S001-CHILLER-B1-001", point_name="chw_supply_temp"
         )
@@ -5615,8 +5614,8 @@ class SIMBIOTMCPServer:
         # Merge MCP_TOOLS with registry tools
         self.tools = MCP_TOOLS + get_all_tools()
         self.tool_handlers = {
-            # Building/Asset tools (Plan 01)
-            "get_buildings": get_buildings_tool,
+            # Site/Asset tools (Plan 01)
+            "get_sites": get_sites_tool,
             "get_assets": get_assets_tool,
             "get_asset_detail": get_asset_detail_tool,
             "get_devices": get_devices_tool,
@@ -5631,15 +5630,15 @@ class SIMBIOTMCPServer:
             # Work order tools (Plan 02)
             "get_work_orders": get_work_orders_tool,
             "create_work_order": create_work_order_tool,
-            # Building management tools (onboarding)
-            "list_managed_buildings": list_managed_buildings_tool,
-            "create_building": create_building_tool,
-            "activate_building": activate_building_tool,
-            "get_building_config": get_building_config_tool,
+            # Site management tools (onboarding)
+            "list_managed_sites": list_managed_sites_tool,
+            "create_site": create_site_tool,
+            "activate_site": activate_site_tool,
+            "get_site_config": get_site_config_tool,
             # AI-Assisted Onboarding tools
-            "add_building_zones": add_building_zones_tool,
-            "add_building_desks": add_building_desks_tool,
-            "add_building_devices": add_building_devices_tool,
+            "add_site_zones": add_site_zones_tool,
+            "add_site_desks": add_site_desks_tool,
+            "add_site_devices": add_site_devices_tool,
             "import_point_list": import_point_list_tool,
             "import_controller_list": import_controller_list_tool,
             "control_dali_device": control_dali_device_tool,
@@ -5655,7 +5654,7 @@ class SIMBIOTMCPServer:
             "get_solar_diagnostics": get_solar_diagnostics_tool,
             # Contract Management tools (Phase 48-02)
             "get_contracts": get_contracts_tool,
-            "add_building_contract": add_building_contract_tool,
+            "add_site_contract": add_site_contract_tool,
             "get_contract_profitability": get_contract_profitability_tool,
             # Municipal Billing tools (Phase 49)
             "process_municipal_bill": process_municipal_bill_tool,
@@ -5719,6 +5718,42 @@ class SIMBIOTMCPServer:
         admin_ok, admin_reason = check_mcp_admin_tool_access(tool_name, auth_ctx)
         if not admin_ok:
             return {"error": admin_reason, "code": "FORBIDDEN"}
+
+        # Control Policy Engine gate — mode-aware tool filtering (Phase 145)
+        # Writes are FAIL-CLOSED: blocked unless mode is explicitly SUPERVISED
+        # or FULL_CONTROL and the policy engine loads cleanly.
+        # Reads are fail-open: policy engine errors don't block read tools.
+        if tool_name in MUTATING_TOOLS:
+            try:
+                from app.services.control_policy_engine import get_control_policy_engine
+                from app.models.control_policy import ControlMode
+
+                policy_engine = get_control_policy_engine()
+                control_mode = policy_engine.get_control_mode()
+
+                if control_mode not in (ControlMode.SUPERVISED, ControlMode.FULL_CONTROL):
+                    logger.warning(
+                        "Control policy BLOCKED write tool '%s' — mode=%s",
+                        tool_name,
+                        control_mode.value,
+                    )
+                    return {
+                        "error": f"Write tool '{tool_name}' not available in {control_mode.value} mode. "
+                        "Switch to SUPERVISED or FULL_CONTROL to enable write operations.",
+                        "code": "CONTROL_MODE_BLOCKED",
+                        "control_mode": control_mode.value,
+                    }
+            except Exception as e:
+                # FAIL-CLOSED for writes: if policy engine can't load, block writes
+                logger.error(
+                    "Control policy engine UNAVAILABLE — BLOCKING write tool '%s': %s",
+                    tool_name,
+                    e,
+                )
+                return {
+                    "error": "Control policy engine unavailable. Write operations blocked for safety.",
+                    "code": "CONTROL_ENGINE_UNAVAILABLE",
+                }
 
         # SSE auth gating — all tools require auth over SSE (except PUBLIC)
         if is_sse and tool_name not in PUBLIC_TOOLS and auth_ctx is None:
@@ -5797,10 +5832,78 @@ class SIMBIOTMCPServer:
 
         timeout_seconds = get_tool_timeout(tool_name)
 
+        # Command Envelope wrapping for mutating tools (Phase 145)
+        # Every write action gets a traceable, auditable envelope with
+        # before-state, policy decision, and rollback plan.
+        envelope = None
+        if tool_name in MUTATING_TOOLS:
+            try:
+                from app.services.control_policy_engine import get_control_policy_engine
+                from app.models.control_policy import ControlMode
+
+                policy_engine = get_control_policy_engine()
+                control_mode = policy_engine.get_control_mode()
+
+                # Extract equipment identifier from kwargs
+                target_eq = kwargs.get("device_id") or kwargs.get("equipment_id") or kwargs.get("equipment_code") or ""
+                site_id_val = kwargs.get("site_id") or ""
+
+                envelope = await policy_engine.evaluate_action(
+                    target_equipment=target_eq,
+                    site_id=site_id_val,
+                    proposed_action={"tool": tool_name, **{k: v for k, v in kwargs.items() if not k.startswith("_")}},
+                    reason=f"MCP tool call: {tool_name}",
+                    created_by=kwargs.get("user", auth_ctx.user_id if auth_ctx else "unknown"),
+                )
+
+                if not envelope.policy_check_passed:
+                    logger.warning(
+                        "CommandEnvelope REJECTED %s: %s",
+                        tool_name,
+                        envelope.policy_check_details,
+                    )
+                    return {
+                        "error": f"Policy check failed: {envelope.policy_check_details}",
+                        "code": "POLICY_CHECK_FAILED",
+                        "envelope_id": envelope.envelope_id,
+                        "control_mode": control_mode.value,
+                    }
+
+                # SUPERVISED mode: requires approval
+                if envelope.requires_approval:
+                    return {
+                        "error": "Action requires human approval before execution",
+                        "code": "APPROVAL_REQUIRED",
+                        "envelope_id": envelope.envelope_id,
+                        "control_mode": control_mode.value,
+                        "approval_endpoint": f"POST /api/control/envelopes/{envelope.envelope_id}/approve",
+                    }
+            except Exception as e:
+                logger.error("CommandEnvelope creation failed for %s: %s — blocking write", tool_name, e)
+                return {
+                    "error": "Command envelope creation failed. Write blocked for safety.",
+                    "code": "ENVELOPE_CREATION_FAILED",
+                }
+
         try:
             result = await asyncio.wait_for(handler(**kwargs), timeout=timeout_seconds)
+
+            # Record envelope outcome for mutating tools
+            if envelope is not None:
+                envelope.executed = True
+                envelope.execution_result = result.get("success", True) if isinstance(result, dict) else True
+                logger.info(
+                    "CommandEnvelope %s executed: tool=%s, target=%s",
+                    envelope.envelope_id,
+                    tool_name,
+                    envelope.target_equipment,
+                )
+
             return result
         except asyncio.TimeoutError:
+            if envelope is not None:
+                envelope.executed = False
+                envelope.execution_result = False
             return {
                 "error": f"Tool '{tool_name}' timed out after {timeout_seconds}s",
                 "code": "TIMEOUT",

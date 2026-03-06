@@ -33,7 +33,7 @@ def _write_events(log_dir: Path, run_id: str, events: list):
     meta = {
         "run_id": run_id,
         "scenario": "test",
-        "building_code": "site-002",
+        "site_code": "site-002",
         "started_at": datetime.now().isoformat(),
         "ended_at": datetime.now().isoformat(),
         "duration_minutes": 2.0,

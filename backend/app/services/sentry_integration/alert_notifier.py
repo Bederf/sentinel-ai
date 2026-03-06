@@ -119,7 +119,7 @@ class AlertNotifier:
         if enabled_commands:
             commands_section = "\n━━━━━━━━━━━━━━━━━━\n" + "\n".join(enabled_commands)
 
-        message = f"""{emoji} {severity} ALERT - {alert.get("building_name", "Building")}
+        message = f"""{emoji} {severity} ALERT - {alert.get("site_name", "Building")}
 
 🏢 Zone: {alert.get("zone_name", "Unknown")}
 🔧 Equipment: {alert.get("equipment_name", "Unknown")}

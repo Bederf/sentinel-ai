@@ -6,7 +6,7 @@ Evaluates every agent tool invocation against role-based policy.
 Usage:
     from app.middleware.agent_security import policy_engine, AgentSession
 
-    session = AgentSession(owner_id="u1", role="admin", tenant_id="t1", building_ids=["b1"])
+    session = AgentSession(owner_id="u1", role="admin", tenant_id="t1", site_ids=["b1"])
     result = policy_engine.evaluate(session, AgentToolName.BMS_READ, "GET", "/api/equipment")
     if result.is_allowed:
         ...  # proceed

@@ -15,7 +15,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # Where equipment JSON files live, relative to the backend root
-_DATA_ROOT = Path(__file__).resolve().parent.parent / "data" / "buildings"
+_DATA_ROOT = Path(__file__).resolve().parent.parent / "data" / "sites"
 
 # Map JSON ``equipment_type`` values to the internal simulation type names
 # used by LifecycleOrchestrator sensor generators.

@@ -44,7 +44,7 @@ import type { QuoteResponse } from '@/lib/api/pricing'
 
 interface QuotePreviewProps {
   quote: QuoteResponse
-  buildingName?: string
+  siteName?: string
   clientName?: string
   equipmentCodes: string[]
   slaTier: string
@@ -54,7 +54,7 @@ interface QuotePreviewProps {
 
 export default function QuotePreview({
   quote,
-  buildingName = 'Building',
+  siteName = 'Building',
   clientName = 'Client',
   equipmentCodes,
   slaTier,
@@ -202,7 +202,7 @@ Valid until: ${quote.valid_until}
             <Col>
               <div className="space-y-2">
                 <Text className="font-medium text-tremor-label">Facility</Text>
-                <Text className="text-base">{buildingName}</Text>
+                <Text className="text-base">{siteName}</Text>
               </div>
             </Col>
           </Grid>

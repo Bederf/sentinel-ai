@@ -7,7 +7,7 @@ extracted from main.py to improve maintainability and organization.
 from fastapi import FastAPI
 
 from app.api.registrars.core import register_core_routers
-from app.api.registrars.building import register_building_routers
+from app.api.registrars.building import register_site_routers
 from app.api.registrars.operations import register_operations_routers
 from app.api.registrars.analytics import register_analytics_routers
 
@@ -32,7 +32,7 @@ def register_all_routes(app: FastAPI) -> None:
     register_core_routers(app)
 
     # Register building management routers (equipment, devices, HVAC, lighting, etc.)
-    register_building_routers(app)
+    register_site_routers(app)
 
     # Register operations routers (work orders, maintenance, inspection, workflow, etc.)
     register_operations_routers(app)

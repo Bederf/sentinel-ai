@@ -170,6 +170,34 @@ X-Sentry-Secret: sentry-bms-phase-41
 
 ---
 
+## Web Chat FM Workflow
+
+The AI chat (SENTINEL web UI) integrates with the same FM workflow used by Telegram. When a user asks about equipment issues, Claude presents clickable slash commands rather than calling `create_work_order` directly:
+
+```
+User asks about equipment problem
+    ↓
+Claude presents clickable commands:
+  `/info_{CODE}`    — Equipment diagnostics (health, alerts, history)
+  `/inspect_{CODE}` — Schedule inspection + auto-assign technician
+  `/WO_{CODE}`      — Create formal work order with checklist
+  `/note_{CODE}`    — Log observations against equipment record
+    ↓
+User clicks command → sent as chat message → slash_command_router.py handles it
+    ↓
+Work order persists to Supabase via POST /api/sentry/create-work-order
+```
+
+**Clickable command rendering:** Commands matching `/info_`, `/WO_`, `/inspect_`, `/reset_`, `/note_` in inline code blocks are rendered as clickable buttons in the web chat (`ChatMessage.tsx`, `COMMAND_RE` regex). Clicking a button sends the command text as a new chat message.
+
+**Implementation:**
+- Slash command router: `backend/app/services/slash_command_router.py`
+- Claude tool enforcement: `backend/app/services/chat_tools.py` (tool description instructs FM workflow)
+- System prompt: `backend/app/services/claude_service.py` (Claude instructed to present commands, not call tool directly)
+- Button rendering: `frontend/src/components/ChatMessage.tsx` (`COMMAND_RE` pattern)
+
+---
+
 ## Standard Inspection Endpoints
 
 For the full inspection module (scheduled tasks, results, deficiencies, measurements), see `backend/app/api/inspection.py`.

@@ -609,7 +609,7 @@ class TestLoadSheddingIntegration:
 
     def test_priority_thresholds(self):
         """Test load shedding priority thresholds are correct."""
-        # These are the thresholds defined in analyze_building_load_shedding
+        # These are the thresholds defined in analyze_site_load_shedding
         priority_threshold = {
             1: 4,  # Stage 1: Keep P1-P4, shed P5
             2: 3,  # Stage 2: Keep P1-P3, shed P4-P5

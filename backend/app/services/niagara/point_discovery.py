@@ -646,7 +646,7 @@ class PointDiscoveryService:
         """
         # If site_id is provided, load from that building's equipment files
         if site_id:
-            equipment_dir = DATA_DIR.parent / "buildings" / site_id / "equipment"
+            equipment_dir = DATA_DIR.parent / "sites" / site_id / "equipment"
 
             if equipment_dir.exists():
                 points = self._load_points_from_equipment_dir(equipment_dir, site_id)
@@ -672,12 +672,12 @@ class PointDiscoveryService:
         # Fallback to haystack_tags.json
         return self._load_from_haystack_tags()
 
-    def _load_points_from_equipment_dir(self, equipment_dir: Path, demo_building_id: str) -> List[Dict[str, Any]]:
+    def _load_points_from_equipment_dir(self, equipment_dir: Path, demo_site_id: str) -> List[Dict[str, Any]]:
         """Extract demo points from a building's equipment files.
 
         Args:
             equipment_dir: Path to equipment directory
-            demo_building_id: ID of the demo building for logging
+            demo_site_id: ID of the demo building for logging
 
         Returns:
             List of point dicts ready for classification
@@ -759,15 +759,15 @@ class PointDiscoveryService:
             equipment_rows = []
             try:
                 buildings_resp = (
-                    client.table("buildings").select("id").or_(f"code.eq.{site_id},site_id.eq.{site_id}").execute()
+                    client.table("sites").select("id").or_(f"code.eq.{site_id},site_id.eq.{site_id}").execute()
                 )
-                building_ids = [b["id"] for b in (buildings_resp.data or [])]
+                site_ids = [b["id"] for b in (buildings_resp.data or [])]
 
-                if building_ids:
+                if site_ids:
                     equip_resp = (
                         client.table("equipment")
                         .select("code,name,type,status,health_score")
-                        .in_("building_id", building_ids)
+                        .in_("site_id", site_ids)
                         .execute()
                     )
                     equipment_rows = equip_resp.data or []

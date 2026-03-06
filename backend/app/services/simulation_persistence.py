@@ -41,7 +41,7 @@ class SimulationPersistence:
         Args:
             simulated_time: Current simulation timestamp
             equipment_states: {equipment_code: {health_score, status, sensor_readings}}
-            schedule_state: Current BuildingSchedule state
+            schedule_state: Current SiteSchedule state
             energy_kw: Current hour power consumption
             ambient_temp: Outside temperature
             humidity: Outside humidity
@@ -224,7 +224,7 @@ class SimulationPersistence:
                 {
                     "time": simulated_time.isoformat(),
                     "zone_id": zone_id,
-                    "building_id": self.site_id,
+                    "site_id": self.site_id,
                     "temp": data.get("temp"),
                     "humidity": data.get("humidity"),
                     "co2": data.get("co2"),
@@ -245,7 +245,7 @@ class SimulationPersistence:
         self,
         simulated_time: datetime,
         equipment_states: Dict[str, Dict[str, Any]],
-        building_load_kw: float,
+        site_load_kw: float,
         tariff_band: str,
         tariff_rate: float,
         hour_index: int,
@@ -276,7 +276,7 @@ class SimulationPersistence:
 
         grid_export_kw = max(
             0.0,
-            solar_gen_kw - building_load_kw - bess_charge_kw + bess_discharge_kw,
+            solar_gen_kw - site_load_kw - bess_charge_kw + bess_discharge_kw,
         )
 
         sim_date = simulated_time.date()
@@ -293,7 +293,7 @@ class SimulationPersistence:
             "day_of_year": day_of_year,
             "hour_of_day": hour_of_day,
             "solar_gen_kw": round(solar_gen_kw, 1),
-            "building_load_kw": round(building_load_kw, 1),
+            "site_load_kw": round(site_load_kw, 1),
             "bess_soc_pct": round(bess_soc_pct, 1),
             "bess_charge_kw": round(bess_charge_kw, 1),
             "bess_discharge_kw": round(bess_discharge_kw, 1),
@@ -310,7 +310,7 @@ class SimulationPersistence:
         self,
         simulated_date,
         solar_gen_kwh: float,
-        building_load_kwh: float,
+        site_load_kwh: float,
         bess_charge_kwh: float,
         bess_discharge_kwh: float,
         grid_import_kwh: float,
@@ -331,7 +331,7 @@ class SimulationPersistence:
             "month": simulated_date.month,
             "day_of_year": day_of_year,
             "solar_gen_kwh": round(solar_gen_kwh, 1),
-            "building_load_kwh": round(building_load_kwh, 1),
+            "site_load_kwh": round(site_load_kwh, 1),
             "bess_charge_kwh": round(bess_charge_kwh, 1),
             "bess_discharge_kwh": round(bess_discharge_kwh, 1),
             "grid_import_kwh": round(grid_import_kwh, 1),

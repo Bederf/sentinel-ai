@@ -274,10 +274,10 @@ def _check_site_access(auth_ctx: AuthContext, site_id: str) -> bool:
 
         repo = get_user_site_access_repository()
         if auth_ctx.email:
-            return repo.has_access_to_building_code(
+            return repo.has_access_to_site_code(
                 user_email=auth_ctx.email,
                 user_role=auth_ctx.role,
-                building_code=site_id,
+                site_code=site_id,
             )
     except Exception as e:
         logger.debug(f"Supabase site access check failed, using JSON fallback: {e}")

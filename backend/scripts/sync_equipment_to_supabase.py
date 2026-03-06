@@ -24,7 +24,7 @@ import psycopg2.extras
 # Resolve paths
 SCRIPT_DIR = Path(__file__).parent
 BACKEND_DIR = SCRIPT_DIR.parent
-EQUIPMENT_DIR = BACKEND_DIR / "app" / "data" / "buildings" / "site-002" / "equipment"
+EQUIPMENT_DIR = BACKEND_DIR / "app" / "data" / "sites" / "site-002" / "equipment"
 BACKUP_DIR = BACKEND_DIR / "app" / "data" / "supabase_backup"
 
 DATABASE_URL = os.getenv(
@@ -62,7 +62,7 @@ def load_equipment_files() -> list[dict]:
         records.append(
             {
                 "code": code,
-                "building_id": BUILDING_ID,
+                "site_id": BUILDING_ID,
                 "name": name,
                 "type": eq_type,
                 "status": "normal",
@@ -110,10 +110,10 @@ def main():
 
         insert_sql = """
             INSERT INTO equipment (
-                building_id, code, name, type, status, health_score,
+                site_id, code, name, type, status, health_score,
                 operating_data, network_info, device_info
             ) VALUES (
-                %(building_id)s, %(code)s, %(name)s, %(type)s, %(status)s,
+                %(site_id)s, %(code)s, %(name)s, %(type)s, %(status)s,
                 %(health_score)s,
                 %(operating_data)s::jsonb, %(network_info)s::jsonb, %(device_info)s::jsonb
             )

@@ -85,7 +85,7 @@ def migrate_buildings(supabase: Client) -> dict:
         }
 
         try:
-            supabase.table("buildings").upsert(record).execute()
+            supabase.table("sites").upsert(record).execute()
             print(f"  ✓ {site['name']}")
         except Exception as e:
             print(f"  ✗ {site['name']}: {e}")
@@ -103,8 +103,8 @@ def migrate_equipment(supabase: Client, building_map: dict) -> dict:
 
     for item in equipment:
         site_id = item.get("site_id")
-        building_id = building_map.get(site_id)
-        if not building_id:
+        site_id = building_map.get(site_id)
+        if not site_id:
             print(f"  ⚠ Skipping {item['id']}: no building for site {site_id}")
             continue
 
@@ -119,7 +119,7 @@ def migrate_equipment(supabase: Client, building_map: dict) -> dict:
         record = {
             "id": new_id,
             "code": item["id"],
-            "building_id": building_id,
+            "site_id": site_id,
             "name": item.get("name", ""),
             "type": item.get("type", "unknown"),
             "manufacturer": item.get("manufacturer"),
@@ -210,17 +210,17 @@ def migrate_alerts(supabase: Client, building_map: dict, equipment_map: dict):
 
     for alert in alerts:
         site_id = alert.get("site_id")
-        building_id = building_map.get(site_id)
+        site_id = building_map.get(site_id)
         equipment_id = equipment_map.get(alert.get("equipment_id"))
 
-        if not building_id:
+        if not site_id:
             continue
 
         new_id = generate_uuid(alert.get("id", f"alert-{count}"))
 
         record = {
             "id": new_id,
-            "building_id": building_id,
+            "site_id": site_id,
             "equipment_id": equipment_id,
             "type": alert.get("type", "system"),
             "title": alert.get("title", alert.get("message", "Alert")),
@@ -250,9 +250,9 @@ def migrate_predictions(supabase: Client, building_map: dict, equipment_map: dic
     for pred in predictions:
         equipment_id = equipment_map.get(pred.get("equipment_id"))
         site_id = pred.get("site_id")
-        building_id = building_map.get(site_id)
+        site_id = building_map.get(site_id)
 
-        if not equipment_id or not building_id:
+        if not equipment_id or not site_id:
             continue
 
         new_id = generate_uuid(pred.get("id", f"pred-{count}"))
@@ -285,7 +285,7 @@ def migrate_predictions(supabase: Client, building_map: dict, equipment_map: dic
             "id": new_id,
             "code": pred.get("id", f"PRED-{count:04d}"),
             "equipment_id": equipment_id,
-            "building_id": building_id,
+            "site_id": site_id,
             "prediction_type": pred.get("type", "maintenance"),
             "probability_percent": int(confidence_val * 100) if isinstance(confidence_val, float) else 50,
             "confidence": confidence,
@@ -315,9 +315,9 @@ def migrate_anomalies(supabase: Client, building_map: dict, equipment_map: dict)
     for anomaly in anomalies:
         equipment_id = equipment_map.get(anomaly.get("equipment_id"))
         site_id = anomaly.get("site_id")
-        building_id = building_map.get(site_id)
+        site_id = building_map.get(site_id)
 
-        if not building_id:
+        if not site_id:
             continue
 
         new_id = generate_uuid(anomaly.get("id", f"anomaly-{count}"))
@@ -347,7 +347,7 @@ def migrate_anomalies(supabase: Client, building_map: dict, equipment_map: dict)
             "id": new_id,
             "code": anomaly.get("id", f"ANOM-{count:04d}"),
             "equipment_id": equipment_id,
-            "building_id": building_id,
+            "site_id": site_id,
             "type": anomaly.get("type", "unknown"),
             "severity": severity,
             "status": status,

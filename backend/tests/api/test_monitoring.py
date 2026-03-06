@@ -107,11 +107,11 @@ def test_monitoring_includes_control_kpis(test_client):
 
 
 def test_monitoring_building_filter(test_client):
-    """Passing building_id filters to that building."""
-    response = test_client.get("/api/system/monitoring?building_id=test-building")
+    """Passing site_id filters to that building."""
+    response = test_client.get("/api/system/monitoring?site_id=test-building")
     assert response.status_code == 200
     data = response.json()
-    assert data["building_id"] == "test-building"
+    assert data["site_id"] == "test-building"
 
 
 # ===========================================================================
@@ -141,7 +141,7 @@ async def test_stale_data_alert_fires():
         mock_health.return_value = _make_integration_health(last_sync=stale_sync)
         mock_qm.return_value = _make_quality_metrics(data_freshness_hours=30)
 
-        snapshot = await svc.get_snapshot(building_id="test")
+        snapshot = await svc.get_snapshot(site_id="test")
         stale_alerts = [a for a in snapshot.alerts if a.rule == "stale_data"]
         assert len(stale_alerts) == 1
         assert stale_alerts[0].severity == "warning"
@@ -171,7 +171,7 @@ async def test_json_in_live_alert_fires():
             {"connection_type": "file_drop"},
         ]
 
-        snapshot = await svc.get_snapshot(building_id="test")
+        snapshot = await svc.get_snapshot(site_id="test")
         json_alerts = [a for a in snapshot.alerts if a.rule == "json_in_live"]
         assert len(json_alerts) == 1
         assert json_alerts[0].severity == "critical"
@@ -198,7 +198,7 @@ async def test_high_error_rate_warning():
         mock_health.return_value = _make_integration_health(recent_errors_count=1, active_sources=5)
         mock_qm.return_value = _make_quality_metrics()
 
-        snapshot = await svc.get_snapshot(building_id="test")
+        snapshot = await svc.get_snapshot(site_id="test")
         error_alerts = [a for a in snapshot.alerts if a.rule == "high_error_rate"]
         assert len(error_alerts) == 1
         assert error_alerts[0].severity == "warning"
@@ -225,7 +225,7 @@ async def test_high_error_rate_critical():
         mock_health.return_value = _make_integration_health(recent_errors_count=2, active_sources=5)
         mock_qm.return_value = _make_quality_metrics()
 
-        snapshot = await svc.get_snapshot(building_id="test")
+        snapshot = await svc.get_snapshot(site_id="test")
         error_alerts = [a for a in snapshot.alerts if a.rule == "high_error_rate"]
         assert len(error_alerts) == 1
         assert error_alerts[0].severity == "critical"
@@ -251,7 +251,7 @@ async def test_low_coverage_alert():
         mock_health.return_value = _make_integration_health(total_points_mapped=100, unmatched_points=60)
         mock_qm.return_value = _make_quality_metrics(match_coverage=40)
 
-        snapshot = await svc.get_snapshot(building_id="test")
+        snapshot = await svc.get_snapshot(site_id="test")
         coverage_alerts = [a for a in snapshot.alerts if a.rule == "low_coverage"]
         assert len(coverage_alerts) == 1
         assert coverage_alerts[0].severity == "warning"

@@ -13,6 +13,8 @@ import {
   ArrowLeft,
   RefreshCw,
   Building2,
+  MessageSquare,
+  Package,
 } from 'lucide-react';
 import {
   api,
@@ -24,6 +26,7 @@ import {
 import { useModules } from '@/contexts/ModuleHooks';
 import { PageLoading } from "./PageLoading";
 import { BuildingSelector } from "./BuildingSelector";
+import TechnicianChat from "./TechnicianChat";
 
 // Re-export types from API for local use
 type Equipment = WorkflowEquipmentItem;
@@ -64,9 +67,12 @@ function getStateIcon(state: string) {
   }
 }
 
+type MaintenanceTab = 'equipment' | 'tech-chat';
+
 export function AssetWorkflowDashboard() {
   const { isModuleActive } = useModules();
   const maintenanceActive = isModuleActive('maintenance');
+  const [activeTab, setActiveTab] = useState<MaintenanceTab>('equipment');
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [workflowStates, setWorkflowStates] = useState<Record<string, WorkflowState>>({});
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
@@ -134,55 +140,97 @@ export function AssetWorkflowDashboard() {
     }
   }, [selectedEquipment, workflowStates]);
 
-  // Show initial loading state
-  if (initialLoading) {
-    return (
-      <PageLoading message="Loading equipment workflow data..." />
-    );
-  }
+  const tabs: { id: MaintenanceTab; label: string; icon: typeof Package }[] = [
+    { id: 'equipment', label: 'Equipment', icon: Package },
+    { id: 'tech-chat', label: 'Tech Chat', icon: MessageSquare },
+  ];
 
   return (
     <div
-      className="h-full overflow-y-auto p-4 md:p-6"
+      className="h-full flex flex-col"
       style={{ background: 'var(--color-sentinel-bg-canvas)' }}
     >
       {/* Page Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 mb-1">
+      <div className="px-4 md:px-6 pt-4 md:pt-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
             <div
               className="p-2 rounded"
               style={{ background: 'rgba(59, 130, 246, 0.15)' }}
             >
-              <Shield className="h-5 w-5" style={{ color: 'var(--color-sentinel-blue)' }} />
+              <Wrench className="h-5 w-5" style={{ color: 'var(--color-sentinel-blue)' }} />
             </div>
             <div>
               <h1
                 className="text-lg font-semibold"
                 style={{ color: 'var(--color-sentinel-text-primary)' }}
               >
-                Asset Management Workflow
+                Maintenance
               </h1>
               <p
                 className="text-sm"
                 style={{ color: 'var(--color-sentinel-text-secondary)' }}
               >
-                Complete visibility from onboarding through repair validation
+                Equipment workflow, work orders & technician support
               </p>
             </div>
           </div>
-          <button
-            onClick={fetchDashboardData}
-            className="p-2 rounded transition-colors"
-            style={{ color: 'var(--color-sentinel-text-secondary)' }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-sentinel-bg-secondary)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = ''}
-            title="Refresh data"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
+          {activeTab === 'equipment' && (
+            <button
+              onClick={fetchDashboardData}
+              className="p-2 rounded transition-colors"
+              style={{ color: 'var(--color-sentinel-text-secondary)' }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-sentinel-bg-secondary)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = ''}
+              title="Refresh data"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Tab Bar */}
+        <div
+          className="flex gap-1 mb-4"
+          style={{ borderBottom: '1px solid var(--color-sentinel-border)' }}
+        >
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            const TabIcon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors relative"
+                style={{
+                  color: isActive
+                    ? 'var(--color-sentinel-text-primary)'
+                    : 'var(--color-sentinel-text-secondary)',
+                }}
+              >
+                <TabIcon className="h-4 w-4" />
+                {tab.label}
+                {isActive && (
+                  <div
+                    className="absolute bottom-0 left-0 right-0 h-0.5"
+                    style={{ background: 'var(--color-sentinel-blue)' }}
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
+
+      {/* Tab Content */}
+      {activeTab === 'tech-chat' ? (
+        <div className="flex-1 min-h-0">
+          <TechnicianChat />
+        </div>
+      ) : initialLoading ? (
+        <PageLoading message="Loading equipment workflow data..." />
+      ) : (
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-4 md:pb-6">
 
       {/* Error State */}
       {error && (
@@ -389,6 +437,8 @@ export function AssetWorkflowDashboard() {
           onBack={() => setSelectedEquipment(null)}
           maintenanceActive={maintenanceActive}
         />
+      )}
+      </div>
       )}
     </div>
   );

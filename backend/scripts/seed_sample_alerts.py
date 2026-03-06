@@ -64,9 +64,7 @@ async def create_sample_alerts():
     created_alerts = []
     for equipment_data in at_risk_equipment:
         # Get equipment by code
-        eq_response = (
-            client.table("equipment").select("id, building_id, name").eq("code", equipment_data["code"]).execute()
-        )
+        eq_response = client.table("equipment").select("id, site_id, name").eq("code", equipment_data["code"]).execute()
 
         if not eq_response.data:
             print(f"  ✗ Equipment {equipment_data['code']} not found - skipping")
@@ -78,7 +76,7 @@ async def create_sample_alerts():
         alert_id = str(uuid.uuid4())
         alert_data = {
             "id": alert_id,
-            "building_id": equipment["building_id"],
+            "site_id": equipment["site_id"],
             "equipment_id": equipment["id"],
             "type": "health_degradation",
             "severity": equipment_data["severity"],

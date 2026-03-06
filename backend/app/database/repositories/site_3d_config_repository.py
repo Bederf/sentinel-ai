@@ -1,6 +1,6 @@
 """Repository for Building 3D Configuration data access layer.
 
-Handles CRUD operations for building_3d_configs table with JSON fallback support.
+Handles CRUD operations for site_3d_configs table with JSON fallback support.
 Follows the dual-write pattern: primary write to Supabase, fallback to JSON files.
 """
 
@@ -16,11 +16,11 @@ logger = logging.getLogger(__name__)
 
 # JSON file storage directory
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
-BUILDINGS_DIR = DATA_DIR / "buildings"
+SITES_DIR = DATA_DIR / "sites"
 
 
-class Building3DConfigRepository:
-    """Repository for building 3D configuration data access."""
+class Site3DConfigRepository:
+    """Repository for site 3D configuration data access."""
 
     def __init__(self):
         """Initialize repository with Supabase client."""
@@ -28,23 +28,23 @@ class Building3DConfigRepository:
 
     def create(
         self,
-        building_id: str,
         site_id: str,
+        site_code: str,
         name: str,
         floors: List[Dict[str, Any]],
         equipment_positions: Optional[List[Dict[str, Any]]] = None,
         code: Optional[str] = None,
         created_by: str = "system",
     ) -> Optional[Dict[str, Any]]:
-        """Create a new building 3D configuration.
+        """Create a new site 3D configuration.
 
         Args:
-            building_id: UUID of the building
-            site_id: Site identifier (e.g., "site-002")
-            name: Building name
+            site_id: UUID of the site
+            site_code: Site identifier (e.g., "site-002")
+            name: Site name
             floors: List of floor definitions
             equipment_positions: List of equipment positions (default: empty)
-            code: Optional building code
+            code: Optional site code
             created_by: Username of creator
 
         Returns:
@@ -52,8 +52,8 @@ class Building3DConfigRepository:
         """
         try:
             payload = {
-                "building_id": building_id,
                 "site_id": site_id,
+                "site_code": site_code,
                 "name": name,
                 "code": code,
                 "floors": floors,
@@ -66,27 +66,27 @@ class Building3DConfigRepository:
             # Write to Supabase (primary)
             if self.supabase:
                 try:
-                    response = self.supabase.table("building_3d_configs").insert(payload).execute()
+                    response = self.supabase.table("site_3d_configs").insert(payload).execute()
 
                     if response.data and len(response.data) > 0:
-                        logger.info(f"✓ Created 3D config for building {building_id} in Supabase")
+                        logger.info(f"✓ Created 3D config for building {site_id} in Supabase")
                         return response.data[0]
                 except Exception as e:
                     logger.warning(f"Failed to save 3D config to Supabase: {e}. Using JSON fallback.")
 
             # Fallback: write to JSON
-            self._save_to_json(building_id, payload)
+            self._save_to_json(site_id, payload)
             return payload
 
         except Exception as e:
             logger.error(f"Failed to create 3D config: {e}")
             return None
 
-    def get_by_building_id(self, building_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_site_id(self, site_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve 3D configuration by building ID.
 
         Args:
-            building_id: UUID of the building
+            site_id: UUID of the building
 
         Returns:
             Config dict or None if not found
@@ -95,9 +95,7 @@ class Building3DConfigRepository:
             # Try Supabase (primary)
             if self.supabase:
                 try:
-                    response = (
-                        self.supabase.table("building_3d_configs").select("*").eq("building_id", building_id).execute()
-                    )
+                    response = self.supabase.table("site_3d_configs").select("*").eq("site_id", site_id).execute()
 
                     if response.data and len(response.data) > 0:
                         return response.data[0]
@@ -105,7 +103,7 @@ class Building3DConfigRepository:
                     logger.debug(f"Supabase query failed: {e}. Trying JSON fallback.")
 
             # Fallback: load from JSON
-            return self._load_from_json(building_id)
+            return self._load_from_json(site_id)
 
         except Exception as e:
             logger.error(f"Failed to retrieve 3D config: {e}")
@@ -113,7 +111,7 @@ class Building3DConfigRepository:
 
     def update(
         self,
-        building_id: str,
+        site_id: str,
         floors: Optional[List[Dict[str, Any]]] = None,
         equipment_positions: Optional[List[Dict[str, Any]]] = None,
         zones: Optional[List[Dict[str, Any]]] = None,
@@ -122,7 +120,7 @@ class Building3DConfigRepository:
         """Update an existing 3D configuration.
 
         Args:
-            building_id: UUID of the building
+            site_id: UUID of the building
             floors: Updated floor definitions (optional)
             equipment_positions: Updated equipment positions (optional)
             zones: Updated zone definitions (optional)
@@ -133,9 +131,9 @@ class Building3DConfigRepository:
         """
         try:
             # Get existing config
-            existing = self.get_by_building_id(building_id)
+            existing = self.get_by_site_id(site_id)
             if not existing:
-                logger.warning(f"3D config not found for building {building_id}")
+                logger.warning(f"3D config not found for building {site_id}")
                 return None
 
             # Build update payload
@@ -151,32 +149,29 @@ class Building3DConfigRepository:
             if self.supabase:
                 try:
                     response = (
-                        self.supabase.table("building_3d_configs")
-                        .update(update_payload)
-                        .eq("building_id", building_id)
-                        .execute()
+                        self.supabase.table("site_3d_configs").update(update_payload).eq("site_id", site_id).execute()
                     )
 
                     if response.data and len(response.data) > 0:
-                        logger.info(f"✓ Updated 3D config for building {building_id} in Supabase")
+                        logger.info(f"✓ Updated 3D config for building {site_id} in Supabase")
                         return response.data[0]
                 except Exception as e:
                     logger.warning(f"Failed to update 3D config in Supabase: {e}. Using JSON fallback.")
 
             # Fallback: update JSON
             updated = {**existing, **update_payload}
-            self._save_to_json(building_id, updated)
+            self._save_to_json(site_id, updated)
             return updated
 
         except Exception as e:
             logger.error(f"Failed to update 3D config: {e}")
             return None
 
-    def delete(self, building_id: str) -> bool:
+    def delete(self, site_id: str) -> bool:
         """Delete 3D configuration for a building.
 
         Args:
-            building_id: UUID of the building
+            site_id: UUID of the building
 
         Returns:
             True if deleted, False if not found or error
@@ -185,16 +180,16 @@ class Building3DConfigRepository:
             # Delete from Supabase (primary)
             if self.supabase:
                 try:
-                    self.supabase.table("building_3d_configs").delete().eq("building_id", building_id).execute()
-                    logger.info(f"✓ Deleted 3D config for building {building_id}")
+                    self.supabase.table("site_3d_configs").delete().eq("site_id", site_id).execute()
+                    logger.info(f"✓ Deleted 3D config for building {site_id}")
                 except Exception as e:
                     logger.warning(f"Failed to delete from Supabase: {e}")
 
             # Delete JSON fallback
-            json_file = BUILDINGS_DIR / building_id / "config_3d.json"
+            json_file = SITES_DIR / site_id / "config_3d.json"
             if json_file.exists():
                 json_file.unlink()
-                logger.info(f"✓ Deleted JSON config for building {building_id}")
+                logger.info(f"✓ Deleted JSON config for building {site_id}")
 
             return True
 
@@ -202,15 +197,15 @@ class Building3DConfigRepository:
             logger.error(f"Failed to delete 3D config: {e}")
             return False
 
-    def _save_to_json(self, building_id: str, config: Dict[str, Any]) -> None:
+    def _save_to_json(self, site_id: str, config: Dict[str, Any]) -> None:
         """Save configuration to JSON file (fallback storage).
 
         Args:
-            building_id: Building ID
+            site_id: Building ID
             config: Configuration data
         """
         try:
-            config_dir = BUILDINGS_DIR / building_id
+            config_dir = SITES_DIR / site_id
             config_dir.mkdir(parents=True, exist_ok=True)
 
             config_file = config_dir / "config_3d.json"
@@ -230,17 +225,17 @@ class Building3DConfigRepository:
         except Exception as e:
             logger.error(f"Failed to save 3D config to JSON: {e}")
 
-    def _load_from_json(self, building_id: str) -> Optional[Dict[str, Any]]:
+    def _load_from_json(self, site_id: str) -> Optional[Dict[str, Any]]:
         """Load configuration from JSON file (fallback storage).
 
         Args:
-            building_id: Building ID
+            site_id: Building ID
 
         Returns:
             Configuration dict or None if not found
         """
         try:
-            config_file = BUILDINGS_DIR / building_id / "config_3d.json"
+            config_file = SITES_DIR / site_id / "config_3d.json"
 
             if not config_file.exists():
                 return None
@@ -257,18 +252,18 @@ class Building3DConfigRepository:
 
 
 # Singleton instance
-_building_3d_config_repository: Optional[Building3DConfigRepository] = None
+_site_3d_config_repository: Optional[Site3DConfigRepository] = None
 
 
-def get_building_3d_config_repository() -> Building3DConfigRepository:
+def get_site_3d_config_repository() -> Site3DConfigRepository:
     """Get or create singleton repository instance.
 
     Returns:
-        Building3DConfigRepository instance
+        Site3DConfigRepository instance
     """
-    global _building_3d_config_repository
+    global _site_3d_config_repository
 
-    if _building_3d_config_repository is None:
-        _building_3d_config_repository = Building3DConfigRepository()
+    if _site_3d_config_repository is None:
+        _site_3d_config_repository = Site3DConfigRepository()
 
-    return _building_3d_config_repository
+    return _site_3d_config_repository

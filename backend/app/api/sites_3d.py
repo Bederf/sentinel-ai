@@ -10,8 +10,8 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.database.repositories.building_repository import BuildingRepository
-from app.services.building_3d_config_service import get_building_3d_config_service
+from app.database.repositories.site_repository import SiteRepository
+from app.services.site_3d_config_service import get_site_3d_config_service
 
 logger = logging.getLogger(__name__)
 
@@ -46,22 +46,22 @@ class BuildingStructure(BaseModel):
     floors: list[FloorDefinition] = Field(..., description="Floor definitions")
 
 
-class Building3DConfigRequest(BaseModel):
+class Site3DConfigRequest(BaseModel):
     """Request to create/update building 3D configuration."""
 
-    building_structure: BuildingStructure = Field(..., description="Building structure")
+    site_structure: BuildingStructure = Field(..., description="Building structure")
     equipment_positions: list[EquipmentPosition] = Field(
         default_factory=list,
         description="Equipment positions on floors",
     )
 
 
-class Building3DConfigResponse(BaseModel):
+class Site3DConfigResponse(BaseModel):
     """Response with building 3D configuration."""
 
     id: str = Field(..., description="Config ID")
-    building_id: str = Field(..., description="Building ID")
-    site_id: str = Field(..., description="Site ID")
+    site_id: str = Field(..., description="Site UUID")
+    site_code: str = Field(..., description="Site code")
     name: str = Field(..., description="Building name")
     code: Optional[str] = Field(None, description="Building code")
     floors: list[Dict[str, Any]] = Field(..., description="Floor definitions")
@@ -74,8 +74,8 @@ class Building3DConfigResponse(BaseModel):
 class Building3DViewerDataResponse(BaseModel):
     """Response with data formatted for 3D viewer."""
 
-    building_id: str = Field(..., description="Building ID")
-    building_name: str = Field(..., description="Building name")
+    site_id: str = Field(..., description="Building ID")
+    site_name: str = Field(..., description="Building name")
     floors: list[Dict[str, Any]] = Field(..., description="Floor data with equipment")
     metadata: Dict[str, Any] = Field(..., description="Metadata")
 
@@ -86,8 +86,8 @@ router = APIRouter(prefix="/buildings", tags=["buildings-3d"])
 
 
 @router.post(
-    "/{building_id}/config",
-    response_model=Building3DConfigResponse,
+    "/{site_id}/config",
+    response_model=Site3DConfigResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create or update building 3D configuration",
     responses={
@@ -96,16 +96,16 @@ router = APIRouter(prefix="/buildings", tags=["buildings-3d"])
     },
 )
 async def create_or_update_config(
-    building_id: str,
-    request: Building3DConfigRequest,
-) -> Building3DConfigResponse:
+    site_id: str,
+    request: Site3DConfigRequest,
+) -> Site3DConfigResponse:
     """Create or update 3D configuration for a building.
 
     Stores building structure (floors) and equipment placement data.
     Automatically infers zones from equipment positions.
 
     Args:
-        building_id: Building UUID
+        site_id: Building UUID
         request: Configuration request with structure and positions
 
     Returns:
@@ -117,23 +117,23 @@ async def create_or_update_config(
     """
     try:
         # Verify building exists
-        building_repo = BuildingRepository()
-        building = building_repo.get_by_uuid(building_id)
+        building_repo = SiteRepository()
+        building = building_repo.get_by_uuid(site_id)
         if not building:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Building {building_id} not found",
+                detail=f"Building {site_id} not found",
             )
 
-        service = get_building_3d_config_service()
+        service = get_site_3d_config_service()
 
         # Validate structure
-        is_valid, error = service.validate_building_structure(
+        is_valid, error = service.validate_site_structure(
             {
-                "name": request.building_structure.name,
-                "code": request.building_structure.code,
-                "numberOfFloors": request.building_structure.numberOfFloors,
-                "floors": [f.model_dump() for f in request.building_structure.floors],
+                "name": request.site_structure.name,
+                "code": request.site_structure.code,
+                "numberOfFloors": request.site_structure.numberOfFloors,
+                "floors": [f.model_dump() for f in request.site_structure.floors],
             }
         )
         if not is_valid:
@@ -147,7 +147,7 @@ async def create_or_update_config(
         is_valid, error = service.validate_equipment_positions(
             positions,
             {
-                "floors": [f.model_dump() for f in request.building_structure.floors],
+                "floors": [f.model_dump() for f in request.site_structure.floors],
             },
         )
         if not is_valid:
@@ -158,27 +158,27 @@ async def create_or_update_config(
 
         # Create or update config
         config_repo = service.repository
-        existing = config_repo.get_by_building_id(building_id)
+        existing = config_repo.get_by_site_id(site_id)
 
         if existing:
             # Update existing
             config = config_repo.update(
-                building_id=building_id,
-                floors=[f.model_dump() for f in request.building_structure.floors],
+                site_id=site_id,
+                floors=[f.model_dump() for f in request.site_structure.floors],
                 equipment_positions=positions,
             )
-            logger.info(f"✓ Updated 3D config for building {building_id}")
+            logger.info(f"✓ Updated 3D config for building {site_id}")
         else:
             # Create new
             config = config_repo.create(
-                building_id=building_id,
-                site_id=building.get("code", building_id),
-                name=request.building_structure.name,
-                code=request.building_structure.code,
-                floors=[f.model_dump() for f in request.building_structure.floors],
+                site_id=site_id,
+                site_code=building.get("code", site_id),
+                name=request.site_structure.name,
+                code=request.site_structure.code,
+                floors=[f.model_dump() for f in request.site_structure.floors],
                 equipment_positions=positions,
             )
-            logger.info(f"✓ Created 3D config for building {building_id}")
+            logger.info(f"✓ Created 3D config for building {site_id}")
 
         if not config:
             raise HTTPException(
@@ -186,10 +186,10 @@ async def create_or_update_config(
                 detail="Failed to save configuration",
             )
 
-        return Building3DConfigResponse(
+        return Site3DConfigResponse(
             id=str(config.get("id", "")),
-            building_id=str(config.get("building_id", "")),
-            site_id=config.get("site_id", ""),
+            site_id=str(config.get("site_id", "")),
+            site_code=config.get("site_code", ""),
             name=config.get("name", ""),
             code=config.get("code"),
             floors=config.get("floors", []),
@@ -210,16 +210,16 @@ async def create_or_update_config(
 
 
 @router.get(
-    "/{building_id}/config",
-    response_model=Building3DConfigResponse,
+    "/{site_id}/config",
+    response_model=Site3DConfigResponse,
     summary="Get building 3D configuration",
     responses={404: {"description": "Configuration not found"}},
 )
-async def get_config(building_id: str) -> Building3DConfigResponse:
+async def get_config(site_id: str) -> Site3DConfigResponse:
     """Retrieve 3D configuration for a building.
 
     Args:
-        building_id: Building UUID
+        site_id: Building UUID
 
     Returns:
         Configuration data
@@ -228,19 +228,19 @@ async def get_config(building_id: str) -> Building3DConfigResponse:
         404: If configuration not found
     """
     try:
-        config_repo = get_building_3d_config_service().repository
-        config = config_repo.get_by_building_id(building_id)
+        config_repo = get_site_3d_config_service().repository
+        config = config_repo.get_by_site_id(site_id)
 
         if not config:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Configuration for building {building_id} not found",
+                detail=f"Configuration for building {site_id} not found",
             )
 
-        return Building3DConfigResponse(
+        return Site3DConfigResponse(
             id=str(config.get("id", "")),
-            building_id=str(config.get("building_id", "")),
-            site_id=config.get("site_id", ""),
+            site_id=str(config.get("site_id", "")),
+            site_code=config.get("site_code", ""),
             name=config.get("name", ""),
             code=config.get("code"),
             floors=config.get("floors", []),
@@ -261,19 +261,19 @@ async def get_config(building_id: str) -> Building3DConfigResponse:
 
 
 @router.get(
-    "/{building_id}/viewer-data",
+    "/{site_id}/viewer-data",
     response_model=Building3DViewerDataResponse,
     summary="Get building 3D viewer data",
     responses={404: {"description": "Configuration not found"}},
 )
-async def get_viewer_data(building_id: str) -> Building3DViewerDataResponse:
+async def get_viewer_data(site_id: str) -> Building3DViewerDataResponse:
     """Retrieve 3D viewer-formatted data for a building.
 
     Data includes floors, equipment positions, and metadata
     formatted for 3D visualization rendering.
 
     Args:
-        building_id: Building UUID
+        site_id: Building UUID
 
     Returns:
         Viewer-ready data
@@ -282,18 +282,18 @@ async def get_viewer_data(building_id: str) -> Building3DViewerDataResponse:
         404: If configuration not found
     """
     try:
-        service = get_building_3d_config_service()
-        config = service.repository.get_by_building_id(building_id)
+        service = get_site_3d_config_service()
+        config = service.repository.get_by_site_id(site_id)
 
         if not config:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Configuration for building {building_id} not found",
+                detail=f"Configuration for building {site_id} not found",
             )
 
         # Generate viewer data
         viewer_data = service.generate_viewer_data(
-            building_id=building_id,
+            site_id=site_id,
             structure={
                 "name": config.get("name"),
                 "code": config.get("code"),
@@ -305,8 +305,8 @@ async def get_viewer_data(building_id: str) -> Building3DViewerDataResponse:
         )
 
         return Building3DViewerDataResponse(
-            building_id=viewer_data.get("building_id", ""),
-            building_name=viewer_data.get("building_name", ""),
+            site_id=viewer_data.get("site_id", ""),
+            site_name=viewer_data.get("site_name", ""),
             floors=viewer_data.get("floors", []),
             metadata=viewer_data.get("metadata", {}),
         )
@@ -322,20 +322,20 @@ async def get_viewer_data(building_id: str) -> Building3DViewerDataResponse:
 
 
 @router.delete(
-    "/{building_id}/config",
+    "/{site_id}/config",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete building 3D configuration",
 )
-async def delete_config(building_id: str) -> None:
+async def delete_config(site_id: str) -> None:
     """Delete 3D configuration for a building.
 
     Args:
-        building_id: Building UUID
+        site_id: Building UUID
     """
     try:
-        config_repo = get_building_3d_config_service().repository
-        config_repo.delete(building_id)
-        logger.info(f"✓ Deleted 3D config for building {building_id}")
+        config_repo = get_site_3d_config_service().repository
+        config_repo.delete(site_id)
+        logger.info(f"✓ Deleted 3D config for building {site_id}")
 
     except Exception as e:
         logger.error(f"Error deleting 3D config: {e}")

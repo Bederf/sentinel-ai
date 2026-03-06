@@ -331,16 +331,14 @@ async def get_recommendations(
             logger.warning("Supabase client not available, skipping predictions fetch")
         else:
             # Get building ID from site code
-            building_response = client.table("buildings").select("id").eq("code", site_id).limit(1).execute()
-            if not building_response.data:
+            site_response = client.table("sites").select("id").eq("code", site_id).limit(1).execute()
+            if not site_response.data:
                 # Try with 'sandton' mapping for legacy support
                 if site_id == get_primary_site():
-                    building_response = (
-                        client.table("buildings").select("id").ilike("name", "%sandton%").limit(1).execute()
-                    )
+                    site_response = client.table("sites").select("id").ilike("name", "%sandton%").limit(1).execute()
 
-            if building_response.data:
-                building_id = building_response.data[0]["id"]
+            if site_response.data:
+                site_id = site_response.data[0]["id"]
 
                 # Query predictions with active status
                 query = (
@@ -350,7 +348,7 @@ async def get_recommendations(
                         "recommended_action, urgency, severity, status, created_at, "
                         "evidence, contributing_factors"
                     )
-                    .eq("building_id", building_id)
+                    .eq("site_id", site_id)
                 )
 
                 if not include_resolved:

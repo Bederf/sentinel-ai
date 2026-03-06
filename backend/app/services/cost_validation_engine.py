@@ -40,15 +40,15 @@ TARIFF_ADJUSTMENT_MAX_PCT = 10.0  # Max tariff change per adjustment
 class CostValidationEngine:
     """Engine for validating simulated costs against real invoices."""
 
-    def __init__(self, building_id: str):
+    def __init__(self, site_id: str):
         """Initialize cost validation engine.
 
         Args:
-            building_id: Building/site identifier (e.g., 'site-002')
+            site_id: Building/site identifier (e.g., 'site-002')
         """
-        self.building_id = building_id
+        self.site_id = site_id
         self.client = get_supabase_client()
-        self.sim_store = get_simulation_store(building_id)
+        self.sim_store = get_simulation_store(site_id)
 
     async def get_daily_simulated_cost(
         self,
@@ -249,7 +249,7 @@ class CostValidationEngine:
             response = (
                 self.client.table("cost_validations")
                 .select("real_cost_r, period_start, period_end")
-                .eq("site_id", self.building_id)
+                .eq("site_id", self.site_id)
                 .order("period_end", desc=True)
                 .limit(3)
                 .execute()
@@ -395,7 +395,7 @@ class CostValidationEngine:
         """Write cost validation record to database."""
         try:
             record = {
-                "building_id": self.building_id,
+                "site_id": self.site_id,
                 "period": validation_result["period"],
                 "validation_status": validation_result["validation_status"],
                 "severity": validation_result["severity"],
@@ -419,7 +419,7 @@ class CostValidationEngine:
             response = (
                 self.client.table("energy_cost_summary")
                 .select("total_cost_r")
-                .eq("building_id", self.building_id)
+                .eq("site_id", self.site_id)
                 .gte("date", f"{year}-{month:02d}-01")
                 .lt("date", f"{year}-{month:02d + 1:02d}-01" if month < 12 else f"{year + 1}-01-01")
                 .execute()
@@ -514,7 +514,7 @@ class CostValidationEngine:
 
 
 async def validate_cost(
-    building_id: str,
+    site_id: str,
     month: int,
     year: int,
     real_invoice_cost_r: float,
@@ -524,7 +524,7 @@ async def validate_cost(
     """Public API for cost validation.
 
     Args:
-        building_id: Building/site ID
+        site_id: Building/site ID
         month: Month (1-12)
         year: Year
         real_invoice_cost_r: Real invoice amount
@@ -534,7 +534,7 @@ async def validate_cost(
     Returns:
         Monthly validation with variance analysis
     """
-    engine = CostValidationEngine(building_id)
+    engine = CostValidationEngine(site_id)
     return await engine.validate_monthly_cost(
         month=month,
         year=year,
@@ -544,13 +544,13 @@ async def validate_cost(
     )
 
 
-def get_cost_validation_engine(building_id: str) -> CostValidationEngine:
+def get_cost_validation_engine(site_id: str) -> CostValidationEngine:
     """Get singleton instance of CostValidationEngine.
 
     Args:
-        building_id: Building identifier
+        site_id: Building identifier
 
     Returns:
         CostValidationEngine instance
     """
-    return CostValidationEngine(building_id)
+    return CostValidationEngine(site_id)

@@ -270,14 +270,14 @@ class TestSecretZeroOutputFilter:
         from app.mcp.schema_validator import scan_output_for_secrets
 
         output = {"config_value": "sk_test_abcdefghijklmnopqrstuvwxyz"}
-        result = scan_output_for_secrets("get_building_config", output)
+        result = scan_output_for_secrets("get_site_config", output)
         assert result["config_value"] == "***REDACTED_BY_SECRET_ZERO_FILTER***"
 
     def test_safe_output_passes_through(self):
         from app.mcp.schema_validator import scan_output_for_secrets
 
         output = {
-            "buildings": [{"id": "S002", "name": "Sandton", "health": 85}],
+            "sites": [{"id": "S002", "name": "Sandton", "health": 85}],
             "count": 1,
         }
         result = scan_output_for_secrets("get_buildings", output)

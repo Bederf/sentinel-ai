@@ -8,9 +8,12 @@
  * Typewriter effect: Characters appear one-by-one during streaming for readability.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { Volume2, Loader2 } from "lucide-react";
+
+/** Regex to detect slash commands in inline code: /info_S002_FCU_301 etc. */
+const COMMAND_RE = /^\/(info|WO|inspect|reset|note)_[A-Za-z0-9][\w]*$/;
 
 interface ChatMessageProps {
   role: "user" | "assistant";
@@ -21,32 +24,54 @@ interface ChatMessageProps {
   onSpeak?: (text: string, messageId: string) => void;
   /** TTS state for this specific message */
   ttsState?: { isLoading: boolean; isPlaying: boolean };
+  /** Callback when a slash command button is clicked */
+  onCommandClick?: (command: string) => void;
 }
 
-export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, ttsState }: ChatMessageProps) {
+export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, ttsState, onCommandClick }: ChatMessageProps) {
   const isUser = role === "user";
-  const [displayedContent, setDisplayedContent] = useState("");
-  const [charIndex, setCharIndex] = useState(0);
+  const [displayedContent, setDisplayedContent] = useState(isUser ? content : "");
+  const charIndexRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+  const [animDone, setAnimDone] = useState(isUser);
 
-  // Typewriter effect: animate characters one-by-one during streaming
+  // Typewriter effect: progressively reveal content word-by-word
   useEffect(() => {
-    // If not streaming, show full content immediately
-    if (!isStreaming) {
+    if (isUser) {
       setDisplayedContent(content);
-      setCharIndex(0);
       return;
     }
 
-    // If streaming, animate characters with slight delay (30ms per char)
-    if (charIndex < content.length) {
-      const timer = setTimeout(() => {
-        setDisplayedContent(content.slice(0, charIndex + 1));
-        setCharIndex(charIndex + 1);
-      }, 30); // 30ms delay per character
+    // Nothing to show yet (waiting for first chunk)
+    if (!content) return;
 
-      return () => clearTimeout(timer);
+    // Already caught up — nothing to animate
+    if (charIndexRef.current >= content.length) {
+      setDisplayedContent(content);
+      if (!isStreaming) setAnimDone(true);
+      return;
     }
-  }, [content, charIndex, isStreaming]);
+
+    // Animate: advance a few characters per frame (~60fps)
+    const step = () => {
+      const target = content;
+      if (charIndexRef.current >= target.length) {
+        setDisplayedContent(target);
+        if (!isStreaming) setAnimDone(true);
+        return;
+      }
+      // Advance 2-4 chars per frame (feels like fast typing)
+      const advance = Math.min(3, target.length - charIndexRef.current);
+      charIndexRef.current += advance;
+      setDisplayedContent(target.slice(0, charIndexRef.current));
+      rafRef.current = requestAnimationFrame(step);
+    };
+
+    rafRef.current = requestAnimationFrame(step);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [content, isStreaming, isUser]);
 
   // Preprocess markdown content to improve structure
   const preprocessMarkdown = (text: string): string => {
@@ -73,8 +98,8 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
     return processed;
   };
 
-  // Use displayed content (typewriter effect) during streaming, full content when done
-  const contentToRender = isStreaming ? displayedContent : content;
+  // Use displayed content (typewriter effect) until animation completes
+  const contentToRender = animDone ? content : displayedContent;
   const processedContent = isUser ? contentToRender : preprocessMarkdown(contentToRender);
 
   return (
@@ -99,6 +124,20 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
           <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
             {content}
           </p>
+        ) : isStreaming && !content ? (
+          /* Thinking indicator while waiting for first chunk */
+          <div className="flex items-center gap-2">
+            <div
+              className="animate-spin h-4 w-4 border-2 border-t-transparent rounded-full"
+              style={{ borderColor: "var(--color-grafana-blue)", borderTopColor: "transparent" }}
+            />
+            <span
+              className="text-sm"
+              style={{ color: "var(--color-grafana-text-secondary)" }}
+            >
+              SENTINEL is thinking...
+            </span>
+          </div>
         ) : (
           /* Assistant messages: render markdown with improved structure */
           <div className="break-words" style={{ fontSize: "0.875rem", lineHeight: "1.6" }}>
@@ -179,9 +218,26 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                     {...props}
                   />
                 ),
-                // Style code blocks
-                code: ({ inline, ...props }: { inline?: boolean; className?: string; children?: React.ReactNode }) =>
-                  inline ? (
+                // Style code blocks — slash commands rendered as clickable buttons
+                code: ({ inline, children, ...props }: { inline?: boolean; className?: string; children?: React.ReactNode }) => {
+                  const text = String(children ?? "").replace(/\n$/, "");
+                  if (inline && onCommandClick && COMMAND_RE.test(text)) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => onCommandClick(text)}
+                        className="px-2 py-0.5 rounded text-xs font-mono cursor-pointer transition-all hover:brightness-125"
+                        style={{
+                          background: "rgba(50, 116, 217, 0.15)",
+                          color: "var(--color-grafana-blue)",
+                          border: "1px solid rgba(50, 116, 217, 0.3)",
+                        }}
+                      >
+                        {text}
+                      </button>
+                    );
+                  }
+                  return inline ? (
                     <code
                       className="px-1.5 py-0.5 rounded text-xs font-mono"
                       style={{
@@ -190,7 +246,9 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                         border: "1px solid rgba(0, 0, 0, 0.1)",
                       }}
                       {...props}
-                    />
+                    >
+                      {children}
+                    </code>
                   ) : (
                     <code
                       className="block p-3 rounded text-xs font-mono mb-3 overflow-x-auto"
@@ -201,8 +259,11 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                         lineHeight: "1.5",
                       }}
                       {...props}
-                    />
-                  ),
+                    >
+                      {children}
+                    </code>
+                  );
+                },
                 // Style strong (bold) text with better visibility
                 strong: ({ ...props }) => (
                   <strong
@@ -261,8 +322,8 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
             >
               {processedContent}
             </ReactMarkdown>
-            {/* Blinking cursor during streaming */}
-            {isStreaming && (
+            {/* Blinking cursor while animating */}
+            {!animDone && (
               <span
                 className="inline-block w-2 h-4 ml-1 animate-pulse"
                 style={{ background: "var(--color-grafana-orange)" }}
@@ -270,13 +331,13 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
               />
             )}
             {/* EU AI Act Article 50 — AI-generated content disclosure */}
-            {!isStreaming && (
+            {animDone && (
               <p className="mt-2 text-xs" style={{ color: "var(--color-grafana-text-secondary)", opacity: 0.7 }}>
                 AI-generated &middot; Review before acting
               </p>
             )}
-            {/* Speaker button for TTS (non-streaming assistant messages only) */}
-            {onSpeak && !isStreaming && messageId && (
+            {/* Speaker button for TTS (after animation completes) */}
+            {onSpeak && animDone && messageId && (
               <button
                 type="button"
                 onClick={() => onSpeak(content, messageId)}

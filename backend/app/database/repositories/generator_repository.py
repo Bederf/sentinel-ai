@@ -24,9 +24,9 @@ class GeneratorRepository:
     # Helper Methods
     # =========================================================================
 
-    def get_building_uuid(self, building_code: str) -> Optional[str]:
+    def get_site_uuid(self, site_code: str) -> Optional[str]:
         """Get building UUID from building code."""
-        response = self.client.table("buildings").select("id").eq("code", building_code).execute()
+        response = self.client.table("sites").select("id").eq("code", site_code).execute()
 
         if response.data:
             return response.data[0]["id"]
@@ -36,14 +36,14 @@ class GeneratorRepository:
     # Diesel Tanks
     # =========================================================================
 
-    def get_tanks(self, building_code: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_tanks(self, site_code: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all diesel tanks, optionally filtered by building."""
         query = self.client.table("diesel_tanks").select("*")
 
-        if building_code:
-            building_uuid = self.get_building_uuid(building_code)
-            if building_uuid:
-                query = query.eq("building_id", building_uuid)
+        if site_code:
+            site_uuid = self.get_site_uuid(site_code)
+            if site_uuid:
+                query = query.eq("site_id", site_uuid)
 
         response = query.execute()
         return response.data
@@ -96,14 +96,14 @@ class GeneratorRepository:
     # Generator Groups
     # =========================================================================
 
-    def get_groups(self, building_code: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_groups(self, site_code: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all generator groups, optionally filtered by building."""
         query = self.client.table("generator_groups").select("*")
 
-        if building_code:
-            building_uuid = self.get_building_uuid(building_code)
-            if building_uuid:
-                query = query.eq("building_id", building_uuid)
+        if site_code:
+            site_uuid = self.get_site_uuid(site_code)
+            if site_uuid:
+                query = query.eq("site_id", site_uuid)
 
         response = query.execute()
         return response.data
@@ -175,14 +175,14 @@ class GeneratorRepository:
     # Generators
     # =========================================================================
 
-    def get_generators(self, building_code: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_generators(self, site_code: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all generators, optionally filtered by building."""
         query = self.client.table("generators").select("*")
 
-        if building_code:
-            building_uuid = self.get_building_uuid(building_code)
-            if building_uuid:
-                query = query.eq("building_id", building_uuid)
+        if site_code:
+            site_uuid = self.get_site_uuid(site_code)
+            if site_uuid:
+                query = query.eq("site_id", site_uuid)
 
         response = query.execute()
         return response.data
@@ -305,7 +305,7 @@ class GeneratorRepository:
     # Bulk Operations
     # =========================================================================
 
-    def delete_all_by_building(self, building_code: str) -> Dict[str, int]:
+    def delete_all_by_site(self, site_code: str) -> Dict[str, int]:
         """Delete all generator data for a building.
 
         Deletes in order: generators -> groups -> tanks (FK dependencies).
@@ -313,18 +313,18 @@ class GeneratorRepository:
         Returns:
             Dict with counts of deleted items
         """
-        building_uuid = self.get_building_uuid(building_code)
-        if not building_uuid:
+        site_uuid = self.get_site_uuid(site_code)
+        if not site_uuid:
             return {"generators": 0, "groups": 0, "tanks": 0}
 
         # Delete generators first
-        gen_response = self.client.table("generators").delete().eq("building_id", building_uuid).execute()
+        gen_response = self.client.table("generators").delete().eq("site_id", site_uuid).execute()
 
         # Delete groups
-        grp_response = self.client.table("generator_groups").delete().eq("building_id", building_uuid).execute()
+        grp_response = self.client.table("generator_groups").delete().eq("site_id", site_uuid).execute()
 
         # Delete tanks
-        tank_response = self.client.table("diesel_tanks").delete().eq("building_id", building_uuid).execute()
+        tank_response = self.client.table("diesel_tanks").delete().eq("site_id", site_uuid).execute()
 
         return {
             "generators": len(gen_response.data),
@@ -332,14 +332,14 @@ class GeneratorRepository:
             "tanks": len(tank_response.data),
         }
 
-    def get_full_plant(self, building_code: str) -> Dict[str, Any]:
+    def get_full_plant(self, site_code: str) -> Dict[str, Any]:
         """Get complete generator plant configuration for a building.
 
         Returns:
             Dict with tanks, groups, and generators
         """
         return {
-            "diesel_tanks": self.get_tanks(building_code),
-            "groups": self.get_groups(building_code),
-            "generators": self.get_generators(building_code),
+            "diesel_tanks": self.get_tanks(site_code),
+            "groups": self.get_groups(site_code),
+            "generators": self.get_generators(site_code),
         }

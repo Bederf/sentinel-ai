@@ -19,7 +19,7 @@ class ContractRepository:
 
     def get_all(
         self,
-        building_id: Optional[str] = None,
+        site_id: Optional[str] = None,
         organization_id: Optional[str] = None,
         status: Optional[str] = None,
         limit: int = 50,
@@ -28,7 +28,7 @@ class ContractRepository:
         List contracts with optional filters.
 
         Args:
-            building_id: Filter by building UUID
+            site_id: Filter by building UUID
             organization_id: Filter by organization UUID
             status: Filter by status (draft, active, expired, etc.)
             limit: Maximum results to return
@@ -48,8 +48,8 @@ class ContractRepository:
                 .limit(limit)
             )
 
-            if building_id:
-                query = query.eq("building_id", building_id)
+            if site_id:
+                query = query.eq("site_id", site_id)
             if organization_id:
                 query = query.eq("organization_id", organization_id)
             if status:
@@ -104,7 +104,7 @@ class ContractRepository:
             logger.error(f"Error getting contract by code {code}: {e}")
             return None
 
-    def get_by_building(self, building_id: str) -> List[Dict[str, Any]]:
+    def get_by_site(self, site_id: str) -> List[Dict[str, Any]]:
         """Get all contracts for a building."""
         if not self.client:
             return []
@@ -113,7 +113,7 @@ class ContractRepository:
             result = (
                 self.client.table("contracts")
                 .select("*, organizations(code, name)")
-                .eq("building_id", building_id)
+                .eq("site_id", site_id)
                 .order("created_at", desc=True)
                 .execute()
             )
@@ -121,7 +121,7 @@ class ContractRepository:
             return result.data or []
 
         except Exception as e:
-            logger.error(f"Error getting contracts for building {building_id}: {e}")
+            logger.error(f"Error getting contracts for building {site_id}: {e}")
             return []
 
     def get_active(self) -> List[Dict[str, Any]]:
@@ -149,7 +149,7 @@ class ContractRepository:
         Create a new contract.
 
         Args:
-            data: Contract data (code, organization_id, building_id, fees, etc.)
+            data: Contract data (code, organization_id, site_id, fees, etc.)
 
         Returns:
             Created contract dict with generated id, or None on error

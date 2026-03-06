@@ -201,9 +201,9 @@ def load_desks_backup(backup_path: Path) -> List[Dict[str, Any]]:
     return desks
 
 
-def get_building_uuid(supabase_client: Any, building_code: str) -> Optional[str]:
+def get_site_uuid(supabase_client: Any, site_code: str) -> Optional[str]:
     """Get building UUID from building code."""
-    response = supabase_client.table("buildings").select("id").eq("code", building_code).execute()
+    response = supabase_client.table("sites").select("id").eq("code", site_code).execute()
 
     if response.data:
         return response.data[0]["id"]
@@ -267,16 +267,16 @@ def validate_zones_and_desks(zones: List[Dict], desks: List[Dict]) -> Tuple[bool
     return len(errors) == 0, errors
 
 
-def insert_zones(supabase_client: Any, building_id: str, zones: List[Dict[str, Any]]) -> bool:
+def insert_zones(supabase_client: Any, site_id: str, zones: List[Dict[str, Any]]) -> bool:
     """Upsert zones into Supabase (insert or update if exists)."""
     print(f"\nUpserting {len(zones)} zones...")
 
     for zone in zones:
-        zone["building_id"] = building_id
+        zone["site_id"] = site_id
 
     try:
         # Use upsert to handle existing zones with updated names
-        response = supabase_client.table("zones").upsert(zones, on_conflict="building_id,zone_id").execute()
+        response = supabase_client.table("zones").upsert(zones, on_conflict="site_id,zone_id").execute()
         print(f"✓ Upserted {len(response.data)} zones")
         return True
     except Exception as e:
@@ -284,12 +284,12 @@ def insert_zones(supabase_client: Any, building_id: str, zones: List[Dict[str, A
         return False
 
 
-def insert_desks(supabase_client: Any, building_id: str, desks: List[Dict[str, Any]]) -> bool:
+def insert_desks(supabase_client: Any, site_id: str, desks: List[Dict[str, Any]]) -> bool:
     """Insert/update desks into Supabase."""
     print(f"\nInserting/updating {len(desks)} desks...")
 
     for desk in desks:
-        desk["building_id"] = building_id
+        desk["site_id"] = site_id
 
     try:
         # Upsert instead of insert (in case some desks already exist)
@@ -301,16 +301,16 @@ def insert_desks(supabase_client: Any, building_id: str, desks: List[Dict[str, A
         return False
 
 
-def verify_insertion(supabase_client: Any, building_id: str) -> bool:
+def verify_insertion(supabase_client: Any, site_id: str) -> bool:
     """Verify data was inserted correctly."""
     print("\nVerifying insertion...")
 
     # Check zones
-    zones_response = supabase_client.table("zones").select("*").eq("building_id", building_id).execute()
+    zones_response = supabase_client.table("zones").select("*").eq("site_id", site_id).execute()
     zone_count = len(zones_response.data)
 
     # Check desks
-    desks_response = supabase_client.table("desks").select("*").eq("building_id", building_id).execute()
+    desks_response = supabase_client.table("desks").select("*").eq("site_id", site_id).execute()
     desk_count = len(desks_response.data)
 
     print(f"✓ Zones in Supabase: {zone_count}")
@@ -318,9 +318,7 @@ def verify_insertion(supabase_client: Any, building_id: str) -> bool:
 
     # Check zone centroids via the view
     try:
-        centroids_response = (
-            supabase_client.table("zone_centroids").select("*").eq("building_id", building_id).execute()
-        )
+        centroids_response = supabase_client.table("zone_centroids").select("*").eq("site_id", site_id).execute()
         centroid_count = len(centroids_response.data)
         print(f"✓ Zone centroids available: {centroid_count} zones with centroids")
     except Exception as e:
@@ -337,7 +335,7 @@ def main():
     args = parser.parse_args()
 
     # Paths
-    data_dir = Path(__file__).parent.parent / "app" / "data" / "buildings" / args.site
+    data_dir = Path(__file__).parent.parent / "app" / "data" / "sites" / args.site
     zones_backup = data_dir / "zones.json.bak"
     desks_backup = data_dir / "desks.json.bak"
 
@@ -388,23 +386,23 @@ def main():
         sys.exit(1)
 
     # Get building UUID
-    building_uuid = get_building_uuid(supabase_client, args.site)
-    if not building_uuid:
+    site_uuid = get_site_uuid(supabase_client, args.site)
+    if not site_uuid:
         print(f"❌ Building not found: {args.site}")
         sys.exit(1)
 
-    print(f"✓ Found building {args.site}: {building_uuid}")
+    print(f"✓ Found building {args.site}: {site_uuid}")
 
     # Insert data
-    zones_ok = insert_zones(supabase_client, building_uuid, zones)
-    desks_ok = insert_desks(supabase_client, building_uuid, desks)
+    zones_ok = insert_zones(supabase_client, site_uuid, zones)
+    desks_ok = insert_desks(supabase_client, site_uuid, desks)
 
     if not (zones_ok and desks_ok):
         print("\n❌ Migration failed during insertion")
         sys.exit(1)
 
     # Verify
-    verify_insertion(supabase_client, building_uuid)
+    verify_insertion(supabase_client, site_uuid)
 
     print(f"\n{'=' * 60}")
     print("✓ Migration complete!")

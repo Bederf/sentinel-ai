@@ -311,14 +311,14 @@ async def _generate_hourly_snapshots_paced(orchestrator, duration_minutes: float
         base_load = 500
         occupancy_load = 300 * occupancy_factor
         hvac_load = 200 * max(0, 1 - abs(current_hour - 14) / 8)
-        building_load_kw = base_load + occupancy_load + hvac_load
+        site_load_kw = base_load + occupancy_load + hvac_load
 
         # BESS dynamics (charge at night, discharge during peak)
         if current_hour < 7 or current_hour > 20:
-            bess_charge_kw = max(0, solar_gen_kw - building_load_kw)
+            bess_charge_kw = max(0, solar_gen_kw - site_load_kw)
             bess_discharge_kw = 0
         elif current_hour > 17:
-            bess_discharge_kw = min(500, building_load_kw - solar_gen_kw)
+            bess_discharge_kw = min(500, site_load_kw - solar_gen_kw)
             bess_charge_kw = 0
         else:
             bess_charge_kw = 0
@@ -329,7 +329,7 @@ async def _generate_hourly_snapshots_paced(orchestrator, duration_minutes: float
         bess_soc_pct = max(10, min(90, bess_soc_pct))
 
         # Grid import/export
-        net_solar = solar_gen_kw - building_load_kw - bess_charge_kw + bess_discharge_kw
+        net_solar = solar_gen_kw - site_load_kw - bess_charge_kw + bess_discharge_kw
         grid_export_kw = max(0, net_solar)
         grid_import_kw = max(0, -net_solar)
 
@@ -350,7 +350,7 @@ async def _generate_hourly_snapshots_paced(orchestrator, duration_minutes: float
             month=current_time.month,
             day_of_year=day_of_year,
             solar_gen_kw=solar_gen_kw,
-            building_load_kw=building_load_kw,
+            site_load_kw=site_load_kw,
             bess_soc_pct=bess_soc_pct,
             bess_charge_kw=bess_charge_kw,
             bess_discharge_kw=bess_discharge_kw,
@@ -422,14 +422,14 @@ def _generate_hourly_snapshots(orchestrator) -> list:
         base_load = 500  # 500 kW base load
         occupancy_load = 300 * occupancy_factor
         hvac_load = 200 * max(0, 1 - abs(current_hour - 14) / 8)  # HVAC peaks at 14:00
-        building_load_kw = base_load + occupancy_load + hvac_load
+        site_load_kw = base_load + occupancy_load + hvac_load
 
         # BESS dynamics (charge at night, discharge during peak)
         if current_hour < 7 or current_hour > 20:  # Night: charge from solar surplus
-            bess_charge_kw = max(0, solar_gen_kw - building_load_kw)
+            bess_charge_kw = max(0, solar_gen_kw - site_load_kw)
             bess_discharge_kw = 0
         elif current_hour > 17:  # Evening peak: discharge
-            bess_discharge_kw = min(500, building_load_kw - solar_gen_kw)
+            bess_discharge_kw = min(500, site_load_kw - solar_gen_kw)
             bess_charge_kw = 0
         else:
             bess_charge_kw = 0
@@ -440,7 +440,7 @@ def _generate_hourly_snapshots(orchestrator) -> list:
         bess_soc_pct = max(10, min(90, bess_soc_pct))  # Keep between 10-90%
 
         # Grid import/export
-        net_solar = solar_gen_kw - building_load_kw - bess_charge_kw + bess_discharge_kw
+        net_solar = solar_gen_kw - site_load_kw - bess_charge_kw + bess_discharge_kw
         grid_export_kw = max(0, net_solar)
         grid_import_kw = max(0, -net_solar)
 
@@ -461,7 +461,7 @@ def _generate_hourly_snapshots(orchestrator) -> list:
             month=current_time.month,
             day_of_year=day_of_year,
             solar_gen_kw=solar_gen_kw,
-            building_load_kw=building_load_kw,
+            site_load_kw=site_load_kw,
             bess_soc_pct=bess_soc_pct,
             bess_charge_kw=bess_charge_kw,
             bess_discharge_kw=bess_discharge_kw,
@@ -504,7 +504,7 @@ async def _cache_results(site_id: str, annual_summary: AnnualSummary, hourly_dat
                         "month": snap.month,
                         "day_of_year": snap.day_of_year,
                         "solar_gen_kwh": 0,
-                        "building_load_kwh": 0,
+                        "site_load_kwh": 0,
                         "grid_import_kwh": 0,
                         "grid_export_kwh": 0,
                         "bess_charge_kwh": 0,
@@ -515,7 +515,7 @@ async def _cache_results(site_id: str, annual_summary: AnnualSummary, hourly_dat
 
                 # Sum hourly values for daily total (kW × 1 hour = kWh)
                 daily_records[day_key]["solar_gen_kwh"] += snap.solar_gen_kw
-                daily_records[day_key]["building_load_kwh"] += snap.building_load_kw
+                daily_records[day_key]["site_load_kwh"] += snap.site_load_kw
                 daily_records[day_key]["grid_import_kwh"] += snap.grid_import_kw
                 daily_records[day_key]["grid_export_kwh"] += snap.grid_export_kw
                 daily_records[day_key]["bess_charge_kwh"] += snap.bess_charge_kw
@@ -534,7 +534,7 @@ async def _cache_results(site_id: str, annual_summary: AnnualSummary, hourly_dat
                 # Round to 1 decimal place
                 for key in [
                     "solar_gen_kwh",
-                    "building_load_kwh",
+                    "site_load_kwh",
                     "grid_import_kwh",
                     "grid_export_kwh",
                     "bess_charge_kwh",

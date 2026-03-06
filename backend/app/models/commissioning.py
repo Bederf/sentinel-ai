@@ -53,7 +53,7 @@ class TruthCheckSubmission(BaseModel):
 class TruthCheckResult(BaseModel):
     """Result of a truth check evaluation."""
 
-    building_id: str
+    site_id: str
     checked_at: datetime
     total_points: int
     agreeing_points: int
@@ -65,8 +65,8 @@ class TruthCheckResult(BaseModel):
 class CommissioningScorecard(BaseModel):
     """Full commissioning scorecard for a building."""
 
-    building_id: str
-    building_name: Optional[str] = None
+    site_id: str
+    site_name: Optional[str] = None
     ingestion_mode: str
     checked_at: datetime
     gates: list[CommissioningGate]
@@ -82,7 +82,7 @@ class PromotionResult(BaseModel):
     """Result of a promote-to-live attempt."""
 
     success: bool
-    building_id: str
+    site_id: str
     previous_mode: str
     new_mode: Optional[str] = None
     message: str

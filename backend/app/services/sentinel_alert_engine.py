@@ -28,7 +28,7 @@ class AlertContext:
 
     simulated_hour: int
     is_peak: bool
-    building_state: str
+    site_state: str
     occupancy_pct: float
     hvac_mode: str
 
@@ -257,7 +257,7 @@ class SentinelAlertEngine:
                     limit_desc = f"limit: {safe_max}{limits['unit']}"
 
                 operational_context = {
-                    "building_state": context.building_state,
+                    "site_state": context.site_state,
                     "is_peak_hours": context.is_peak,
                     "occupancy_pct": context.occupancy_pct,
                     "hvac_mode": context.hvac_mode,

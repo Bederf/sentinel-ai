@@ -282,8 +282,8 @@ class TestToolPermissions:
         for tool in MUTATING_TOOLS:
             assert tool in MCP_TOOL_MIN_ROLE, f"Tool '{tool}' missing from MCP_TOOL_MIN_ROLE"
 
-    def test_extract_site_from_building_id(self):
-        assert extract_site_id_from_args("create_building", {"building_id": "S002"}) == "S002"
+    def test_extract_site_from_site_id(self):
+        assert extract_site_id_from_args("create_building", {"site_id": "S002"}) == "S002"
 
     def test_extract_site_from_device_id(self):
         assert extract_site_id_from_args("write_device_point", {"device_id": "S002-CHILLER-B1-001"}) == "S002"

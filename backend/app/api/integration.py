@@ -114,7 +114,7 @@ class ActivationResult(BaseModel):
     """Result of building activation attempt."""
 
     success: bool
-    building_id: str
+    site_id: str
     new_status: str  # BuildingStatus enum value
     message: str
     validation_errors: List[str] = Field(default_factory=list)
@@ -123,14 +123,14 @@ class ActivationResult(BaseModel):
 class BuildingStatusResponse(BaseModel):
     """Current building status."""
 
-    building_id: str
+    site_id: str
     status: str  # BuildingStatus enum value
     last_validated_at: Optional[datetime] = None
     notes: Optional[str] = None
 
 
 from app.database.repositories.integration_repository import IntegrationRepository  # noqa: E402
-from app.database.repositories.building_repository import BuildingRepository  # noqa: E402
+from app.database.repositories.site_repository import SiteRepository  # noqa: E402
 from app.database.repositories.equipment_repository import EquipmentRepository  # noqa: E402
 from app.services.log_parser import LogParserService  # noqa: E402
 from app.services.point_matcher import PointMatcherService  # noqa: E402
@@ -143,35 +143,35 @@ router = APIRouter(prefix="/api/integration", tags=["Integration"])
 
 # Services
 integration_repo = IntegrationRepository()
-building_repo = BuildingRepository()
+building_repo = SiteRepository()
 equipment_repo = EquipmentRepository()
 parser_service = LogParserService()
 matcher_service = PointMatcherService()
 commissioning_service = CommissioningService()
 
 
-_building_uuid_cache: dict[str, str] = {}
+_site_uuid_cache: dict[str, str] = {}
 
 
-def resolve_building_uuid(building_id: str) -> str:
+def resolve_site_uuid(site_id: str) -> str:
     """Resolve a site code (e.g. 'site-002') to the Supabase building UUID.
 
     The frontend uses site codes from /api/sites, but integration tables
     store building UUIDs. This bridges the two ID systems.
     Results are cached for the lifetime of the process.
     """
-    if building_id in _building_uuid_cache:
-        return _building_uuid_cache[building_id]
+    if site_id in _site_uuid_cache:
+        return _site_uuid_cache[site_id]
 
     try:
-        building = building_repo.get_by_id(building_id)
+        building = building_repo.get_by_id(site_id)
         if building:
             resolved = building["id"]
-            _building_uuid_cache[building_id] = resolved
+            _site_uuid_cache[site_id] = resolved
             return resolved
     except Exception:
         pass
-    return building_id
+    return site_id
 
 
 # ==================== Log Sources ====================
@@ -179,14 +179,14 @@ def resolve_building_uuid(building_id: str) -> str:
 
 @router.get("/sources", response_model=List[LogSource])
 async def list_log_sources(
-    building_id: Optional[str] = None,
+    site_id: Optional[str] = None,
     source_type: Optional[str] = None,
     is_active: Optional[bool] = None,
 ):
     """List configured log sources."""
-    resolved_id = resolve_building_uuid(building_id) if building_id else None
+    resolved_id = resolve_site_uuid(site_id) if site_id else None
     return integration_repo.get_log_sources(
-        building_id=resolved_id,
+        site_id=resolved_id,
         source_type=source_type,
         is_active=is_active,
     )
@@ -205,13 +205,13 @@ async def get_log_source(source_id: str):
 async def create_log_source(source: LogSourceCreate):
     """Create a new log source configuration."""
     # Resolve site code to UUID and verify building exists
-    resolved_id = resolve_building_uuid(source.building_id)
+    resolved_id = resolve_site_uuid(source.site_id)
     building = building_repo.get_by_uuid(resolved_id)
     if not building:
         raise HTTPException(status_code=404, detail="Building not found")
 
     data = source.model_dump(exclude_none=True)
-    data["building_id"] = resolved_id
+    data["site_id"] = resolved_id
     return integration_repo.create_log_source(data)
 
 
@@ -306,9 +306,9 @@ async def save_column_mappings(source_id: str, mappings: List[ColumnMappingCreat
 # ==================== Point-Asset Matching ====================
 
 
-@router.post("/buildings/{building_id}/match-points", response_model=BulkMatchResult)
+@router.post("/buildings/{site_id}/match-points", response_model=BulkMatchResult)
 async def match_points_to_assets(
-    building_id: str,
+    site_id: str,
     file: UploadFile = File(...),
 ):
     """
@@ -316,14 +316,14 @@ async def match_points_to_assets(
 
     This is Step 3 of the setup wizard.
     """
-    resolved_id = resolve_building_uuid(building_id)
+    resolved_id = resolve_site_uuid(site_id)
     # Get CAFM assets for building
     cafm_assets = integration_repo.get_cafm_assets(resolved_id)
     if not cafm_assets:
         # Fall back to equipment table if no CAFM sync yet
         building = building_repo.get_by_uuid(resolved_id)
         if building:
-            equipment = equipment_repo.get_by_building(building["id"])
+            equipment = equipment_repo.get_by_site(building["id"])
             cafm_assets = [{"asset_tag": e["code"], "description": e["name"]} for e in equipment]
 
     # Parse file to extract point IDs
@@ -350,13 +350,13 @@ async def match_points_to_assets(
     return result
 
 
-@router.post("/buildings/{building_id}/point-mappings")
+@router.post("/buildings/{site_id}/point-mappings")
 async def save_point_mappings(
-    building_id: str,
+    site_id: str,
     mappings: List[PointAssetMappingCreate],
 ):
     """Save point-to-asset mappings after review."""
-    resolved_id = resolve_building_uuid(building_id)
+    resolved_id = resolve_site_uuid(site_id)
     mapping_dicts = [m.model_dump() for m in mappings]
     count = integration_repo.bulk_upsert_point_mappings(resolved_id, mapping_dicts)
     return {"saved": count}
@@ -370,7 +370,7 @@ async def verify_point_mapping(mapping_id: str, cafm_asset_id: str):
 
 @router.get("/point-mappings")
 async def get_all_point_mappings(
-    building_id: Optional[str] = Query(None, description="Filter by building ID"),
+    site_id: Optional[str] = Query(None, description="Filter by building ID"),
     confidence: Optional[str] = Query(None, description="Filter by confidence level (high, medium, low, unmatched)"),
     verified_only: bool = Query(False, description="Only return verified mappings"),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of results"),
@@ -380,11 +380,11 @@ async def get_all_point_mappings(
     Get point-to-asset mappings across all buildings or for a specific building.
 
     Use this endpoint for monitoring dashboard overviews.
-    For building-specific operations, use /buildings/{building_id}/point-mappings instead.
+    For building-specific operations, use /buildings/{site_id}/point-mappings instead.
     """
-    resolved_id = resolve_building_uuid(building_id) if building_id else None
+    resolved_id = resolve_site_uuid(site_id) if site_id else None
     return integration_repo.get_all_point_mappings(
-        building_id=resolved_id,
+        site_id=resolved_id,
         confidence=confidence,
         verified_only=verified_only,
         limit=limit,
@@ -392,14 +392,14 @@ async def get_all_point_mappings(
     )
 
 
-@router.get("/buildings/{building_id}/point-mappings", response_model=List[PointAssetMapping])
+@router.get("/buildings/{site_id}/point-mappings", response_model=List[PointAssetMapping])
 async def get_point_mappings(
-    building_id: str,
+    site_id: str,
     confidence: Optional[str] = None,
     verified_only: bool = False,
 ):
     """Get point-to-asset mappings for a building."""
-    resolved_id = resolve_building_uuid(building_id)
+    resolved_id = resolve_site_uuid(site_id)
     return integration_repo.get_point_mappings(
         resolved_id,
         confidence=confidence,
@@ -464,7 +464,7 @@ async def ingest_log_file(
 
     # Get point mappings for asset lookup
     point_mappings = {
-        m["bms_point_id"]: m.get("cafm_asset_id") for m in integration_repo.get_point_mappings(source["building_id"])
+        m["bms_point_id"]: m.get("cafm_asset_id") for m in integration_repo.get_point_mappings(source["site_id"])
     }
 
     # Create sync job
@@ -479,7 +479,7 @@ async def ingest_log_file(
             for alarm in result.parsed_alarms:
                 alarm_dict = {
                     "log_source_id": source_id,
-                    "building_id": source["building_id"],
+                    "site_id": source["site_id"],
                     "occurred_at": alarm.occurred_at.isoformat(),
                     "point_id": alarm.point_id,
                     "asset_id": point_mappings.get(alarm.point_id) or alarm.asset_id,
@@ -504,7 +504,7 @@ async def ingest_log_file(
             for trend in result.parsed_trends:
                 trend_dict = {
                     "log_source_id": source_id,
-                    "building_id": source["building_id"],
+                    "site_id": source["site_id"],
                     "recorded_at": trend.recorded_at.isoformat(),
                     "point_id": trend.point_id,
                     "asset_id": point_mappings.get(trend.point_id) or trend.asset_id,
@@ -572,21 +572,21 @@ async def get_severity_mappings(source_id: Optional[str] = None):
 # ==================== CAFM Assets ====================
 
 
-@router.get("/buildings/{building_id}/cafm-assets")
-async def get_cafm_assets(building_id: str):
+@router.get("/buildings/{site_id}/cafm-assets")
+async def get_cafm_assets(site_id: str):
     """Get synced CAFM assets for a building."""
-    resolved_id = resolve_building_uuid(building_id)
+    resolved_id = resolve_site_uuid(site_id)
     return integration_repo.get_cafm_assets(resolved_id)
 
 
-@router.get("/buildings/{building_id}/alarms")
+@router.get("/buildings/{site_id}/alarms")
 async def get_recent_alarms(
-    building_id: str,
+    site_id: str,
     limit: int = Query(100, ge=1, le=1000),
     severity: Optional[str] = None,
 ):
     """Get recent ingested alarms for a building."""
-    resolved_id = resolve_building_uuid(building_id)
+    resolved_id = resolve_site_uuid(site_id)
     return integration_repo.get_recent_alarms(resolved_id, limit, severity)
 
 
@@ -595,7 +595,7 @@ async def get_recent_alarms(
 
 @router.get("/health", response_model=IntegrationHealthSummary)
 async def get_integration_health(
-    building_id: Optional[str] = Query(None, description="Filter by building ID"),
+    site_id: Optional[str] = Query(None, description="Filter by building ID"),
 ):
     """
     Get integration health summary for monitoring dashboard.
@@ -608,7 +608,7 @@ async def get_integration_health(
     - Recent errors
     - Generated alerts for problematic conditions
     """
-    resolved_id = resolve_building_uuid(building_id) if building_id else None
+    resolved_id = resolve_site_uuid(site_id) if site_id else None
     health = integration_repo.get_integration_health(resolved_id)
 
     # Generate alerts based on conditions
@@ -684,8 +684,8 @@ async def get_integration_health(
 
         lighting_service = get_lighting_service()
         for dh in lighting_service.get_sources_health():
-            # If filtering by building_id, only include matching site
-            if resolved_id and dh.get("site_id") != building_id:
+            # If filtering by site_id, only include matching site
+            if resolved_id and dh.get("site_id") != site_id:
                 continue
             dali_sources.append(DALISourceHealth(**dh))
     except Exception:
@@ -704,8 +704,8 @@ async def get_integration_health(
     )
 
 
-@router.get("/quality-metrics/{building_id}", response_model=DataQualityMetrics)
-async def get_quality_metrics(building_id: str):
+@router.get("/quality-metrics/{site_id}", response_model=DataQualityMetrics)
+async def get_quality_metrics(site_id: str):
     """
     Get data quality metrics for a specific building.
 
@@ -717,7 +717,7 @@ async def get_quality_metrics(building_id: str):
     - overall_score: Weighted quality score (0-100)
     - trend: Quality trend ('improving', 'stable', 'degrading')
     """
-    resolved_id = resolve_building_uuid(building_id)
+    resolved_id = resolve_site_uuid(site_id)
     metrics = integration_repo.get_quality_metrics(resolved_id)
 
     return DataQualityMetrics(
@@ -732,7 +732,7 @@ async def get_quality_metrics(building_id: str):
 
 @router.get("/sync-jobs", response_model=List[SyncJobSummary])
 async def get_sync_jobs_summary(
-    building_id: Optional[str] = Query(None, description="Filter by building ID"),
+    site_id: Optional[str] = Query(None, description="Filter by building ID"),
     days: int = Query(7, ge=1, le=30, description="Number of days to look back"),
 ):
     """
@@ -741,7 +741,7 @@ async def get_sync_jobs_summary(
     Returns list of sync jobs from the last N days (default 7, max 30).
     Includes job status, record counts, processing time, and timestamps.
     """
-    resolved_id = resolve_building_uuid(building_id) if building_id else None
+    resolved_id = resolve_site_uuid(site_id) if site_id else None
     jobs = integration_repo.get_sync_jobs_summary(resolved_id, days)
 
     # Look up source names for display
@@ -774,8 +774,8 @@ async def get_sync_jobs_summary(
 # ==================== Building Status / Go-Live Workflow ====================
 
 
-@router.get("/buildings/{building_id}/validation-checklist", response_model=ValidationChecklist)
-async def get_validation_checklist(building_id: str):
+@router.get("/buildings/{site_id}/validation-checklist", response_model=ValidationChecklist)
+async def get_validation_checklist(site_id: str):
     """
     Get go-live validation checklist for a building.
 
@@ -786,26 +786,26 @@ async def get_validation_checklist(building_id: str):
     - Data quality metrics
     - Configuration completeness
     """
-    resolved_id = resolve_building_uuid(building_id)
+    resolved_id = resolve_site_uuid(site_id)
     checklist = integration_repo.get_validation_checklist(resolved_id)
 
     # Get building name from building_repo if available
     try:
         building = building_repo.get_by_uuid(resolved_id)
         if not building:
-            building = building_repo.get_by_id(building_id)
+            building = building_repo.get_by_id(site_id)
         if building:
-            checklist["building_name"] = building.get("name")
+            checklist["site_name"] = building.get("name")
     except Exception:
         pass
 
     # Get current building status
-    status_record = integration_repo.get_building_status(resolved_id)
+    status_record = integration_repo.get_site_status(resolved_id)
     current_status = BuildingStatus(status_record["status"]) if status_record else BuildingStatus.DRAFT
 
     return ValidationChecklist(
-        building_id=building_id,
-        building_name=checklist.get("building_name"),
+        site_id=site_id,
+        site_name=checklist.get("site_name"),
         status=current_status,
         checked_at=datetime.utcnow(),
         items=checklist["items"],
@@ -815,40 +815,40 @@ async def get_validation_checklist(building_id: str):
     )
 
 
-@router.get("/buildings/{building_id}/status", response_model=BuildingStatusResponse)
-async def get_building_status(building_id: str):
+@router.get("/buildings/{site_id}/status", response_model=BuildingStatusResponse)
+async def get_site_status(site_id: str):
     """
     Get current building status.
 
     Returns the activation status (draft, pending_validation, active, suspended).
     If no status record exists, returns DRAFT.
     """
-    resolved_id = resolve_building_uuid(building_id)
-    status_record = integration_repo.get_building_status(resolved_id)
+    resolved_id = resolve_site_uuid(site_id)
+    status_record = integration_repo.get_site_status(resolved_id)
 
     if not status_record:
         return BuildingStatusResponse(
-            building_id=building_id,
+            site_id=site_id,
             status=BuildingStatus.DRAFT.value,
         )
 
     return BuildingStatusResponse(
-        building_id=building_id,
+        site_id=site_id,
         status=status_record["status"],
         last_validated_at=status_record.get("last_validated_at"),
         notes=status_record.get("notes"),
     )
 
 
-@router.post("/buildings/{building_id}/validate", response_model=ValidationChecklist)
-async def validate_building(building_id: str):
+@router.post("/buildings/{site_id}/validate", response_model=ValidationChecklist)
+async def validate_building(site_id: str):
     """
     Validate building configuration for go-live.
 
     Runs validation checklist and updates building status to PENDING_VALIDATION
     if all critical checks pass. Returns the validation checklist.
     """
-    resolved_id = resolve_building_uuid(building_id)
+    resolved_id = resolve_site_uuid(site_id)
 
     # Run validation checklist
     checklist = integration_repo.get_validation_checklist(resolved_id)
@@ -857,28 +857,28 @@ async def validate_building(building_id: str):
     try:
         building = building_repo.get_by_uuid(resolved_id)
         if not building:
-            building = building_repo.get_by_id(building_id)
+            building = building_repo.get_by_id(site_id)
         if building:
-            checklist["building_name"] = building.get("name")
+            checklist["site_name"] = building.get("name")
     except Exception:
         pass
 
     # Determine new status based on validation
     if checklist["can_activate"]:
         new_status = BuildingStatus.PENDING_VALIDATION
-        integration_repo.update_building_status(
+        integration_repo.update_site_status(
             resolved_id,
             new_status.value,
             notes="Passed validation - ready for activation",
         )
     else:
         # Stay in DRAFT or current status if validation fails
-        current = integration_repo.get_building_status(resolved_id)
+        current = integration_repo.get_site_status(resolved_id)
         new_status = BuildingStatus(current["status"]) if current else BuildingStatus.DRAFT
 
     return ValidationChecklist(
-        building_id=building_id,
-        building_name=checklist.get("building_name"),
+        site_id=site_id,
+        site_name=checklist.get("site_name"),
         status=new_status,
         checked_at=datetime.utcnow(),
         items=checklist["items"],
@@ -888,8 +888,8 @@ async def validate_building(building_id: str):
     )
 
 
-@router.post("/buildings/{building_id}/activate", response_model=ActivationResult)
-async def activate_building(building_id: str):
+@router.post("/buildings/{site_id}/activate", response_model=ActivationResult)
+async def activate_building(site_id: str):
     """
     Activate a building after successful validation.
 
@@ -899,14 +899,14 @@ async def activate_building(building_id: str):
 
     Returns activation result with success/failure and any validation errors.
     """
-    resolved_id = resolve_building_uuid(building_id)
+    resolved_id = resolve_site_uuid(site_id)
 
     # Check current status
-    current = integration_repo.get_building_status(resolved_id)
+    current = integration_repo.get_site_status(resolved_id)
     if not current or current["status"] != BuildingStatus.PENDING_VALIDATION.value:
         return ActivationResult(
             success=False,
-            building_id=building_id,
+            site_id=site_id,
             new_status=current["status"] if current else BuildingStatus.DRAFT.value,
             message="Building must be in PENDING_VALIDATION status to activate. Run /validate first.",
             validation_errors=["Status is not PENDING_VALIDATION"],
@@ -918,14 +918,14 @@ async def activate_building(building_id: str):
     if not checklist["can_activate"]:
         return ActivationResult(
             success=False,
-            building_id=building_id,
+            site_id=site_id,
             new_status=BuildingStatus.PENDING_VALIDATION.value,
             message="Activation blocked by failed validation checks.",
             validation_errors=checklist["blocking_issues"],
         )
 
     # Activate the building
-    integration_repo.update_building_status(
+    integration_repo.update_site_status(
         resolved_id,
         BuildingStatus.ACTIVE.value,
         notes="Activated after successful validation",
@@ -933,16 +933,16 @@ async def activate_building(building_id: str):
 
     return ActivationResult(
         success=True,
-        building_id=building_id,
+        site_id=site_id,
         new_status=BuildingStatus.ACTIVE.value,
         message="Building successfully activated.",
         validation_errors=[],
     )
 
 
-@router.post("/buildings/{building_id}/suspend", response_model=BuildingStatusResponse)
+@router.post("/buildings/{site_id}/suspend", response_model=BuildingStatusResponse)
 async def suspend_building(
-    building_id: str,
+    site_id: str,
     body: BuildingStatusUpdate = None,
 ):
     """
@@ -951,16 +951,16 @@ async def suspend_building(
     Sets the building status to SUSPENDED. Can be used to temporarily
     disable a building without losing configuration.
     """
-    resolved_id = resolve_building_uuid(building_id)
+    resolved_id = resolve_site_uuid(site_id)
     notes = body.notes if body else None
-    integration_repo.update_building_status(
+    integration_repo.update_site_status(
         resolved_id,
         BuildingStatus.SUSPENDED.value,
         notes=notes or "Manually suspended",
     )
 
     return BuildingStatusResponse(
-        building_id=building_id,
+        site_id=site_id,
         status=BuildingStatus.SUSPENDED.value,
         last_validated_at=datetime.utcnow(),
         notes=notes or "Manually suspended",
@@ -972,7 +972,7 @@ async def suspend_building(
 
 @router.get("/unmatched-points")
 async def get_unmatched_points(
-    building_id: Optional[str] = Query(None, description="Filter by building ID"),
+    site_id: Optional[str] = Query(None, description="Filter by building ID"),
     limit: int = Query(10, ge=1, le=100, description="Number of results"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
 ):
@@ -981,7 +981,7 @@ async def get_unmatched_points(
 
     Returns BMS points that haven't been mapped to CAFM assets yet.
     """
-    resolved_id = resolve_building_uuid(building_id) if building_id else None
+    resolved_id = resolve_site_uuid(site_id) if site_id else None
     result = integration_repo.get_unmatched_points(resolved_id, limit, offset)
     return result
 
@@ -1002,20 +1002,20 @@ async def seed_integration_data():
     if not building:
         raise HTTPException(status_code=404, detail=f"Primary building '{_primary_site}' not found")
 
-    building_id = building["id"]
+    site_id = building["id"]
 
     # Get existing log source
-    sources = integration_repo.get_log_sources(building_id=building_id)
+    sources = integration_repo.get_log_sources(site_id=site_id)
     if not sources:
         raise HTTPException(status_code=404, detail="No log sources found. Create one first.")
 
     source_id = sources[0]["id"]
 
     # Get REAL equipment from the primary site
-    equipment_list = equipment_repo.get_by_building_code(_primary_site)
+    equipment_list = equipment_repo.get_by_site_code(_primary_site)
     if not equipment_list:
-        # Fallback: try get_all with building_id filter
-        equipment_list = equipment_repo.get_all(building_id=_primary_site)
+        # Fallback: try get_all with site_id filter
+        equipment_list = equipment_repo.get_all(site_id=_primary_site)
     if not equipment_list:
         raise HTTPException(status_code=404, detail=f"No equipment found for {_primary_site}")
 
@@ -1106,7 +1106,7 @@ async def seed_integration_data():
         ]
     )
 
-    mappings_created = integration_repo.bulk_upsert_point_mappings(building_id, point_mappings)
+    mappings_created = integration_repo.bulk_upsert_point_mappings(site_id, point_mappings)
 
     # Seed column_mappings for the log source
     # Schema: source_column, sentinel_field, transform, transform_params (jsonb)
@@ -1128,7 +1128,7 @@ async def seed_integration_data():
 
     return {
         "success": True,
-        "building_id": building_id,
+        "site_id": site_id,
         "source_id": source_id,
         "point_mappings_created": mappings_created,
         "column_mappings_created": len(mappings_saved),
@@ -1139,29 +1139,29 @@ async def seed_integration_data():
 # ==================== Commissioning Scorecard (Phase 107b) ====================
 
 
-@router.get("/buildings/{building_id}/commissioning-scorecard")
-async def get_commissioning_scorecard(building_id: str):
+@router.get("/buildings/{site_id}/commissioning-scorecard")
+async def get_commissioning_scorecard(site_id: str):
     """Run the commissioning scorecard for a building.
 
     Evaluates 8 hard gates and returns pass/fail status, truth check results,
     consecutive pass days, and promotion readiness.
     """
-    scorecard = await commissioning_service.run_scorecard(building_id)
+    scorecard = await commissioning_service.run_scorecard(site_id)
     return scorecard.model_dump()
 
 
-@router.post("/buildings/{building_id}/truth-check")
-async def submit_truth_check(building_id: str, submission: TruthCheckSubmission):
+@router.post("/buildings/{site_id}/truth-check")
+async def submit_truth_check(site_id: str, submission: TruthCheckSubmission):
     """Submit a truth check for a building (minimum 20 entries).
 
     Compares SENTINEL readings against native BMS values to verify accuracy.
     """
-    result = commissioning_service.submit_truth_check(building_id, submission.entries)
+    result = commissioning_service.submit_truth_check(site_id, submission.entries)
     return result.model_dump()
 
 
-@router.post("/buildings/{building_id}/promote-to-live")
-async def promote_to_live(building_id: str):
+@router.post("/buildings/{site_id}/promote-to-live")
+async def promote_to_live(site_id: str):
     """Attempt to promote a building from SHADOW_LIVE to LIVE_CONTROL.
 
     Requires: all gates passed, >= 2 consecutive pass days, passing truth check,
@@ -1173,11 +1173,11 @@ async def promote_to_live(building_id: str):
     if current_mode != IngestionMode.SHADOW_LIVE:
         return {
             "success": False,
-            "building_id": building_id,
+            "site_id": site_id,
             "previous_mode": current_mode.value,
             "message": f"Cannot promote: current mode is {current_mode.value}, must be shadow_live",
             "blocking_reasons": [f"mode_is_{current_mode.value}"],
         }
 
-    result = await commissioning_service.promote_to_live(building_id)
+    result = await commissioning_service.promote_to_live(site_id)
     return result.model_dump()

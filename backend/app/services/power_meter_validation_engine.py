@@ -43,15 +43,15 @@ COP_CRITICAL_THRESHOLD = 2.5  # Critical if below this
 class PowerMeterValidationEngine:
     """Engine for validating simulated power against real meter data."""
 
-    def __init__(self, building_id: str):
+    def __init__(self, site_id: str):
         """Initialize power meter validation engine.
 
         Args:
-            building_id: Building/site identifier (e.g., 'site-002')
+            site_id: Building/site identifier (e.g., 'site-002')
         """
-        self.building_id = building_id
+        self.site_id = site_id
         self.client = get_supabase_client()
-        self.sim_store = get_simulation_store(building_id)
+        self.sim_store = get_simulation_store(site_id)
         self._baseline_cache = {}
 
     async def get_power_baseline(
@@ -269,7 +269,7 @@ class PowerMeterValidationEngine:
         """
         try:
             record = {
-                "building_id": self.building_id,
+                "site_id": self.site_id,
                 "meter_id": meter_id,
                 "timestamp": simulated_date.isoformat(),
                 "validation_status": validation_result["validation_status"],
@@ -540,7 +540,7 @@ class PowerMeterValidationEngine:
 
 
 async def validate_power_meter(
-    building_id: str,
+    site_id: str,
     meter_id: str,
     simulated_power_kw: float,
     real_power_kw: Optional[float] = None,
@@ -552,7 +552,7 @@ async def validate_power_meter(
     Called hourly when real meter data available.
 
     Args:
-        building_id: Building/site ID
+        site_id: Building/site ID
         meter_id: Meter identifier
         simulated_power_kw: Simulated HVAC power
         real_power_kw: Real meter reading
@@ -562,7 +562,7 @@ async def validate_power_meter(
     Returns:
         Validation result with variance analysis
     """
-    engine = PowerMeterValidationEngine(building_id)
+    engine = PowerMeterValidationEngine(site_id)
     return await engine.validate_hourly_power(
         meter_id=meter_id,
         simulated_power_kw=simulated_power_kw,
@@ -572,13 +572,13 @@ async def validate_power_meter(
     )
 
 
-def get_power_meter_validation_engine(building_id: str) -> PowerMeterValidationEngine:
+def get_power_meter_validation_engine(site_id: str) -> PowerMeterValidationEngine:
     """Get singleton instance of PowerMeterValidationEngine.
 
     Args:
-        building_id: Building identifier
+        site_id: Building identifier
 
     Returns:
         PowerMeterValidationEngine instance
     """
-    return PowerMeterValidationEngine(building_id)
+    return PowerMeterValidationEngine(site_id)

@@ -47,7 +47,7 @@ const mockEquipment: Equipment = {
   name: 'Chiller Unit 1',
   equipment_type: 'CHILLER',
   site_code: 'site-002',
-  building_code: 'B1',
+  site_code: 'B1',
   zone_code: 'MECH',
   status: 'online',
   health_score: 85,
@@ -460,7 +460,7 @@ describe('useEquipmentByType Hook', () => {
           id: '550e8400-e29b-41d4-a716-446655440003',
           code: 'S002-CHILLER-L2-001',
           name: 'Chiller Unit 4',
-          building_code: 'L2',
+          site_code: 'L2',
         },
       ];
 

@@ -17,12 +17,12 @@ class ConditionAssessmentRepository:
     def __init__(self):
         self.client = get_supabase_client()
 
-    def get_by_building(self, building_id: str) -> List[Dict[str, Any]]:
+    def get_by_site(self, site_id: str) -> List[Dict[str, Any]]:
         """
         Get all condition assessments for a building.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
 
         Returns:
             List of assessment dicts ordered by date descending
@@ -35,7 +35,7 @@ class ConditionAssessmentRepository:
             result = (
                 self.client.table("condition_assessments")
                 .select("*")
-                .eq("building_id", building_id)
+                .eq("site_id", site_id)
                 .order("assessment_date", desc=True)
                 .execute()
             )
@@ -43,7 +43,7 @@ class ConditionAssessmentRepository:
             return result.data or []
 
         except Exception as e:
-            logger.error(f"Error getting assessments for building {building_id}: {e}")
+            logger.error(f"Error getting assessments for building {site_id}: {e}")
             return []
 
     def get_latest_for_equipment(self, equipment_id: str) -> Optional[Dict[str, Any]]:
@@ -82,7 +82,7 @@ class ConditionAssessmentRepository:
         Create a new condition assessment.
 
         Args:
-            data: Assessment data (code, building_id/equipment_id, scores, etc.)
+            data: Assessment data (code, site_id/equipment_id, scores, etc.)
 
         Returns:
             Created assessment dict, or None on error

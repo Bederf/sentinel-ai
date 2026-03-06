@@ -98,7 +98,7 @@ describe('SecurityPanel', () => {
         access_points: [
           {
             point_id: 'AP-001',
-            building_id: 'site-002',
+            site_id: 'site-002',
             zone: 'L0',
             location: 'Main Entrance',
             device_type: 'reader',
@@ -144,7 +144,7 @@ describe('SecurityPanel', () => {
             alert_type: 'after_hours',
             timestamp: new Date().toISOString(),
             location: 'Server Room',
-            building_id: 'site-002',
+            site_id: 'site-002',
             severity: 'warning',
             status: 'open',
             description: 'After-hours access detected',

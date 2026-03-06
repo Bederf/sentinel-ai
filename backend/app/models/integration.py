@@ -66,7 +66,7 @@ class LogSourceBase(BaseModel):
 
 
 class LogSourceCreate(LogSourceBase):
-    building_id: str
+    site_id: str
 
 
 class LogSourceUpdate(BaseModel):
@@ -83,7 +83,7 @@ class LogSourceUpdate(BaseModel):
 
 class LogSource(LogSourceBase):
     id: str
-    building_id: str
+    site_id: str
     vendor_pattern: Optional[str] = None
     is_active: bool = False
     last_sync_at: Optional[datetime] = None
@@ -124,7 +124,7 @@ class PointAssetMappingCreate(BaseModel):
 
 class PointAssetMapping(PointAssetMappingCreate):
     id: str
-    building_id: str
+    site_id: str
     is_verified: bool = False
     created_at: datetime
 
@@ -261,8 +261,8 @@ class ChecklistItem(BaseModel):
 class ValidationChecklist(BaseModel):
     """Complete go-live validation checklist."""
 
-    building_id: str
-    building_name: Optional[str] = None
+    site_id: str
+    site_name: Optional[str] = None
     status: BuildingStatus
     checked_at: datetime
     items: List[ChecklistItem]

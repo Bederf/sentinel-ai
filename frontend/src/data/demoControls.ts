@@ -192,7 +192,7 @@ export const demoDevices: Device[] = [
       zone_id: "Zone-L12-N",
       zone_name: "Level 12 North",
       desks_served: "201-225",
-      building_id: "sandton",
+      site_id: "sandton",
     },
   },
   {
@@ -261,7 +261,7 @@ export const demoDevices: Device[] = [
     metadata: {
       zone_id: "Zone-L11-N",
       zone_name: "Level 11 North",
-      building_id: "sandton",
+      site_id: "sandton",
     },
   },
   {
@@ -318,7 +318,7 @@ export const demoDevices: Device[] = [
     },
     metadata: {
       serves: "All Level 12 zones",
-      building_id: "sandton",
+      site_id: "sandton",
       critical: true,
     },
   },

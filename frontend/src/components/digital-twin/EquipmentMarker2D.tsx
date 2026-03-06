@@ -91,18 +91,18 @@ export function EquipmentMarker2D({
       {/* Tooltip on hover */}
       <title>{`${code} - Health: ${healthScore}%`}</title>
 
-      {/* Optional: small text label for code (comment out if too cluttered) */}
-      {/* <text
+      {/* Equipment type + zone label */}
+      <text
         x={0}
-        y={0}
-        fontSize={0.15}
+        y={-0.45}
+        fontSize={0.12}
         fill="white"
         textAnchor="middle"
-        dominantBaseline="middle"
+        dominantBaseline="auto"
         pointerEvents="none"
       >
-        {code.split('-').slice(-1)[0]}
-      </text> */}
+        {code.split('-').slice(1).join('-')}
+      </text>
     </g>
   );
 }

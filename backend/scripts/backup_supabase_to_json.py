@@ -84,9 +84,9 @@ def main():
     print()
 
     # =========================================================================
-    # Tables filtered by building_id
+    # Tables filtered by site_id
     # =========================================================================
-    building_id_tables = [
+    site_id_tables = [
         "alerts",
         "anomalies",
         "predictions",
@@ -147,24 +147,24 @@ def main():
         "audit_log",
     ]
 
-    print("=== Tables with building_id filter ===")
-    for table in building_id_tables:
-        # Check if table has building_id column
+    print("=== Tables with site_id filter ===")
+    for table in site_id_tables:
+        # Check if table has site_id column
         cur.execute(
             """
             SELECT column_name FROM information_schema.columns
-            WHERE table_schema = 'public' AND table_name = %s AND column_name = 'building_id'
+            WHERE table_schema = 'public' AND table_name = %s AND column_name = 'site_id'
         """,
             (table,),
         )
         if cur.fetchone():
-            data = query_table(cur, table, "building_id = %s", (BUILDING_ID,))
+            data = query_table(cur, table, "site_id = %s", (BUILDING_ID,))
             if data:
                 save_json(data, BACKUP_DIR / f"{table}.json")
             else:
                 print(f"  {table}: 0 rows (skipping file)")
         else:
-            print(f"  {table}: no building_id column, checking site_id...")
+            print(f"  {table}: no site_id column, checking site_id...")
             # Try site_id
             cur.execute(
                 """
@@ -180,14 +180,14 @@ def main():
                 else:
                     print(f"  {table}: 0 rows (skipping file)")
             else:
-                print(f"  {table}: no building_id or site_id column (skip)")
+                print(f"  {table}: no site_id or site_id column (skip)")
 
     # =========================================================================
     # Tables filtered by equipment_id (equipment belonging to site-002)
     # =========================================================================
     print()
     print("=== Getting site-002 equipment IDs ===")
-    cur.execute("SELECT id FROM equipment WHERE building_id = %s", (BUILDING_ID,))
+    cur.execute("SELECT id FROM equipment WHERE site_id = %s", (BUILDING_ID,))
     equipment_ids = [row[0] for row in cur.fetchall()]
     print(f"  Found {len(equipment_ids)} equipment items")
 
@@ -231,9 +231,9 @@ def main():
     # =========================================================================
     print()
     print("=== Building record ===")
-    data = query_table(cur, "buildings", "id = %s", (BUILDING_ID,))
+    data = query_table(cur, "sites", "id = %s", (BUILDING_ID,))
     if data:
-        save_json(data, BACKUP_DIR / "buildings.json")
+        save_json(data, BACKUP_DIR / "sites.json")
 
     # =========================================================================
     # Energy centre and related electrical infrastructure
@@ -241,26 +241,26 @@ def main():
     print()
     print("=== Energy centre / electrical infrastructure ===")
     energy_tables = [
-        ("energy_centres", "building_id"),
-        ("generators", "building_id"),
-        ("generator_groups", "building_id"),
-        ("generator_run_history", "building_id"),
-        ("diesel_tanks", "building_id"),
-        ("transformers", "building_id"),
-        ("lv_switchboards", "building_id"),
-        ("mv_incomers", "building_id"),
-        ("power_meters", "building_id"),
-        ("feeders", "building_id"),
-        ("pfc_banks", "building_id"),
-        ("ups_systems", "building_id"),
-        ("ats_units", "building_id"),
-        ("bess_containers", "building_id"),
-        ("solar_plants", "building_id"),
-        ("solar_inverters", "building_id"),
-        ("solar_meters", "building_id"),
-        ("solar_bess", "building_id"),
-        ("solar_sites", "building_id"),
-        ("solar_readings", "building_id"),
+        ("energy_centres", "site_id"),
+        ("generators", "site_id"),
+        ("generator_groups", "site_id"),
+        ("generator_run_history", "site_id"),
+        ("diesel_tanks", "site_id"),
+        ("transformers", "site_id"),
+        ("lv_switchboards", "site_id"),
+        ("mv_incomers", "site_id"),
+        ("power_meters", "site_id"),
+        ("feeders", "site_id"),
+        ("pfc_banks", "site_id"),
+        ("ups_systems", "site_id"),
+        ("ats_units", "site_id"),
+        ("bess_containers", "site_id"),
+        ("solar_plants", "site_id"),
+        ("solar_inverters", "site_id"),
+        ("solar_meters", "site_id"),
+        ("solar_bess", "site_id"),
+        ("solar_sites", "site_id"),
+        ("solar_readings", "site_id"),
     ]
 
     for table, col in energy_tables:

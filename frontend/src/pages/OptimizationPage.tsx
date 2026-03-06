@@ -757,8 +757,8 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
                 </p>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <PowerMeterValidationCard buildingId={selectedSiteId} />
-                <CostValidationCard buildingId={selectedSiteId} />
+                <PowerMeterValidationCard siteId={selectedSiteId} />
+                <CostValidationCard siteId={selectedSiteId} />
               </div>
 
               {/* ROI Summary */}

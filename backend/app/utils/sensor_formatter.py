@@ -37,12 +37,12 @@ def format_sensor_with_zone(sensor_data: Dict[str, Any]) -> Dict[str, Any]:
     return formatted
 
 
-async def get_sensors_with_zones(building_id: str) -> List[Dict[str, Any]]:
+async def get_sensors_with_zones(site_id: str) -> List[Dict[str, Any]]:
     """
     Get all sensors for a building with zone assignments.
 
     Args:
-        building_id: Building UUID
+        site_id: Building UUID
 
     Returns:
         List of sensors with zone information
@@ -50,7 +50,7 @@ async def get_sensors_with_zones(building_id: str) -> List[Dict[str, Any]]:
     client = get_supabase_client()
 
     # Get all DALI equipment (sensors)
-    result = client.table("equipment").select("*").eq("building_id", building_id).eq("type", "dali").execute()
+    result = client.table("equipment").select("*").eq("site_id", site_id).eq("type", "dali").execute()
 
     sensors = []
     for sensor in result.data:

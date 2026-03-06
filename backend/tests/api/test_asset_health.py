@@ -34,9 +34,8 @@ def _make_equipment(code: str, name: str = "", health: int = 85, **overrides):
         "updated_at": datetime.now().isoformat(),
         "controllable": False,
         "location": "Level 1",
-        "building_id": "test-building",
-        "building_name": "Test Building",
         "site_id": "site-002",
+        "site_name": "Test Building",
         "details": {},
     }
     defaults.update(overrides)

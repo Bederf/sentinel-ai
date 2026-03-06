@@ -652,15 +652,13 @@ class ServiceOptimizer:
             import os
 
             # Read buildings registry
-            registry_path = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)), "data", "buildings", "_registry.json"
-            )
+            registry_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "sites", "_registry.json")
 
             if os.path.exists(registry_path):
                 with open(registry_path, "r") as f:
                     registry = json.load(f)
 
-                for site_id in registry.get("active_buildings", []):
+                for site_id in registry.get("active_sites", []):
                     site_path = os.path.join(os.path.dirname(registry_path), f"{site_id}.json")
                     if os.path.exists(site_path):
                         with open(site_path, "r") as f:

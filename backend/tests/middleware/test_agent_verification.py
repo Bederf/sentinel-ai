@@ -192,7 +192,7 @@ async def test_work_order_create_verifier_success():
     mock_wo = {
         "id": "wo-123",
         "title": "Fix AHU-1",
-        "building_id": "b-001",
+        "site_id": "b-001",
         "priority": "high",
         "status": "open",
     }
@@ -210,7 +210,7 @@ async def test_work_order_create_verifier_success():
             {
                 "work_order_id": "wo-123",
                 "title": "Fix AHU-1",
-                "building_id": "b-001",
+                "site_id": "b-001",
                 "priority": "high",
             },
         )

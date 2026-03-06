@@ -9,8 +9,9 @@ class PredictionRepository:
     """Repository for prediction database operations."""
 
     _COLUMNS = (
-        "id, code, equipment_id, building_id, severity, status, "
-        "probability_percent, failure_type, predicted_date, "
+        "id, code, equipment_id, site_id, severity, status, "
+        "probability_percent, prediction_type, predicted_failure_date, "
+        "timeframe_days, confidence, "
         "repair_cost_zar, replacement_cost_zar, "
         "downtime_cost_per_hour_zar, potential_loss_zar, "
         "created_at, updated_at"
@@ -22,7 +23,7 @@ class PredictionRepository:
 
     def get_all(
         self,
-        building_id: Optional[str] = None,
+        site_id: Optional[str] = None,
         equipment_id: Optional[str] = None,
         status: Optional[str] = None,
         severity: Optional[str] = None,
@@ -30,7 +31,7 @@ class PredictionRepository:
         """Get all predictions with optional filtering.
 
         Args:
-            building_id: Filter by building UUID
+            site_id: Filter by building UUID
             equipment_id: Filter by equipment UUID
             status: Filter by status
             severity: Filter by severity
@@ -40,11 +41,11 @@ class PredictionRepository:
         """
         # Join with equipment and buildings to get related data
         query = self.client.table("predictions").select(
-            "*, equipment:equipment_id(id, code, name, type), building:building_id(id, code, name)"
+            "*, equipment:equipment_id(id, code, name, type), building:site_id(id, code, name)"
         )
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
         if equipment_id:
             query = query.eq("equipment_id", equipment_id)
         if status:
@@ -85,29 +86,29 @@ class PredictionRepository:
             return response.data[0]
         return None
 
-    def get_active_by_building(self, building_uuid: str) -> List[Dict[str, Any]]:
+    def get_active_by_site(self, site_uuid: str) -> List[Dict[str, Any]]:
         """Get active predictions for a building.
 
         Args:
-            building_uuid: Building UUID
+            site_uuid: Building UUID
 
         Returns:
             List of active predictions
         """
-        cached = cache.get(CacheKeys.predictions_active(building_uuid))
+        cached = cache.get(CacheKeys.predictions_active(site_uuid))
         if cached is not None:
             return cached
 
         response = (
             self.client.table("predictions")
             .select(self._COLUMNS)
-            .eq("building_id", building_uuid)
+            .eq("site_id", site_uuid)
             .eq("status", "active")
             .execute()
         )
 
         result = response.data
-        cache.set(CacheKeys.predictions_active(building_uuid), result, CacheService.TTL_DYNAMIC)
+        cache.set(CacheKeys.predictions_active(site_uuid), result, CacheService.TTL_DYNAMIC)
         return result
 
     def get_active_by_equipment(self, equipment_uuid: str) -> List[Dict[str, Any]]:
@@ -175,7 +176,7 @@ class PredictionRepository:
         """
         response = self.client.table("predictions").insert(prediction_data).execute()
         result = response.data[0]
-        CacheInvalidation.on_prediction_change(building_id=prediction_data.get("building_id"))
+        CacheInvalidation.on_prediction_change(site_id=prediction_data.get("site_id"))
         return result
 
     def update(self, prediction_id: str, prediction_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:

@@ -12,7 +12,7 @@ export interface Document {
   title: string;
   code: string;
   document_type: string;
-  building_id: string;
+  site_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -32,21 +32,21 @@ export const documentsApi = {
    * The document will be extracted, stored in Supabase Storage,
    * and indexed into the RAG system with building association.
    *
-   * @param buildingId - Building UUID
+   * @param siteId - Building UUID
    * @param file - Document file (PDF, DOCX, or TXT)
    * @param title - Optional document title (defaults to filename)
    * @param documentType - Document classification (default: "building_manual")
    * @returns Upload confirmation with document ID and chunk count
    */
   async uploadDocument(
-    buildingId: string,
+    siteId: string,
     file: File,
     title?: string,
     documentType: string = 'building_manual'
   ): Promise<DocumentUploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('building_id', buildingId);
+    formData.append('site_id', siteId);
     if (title) {
       formData.append('title', title);
     }

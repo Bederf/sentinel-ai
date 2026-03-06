@@ -273,12 +273,29 @@ ollama pull qwen:7b           # For generation
 - Cross-lingual support
 - Real-time knowledge updates
 
+## Evolution: Hybrid Knowledge Layer
+
+The current RAG system indexes SENTINEL system documentation for demo/Q&A. The planned **Hybrid Knowledge Layer** extends this to combine:
+
+1. **Document RAG** (this system) -- extended with MRI Evolution facility documents via Google Drive intake
+2. **Asset Knowledge Graph** (Brick ontology) -- equipment relationships, vendors, contracts, locations
+3. **Live Telemetry** (SIMBIOT) -- current sensor readings, alarms, ML model outputs
+
+The context assembly engine (`hybrid_query_service.py`) will merge all three layers into a single context payload for AI agents, enabling questions like "the generator alarmed -- who is the vendor and what did the last inspection find?"
+
+See:
+- **[Hybrid Knowledge Layer](../02-architecture/hybrid-knowledge-layer.md)** -- Full architecture
+- **[Brick Ontology Layer](../02-architecture/brick-ontology-layer.md)** -- Asset graph design
+- **[Drive Intake Pipeline](../05-integrations/drive-intake-pipeline.md)** -- MRI document ingestion
+
 ## Related Documentation
 
 - **[Explainable AI](explainable-ai.md)** - Uses RAG for context
 - **[Supabase Schema](../../supabase/migrations/023_pgvector_rag_schema.sql)** - Database implementation
 - **[Embedding Service](../app/services/embedding_service.py)** - Text embeddings
 - **[Vector DB Service](../app/services/vector_db.py)** - Supabase wrapper
+- **[Hybrid Knowledge Layer](../02-architecture/hybrid-knowledge-layer.md)** - Planned context assembly
+- **[Drive Intake Pipeline](../05-integrations/drive-intake-pipeline.md)** - Planned document intake from Drive
 
 ## References
 

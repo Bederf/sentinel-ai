@@ -336,7 +336,7 @@ export function AIPerformanceTab() {
         </select>
         {selectedRun && (
           <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-            Building: {selectedRun.building_code} | Started:{" "}
+            Building: {selectedRun.site_code} | Started:{" "}
             {new Date(selectedRun.started_at).toLocaleString()}
             {selectedRun.duration_minutes != null &&
               ` | Duration: ${selectedRun.duration_minutes.toFixed(1)} min`}

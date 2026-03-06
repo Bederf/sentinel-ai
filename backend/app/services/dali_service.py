@@ -613,8 +613,8 @@ class DALIService:
         site_data = self._get_site_data(site_id)
         if not site_data:
             return {
-                "building_id": site_id or "",
-                "building_name": "",
+                "site_id": site_id or "",
+                "site_name": "",
                 "total_floors": 0,
                 "total_zones": 0,
                 "total_sensors": 0,
@@ -652,8 +652,8 @@ class DALIService:
                 energy_waste_zones += 1
 
         return {
-            "building_id": site_data.site_id,
-            "building_name": site_data.site_name,
+            "site_id": site_data.site_id,
+            "site_name": site_data.site_name,
             "total_floors": len(floors),
             "total_zones": len(zones),
             "total_sensors": total_sensors,

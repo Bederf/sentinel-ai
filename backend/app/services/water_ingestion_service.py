@@ -64,7 +64,7 @@ class WaterIngestionService:
 
     def _load_sites(self):
         """Auto-load sites from equipment files."""
-        buildings_dir = Path(__file__).parent.parent / "data" / "buildings"
+        buildings_dir = Path(__file__).parent.parent / "data" / "sites"
 
         for site_dir in buildings_dir.iterdir():
             if not site_dir.is_dir() or not site_dir.name.startswith("site-"):

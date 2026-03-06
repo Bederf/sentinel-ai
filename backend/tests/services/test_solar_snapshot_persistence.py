@@ -55,7 +55,7 @@ class TestPersistSolarSnapshot:
         result = await persistence.persist_solar_snapshot(
             simulated_time=datetime(2026, 6, 15, 12, 0, 0),
             equipment_states=equipment_states,
-            building_load_kw=20.0,
+            site_load_kw=20.0,
             tariff_band="standard",
             tariff_rate=200.0,
             hour_index=4380,
@@ -86,7 +86,7 @@ class TestPersistSolarSnapshot:
         result = await persistence.persist_solar_snapshot(
             simulated_time=datetime(2026, 1, 1, 3, 0, 0),
             equipment_states=equipment_states,
-            building_load_kw=5.0,
+            site_load_kw=5.0,
             tariff_band="off_peak",
             tariff_rate=80.0,
             hour_index=3,
@@ -121,7 +121,7 @@ class TestPersistSolarSnapshot:
         await persistence.persist_solar_snapshot(
             simulated_time=datetime(2026, 6, 15, 12, 0, 0),
             equipment_states=equipment_states,
-            building_load_kw=50.0,
+            site_load_kw=50.0,
             tariff_band="standard",
             tariff_rate=200.0,
             hour_index=100,
@@ -142,7 +142,7 @@ class TestPersistSolarDaily:
         result = await persistence.persist_solar_daily(
             simulated_date=datetime(2026, 3, 15).date(),
             solar_gen_kwh=450.0,
-            building_load_kwh=600.0,
+            site_load_kwh=600.0,
             bess_charge_kwh=80.0,
             bess_discharge_kwh=60.0,
             grid_import_kwh=200.0,
@@ -179,7 +179,7 @@ class TestMeterDifferentiation:
         # Create raw instance without __init__ (avoids Supabase/ML imports)
         orc = object.__new__(LifecycleOrchestrator)
         orc._scenario_rng = random.Random(42)
-        orc.current_building_load_kw = 120.0
+        orc.current_site_load_kw = 120.0
         orc.current_solar_gen_kw = 200.0
         orc.current_grid_import_kw = 0.0
         orc.current_grid_export_kw = 80.0
@@ -206,7 +206,7 @@ class TestMeterDifferentiation:
         readings = orchestrator._generate_sensor_readings("S002-MTR-B1-MAIN", "meter", 95.0, 12, schedule_state)
         assert readings["power_kw"] == 0.0  # solar > building load
         assert readings["grid_export_kw"] == 80.0
-        assert readings["building_load_kw"] == 120.0
+        assert readings["site_load_kw"] == 120.0
         assert readings["solar_offset_kw"] == 200.0
         assert "power_factor" in readings
 
@@ -226,12 +226,12 @@ class TestMeterDifferentiation:
     def test_grid_meter_shows_import_at_night(self, orchestrator, schedule_state):
         """At night with no solar, grid meter shows full building load + BESS charge."""
         orchestrator.current_solar_gen_kw = 0.0
-        orchestrator.current_building_load_kw = 25.0
+        orchestrator.current_site_load_kw = 25.0
         orchestrator.current_grid_import_kw = 65.0  # 25 + 40 BESS charge
         orchestrator.current_grid_export_kw = 0.0
         readings = orchestrator._generate_sensor_readings("S002-MTR-B1-MAIN", "meter", 96.0, 3, schedule_state)
         assert readings["power_kw"] == 65.0  # Council sees building + BESS charge
-        assert readings["building_load_kw"] == 25.0
+        assert readings["site_load_kw"] == 25.0
 
 
 # ------------------------------------------------------------------

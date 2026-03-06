@@ -92,7 +92,7 @@ class AccessPoint(BaseModel):
     """Physical access control point (door, gate, reader)."""
 
     point_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    building_id: str
+    site_id: str
     zone: str  # Floor or area
     location: str  # Descriptive name (e.g., "Server Room Door")
     device_type: DeviceType  # reader, lock, sensor, controller
@@ -106,7 +106,7 @@ class AccessPoint(BaseModel):
         """Convert to dictionary for JSON serialization."""
         return {
             "point_id": self.point_id,
-            "building_id": self.building_id,
+            "site_id": self.site_id,
             "zone": self.zone,
             "location": self.location,
             "device_type": self.device_type,
@@ -259,7 +259,7 @@ class SecurityAlert(BaseModel):
     alert_type: AlertType
     timestamp: datetime
     location: str
-    building_id: str
+    site_id: str
     severity: AlertSeverity
     status: AlertStatus
     description: str
@@ -278,7 +278,7 @@ class SecurityAlert(BaseModel):
             "alert_type": self.alert_type,
             "timestamp": self.timestamp.isoformat(),
             "location": self.location,
-            "building_id": self.building_id,
+            "site_id": self.site_id,
             "severity": self.severity,
             "status": self.status,
             "description": self.description,

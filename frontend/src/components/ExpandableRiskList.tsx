@@ -47,9 +47,7 @@ export function ExpandableRiskList({
       const loadEquipment = async () => {
         setLoading(true);
         try {
-          // Use site ID directly as building ID
-          const buildingId = siteId;
-          const response = await api.getBuildingEquipment(buildingId);
+          const response = await api.getSiteEquipment(siteId);
 
           // Filter for at-risk equipment: explicit status OR health-based degradation
           // Aligns with SafetySummary logic in sites_aggregation.py

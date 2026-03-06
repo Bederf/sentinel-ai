@@ -180,7 +180,7 @@ class SimulatedSolarConnector(SolarConnector):
 
         # Extract key metrics from simulation
         solar_gen_kw = current_hour_data.get("solar_gen_kw", 0.0)
-        building_load_kw = current_hour_data.get("building_load_kw", 500.0)
+        site_load_kw = current_hour_data.get("site_load_kw", 500.0)
         grid_import_kw = current_hour_data.get("grid_import_kw", 0.0)
         grid_export_kw = current_hour_data.get("grid_export_kw", 0.0)
 
@@ -198,7 +198,7 @@ class SimulatedSolarConnector(SolarConnector):
                 NormalisedReading(
                     source_id="building-load",
                     description="Building Load",
-                    value=building_load_kw,
+                    value=site_load_kw,
                     unit="kW",
                     quality=QualityFlag.GOOD,
                     timestamp=datetime.now(timezone.utc).isoformat(),
@@ -316,14 +316,14 @@ class SimulatedSolarConnector(SolarConnector):
             base_load = 500  # 500 kW base load
             occupancy_load = 300 * occupancy_factor
             hvac_load = 200 * max(0, 1 - abs(current_hour - 14) / 8)  # HVAC peaks at 14:00
-            building_load_kw = base_load + occupancy_load + hvac_load
+            site_load_kw = base_load + occupancy_load + hvac_load
 
             # === BESS dynamics (from simulation) ===
             if current_hour < 7 or current_hour > 20:  # Night: charge from solar surplus
-                bess_charge_kw = max(0, current_solar_kw - building_load_kw)
+                bess_charge_kw = max(0, current_solar_kw - site_load_kw)
                 bess_discharge_kw = 0
             elif current_hour > 17:  # Evening peak: discharge
-                bess_discharge_kw = min(500, building_load_kw - current_solar_kw)
+                bess_discharge_kw = min(500, site_load_kw - current_solar_kw)
                 bess_charge_kw = 0
             else:
                 bess_charge_kw = 0
@@ -334,13 +334,13 @@ class SimulatedSolarConnector(SolarConnector):
             bess_soc_pct = max(10, min(90, bess_soc_pct))
 
             # === Grid import/export ===
-            net_solar = current_solar_kw - building_load_kw - bess_charge_kw + bess_discharge_kw
+            net_solar = current_solar_kw - site_load_kw - bess_charge_kw + bess_discharge_kw
             grid_export_kw = max(0, net_solar)
             grid_import_kw = max(0, -net_solar)
 
             return {
                 "solar_gen_kw": round(current_solar_kw, 1),
-                "building_load_kw": round(building_load_kw, 1),
+                "site_load_kw": round(site_load_kw, 1),
                 "grid_import_kw": round(grid_import_kw, 1),
                 "grid_export_kw": round(grid_export_kw, 1),
                 "bess_soc_pct": round(bess_soc_pct, 1),

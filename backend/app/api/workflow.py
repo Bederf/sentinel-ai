@@ -434,12 +434,12 @@ async def get_dashboard_equipment(site_id: Optional[str] = Query(None, descripti
         raise HTTPException(status_code=500, detail="Database not available")
 
     try:
-        # Get building UUID from site_id code
-        building_uuid = None
+        # Get site UUID from site_id code
+        site_uuid = None
         if site_id:
-            building_result = client.table("buildings").select("id").eq("code", site_id).execute()
-            if building_result.data:
-                building_uuid = building_result.data[0]["id"]
+            site_result = client.table("sites").select("id").eq("code", site_id).execute()
+            if site_result.data:
+                site_uuid = site_result.data[0]["id"]
 
         # Initialize repositories
         equipment_repo = EquipmentRepository()
@@ -449,8 +449,8 @@ async def get_dashboard_equipment(site_id: Optional[str] = Query(None, descripti
         work_order_repo = get_work_order_repository()
 
         # Get equipment
-        if building_uuid:
-            equipment_list = equipment_repo.get_all(building_id=building_uuid)
+        if site_uuid:
+            equipment_list = equipment_repo.get_all(site_id=site_uuid)
         else:
             equipment_list = equipment_repo.get_all()
 
@@ -471,12 +471,13 @@ async def get_dashboard_equipment(site_id: Optional[str] = Query(None, descripti
 
             if predictions:
                 pred = predictions[0]
-                prediction_probability = pred.get("probability_percent", 0) / 100.0
+                prediction_probability = (pred.get("probability_percent") or 0) / 100.0
+                timeframe_days = pred.get("timeframe_days") or 30
                 prediction_data = {
                     "failure_probability": prediction_probability,
-                    "timeframe": pred.get("timeframe", "30 days"),
-                    "confidence": pred.get("severity", "medium"),
-                    "explanation": pred.get("description", "ML prediction based on sensor data"),
+                    "timeframe": f"{timeframe_days} days",
+                    "confidence": pred.get("confidence") or pred.get("severity") or "medium",
+                    "explanation": pred.get("prediction_type") or "ML prediction based on sensor data",
                 }
 
             # Get baseline summary
@@ -494,18 +495,22 @@ async def get_dashboard_equipment(site_id: Optional[str] = Query(None, descripti
             except Exception:
                 recent_tasks = []
 
-            has_pending_inspection = any(t.get("status") in ("scheduled", "in_progress") for t in recent_tasks)
+            has_pending_inspection = any(
+                getattr(t, "status", None) in ("scheduled", "in_progress") for t in recent_tasks
+            )
             last_inspection = recent_tasks[0] if recent_tasks else None
 
             inspection_status = {
-                "last_inspection": last_inspection.get("scheduled_date") if last_inspection else None,
-                "status": last_inspection.get("status") if last_inspection else "none",
-                "findings": last_inspection.get("completion_notes") if last_inspection else "",
+                "last_inspection": getattr(last_inspection, "scheduled_date", None) if last_inspection else None,
+                "status": getattr(last_inspection, "status", "none") if last_inspection else "none",
+                "findings": getattr(last_inspection, "completion_notes", "") if last_inspection else "",
             }
 
             # Get active work orders
             work_orders = (
-                work_order_repo.get_work_orders_for_equipment(eq_uuid, status="in_progress", limit=5) if eq_uuid else []
+                await work_order_repo.get_work_orders_for_equipment(eq_uuid, status="in_progress", limit=5)
+                if eq_uuid
+                else []
             )
             has_active_work_order = len(work_orders) > 0
 

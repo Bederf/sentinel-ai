@@ -42,10 +42,10 @@ async def init_site_devices(
     try:
         # Verify user has access to this site (Security: Authorization check)
         site_access_repo = get_user_site_access_repository()
-        has_access = site_access_repo.has_access_to_building_code(
+        has_access = site_access_repo.has_access_to_site_code(
             user_email=auth.email,
             user_role=auth.role,
-            building_code=site_id,
+            site_code=site_id,
         )
 
         if not has_access:
@@ -89,10 +89,10 @@ async def init_default_devices(
 
         # Verify user has access to default site (Security: Authorization check)
         site_access_repo = get_user_site_access_repository()
-        has_access = site_access_repo.has_access_to_building_code(
+        has_access = site_access_repo.has_access_to_site_code(
             user_email=auth.email,
             user_role=auth.role,
-            building_code=site_id,
+            site_code=site_id,
         )
 
         if not has_access:

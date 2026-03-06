@@ -18,7 +18,7 @@ import type React from 'react';
 import { useSimulation } from '@/contexts/SimulationContext';
 
 interface UseOccupancySyncOptions {
-  buildingId: string;
+  siteId: string;
   simulationRef: React.RefObject<OccupancySimulation | null>;
   enabled: boolean;
 }
@@ -30,7 +30,7 @@ interface UseOccupancySyncOptions {
  * Ensures 3D animation stays in sync with backend lifecycle simulation.
  */
 export function useOccupancySync({
-  buildingId,
+  siteId,
   simulationRef,
   enabled,
 }: UseOccupancySyncOptions) {

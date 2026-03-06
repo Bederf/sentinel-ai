@@ -11,10 +11,7 @@
 
 import { useState } from "react";
 import {
-  Card,
-  Title,
   Text,
-  Metric,
   LineChart,
   BarChart,
   Tab,
@@ -53,18 +50,18 @@ interface TariffTier {
 }
 
 interface WaterCostAnalysisProps {
-  buildingId: string;
+  siteId: string;
 }
 
 export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
-  buildingId,
+  siteId,
 }) => {
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
   const [scenarioReduction, setScenarioReduction] = useState(0);
 
   // Mock cost data
   const { data: costData, isLoading: costLoading } = useQuery({
-    queryKey: ["water", "costs", buildingId],
+    queryKey: ["water", "costs", siteId],
     queryFn: async () => {
       const mockData: CostAnalysis = {
         period: "February 2026",
@@ -84,7 +81,7 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
 
   // Mock forecast data
   const { data: forecast, isLoading: forecastLoading } = useQuery({
-    queryKey: ["water", "forecast", buildingId],
+    queryKey: ["water", "forecast", siteId],
     queryFn: async () => {
       const mockForecast: ForecastData[] = [];
       const today = new Date();
@@ -132,13 +129,13 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
 
   if (isLoading || !costData) {
     return (
-      <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+      <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
         <div className="flex items-center justify-center h-64">
           <Text style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Loading cost analysis...
           </Text>
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -195,94 +192,94 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
           <div className="space-y-6">
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+              <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                 <Text
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
                 >
                   Current Period Total
                 </Text>
-                <Metric className="mt-2">
+                <p className="text-xl font-semibold mt-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
                   R{costData.total_cost.toLocaleString()}
-                </Metric>
+                </p>
                 <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   February 2026
                 </Text>
-              </Card>
+              </div>
 
-              <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+              <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                 <Text
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
                 >
                   Average Daily Cost
                 </Text>
-                <Metric className="mt-2">
+                <p className="text-xl font-semibold mt-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
                   R{costData.avg_daily_cost.toLocaleString()}
-                </Metric>
+                </p>
                 <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   Last 7 days
                 </Text>
-              </Card>
+              </div>
 
-              <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+              <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                 <Text
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
                 >
                   Top Zone by Cost
                 </Text>
-                <Metric className="mt-2">
+                <p className="text-xl font-semibold mt-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
                   R{(costData.top_zone_cost || 0).toLocaleString()}
-                </Metric>
+                </p>
                 <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   {costData.top_zone_name}
                 </Text>
-              </Card>
+              </div>
             </div>
 
             {/* Cost Breakdown Chart */}
-            <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
-              <Title>Cost Breakdown by Tier</Title>
+            <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+              <h4 className="font-medium text-base" style={{ color: "var(--color-sentinel-text-primary)" }}>Cost Breakdown by Tier</h4>
               <BarChart
                 data={costBreakdownData}
                 index="name"
                 categories={["Cost (R)"]}
                 colors={["emerald"]}
               />
-            </Card>
+            </div>
 
             {/* Monthly & Annual Projections */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+              <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                 <Text
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
                 >
                   Monthly Projection
                 </Text>
-                <Metric className="mt-2">
+                <p className="text-xl font-semibold mt-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
                   R{Math.round(monthlyProjection).toLocaleString()}
-                </Metric>
+                </p>
                 <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   Based on current usage pattern
                 </Text>
-              </Card>
+              </div>
 
-              <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+              <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                 <Text
                   style={{ color: "var(--color-sentinel-text-secondary)" }}
                   className="text-xs"
                 >
                   Annual Projection
                 </Text>
-                <Metric className="mt-2">
+                <p className="text-xl font-semibold mt-2" style={{ color: "var(--color-sentinel-text-primary)" }}>
                   R{Math.round(annualProjection).toLocaleString()}
-                </Metric>
+                </p>
                 <Text className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   Annualized run rate
                 </Text>
-              </Card>
+              </div>
             </div>
           </div>
         </TabPanel>
@@ -291,8 +288,8 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
         <TabPanel>
           <div className="space-y-6">
             {/* Forecast Chart */}
-            <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
-              <Title>30-Day Cost Forecast</Title>
+            <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+              <h4 className="font-medium text-base" style={{ color: "var(--color-sentinel-text-primary)" }}>30-Day Cost Forecast</h4>
               <Text className="text-xs mb-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 Projected daily costs with confidence band
               </Text>
@@ -303,11 +300,11 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
                   categories={["Projected Cost"]}
                 />
               )}
-            </Card>
+            </div>
 
             {/* Scenario Analysis */}
-            <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
-              <Title className="mb-4">Scenario Analysis: Consumption Reduction</Title>
+            <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+              <h4 className="font-medium text-base mb-4" style={{ color: "var(--color-sentinel-text-primary)" }}>Scenario Analysis: Consumption Reduction</h4>
 
               <div className="space-y-4">
                 <div>
@@ -340,9 +337,9 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
                     >
                       Baseline Monthly
                     </Text>
-                    <Metric className="mt-1 text-lg">
+                    <p className="text-lg font-semibold mt-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
                       R{Math.round(monthlyProjection).toLocaleString()}
-                    </Metric>
+                    </p>
                   </div>
 
                   <div>
@@ -352,9 +349,9 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
                     >
                       With {scenarioReduction}% Reduction
                     </Text>
-                    <Metric className="mt-1 text-lg">
+                    <p className="text-lg font-semibold mt-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
                       R{Math.round(scenarioMonthly).toLocaleString()}
-                    </Metric>
+                    </p>
                   </div>
 
                   <div>
@@ -364,20 +361,20 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
                     >
                       Monthly Savings
                     </Text>
-                    <Metric className="mt-1 text-lg text-green-500">
+                    <p className="text-lg font-semibold mt-1 text-green-500">
                       R{Math.round(scenarioSavings).toLocaleString()}
-                    </Metric>
+                    </p>
                   </div>
                 </div>
               </div>
-            </Card>
+            </div>
           </div>
         </TabPanel>
 
         {/* Tariff Tab */}
         <TabPanel>
-          <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
-            <Title className="mb-4">Current Tariff Structure</Title>
+          <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+            <h4 className="font-medium text-base mb-4" style={{ color: "var(--color-sentinel-text-primary)" }}>Current Tariff Structure</h4>
 
             <div className="mb-6 p-4 rounded border border-gray-200 dark:border-gray-800">
               <Text
@@ -470,7 +467,7 @@ export const WaterCostAnalysis: React.FC<WaterCostAnalysisProps> = ({
                 </tbody>
               </table>
             </div>
-          </Card>
+          </div>
         </TabPanel>
       </TabPanels>
     </TabGroup>

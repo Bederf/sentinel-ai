@@ -46744,5 +46744,49 @@
     "created_at": "2026-03-01T17:26:36.418043",
     "updated_at": "2026-03-01T17:26:36.418053",
     "write_attempt_count": 1
+  },
+  "a8e61a54-7982-4805-8dd1-c566ac927687": {
+    "correlation_id": "0d28ba26-a9ba-474f-a916-ad1fa111486c",
+    "recommendation_id": "rec-123",
+    "site_id": "",
+    "equipment_code": "S002-CHILLER-B1-001",
+    "tier": "tier2",
+    "decision_type": "tier2_rejected",
+    "write_status": "rejected",
+    "actor": "human_tier2",
+    "mode": "simulation",
+    "rejection_category": "user_rejected",
+    "contributing_factors": {
+      "created_by": "approval_service",
+      "rejected_by": "supervisor@site-002",
+      "reason": "Conflicting with scheduled maintenance",
+      "approval_outcome": "rejected"
+    },
+    "id": "a8e61a54-7982-4805-8dd1-c566ac927687",
+    "created_at": "2026-03-02T18:18:22.099628",
+    "updated_at": "2026-03-02T18:18:22.099636",
+    "write_attempt_count": 1
+  },
+  "df74bebd-e869-4a20-82a1-4f0f736039c8": {
+    "correlation_id": "6083a2da-c36e-444e-aee6-74252e60cea8",
+    "recommendation_id": "rec-123",
+    "site_id": "",
+    "equipment_code": "S002-CHILLER-B1-001",
+    "tier": "tier2",
+    "decision_type": "tier2_rejected",
+    "write_status": "rejected",
+    "actor": "human_tier2",
+    "mode": "simulation",
+    "rejection_category": "user_rejected",
+    "contributing_factors": {
+      "created_by": "approval_service",
+      "rejected_by": "supervisor@site-002",
+      "reason": "Conflicting with scheduled maintenance",
+      "approval_outcome": "rejected"
+    },
+    "id": "df74bebd-e869-4a20-82a1-4f0f736039c8",
+    "created_at": "2026-03-02T18:37:36.534592",
+    "updated_at": "2026-03-02T18:37:36.534596",
+    "write_attempt_count": 1
   }
 }

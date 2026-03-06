@@ -334,7 +334,7 @@ class BuildingOccupancy:
     """Building-wide occupancy overview with floor and zone breakdown."""
 
     site_id: str
-    building_name: str
+    site_name: str
     timestamp: str
     total_occupancy_percent: float
     total_zones: int
@@ -351,8 +351,7 @@ class BuildingOccupancy:
         """Convert to dictionary for JSON serialization."""
         return {
             "site_id": self.site_id,
-            "building_id": self.site_id,
-            "building_name": self.building_name,
+            "site_name": self.site_name,
             "timestamp": self.timestamp,
             "last_updated": self.timestamp,
             "total_occupancy_percent": self.total_occupancy_percent,

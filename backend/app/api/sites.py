@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.config.settings import settings
-from app.database.repositories import BuildingRepository
+from app.database.repositories import SiteRepository
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel, SentinelRole
 
@@ -19,7 +19,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 # Buildings directory for demo data and new site creation
-BUILDINGS_DIR = Path(__file__).parent.parent / "data" / "buildings"
+SITES_DIR = Path(__file__).parent.parent / "data" / "sites"
 
 # Load sites data (fallback)
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -79,10 +79,10 @@ def _load_building_json(site_id: str) -> Optional[dict]:
     Building metadata (contacts, BMS vendor, features) is external to SENTINEL
     and lives in JSON files under buildings/{site_id}/building.json.
     """
-    building_file = BUILDINGS_DIR / site_id / "building.json"
-    if building_file.exists():
+    site_file = SITES_DIR / site_id / "building.json"
+    if site_file.exists():
         try:
-            with open(building_file) as f:
+            with open(site_file) as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError) as e:
             logger.warning(f"Failed to read building.json for {site_id}: {e}")
@@ -130,21 +130,21 @@ def get_json_asset_counts(site_id: str) -> dict:
 
     Counts assets from:
     - equipment.json (legacy equipment)
-    - buildings/{building_code}/zones.json (HVAC zones)
-    - buildings/{building_code}/generators.json (generators, groups, tanks)
-    - buildings/{building_code}/energy_centre.json (EC components)
+    - buildings/{site_code}/zones.json (HVAC zones)
+    - buildings/{site_code}/generators.json (generators, groups, tanks)
+    - buildings/{site_code}/energy_centre.json (EC components)
     - dali_mock_data.json (DALI controllers by building)
 
     Returns:
         Dict with total_assets and breakdown by category
     """
-    # Map site_id to building_code (for modular building structure)
+    # Map site_id to site_code (for modular building structure)
     # TODO: Store this mapping in sites.json or buildings registry
     SITE_TO_BUILDING = {
         "site-002": "sandton",  # Sandton City Office Tower -> sandton folder
     }
 
-    building_code = SITE_TO_BUILDING.get(site_id, site_id)
+    site_code = SITE_TO_BUILDING.get(site_id, site_id)
 
     counts = {
         "equipment": 0,
@@ -164,17 +164,17 @@ def get_json_asset_counts(site_id: str) -> dict:
             counts["equipment"] = len([e for e in equipment if e.get("site_id") == site_id])
 
     # 2. Building-specific data
-    building_path = DATA_DIR / "buildings" / building_code
+    site_path = DATA_DIR / "sites" / site_code
 
     # HVAC zones
-    zones_file = building_path / "zones.json"
+    zones_file = site_path / "zones.json"
     if zones_file.exists():
         with open(zones_file) as f:
             zones = json.load(f)
             counts["hvac_zones"] = len(zones)
 
     # Generators (includes generators, groups, tanks)
-    generators_file = building_path / "generators.json"
+    generators_file = site_path / "generators.json"
     if generators_file.exists():
         with open(generators_file) as f:
             gen_data = json.load(f)
@@ -183,7 +183,7 @@ def get_json_asset_counts(site_id: str) -> dict:
             counts["diesel_tanks"] = len(gen_data.get("diesel_tanks", []))
 
     # Energy centre components
-    ec_file = building_path / "energy_centre.json"
+    ec_file = site_path / "energy_centre.json"
     if ec_file.exists():
         with open(ec_file) as f:
             ec_data = json.load(f)
@@ -203,13 +203,13 @@ def get_json_asset_counts(site_id: str) -> dict:
     if dali_file.exists():
         with open(dali_file) as f:
             dali_data = json.load(f)
-            # Check if site_id matches (flat structure) or building_id matches (nested)
+            # Check if site_id matches (flat structure) or site_id matches (nested)
             if dali_data.get("site_id") == site_id:
                 counts["dali_controllers"] = len(dali_data.get("controllers", []))
             else:
                 # Try nested buildings structure
-                for building in dali_data.get("buildings", []):
-                    if building.get("building_id", "").lower() == building_code.lower():
+                for building in dali_data.get("sites", []):
+                    if building.get("site_id", "").lower() == site_code.lower():
                         counts["dali_controllers"] = len(building.get("controllers", []))
                         break
 
@@ -222,11 +222,11 @@ def get_json_asset_counts(site_id: str) -> dict:
     }
 
 
-def get_equipment_status_breakdown(building_uuid: str) -> dict:
+def get_equipment_status_breakdown(site_uuid: str) -> dict:
     """Get equipment count by status for a building.
 
     Args:
-        building_uuid: Building UUID
+        site_uuid: Building UUID
 
     Returns:
         Dict with total, ok, warning, critical counts
@@ -238,7 +238,7 @@ def get_equipment_status_breakdown(building_uuid: str) -> dict:
 
         # Read once and derive health-aware safety buckets.
         # This keeps site status aligned with equipment warning state, not predictor events.
-        result = client.table("equipment").select("status, health_score").eq("building_id", building_uuid).execute()
+        result = client.table("equipment").select("status, health_score").eq("site_id", site_uuid).execute()
 
         equipment = result.data or []
         counts = {"total": len(equipment), "ok": 0, "warning": 0, "critical": 0}
@@ -266,13 +266,13 @@ def get_equipment_status_breakdown(building_uuid: str) -> dict:
         return {"total": 0, "ok": 0, "warning": 0, "critical": 0}
 
 
-def get_prediction_risk_count(building_uuid: str) -> int:
+def get_prediction_risk_count(site_uuid: str) -> int:
     """Get count of active predictions with warning/critical severity for a building.
 
     This is the consolidated risk count (replacing alert_count).
 
     Args:
-        building_uuid: Building UUID
+        site_uuid: Building UUID
 
     Returns:
         Count of active risk predictions
@@ -286,7 +286,7 @@ def get_prediction_risk_count(building_uuid: str) -> int:
         result = (
             client.table("predictions")
             .select("id", count="exact")
-            .eq("building_id", building_uuid)
+            .eq("site_id", site_uuid)
             .eq("status", "active")
             .in_("severity", ["warning", "critical"])
             .execute()
@@ -342,7 +342,7 @@ def db_to_site_dict(
         db_building: Building record from database
         equipment_count: Legacy equipment count (fallback)
         alert_count: Active alert count
-        asset_summary: Asset summary from v_building_asset_summary view (if available)
+        asset_summary: Asset summary from v_site_asset_summary view (if available)
         equipment_status: Equipment status breakdown (ok/warning/critical counts)
     """
     operating_hours = db_building.get("operating_hours") or {"start": "08:00", "end": "18:00"}
@@ -473,10 +473,10 @@ def get_sites_from_supabase(
         return [], False
 
     try:
-        repo = BuildingRepository()
+        repo = SiteRepository()
 
         # Filter by user access if auth context provided
-        # Demo-mode users get full access (no user_building_access grants exist for them)
+        # Demo-mode users get full access (no user_site_access grants exist for them)
         is_demo = user_email and user_email.startswith("demo@")
         if user_email and user_role and not is_demo:
             buildings = repo.get_all_for_user(
@@ -507,8 +507,8 @@ def get_sites_from_supabase(
         sites = []
         for b in buildings:
             # Get equipment and alert counts
-            building_uuid = b.get("id")
-            building_code = b.get("code")
+            site_uuid = b.get("id")
+            site_code = b.get("code")
 
             # ⚠️  IMPORTANT: Read ONLY from Supabase, NOT from JSON fallback
             # Get actual equipment count from equipment table (not from buildings.equipment_count column)
@@ -516,19 +516,17 @@ def get_sites_from_supabase(
                 from app.database.supabase_client import get_supabase_client
 
                 client = get_supabase_client()
-                eq_result = (
-                    client.table("equipment").select("id", count="exact").eq("building_id", building_uuid).execute()
-                )
+                eq_result = client.table("equipment").select("id", count="exact").eq("site_id", site_uuid).execute()
                 eq_count = eq_result.count or 0
             except Exception as e:
-                logger.warning(f"Failed to get equipment count from Supabase for {building_code}: {e}")
+                logger.warning(f"Failed to get equipment count from Supabase for {site_code}: {e}")
                 eq_count = 0
 
             # Count active risks from predictions (consolidated risk system)
-            alert_count = get_prediction_risk_count(building_uuid) if building_uuid else 0
+            alert_count = get_prediction_risk_count(site_uuid) if site_uuid else 0
 
             # Get equipment status breakdown
-            equipment_status = get_equipment_status_breakdown(building_uuid) if building_uuid else None
+            equipment_status = get_equipment_status_breakdown(site_uuid) if site_uuid else None
 
             # Don't use asset_summary - only use actual Supabase equipment count
             sites.append(db_to_site_dict(b, eq_count, alert_count, None, equipment_status))
@@ -545,13 +543,13 @@ def get_site_from_supabase(site_id: str) -> tuple[Optional[dict], bool]:
         return None, False
 
     try:
-        repo = BuildingRepository()
+        repo = SiteRepository()
         building = repo.get_by_id(site_id)
 
         if not building:
             return None, True  # Success but not found
 
-        building_uuid = building.get("id")
+        site_uuid = building.get("id")
 
         # ⚠️  IMPORTANT: Read ONLY from Supabase, NOT from JSON fallback
         # Get actual equipment count from equipment table (not from buildings.equipment_count column)
@@ -559,17 +557,17 @@ def get_site_from_supabase(site_id: str) -> tuple[Optional[dict], bool]:
             from app.database.supabase_client import get_supabase_client
 
             client = get_supabase_client()
-            eq_result = client.table("equipment").select("id", count="exact").eq("building_id", building_uuid).execute()
+            eq_result = client.table("equipment").select("id", count="exact").eq("site_id", site_uuid).execute()
             eq_count = eq_result.count or 0
         except Exception as e:
             logger.warning(f"Failed to get equipment count from Supabase for {site_id}: {e}")
             eq_count = 0
 
         # Count active risks from predictions (consolidated risk system)
-        alert_count = get_prediction_risk_count(building_uuid) if building_uuid else 0
+        alert_count = get_prediction_risk_count(site_uuid) if site_uuid else 0
 
         # Get equipment status breakdown
-        equipment_status = get_equipment_status_breakdown(building_uuid) if building_uuid else None
+        equipment_status = get_equipment_status_breakdown(site_uuid) if site_uuid else None
 
         # Don't use asset_summary - only use actual Supabase equipment count
         return db_to_site_dict(building, eq_count, alert_count, None, equipment_status), True
@@ -688,7 +686,7 @@ async def list_demo_buildings() -> List[DemoBuilding]:
     Scans buildings directory for sites that have equipment files.
     These can be used as demo data sources during onboarding.
     """
-    registry_path = BUILDINGS_DIR / "_registry.json"
+    registry_path = SITES_DIR / "_registry.json"
 
     if not registry_path.exists():
         return []
@@ -697,17 +695,17 @@ async def list_demo_buildings() -> List[DemoBuilding]:
         registry = json.load(f)
 
     demo_buildings = []
-    for site_id in registry.get("active_buildings", []):
-        building_file = BUILDINGS_DIR / site_id / "building.json"
-        equipment_dir = BUILDINGS_DIR / site_id / "equipment"
+    for site_id in registry.get("active_sites", []):
+        site_file = SITES_DIR / site_id / "building.json"
+        equipment_dir = SITES_DIR / site_id / "equipment"
 
-        if not building_file.exists():
+        if not site_file.exists():
             continue
 
         if not equipment_dir.exists():
             continue
 
-        with open(building_file) as f:
+        with open(site_file) as f:
             building = json.load(f)
 
         # Count equipment files
@@ -716,15 +714,15 @@ async def list_demo_buildings() -> List[DemoBuilding]:
             continue  # Skip sites with no demo equipment
 
         metadata = building.get("metadata", {})
-        building_type = metadata.get("type", "office")
+        site_type = metadata.get("type", "office")
 
         demo_buildings.append(
             DemoBuilding(
                 id=site_id,
                 name=building.get("name", site_id),
-                type=building_type,
+                type=site_type,
                 equipment_count=equipment_count,
-                description=f"{equipment_count} equipment, {building_type.replace('_', ' ')}",
+                description=f"{equipment_count} equipment, {site_type.replace('_', ' ')}",
             )
         )
 
@@ -761,7 +759,7 @@ class NextSiteIdResponse(BaseModel):
 
 def _get_next_site_number() -> int:
     """Scan registry to find the highest site number and return next available."""
-    registry_path = BUILDINGS_DIR / "_registry.json"
+    registry_path = SITES_DIR / "_registry.json"
 
     if not registry_path.exists():
         return 1
@@ -770,7 +768,7 @@ def _get_next_site_number() -> int:
         registry = json.load(f)
 
     max_num = 0
-    for site_id in registry.get("active_buildings", []):
+    for site_id in registry.get("active_sites", []):
         # Extract number from site-XXX format
         match = re.match(r"site-(\d+)", site_id)
         if match:
@@ -810,7 +808,7 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
     site_id = f"site-{next_num:03d}"
 
     # 2. Create building directory structure
-    site_dir = BUILDINGS_DIR / site_id
+    site_dir = SITES_DIR / site_id
     equipment_dir = site_dir / "equipment"
 
     try:
@@ -821,7 +819,7 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
         raise HTTPException(status_code=500, detail=f"Failed to create site directory: {e}")
 
     # 3. Create building.json
-    building_data = {
+    site_data = {
         "id": site_id,
         "name": request.name,
         "display_name": request.name,
@@ -850,25 +848,25 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
         },
     }
 
-    building_file = site_dir / "building.json"
+    site_file = site_dir / "building.json"
     try:
-        with open(building_file, "w") as f:
-            json.dump(building_data, f, indent=2)
+        with open(site_file, "w") as f:
+            json.dump(site_data, f, indent=2)
     except Exception as e:
         logger.error(f"Failed to write building.json: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to write building configuration: {e}")
 
     # 4. Update registry
-    registry_path = BUILDINGS_DIR / "_registry.json"
+    registry_path = SITES_DIR / "_registry.json"
     try:
         if registry_path.exists():
             with open(registry_path) as f:
                 registry = json.load(f)
         else:
-            registry = {"active_buildings": [], "default_building": site_id}
+            registry = {"active_sites": [], "default_building": site_id}
 
-        if site_id not in registry.get("active_buildings", []):
-            registry.setdefault("active_buildings", []).append(site_id)
+        if site_id not in registry.get("active_sites", []):
+            registry.setdefault("active_sites", []).append(site_id)
 
         with open(registry_path, "w") as f:
             json.dump(registry, f, indent=2)
@@ -883,7 +881,7 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
 
             client = get_supabase_client()
             if client:
-                client.table("buildings").insert(
+                client.table("sites").insert(
                     {
                         "code": site_id,
                         "name": request.name,
@@ -1032,7 +1030,7 @@ async def is_site_processing_enabled(site_id: str) -> bool:
         from app.database.supabase_client import get_supabase_client
 
         client = get_supabase_client()
-        result = client.table("buildings").select("sentinel_processing_enabled").eq("code", site_id).limit(1).execute()
+        result = client.table("sites").select("sentinel_processing_enabled").eq("code", site_id).limit(1).execute()
         if result.data:
             return result.data[0].get("sentinel_processing_enabled", True) is not False
     except Exception as e:
@@ -1069,7 +1067,7 @@ async def toggle_site_processing(
         from app.database.supabase_client import get_supabase_client
 
         client = get_supabase_client()
-        client.table("buildings").update({"sentinel_processing_enabled": enabled}).eq("code", site_id).execute()
+        client.table("sites").update({"sentinel_processing_enabled": enabled}).eq("code", site_id).execute()
         supabase_ok = True
         logger.info(f"SENTINEL processing {'enabled' if enabled else 'disabled'} for {site_id}")
     except Exception as e:

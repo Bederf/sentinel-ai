@@ -480,8 +480,8 @@ export function ProfitabilityDashboardPage() {
   const buildings = useMemo(() => {
     const buildingMap = new Map<string, string>();
     contracts.forEach((c) => {
-      const id = c.building_id;
-      const name = c.building_name || c.building_id || "Unknown";
+      const id = c.site_id;
+      const name = c.site_name || c.site_id || "Unknown";
       if (id && !buildingMap.has(id)) {
         buildingMap.set(id, name);
       }
@@ -497,7 +497,7 @@ export function ProfitabilityDashboardPage() {
 
     // Filter by building
     if (buildingFilter) {
-      filtered = filtered.filter((c) => c.building_id === buildingFilter);
+      filtered = filtered.filter((c) => c.site_id === buildingFilter);
     }
 
     // Filter by search query
@@ -506,7 +506,7 @@ export function ProfitabilityDashboardPage() {
       filtered = filtered.filter(
         (c) =>
           c.contract_name.toLowerCase().includes(query) ||
-          (c.building_name || c.building_id || "")
+          (c.site_name || c.site_id || "")
             .toLowerCase()
             .includes(query)
       );
@@ -930,7 +930,7 @@ export function ProfitabilityDashboardPage() {
                           className="text-xs"
                           style={{ color: "var(--color-sentinel-text-secondary)" }}
                         >
-                          {contract.building_name || contract.building_id}
+                          {contract.site_name || contract.site_id}
                         </div>
                       </div>
                     </TableCell>

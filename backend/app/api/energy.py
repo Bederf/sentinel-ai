@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from app.config.settings import settings
 from app.database.repositories.energy_consumption_repository import get_energy_consumption_repository
-from app.services.building_loader import BuildingDataLoader
+from app.services.site_loader import BuildingDataLoader
 from app.services.energy_rules_engine import get_energy_rules_engine
 from app.models.energy_rules import BuildingState
 from app.utils.ai_provenance import get_ml_provenance
@@ -23,15 +23,15 @@ logger = logging.getLogger(__name__)
 DATA_DIR = Path(__file__).parent.parent / "data"
 
 # Initialize building loader
-_building_loader = None
+_site_loader = None
 
 
-def get_building_loader():
+def get_site_loader():
     """Get or initialize building loader."""
-    global _building_loader
-    if _building_loader is None:
-        _building_loader = BuildingDataLoader()
-    return _building_loader
+    global _site_loader
+    if _site_loader is None:
+        _site_loader = BuildingDataLoader()
+    return _site_loader
 
 
 def load_equipment() -> list[dict]:
@@ -65,7 +65,7 @@ def load_equipment() -> list[dict]:
     # Map to the format expected by generate_energy_data
     equipment = []
     for eq in all_equipment:
-        building = eq.get("buildings")
+        building = eq.get("sites")
         if building:
             equipment.append(
                 {
@@ -259,8 +259,8 @@ def _estimate_occupancy(dt: datetime, site_id: str) -> int:
         from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
 
         orchestrator = get_lifecycle_orchestrator()
-        if orchestrator.building_state:
-            occupancy = orchestrator.building_state.get("occupancy_percent")
+        if orchestrator.site_state:
+            occupancy = orchestrator.site_state.get("occupancy_percent")
             if occupancy is not None:
                 return int(occupancy)
     except Exception:
@@ -297,8 +297,8 @@ def _estimate_daylight(dt: datetime, site_id: str) -> int:
         from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
 
         orchestrator = get_lifecycle_orchestrator()
-        if orchestrator.building_state:
-            daylight = orchestrator.building_state.get("daylight_factor")
+        if orchestrator.site_state:
+            daylight = orchestrator.site_state.get("daylight_factor")
             if daylight is not None:
                 return int(daylight)
     except Exception:
@@ -338,8 +338,8 @@ def _estimate_chiller_load(site_id: str) -> int:
         from app.services.lifecycle_orchestrator import get_lifecycle_orchestrator
 
         orchestrator = get_lifecycle_orchestrator()
-        if orchestrator.building_state:
-            chiller_load = orchestrator.building_state.get("chiller_load_percent")
+        if orchestrator.site_state:
+            chiller_load = orchestrator.site_state.get("chiller_load_percent")
             if chiller_load is not None:
                 return int(chiller_load)
     except Exception:
@@ -578,13 +578,13 @@ def generate_energy_data(
 
 
 def get_energy_from_supabase(
-    building_id: Optional[str],
+    site_id: Optional[str],
     days: int,
 ) -> tuple[list[EnergyDataPoint], bool]:
     """Get energy consumption data from Supabase.
 
     Args:
-        building_id: Optional building code to filter by
+        site_id: Optional building code to filter by
         days: Number of days of data
 
     Returns:
@@ -598,25 +598,25 @@ def get_energy_from_supabase(
         client = get_supabase_client()
 
         # Get consumption records
-        if building_id:
-            records = repo.get_by_building(building_id, days)
+        if site_id:
+            records = repo.get_by_site(site_id, days)
         else:
-            records = repo.get_all_buildings(days)
+            records = repo.get_all_sites(days)
 
         if not records:
             return [], True
 
         # Get building info from Supabase for names
-        result = client.table("buildings").select("code, name").execute()
-        building_names = {}
+        result = client.table("sites").select("code, name").execute()
+        site_names = {}
         for b in result.data or []:
-            building_names[b.get("code")] = b.get("name") or b.get("code")
+            site_names[b.get("code")] = b.get("name") or b.get("code")
 
         # Convert to EnergyDataPoint format
         data = []
         for record in records:
-            bid = record["building_id"]
-            site_name = building_names.get(bid, bid)
+            bid = record["site_id"]
+            site_name = site_names.get(bid, bid)
 
             data.append(
                 EnergyDataPoint(
@@ -710,7 +710,7 @@ async def get_energy(
 
     try:
         client = get_supabase_client()
-        result = client.table("buildings").select("code, name, sqm").execute()
+        result = client.table("sites").select("code, name, sqm").execute()
         sites = []
         for b in result.data or []:
             sites.append(
@@ -724,10 +724,10 @@ async def get_energy(
         logger.warning(f"Failed to load buildings from Supabase: {e}")
         sites = []
 
-    # If still no sites, use building_loader
+    # If still no sites, use site_loader
     if not sites:
-        building_loader = get_building_loader()
-        buildings = building_loader.get_all_buildings()
+        site_loader = get_site_loader()
+        buildings = site_loader.get_all_sites()
 
         for b in buildings:
             if hasattr(b, "to_dict"):
@@ -762,7 +762,7 @@ async def get_energy(
 
 @router.post("/energy/seed")
 async def seed_energy_data(
-    building_id: Optional[str] = Query(None, description="Building code to seed (default: all)"),
+    site_id: Optional[str] = Query(None, description="Building code to seed (default: all)"),
     days: int = Query(90, ge=1, le=365, description="Number of days to seed"),
 ) -> dict:
     """
@@ -771,7 +771,7 @@ async def seed_energy_data(
     Uses the mock data generator and stores results in Supabase.
 
     Args:
-        building_id: Optional building code (default: all buildings)
+        site_id: Optional building code (default: all buildings)
         days: Number of days to seed (default 90)
 
     Returns:
@@ -784,13 +784,13 @@ async def seed_energy_data(
         client = get_supabase_client()
 
         # Get buildings from Supabase (has all 10 sites)
-        if building_id:
-            result = client.table("buildings").select("id, code, name, sqm").eq("code", building_id).execute()
+        if site_id:
+            result = client.table("sites").select("id, code, name, sqm").eq("code", site_id).execute()
         else:
-            result = client.table("buildings").select("id, code, name, sqm").execute()
+            result = client.table("sites").select("id, code, name, sqm").execute()
 
         if not result.data:
-            raise HTTPException(status_code=404, detail=f"Building {building_id} not found")
+            raise HTTPException(status_code=404, detail=f"Building {site_id} not found")
 
         buildings = result.data
 
@@ -801,30 +801,30 @@ async def seed_energy_data(
         records_created = 0
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=days - 1)
-        building_codes = []
+        site_codes = []
 
         for building in buildings:
-            building_code = building.get("code", building.get("id"))
-            building_codes.append(building_code)
+            site_code = building.get("code", building.get("id"))
+            site_codes.append(site_code)
 
             # Prepare site data for energy generator
             sites = [
                 {
-                    "id": building_code,  # Use building code as site_id
-                    "name": building.get("name", building_code),
+                    "id": site_code,  # Use building code as site_id
+                    "name": building.get("name", site_code),
                     "sqm": building.get("sqm") or 1000,
                 }
             ]
 
             # Generate mock data for this building
-            mock_data = generate_energy_data(sites, equipment, days=days, site_id=building_code)
+            mock_data = generate_energy_data(sites, equipment, days=days, site_id=site_code)
 
             # Batch upsert for efficiency
             batch_records = []
             for point in mock_data:
                 batch_records.append(
                     {
-                        "building_id": point.site_id,
+                        "site_id": point.site_id,
                         "date": point.date,
                         "hvac_kwh": point.hvac_kwh,
                         "lighting_kwh": point.lighting_kwh,
@@ -839,7 +839,7 @@ async def seed_energy_data(
         return {
             "success": True,
             "message": f"Seeded {records_created} energy consumption records",
-            "buildings": building_codes,
+            "sites": site_codes,
             "days": days,
             "date_range": f"{start_date} to {end_date}",
         }
@@ -1045,7 +1045,7 @@ async def get_energy_comparison_summary(
         try:
             # Build current building state from helpers
             now = datetime.now()
-            building_state = BuildingState(
+            site_state = BuildingState(
                 current_hour=now.hour,
                 occupancy_percent=_estimate_occupancy(now, site_id),
                 daylight_lux=_estimate_daylight(now, site_id),
@@ -1069,7 +1069,7 @@ async def get_energy_comparison_summary(
 
             # Evaluate rules
             engine = get_energy_rules_engine(site_id)
-            rules_output = engine.evaluate_rules(building_state, active_modules, baseline_kwh=actual_metrics.total_kwh)
+            rules_output = engine.evaluate_rules(site_state, active_modules, baseline_kwh=actual_metrics.total_kwh)
 
             # Apply rules output to actual metrics to get sentinel metrics
             sentinel_metrics = _apply_rules_output(actual_metrics, rules_output)
@@ -1204,7 +1204,7 @@ async def get_energy_comparison(
             date=datetime.now().date().isoformat(),
         )
         rules_output = engine.evaluate_rules(
-            building_state=sample_state,
+            site_state=sample_state,
             active_modules=["hvac", "dali", "solar"],
             baseline_kwh=total_kwh,
         )
@@ -1425,7 +1425,7 @@ async def get_simulated_energy_costs(
         from app.database.supabase_client import get_supabase_client
 
         supabase = get_supabase_client()
-        EnergyCostService(building_id=site_id)  # validate tariff loads
+        EnergyCostService(site_id=site_id)  # validate tariff loads
 
         # Query energy_cost_summary table for recent days
         end_date = datetime.now().date()
@@ -1437,7 +1437,7 @@ async def get_simulated_energy_costs(
                 .select("*")
                 .gte("date", start_date.isoformat())
                 .lte("date", end_date.isoformat())
-                .eq("building_id", site_id)
+                .eq("site_id", site_id)
                 .order("date", desc=False)
                 .execute()
             )
@@ -1526,7 +1526,7 @@ async def get_simulated_monthly_costs(
     try:
         from app.services.energy_cost_service import EnergyCostService
 
-        cost_svc = EnergyCostService(building_id=site_id)
+        cost_svc = EnergyCostService(site_id=site_id)
 
         # Use current date if not specified
         today = datetime.now()
@@ -1534,7 +1534,7 @@ async def get_simulated_monthly_costs(
         month = month or today.month
 
         monthly_summary = await cost_svc.get_monthly_summary(
-            building_id=site_id,
+            site_id=site_id,
             year=year,
             month=month,
         )
@@ -1586,7 +1586,7 @@ async def get_tariff_info(
     try:
         from app.services.energy_cost_service import EnergyCostService
 
-        cost_svc = EnergyCostService(building_id=site_id)
+        cost_svc = EnergyCostService(site_id=site_id)
 
         if not cost_svc.tariff_data:
             raise ValueError("No tariff data available")
@@ -2245,7 +2245,7 @@ async def get_ai_recommendations(
 
     Example Response:
         {
-            "building_id": "<building-id>",
+            "site_id": "<building-id>",
             "recommendation_count": 4,
             "total_annual_savings_r": 60250.00,
             "total_investment_r": 135000.00,
@@ -2273,7 +2273,7 @@ async def get_ai_recommendations(
         from app.services.ai_recommendation_engine import generate_ai_recommendations
 
         result = await generate_ai_recommendations(
-            building_id=site_id,
+            site_id=site_id,
             lighting_kwh_current=lighting_kwh_current,
             water_liters_current=water_liters_current,
             hvac_cop_current=hvac_cop_current,

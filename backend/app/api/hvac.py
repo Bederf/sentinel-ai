@@ -103,7 +103,7 @@ def get_equipment_from_supabase(site_id: Optional[str] = None, equipment_type: O
     """
     try:
         if site_id:
-            equipment = equipment_repo.get_by_building_code(site_id)
+            equipment = equipment_repo.get_by_site_code(site_id)
         else:
             equipment = equipment_repo.get_all()
 
@@ -131,7 +131,7 @@ def get_zones_from_supabase(site_id: Optional[str] = None, floor: Optional[str] 
     # Tier 1: Supabase
     try:
         if site_id:
-            zones = zone_repo.get_by_building_code(site_id)
+            zones = zone_repo.get_by_site_code(site_id)
         else:
             zones = zone_repo.get_all()
     except Exception as e:
@@ -145,7 +145,7 @@ def get_zones_from_supabase(site_id: Optional[str] = None, floor: Optional[str] 
                 with open(hvac_zones_path) as f:
                     zones = json.load(f)
                 if site_id:
-                    zones = [z for z in zones if z.get("building_id") == site_id]
+                    zones = [z for z in zones if z.get("site_id") == site_id]
                 logger.debug(f"Loaded {len(zones)} zones from hvac_zones.json")
         except Exception as e:
             logger.error(f"Error loading zones from JSON fallback: {e}")

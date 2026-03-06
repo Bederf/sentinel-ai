@@ -19,7 +19,7 @@ try:
     print("=" * 70)
 
     # Get all buildings with their equipment_count
-    result = client.table("buildings").select("code, name, equipment_count").execute()
+    result = client.table("sites").select("code, name, equipment_count").execute()
 
     print("\nBuildings in Supabase:\n")
     for building in result.data:
@@ -30,16 +30,16 @@ try:
     print("=" * 70 + "\n")
 
     for building in result.data:
-        building_code = building["code"]
-        building_id = building["id"]
+        site_code = building["code"]
+        site_id = building["id"]
         stored_count = building.get("equipment_count", 0)
 
         # Count actual equipment
-        eq_result = client.table("equipment").select("id", count="exact").eq("building_id", building_id).execute()
+        eq_result = client.table("equipment").select("id", count="exact").eq("site_id", site_id).execute()
         actual_count = eq_result.count or 0
 
         match = "✓" if stored_count == actual_count else "❌"
-        print(f"{match} {building_code}:")
+        print(f"{match} {site_code}:")
         print(f"   Stored in buildings.equipment_count: {stored_count}")
         print(f"   Actual equipment rows: {actual_count}")
         if stored_count != actual_count:

@@ -19,15 +19,15 @@ class StorageService:
 
     async def upload_document(
         self,
-        building_id: str,
+        site_id: str,
         file: UploadFile,
     ) -> str:
         """Upload document to Supabase Storage.
 
-        Storage path: building-documents/{building_id}/{filename}
+        Storage path: building-documents/{site_id}/{filename}
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             file: UploadFile from FastAPI multipart form
 
         Returns:
@@ -39,7 +39,7 @@ class StorageService:
         content = await file.read()
 
         # Generate storage path
-        storage_path = f"{building_id}/{file.filename}"
+        storage_path = f"{site_id}/{file.filename}"
 
         try:
             # Upload file to Supabase Storage
@@ -64,7 +64,7 @@ class StorageService:
         """Get signed URL for downloading document (for Phase 2).
 
         Args:
-            storage_path: Path within bucket (e.g., "{building_id}/{filename}")
+            storage_path: Path within bucket (e.g., "{site_id}/{filename}")
             expires_in: URL expiration in seconds (default 1 hour)
 
         Returns:

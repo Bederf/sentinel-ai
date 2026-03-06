@@ -1837,7 +1837,7 @@ export function BMSConnectionWizard({
           >
             <div className="p-6">
               <ZoneIngestionWizard
-                buildingId={state.siteId}
+                siteId={state.siteId}
                 onComplete={() => {
                   dispatch({ type: "SET_ZONE_INGESTION_WIZARD", show: false });
                   // Mark zone configuration as complete and trigger parent callback

@@ -27,7 +27,7 @@ interface CorrelationDataPoint {
 
 interface CorrelationResponse {
   date: string;
-  building_id: string;
+  site_id: string;
   hourly_data: CorrelationDataPoint[];
   daily_summary: {
     total_wasted_kwh: number;
@@ -51,7 +51,7 @@ interface Scenario {
 
 interface ScenariosResponse {
   date: string;
-  building_id: string;
+  site_id: string;
   scenarios: Scenario[];
   annual_impact: {
     worst_case_cost_r: number;
@@ -76,7 +76,7 @@ interface Optimization {
 
 interface SavingsResponse {
   date: string;
-  building_id: string;
+  site_id: string;
   baseline: {
     hvac_kwh: number;
     lighting_kwh: number;
@@ -118,9 +118,9 @@ export function OccupancyEnergyCorrelationPage() {
       try {
         setLoading(true);
         const [corrRes, scenRes, savRes] = await Promise.all([
-          fetch('/api/occupancy-energy/correlation?building_id=bld-002'),
-          fetch('/api/occupancy-energy/scenarios?building_id=bld-002'),
-          fetch('/api/occupancy-energy/savings-potential?building_id=bld-002'),
+          fetch('/api/occupancy-energy/correlation?site_id=bld-002'),
+          fetch('/api/occupancy-energy/scenarios?site_id=bld-002'),
+          fetch('/api/occupancy-energy/savings-potential?site_id=bld-002'),
         ]);
 
         if (!corrRes.ok || !scenRes.ok || !savRes.ok) {

@@ -102,12 +102,12 @@ class EnergyRulesEngine:
         self.deployment_date = deployment_date
 
     def evaluate_rules(
-        self, building_state: BuildingState, active_modules: List[str], baseline_kwh: float
+        self, site_state: BuildingState, active_modules: List[str], baseline_kwh: float
     ) -> RulesEngineOutput:
         """Evaluate all 5 rules and calculate total savings.
 
         Args:
-            building_state: Current operational state
+            site_state: Current operational state
             active_modules: List of active module types (e.g., ["solar", "dali", "hvac"])
             baseline_kwh: Baseline energy consumption (kWh) to calculate delta
 
@@ -116,11 +116,11 @@ class EnergyRulesEngine:
         """
         # Evaluate each rule
         rule_results = [
-            self._evaluate_rule_1_chiller_staging(building_state),
-            self._evaluate_rule_2_thermal_precooling(building_state),
-            self._evaluate_rule_3_occupancy_hvac(building_state),
-            self._evaluate_rule_4_daylight_harvesting(building_state, active_modules),
-            self._evaluate_rule_5_peak_load_shaving(building_state),
+            self._evaluate_rule_1_chiller_staging(site_state),
+            self._evaluate_rule_2_thermal_precooling(site_state),
+            self._evaluate_rule_3_occupancy_hvac(site_state),
+            self._evaluate_rule_4_daylight_harvesting(site_state, active_modules),
+            self._evaluate_rule_5_peak_load_shaving(site_state),
         ]
 
         # Sum savings from active rules (capped at 35%)

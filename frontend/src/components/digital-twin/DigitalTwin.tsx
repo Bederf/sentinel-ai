@@ -78,20 +78,20 @@ export function DigitalTwin() {
   const { theme } = useTheme();
 
   // Site selection state - auto-select first site when loaded
-  const [selectedBuildingId, setSelectedBuildingId] = useState<string>('');
+  const [selectedSiteId, setSelectedSiteId] = useState<string>('');
 
   // Load available sites via React Query hook (auto-caching, deduplication)
   const { data: sites = [], isLoading: sitesLoading } = useSitesList();
 
   // Auto-select first available site as default
   useEffect(() => {
-    if (!selectedBuildingId && sites.length > 0) {
-      setSelectedBuildingId(sites[0].id);
+    if (!selectedSiteId && sites.length > 0) {
+      setSelectedSiteId(sites[0].id);
     }
-  }, [sites, selectedBuildingId]);
+  }, [sites, selectedSiteId]);
 
-  const buildingId = selectedBuildingId;
-  const { equipment, loading, error } = useEquipmentData(buildingId);
+  const siteId = selectedSiteId;
+  const { equipment, loading, error } = useEquipmentData(siteId);
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
   const [equipmentTypeFilter, setEquipmentTypeFilter] = useState<string | null>(null);
   const [equipmentDropdownOpen, setEquipmentDropdownOpen] = useState(false);
@@ -132,13 +132,8 @@ export function DigitalTwin() {
 
   useEffect(() => {
     if (dynamicFloors.length > 0 && selectedFloors.size === 0) {
-      // Auto-select ground floor (L0/G) or first floor if available
-      const groundFloor = dynamicFloors.find((f) => f.code === 'L0' || f.code === 'G');
-      if (groundFloor) {
-        setSelectedFloors(new Set([groundFloor.id]));
-      } else {
-        setSelectedFloors(new Set([dynamicFloors[0].id]));
-      }
+      // Auto-select ALL floors so all equipment is visible immediately
+      setSelectedFloors(new Set(dynamicFloors.map(f => f.id)));
     }
   }, [dynamicFloors]);
 
@@ -196,13 +191,13 @@ export function DigitalTwin() {
 
   // Phase 4: Sync with SimulationContext occupancy targets
   const { simulationTime, totalOccupancy } = useOccupancySync({
-    buildingId: buildingId || '',
+    siteId: siteId || '',
     simulationRef,
     enabled: occupancyEnabled,
   });
 
   // Load zone bounds for adaptive equipment positioning
-  const zoneBounds = useZoneBounds(buildingId);
+  const zoneBounds = useZoneBounds(siteId);
 
   const toggleFloor = (floor: number) => {
     const newFloors = new Set(selectedFloors);
@@ -389,8 +384,8 @@ export function DigitalTwin() {
                 Building:
               </label>
               <BuildingSelector
-                value={selectedBuildingId}
-                onChange={setSelectedBuildingId}
+                value={selectedSiteId}
+                onChange={setSelectedSiteId}
                 sites={sites}
                 disabled={sitesLoading}
               />

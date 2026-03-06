@@ -35,8 +35,8 @@ export interface Equipment {
 }
 
 export interface BuildingEquipmentResponse {
-  building_id: string;
-  building_name: string;
+  site_id: string;
+  site_name: string;
   total_assets: number;
   equipment: Equipment[];
 }
@@ -73,14 +73,14 @@ export interface ZoneCentroidResponse {
 }
 
 export interface AllZoneCentroidsResponse {
-  building_id: string;
+  site_id: string;
   zone_count: number;
   centroid_count: number;
   centroids: Record<string, ZoneCentroid>;
 }
 
 export interface DeskStatsResponse {
-  building_id: string;
+  site_id: string;
   total_desks: number;
   total_zones: number;
   desks_per_zone: Record<string, number>;
@@ -142,8 +142,8 @@ export const sitesApi = {
   /**
    * Get equipment for a building
    */
-  getEquipment: (buildingId: string) =>
-    fetchApi<BuildingEquipmentResponse>(`/api/buildings/${buildingId}/equipment`),
+  getEquipment: (siteId: string) =>
+    fetchApi<BuildingEquipmentResponse>(`/api/buildings/${siteId}/equipment`),
 
   /**
    * Get equipment by code
@@ -157,39 +157,39 @@ export const sitesApi = {
    * Get all desks for a building
    * Optionally filtered by floor
    *
-   * @param buildingId - Building UUID
+   * @param siteId - Building UUID
    * @param floor - Optional floor code filter (e.g., "L0", "L1", "L2")
    * @returns List of desk records with positions and context
    */
-  getDesks: (buildingId: string, floor?: string) => {
+  getDesks: (siteId: string, floor?: string) => {
     const url = floor
-      ? `/api/buildings/${buildingId}/desks?floor=${encodeURIComponent(floor)}`
-      : `/api/buildings/${buildingId}/desks`;
+      ? `/api/buildings/${siteId}/desks?floor=${encodeURIComponent(floor)}`
+      : `/api/buildings/${siteId}/desks`;
     return fetchApi<Desk[]>(url);
   },
 
   /**
    * Get all desks in a specific zone
    *
-   * @param buildingId - Building UUID
+   * @param siteId - Building UUID
    * @param zoneId - Zone ID (e.g., "Zone-L1-A")
    * @returns List of desks in the zone
    */
-  getDesksByZone: (buildingId: string, zoneId: string) =>
-    fetchApi<Desk[]>(`/api/buildings/${buildingId}/desks/zones/${encodeURIComponent(zoneId)}`),
+  getDesksByZone: (siteId: string, zoneId: string) =>
+    fetchApi<Desk[]>(`/api/buildings/${siteId}/desks/zones/${encodeURIComponent(zoneId)}`),
 
   /**
    * Get centroid for a specific zone
    *
    * Used for calculating zone center position from desk positions.
    *
-   * @param buildingId - Building UUID
+   * @param siteId - Building UUID
    * @param zoneId - Zone ID (e.g., "Zone-L1-A")
    * @returns Zone centroid with x, z coordinates and desk count
    */
-  getZoneCentroid: (buildingId: string, zoneId: string) =>
+  getZoneCentroid: (siteId: string, zoneId: string) =>
     fetchApi<ZoneCentroidResponse>(
-      `/api/buildings/${buildingId}/desks/zones/${encodeURIComponent(zoneId)}/centroid`
+      `/api/buildings/${siteId}/desks/zones/${encodeURIComponent(zoneId)}/centroid`
     ),
 
   /**
@@ -198,11 +198,11 @@ export const sitesApi = {
    * Efficient operation: returns pre-calculated centroids for all zones.
    * ~80x smaller payload than loading all desks, ideal for Digital Twin.
    *
-   * @param buildingId - Building UUID
+   * @param siteId - Building UUID
    * @returns Map of zone_id → centroid coordinates
    */
-  getZoneCentroids: (buildingId: string) =>
-    fetchApi<AllZoneCentroidsResponse>(`/api/buildings/${buildingId}/zone-ingestion/centroids`),
+  getZoneCentroids: (siteId: string) =>
+    fetchApi<AllZoneCentroidsResponse>(`/api/buildings/${siteId}/zone-ingestion/centroids`),
 
   /**
    * Get desk statistics for a building
@@ -213,23 +213,23 @@ export const sitesApi = {
    * - Desks per floor
    * - Distribution by context
    *
-   * @param buildingId - Building UUID
+   * @param siteId - Building UUID
    * @returns Desk statistics
    */
-  getDeskStats: (buildingId: string) =>
-    fetchApi<DeskStatsResponse>(`/api/buildings/${buildingId}/desks/stats`),
+  getDeskStats: (siteId: string) =>
+    fetchApi<DeskStatsResponse>(`/api/buildings/${siteId}/desks/stats`),
 
   // ============= Zone Ingestion Methods =============
 
   /**
    * Ingest zone configuration for a building
    *
-   * @param buildingId - Building UUID
+   * @param siteId - Building UUID
    * @param request - Object with zones array
    * @returns Ingestion response
    */
-  ingestZones: (buildingId: string, request: { zones: (Omit<ZoneCentroidResponse, 'centroid'> & Omit<ZoneCentroid, 'centroid'> & { zone_id: string; zone_name: string; floor: string; zone_type: string; typical_occupancy?: number; area_sqm?: number; zone_letter?: string })[] }) =>
-    fetchApi(`/api/buildings/${buildingId}/zone-ingestion/zones`, {
+  ingestZones: (siteId: string, request: { zones: (Omit<ZoneCentroidResponse, 'centroid'> & Omit<ZoneCentroid, 'centroid'> & { zone_id: string; zone_name: string; floor: string; zone_type: string; typical_occupancy?: number; area_sqm?: number; zone_letter?: string })[] }) =>
+    fetchApi(`/api/buildings/${siteId}/zone-ingestion/zones`, {
       method: 'POST',
       body: JSON.stringify(request),
     }),
@@ -237,12 +237,12 @@ export const sitesApi = {
   /**
    * Ingest desk configuration for a building
    *
-   * @param buildingId - Building UUID
+   * @param siteId - Building UUID
    * @param request - Object with desks array
    * @returns Ingestion response
    */
-  ingestDesks: (buildingId: string, request: { desks: (Desk & { coordinates: { x: number; y: number; z: number } })[] }) =>
-    fetchApi(`/api/buildings/${buildingId}/zone-ingestion/desks`, {
+  ingestDesks: (siteId: string, request: { desks: (Desk & { coordinates: { x: number; y: number; z: number } })[] }) =>
+    fetchApi(`/api/buildings/${siteId}/zone-ingestion/desks`, {
       method: 'POST',
       body: JSON.stringify(request),
     }),

@@ -17,7 +17,7 @@ from app.mcp.equipment_server import (
 from app.mcp.simbiot_server import (
     SIMBIOTMCPServer,
     # Building/Asset tools
-    get_buildings_tool,
+    get_sites_tool,
     get_assets_tool,
     get_asset_detail_tool,
     get_devices_tool,
@@ -49,7 +49,7 @@ __all__ = [
     # SIMBIOT MCP
     "SIMBIOTMCPServer",
     # Building/Asset tools
-    "get_buildings_tool",
+    "get_sites_tool",
     "get_assets_tool",
     "get_asset_detail_tool",
     "get_devices_tool",

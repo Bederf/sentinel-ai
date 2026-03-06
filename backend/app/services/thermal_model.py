@@ -207,7 +207,7 @@ def get_gateway_theatre_params() -> Dict:
         "thermal_mass": 0.8,  # High thermal mass (concrete construction)
         "insulation_factor": 0.6,  # Moderate insulation
         "internal_heat_gain": 0.5,  # Moderate internal heat from people/equipment
-        "building_type": "shopping_mall",
+        "site_type": "shopping_mall",
         "floor_area_sqm": 85000,
         "occupancy": 1200,
     }
@@ -224,7 +224,7 @@ def get_sandton_city_params() -> Dict:
         "thermal_mass": 0.7,
         "insulation_factor": 0.7,  # Better insulation (modern building)
         "internal_heat_gain": 0.6,  # Higher internal heat (more equipment)
-        "building_type": "office_tower",
+        "site_type": "office_tower",
         "floor_area_sqm": 65000,
         "occupancy": 800,
     }
@@ -241,7 +241,7 @@ def get_centurion_mall_params() -> Dict:
         "thermal_mass": 0.9,  # Very high thermal mass
         "insulation_factor": 0.5,  # Poorer insulation (older building)
         "internal_heat_gain": 0.7,  # High internal heat
-        "building_type": "mixed_use",
+        "site_type": "mixed_use",
         "floor_area_sqm": 95000,
         "occupancy": 1500,
     }

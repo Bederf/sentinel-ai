@@ -22,7 +22,7 @@ from app.models.optimization import (
     OptimizationHistoryEntry,
 )
 from app.models.module_registry import ModuleType
-from app.database.repositories import BuildingRepository
+from app.database.repositories import SiteRepository
 from app.config.settings import settings
 from app.services.optimization_tier_router import get_tier_router
 from app.services.module_registry_service import module_registry
@@ -423,7 +423,7 @@ def load_sites():
     # Try Supabase first
     if not settings.use_json_storage:
         try:
-            repo = BuildingRepository()
+            repo = SiteRepository()
             buildings = repo.get_all()
             if buildings:
                 # Convert database format to expected format
@@ -461,7 +461,7 @@ def save_sites(sites: List[Dict[str, Any]]):
     # Try Supabase first
     if not settings.use_json_storage:
         try:
-            repo = BuildingRepository()
+            repo = SiteRepository()
             for site in sites:
                 site_id = site.get("id")
                 # Build update data (only optimization-related fields that exist in schema)
@@ -848,7 +848,7 @@ async def analyze_load_shedding(request: LoadSheddingAnalyzeRequest) -> Dict[str
         )
 
         # Call AI optimizer service with load shedding awareness
-        recommendation = await get_ai_optimizer().analyze_building_load_shedding(
+        recommendation = await get_ai_optimizer().analyze_site_load_shedding(
             site_id=request.site_id,
             load_shedding_stage=request.load_shedding_stage,
             current_conditions=request.current_conditions,

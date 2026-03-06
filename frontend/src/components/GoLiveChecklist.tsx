@@ -33,7 +33,7 @@ import type {
 } from '@/lib/api';
 
 interface GoLiveChecklistProps {
-  buildingId: string;
+  siteId: string;
   onStatusChange?: (status: BuildingStatus) => void;
 }
 
@@ -194,7 +194,7 @@ const categoryLabels: Record<string, string> = {
   configuration: "Configuration",
 };
 
-export function GoLiveChecklist({ buildingId, onStatusChange }: GoLiveChecklistProps) {
+export function GoLiveChecklist({ siteId, onStatusChange }: GoLiveChecklistProps) {
   // State
   const [checklist, setChecklist] = useState<ValidationChecklist | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -213,7 +213,7 @@ export function GoLiveChecklist({ buildingId, onStatusChange }: GoLiveChecklistP
       // Add delay to stagger requests and avoid 429 rate limiting
       // Increased to 2s to prevent concurrent request bursts
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      const data = await validationApi.getChecklist(buildingId);
+      const data = await validationApi.getChecklist(siteId);
       setChecklist(data);
     } catch (err: any) {
       // Retry on rate limit with exponential backoff
@@ -221,7 +221,7 @@ export function GoLiveChecklist({ buildingId, onStatusChange }: GoLiveChecklistP
         console.warn("Rate limited, retrying in 3 seconds...");
         await new Promise((resolve) => setTimeout(resolve, 3000));
         try {
-          const data = await validationApi.getChecklist(buildingId);
+          const data = await validationApi.getChecklist(siteId);
           setChecklist(data);
         } catch (retryErr) {
           console.error("Retry failed:", retryErr);
@@ -234,7 +234,7 @@ export function GoLiveChecklist({ buildingId, onStatusChange }: GoLiveChecklistP
     } finally {
       setIsLoading(false);
     }
-  }, [buildingId]);
+  }, [siteId]);
 
   // Initial load
   useEffect(() => {
@@ -248,7 +248,7 @@ export function GoLiveChecklist({ buildingId, onStatusChange }: GoLiveChecklistP
     setActivationResult(null);
 
     try {
-      const data = await validationApi.validate(buildingId);
+      const data = await validationApi.validate(siteId);
       setChecklist(data);
       onStatusChange?.(data.status);
     } catch (err) {
@@ -265,7 +265,7 @@ export function GoLiveChecklist({ buildingId, onStatusChange }: GoLiveChecklistP
     setError(null);
 
     try {
-      const result = await validationApi.activate(buildingId);
+      const result = await validationApi.activate(siteId);
       setActivationResult(result);
       setShowConfirmModal(false);
 
@@ -344,7 +344,7 @@ export function GoLiveChecklist({ buildingId, onStatusChange }: GoLiveChecklistP
                 className="font-semibold text-base"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                {checklist.building_name || `Building ${buildingId}`}
+                {checklist.site_name || `Building ${siteId}`}
               </h3>
               <div className="flex items-center gap-2 mt-1">
                 <StatusBadge status={checklist.status} />
@@ -548,7 +548,7 @@ export function GoLiveChecklist({ buildingId, onStatusChange }: GoLiveChecklistP
       <ConfirmationModal
         isOpen={showConfirmModal}
         title="Activate Building"
-        message={`Are you sure you want to activate "${checklist.building_name || buildingId}"? This will enable live data collection and alerts for this building.`}
+        message={`Are you sure you want to activate "${checklist.site_name || siteId}"? This will enable live data collection and alerts for this building.`}
         confirmText="Activate"
         cancelText="Cancel"
         isLoading={isActivating}

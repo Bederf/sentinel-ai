@@ -59,7 +59,7 @@ vi.mock('../../lib/simulationApi', () => ({
 vi.mock('@/lib/api', () => ({
   default: {
     getSites: vi.fn(() => Promise.resolve([
-      { id: 'site-002', name: 'Sandton Site', building_code: 'S002' },
+      { id: 'site-002', name: 'Sandton Site', site_code: 'S002' },
     ])),
   },
 }));

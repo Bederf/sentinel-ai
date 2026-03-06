@@ -51,14 +51,14 @@ class ComfortComplaintHandler:
             from app.database.repositories.zone_repository import ZoneRepository
 
             # Build building UUID -> code lookup
-            building_code_map = {}
+            site_code_map = {}
             try:
                 from app.database.supabase_client import get_supabase_client
 
                 client = get_supabase_client()
-                bld_resp = client.table("buildings").select("id, code").execute()
+                bld_resp = client.table("sites").select("id, code").execute()
                 if bld_resp.data:
-                    building_code_map = {b["id"]: b["code"] for b in bld_resp.data}
+                    site_code_map = {b["id"]: b["code"] for b in bld_resp.data}
             except Exception:
                 pass
 
@@ -68,8 +68,8 @@ class ComfortComplaintHandler:
             if all_desks:
                 for d in all_desks:
                     # Populate building field from UUID lookup
-                    if not d.get("building") and d.get("building_id"):
-                        d["building"] = building_code_map.get(d["building_id"], "")
+                    if not d.get("building") and d.get("site_id"):
+                        d["building"] = site_code_map.get(d["site_id"], "")
                     desk = Desk.from_dict(d)
                     self._desks[desk.desk_id] = desk
                     # Create normalized ID mappings for flexible lookup

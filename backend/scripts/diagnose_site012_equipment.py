@@ -12,10 +12,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
     from app.database.supabase_client import get_supabase_client
-    from app.database.repositories import BuildingRepository
+    from app.database.repositories import SiteRepository
 
     client = get_supabase_client()
-    building_repo = BuildingRepository()
+    building_repo = SiteRepository()
 
     print("=" * 70)
     print("SITE-012 EQUIPMENT DIAGNOSTIC")
@@ -28,23 +28,23 @@ try:
         print("❌ Building not found!")
         sys.exit(1)
 
-    building_id = building["id"]
-    print(f"✓ Building UUID: {building_id}")
+    site_id = building["id"]
+    print(f"✓ Building UUID: {site_id}")
     print(f"✓ Building Name: {building['name']}")
 
     # Step 2: Query equipment directly from Supabase
     print("\n[2] Querying equipment table directly...")
     equipment_result = (
         client.table("equipment")
-        .select("id, code, name, status, health_score, type, building_id", count="exact")
-        .eq("building_id", building_id)
+        .select("id, code, name, status, health_score, type, site_id", count="exact")
+        .eq("site_id", site_id)
         .execute()
     )
 
     print(f"✓ Total equipment in table: {equipment_result.count}")
 
-    # Step 3: Use BuildingRepository.get_equipment()
-    print("\n[3] Using BuildingRepository.get_equipment()...")
+    # Step 3: Use SiteRepository.get_equipment()
+    print("\n[3] Using SiteRepository.get_equipment()...")
     equipment_list = building_repo.get_equipment("site-012")
     print(f"✓ Equipment from repository: {len(equipment_list)}")
 

@@ -71,7 +71,7 @@ class DispatchPriority:
     reason: str = ""
     solar_available_kw: float = 0.0
     bess_soc_pct: float = 0.0
-    building_load_kw: float = 0.0
+    site_load_kw: float = 0.0
     load_shedding_active: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
@@ -83,7 +83,7 @@ class DispatchPriority:
             "reason": self.reason,
             "solar_available_kw": round(self.solar_available_kw, 0),
             "bess_soc_pct": round(self.bess_soc_pct, 1),
-            "building_load_kw": round(self.building_load_kw, 0),
+            "site_load_kw": round(self.site_load_kw, 0),
             "load_shedding_active": self.load_shedding_active,
         }
 
@@ -100,7 +100,7 @@ class GeneratorAssessment:
     bess_runtime_hours: float = 0.0  # How long BESS can sustain at current load
     ls_remaining_hours: float = 0.0  # Hours until load shedding ends
     solar_forecast_kw: float = 0.0  # Expected solar for remaining LS window
-    building_load_kw: float = 0.0
+    site_load_kw: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -112,7 +112,7 @@ class GeneratorAssessment:
             "bess_runtime_hours": round(self.bess_runtime_hours, 2),
             "ls_remaining_hours": round(self.ls_remaining_hours, 2),
             "solar_forecast_kw": round(self.solar_forecast_kw, 0),
-            "building_load_kw": round(self.building_load_kw, 0),
+            "site_load_kw": round(self.site_load_kw, 0),
         }
 
 
@@ -160,7 +160,7 @@ class GeneratorEvent:
     reason: str
     bess_soc_pct: float = 0.0
     solar_gen_kw: float = 0.0
-    building_load_kw: float = 0.0
+    site_load_kw: float = 0.0
     load_shedding_stage: int = 0
     fuel_litres_used: float = 0.0
     duration_hours: float = 0.0
@@ -173,7 +173,7 @@ class GeneratorEvent:
             "reason": self.reason,
             "bess_soc_pct": round(self.bess_soc_pct, 1),
             "solar_gen_kw": round(self.solar_gen_kw, 0),
-            "building_load_kw": round(self.building_load_kw, 0),
+            "site_load_kw": round(self.site_load_kw, 0),
         }
         if self.load_shedding_stage > 0:
             result["load_shedding_stage"] = self.load_shedding_stage
@@ -303,7 +303,7 @@ class SolarGeneratorCoordinator:
                             ),
                             bess_soc_pct=soc,
                             solar_gen_kw=solar_gen,
-                            building_load_kw=critical_load,
+                            site_load_kw=critical_load,
                             load_shedding_stage=ls_stage,
                             duration_hours=ls_duration,
                         )
@@ -323,7 +323,7 @@ class SolarGeneratorCoordinator:
                             ),
                             bess_soc_pct=soc,
                             solar_gen_kw=solar_gen,
-                            building_load_kw=critical_load,
+                            site_load_kw=critical_load,
                             load_shedding_stage=ls_stage,
                             fuel_litres_used=fuel,
                             duration_hours=gen_hours,
@@ -337,7 +337,7 @@ class SolarGeneratorCoordinator:
                             reason=f"BESS depleted during Stage {ls_stage}; generator started",
                             bess_soc_pct=self.BESS_MIN_SOC_PCT + 5,
                             solar_gen_kw=solar_gen * 0.5,
-                            building_load_kw=critical_load,
+                            site_load_kw=critical_load,
                             load_shedding_stage=ls_stage,
                         )
                     )
@@ -349,7 +349,7 @@ class SolarGeneratorCoordinator:
                             reason=f"Load shedding ended; generator stopped after {gen_hours:.1f}h",
                             bess_soc_pct=self.BESS_MIN_SOC_PCT,
                             solar_gen_kw=0,
-                            building_load_kw=critical_load,
+                            site_load_kw=critical_load,
                             load_shedding_stage=ls_stage,
                             fuel_litres_used=fuel,
                             duration_hours=gen_hours,
@@ -393,14 +393,14 @@ class SolarGeneratorCoordinator:
         else:
             bess_soc = rng.uniform(15, 35)  # Evening discharge
 
-        building_load = self.DEFAULT_BUILDING_LOAD_KW * rng.uniform(0.85, 1.15)
+        site_load = self.DEFAULT_BUILDING_LOAD_KW * rng.uniform(0.85, 1.15)
         ls_active = False  # Simulated -- no active LS
 
         # Determine active source
-        if solar_kw >= building_load:
+        if solar_kw >= site_load:
             active = DispatchSource.SOLAR.value
-            reason = f"Solar ({solar_kw:.0f} kW) exceeds building load ({building_load:.0f} kW)"
-        elif solar_kw + self.BESS_RATED_POWER_KW >= building_load and bess_soc > self.BESS_MIN_SOC_PCT:
+            reason = f"Solar ({solar_kw:.0f} kW) exceeds building load ({site_load:.0f} kW)"
+        elif solar_kw + self.BESS_RATED_POWER_KW >= site_load and bess_soc > self.BESS_MIN_SOC_PCT:
             active = DispatchSource.BESS.value
             reason = f"Solar + BESS supplementing load; BESS at {bess_soc:.0f}% SOC"
         elif not ls_active:
@@ -435,7 +435,7 @@ class SolarGeneratorCoordinator:
             reason=reason,
             solar_available_kw=solar_kw,
             bess_soc_pct=bess_soc,
-            building_load_kw=building_load,
+            site_load_kw=site_load,
             load_shedding_active=ls_active,
         )
 
@@ -454,7 +454,7 @@ class SolarGeneratorCoordinator:
         rng = random.Random(hash(f"{site_id}-gen-{now.strftime('%Y%m%d%H')}"))
 
         # Simulate current state
-        building_load = self.DEFAULT_BUILDING_LOAD_KW * rng.uniform(0.85, 1.15)
+        site_load = self.DEFAULT_BUILDING_LOAD_KW * rng.uniform(0.85, 1.15)
         bess_soc = rng.uniform(35, 65)
 
         # Solar generation
@@ -470,7 +470,7 @@ class SolarGeneratorCoordinator:
         ls_remaining_hours = 0.0
 
         # BESS runtime calculation
-        critical_load = building_load * self.CRITICAL_LOAD_PCT
+        critical_load = site_load * self.CRITICAL_LOAD_PCT
         net_load = max(0, critical_load - solar_kw)
         usable_kwh = self.BESS_CAPACITY_KWH * (bess_soc - self.BESS_MIN_SOC_PCT) / 100.0
         bess_runtime = usable_kwh / net_load if net_load > 0 else 999.0
@@ -503,7 +503,7 @@ class SolarGeneratorCoordinator:
             bess_runtime_hours=min(bess_runtime, 99.9),
             ls_remaining_hours=ls_remaining_hours,
             solar_forecast_kw=solar_kw,
-            building_load_kw=building_load,
+            site_load_kw=site_load,
         )
 
     def calculate_diesel_avoidance(

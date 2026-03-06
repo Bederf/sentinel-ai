@@ -49,7 +49,7 @@
           "floor": "B1",
           "zone_letter": "LAU",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.908792",
@@ -101,7 +101,7 @@
           "floor": "L2",
           "zone_letter": "001",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.908856",
@@ -141,7 +141,7 @@
           "floor": "L3",
           "zone_letter": "ICU",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.909009",
@@ -181,7 +181,7 @@
           "floor": "L3",
           "zone_letter": "TH1",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.909101",
@@ -221,7 +221,7 @@
           "floor": "L3",
           "zone_letter": "TH2",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.909256",
@@ -261,7 +261,7 @@
           "floor": "L3",
           "zone_letter": "TH3",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.909386",
@@ -313,7 +313,7 @@
           "floor": "L4",
           "zone_letter": "001",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.909411",
@@ -365,7 +365,7 @@
           "floor": "L5",
           "zone_letter": "001",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.909435",
@@ -417,7 +417,7 @@
           "floor": "L6",
           "zone_letter": "001",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.909505",
@@ -469,7 +469,7 @@
           "floor": "L7",
           "zone_letter": "001",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.909529",
@@ -521,7 +521,7 @@
           "floor": "L8",
           "zone_letter": "001",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.909553",
@@ -573,7 +573,7 @@
           "floor": "L9",
           "zone_letter": "001",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.909577",
@@ -625,7 +625,7 @@
           "floor": "B1",
           "zone_letter": "001",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.909620",
@@ -677,7 +677,7 @@
           "floor": "B1",
           "zone_letter": "002",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.909655",
@@ -727,7 +727,7 @@
           "floor": "B1",
           "zone_letter": "001",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.913250",
@@ -765,7 +765,7 @@
           "floor": "L1",
           "zone_letter": "001",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.913500",
@@ -803,7 +803,7 @@
           "floor": "L1",
           "zone_letter": "002",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.909965",
@@ -843,7 +843,7 @@
           "floor": "R",
           "zone_letter": "001",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.910124",
@@ -883,7 +883,7 @@
           "floor": "R",
           "zone_letter": "002",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.910221",
@@ -921,7 +921,7 @@
           "floor": "L3",
           "zone_letter": "001",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.910282",
@@ -959,7 +959,7 @@
           "floor": "L3",
           "zone_letter": "002",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.910332",
@@ -999,7 +999,7 @@
           "floor": "B1",
           "zone_letter": "001",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.910814",
@@ -1039,7 +1039,7 @@
           "floor": "B1",
           "zone_letter": "002",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.910904",
@@ -1079,7 +1079,7 @@
           "floor": "B1",
           "zone_letter": "003",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.910995",
@@ -1119,7 +1119,7 @@
           "floor": "B1",
           "zone_letter": "CHW",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.913375",
@@ -1159,7 +1159,7 @@
           "floor": "B1",
           "zone_letter": "CW1",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.913408",
@@ -1199,7 +1199,7 @@
           "floor": "L3",
           "zone_letter": "001",
           "zone_type": "open_office",
-          "building_id": "site-005"
+          "site_id": "site-005"
         }
       },
       "created_at": "2026-02-23T17:27:49.913558",

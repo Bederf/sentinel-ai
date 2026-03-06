@@ -169,7 +169,7 @@ async def clear_faults(equipment_id: str):
 
 
 @router.post("/control/speed")
-async def set_simulation_speed(speed: float = Query(..., description="Simulation speed multiplier", ge=0.1, le=10.0)):
+async def set_simulation_speed(speed: float = Query(..., description="Simulation speed multiplier", ge=0.1, le=1000.0)):
     """Set simulation speed multiplier."""
     try:
         orchestrator = _get_orchestrator()
@@ -215,12 +215,12 @@ async def start_simulation():
 
         # Register in simulation store for checkpoint persistence
         task_id = str(uuid.uuid4())
-        store = get_simulation_store(orchestrator.building_id)
+        store = get_simulation_store(orchestrator.site_id)
         store.update_task_progress(
             task_id,
             {
                 "task_id": task_id,
-                "site_id": orchestrator.building_id,
+                "site_id": orchestrator.site_id,
                 "scenario": "sentinel_annual",
                 "simulation_type": "lifecycle",
                 "status": "running",
@@ -594,29 +594,27 @@ async def trigger_demo_warnings(
     prediction_generator = get_prediction_generator()
 
     # Get building UUID from code
-    building_resp = client.table("buildings").select("id, name, code").eq("code", site_code).execute()
+    building_resp = client.table("sites").select("id, name, code").eq("code", site_code).execute()
     if not building_resp.data:
         raise HTTPException(status_code=404, detail=f"Building {site_code} not found")
 
     building = building_resp.data[0]
-    building_id = building["id"]
-    building_name = building["name"]
+    site_id = building["id"]
+    site_name = building["name"]
 
-    logger.info(f"Demo: Triggering {count} warnings for {building_name} ({site_code})")
+    logger.info(f"Demo: Triggering {count} warnings for {site_name} ({site_code})")
 
     # Get healthy equipment from building (health >= 70)
     equipment_resp = (
         client.table("equipment")
         .select("id, code, name, type, health_score")
-        .eq("building_id", building_id)
+        .eq("site_id", site_id)
         .gte("health_score", 70)
         .execute()
     )
 
     if not equipment_resp.data:
-        raise HTTPException(
-            status_code=400, detail=f"No healthy equipment found in {building_name} to trigger warnings"
-        )
+        raise HTTPException(status_code=400, detail=f"No healthy equipment found in {site_name} to trigger warnings")
 
     # Select random subset
     available = equipment_resp.data
@@ -624,7 +622,7 @@ async def trigger_demo_warnings(
     selected_equipment = random.sample(available, selected_count)
 
     results = {
-        "building": building_name,
+        "building": site_name,
         "site_code": site_code,
         "equipment_affected": [],
         "alerts_created": 0,
@@ -657,7 +655,7 @@ async def trigger_demo_warnings(
             # Create alert
             alert_result = alert_service.create_alert_for_equipment(
                 equipment_id=eq["id"],
-                building_id=building_id,
+                site_id=site_id,
                 severity="warning",
                 message=f"Health score dropped from {old_health}% to {new_health}%. Maintenance recommended.",
                 alert_type="health_degradation",
@@ -726,7 +724,7 @@ async def trigger_demo_warnings(
                     "equipment_id": eq.get("code", eq["id"]),
                     "equipment_type": eq.get("type", "unknown"),
                     "health_score": eq_info["new_health"],
-                    "building_id": site_code,
+                    "site_id": site_code,
                 },
                 suggested_action={
                     "type": "schedule_maintenance",
@@ -757,7 +755,7 @@ async def trigger_demo_warnings(
 
     return {
         "success": True,
-        "message": f"Triggered {len(results['equipment_affected'])} warning states for {building_name}",
+        "message": f"Triggered {len(results['equipment_affected'])} warning states for {site_name}",
         "results": results,
         "timestamp": datetime.now().isoformat(),
     }
@@ -787,18 +785,18 @@ async def reset_demo_to_healthy(
     prediction_repo = PredictionRepository()
 
     # Get building UUID from code
-    building_resp = client.table("buildings").select("id, name, code").eq("code", site_code).execute()
+    building_resp = client.table("sites").select("id, name, code").eq("code", site_code).execute()
     if not building_resp.data:
         raise HTTPException(status_code=404, detail=f"Building {site_code} not found")
 
     building = building_resp.data[0]
-    building_id = building["id"]
-    building_name = building["name"]
+    site_id = building["id"]
+    site_name = building["name"]
 
-    logger.info(f"Demo: Resetting {building_name} ({site_code}) to healthy state")
+    logger.info(f"Demo: Resetting {site_name} ({site_code}) to healthy state")
 
     results = {
-        "building": building_name,
+        "building": site_name,
         "site_code": site_code,
         "equipment_reset": 0,
         "alerts_resolved": 0,
@@ -812,7 +810,7 @@ async def reset_demo_to_healthy(
 
     # Reset all equipment health to 92 and status to 'normal'
     try:
-        equipment_resp = client.table("equipment").select("id").eq("building_id", building_id).execute()
+        equipment_resp = client.table("equipment").select("id").eq("site_id", site_id).execute()
 
         if equipment_resp.data:
             for eq in equipment_resp.data:
@@ -832,7 +830,7 @@ async def reset_demo_to_healthy(
 
     # Resolve all active alerts for building
     try:
-        resolved_alerts = alert_service.resolve_alerts_for_building(building_id)
+        resolved_alerts = alert_service.resolve_alerts_for_site(site_id)
         results["alerts_resolved"] = resolved_alerts
     except Exception as e:
         error_msg = f"Failed to resolve alerts: {str(e)}"
@@ -841,7 +839,7 @@ async def reset_demo_to_healthy(
 
     # Resolve all active predictions for building
     try:
-        active_predictions = prediction_repo.get_active_by_building(building_id)
+        active_predictions = prediction_repo.get_active_by_site(site_id)
         for pred in active_predictions:
             prediction_repo.resolve(pred.get("code", pred.get("id")))
             results["predictions_resolved"] += 1
@@ -870,7 +868,7 @@ async def reset_demo_to_healthy(
 
     return {
         "success": True,
-        "message": f"Reset {building_name} to healthy state",
+        "message": f"Reset {site_name} to healthy state",
         "results": results,
         "timestamp": datetime.now().isoformat(),
     }

@@ -21,8 +21,8 @@ class ImageExtractionRequest(BaseModel):
     """Request to extract building config from floor plan image."""
 
     image_base64: str = Field(..., description="Base64-encoded floor plan image")
-    building_code: str = Field(..., description="Building code (e.g., site-002)")
-    building_name: str = Field(..., description="Building name (e.g., Sandton City)")
+    site_code: str = Field(..., description="Building code (e.g., site-002)")
+    site_name: str = Field(..., description="Building name (e.g., Sandton City)")
     floors_count: int = Field(..., ge=1, le=50, description="Expected number of floors")
     skip_sanitization: bool = Field(
         default=False,
@@ -63,8 +63,8 @@ class ZoneDefinition(BaseModel):
 class BuildingConfigResponse(BaseModel):
     """Extracted building configuration for SIMBIOT wizard."""
 
-    building_code: str = Field(..., description="Building code")
-    building_name: str = Field(..., description="Building name")
+    site_code: str = Field(..., description="Building code")
+    site_name: str = Field(..., description="Building name")
     floors: list[FloorDefinition] = Field(..., description="Floor definitions")
     equipment: list[EquipmentLocation] = Field(..., description="Equipment locations")
     zones: list[ZoneDefinition] = Field(..., description="Zone definitions")
@@ -142,19 +142,19 @@ async def extract_from_image(
         service = get_digital_twin_service()
 
         # Extract config
-        logger.info(f"Extracting building config: {request.building_code} (sanitize={not request.skip_sanitization})")
+        logger.info(f"Extracting building config: {request.site_code} (sanitize={not request.skip_sanitization})")
 
         config = await service.extract_from_image(
             image_base64=request.image_base64,
-            building_code=request.building_code,
-            building_name=request.building_name,
+            site_code=request.site_code,
+            site_name=request.site_name,
             floors_count=request.floors_count,
             skip_sanitization=request.skip_sanitization,
         )
 
         # Validate response
         if not config or "equipment" not in config:
-            logger.warning(f"Empty extraction for {request.building_code}")
+            logger.warning(f"Empty extraction for {request.site_code}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="No equipment extracted from image",
@@ -162,8 +162,8 @@ async def extract_from_image(
 
         # Convert to response model
         return BuildingConfigResponse(
-            building_code=config.get("building_code", request.building_code),
-            building_name=config.get("building_name", request.building_name),
+            site_code=config.get("site_code", request.site_code),
+            site_name=config.get("site_name", request.site_name),
             floors=[FloorDefinition(**f) for f in config.get("floors", [])],
             equipment=[EquipmentLocation(**e) for e in config.get("equipment", [])],
             zones=[ZoneDefinition(**z) for z in config.get("zones", [])],
@@ -192,8 +192,8 @@ async def extract_from_image(
     summary="Get demo building configuration",
 )
 async def get_demo_config(
-    building_code: str = Query(..., description="Building code"),
-    building_name: str = "Demo Building",
+    site_code: str = Query(..., description="Building code"),
+    site_name: str = "Demo Building",
     floors_count: int = 5,
 ) -> BuildingConfigResponse:
     """
@@ -206,8 +206,8 @@ async def get_demo_config(
     - Metrics suitable for testing the full onboarding workflow
 
     Args:
-        building_code: Building identifier (default: site-002)
-        building_name: Building display name (default: Demo Building)
+        site_code: Building identifier (default: site-002)
+        site_name: Building display name (default: Demo Building)
         floors_count: Number of floors (1-5, default: 5)
 
     Returns:
@@ -215,11 +215,11 @@ async def get_demo_config(
     """
     try:
         service = get_digital_twin_service()
-        config = service._generate_demo_config(building_code, building_name, floors_count)
+        config = service._generate_demo_config(site_code, site_name, floors_count)
 
         return BuildingConfigResponse(
-            building_code=config["building_code"],
-            building_name=config["building_name"],
+            site_code=config["site_code"],
+            site_name=config["site_name"],
             floors=[FloorDefinition(**f) for f in config["floors"]],
             equipment=[EquipmentLocation(**e) for e in config["equipment"]],
             zones=[ZoneDefinition(**z) for z in config["zones"]],
@@ -245,8 +245,8 @@ async def get_demo_config(
 )
 async def extract_from_dxf(
     file: UploadFile = File(..., description="DXF file upload"),
-    building_code: str = ...,
-    building_name: str = "",
+    site_code: str = ...,
+    site_name: str = "",
 ) -> BuildingConfigResponse:
     """
     Extract building configuration from DXF (AutoCAD) file.
@@ -269,8 +269,8 @@ async def extract_from_dxf(
 
     Args:
         file: DXF file upload (AutoCAD R12-2024 supported)
-        building_code: Building identifier (e.g., "site-002")
-        building_name: Building display name (optional)
+        site_code: Building identifier (e.g., "site-002")
+        site_name: Building display name (optional)
 
     Returns:
         Building configuration with floors, equipment, zones
@@ -301,17 +301,17 @@ async def extract_from_dxf(
         service = get_digital_twin_service()
 
         # Extract config
-        logger.info(f"Extracting building config from DXF: {building_code}")
+        logger.info(f"Extracting building config from DXF: {site_code}")
 
         config = await service.extract_from_dxf(
             dxf_bytes=dxf_bytes,
-            building_code=building_code,
-            building_name=building_name or building_code,
+            site_code=site_code,
+            site_name=site_name or site_code,
         )
 
         # Validate response
         if not config or "equipment" not in config:
-            logger.warning(f"Empty DXF extraction for {building_code}")
+            logger.warning(f"Empty DXF extraction for {site_code}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="No equipment extracted from DXF file",
@@ -319,8 +319,8 @@ async def extract_from_dxf(
 
         # Convert to response model
         return BuildingConfigResponse(
-            building_code=config.get("building_code", building_code),
-            building_name=config.get("building_name", building_name),
+            site_code=config.get("site_code", site_code),
+            site_name=config.get("site_name", site_name),
             floors=[FloorDefinition(**f) for f in config.get("floors", [])],
             equipment=[EquipmentLocation(**e) for e in config.get("equipment", [])],
             zones=[ZoneDefinition(**z) for z in config.get("zones", [])],

@@ -19,8 +19,8 @@ interface ESGPageProps {
 }
 
 export function ESGPage({ selectedBuilding }: ESGPageProps) {
-  const buildingId = selectedBuilding?.id || '';
-  const buildingName = selectedBuilding?.name || 'Building';
+  const siteId = selectedBuilding?.id || '';
+  const siteName = selectedBuilding?.name || 'Building';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
@@ -30,11 +30,11 @@ export function ESGPage({ selectedBuilding }: ESGPageProps) {
           <Leaf className="w-8 h-8 text-emerald-400" />
           <h1 className="text-3xl font-bold text-white">ESG & Sustainability</h1>
         </div>
-        <p className="text-slate-400">{buildingName} • Carbon Emissions & ESG Metrics</p>
+        <p className="text-slate-400">{siteName} • Carbon Emissions & ESG Metrics</p>
       </div>
 
       {/* Main Dashboard */}
-      <SustainabilityDashboard siteId={buildingId} />
+      <SustainabilityDashboard siteId={siteId} />
 
       {/* Footer Info */}
       <Card className="mt-8 bg-slate-800/40 border border-slate-700">

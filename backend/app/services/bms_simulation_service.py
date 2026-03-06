@@ -131,16 +131,16 @@ class BMSimulationService:
                 client = get_supabase_client()
 
                 # Get building UUID for site-002
-                building_result = client.table("buildings").select("id").eq("code", site_id).execute()
-                if building_result.data:
-                    building_uuid = building_result.data[0]["id"]
+                site_result = client.table("sites").select("id").eq("code", site_id).execute()
+                if site_result.data:
+                    site_uuid = site_result.data[0]["id"]
 
                     # Get equipment for this building (HVAC types only for simulation)
                     hvac_types = ["ahu", "fcu", "vav", "chiller", "cooling_tower", "ups", "generator"]
                     equipment_result = (
                         client.table("equipment")
                         .select("code, name, type, manufacturer, location, health_score, status")
-                        .eq("building_id", building_uuid)
+                        .eq("site_id", site_uuid)
                         .in_("type", hvac_types)
                         .limit(50)  # Limit to 50 equipment items for simulation
                         .execute()
@@ -550,7 +550,7 @@ class BMSimulationService:
             # Resolve region/province from buildings table
             region = "Gauteng"
             try:
-                building_resp = client.table("buildings").select("region").eq("code", site_id).limit(1).execute()
+                building_resp = client.table("sites").select("region").eq("code", site_id).limit(1).execute()
                 if building_resp.data:
                     region = building_resp.data[0].get("region") or region
             except Exception as exc:
@@ -1025,7 +1025,7 @@ class BMSimulationService:
         if severity in ["warning", "critical"]:
             telegram_alert = {
                 "id": alert["id"],
-                "building_name": alert["site_name"],
+                "site_name": alert["site_name"],
                 "zone_name": equipment.location,
                 "equipment_name": equipment.name,
                 "equipment_code": equipment.id,

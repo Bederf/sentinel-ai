@@ -86,7 +86,7 @@
     },
     "metadata": {
       "building": "Gateway Centre",
-      "building_id": "site-001",
+      "site_id": "site-001",
       "floor": -1,
       "zone": "Plant Room",
       "location": "Basement Plant Room",
@@ -181,7 +181,7 @@
     },
     "metadata": {
       "building": "Gateway Centre",
-      "building_id": "site-001",
+      "site_id": "site-001",
       "floor": 3,
       "zone": "Executive Wing",
       "location": "Level 3 Plant Room",
@@ -266,7 +266,7 @@
     },
     "metadata": {
       "building": "Gateway Centre",
-      "building_id": "site-001",
+      "site_id": "site-001",
       "floor": 3,
       "zone": "Executive Wing",
       "location": "CTO Office Suite 301",
@@ -352,7 +352,7 @@
     },
     "metadata": {
       "building": "Gateway Centre",
-      "building_id": "site-001",
+      "site_id": "site-001",
       "floor": 0,
       "zone": "Lobby",
       "location": "Ground Floor Main Lobby",
@@ -432,7 +432,7 @@
     },
     "metadata": {
       "building": "Gateway Centre",
-      "building_id": "site-001",
+      "site_id": "site-001",
       "floor": 0,
       "zone": "Entrance",
       "location": "Ground Floor Main Entrance",
@@ -522,7 +522,7 @@
     },
     "metadata": {
       "building": "Gateway Centre",
-      "building_id": "site-001",
+      "site_id": "site-001",
       "floor": -1,
       "zone": "Fire Systems",
       "location": "Basement Fire Pump Room",
@@ -642,7 +642,7 @@
     },
     "metadata": {
       "building": "Gateway Centre",
-      "building_id": "site-001",
+      "site_id": "site-001",
       "floor": "1-3",
       "zone": "Main Office Area",
       "location": "BMS Room Level 2",
@@ -739,7 +739,7 @@
     },
     "metadata": {
       "building": "Gateway Centre",
-      "building_id": "site-001",
+      "site_id": "site-001",
       "floor": -1,
       "zone": "Plant Room",
       "location": "Basement Plant Room",
@@ -827,7 +827,7 @@
     },
     "metadata": {
       "building": "Menlyn Maine",
-      "building_id": "site-003",
+      "site_id": "site-003",
       "floor": 1,
       "zone": "Ground Floor",
       "location": "Floor 1 Open Plan",
@@ -912,7 +912,7 @@
     },
     "metadata": {
       "building": "Menlyn Maine",
-      "building_id": "site-003",
+      "site_id": "site-003",
       "floor": 2,
       "zone": "Upper Floor",
       "location": "Floor 2 Open Plan",
@@ -1009,7 +1009,7 @@
     },
     "metadata": {
       "building": "Menlyn Maine",
-      "building_id": "site-003",
+      "site_id": "site-003",
       "floor": 0,
       "zone": "Plant Room",
       "location": "Roof Plant Room",
@@ -1114,7 +1114,7 @@
     },
     "metadata": {
       "building": "Menlyn Maine",
-      "building_id": "site-003",
+      "site_id": "site-003",
       "floor": -1,
       "zone": "Plant Room",
       "location": "Basement Plant Room",
@@ -1212,7 +1212,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 0,
       "zone": "Roof Level",
       "location": "Roof Plant Room",
@@ -1307,7 +1307,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": -1,
       "zone": "Chiller Plant Room",
       "location": "Basement Plant Room",
@@ -1393,7 +1393,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 1,
       "zone": "Floor 1 Office",
       "location": "Floor 1 Open Plan",
@@ -1475,7 +1475,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": "1-3",
       "zone": "Main Office Area",
       "location": "BMS Room Level 2",
@@ -1562,7 +1562,7 @@
     },
     "metadata": {
       "building": "Rosebank Towers",
-      "building_id": "site-004",
+      "site_id": "site-004",
       "floor": 0,
       "zone": "Roof",
       "location": "Roof Plant Room",
@@ -1653,7 +1653,7 @@
     },
     "metadata": {
       "building": "Rosebank Towers",
-      "building_id": "site-004",
+      "site_id": "site-004",
       "floor": 1,
       "zone": "Banking Hall",
       "location": "Banking Hall",
@@ -1750,7 +1750,7 @@
     },
     "metadata": {
       "building": "V&A Waterfront",
-      "building_id": "site-006",
+      "site_id": "site-006",
       "floor": 0,
       "zone": "Roof",
       "location": "Roof Plant Room",
@@ -1845,7 +1845,7 @@
     },
     "metadata": {
       "building": "V&A Waterfront",
-      "building_id": "site-006",
+      "site_id": "site-006",
       "floor": -1,
       "zone": "Plant Room",
       "location": "Basement Plant Room",
@@ -1931,7 +1931,7 @@
     },
     "metadata": {
       "building": "V&A Waterfront",
-      "building_id": "site-006",
+      "site_id": "site-006",
       "floor": 1,
       "zone": "Floor 1",
       "location": "Floor 1 Open Plan",
@@ -2028,7 +2028,7 @@
     },
     "metadata": {
       "building": "Umhlanga Ridge",
-      "building_id": "site-007",
+      "site_id": "site-007",
       "floor": 0,
       "zone": "Roof",
       "location": "Roof Plant Room",
@@ -2123,7 +2123,7 @@
     },
     "metadata": {
       "building": "Umhlanga Ridge",
-      "building_id": "site-007",
+      "site_id": "site-007",
       "floor": -1,
       "zone": "Plant Room",
       "location": "Basement Plant Room",
@@ -2209,7 +2209,7 @@
     },
     "metadata": {
       "building": "Umhlanga Ridge",
-      "building_id": "site-007",
+      "site_id": "site-007",
       "floor": 1,
       "zone": "Floor 1",
       "location": "Floor 1 Open Plan",
@@ -2294,7 +2294,7 @@
     },
     "metadata": {
       "building": "Umhlanga Ridge",
-      "building_id": "site-007",
+      "site_id": "site-007",
       "floor": 2,
       "zone": "Floor 2",
       "location": "Floor 2 Open Plan",
@@ -2385,7 +2385,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": "L2",
       "zone": "Level 12 North",
       "zone_id": "Zone-L2-N",
@@ -2474,7 +2474,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": "L2",
       "zone": "Level 12 South",
       "zone_id": "Zone-L2-S",
@@ -2563,7 +2563,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": "L1",
       "zone": "Level 11 North",
       "zone_id": "Zone-L1-N",
@@ -2652,7 +2652,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": "L1",
       "zone": "Level 11 South",
       "zone_id": "Zone-L1-S",
@@ -2741,7 +2741,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": "L0",
       "zone": "Level 10 North",
       "zone_id": "Zone-L0-N",
@@ -2842,7 +2842,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": "L2",
       "serves": "All zones on L2",
       "critical": true
@@ -2942,7 +2942,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": "L1",
       "serves": "All zones on L1",
       "critical": true
@@ -3042,7 +3042,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": "L0",
       "serves": "All zones on L0",
       "critical": true
@@ -3127,7 +3127,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 12,
       "zone": "Zone-L2-A",
       "location": "Level 12 Zone A ceiling",
@@ -3215,7 +3215,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 12,
       "zone": "Zone-L2-B",
       "location": "Level 12 Zone B ceiling",
@@ -3303,7 +3303,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 12,
       "zone": "Zone-L2-C",
       "location": "Level 12 Zone C ceiling",
@@ -3391,7 +3391,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 12,
       "zone": "Zone-L2-D",
       "location": "Level 12 Zone D ceiling",
@@ -3479,7 +3479,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 12,
       "zone": "Zone-L2-E",
       "location": "Level 12 Zone E ceiling",
@@ -3567,7 +3567,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 11,
       "zone": "Zone-L1-A",
       "location": "Level 11 Zone A ceiling",
@@ -3655,7 +3655,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 11,
       "zone": "Zone-L1-B",
       "location": "Level 11 Zone B ceiling",
@@ -3743,7 +3743,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 11,
       "zone": "Zone-L1-C",
       "location": "Level 11 Zone C ceiling",
@@ -3831,7 +3831,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 11,
       "zone": "Zone-L1-D",
       "location": "Level 11 Zone D ceiling",
@@ -3919,7 +3919,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 11,
       "zone": "Zone-L1-E",
       "location": "Level 11 Zone E ceiling",
@@ -4007,7 +4007,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 10,
       "zone": "Zone-L0-A",
       "location": "Level 10 Zone A ceiling",
@@ -4095,7 +4095,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 10,
       "zone": "Zone-L0-B",
       "location": "Level 10 Zone B ceiling",
@@ -4183,7 +4183,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 10,
       "zone": "Zone-L0-C",
       "location": "Level 10 Zone C ceiling",
@@ -4271,7 +4271,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 10,
       "zone": "Zone-L0-D",
       "location": "Level 10 Zone D ceiling",
@@ -4359,7 +4359,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 10,
       "zone": "Zone-L0-E",
       "location": "Level 10 Zone E ceiling",
@@ -4448,7 +4448,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 0,
       "zone": "Fire Control Room",
       "location": "Ground Floor Fire Control Room",
@@ -4522,7 +4522,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 10,
       "zone": "Zone-L0-B",
       "location": "Level 0 AHU supply duct",
@@ -4596,7 +4596,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 10,
       "zone": "Zone-L0-D",
       "location": "Level 0 AHU return duct",
@@ -4670,7 +4670,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 11,
       "zone": "Zone-L1-A",
       "location": "Level 1 AHU supply duct",
@@ -4744,7 +4744,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 11,
       "zone": "Zone-L1-C",
       "location": "Level 1 AHU return duct",
@@ -4818,7 +4818,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 12,
       "zone": "Zone-L2-A",
       "location": "Level 2 AHU supply duct",
@@ -4892,7 +4892,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 12,
       "zone": "Zone-L2-D",
       "location": "Level 2 AHU return duct",
@@ -4966,7 +4966,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 0,
       "zone": "Stairwell-A",
       "location": "Ground Floor Stairwell A fan room",
@@ -5040,7 +5040,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 0,
       "zone": "Stairwell-B",
       "location": "Ground Floor Stairwell B fan room",
@@ -5121,7 +5121,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 0,
       "zone": "A",
       "location": "Ground Floor Main Entrance",
@@ -5202,7 +5202,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 1,
       "zone": "A",
       "location": "Level 1 Office Entry",
@@ -5283,7 +5283,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 2,
       "zone": "A",
       "location": "Level 2 Office Entry",
@@ -5364,7 +5364,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 1,
       "zone": "C",
       "location": "Level 1 Server Room",
@@ -5444,7 +5444,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 0,
       "zone": "A",
       "location": "Ground Floor Lobby",
@@ -5524,7 +5524,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 1,
       "zone": "A",
       "location": "Level 1 Corridor",
@@ -5604,7 +5604,7 @@
     },
     "metadata": {
       "building": "Sandton City Office Tower",
-      "building_id": "site-002",
+      "site_id": "site-002",
       "floor": 1,
       "zone": "C",
       "location": "Level 1 Server Room",

@@ -19,7 +19,7 @@ export interface MonthlyEmission {
 
 export interface EmissionsSummary {
   status: string;
-  building_id: string;
+  site_id: string;
   year: number;
   scope1_total: number;
   scope2_total: number;
@@ -36,7 +36,7 @@ export interface EmissionsSummary {
 
 export interface EmissionsBySource {
   status: string;
-  building_id: string;
+  site_id: string;
   months: number;
   data: Array<{
     source_type: string;
@@ -49,7 +49,7 @@ export interface EmissionsBySource {
 
 export interface Benchmark {
   status: string;
-  building_id: string;
+  site_id: string;
   building_intensity: number;
   portfolio_avg_intensity: number;
   industry_avg_intensity: number;
@@ -60,7 +60,7 @@ export interface Benchmark {
 
 export interface ESGMetrics {
   status: string;
-  building_id: string;
+  site_id: string;
   carbon_intensity_score: number;
   energy_efficiency_score: number;
   waste_diversion_score: number;
@@ -87,7 +87,7 @@ export interface Certification {
 
 export interface Certifications {
   status: string;
-  building_id: string;
+  site_id: string;
   certifications: Certification[];
   timestamp: string;
 }
@@ -100,7 +100,7 @@ export interface ForecastData {
 
 export interface Forecast {
   status: string;
-  building_id: string;
+  site_id: string;
   forecast_year: number;
   reduction_target_pct: number;
   data: ForecastData[];
@@ -111,11 +111,11 @@ export interface Forecast {
 
 export const sustainabilityApi = {
   /**
-   * 1. GET /buildings/{building_id}/emissions/monthly
+   * 1. GET /buildings/{site_id}/emissions/monthly
    * Monthly emissions breakdown by scope (last 12 months default)
    */
   getMonthlyEmissions: async (
-    buildingId: string,
+    siteId: string,
     startDate?: string,
     endDate?: string,
   ): Promise<{ status: string; data: MonthlyEmission[] }> => {
@@ -123,61 +123,61 @@ export const sustainabilityApi = {
     if (startDate) params.append('start_date', startDate);
     if (endDate) params.append('end_date', endDate);
     const query = params.toString() ? `?${params.toString()}` : '';
-    return fetchApi(`/api/sustainability/buildings/${buildingId}/emissions/monthly${query}`);
+    return fetchApi(`/api/sustainability/buildings/${siteId}/emissions/monthly${query}`);
   },
 
   /**
-   * 2. GET /buildings/{building_id}/emissions/summary
+   * 2. GET /buildings/{site_id}/emissions/summary
    * Current year emissions summary with source breakdown
    */
-  getEmissionsSummary: async (buildingId: string): Promise<EmissionsSummary> => {
-    return fetchApi(`/api/sustainability/buildings/${buildingId}/emissions/summary`);
+  getEmissionsSummary: async (siteId: string): Promise<EmissionsSummary> => {
+    return fetchApi(`/api/sustainability/buildings/${siteId}/emissions/summary`);
   },
 
   /**
-   * 3. GET /buildings/{building_id}/emissions/by-source
+   * 3. GET /buildings/{site_id}/emissions/by-source
    * Emissions breakdown by source for pie chart (last 12 months)
    */
-  getEmissionsBySource: async (buildingId: string, months = 12): Promise<EmissionsBySource> => {
-    return fetchApi(`/api/sustainability/buildings/${buildingId}/emissions/by-source?months=${months}`);
+  getEmissionsBySource: async (siteId: string, months = 12): Promise<EmissionsBySource> => {
+    return fetchApi(`/api/sustainability/buildings/${siteId}/emissions/by-source?months=${months}`);
   },
 
   /**
    * 4. GET /portfolio/emissions/benchmark
    * Compare building to portfolio and industry benchmarks
    */
-  getBenchmark: async (buildingId: string): Promise<Benchmark> => {
-    return fetchApi(`/api/sustainability/portfolio/emissions/benchmark?building_id=${buildingId}`);
+  getBenchmark: async (siteId: string): Promise<Benchmark> => {
+    return fetchApi(`/api/sustainability/portfolio/emissions/benchmark?site_id=${siteId}`);
   },
 
   /**
-   * 5. GET /buildings/{building_id}/esg-metrics
+   * 5. GET /buildings/{site_id}/esg-metrics
    * Overall ESG score and component metrics
    */
-  getESGMetrics: async (buildingId: string): Promise<ESGMetrics> => {
-    return fetchApi(`/api/sustainability/buildings/${buildingId}/esg-metrics`);
+  getESGMetrics: async (siteId: string): Promise<ESGMetrics> => {
+    return fetchApi(`/api/sustainability/buildings/${siteId}/esg-metrics`);
   },
 
   /**
-   * 6. GET /buildings/{building_id}/certifications
+   * 6. GET /buildings/{site_id}/certifications
    * Green Star/LEED/Carbon Trust certification progress
    */
-  getCertifications: async (buildingId: string): Promise<Certifications> => {
-    return fetchApi(`/api/sustainability/buildings/${buildingId}/certifications`);
+  getCertifications: async (siteId: string): Promise<Certifications> => {
+    return fetchApi(`/api/sustainability/buildings/${siteId}/certifications`);
   },
 
   /**
-   * 7. POST /buildings/{building_id}/update-emissions
+   * 7. POST /buildings/{site_id}/update-emissions
    * Record emissions data from energy systems
    */
   updateEmissions: async (
-    buildingId: string,
+    siteId: string,
     sourceType: string,
     month: string,
     value: number,
     unit: string,
   ): Promise<{ status: string; calculated_co2e_kg: number }> => {
-    return fetchApi(`/api/sustainability/buildings/${buildingId}/update-emissions`, {
+    return fetchApi(`/api/sustainability/buildings/${siteId}/update-emissions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -190,10 +190,10 @@ export const sustainabilityApi = {
   },
 
   /**
-   * 8. GET /buildings/{building_id}/emissions/forecast
+   * 8. GET /buildings/{site_id}/emissions/forecast
    * 12-month emissions projection with seasonal adjustment
    */
-  getForecast: async (buildingId: string): Promise<Forecast> => {
-    return fetchApi(`/api/sustainability/buildings/${buildingId}/emissions/forecast`);
+  getForecast: async (siteId: string): Promise<Forecast> => {
+    return fetchApi(`/api/sustainability/buildings/${siteId}/emissions/forecast`);
   },
 };

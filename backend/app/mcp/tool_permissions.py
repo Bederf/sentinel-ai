@@ -28,9 +28,9 @@ MCP_TOOL_MODULE_REQUIREMENTS: dict[str, ModuleType] = {
     "create_work_order": ModuleType.MAINTENANCE,
     "create_building": ModuleType.SIMBIOT,
     "activate_building": ModuleType.SIMBIOT,
-    "add_building_zones": ModuleType.SIMBIOT,
+    "add_site_zones": ModuleType.SIMBIOT,
     "add_building_desks": ModuleType.SIMBIOT,
-    "add_building_devices": ModuleType.SIMBIOT,
+    "add_site_devices": ModuleType.SIMBIOT,
     "import_point_list": ModuleType.SIMBIOT,
     "import_controller_list": ModuleType.SIMBIOT,
     "control_dali_device": ModuleType.SIMBIOT,
@@ -49,9 +49,9 @@ MCP_TOOL_MIN_ROLE: dict[str, SentinelRole] = {
     "create_work_order": SentinelRole.OPERATOR,
     "create_building": SentinelRole.ADMIN,
     "activate_building": SentinelRole.ADMIN,
-    "add_building_zones": SentinelRole.ADMIN,
+    "add_site_zones": SentinelRole.ADMIN,
     "add_building_desks": SentinelRole.ADMIN,
-    "add_building_devices": SentinelRole.ADMIN,
+    "add_site_devices": SentinelRole.ADMIN,
     "import_point_list": SentinelRole.ADMIN,
     "import_controller_list": SentinelRole.ADMIN,
     "control_dali_device": SentinelRole.OPERATOR,
@@ -100,7 +100,7 @@ def extract_site_id_from_args(tool_name: str, kwargs: dict) -> str | None:
         Site code string or None if not determinable.
     """
     # Direct building/site identifiers
-    for key in ("building_id", "building_code", "site_id", "site_code"):
+    for key in ("site_id", "site_code", "site_id", "site_code"):
         val = kwargs.get(key)
         if val:
             return str(val)

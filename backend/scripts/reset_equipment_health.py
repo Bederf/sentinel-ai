@@ -58,10 +58,10 @@ def reset_health_scores():
 
     # Get all buildings for summary
     print("\n📊 Summary by Site:")
-    buildings = client.table("buildings").select("id, code, name").execute()
+    buildings = client.table("sites").select("id, code, name").execute()
 
     for building in buildings.data or []:
-        eq_count = client.table("equipment").select("id").eq("building_id", building["id"]).execute()
+        eq_count = client.table("equipment").select("id").eq("site_id", building["id"]).execute()
         count = len(eq_count.data) if eq_count.data else 0
         print(f"  • {building['code']} ({building['name']}): {count} equipment")
 

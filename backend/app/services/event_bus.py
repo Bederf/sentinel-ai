@@ -97,7 +97,7 @@ class SentinelEvent:
     importance: Importance = Importance.INFO
     site_id: Optional[str] = None
     equipment_id: Optional[str] = None
-    building_name: Optional[str] = None
+    site_name: Optional[str] = None
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: str = field(default_factory=lambda: _utc_iso())
     correlation_id: Optional[str] = None
@@ -137,7 +137,7 @@ class SentinelEvent:
             importance=kwargs.pop("importance", self.importance),
             site_id=kwargs.pop("site_id", self.site_id),
             equipment_id=kwargs.pop("equipment_id", self.equipment_id),
-            building_name=kwargs.pop("building_name", self.building_name),
+            site_name=kwargs.pop("site_name", self.site_name),
             correlation_id=self.correlation_id or self.event_id,
             caused_by=self.event_id,
             **kwargs,
@@ -156,7 +156,7 @@ class SentinelEvent:
             },
             "site_id": self.site_id,
             "equipment_id": self.equipment_id,
-            "building_name": self.building_name,
+            "site_name": self.site_name,
             "timestamp": self.timestamp,
             "correlation_id": self.correlation_id,
             "caused_by": self.caused_by,
@@ -283,12 +283,12 @@ class EnrichmentMiddleware:
         self._site_lookup = site_lookup
 
     async def __call__(self, event: SentinelEvent) -> Optional[SentinelEvent]:
-        """Enrich event with building name if site_id is present and building_name is missing."""
-        if self._site_lookup and event.site_id and not event.building_name:
+        """Enrich event with building name if site_id is present and site_name is missing."""
+        if self._site_lookup and event.site_id and not event.site_name:
             try:
-                building_name = await self._site_lookup(event.site_id)
-                if building_name:
-                    event.building_name = building_name
+                site_name = await self._site_lookup(event.site_id)
+                if site_name:
+                    event.site_name = site_name
             except Exception as e:
                 logger.warning("Enrichment lookup failed for site %s: %s", event.site_id, e)
         return event

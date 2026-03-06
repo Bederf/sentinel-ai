@@ -96,7 +96,7 @@ class PointListExporter:
 
         # First try to load from buildings directory (preferred for newer sites)
         if site_id:
-            buildings_path = self.DATA_DIR / "buildings" / site_id / "equipment"
+            buildings_path = self.DATA_DIR / "sites" / site_id / "equipment"
             if buildings_path.exists():
                 devices = self._load_devices_from_buildings(buildings_path)
                 if devices:
@@ -196,7 +196,7 @@ class PointListExporter:
                     },
                     "metadata": {
                         "building": location.get("building", "Sandton City Office Tower"),
-                        "building_id": site_id,
+                        "site_id": site_id,
                         "floor": self._floor_to_number(floor),
                         "zone": f"Zone-{floor}-{zone_letter}",
                         "location": f"{floor} Zone {zone_letter} Ceiling",
@@ -237,10 +237,10 @@ class PointListExporter:
         site_code = SITE_CODE_MAP.get(site_id, "UMH")
 
         # Building name based on site
-        building_names = {
+        site_names = {
             "site-004": "uMhlanga Private Hospital",
         }
-        building_name = building_names.get(site_id, "Hospital")
+        site_name = site_names.get(site_id, "Hospital")
 
         # Zone type descriptions for hospitals
         zone_descriptions = {
@@ -270,7 +270,7 @@ class PointListExporter:
                     "capacity": 300,  # CFM capacity (hospital typically lower)
                     "points": dict(RICKARD_DIFFUSER_TEMPLATE["points"]),
                     "device_location": {
-                        "building": building_name,
+                        "building": site_name,
                         "floor": floor,
                         "zone": zone,
                         "room": f"Room {floor}-{seq:02d}",
@@ -292,8 +292,8 @@ class PointListExporter:
                         "legacy_age_years": 0,
                     },
                     "metadata": {
-                        "building": building_name,
-                        "building_id": site_id,
+                        "building": site_name,
+                        "site_id": site_id,
                         "floor": self._floor_to_number(floor),
                         "zone": zone,
                         "location": f"{floor} {zone} Ceiling",

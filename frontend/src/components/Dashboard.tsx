@@ -67,8 +67,8 @@ interface DashboardProps {
 
 export function Dashboard({ onViewChange }: DashboardProps) {
   // React Query hooks — filter to primary site only
-  const { data: allBuildings = [] } = useBuildingsList();
-  const buildingsList = allBuildings;
+  const { data: allSites = [] } = useBuildingsList();
+  const buildingsList = allSites;
 
   // Module gating
   const { isModuleActive, activeModules } = useModules();

@@ -310,7 +310,7 @@ class TestToolTimeout:
 
         async def slow_handler(**kwargs):
             await asyncio.sleep(60)  # Way over any timeout
-            return {"buildings": []}
+            return {"sites": []}
 
         server.tool_handlers["get_buildings"] = slow_handler
 

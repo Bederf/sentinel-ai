@@ -178,7 +178,7 @@ export function SolarDashboard() {
             >
               {solarSites.map((site) => (
                 <option key={site.site_id} value={site.site_id}>
-                  {site.building_name} — {site.site_name}
+                  {site.site_name} — {site.site_name}
                 </option>
               ))}
             </select>
@@ -210,17 +210,20 @@ export function SolarDashboard() {
       <>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         <div
-          className="glass-panel overflow-hidden"
+          className="rounded-md overflow-hidden"
+          style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <SolarOverviewPanel siteId={selectedSiteId} />
         </div>
         <div
-          className="glass-panel overflow-hidden"
+          className="rounded-md overflow-hidden"
+          style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <BESSStatusPanel siteId={selectedSiteId} />
         </div>
         <div
-          className="glass-panel overflow-hidden"
+          className="rounded-md overflow-hidden"
+          style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <EnergyFlowDiagram siteId={selectedSiteId} />
         </div>
@@ -229,7 +232,8 @@ export function SolarDashboard() {
       {/* Row 2: Inverter Matrix (full width) */}
       <div className="mb-4">
         <div
-          className="glass-panel overflow-hidden"
+          className="rounded-md overflow-hidden"
+          style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <InverterStatusMatrix siteId={selectedSiteId} />
         </div>
@@ -238,12 +242,14 @@ export function SolarDashboard() {
       {/* Row 3: Financial Report + Forecast Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <div
-          className="glass-panel overflow-hidden"
+          className="rounded-md overflow-hidden"
+          style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <SolarFinancialReport siteId={selectedSiteId} />
         </div>
         <div
-          className="glass-panel overflow-hidden"
+          className="rounded-md overflow-hidden"
+          style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <ForecastActualChart siteId={selectedSiteId} />
         </div>
@@ -252,7 +258,8 @@ export function SolarDashboard() {
       {/* Row 4: Annual Performance Summary (365 days) */}
       <div className="mb-4">
         <div
-          className="glass-panel overflow-hidden"
+          className="rounded-md overflow-hidden"
+          style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
         >
           <SolarAnnualCard siteId={selectedSiteId} />
         </div>

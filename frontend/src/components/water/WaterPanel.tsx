@@ -13,8 +13,6 @@
 
 import { useState, useEffect } from "react";
 import {
-  Card,
-  Metric,
   Flex,
   Tab,
   TabGroup,
@@ -332,61 +330,61 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
 
       {/* Quick Stats KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Flex justifyContent="between" alignItems="center">
             <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Today's Consumption
             </Text>
             <Droplets className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
           </Flex>
-          <Metric className="text-xl">{todayVolume.toLocaleString()}</Metric>
+          <p className="text-xl font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>{todayVolume.toLocaleString()}</p>
           <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Liters
           </Text>
-        </Card>
+        </div>
 
-        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Flex justifyContent="between" alignItems="center">
             <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Monthly Cost
             </Text>
             <Droplets className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
           </Flex>
-          <Metric className="text-xl">R2,480</Metric>
+          <p className="text-xl font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>R2,480</p>
           <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Feb estimate
           </Text>
-        </Card>
+        </div>
 
-        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Flex justifyContent="between" alignItems="center">
             <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Active Alerts
             </Text>
             <AlertTriangle className="h-4 w-4" style={{ color: "var(--color-sentinel-red)" }} />
           </Flex>
-          <Metric className="text-xl">{alerts.length}</Metric>
+          <p className="text-xl font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>{alerts.length}</p>
           <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             {alerts.some((a) => a.severity === "critical" || a.severity === "high")
               ? "Critical"
               : "Check required"}
           </Text>
-        </Card>
+        </div>
 
-        <Card className="glass-panel" style={{ border: "1px solid var(--glass-border)" }}>
+        <div className="rounded-md p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
           <Flex justifyContent="between" alignItems="center">
             <Text style={{ color: "var(--color-sentinel-text-secondary)" }} className="text-xs">
               Efficiency
             </Text>
             <Droplets className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
           </Flex>
-          <Metric className="text-xl">
+          <p className="text-xl font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
             {trending ? `${Math.abs(trending.baseline_comparison_percent).toFixed(1)}%` : "---"}
-          </Metric>
+          </p>
           <Text className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             {trending && trending.baseline_comparison_percent > 0 ? "Above" : "Below"} baseline
           </Text>
-        </Card>
+        </div>
       </div>
 
       {/* Tab Navigation and Content */}
@@ -406,15 +404,15 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
           </TabPanel>
 
           <TabPanel className="space-y-6">
-            <WaterZoneBreakdown buildingId={selectedSiteId} days={30} />
+            <WaterZoneBreakdown siteId={selectedSiteId} days={30} />
           </TabPanel>
 
           <TabPanel className="space-y-6">
-            <WaterCostAnalysis buildingId={selectedSiteId} />
+            <WaterCostAnalysis siteId={selectedSiteId} />
           </TabPanel>
 
           <TabPanel className="space-y-6">
-            <WaterAlertPanel buildingId={selectedSiteId} />
+            <WaterAlertPanel siteId={selectedSiteId} />
           </TabPanel>
         </TabPanels>
       </TabGroup>

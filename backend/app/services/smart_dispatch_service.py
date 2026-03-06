@@ -426,10 +426,10 @@ class SmartDispatchService:
         monitoring = get_remote_monitoring_service()
 
         # Building info
-        building_info = self._get_building_info(site_id)
+        site_info = self._get_site_info(site_id)
 
         # Current building status
-        building_status = await monitoring.get_building_status(site_id)
+        site_status = await monitoring.get_site_status(site_id)
 
         # Floor-by-floor task routing
         floor_routing = self._build_floor_routing(bundled_tasks)
@@ -454,19 +454,19 @@ class SmartDispatchService:
             "briefing_id": str(uuid.uuid4()),
             "generated_at": datetime.now().isoformat(),
             "site_id": site_id,
-            "building": building_info,
+            "building": site_info,
             "technician": {
                 "id": technician_id,
                 "name": tech["name"] if tech else technician_id,
                 "phone": tech.get("phone") if tech else None,
             },
-            "building_status": {
-                "devices_total": building_status.get("device_count", 0),
-                "devices_online": building_status.get("devices_online", 0),
-                "devices_in_alarm": building_status.get("devices_in_alarm", 0),
-                "devices_in_warning": building_status.get("devices_in_warning", 0),
-                "overall_health": building_status.get("overall_health_score", 0),
-                "active_alarms": building_status.get("active_alarms", []),
+            "site_status": {
+                "devices_total": site_status.get("device_count", 0),
+                "devices_online": site_status.get("devices_online", 0),
+                "devices_in_alarm": site_status.get("devices_in_alarm", 0),
+                "devices_in_warning": site_status.get("devices_in_warning", 0),
+                "overall_health": site_status.get("overall_health_score", 0),
+                "active_alarms": site_status.get("active_alarms", []),
             },
             "task_count": len(bundled_tasks),
             "tasks": bundled_tasks,
@@ -483,7 +483,7 @@ class SmartDispatchService:
                 "Wear PPE in plant room areas",
                 "Lock out/tag out before working on electrical equipment",
             ],
-            "access_instructions": building_info.get("access_instructions", ""),
+            "access_instructions": site_info.get("access_instructions", ""),
         }
 
     # ------------------------------------------------------------------
@@ -816,7 +816,7 @@ class SmartDispatchService:
 
         return suggestions
 
-    def _get_building_info(self, site_id: str) -> Dict[str, Any]:
+    def _get_site_info(self, site_id: str) -> Dict[str, Any]:
         """Get building information for a site.
 
         Loads from buildings data or returns demo defaults.

@@ -115,7 +115,7 @@ class ServiceRecord(BaseModel):
     code: str
     work_order_id: Optional[str] = None
     equipment_id: str
-    building_id: Optional[str] = None
+    site_id: Optional[str] = None
     service_type: ServiceType
     technician_id: str
     technician_name: str
@@ -152,7 +152,7 @@ class ServiceRecordCreate(BaseModel):
 
     work_order_id: Optional[str] = None
     equipment_id: str
-    building_id: Optional[str] = None
+    site_id: Optional[str] = None
     service_type: ServiceType
     technician_id: str
     technician_name: str

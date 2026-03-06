@@ -72,7 +72,7 @@ def prepare_building_for_supabase(building_data: Dict[str, Any]) -> Dict[str, An
     }
 
 
-def prepare_equipment_for_supabase(equipment_data: Dict[str, Any], building_uuid: str) -> Dict[str, Any]:
+def prepare_equipment_for_supabase(equipment_data: Dict[str, Any], site_uuid: str) -> Dict[str, Any]:
     """Transform equipment JSON to Supabase schema."""
 
     # Extract equipment type from equipment_id
@@ -90,7 +90,7 @@ def prepare_equipment_for_supabase(equipment_data: Dict[str, Any], building_uuid
         "id": str(uuid.uuid4()),
         "code": equipment_data.get("id", ""),
         "name": equipment_data.get("name", ""),
-        "building_id": building_uuid,
+        "site_id": site_uuid,
         "type": equipment_type.lower(),
         "device_type": equipment_data.get("device_type", "unknown"),
         "equipment_type": equipment_data.get("equipment_type", "").lower(),
@@ -119,19 +119,19 @@ def seed_site(site_id: str, client) -> bool:
         building_supabase = prepare_building_for_supabase(building_data)
 
         # Check if building already exists
-        existing = client.table("buildings").select("id").eq("code", site_id).execute()
+        existing = client.table("sites").select("id").eq("code", site_id).execute()
         if existing.data:
             logger.warning(f"Building {site_id} already exists in Supabase. Skipping...")
-            building_uuid = existing.data[0]["id"]
+            site_uuid = existing.data[0]["id"]
         else:
             # Insert building
             logger.info(f"Inserting building {site_id}...")
-            response = client.table("buildings").insert(building_supabase).execute()
+            response = client.table("sites").insert(building_supabase).execute()
             if not response.data:
                 logger.error(f"Failed to insert building {site_id}")
                 return False
-            building_uuid = response.data[0]["id"]
-            logger.info(f"✅ Building inserted: {site_id} (UUID: {building_uuid})")
+            site_uuid = response.data[0]["id"]
+            logger.info(f"✅ Building inserted: {site_id} (UUID: {site_uuid})")
 
         # Load and insert equipment
         logger.info(f"Loading equipment files for {site_id}...")
@@ -139,7 +139,7 @@ def seed_site(site_id: str, client) -> bool:
         logger.info(f"Found {len(equipment_list)} equipment items")
 
         for i, equipment_data in enumerate(equipment_list, 1):
-            equipment_supabase = prepare_equipment_for_supabase(equipment_data, building_uuid)
+            equipment_supabase = prepare_equipment_for_supabase(equipment_data, site_uuid)
 
             # Check if equipment already exists
             existing = client.table("equipment").select("id").eq("code", equipment_supabase["code"]).execute()

@@ -65,9 +65,9 @@ class CentroidsMapResponse(dict):
 # ============================================================================
 
 
-@router.get("/{building_id}/desks")
+@router.get("/{site_id}/desks")
 async def get_desks(
-    building_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
+    site_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
     floor: Optional[str] = Query(None, description="Optional floor filter (L0, L1, L2, etc.)"),
 ) -> List[Dict[str, Any]]:
     """Get desk data for a building.
@@ -95,7 +95,7 @@ async def get_desks(
     ```
 
     Args:
-        building_id: Building UUID or code (accepts both formats for flexibility)
+        site_id: Building UUID or code (accepts both formats for flexibility)
         floor: Optional floor code
 
     Returns:
@@ -108,38 +108,37 @@ async def get_desks(
 
     try:
         # Accept both building codes and UUIDs
-        actual_building_id = building_id
+        actual_site_id = site_id
 
         # If it looks like a building code (not UUID format), convert it to UUID
-        if not _is_uuid(building_id):
+        if not _is_uuid(site_id):
             try:
-                actual_building_id = desk_repo.get_building_uuid(building_id)
-                if not actual_building_id:
-                    logger.warning(f"Building not found for code: {building_id}")
+                actual_site_id = desk_repo.get_site_uuid(site_id)
+                if not actual_site_id:
+                    logger.warning(f"Building not found for code: {site_id}")
                     # Return empty list if building not found
                     return []
             except Exception as e:
-                logger.warning(f"Failed to resolve building code '{building_id}' to UUID: {e}")
-                actual_building_id = building_id
+                logger.warning(f"Failed to resolve building code '{site_id}' to UUID: {e}")
+                actual_site_id = site_id
 
-        desks = desk_repo.get_by_building_uuid(actual_building_id)
+        desks = desk_repo.get_by_site_uuid(actual_site_id)
 
         if floor:
             desks = [d for d in desks if d.get("floor") == floor]
 
         logger.info(
-            f"Retrieved {len(desks)} desks for building {building_id} "
-            f"(UUID: {actual_building_id}) floor {floor or 'any'}"
+            f"Retrieved {len(desks)} desks for building {site_id} (UUID: {actual_site_id}) floor {floor or 'any'}"
         )
         return desks
     except Exception as e:
-        logger.error(f"Failed to get desks for building {building_id}: {e}")
+        logger.error(f"Failed to get desks for building {site_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve desks: {e}")
 
 
-@router.get("/{building_id}/desks/zones/{zone_id}")
+@router.get("/{site_id}/desks/zones/{zone_id}")
 async def get_desks_by_zone(
-    building_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
+    site_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
     zone_id: str = Path(..., description="Zone ID (e.g., Zone-L1-A)"),
 ) -> List[Dict[str, Any]]:
     """Get all desks in a specific zone.
@@ -147,7 +146,7 @@ async def get_desks_by_zone(
     Returns all desks for a given zone with their positions and context.
 
     Args:
-        building_id: Building UUID or code (accepts both formats for flexibility)
+        site_id: Building UUID or code (accepts both formats for flexibility)
         zone_id: Zone ID
 
     Returns:
@@ -160,33 +159,31 @@ async def get_desks_by_zone(
 
     try:
         # Accept both building codes and UUIDs
-        actual_building_id = building_id
+        actual_site_id = site_id
 
         # If it looks like a building code (not UUID format), convert it to UUID
-        if not _is_uuid(building_id):
+        if not _is_uuid(site_id):
             try:
-                actual_building_id = desk_repo.get_building_uuid(building_id)
-                if not actual_building_id:
-                    logger.warning(f"Building not found for code: {building_id}")
+                actual_site_id = desk_repo.get_site_uuid(site_id)
+                if not actual_site_id:
+                    logger.warning(f"Building not found for code: {site_id}")
                     return []
             except Exception as e:
-                logger.warning(f"Failed to resolve building code '{building_id}' to UUID: {e}")
-                actual_building_id = building_id
+                logger.warning(f"Failed to resolve building code '{site_id}' to UUID: {e}")
+                actual_site_id = site_id
 
-        desks = desk_repo.get_by_zone_id(actual_building_id, zone_id)
+        desks = desk_repo.get_by_zone_id(actual_site_id, zone_id)
 
-        logger.info(
-            f"Retrieved {len(desks)} desks for zone {zone_id} in building {building_id} (UUID: {actual_building_id})"
-        )
+        logger.info(f"Retrieved {len(desks)} desks for zone {zone_id} in building {site_id} (UUID: {actual_site_id})")
         return desks
     except Exception as e:
         logger.error(f"Failed to get desks for zone {zone_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve desks: {e}")
 
 
-@router.get("/{building_id}/desks/zones/{zone_id}/centroid")
+@router.get("/{site_id}/desks/zones/{zone_id}/centroid")
 async def get_zone_centroid(
-    building_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
+    site_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
     zone_id: str = Path(..., description="Zone ID (e.g., Zone-L1-A)"),
 ) -> Dict[str, Any]:
     """Get centroid for a specific zone.
@@ -204,7 +201,7 @@ async def get_zone_centroid(
     ```
 
     Args:
-        building_id: Building UUID or code (accepts both formats for flexibility)
+        site_id: Building UUID or code (accepts both formats for flexibility)
         zone_id: Zone ID
 
     Returns:
@@ -218,22 +215,22 @@ async def get_zone_centroid(
 
     try:
         # Accept both building codes and UUIDs
-        actual_building_id = building_id
+        actual_site_id = site_id
 
         # If it looks like a building code (not UUID format), convert it to UUID
-        if not _is_uuid(building_id):
+        if not _is_uuid(site_id):
             try:
-                actual_building_id = desk_repo.get_building_uuid(building_id)
-                if not actual_building_id:
-                    logger.warning(f"Building not found for code: {building_id}")
-                    raise HTTPException(status_code=404, detail=f"Building not found: {building_id}")
+                actual_site_id = desk_repo.get_site_uuid(site_id)
+                if not actual_site_id:
+                    logger.warning(f"Building not found for code: {site_id}")
+                    raise HTTPException(status_code=404, detail=f"Building not found: {site_id}")
             except HTTPException:
                 raise
             except Exception as e:
-                logger.warning(f"Failed to resolve building code '{building_id}' to UUID: {e}")
-                actual_building_id = building_id
+                logger.warning(f"Failed to resolve building code '{site_id}' to UUID: {e}")
+                actual_site_id = site_id
 
-        desks = desk_repo.get_by_zone_id(actual_building_id, zone_id)
+        desks = desk_repo.get_by_zone_id(actual_site_id, zone_id)
 
         if not desks:
             logger.warning(f"No desks found for zone {zone_id}")
@@ -254,9 +251,9 @@ async def get_zone_centroid(
         raise HTTPException(status_code=500, detail=f"Centroid calculation failed: {e}")
 
 
-@router.get("/{building_id}/desks/centroids")
+@router.get("/{site_id}/desks/centroids")
 async def get_all_zone_centroids(
-    building_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
+    site_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
 ) -> Dict[str, Any]:
     """Get centroids for all zones in a building.
 
@@ -268,7 +265,7 @@ async def get_all_zone_centroids(
     **Example Response:**
     ```json
     {
-      "building_id": "uuid",
+      "site_id": "uuid",
       "zone_count": 15,
       "centroids": {
         "Zone-L1-A": {"x": 3.5, "z": 10.5},
@@ -279,7 +276,7 @@ async def get_all_zone_centroids(
     ```
 
     Args:
-        building_id: Building UUID or code (accepts both formats for flexibility)
+        site_id: Building UUID or code (accepts both formats for flexibility)
 
     Returns:
         Dict with map of zone_id → centroid coordinates
@@ -293,41 +290,39 @@ async def get_all_zone_centroids(
 
     try:
         # Accept both building codes (e.g., 'site-002') and UUIDs
-        actual_building_id = building_id
+        actual_site_id = site_id
 
         # If it looks like a building code (not UUID format), convert it to UUID
-        if not _is_uuid(building_id):
+        if not _is_uuid(site_id):
             try:
-                actual_building_id = desk_repo.get_building_uuid(building_id)
-                if not actual_building_id:
-                    logger.warning(f"Building not found for code: {building_id}")
-                    raise HTTPException(status_code=404, detail=f"Building not found: {building_id}")
+                actual_site_id = desk_repo.get_site_uuid(site_id)
+                if not actual_site_id:
+                    logger.warning(f"Building not found for code: {site_id}")
+                    raise HTTPException(status_code=404, detail=f"Building not found: {site_id}")
             except Exception as e:
-                logger.warning(f"Failed to resolve building code '{building_id}' to UUID: {e}")
+                logger.warning(f"Failed to resolve building code '{site_id}' to UUID: {e}")
                 # Try querying anyway in case it's already a UUID
-                actual_building_id = building_id
+                actual_site_id = site_id
 
-        zones = zone_repo.get_by_building(actual_building_id)
+        zones = zone_repo.get_by_site(actual_site_id)
 
         if not zones:
-            logger.warning(f"No zones found for building {building_id} (UUID: {actual_building_id})")
+            logger.warning(f"No zones found for building {site_id} (UUID: {actual_site_id})")
             # Return empty centroids instead of error
             return {
-                "building_id": building_id,
+                "site_id": site_id,
                 "zone_count": 0,
                 "centroid_count": 0,
                 "centroids": {},
             }
 
         zone_ids = [z["zone_id"] for z in zones]
-        centroids = desk_repo.get_centroids_for_zones(actual_building_id, zone_ids)
+        centroids = desk_repo.get_centroids_for_zones(actual_site_id, zone_ids)
 
-        logger.info(
-            f"Retrieved {len(centroids)} zone centroids for building {building_id} (UUID: {actual_building_id})"
-        )
+        logger.info(f"Retrieved {len(centroids)} zone centroids for building {site_id} (UUID: {actual_site_id})")
 
         return {
-            "building_id": building_id,
+            "site_id": site_id,
             "zone_count": len(zones),
             "centroid_count": len(centroids),
             "centroids": centroids,
@@ -335,13 +330,13 @@ async def get_all_zone_centroids(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get centroids for building {building_id}: {e}")
+        logger.error(f"Failed to get centroids for building {site_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Centroid retrieval failed: {e}")
 
 
-@router.get("/{building_id}/desks/stats")
+@router.get("/{site_id}/desks/stats")
 async def get_desk_statistics(
-    building_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
+    site_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
 ) -> Dict[str, Any]:
     """Get desk statistics for a building.
 
@@ -352,7 +347,7 @@ async def get_desk_statistics(
     - Distribution by context
 
     Args:
-        building_id: Building UUID or code (accepts both formats for flexibility)
+        site_id: Building UUID or code (accepts both formats for flexibility)
 
     Returns:
         Dict with desk statistics
@@ -365,16 +360,16 @@ async def get_desk_statistics(
 
     try:
         # Accept both building codes and UUIDs
-        actual_building_id = building_id
+        actual_site_id = site_id
 
         # If it looks like a building code (not UUID format), convert it to UUID
-        if not _is_uuid(building_id):
+        if not _is_uuid(site_id):
             try:
-                actual_building_id = desk_repo.get_building_uuid(building_id)
-                if not actual_building_id:
-                    logger.warning(f"Building not found for code: {building_id}")
+                actual_site_id = desk_repo.get_site_uuid(site_id)
+                if not actual_site_id:
+                    logger.warning(f"Building not found for code: {site_id}")
                     return {
-                        "building_id": building_id,
+                        "site_id": site_id,
                         "total_desks": 0,
                         "total_zones": 0,
                         "desks_per_zone": {},
@@ -382,11 +377,11 @@ async def get_desk_statistics(
                         "desks_by_context": {},
                     }
             except Exception as e:
-                logger.warning(f"Failed to resolve building code '{building_id}' to UUID: {e}")
-                actual_building_id = building_id
+                logger.warning(f"Failed to resolve building code '{site_id}' to UUID: {e}")
+                actual_site_id = site_id
 
-        desks = desk_repo.get_by_building_uuid(actual_building_id)
-        zones = zone_repo.get_by_building(actual_building_id)
+        desks = desk_repo.get_by_site_uuid(actual_site_id)
+        zones = zone_repo.get_by_site(actual_site_id)
 
         # Group by zone
         desks_by_zone = {}
@@ -407,7 +402,7 @@ async def get_desk_statistics(
             desks_by_context[context] = desks_by_context.get(context, 0) + 1
 
         return {
-            "building_id": building_id,
+            "site_id": site_id,
             "total_desks": len(desks),
             "total_zones": len(zones),
             "desks_per_zone": desks_by_zone,
@@ -415,5 +410,5 @@ async def get_desk_statistics(
             "desks_by_context": desks_by_context,
         }
     except Exception as e:
-        logger.error(f"Failed to get desk statistics for building {building_id}: {e}")
+        logger.error(f"Failed to get desk statistics for building {site_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Statistics retrieval failed: {e}")

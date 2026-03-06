@@ -399,7 +399,7 @@ async def run_aegis_cycle(
             site_id=site_id,
             current_soc_pct=bess_state.soc_pct,
             solar_gen_kw=0.0,  # Will be enriched by caller context
-            building_load_kw=1800.0,
+            site_load_kw=1800.0,
             load_shedding_active=bool(context and context.get("ls_stage", 0) > 0),
             timestamp=now,
         )

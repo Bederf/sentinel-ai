@@ -445,7 +445,7 @@ class SafetyEngine:
             from app.api.metrics import sentinel_safety_violations_total
 
             # Extract site_id from device context; fall back to "unknown"
-            site_id = getattr(device, "building_id", None) or getattr(device, "site_id", None) or "unknown"
+            site_id = getattr(device, "site_id", None) or getattr(device, "site_id", None) or "unknown"
             if block_violations:
                 sentinel_safety_violations_total.labels(site_id=site_id, severity="block").inc(len(block_violations))
             if warning_violations:

@@ -37,20 +37,20 @@ class PerformanceMonitor:
         self.log_dir = log_dir
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-    def evaluate_predictions(self, days_back: int = 7, building_code: str | None = None) -> Dict[str, Any]:
+    def evaluate_predictions(self, days_back: int = 7, site_code: str | None = None) -> Dict[str, Any]:
         """
         Evaluate prediction accuracy against actual simulation outcomes.
 
         Args:
             days_back: Number of days to look back (uses recent simulation runs)
-            building_code: Building code to filter (usually site-002)
+            site_code: Building code to filter (usually site-002)
 
         Returns:
             Dict with metrics, confusion matrix, and metadata
         """
         # Find simulation run files from the last N days
         cutoff_time = datetime.now() - timedelta(days=days_back)
-        run_files = self._find_recent_runs(cutoff_time, building_code)
+        run_files = self._find_recent_runs(cutoff_time, site_code)
 
         if not run_files:
             logger.warning(f"No simulation runs found in last {days_back} days")
@@ -111,7 +111,7 @@ class PerformanceMonitor:
         return {
             "evaluated_at": datetime.now().isoformat(),
             "period_days": days_back,
-            "building_code": building_code,
+            "site_code": site_code,
             "predictions_count": len(equipment_predictions),
             "alerts_count": len([e for e in all_events if e.get("event_type") == "alert_generated"]),
             "metrics": {
@@ -170,7 +170,7 @@ class PerformanceMonitor:
                 "error": str(e),
             }
 
-    def _find_recent_runs(self, cutoff_time: datetime, building_code: str) -> List[Path]:
+    def _find_recent_runs(self, cutoff_time: datetime, site_code: str) -> List[Path]:
         """Find simulation run metadata files newer than cutoff_time."""
         recent_runs = []
 
@@ -187,7 +187,7 @@ class PerformanceMonitor:
                 # Check building code in metadata
                 with open(meta_file) as f:
                     meta = json.load(f)
-                    if meta.get("building_code") == building_code:
+                    if meta.get("site_code") == site_code:
                         # Find corresponding events file
                         events_file = self.log_dir / meta["events_file"]
                         if events_file.exists():
@@ -247,7 +247,7 @@ class PerformanceMonitor:
         return {
             "evaluated_at": datetime.now().isoformat(),
             "period_days": 7,
-            "building_code": "unknown",
+            "site_code": "unknown",
             "predictions_count": 0,
             "alerts_count": 0,
             "metrics": {

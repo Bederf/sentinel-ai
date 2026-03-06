@@ -16,7 +16,7 @@ import logging
 import asyncio
 
 from app.services.lighting_service import get_lighting_service
-from app.services.building_loader import get_building_loader
+from app.services.site_loader import get_site_loader
 from app.models.lighting import ZoneOccupancy, ZoneLighting
 
 logger = logging.getLogger(__name__)
@@ -82,13 +82,13 @@ class CrossSystemAnalyzer:
 
     def __init__(self):
         self.lighting = get_lighting_service()
-        self._building_loader = get_building_loader()
+        self._site_loader = get_site_loader()
         self._hvac_data: Dict[str, Dict] = {}
         self._load_hvac_from_zones()
 
     def _load_hvac_from_zones(self) -> None:
         """Load HVAC zone data from building loader (zones.json files)."""
-        all_zones = self._building_loader.get_all_zones()
+        all_zones = self._site_loader.get_all_zones()
 
         for zone in all_zones:
             zone_id = zone.get("zone_id")
@@ -102,14 +102,14 @@ class CrossSystemAnalyzer:
                     "ahu": zone.get("ahu_id"),
                     "zone_name": zone.get("zone_name", zone_id),
                     "floor": zone.get("floor", ""),
-                    "building_id": zone.get("building_id", ""),
+                    "site_id": zone.get("site_id", ""),
                 }
 
         logger.info(f"Loaded HVAC data for {len(self._hvac_data)} zones from building loader")
 
     def refresh_hvac_data(self) -> None:
         """Refresh HVAC data from building loader (call after zone updates)."""
-        self._building_loader.load(force=True)
+        self._site_loader.load(force=True)
         self._load_hvac_from_zones()
 
     def _get_vav_data(self, vav_id: str) -> Dict[str, Any]:

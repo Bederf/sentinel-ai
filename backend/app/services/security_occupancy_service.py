@@ -109,8 +109,8 @@ class SecurityOccupancyService:
             total += occ_data["occupancy_count"]
 
         return {
-            "building_id": get_primary_site() or "unknown",
-            "building_name": "Sandton City Office Tower",
+            "site_id": get_primary_site() or "unknown",
+            "site_name": "Sandton City Office Tower",
             "total_occupancy": total,
             "zones": zone_occupancies,
             "last_updated": datetime.now(timezone.utc).isoformat(),

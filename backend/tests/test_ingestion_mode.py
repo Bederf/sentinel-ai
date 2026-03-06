@@ -152,7 +152,7 @@ class TestLiveModeFallbackBlock:
         with patch("app.config.settings.settings", mock_settings):
             from app.mcp.simbiot_server import get_buildings_tool
 
-            # The BuildingRepository import will attempt Supabase connection and fail
+            # The SiteRepository import will attempt Supabase connection and fail
             # in test env, returning the LIVE_DATA_REQUIRED error
             result = await get_buildings_tool()
             assert result.get("code") == "LIVE_DATA_REQUIRED"

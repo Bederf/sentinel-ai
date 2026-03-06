@@ -12,7 +12,7 @@ export interface Device {
   id: string;
   code: string;
   name: string;
-  building_id: string;
+  site_id: string;
   type: string;
   status: "online" | "offline" | "error";
   health_score: number;
@@ -65,8 +65,8 @@ export const devicesApi = {
   /**
    * Get all devices for a building
    */
-  getDevices: (buildingId: string) =>
-    fetchApi<Device[]>(`/api/buildings/${buildingId}/devices`),
+  getDevices: (siteId: string) =>
+    fetchApi<Device[]>(`/api/buildings/${siteId}/devices`),
 
   /**
    * Get device details

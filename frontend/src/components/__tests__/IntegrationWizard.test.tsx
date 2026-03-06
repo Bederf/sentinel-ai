@@ -97,7 +97,7 @@ describe('IntegrationWizard', () => {
     it('should render wizard with card container', () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -109,7 +109,7 @@ describe('IntegrationWizard', () => {
     it('should display all four step titles', () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -124,7 +124,7 @@ describe('IntegrationWizard', () => {
     it('should display step descriptions', () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -141,7 +141,7 @@ describe('IntegrationWizard', () => {
     it('should start at Upload File step', () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -153,7 +153,7 @@ describe('IntegrationWizard', () => {
     it('should navigate to Mapping step when Next clicked', async () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -170,7 +170,7 @@ describe('IntegrationWizard', () => {
     it('should navigate to Matching step from Mapping', async () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -196,7 +196,7 @@ describe('IntegrationWizard', () => {
     it('should navigate to Review step from Matching', async () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -228,7 +228,7 @@ describe('IntegrationWizard', () => {
     it('should show progress stepper with step indicators', () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -241,7 +241,7 @@ describe('IntegrationWizard', () => {
     it('should highlight completed steps in progress', async () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -261,7 +261,7 @@ describe('IntegrationWizard', () => {
     it('should disable Back button on first step', () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -274,7 +274,7 @@ describe('IntegrationWizard', () => {
     it('should navigate back from Mapping to Upload', async () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -300,7 +300,7 @@ describe('IntegrationWizard', () => {
     it('should navigate back from Matching to Mapping', async () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -335,7 +335,7 @@ describe('IntegrationWizard', () => {
     it('should display Cancel button on all steps', () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -348,7 +348,7 @@ describe('IntegrationWizard', () => {
       const onClose = vi.fn();
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={onClose}
           onComplete={vi.fn()}
         />
@@ -364,7 +364,7 @@ describe('IntegrationWizard', () => {
       const onClose = vi.fn();
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={onClose}
           onComplete={vi.fn()}
         />
@@ -390,7 +390,7 @@ describe('IntegrationWizard', () => {
     it('should display Configuration Summary on review step', async () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -410,7 +410,7 @@ describe('IntegrationWizard', () => {
     it('should display activation warning callout', async () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -442,7 +442,7 @@ describe('IntegrationWizard', () => {
     it('should display Activate Integration button', async () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -474,7 +474,7 @@ describe('IntegrationWizard', () => {
     it('should display file information in summary', async () => {
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -513,7 +513,7 @@ describe('IntegrationWizard', () => {
 
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -558,7 +558,7 @@ describe('IntegrationWizard', () => {
 
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -609,7 +609,7 @@ describe('IntegrationWizard', () => {
 
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -652,7 +652,7 @@ describe('IntegrationWizard', () => {
 
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -694,7 +694,7 @@ describe('IntegrationWizard', () => {
 
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -726,7 +726,7 @@ describe('IntegrationWizard', () => {
       await waitFor(() => {
         const call = vi.mocked(authorizedFetch).mock.calls[0];
         const body = JSON.parse((call[1] as any).body);
-        expect(body.building_id).toBe('bld-001');
+        expect(body.site_id).toBe('bld-001');
       });
     });
 
@@ -738,7 +738,7 @@ describe('IntegrationWizard', () => {
 
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -785,7 +785,7 @@ describe('IntegrationWizard', () => {
 
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />
@@ -827,7 +827,7 @@ describe('IntegrationWizard', () => {
 
       render(
         <IntegrationWizard
-          buildingId="bld-001"
+          siteId="bld-001"
           onClose={vi.fn()}
           onComplete={vi.fn()}
         />

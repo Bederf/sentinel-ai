@@ -12,7 +12,6 @@ import {
   Shield,
   Settings as SettingsIcon,
   Activity,
-  Package,
   Plug,
   FileText,
   Wrench,
@@ -30,10 +29,9 @@ export type View =
   | "ai-chat"
   | "integrations"
   | "logs"
-  | "assets"
+  | "maintenance"
   | "simbiot"
   | "settings"
-  | "maintenance"
   | "financial"
   | "compliance"
   | "fleet-ml";
@@ -57,10 +55,9 @@ export const VIEW_TITLES: Record<View, string> = {
   "ai-chat": "AI Chat",
   integrations: "System Health",
   logs: "Logs",
-  assets: "Assets",
+  maintenance: "Maintenance",
   simbiot: "SIMBIOT",
   settings: "Settings",
-  maintenance: "Maintenance",
   financial: "Financial",
   compliance: "Compliance & ESG",
   "fleet-ml": "Fleet ML",
@@ -74,7 +71,7 @@ export const BASE_NAV_ITEMS: NavItem[] = [
   { id: "ai-chat", label: "AI Chat", icon: MessageSquare, description: "SENTINEL AI Assistant", category: "base" },
   { id: "integrations", label: "System Health", icon: Activity, description: "Integration monitoring", category: "base" },
   { id: "logs", label: "Logs", icon: FileText, description: "Audit trail and event logs", category: "base" },
-  { id: "assets", label: "Assets", icon: Package, description: "Equipment registry and condition", category: "base" },
+  { id: "maintenance", label: "Maintenance", icon: Wrench, description: "Equipment, work orders & tech chat", category: "base" },
 ];
 
 /**
@@ -90,7 +87,6 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
  * Only visible when the respective add-on module is active.
  */
 export const ADDON_NAV_ITEMS: NavItem[] = [
-  { id: "maintenance", label: "Maintenance", icon: Wrench, description: "Work orders and scheduling", category: "addon", requiredModule: "maintenance" },
   { id: "financial", label: "Financial", icon: DollarSign, description: "Contracts and billing", category: "addon", requiredModule: "financial" },
   { id: "compliance", label: "Compliance", icon: Shield, description: "ESG and certification", category: "addon", requiredModule: "compliance" },
   { id: "fleet-ml", label: "Fleet ML", icon: Brain, description: "Cross-site analytics", category: "addon", requiredModule: "fleet_ml" },

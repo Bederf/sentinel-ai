@@ -58,8 +58,8 @@ class SustainabilityService:
         """Update and persist site sustainability config."""
         config = self.get_config(site_id)
 
-        if "building_sqm" in updates:
-            config.building_sqm = updates["building_sqm"]
+        if "site_sqm" in updates:
+            config.site_sqm = updates["site_sqm"]
         if "occupancy_capacity" in updates:
             config.occupancy_capacity = updates["occupancy_capacity"]
         if "target_reduction_pct" in updates:
@@ -90,10 +90,10 @@ class SustainabilityService:
         """Get energy consumption data from energy API."""
         try:
             from app.api.energy import generate_energy_data, load_equipment
-            from app.services.building_loader import BuildingDataLoader
+            from app.services.site_loader import BuildingDataLoader
 
             loader = BuildingDataLoader()
-            buildings = loader.get_all_buildings()
+            buildings = loader.get_all_sites()
 
             sites = []
             for b in buildings:
@@ -128,7 +128,7 @@ class SustainabilityService:
         """Generate synthetic energy data when energy API is unavailable."""
         random.seed(42)
         config = self.get_config(site_id)
-        sqm = config.building_sqm
+        sqm = config.site_sqm
 
         # SA office typical: ~170 kWh/sqm/year = ~0.465 kWh/sqm/day
         daily_base = sqm * 0.465
@@ -318,7 +318,7 @@ class SustainabilityService:
             "commuting": round(commute_co2, 2),
         }
 
-        sqm = config.building_sqm
+        sqm = config.site_sqm
         return EmissionsSnapshot(
             month=month_str,
             site_id=site_id,
@@ -347,7 +347,7 @@ class SustainabilityService:
         """Get monthly emissions snapshots for the past N months."""
         config = self.get_config(site_id)
         ef = config.emission_factors
-        sqm = config.building_sqm
+        sqm = config.site_sqm
 
         # Get energy data for the full period
         days = months * 30
@@ -453,7 +453,7 @@ class SustainabilityService:
     def get_efficiency_metrics(self, site_id: str) -> Dict:
         """Calculate efficiency metrics with benchmark comparison."""
         config = self.get_config(site_id)
-        sqm = config.building_sqm
+        sqm = config.site_sqm
 
         # Get 12-month data
         history = self.get_emissions_history(site_id, months=12)
@@ -470,7 +470,7 @@ class SustainabilityService:
         return {
             "site_id": site_id,
             "period": "12 months",
-            "building_sqm": sqm,
+            "site_sqm": sqm,
             "energy_intensity_kwh_per_sqm_yr": round(energy_intensity, 1),
             "carbon_intensity_kg_per_sqm_yr": round(carbon_intensity, 1),
             "total_kwh_year": round(total_kwh_year, 0),

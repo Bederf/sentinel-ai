@@ -16,10 +16,10 @@ interface FormatDetectionResult {
 }
 
 export function FileUploadStep({
-  buildingId: _buildingId,
+  siteId: _siteId,
   onNext
 }: {
-  buildingId: string;
+  siteId: string;
   onNext: (data: { file: File; formatDetection: FormatDetectionResult }) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);

@@ -31,7 +31,7 @@ class FMContextService:
         Returns:
             Markdown-formatted site information.
         """
-        sites = load_json("sites.json")
+        sites = load_json("sites.json") or load_json("sites.json")
         equipment = load_json("equipment.json")
         alerts = load_json("alerts.json")
 
@@ -42,11 +42,17 @@ class FMContextService:
         lines.append("|---------|------|--------|------|------------|-----------|---------------|")
 
         for site in sites:
-            site_equipment = [e for e in equipment if e.get("site_id") == site["id"]]
-            site_alerts = [a for a in alerts if a.get("site_id") == site["id"] and a.get("status") == "active"]
+            site_id = site.get("id", "")
+            site_code = site.get("code", site_id)
+            site_equipment = [e for e in equipment if e.get("site_id") == site_id or e.get("site_id") == site_id]
+            site_alerts = [
+                a
+                for a in alerts
+                if (a.get("site_id") == site_id or a.get("site_id") == site_code) and a.get("status") == "active"
+            ]
             lines.append(
-                f"| {site['id']} | {site['name']} | {site['region']} | "
-                f"{site['type']} | {site['sqm']} | {len(site_equipment)} | {len(site_alerts)} |"
+                f"| {site_code} | {site.get('name', '')} | {site.get('region', '')} | "
+                f"{site.get('type', '')} | {site.get('sqm', '')} | {len(site_equipment)} | {len(site_alerts)} |"
             )
 
         return "\n".join(lines)

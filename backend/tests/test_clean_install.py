@@ -38,7 +38,7 @@ class TestCleanInstallDeviceManager:
         assert len(devices) > 0, "reference_devices.json should contain devices"
 
     @pytest.mark.asyncio
-    async def test_building_equipment_loads_regardless(self):
+    async def test_site_equipment_loads_regardless(self):
         """Building equipment loads regardless of site002 setting."""
         from app.api.devices import load_equipment_from_buildings
 

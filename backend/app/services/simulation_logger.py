@@ -26,7 +26,7 @@ class SimulationLogger:
         self,
         run_id: str,
         scenario: str,
-        building_code: str,
+        site_code: str,
         config: Dict[str, Any],
     ) -> None:
         """Initialize logging for a new simulation run."""
@@ -37,7 +37,7 @@ class SimulationLogger:
         self._meta = {
             "run_id": run_id,
             "scenario": scenario,
-            "building_code": building_code,
+            "site_code": site_code,
             "started_at": datetime.now().isoformat(),
             "ended_at": None,
             "duration_minutes": None,

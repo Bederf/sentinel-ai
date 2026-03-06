@@ -50,7 +50,7 @@ class DispatchEvent:
     reason: str
     load_shedding: bool = False
     solar_gen_kw: float = 0.0
-    building_load_kw: float = 0.0
+    site_load_kw: float = 0.0
     grid_import_kw: float = 0.0
     grid_export_kw: float = 0.0
     aegis_proposal_id: Optional[str] = None  # Join key to parasite_decisions
@@ -68,7 +68,7 @@ class DispatchEvent:
             "reason": self.reason,
             "load_shedding": self.load_shedding,
             "solar_gen_kw": round(self.solar_gen_kw, 0),
-            "building_load_kw": round(self.building_load_kw, 0),
+            "site_load_kw": round(self.site_load_kw, 0),
             "grid_import_kw": round(self.grid_import_kw, 0),
             "grid_export_kw": round(self.grid_export_kw, 0),
         }
@@ -240,7 +240,7 @@ class SolarDispatchService:
                     rate_per_kwh=rate,
                     reason=reason,
                     solar_gen_kw=solar_kw_noisy,
-                    building_load_kw=load_kw_noisy,
+                    site_load_kw=load_kw_noisy,
                     grid_import_kw=grid_import,
                     grid_export_kw=grid_export,
                 )
@@ -521,7 +521,7 @@ class SolarDispatchService:
                 site_id=site_id,
                 current_soc_pct=current_soc,
                 solar_gen_kw=solar_kw,
-                building_load_kw=load_kw,
+                site_load_kw=load_kw,
                 load_shedding_active=load_shedding_active,
                 timestamp=now,
             )
@@ -568,7 +568,7 @@ class SolarDispatchService:
             reason=action.reason,
             load_shedding=action.load_shedding_active,
             solar_gen_kw=solar_kw,
-            building_load_kw=load_kw,
+            site_load_kw=load_kw,
             grid_import_kw=grid_import,
             grid_export_kw=grid_export,
         )

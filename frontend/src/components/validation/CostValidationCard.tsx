@@ -79,12 +79,12 @@ function mapCostResponse(raw: CostValidationRaw): CostValidation {
 }
 
 interface CostValidationCardProps {
-  buildingId?: string;
+  siteId?: string;
   className?: string;
 }
 
 export function CostValidationCard({
-  buildingId = "S002",
+  siteId = "S002",
   className = "",
 }: CostValidationCardProps) {
   const [validation, setValidation] = useState<CostValidation | null>(null);
@@ -114,10 +114,10 @@ export function CostValidationCard({
       const token = localStorage.getItem("sentinel_token");
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("site_id", buildingId);
+      formData.append("site_id", siteId);
       formData.append("municipality", "city_power");
       formData.append("utility_type", "electricity");
-      formData.append("account_number", `${buildingId}-MAIN`);
+      formData.append("account_number", `${siteId}-MAIN`);
 
       const response = await fetch("/api/municipal-billing/invoices/upload", {
         method: "POST",
@@ -145,7 +145,7 @@ export function CostValidationCard({
       if (totalZar && totalZar > 0) {
         const now = new Date();
         const reconResponse = await fetch(
-          `/api/validation/cost?site_id=${buildingId}&month=${now.getMonth() + 1}&year=${now.getFullYear()}&real_invoice_cost_r=${totalZar}`,
+          `/api/validation/cost?site_id=${siteId}&month=${now.getMonth() + 1}&year=${now.getFullYear()}&real_invoice_cost_r=${totalZar}`,
           {
             method: "POST",
             headers: {
@@ -183,7 +183,7 @@ export function CostValidationCard({
         setLoading(true);
         const token = localStorage.getItem("sentinel_token");
         const response = await fetch(
-          `/api/validation/cost/daily?site_id=${buildingId}`,
+          `/api/validation/cost/daily?site_id=${siteId}`,
           {
             headers: {
               Authorization: `Bearer ${token || ""}`,
@@ -205,7 +205,7 @@ export function CostValidationCard({
     fetchValidation();
 
     return () => clearInterval(interval);
-  }, [buildingId]);
+  }, [siteId]);
 
   if (loading) {
     return (

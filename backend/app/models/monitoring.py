@@ -62,7 +62,7 @@ class MonitoringSnapshot(BaseModel):
 
     ingestion_mode: str
     is_live: bool
-    building_id: str | None
+    site_id: str | None
     ingestion: IngestionKPIs
     control: ControlKPIs
     commissioning: CommissioningSnapshot | None  # None in SIMULATION mode

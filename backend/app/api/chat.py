@@ -19,10 +19,14 @@ from app.security.sse_buffer import SecureSSEBuffer
 from app.services.claude_service import claude_service
 from app.services.feature_request_logger import log_chat_query
 from app.services.hybrid_ai_service import hybrid_ai_service
+from app.services import slash_command_router
+from app.services.openai_service import openai_service
 from app.services.popia_consent_guard import should_allow_cloud_processing
 from app.services.work_order_service import work_order_service
-from app.services.zai_service import zai_service
 from app.utils.ai_provenance import get_cloud_llm_provenance, get_local_llm_provenance, provenance_headers
+
+# Track Claude credit exhaustion so we skip it on subsequent requests
+_claude_credits_exhausted = False
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -222,35 +226,75 @@ async def generate_sse_stream(
                 if buffer.killed:
                     break
         elif use_tools:
-            # Use tool-enabled streaming for device control capabilities
-            async for chunk in claude_service.stream_response_with_tools(
-                messages,
-                site_id=site_id,
-                user_email=user_email,
-                user_role=user_role,
-            ):
-                safe_text = buffer.add_token(chunk)
-                if safe_text is not None:
-                    yield format_sse_chunk(safe_text)
-                if buffer.killed:
-                    break
+            # Tool-enabled streaming: Claude primary, OpenAI fallback
+            streamed = False
+            global _claude_credits_exhausted
+            if claude_service.is_configured() and not _claude_credits_exhausted:
+                try:
+                    async for chunk in claude_service.stream_response_with_tools(
+                        messages,
+                        site_id=site_id,
+                        user_email=user_email,
+                        user_role=user_role,
+                    ):
+                        safe_text = buffer.add_token(chunk)
+                        if safe_text is not None:
+                            yield format_sse_chunk(safe_text)
+                        if buffer.killed:
+                            break
+                    streamed = True
+                except Exception as claude_err:
+                    if "credit balance" in str(claude_err).lower():
+                        _claude_credits_exhausted = True
+                        logger.warning("Claude credits exhausted, switching to OpenAI")
+                    else:
+                        logger.error("Claude tool chat error: %s", claude_err)
+            if not streamed and openai_service.is_configured():
+                try:
+                    buffer = SecureSSEBuffer(user_role=user_role)
+                    async for chunk in openai_service.stream_response_with_tools(messages):
+                        safe_text = buffer.add_token(chunk)
+                        if safe_text is not None:
+                            yield format_sse_chunk(safe_text)
+                        if buffer.killed:
+                            break
+                    streamed = True
+                except Exception as oai_err:
+                    logger.error("OpenAI tool chat fallback error: %s", oai_err)
+            if not streamed:
+                yield format_sse_chunk("AI services are temporarily unavailable. Please try again shortly.")
         else:
-            # Use regular streaming without tools
-            provider = hybrid_ai_service.get_active_cloud_provider()
-            if provider == "zai":
-                async for chunk in zai_service.stream_response(messages):
-                    safe_text = buffer.add_token(chunk)
-                    if safe_text is not None:
-                        yield format_sse_chunk(safe_text)
-                    if buffer.killed:
-                        break
-            else:
-                async for chunk in claude_service.stream_response(messages):
-                    safe_text = buffer.add_token(chunk)
-                    if safe_text is not None:
-                        yield format_sse_chunk(safe_text)
-                    if buffer.killed:
-                        break
+            # Regular streaming without tools: Claude primary, OpenAI fallback
+            streamed = False
+            if claude_service.is_configured() and not _claude_credits_exhausted:
+                try:
+                    async for chunk in claude_service.stream_response(messages):
+                        safe_text = buffer.add_token(chunk)
+                        if safe_text is not None:
+                            yield format_sse_chunk(safe_text)
+                        if buffer.killed:
+                            break
+                    streamed = True
+                except Exception as claude_err:
+                    if "credit balance" in str(claude_err).lower():
+                        _claude_credits_exhausted = True
+                        logger.warning("Claude credits exhausted, switching to OpenAI")
+                    else:
+                        logger.error("Claude chat error: %s", claude_err)
+            if not streamed and openai_service.is_configured():
+                try:
+                    buffer = SecureSSEBuffer(user_role=user_role)
+                    async for chunk in openai_service.stream_response(messages):
+                        safe_text = buffer.add_token(chunk)
+                        if safe_text is not None:
+                            yield format_sse_chunk(safe_text)
+                        if buffer.killed:
+                            break
+                    streamed = True
+                except Exception as oai_err:
+                    logger.error("OpenAI chat fallback error: %s", oai_err)
+            if not streamed:
+                yield format_sse_chunk("AI services are temporarily unavailable. Please try again shortly.")
 
         # Flush remaining buffer content
         final = buffer.finalize()
@@ -322,6 +366,25 @@ async def chat(
     # The old check_query_safety call is superseded by the new scoring engine.
     user_message = guarded_message.strip() if guarded_message else chat_request.message.strip()
 
+    # --- Slash command interception (no AI needed) ---
+    parsed_cmd = slash_command_router.parse(user_message)
+    if parsed_cmd:
+        command, equipment_code, extra_text = parsed_cmd
+        auth_ctx = get_current_auth(request)
+        user_email = getattr(auth_ctx, "email", None)
+        logger.info("Slash command: /%s_%s (user=%s)", command, equipment_code, user_email)
+        result = await slash_command_router.execute(command, equipment_code, extra_text, user_email)
+        return StreamingResponse(
+            generate_static_sse(result.message),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+                "X-Response-Type": "command_executed",
+            },
+        )
+
     logger.info(
         f"Chat request: conversation_id={chat_request.conversation_id}, "
         f"search_docs={chat_request.search_docs}, site_id={chat_request.site_id}, "
@@ -337,7 +400,8 @@ async def chat(
     # When Claude tools are available, let Claude handle work orders
     # (better UX: confirms details, looks up equipment, validates).
     # Only fall back to direct detection when tools are not available.
-    tools_enabled = hybrid_ai_service.get_active_cloud_provider() == "anthropic"
+    # Tools work with both Claude and OpenAI
+    tools_enabled = claude_service.is_configured() or openai_service.is_configured()
 
     if not tools_enabled:
         wo_detection = work_order_service.detect_work_order_request(user_message)
@@ -367,7 +431,8 @@ async def chat(
                 },
             )
 
-    tools_enabled = hybrid_ai_service.get_active_cloud_provider() == "anthropic"
+    # Tools work with both Claude and OpenAI
+    tools_enabled = claude_service.is_configured() or openai_service.is_configured()
     return StreamingResponse(
         generate_sse_stream(
             user_message,
@@ -408,7 +473,7 @@ async def chat_status():
         "features": {
             "device_control": tools_enabled,  # Tool-based control is Claude-only
             "work_orders": True,
-            "building_context": True,
+            "site_context": True,
             "demo_cache": settings.demo_mode,
             "tool_calling": tools_enabled,
             "documentation_search": True,  # RAG-based documentation search

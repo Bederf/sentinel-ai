@@ -439,9 +439,9 @@ def _register_dali_if_discovered(
         lighting_service = get_lighting_service()
         site_name = site_id  # Default; could resolve from building registry
         try:
-            from app.database.repositories.building_repository import BuildingRepository
+            from app.database.repositories.site_repository import SiteRepository
 
-            building_repo = BuildingRepository()
+            building_repo = SiteRepository()
             building = building_repo.get_by_id(site_id)
             if building:
                 site_name = building.get("name", site_id)

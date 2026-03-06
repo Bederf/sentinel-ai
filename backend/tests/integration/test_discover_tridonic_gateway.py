@@ -16,7 +16,7 @@ async def test_discover_tridonic_gateway_simulated():
 
     # Test with simulated mode
     result = await discover_tridonic_gateway_tool(
-        building_id="site-002",
+        site_id="site-002",
         gateway_ip="192.168.10.50",
         gateway_type="tridonic",
         use_simulated=True,
@@ -24,7 +24,7 @@ async def test_discover_tridonic_gateway_simulated():
 
     # Verify result structure
     assert result["success"] is True
-    assert result["building_id"] == "site-002"
+    assert result["site_id"] == "site-002"
     assert result["gateway_ip"] == "192.168.10.50"
     assert result["gateway"] is not None
     assert result["gateway"]["simulated"] is True
@@ -56,7 +56,7 @@ async def test_discover_tridonic_gateway_offline():
 
     # Test with offline gateway and no simulated mode
     result = await discover_tridonic_gateway_tool(
-        building_id="site-003",
+        site_id="site-003",
         gateway_ip="192.168.10.99",
         gateway_type="tridonic",
         use_simulated=False,
@@ -75,7 +75,7 @@ async def test_discover_tridonic_gateway_equipment_code_format():
     from app.mcp.simbiot_server import discover_tridonic_gateway_tool
 
     result = await discover_tridonic_gateway_tool(
-        building_id="site-005",
+        site_id="site-005",
         gateway_ip="192.168.10.50",
         use_simulated=True,
     )
@@ -104,7 +104,7 @@ async def test_discover_tridonic_gateway_equipment_code_format():
 
 
 @pytest.mark.asyncio
-async def test_discover_tridonic_gateway_different_building_id_formats():
+async def test_discover_tridonic_gateway_different_site_id_formats():
     """Test equipment code generation with different building ID formats."""
     from app.mcp.simbiot_server import discover_tridonic_gateway_tool
 
@@ -114,9 +114,9 @@ async def test_discover_tridonic_gateway_different_building_id_formats():
         ("site-123", "S123"),
     ]
 
-    for building_id, expected_site_code in test_cases:
+    for site_id, expected_site_code in test_cases:
         result = await discover_tridonic_gateway_tool(
-            building_id=building_id,
+            site_id=site_id,
             gateway_ip="192.168.10.50",
             use_simulated=True,
         )
@@ -136,7 +136,7 @@ async def test_discover_tridonic_gateway_summary_counts():
     from app.mcp.simbiot_server import discover_tridonic_gateway_tool
 
     result = await discover_tridonic_gateway_tool(
-        building_id="site-002",
+        site_id="site-002",
         gateway_ip="192.168.10.50",
         use_simulated=True,
     )

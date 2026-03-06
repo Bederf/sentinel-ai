@@ -40,7 +40,7 @@ def get_stats_from_supabase() -> Optional[dict]:
         client = get_supabase_client()
 
         # Get building count
-        buildings_result = client.table("buildings").select("id", count="exact").execute()
+        buildings_result = client.table("sites").select("id", count="exact").execute()
         total_sites = buildings_result.count or 0
 
         # Get equipment counts by status
@@ -94,7 +94,7 @@ def get_stats_from_supabase() -> Optional[dict]:
         total_damage = sum(a.get("damage_cost_zar", 0) for a in anomalies)
 
         # Get buildings with sqm for total
-        buildings_detail = client.table("buildings").select("region,sqm").execute()
+        buildings_detail = client.table("sites").select("region,sqm").execute()
         buildings = buildings_detail.data or []
         total_sqm = sum(b.get("sqm", 0) for b in buildings)
 

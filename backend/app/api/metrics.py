@@ -180,6 +180,224 @@ sentinel_cache_hit_rate_percent = Gauge(
 )
 
 # ---------------------------------------------------------------------------
+# FM / Media Wall metrics (Phase 144 — Building Intelligence Dashboard)
+# ---------------------------------------------------------------------------
+
+# 17. Active alerts by severity and building
+sentinel_alerts = Gauge(
+    "sentinel_alerts",
+    "Active alerts by severity and building",
+    labelnames=["severity", "building", "status"],
+    registry=REGISTRY,
+)
+
+# 18. Job cards by status and outcome
+sentinel_job_cards = Gauge(
+    "sentinel_job_cards",
+    "Job card records by building, status, and outcome",
+    labelnames=["building", "status", "outcome"],
+    registry=REGISTRY,
+)
+
+# 19. Job cards created total (counter for rate calculations)
+sentinel_job_cards_created_total = Counter(
+    "sentinel_job_cards_created_total",
+    "Total job cards created by building",
+    labelnames=["building"],
+    registry=REGISTRY,
+)
+
+# 20. SLA met count
+sentinel_sla_met = Gauge(
+    "sentinel_sla_met",
+    "Count of SLA-compliant completed jobs by building",
+    labelnames=["building"],
+    registry=REGISTRY,
+)
+
+# 21. Critical response time
+sentinel_critical_response_time_seconds = Gauge(
+    "sentinel_critical_response_time_seconds",
+    "Average response time for critical alerts in seconds",
+    labelnames=["severity", "building"],
+    registry=REGISTRY,
+)
+
+# 22. Equipment health status
+sentinel_equipment_health = Gauge(
+    "sentinel_equipment_health",
+    "Equipment health status gauge (1 = in this state)",
+    labelnames=["building", "equipment", "health"],
+    registry=REGISTRY,
+)
+
+# 23. Equipment issues (for table panel)
+sentinel_equipment_issues = Gauge(
+    "sentinel_equipment_issues",
+    "Active equipment issues with details",
+    labelnames=["building", "equipment", "issue", "severity"],
+    registry=REGISTRY,
+)
+
+# 24. Maintenance backlog in days
+sentinel_maintenance_backlog_days = Gauge(
+    "sentinel_maintenance_backlog_days",
+    "Days of pending maintenance work per building",
+    labelnames=["building"],
+    registry=REGISTRY,
+)
+
+
+_site_name_cache: dict[str, str] = {}
+
+
+def _resolve_site_name(client, site_id: str) -> str:
+    """Resolve site UUID to readable name, with caching."""
+    if not site_id or site_id == "None":
+        return "unknown"
+    if site_id in _site_name_cache:
+        return _site_name_cache[site_id]
+    try:
+        resp = client.table("sites").select("name, code").eq("id", site_id).limit(1).execute()
+        if resp.data:
+            name = resp.data[0].get("code") or resp.data[0].get("name") or site_id
+            _site_name_cache[site_id] = name
+            return name
+    except Exception:
+        pass
+    _site_name_cache[site_id] = site_id
+    return site_id
+
+
+def _collect_fm_metrics() -> None:
+    """Collect FM metrics from Supabase for the media wall dashboard.
+
+    Called on each /metrics scrape to provide fresh data.
+    Gauges are reset and re-populated from live database queries.
+    """
+    import logging
+
+    logger = logging.getLogger("sentinel.metrics")
+
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        if not client:
+            return
+    except Exception:
+        return
+
+    # --- Alerts by severity and building ---
+    try:
+        alerts_resp = client.table("alerts").select("severity, site_id").eq("status", "active").execute()
+        # Reset alert gauges
+        sentinel_alerts._metrics.clear()
+
+        if alerts_resp.data:
+            # Count by severity and building
+            alert_counts: dict[tuple[str, str], int] = {}
+            for alert in alerts_resp.data:
+                sev = alert.get("severity", "info")
+                building = _resolve_site_name(client, alert.get("site_id", ""))
+                key = (sev, building)
+                alert_counts[key] = alert_counts.get(key, 0) + 1
+
+            for (sev, building), count in alert_counts.items():
+                sentinel_alerts.labels(severity=sev, building=building, status="active").set(count)
+    except Exception as e:
+        logger.debug(f"FM metrics: alerts query failed: {e}")
+
+    # --- Equipment health ---
+    try:
+        equip_resp = client.table("equipment").select("code, name, health_score, site_id, status").execute()
+        sentinel_equipment_health._metrics.clear()
+        sentinel_equipment_issues._metrics.clear()
+
+        if equip_resp.data:
+            building_degrading: dict[str, int] = {}
+            for eq in equip_resp.data:
+                health = eq.get("health_score")
+                if health is None:
+                    continue
+                site = _resolve_site_name(client, eq.get("site_id", ""))
+                code = eq.get("code", "unknown")
+                status = eq.get("status", "unknown")
+
+                if health < 50:
+                    state = "critical"
+                elif health < 75:
+                    state = "degrading"
+                    building_degrading[site] = building_degrading.get(site, 0) + 1
+                else:
+                    state = "healthy"
+
+                sentinel_equipment_health.labels(building=site, equipment=code, health=state).set(1)
+
+                # Populate issues table for degrading/critical
+                if state in ("critical", "degrading"):
+                    issue_text = f"Health score {health}% — {status}"
+                    sentinel_equipment_issues.labels(
+                        building=site,
+                        equipment=code,
+                        issue=issue_text,
+                        severity="critical" if state == "critical" else "warning",
+                    ).set(1)
+    except Exception as e:
+        logger.debug(f"FM metrics: equipment query failed: {e}")
+
+    # --- Work orders (job cards) ---
+    try:
+        wo_resp = client.table("work_orders").select("site_id, status, priority, created_at, completed_at").execute()
+        sentinel_job_cards._metrics.clear()
+        sentinel_sla_met._metrics.clear()
+        sentinel_maintenance_backlog_days._metrics.clear()
+
+        if wo_resp.data:
+            # Count by building + status
+            wo_counts: dict[tuple[str, str], int] = {}
+            completed_by_building: dict[str, int] = {}
+            sla_met_by_building: dict[str, int] = {}
+            open_by_building: dict[str, int] = {}
+
+            for wo in wo_resp.data:
+                site = _resolve_site_name(client, wo.get("site_id", ""))
+                status = wo.get("status", "open")
+                wo_counts[(site, status)] = wo_counts.get((site, status), 0) + 1
+
+                if status == "completed":
+                    completed_by_building[site] = completed_by_building.get(site, 0) + 1
+                    # SLA: completed within 48h = met
+                    created = wo.get("created_at")
+                    completed = wo.get("completed_at")
+                    if created and completed:
+                        try:
+                            from datetime import datetime as dt
+
+                            c = dt.fromisoformat(created.replace("Z", "+00:00"))
+                            d = dt.fromisoformat(completed.replace("Z", "+00:00"))
+                            if (d - c).total_seconds() < 172800:  # 48h
+                                sla_met_by_building[site] = sla_met_by_building.get(site, 0) + 1
+                        except Exception:
+                            pass
+                elif status in ("open", "in_progress", "assigned"):
+                    open_by_building[site] = open_by_building.get(site, 0) + 1
+
+            for (site, status), count in wo_counts.items():
+                outcome = "first_fix" if status == "completed" else "pending"
+                sentinel_job_cards.labels(building=site, status=status, outcome=outcome).set(count)
+
+            for site, count in sla_met_by_building.items():
+                sentinel_sla_met.labels(building=site).set(count)
+
+            # Backlog = open work orders (rough proxy for days)
+            for site, count in open_by_building.items():
+                sentinel_maintenance_backlog_days.labels(building=site).set(count)
+    except Exception as e:
+        logger.debug(f"FM metrics: work orders query failed: {e}")
+
+
+# ---------------------------------------------------------------------------
 # Static info set once at import time
 # ---------------------------------------------------------------------------
 _MODE = os.getenv("SENTINEL_MODE", "simulation")
@@ -308,6 +526,12 @@ async def prometheus_metrics(request: Request) -> PlainTextResponse:
     # Seed demo values on first request (only in DEMO_MODE)
     if _DEMO_MODE:
         _seed_demo_values()
+
+    # Collect live FM metrics from Supabase (media wall dashboard)
+    try:
+        _collect_fm_metrics()
+    except Exception:
+        pass  # Never let metrics collection crash the endpoint
 
     # Generate Prometheus text exposition
     output = generate_latest(REGISTRY)

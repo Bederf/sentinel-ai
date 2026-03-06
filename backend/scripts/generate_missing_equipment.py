@@ -14,7 +14,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-EQUIP_DIR = Path(__file__).resolve().parent.parent / "app" / "data" / "buildings" / "site-002" / "equipment"
+EQUIP_DIR = Path(__file__).resolve().parent.parent / "app" / "data" / "sites" / "site-002" / "equipment"
 NOW = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")
 
 

@@ -38,12 +38,12 @@ class FeatureEngineeringService:
     SA_CARBON_INTENSITY = 0.35  # kg CO2/kWh
 
     def __init__(self):
-        self._building_cache: Dict[str, Dict[str, Any]] = {}
+        self._site_cache: Dict[str, Dict[str, Any]] = {}
 
-    def _get_building_metadata(self, site_id: str) -> Dict[str, Any]:
+    def _get_site_metadata(self, site_id: str) -> Dict[str, Any]:
         """Load building metadata (sqm, floors, operating hours)."""
-        if site_id in self._building_cache:
-            return self._building_cache[site_id]
+        if site_id in self._site_cache:
+            return self._site_cache[site_id]
 
         try:
             from app.services.ai_optimizer import load_sites
@@ -51,7 +51,7 @@ class FeatureEngineeringService:
             sites = load_sites()
             for site in sites:
                 if site.get("id") == site_id:
-                    self._building_cache[site_id] = site
+                    self._site_cache[site_id] = site
                     return site
         except Exception as e:
             logger.debug(f"Could not load building metadata for {site_id}: {e}")
@@ -59,14 +59,14 @@ class FeatureEngineeringService:
         # Fallback defaults
         return {"sqm": 9000, "floors": 5, "operating_hours": {"start": "08:00", "end": "18:00"}}
 
-    async def compute_building_features(self, site_id: str) -> Dict[str, Any]:
+    async def compute_site_features(self, site_id: str) -> Dict[str, Any]:
         """Compute all building-level derived features.
 
         Returns dict with: eui, base_load_index, cooling_degree_days,
         setpoint_deviation, efficiency_score, and their components.
         """
         features: Dict[str, Any] = {}
-        building = self._get_building_metadata(site_id)
+        building = self._get_site_metadata(site_id)
         sqm = building.get("sqm", 9000)
 
         # Gather telemetry from simulation store or Supabase

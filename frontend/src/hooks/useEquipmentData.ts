@@ -12,21 +12,21 @@ import type { Equipment } from '@/lib/api/sites';
  *
  * Refreshes every 5 seconds to keep equipment status current
  */
-export function useEquipmentData(buildingId: string) {
+export function useEquipmentData(siteId: string) {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchEquipment() {
-      if (!buildingId) {
+      if (!siteId) {
         setLoading(false);
         return;
       }
 
       try {
         setLoading(true);
-        const response = await sitesApi.getEquipment(buildingId);
+        const response = await sitesApi.getEquipment(siteId);
         setEquipment(response.equipment || []);
         setError(null);
       } catch (err) {
@@ -44,7 +44,7 @@ export function useEquipmentData(buildingId: string) {
     // Redis cache (300s TTL) will serve most requests quickly
     const interval = setInterval(fetchEquipment, 5000);
     return () => clearInterval(interval);
-  }, [buildingId]);
+  }, [siteId]);
 
   return { equipment, loading, error };
 }

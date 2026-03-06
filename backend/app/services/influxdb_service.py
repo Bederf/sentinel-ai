@@ -161,7 +161,7 @@ class InfluxDBService:
             return True
 
         return self.write_sensor_reading(
-            building_id=tags.get("building", "default") if tags else "default",
+            site_id=tags.get("building", "default") if tags else "default",
             equipment_id=equipment_id,
             sensor_type=sensor_type,
             value=value,
@@ -311,7 +311,7 @@ class InfluxDBService:
 
     def write_sensor_reading(
         self,
-        building_id: str,
+        site_id: str,
         equipment_id: str,
         sensor_type: str,
         value: float,
@@ -321,7 +321,7 @@ class InfluxDBService:
         """Write a single sensor reading.
 
         Args:
-            building_id: Building identifier
+            site_id: Building identifier
             equipment_id: Equipment identifier
             sensor_type: Type of sensor (e.g., "temperature", "vibration_rms")
             value: Sensor reading value
@@ -348,7 +348,7 @@ class InfluxDBService:
 
             point = (
                 Point("sensor_reading")
-                .tag("building", building_id)
+                .tag("building", site_id)
                 .tag("equipment", equipment_id)
                 .tag("sensor_type", sensor_type)
                 .field("value", float(value))
@@ -372,7 +372,7 @@ class InfluxDBService:
 
         Args:
             readings: List of reading dicts with keys:
-                - building_id (optional), equipment_id, sensor_type, value
+                - site_id (optional), equipment_id, sensor_type, value
                 - Optional: unit, timestamp
 
         Returns:
@@ -403,7 +403,7 @@ class InfluxDBService:
             for reading in readings:
                 point = (
                     Point("sensor_reading")
-                    .tag("building", reading.get("building_id", "default"))
+                    .tag("building", reading.get("site_id", "default"))
                     .tag("equipment", reading["equipment_id"])
                     .tag("sensor_type", reading["sensor_type"])
                     .field("value", float(reading["value"]))
@@ -458,7 +458,7 @@ class InfluxDBService:
                 return [
                     {
                         "timestamp": r.timestamp,
-                        "building_id": "default",
+                        "site_id": "default",
                         "equipment_id": r.equipment_id,
                         "sensor_type": r.sensor_type,
                         "value": r.value,
@@ -475,7 +475,7 @@ class InfluxDBService:
                             [
                                 {
                                     "timestamp": r.timestamp,
-                                    "building_id": "default",
+                                    "site_id": "default",
                                     "equipment_id": r.equipment_id,
                                     "sensor_type": r.sensor_type,
                                     "value": r.value,
@@ -517,7 +517,7 @@ class InfluxDBService:
                     readings.append(
                         {
                             "timestamp": record.get_time(),
-                            "building_id": record.values.get("building"),
+                            "site_id": record.values.get("building"),
                             "equipment_id": record.values.get("equipment"),
                             "sensor_type": record.values.get("sensor_type"),
                             "value": record.get_value(),

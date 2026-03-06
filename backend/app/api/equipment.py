@@ -111,7 +111,6 @@ async def load_equipment() -> list[dict]:
                         "health_score": int(eq.get("health_score") or 100),
                         "location": eq.get("location") or "",
                         "serial_number": eq.get("serial_number") or "",
-                        "building_id": eq.get("building_id") or "",
                     }
                 )
 
@@ -637,7 +636,7 @@ async def get_equipment_controls(equipment_id: str):
             eq = next((e for e in equipment_list if e.get("id") == equipment_id), None)
             # Map JSON fields to expected format
             if eq:
-                eq["building_id"] = eq.get("site_id", "")
+                eq["site_id"] = eq.get("site_id", "")
 
         if not eq:
             raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
@@ -782,7 +781,7 @@ async def get_equipment_controls(equipment_id: str):
             "type": eq.get("type", "unknown"),
             "protocol": "supabase",
             "location": eq.get("location", ""),
-            "site_id": eq.get("building_id", ""),
+            "site_id": eq.get("site_id", ""),
             "description": f"{eq.get('manufacturer', '')} {eq.get('model', '')}".strip() or eq.get("name", ""),
             "points": points,
             "status": eq.get("status", "normal"),
@@ -843,7 +842,7 @@ async def control_equipment(
             equipment_list = await load_equipment()
             eq = next((e for e in equipment_list if e.get("id") == equipment_id), None)
             if eq:
-                eq["building_id"] = eq.get("site_id", "")
+                eq["site_id"] = eq.get("site_id", "")
 
         if not eq:
             raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")

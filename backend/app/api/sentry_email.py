@@ -212,8 +212,15 @@ def _build_reply_template(action: str, intake: dict[str, Any]) -> str:
     return body
 
 
-def _build_reply_html(action: str, intake: dict[str, Any]) -> str:
-    """Build a branded HTML auto-reply for n8n to send."""
+def _build_reply_html(action: str, intake: dict[str, Any], agent_body: str | None = None) -> str:
+    """Build a branded HTML auto-reply for n8n to send.
+
+    Args:
+        action: The action taken (auto_submit, request_info, etc.)
+        intake: The intake record dict
+        agent_body: If provided, use this AI-generated text as the body
+                    instead of the action-specific template text.
+    """
     ref = intake.get("concept_ref") or intake.get("id", "")[:8]
     category = intake.get("issue_category", "general")
     summary = intake.get("issue_summary", "your request")
@@ -235,8 +242,16 @@ def _build_reply_html(action: str, intake: dict[str, Any]) -> str:
     }
     badge_colour = cat_colours.get(category, "#6b7280")
 
-    # Action-specific body section
-    if action == "linked_existing":
+    # Body section: use agent-generated text if available, else action templates
+    if agent_body:
+        # Convert agent plain text to HTML paragraphs
+        body_section = ""
+        for para in agent_body.split("\n\n"):
+            para = para.strip()
+            if not para:
+                continue
+            body_section += f"<p>{_esc(para).replace(chr(10), '<br>')}</p>"
+    elif action == "linked_existing":
         existing_ref = intake.get("existing_reference", ref)
         body_section = (
             f"<p>Thank you for your follow-up regarding <strong>{_esc(summary)}</strong>.</p>"
@@ -407,27 +422,27 @@ async def _enrich_with_bms(site_id: Optional[str], issue_category: Optional[str]
     if not site_id:
         return context
 
-    building_uuid: Optional[str] = None
+    site_uuid: Optional[str] = None
 
     # 1. Building lookup (also resolves UUID for subsequent queries)
     try:
-        from app.database.repositories import BuildingRepository
+        from app.database.repositories import SiteRepository
 
-        building_repo = BuildingRepository()
+        building_repo = SiteRepository()
         building = building_repo.get_by_id(site_id)
         if building:
-            context["building_name"] = building.get("name", site_id)
-            building_uuid = building.get("id")
+            context["site_name"] = building.get("name", site_id)
+            site_uuid = building.get("id")
     except Exception as exc:
         logger.debug("BMS enrichment: building lookup failed: %s", exc)
 
     # 2. Active alerts for the building
-    if building_uuid:
+    if site_uuid:
         try:
             from app.database.repositories.alert_repository import AlertRepository
 
             alert_repo = AlertRepository()
-            alerts = alert_repo.get_active_by_building(building_uuid)
+            alerts = alert_repo.get_active_by_site(site_uuid)
             if alerts:
                 context["active_alerts"] = [
                     {
@@ -441,7 +456,7 @@ async def _enrich_with_bms(site_id: Optional[str], issue_category: Optional[str]
             logger.debug("BMS enrichment: alerts lookup failed: %s", exc)
 
     # 3. Recent open work orders
-    if building_uuid:
+    if site_uuid:
         try:
             from app.database.repositories.work_order_repository import (
                 WorkOrderRepository,
@@ -450,7 +465,7 @@ async def _enrich_with_bms(site_id: Optional[str], issue_category: Optional[str]
             wo_repo = WorkOrderRepository()
             open_wos = await wo_repo.get_all_work_orders(limit=5, status="scheduled")
             # Filter to this building (get_all doesn't filter by building)
-            site_wos = [w for w in (open_wos or []) if w.get("building_id") == building_uuid][:3]
+            site_wos = [w for w in (open_wos or []) if w.get("site_id") == site_uuid][:3]
             if site_wos:
                 context["recent_work_orders"] = [
                     {
@@ -465,12 +480,12 @@ async def _enrich_with_bms(site_id: Optional[str], issue_category: Optional[str]
             logger.debug("BMS enrichment: work orders lookup failed: %s", exc)
 
     # 4. Equipment health summary
-    if building_uuid:
+    if site_uuid:
         try:
-            from app.database.repositories import BuildingRepository as BR
+            from app.database.repositories import SiteRepository as BR
 
             br = BR()
-            at_risk_count = br.get_at_risk_equipment_count(building_uuid)
+            at_risk_count = br.get_at_risk_equipment_count(site_uuid)
             if at_risk_count > 0:
                 context["equipment_health"] = {
                     "at_risk_count": at_risk_count,
@@ -603,13 +618,13 @@ async def _create_concept_work_order(intake: dict[str, Any]) -> Optional[str]:
 
                 sb = get_supabase_client()
                 if sb:
-                    bld = sb.table("buildings").select("id").eq("code", site_id).execute()
+                    bld = sb.table("sites").select("id").eq("code", site_id).execute()
                     if bld.data:
-                        building_id = bld.data[0]["id"]
+                        site_id = bld.data[0]["id"]
                         tech_result = (
                             sb.table("site_technicians")
                             .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                            .eq("building_id", building_id)
+                            .eq("site_id", site_id)
                             .eq("specialty", specialty)
                             .eq("is_primary", True)
                             .execute()
@@ -621,7 +636,7 @@ async def _create_concept_work_order(intake: dict[str, Any]) -> Optional[str]:
                             tech_result = (
                                 sb.table("site_technicians")
                                 .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                                .eq("building_id", building_id)
+                                .eq("site_id", site_id)
                                 .eq("specialty", "general")
                                 .eq("is_primary", True)
                                 .execute()
@@ -717,10 +732,16 @@ async def _send_reply_and_respond(
     If disabled or sending fails, ``reply_sent=False`` and n8n falls back to
     its own emailSend node (without threading).
     """
-    # Phase 134: Use agent-generated reply if available, else template
-    if record.get("_agent_reply_text"):
-        reply_template = record["_agent_reply_text"]
-        reply_html = record["_agent_reply_html"]
+    # Always use the rich HTML template — pass agent text as body when available
+    agent_text = record.get("_agent_reply_text")
+    if agent_text:
+        reply_template = agent_text
+        # Inject BMS context into record for the HTML builder
+        if bms_context and "bms_context" not in record:
+            record["bms_context"] = bms_context
+        if concept_ref and "concept_ref" not in record:
+            record["concept_ref"] = concept_ref
+        reply_html = _build_reply_html(action_taken, record, agent_body=agent_text)
     else:
         reply_template = _build_reply_template(action_taken, record)
         reply_html = _build_reply_html(action_taken, record)
@@ -1084,6 +1105,34 @@ async def email_intake(
             req.floor_hint = req.floor_hint or agent_result.location_floor
             req.from_phone = req.from_phone or agent_result.phone
 
+            # --- Post-agent regex safety net ---
+            # Agent may miss structured data that regex catches reliably
+            if req.subject or req.body_plain:
+                combined = f"{req.subject or ''} {req.body_plain or ''}"
+
+                # Desk extraction safety net
+                if not req.zone_hint:
+                    desk = extract_desk_from_message(combined)
+                    if desk:
+                        req.zone_hint = f"Desk {desk}"
+                        logger.info("Post-agent regex found desk: %s", desk)
+
+                # Floor extraction safety net
+                if not req.floor_hint:
+                    floor = extract_floor_from_message(combined)
+                    if floor:
+                        req.floor_hint = floor
+                        logger.info("Post-agent regex found floor: %s", floor)
+
+                # Phone extraction safety net
+                if not req.from_phone:
+                    phone_match = re.search(r"\b(0\d{9})\b", combined)
+                    if not phone_match:
+                        phone_match = re.search(r"\b(\+27\d{9})\b", combined)
+                    if phone_match:
+                        req.from_phone = phone_match.group(1)
+                        logger.info("Post-agent regex found phone: %s", req.from_phone)
+
             # Use agent's classification as taxonomy result
             taxonomy_result = {
                 "discipline": agent_result.discipline,
@@ -1161,7 +1210,15 @@ async def email_intake(
     # ------------------------------------------------------------------
     if agent_result is not None:
         completeness = agent_result.completeness
-        route = agent_result.action
+        # Boost if post-agent regex found fields the agent missed
+        if req.zone_hint and not agent_result.location_desk:
+            completeness = min(1.0, completeness + 0.25)
+        if req.from_phone and not agent_result.phone:
+            completeness = min(1.0, completeness + 0.10)
+        if req.floor_hint and not agent_result.location_floor:
+            completeness = min(1.0, completeness + 0.05)
+        completeness = round(completeness, 3)
+        route = _determine_route(completeness)  # Re-derive from boosted score
     else:
         completeness = _score_completeness(req)
         if taxonomy_result:

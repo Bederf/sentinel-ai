@@ -19,12 +19,12 @@ class DeviceRepository:
         self.client = get_supabase_client()
 
     def get_all(
-        self, building_id: Optional[str] = None, device_type: Optional[str] = None, status: Optional[str] = None
+        self, site_id: Optional[str] = None, device_type: Optional[str] = None, status: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all devices with optional filtering.
 
         Args:
-            building_id: Filter by building UUID
+            site_id: Filter by building UUID
             device_type: Filter by device type (hvac, lighting, security, etc.)
             status: Filter by status (online, offline, fault, etc.)
 
@@ -33,8 +33,8 @@ class DeviceRepository:
         """
         query = self.client.table("devices").select("*")
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
         if device_type:
             query = query.eq("device_type", device_type)
         if status:
@@ -43,19 +43,17 @@ class DeviceRepository:
         response = query.execute()
         return response.data
 
-    def get_by_id(self, building_id: str, device_id: str) -> Optional[Dict[str, Any]]:
+    def get_by_id(self, site_id: str, device_id: str) -> Optional[Dict[str, Any]]:
         """Get device by building and device_id composite key.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             device_id: Device identifier (e.g., 'S001-CHILLER-B1-001')
 
         Returns:
             Device data or None if not found
         """
-        response = (
-            self.client.table("devices").select("*").eq("building_id", building_id).eq("device_id", device_id).execute()
-        )
+        response = self.client.table("devices").select("*").eq("site_id", site_id).eq("device_id", device_id).execute()
 
         if response.data:
             return response.data[0]
@@ -76,25 +74,25 @@ class DeviceRepository:
             return response.data[0]
         return None
 
-    def get_by_building_code(self, building_code: str) -> List[Dict[str, Any]]:
+    def get_by_site_code(self, site_code: str) -> List[Dict[str, Any]]:
         """Get devices by building code.
 
         Args:
-            building_code: Building code (e.g., 'sandton')
+            site_code: Building code (e.g., 'sandton')
 
         Returns:
             List of devices
         """
         # First get the building UUID
-        building_response = self.client.table("buildings").select("id").eq("code", building_code).execute()
+        site_response = self.client.table("sites").select("id").eq("code", site_code).execute()
 
-        if not building_response.data:
+        if not site_response.data:
             return []
 
-        building_uuid = building_response.data[0]["id"]
+        site_uuid = site_response.data[0]["id"]
 
         # Get devices for this building
-        response = self.client.table("devices").select("*").eq("building_id", building_uuid).execute()
+        response = self.client.table("devices").select("*").eq("site_id", site_uuid).execute()
 
         return response.data
 
@@ -124,55 +122,55 @@ class DeviceRepository:
 
         return response.data
 
-    def get_with_details(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_with_details(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get devices with enriched building/equipment/zone details.
 
         Uses the v_devices_with_equipment view for efficient joins.
 
         Args:
-            building_id: Optional filter by building UUID
+            site_id: Optional filter by building UUID
 
         Returns:
             List of enriched device records
         """
         query = self.client.table("v_devices_with_equipment").select("*")
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
 
         response = query.execute()
         return response.data
 
-    def get_fault_devices(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_fault_devices(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all devices with fault status.
 
         Args:
-            building_id: Optional filter by building UUID
+            site_id: Optional filter by building UUID
 
         Returns:
             List of devices in fault state
         """
         query = self.client.table("devices").select("*").eq("status", "fault")
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
 
         response = query.execute()
         return response.data
 
-    def get_offline_devices(self, building_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_offline_devices(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all offline devices.
 
         Args:
-            building_id: Optional filter by building UUID
+            site_id: Optional filter by building UUID
 
         Returns:
             List of offline devices
         """
         query = self.client.table("devices").select("*").eq("status", "offline")
 
-        if building_id:
-            query = query.eq("building_id", building_id)
+        if site_id:
+            query = query.eq("site_id", site_id)
 
         response = query.execute()
         return response.data
@@ -181,7 +179,7 @@ class DeviceRepository:
         """Create a new device.
 
         Args:
-            device_data: Device data including building_id, device_id, name, etc.
+            device_data: Device data including site_id, device_id, name, etc.
 
         Returns:
             Created device
@@ -192,7 +190,7 @@ class DeviceRepository:
     def upsert(self, device_data: Dict[str, Any]) -> Dict[str, Any]:
         """Insert or update a device.
 
-        Uses composite unique constraint (building_id, device_id).
+        Uses composite unique constraint (site_id, device_id).
 
         Args:
             device_data: Device data
@@ -200,7 +198,7 @@ class DeviceRepository:
         Returns:
             Upserted device data
         """
-        response = self.client.table("devices").upsert(device_data, on_conflict="building_id,device_id").execute()
+        response = self.client.table("devices").upsert(device_data, on_conflict="site_id,device_id").execute()
         return response.data[0] if response.data else {}
 
     def upsert_many(self, devices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -215,14 +213,14 @@ class DeviceRepository:
         if not devices:
             return []
 
-        response = self.client.table("devices").upsert(devices, on_conflict="building_id,device_id").execute()
+        response = self.client.table("devices").upsert(devices, on_conflict="site_id,device_id").execute()
         return response.data
 
-    def update(self, building_id: str, device_id: str, device_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update(self, site_id: str, device_id: str, device_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a device.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             device_id: Device identifier
             device_data: Data to update
 
@@ -230,11 +228,7 @@ class DeviceRepository:
             Updated device or None if not found
         """
         response = (
-            self.client.table("devices")
-            .update(device_data)
-            .eq("building_id", building_id)
-            .eq("device_id", device_id)
-            .execute()
+            self.client.table("devices").update(device_data).eq("site_id", site_id).eq("device_id", device_id).execute()
         )
 
         if response.data:
@@ -257,19 +251,17 @@ class DeviceRepository:
             return response.data[0]
         return None
 
-    def delete(self, building_id: str, device_id: str) -> bool:
+    def delete(self, site_id: str, device_id: str) -> bool:
         """Delete a device.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             device_id: Device identifier
 
         Returns:
             True if deleted, False if not found
         """
-        response = (
-            self.client.table("devices").delete().eq("building_id", building_id).eq("device_id", device_id).execute()
-        )
+        response = self.client.table("devices").delete().eq("site_id", site_id).eq("device_id", device_id).execute()
 
         return len(response.data) > 0
 
@@ -285,26 +277,26 @@ class DeviceRepository:
         response = self.client.table("devices").delete().eq("id", uuid).execute()
         return len(response.data) > 0
 
-    def update_status(self, building_id: str, device_id: str, status: str) -> Optional[Dict[str, Any]]:
+    def update_status(self, site_id: str, device_id: str, status: str) -> Optional[Dict[str, Any]]:
         """Update device status.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             device_id: Device identifier
             status: New status ('online', 'offline', 'fault', 'maintenance', 'standby')
 
         Returns:
             Updated device or None if not found
         """
-        return self.update(building_id, device_id, {"status": status})
+        return self.update(site_id, device_id, {"status": status})
 
-    def update_last_seen(self, building_id: str, device_id: str) -> Optional[Dict[str, Any]]:
+    def update_last_seen(self, site_id: str, device_id: str) -> Optional[Dict[str, Any]]:
         """Update device last_seen timestamp to NOW.
 
         Uses the optimized update_device_last_seen function.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             device_id: Device identifier
 
         Returns:
@@ -312,39 +304,37 @@ class DeviceRepository:
         """
         # Use the stored function for fast heartbeat updates
         try:
-            self.client.rpc(
-                "update_device_last_seen", {"p_device_id": device_id, "p_building_id": building_id}
-            ).execute()
+            self.client.rpc("update_device_last_seen", {"p_device_id": device_id, "p_site_id": site_id}).execute()
             return None
         except Exception as e:
             logger.error(f"Failed to update last_seen for device {device_id}: {e}")
             return None
 
-    def update_points(self, building_id: str, device_id: str, points: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_points(self, site_id: str, device_id: str, points: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update device points (control/monitoring points).
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
             device_id: Device identifier
             points: Points JSONB object
 
         Returns:
             Updated device or None if not found
         """
-        return self.update(building_id, device_id, {"points": points})
+        return self.update(site_id, device_id, {"points": points})
 
-    def get_building_summary(self, building_id: str) -> Optional[Dict[str, Any]]:
+    def get_site_summary(self, site_id: str) -> Optional[Dict[str, Any]]:
         """Get device summary for a building.
 
-        Uses the v_building_device_summary view.
+        Uses the v_site_device_summary view.
 
         Args:
-            building_id: Building UUID
+            site_id: Building UUID
 
         Returns:
             Device summary with counts by type and status
         """
-        response = self.client.table("v_building_device_summary").select("*").eq("building_id", building_id).execute()
+        response = self.client.table("v_site_device_summary").select("*").eq("site_id", site_id).execute()
 
         if response.data:
             return response.data[0]

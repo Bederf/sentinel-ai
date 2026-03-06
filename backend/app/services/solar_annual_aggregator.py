@@ -34,7 +34,7 @@ class HourlySnapshot:
     day_of_year: int
 
     solar_gen_kw: float = 0.0  # Solar generation
-    building_load_kw: float = 0.0  # HVAC + lights + equipment
+    site_load_kw: float = 0.0  # HVAC + lights + equipment
     bess_soc_pct: float = 50.0  # Battery state of charge
     bess_charge_kw: float = 0.0  # Positive = charging
     bess_discharge_kw: float = 0.0  # Positive = discharging
@@ -59,7 +59,7 @@ class MonthSummary:
     bess_discharged_kwh: float = 0.0
     grid_import_kwh: float = 0.0
     grid_export_kwh: float = 0.0
-    building_load_kwh: float = 0.0
+    site_load_kwh: float = 0.0
     self_consumption_kwh: float = 0.0
 
     # Peak demand (kW)
@@ -116,7 +116,7 @@ class AnnualSummary:
     total_solar_kwh: float = 0.0
     total_grid_import_kwh: float = 0.0
     total_grid_export_kwh: float = 0.0
-    total_building_load_kwh: float = 0.0
+    total_site_load_kwh: float = 0.0
     total_self_consumption_kwh: float = 0.0
 
     # Cost metrics
@@ -248,7 +248,7 @@ class SolarAnnualAggregator:
         total_solar = sum(m.solar_generated_kwh for m in monthly_summaries)
         total_import = sum(m.grid_import_kwh for m in monthly_summaries)
         total_export = sum(m.grid_export_kwh for m in monthly_summaries)
-        total_load = sum(m.building_load_kwh for m in monthly_summaries)
+        total_load = sum(m.site_load_kwh for m in monthly_summaries)
         total_self_consumption = sum(m.self_consumption_kwh for m in monthly_summaries)
 
         total_cost_standard = sum(m.total_cost_standard_ems_zar for m in monthly_summaries)
@@ -273,7 +273,7 @@ class SolarAnnualAggregator:
             total_solar_kwh=total_solar,
             total_grid_import_kwh=total_import,
             total_grid_export_kwh=total_export,
-            total_building_load_kwh=total_load,
+            total_site_load_kwh=total_load,
             total_self_consumption_kwh=total_self_consumption,
             total_cost_standard_ems_zar=total_cost_standard,
             total_cost_sentinel_ai_zar=total_cost_sentinel,
@@ -318,14 +318,14 @@ class SolarAnnualAggregator:
             bess_discharged_kwh = sum(h.bess_discharge_kw for h in month_hours)
             grid_import_kwh = sum(h.grid_import_kw for h in month_hours)
             grid_export_kwh = sum(h.grid_export_kw for h in month_hours)
-            building_load_kwh = sum(h.building_load_kw for h in month_hours)
+            site_load_kwh = sum(h.site_load_kw for h in month_hours)
 
             # Self-consumption: solar used on-site (not exported)
             self_consumption_kwh = solar_kwh - grid_export_kwh
 
             # Peak demand (kW)
-            peak_demand_kw = max((h.grid_import_kw + h.building_load_kw) for h in month_hours) if month_hours else 0
-            peak_hour = min(month_hours, key=lambda h: h.grid_import_kw + h.building_load_kw) if month_hours else None
+            peak_demand_kw = max((h.grid_import_kw + h.site_load_kw) for h in month_hours) if month_hours else 0
+            peak_hour = min(month_hours, key=lambda h: h.grid_import_kw + h.site_load_kw) if month_hours else None
             peak_hour_str = peak_hour.date.isoformat() if peak_hour else None
 
             # Average BESS SOC
@@ -357,7 +357,7 @@ class SolarAnnualAggregator:
                 bess_discharged_kwh=bess_discharged_kwh,
                 grid_import_kwh=grid_import_kwh,
                 grid_export_kwh=grid_export_kwh,
-                building_load_kwh=building_load_kwh,
+                site_load_kwh=site_load_kwh,
                 self_consumption_kwh=self_consumption_kwh,
                 peak_demand_kw=peak_demand_kw,
                 peak_hour_utc=peak_hour_str,

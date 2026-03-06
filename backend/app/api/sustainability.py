@@ -1,14 +1,14 @@
 """Sustainability & ESG Module API endpoints.
 
 8 endpoints for carbon emissions tracking, ESG metrics, and benchmarking:
-1. GET /buildings/{building_id}/emissions/monthly - Monthly breakdown
-2. GET /buildings/{building_id}/emissions/summary - Current year summary
-3. GET /buildings/{building_id}/emissions/by-source - Pie chart breakdown
+1. GET /buildings/{site_id}/emissions/monthly - Monthly breakdown
+2. GET /buildings/{site_id}/emissions/summary - Current year summary
+3. GET /buildings/{site_id}/emissions/by-source - Pie chart breakdown
 4. GET /portfolio/emissions/benchmark - Benchmarking
-5. GET /buildings/{building_id}/esg-metrics - ESG score
-6. GET /buildings/{building_id}/certifications - Green Star/LEED progress
-7. POST /buildings/{building_id}/update-emissions - Record emissions data
-8. GET /buildings/{building_id}/emissions/forecast - 12-month projection
+5. GET /buildings/{site_id}/esg-metrics - ESG score
+6. GET /buildings/{site_id}/certifications - Green Star/LEED progress
+7. POST /buildings/{site_id}/update-emissions - Record emissions data
+8. GET /buildings/{site_id}/emissions/forecast - 12-month projection
 """
 
 import csv
@@ -33,7 +33,7 @@ router = APIRouter(
         Depends(
             require_active_module(
                 ModuleType.COMPLIANCE,
-                site_keys=("site_id", "site", "building_id"),
+                site_keys=("site_id", "site", "site_id"),
             )
         )
     ],
@@ -51,7 +51,7 @@ class GreenStarUpdateRequest(BaseModel):
 class ConfigUpdateRequest(BaseModel):
     """Request to update sustainability config."""
 
-    building_sqm: Optional[float] = None
+    site_sqm: Optional[float] = None
     occupancy_capacity: Optional[int] = None
     target_reduction_pct: Optional[float] = None
     monthly_water_kl: Optional[float] = None
@@ -226,9 +226,9 @@ class DailyMetricsUpdateRequest(BaseModel):
     data_source: str = "measured"  # measured | simulation | estimated
 
 
-@router.get("/buildings/{building_id}/emissions/monthly")
+@router.get("/buildings/{site_id}/emissions/monthly")
 async def get_monthly_emissions(
-    building_id: str,
+    site_id: str,
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
 ):
@@ -251,7 +251,7 @@ async def get_monthly_emissions(
         response = (
             supabase.table("emissions_sources")
             .select("measurement_date,scope,co2e_kg")
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .gte("measurement_date", start_date.isoformat())
             .lte("measurement_date", end_date.isoformat())
             .order("measurement_date")
@@ -286,7 +286,7 @@ async def get_monthly_emissions(
                 daily_response = (
                     supabase.table("daily_sustainability_metrics")
                     .select("date,grid_kwh,diesel_liters,water_liters,solar_generation_kwh")
-                    .eq("site_id", building_id)
+                    .eq("site_id", site_id)
                     .gte("date", start_date.isoformat())
                     .lte("date", end_date.isoformat())
                     .order("date")
@@ -344,7 +344,7 @@ async def get_monthly_emissions(
 
         # Calculate intensity if floor area available
         try:
-            building = supabase.table("buildings").select("floor_area_m2").eq("id", building_id).execute()
+            building = supabase.table("sites").select("floor_area_m2").eq("id", site_id).execute()
             floor_area = building.data[0]["floor_area_m2"] if building.data else None
         except Exception:
             floor_area = None
@@ -355,7 +355,7 @@ async def get_monthly_emissions(
 
         return {
             "status": "success",
-            "building_id": building_id,
+            "site_id": site_id,
             "period_start": start_date.isoformat(),
             "period_end": end_date.isoformat(),
             "data_source": data_source,
@@ -368,8 +368,8 @@ async def get_monthly_emissions(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/buildings/{building_id}/emissions/summary")
-async def get_emissions_summary(building_id: str):
+@router.get("/buildings/{site_id}/emissions/summary")
+async def get_emissions_summary(site_id: str):
     """
     Get current year emissions summary with scope totals and source breakdown.
     """
@@ -383,7 +383,7 @@ async def get_emissions_summary(building_id: str):
         year_end = date(today.year, 12, 31)
 
         # Calculate totals
-        emissions = calculator.calculate_total_emissions(building_id, year_start, year_end)
+        emissions = calculator.calculate_total_emissions(site_id, year_start, year_end)
 
         if not emissions or emissions["total_kg_co2e"] == 0:
             return {
@@ -398,7 +398,7 @@ async def get_emissions_summary(building_id: str):
         response = (
             supabase.table("emissions_sources")
             .select("source_type,co2e_kg")
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .gte("measurement_date", year_start.isoformat())
             .lte("measurement_date", year_end.isoformat())
             .execute()
@@ -424,7 +424,7 @@ async def get_emissions_summary(building_id: str):
 
         return {
             "status": "success",
-            "building_id": building_id,
+            "site_id": site_id,
             "year": today.year,
             "scope1_total": emissions["scope1_kg_co2e"],
             "scope2_total": emissions["scope2_kg_co2e"],
@@ -440,9 +440,9 @@ async def get_emissions_summary(building_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/buildings/{building_id}/emissions/by-source")
+@router.get("/buildings/{site_id}/emissions/by-source")
 async def get_emissions_by_source(
-    building_id: str,
+    site_id: str,
     months: int = Query(12, ge=1, le=36),
 ):
     """
@@ -459,7 +459,7 @@ async def get_emissions_by_source(
         response = (
             supabase.table("emissions_sources")
             .select("source_type,co2e_kg,scope")
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .gte("measurement_date", start_date.isoformat())
             .order("co2e_kg", desc=True)
             .execute()
@@ -489,7 +489,7 @@ async def get_emissions_by_source(
 
         return {
             "status": "success",
-            "building_id": building_id,
+            "site_id": site_id,
             "months": months,
             "data": breakdown,
             "timestamp": date.today().isoformat(),
@@ -501,7 +501,7 @@ async def get_emissions_by_source(
 
 
 @router.get("/portfolio/emissions/benchmark")
-async def get_emissions_benchmark(building_id: str):
+async def get_emissions_benchmark(site_id: str):
     """
     Compare building carbon intensity to portfolio average and industry benchmark.
     Returns percentile ranking (0-100, where 0 is worst).
@@ -513,7 +513,7 @@ async def get_emissions_benchmark(building_id: str):
         today = date.today()
         year_start = date(today.year, 1, 1)
 
-        building_intensity = calculator.calculate_carbon_intensity(building_id, year_start, today)
+        building_intensity = calculator.calculate_carbon_intensity(site_id, year_start, today)
 
         if not building_intensity:
             return {
@@ -531,7 +531,7 @@ async def get_emissions_benchmark(building_id: str):
 
         return {
             "status": "success",
-            "building_id": building_id,
+            "site_id": site_id,
             "building_intensity": round(building_value, 4),
             "portfolio_avg_intensity": sa_benchmark,
             "industry_avg_intensity": sa_benchmark,
@@ -551,8 +551,8 @@ async def get_emissions_benchmark(building_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/buildings/{building_id}/esg-metrics")
-async def get_esg_metrics(building_id: str):
+@router.get("/buildings/{site_id}/esg-metrics")
+async def get_esg_metrics(site_id: str):
     """
     Get overall ESG score and component metrics.
     Weighted: Carbon 40%, Energy 30%, Waste 20%, Water 10%
@@ -563,7 +563,7 @@ async def get_esg_metrics(building_id: str):
         today = date.today()
         year_start = date(today.year, 1, 1)
 
-        scores = calculator.calculate_esg_score(building_id, year_start, today)
+        scores = calculator.calculate_esg_score(site_id, year_start, today)
 
         if not scores:
             return {
@@ -574,7 +574,7 @@ async def get_esg_metrics(building_id: str):
 
         return {
             "status": "success",
-            "building_id": building_id,
+            "site_id": site_id,
             "carbon_intensity_score": scores["carbon_intensity_score"],
             "energy_efficiency_score": scores["energy_efficiency_score"],
             "waste_diversion_score": scores["waste_diversion_score"],
@@ -591,15 +591,15 @@ async def get_esg_metrics(building_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/buildings/{building_id}/certifications")
-async def get_certifications(building_id: str):
+@router.get("/buildings/{site_id}/certifications")
+async def get_certifications(site_id: str):
     """
     Get Green Star/LEED/Carbon Trust certification progress.
     """
     try:
         supabase = get_supabase_client()
 
-        response = supabase.table("certification_progress").select("*").eq("building_id", building_id).execute()
+        response = supabase.table("certification_progress").select("*").eq("site_id", site_id).execute()
 
         certs = []
         for row in response.data:
@@ -623,7 +623,7 @@ async def get_certifications(building_id: str):
 
         return {
             "status": "success",
-            "building_id": building_id,
+            "site_id": site_id,
             "certifications": certs,
             "timestamp": date.today().isoformat(),
         }
@@ -633,9 +633,9 @@ async def get_certifications(building_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/buildings/{building_id}/update-emissions")
+@router.post("/buildings/{site_id}/update-emissions")
 async def update_emissions(
-    building_id: str,
+    site_id: str,
     request: EmissionsUpdateRequest,
 ):
     """
@@ -675,7 +675,7 @@ async def update_emissions(
 
         # Insert emissions_sources record
         record = {
-            "building_id": building_id,
+            "site_id": site_id,
             "source_type": request.source_type,
             "measurement_date": request.month.isoformat(),
             "monthly_value": request.value,
@@ -692,7 +692,7 @@ async def update_emissions(
         return {
             "status": "success",
             "message": "Emissions data recorded",
-            "building_id": building_id,
+            "site_id": site_id,
             "source_type": request.source_type,
             "value": request.value,
             "unit": request.unit,
@@ -707,9 +707,9 @@ async def update_emissions(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/buildings/{building_id}/daily-metrics")
+@router.post("/buildings/{site_id}/daily-metrics")
 async def update_daily_metrics(
-    building_id: str,
+    site_id: str,
     request: DailyMetricsUpdateRequest,
 ):
     """
@@ -720,7 +720,7 @@ async def update_daily_metrics(
         supabase = get_supabase_client()
 
         record = {
-            "site_id": building_id,
+            "site_id": site_id,
             "date": request.date.isoformat(),
             "grid_kwh": request.grid_kwh,
             "hvac_kwh": request.hvac_kwh,
@@ -740,7 +740,7 @@ async def update_daily_metrics(
         return {
             "status": "success",
             "message": "Daily metrics recorded",
-            "building_id": building_id,
+            "site_id": site_id,
             "date": request.date.isoformat(),
             "data_source": request.data_source,
             "timestamp": date.today().isoformat(),
@@ -751,8 +751,8 @@ async def update_daily_metrics(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/buildings/{building_id}/emissions/forecast")
-async def get_emissions_forecast(building_id: str):
+@router.get("/buildings/{site_id}/emissions/forecast")
+async def get_emissions_forecast(site_id: str):
     """
     12-month emissions projection based on seasonal patterns.
     Assumes 10% year-over-year reduction target.
@@ -764,7 +764,7 @@ async def get_emissions_forecast(building_id: str):
 
         # Get last year's baseline
         baseline_year = today.year - 1
-        baseline = calculator.calculate_emissions_baseline(building_id, baseline_year)
+        baseline = calculator.calculate_emissions_baseline(site_id, baseline_year)
 
         if not baseline or baseline.get("total_kg_co2e", 0) == 0:
             return {
@@ -796,7 +796,7 @@ async def get_emissions_forecast(building_id: str):
 
         return {
             "status": "success",
-            "building_id": building_id,
+            "site_id": site_id,
             "forecast_year": today.year,
             "reduction_target_pct": 10,
             "data": forecast,

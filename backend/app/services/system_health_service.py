@@ -111,7 +111,7 @@ class SystemHealthService:
     async def _check_supabase(self) -> Dict[str, Any]:
         """Probe Supabase with a lightweight query."""
         try:
-            result = self.client.table("buildings").select("id", count="exact").limit(1).execute()
+            result = self.client.table("sites").select("id", count="exact").limit(1).execute()
             count = result.count if result.count is not None else len(result.data or [])
             return {
                 "score": 95,
@@ -440,7 +440,7 @@ class SystemHealthService:
     async def run_diagnostics(
         self,
         target: str = "full_system",
-        building_code: Optional[str] = None,
+        site_code: Optional[str] = None,
     ) -> str:
         """
         Run SIMBIOT diagnostics workflow.
@@ -455,7 +455,7 @@ class SystemHealthService:
 
         Args:
             target: "full_system", "building:{code}", or "component:{name}"
-            building_code: Optional building code for filtered diagnostics
+            site_code: Optional building code for filtered diagnostics
 
         Returns:
             diagnostic_id for polling results
@@ -477,7 +477,7 @@ class SystemHealthService:
 
         # Start async diagnostic execution
         # In production, this would be queued to a background task
-        asyncio.create_task(self._execute_diagnostics(diagnostic_id, target, building_code))
+        asyncio.create_task(self._execute_diagnostics(diagnostic_id, target, site_code))
 
         return diagnostic_id
 
@@ -485,7 +485,7 @@ class SystemHealthService:
         self,
         diagnostic_id: str,
         target: str,
-        building_code: Optional[str],
+        site_code: Optional[str],
     ) -> None:
         """Execute diagnostics workflow (runs in background)."""
         try:
@@ -512,7 +512,7 @@ class SystemHealthService:
             try:
                 results["dali_gateway"] = await self._call_simbiot_tool(
                     "discover_tridonic_gateway",
-                    {"building_code": building_code or get_primary_site() or "unknown"},
+                    {"site_code": site_code or get_primary_site() or "unknown"},
                 )
             except Exception as e:
                 results["dali_gateway"] = {"error": str(e)}
@@ -520,16 +520,16 @@ class SystemHealthService:
 
             # Tool 3: Get buildings
             try:
-                results["buildings"] = await self._call_simbiot_tool("get_buildings")
+                results["sites"] = await self._call_simbiot_tool("get_buildings")
             except Exception as e:
-                results["buildings"] = {"error": str(e)}
+                results["sites"] = {"error": str(e)}
                 recommendations.append("Building configuration check failed - verify database connectivity")
 
             # Tool 4: Search alarms
             try:
                 results["alarms"] = await self._call_simbiot_tool(
                     "search_alarms",
-                    {"building_code": building_code or get_primary_site() or "unknown"},
+                    {"site_code": site_code or get_primary_site() or "unknown"},
                 )
             except Exception as e:
                 results["alarms"] = {"error": str(e)}
@@ -539,7 +539,7 @@ class SystemHealthService:
             try:
                 results["health_score"] = await self._call_simbiot_tool(
                     "get_health_score",
-                    {"building_code": building_code or get_primary_site() or "unknown"},
+                    {"site_code": site_code or get_primary_site() or "unknown"},
                 )
             except Exception as e:
                 results["health_score"] = {"error": str(e)}
@@ -548,7 +548,7 @@ class SystemHealthService:
             try:
                 results["asset_details"] = await self._call_simbiot_tool(
                     "get_asset_detail",
-                    {"building_code": building_code or get_primary_site() or "unknown"},
+                    {"site_code": site_code or get_primary_site() or "unknown"},
                 )
             except Exception as e:
                 results["asset_details"] = {"error": str(e)}
@@ -606,7 +606,7 @@ class SystemHealthService:
             },
             "get_buildings": {
                 "status": "success",
-                "buildings": [
+                "sites": [
                     {"code": "site-002", "name": "Sandton", "status": "active"},
                 ],
             },

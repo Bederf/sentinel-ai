@@ -32,8 +32,8 @@ class DigitalTwinService:
     async def extract_from_image(
         self,
         image_base64: str,
-        building_code: str,
-        building_name: str,
+        site_code: str,
+        site_name: str,
         floors_count: int,
         skip_sanitization: bool = False,
     ) -> Dict:
@@ -45,8 +45,8 @@ class DigitalTwinService:
 
         Args:
             image_base64: Base64-encoded image (PDF/PNG/JPG converted to image)
-            building_code: Building identifier (e.g., "site-002")
-            building_name: Building name (e.g., "Sandton City")
+            site_code: Building identifier (e.g., "site-002")
+            site_name: Building name (e.g., "Sandton City")
             floors_count: Expected number of floors
             skip_sanitization: If False, sanitize before API (recommended)
 
@@ -83,18 +83,18 @@ class DigitalTwinService:
 
         # Sanitize if requested (default)
         if not skip_sanitization:
-            logger.info(f"Sanitizing floor plan for {building_code}")
+            logger.info(f"Sanitizing floor plan for {site_code}")
             sanitized_bytes, _ = self.sanitizer.sanitize_floor_plan(image_bytes, remove_text=True, return_lookup=True)
             image_to_send = sanitized_bytes
             was_sanitized = True
         else:
-            logger.warning(f"Skipping sanitization for {building_code} (demo/non-sensitive only)")
+            logger.warning(f"Skipping sanitization for {site_code} (demo/non-sensitive only)")
             image_to_send = image_bytes
             was_sanitized = False
 
         # Send to Claude vision for extraction
         extracted = await self._extract_via_claude_vision(
-            image_to_send, building_code, building_name, floors_count, was_sanitized
+            image_to_send, site_code, site_name, floors_count, was_sanitized
         )
 
         # Re-identify with original zone names if sanitized
@@ -112,7 +112,7 @@ class DigitalTwinService:
 
         logger.info(
             f"✓ Extracted {extracted['extraction_metadata']['equipment_count']} equipment "
-            f"from {building_code} (sanitized={was_sanitized})"
+            f"from {site_code} (sanitized={was_sanitized})"
         )
 
         return extracted
@@ -120,8 +120,8 @@ class DigitalTwinService:
     async def _extract_via_claude_vision(
         self,
         image_bytes: bytes,
-        building_code: str,
-        building_name: str,
+        site_code: str,
+        site_name: str,
         floors_count: int,
         was_sanitized: bool,
     ) -> Dict:
@@ -135,8 +135,8 @@ class DigitalTwinService:
 
         Args:
             image_bytes: Image to analyze (sanitized or original)
-            building_code: Site code (e.g., "site-002")
-            building_name: Building name
+            site_code: Site code (e.g., "site-002")
+            site_name: Building name
             floors_count: Number of floors to expect
             was_sanitized: Whether image was sanitized before transmission
 
@@ -149,7 +149,7 @@ class DigitalTwinService:
             claude = ClaudeService()
 
             # Prepare extraction prompt
-            prompt = self._build_extraction_prompt(building_name, floors_count, was_sanitized)
+            prompt = self._build_extraction_prompt(site_name, floors_count, was_sanitized)
 
             # Encode image to base64 for API
             import base64
@@ -160,15 +160,15 @@ class DigitalTwinService:
             response = await claude.call_claude_vision(prompt=prompt, image_base64=image_b64)
 
             # Parse response as JSON
-            extracted = self._parse_extraction_response(response, building_code)
+            extracted = self._parse_extraction_response(response, site_code)
 
             return extracted
         except Exception as e:
             logger.error(f"Claude vision extraction failed: {e}")
             # Return demo config for testing
-            return self._generate_demo_config(building_code, building_name, floors_count)
+            return self._generate_demo_config(site_code, site_name, floors_count)
 
-    def _build_extraction_prompt(self, building_name: str, floors_count: int, was_sanitized: bool) -> str:
+    def _build_extraction_prompt(self, site_name: str, floors_count: int, was_sanitized: bool) -> str:
         """Build structured extraction prompt for Claude vision."""
         sanitization_note = (
             "\n**NOTE:** This floor plan has been sanitized to remove identifying "
@@ -178,7 +178,7 @@ class DigitalTwinService:
             else ""
         )
 
-        prompt = f"""Analyze this architectural floor plan for {building_name} and extract equipment locations.
+        prompt = f"""Analyze this architectural floor plan for {site_name} and extract equipment locations.
 
 **Building Information:**
 - Expected floors: {floors_count}
@@ -241,7 +241,7 @@ class DigitalTwinService:
 """
         return prompt
 
-    def _parse_extraction_response(self, response: str, building_code: str) -> Dict:
+    def _parse_extraction_response(self, response: str, site_code: str) -> Dict:
         """Parse Claude vision response into structured config."""
         try:
             # Extract JSON from response
@@ -258,7 +258,7 @@ class DigitalTwinService:
 
             # Normalize equipment types to v2.0 format
             for equipment in config.get("equipment", []):
-                equipment["building_code"] = building_code
+                equipment["site_code"] = site_code
 
             logger.info(f"✓ Parsed extraction response: {len(config.get('equipment', []))} equipment")
             return config
@@ -269,8 +269,8 @@ class DigitalTwinService:
     async def extract_from_dxf(
         self,
         dxf_bytes: bytes,
-        building_code: str,
-        building_name: str,
+        site_code: str,
+        site_name: str,
     ) -> Dict:
         """
         Extract building config from DXF (AutoCAD) file.
@@ -283,8 +283,8 @@ class DigitalTwinService:
 
         Args:
             dxf_bytes: DXF file content (bytes)
-            building_code: Building identifier (e.g., "site-002")
-            building_name: Building name (e.g., "Sandton City")
+            site_code: Building identifier (e.g., "site-002")
+            site_name: Building name (e.g., "Sandton City")
 
         Returns:
             Same format as extract_from_image() for API consistency
@@ -294,7 +294,7 @@ class DigitalTwinService:
         parser = get_dxf_parser_service()
 
         try:
-            config = await parser.parse_dxf_file(dxf_bytes, building_code, building_name)
+            config = await parser.parse_dxf_file(dxf_bytes, site_code, site_name)
 
             # Add metadata
             config["extraction_metadata"] = {
@@ -314,11 +314,11 @@ class DigitalTwinService:
         except Exception as e:
             logger.error(f"DXF parsing failed: {e}", exc_info=True)
             # Fallback to demo config for testing
-            return self._generate_demo_config(building_code, building_name, 5)
+            return self._generate_demo_config(site_code, site_name, 5)
 
-    def _generate_demo_config(self, building_code: str, building_name: str, floors_count: int) -> Dict:
+    def _generate_demo_config(self, site_code: str, site_name: str, floors_count: int) -> Dict:
         """Generate realistic demo config for testing."""
-        logger.info(f"Generating demo config for {building_code}")
+        logger.info(f"Generating demo config for {site_code}")
 
         # Generate realistic South African commercial building
         _equipment_types = ["chiller", "ahu", "fcu", "vav", "gen", "ups"]
@@ -418,8 +418,8 @@ class DigitalTwinService:
                     )
 
         return {
-            "building_code": building_code,
-            "building_name": building_name,
+            "site_code": site_code,
+            "site_name": site_name,
             "floors": floor_defs,
             "equipment": equipment,
             "zones": zones,

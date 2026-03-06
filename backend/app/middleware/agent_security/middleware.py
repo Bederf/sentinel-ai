@@ -121,31 +121,31 @@ def _resolve_quota_tier(role) -> QuotaTier:
     return QuotaTier.PER_AGENT
 
 
-def _build_session(auth_context, building_id: Optional[str] = None) -> AgentSession:
+def _build_session(auth_context, site_id: Optional[str] = None) -> AgentSession:
     """Build an AgentSession from an AuthContext."""
-    building_ids = []
-    if building_id:
-        building_ids = [building_id]
+    site_ids = []
+    if site_id:
+        site_ids = [site_id]
 
     return AgentSession(
         owner_id=auth_context.user_id,
         role=auth_context.role.value if hasattr(auth_context.role, "value") else str(auth_context.role),
         tenant_id=getattr(auth_context, "metadata", {}).get("tenant_id", "default"),
-        building_ids=building_ids,
+        site_ids=site_ids,
     )
 
 
-def _extract_building_id(request: Request) -> Optional[str]:
-    """Try to extract a building_id from path params or query string."""
+def _extract_site_id(request: Request) -> Optional[str]:
+    """Try to extract a site_id from path params or query string."""
     # Check query parameters
-    building_id = request.query_params.get("building_id")
-    if building_id:
-        return building_id
+    site_id = request.query_params.get("site_id")
+    if site_id:
+        return site_id
 
     # Check path for common patterns like /api/buildings/{id}/...
     path_parts = request.url.path.strip("/").split("/")
-    if "buildings" in path_parts:
-        idx = path_parts.index("buildings")
+    if "sites" in path_parts:
+        idx = path_parts.index("sites")
         if idx + 1 < len(path_parts):
             return path_parts[idx + 1]
 
@@ -289,8 +289,8 @@ class AgentSecurityMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # Step h: Build AgentSession
-        building_id = _extract_building_id(request)
-        session = _build_session(auth_context, building_id)
+        site_id = _extract_site_id(request)
+        session = _build_session(auth_context, site_id)
 
         # Step i: Policy engine evaluate
         policy_result = policy_engine.evaluate(
@@ -298,7 +298,7 @@ class AgentSecurityMiddleware(BaseHTTPMiddleware):
             tool=tool,
             action=action,
             target=path,
-            building_id=building_id,
+            site_id=site_id,
         )
 
         if policy_result.decision == PolicyDecision.DENY:

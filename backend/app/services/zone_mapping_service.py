@@ -205,7 +205,7 @@ class ZoneMappingService:
                 "floor": "L2",
                 "zone_letter": "A",
                 "zone_type": "open_office",
-                "building_id": "site-002"
+                "site_id": "site-002"
               }
         """
         import re
@@ -234,7 +234,7 @@ class ZoneMappingService:
             "floor": floor,
             "zone_letter": zone,
             "zone_type": zone_type,
-            "building_id": site_id,
+            "site_id": site_id,
         }
 
     def auto_assign_equipment_to_zones(

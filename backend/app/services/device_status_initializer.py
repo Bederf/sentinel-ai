@@ -42,17 +42,17 @@ class DeviceStatusInitializer:
                 logger.warning(f"No site config for {site_id}")
                 return {"status": "no_site_config"}
 
-            building_id = site_config.get("building_id")
+            site_uuid = site_config.get("site_uuid")
             plant_capacity = site_config.get("solar_capacity_kwp", 3.875)
 
             # Initialize solar devices from simulation
-            solar_count = await self._init_solar_devices(site_id, building_id, plant_capacity)
+            solar_count = await self._init_solar_devices(site_id, site_uuid, plant_capacity)
 
             # Initialize HVAC devices (mark online if equipment exists)
-            hvac_count = await self._init_hvac_devices(site_id, building_id)
+            hvac_count = await self._init_hvac_devices(site_id, site_uuid)
 
             # Initialize other equipment types
-            other_count = await self._init_other_devices(site_id, building_id)
+            other_count = await self._init_other_devices(site_id, site_uuid)
 
             logger.info(
                 f"Initialized devices for {site_id}: solar={solar_count}, hvac={hvac_count}, other={other_count}"
@@ -79,7 +79,7 @@ class DeviceStatusInitializer:
                 return {
                     "site_id": site_id,
                     "name": f"{site_id} Solar Campus",
-                    "building_id": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
+                    "site_uuid": "7e7c1500-d9b2-4b43-b7cf-650648816b21",
                     "solar_capacity_kwp": 3.875,
                     "bess_capacity_kwh": 5.015,
                 }
@@ -88,7 +88,7 @@ class DeviceStatusInitializer:
             logger.error(f"Error getting site config: {e}")
             return None
 
-    async def _init_solar_devices(self, site_id: str, building_id: str, capacity_kwp: float) -> int:
+    async def _init_solar_devices(self, site_id: str, site_uuid: str, capacity_kwp: float) -> int:
         """Initialize solar devices (inverters, BESS) from simulation data."""
         try:
             connector = SimulatedSolarConnector(site_id, capacity_kwp)
@@ -149,7 +149,7 @@ class DeviceStatusInitializer:
             logger.error(f"Error initializing solar devices: {e}")
             return 0
 
-    async def _init_hvac_devices(self, site_id: str, building_id: str) -> int:
+    async def _init_hvac_devices(self, site_id: str, site_uuid: str) -> int:
         """Initialize HVAC devices (mark online if they exist)."""
         try:
             # Query HVAC equipment from demo data
@@ -159,7 +159,7 @@ class DeviceStatusInitializer:
             response = (
                 self.client.table("equipment")
                 .select("id, code, type")
-                .eq("building_id", building_id)
+                .eq("site_id", site_id)
                 .in_("type", ["VAV", "AHU", "FCU", "CHILLER"])
                 .execute()
             )
@@ -183,14 +183,14 @@ class DeviceStatusInitializer:
             logger.error(f"Error initializing HVAC devices: {e}")
             return 0
 
-    async def _init_other_devices(self, site_id: str, building_id: str) -> int:
+    async def _init_other_devices(self, site_id: str, site_uuid: str) -> int:
         """Initialize other equipment types (lighting, power, etc)."""
         try:
             if not self.client:
                 return 0
 
             # Mark all existing equipment as online with default status
-            response = self.client.table("equipment").select("id, code, type").eq("building_id", building_id).execute()
+            response = self.client.table("equipment").select("id, code, type").eq("site_id", site_id).execute()
 
             devices = response.data or []
             updated = 0

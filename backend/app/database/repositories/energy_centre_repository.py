@@ -30,9 +30,9 @@ class EnergyCentreRepository:
     # Helper Methods
     # =========================================================================
 
-    def get_building_uuid(self, building_code: str) -> Optional[str]:
+    def get_site_uuid(self, site_code: str) -> Optional[str]:
         """Get building UUID from building code."""
-        response = self.client.table("buildings").select("id").eq("code", building_code).execute()
+        response = self.client.table("sites").select("id").eq("code", site_code).execute()
 
         if response.data:
             return response.data[0]["id"]
@@ -46,13 +46,13 @@ class EnergyCentreRepository:
             return response.data[0]["id"]
         return None
 
-    def get_ec_uuid_by_building(self, building_code: str) -> Optional[str]:
+    def get_ec_uuid_by_site(self, site_code: str) -> Optional[str]:
         """Get energy centre UUID by building code."""
-        building_uuid = self.get_building_uuid(building_code)
-        if not building_uuid:
+        site_uuid = self.get_site_uuid(site_code)
+        if not site_uuid:
             return None
 
-        response = self.client.table("energy_centres").select("id").eq("building_id", building_uuid).execute()
+        response = self.client.table("energy_centres").select("id").eq("site_id", site_uuid).execute()
 
         if response.data:
             return response.data[0]["id"]
@@ -62,13 +62,13 @@ class EnergyCentreRepository:
     # Energy Centres
     # =========================================================================
 
-    def get_energy_centre(self, building_code: str) -> Optional[Dict[str, Any]]:
+    def get_energy_centre(self, site_code: str) -> Optional[Dict[str, Any]]:
         """Get energy centre for a building."""
-        building_uuid = self.get_building_uuid(building_code)
-        if not building_uuid:
+        site_uuid = self.get_site_uuid(site_code)
+        if not site_uuid:
             return None
 
-        response = self.client.table("energy_centres").select("*").eq("building_id", building_uuid).execute()
+        response = self.client.table("energy_centres").select("*").eq("site_id", site_uuid).execute()
 
         if response.data:
             return response.data[0]
@@ -312,13 +312,13 @@ class EnergyCentreRepository:
     # Full Energy Centre Operations
     # =========================================================================
 
-    def get_full_energy_centre(self, building_code: str) -> Dict[str, Any]:
+    def get_full_energy_centre(self, site_code: str) -> Dict[str, Any]:
         """Get complete energy centre configuration for a building.
 
         Returns:
             Dict with energy_centre and all components
         """
-        ec = self.get_energy_centre(building_code)
+        ec = self.get_energy_centre(site_code)
         if not ec:
             return {}
 
@@ -336,7 +336,7 @@ class EnergyCentreRepository:
             "feeders": self.get_feeders(centre_id),
         }
 
-    def delete_all_by_building(self, building_code: str) -> Dict[str, int]:
+    def delete_all_by_site(self, site_code: str) -> Dict[str, int]:
         """Delete all energy centre data for a building.
 
         Deletes energy_centre which cascades to all components.
@@ -344,10 +344,10 @@ class EnergyCentreRepository:
         Returns:
             Dict with count of deleted items
         """
-        building_uuid = self.get_building_uuid(building_code)
-        if not building_uuid:
+        site_uuid = self.get_site_uuid(site_code)
+        if not site_uuid:
             return {"energy_centres": 0}
 
-        response = self.client.table("energy_centres").delete().eq("building_id", building_uuid).execute()
+        response = self.client.table("energy_centres").delete().eq("site_id", site_uuid).execute()
 
         return {"energy_centres": len(response.data)}

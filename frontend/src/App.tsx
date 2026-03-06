@@ -105,6 +105,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState<View>("dashboard");
   const [viewRefreshKey, setViewRefreshKey] = useState(0);
+  const [chatKey, setChatKey] = useState(0);
   // Card library removed — dashboard now shows only portfolio-level sections
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showAlertsPanel, setShowAlertsPanel] = useState(false);
@@ -387,6 +388,7 @@ function App() {
       setViewRefreshKey(k => k + 1);
     } else {
       setCurrentView(view);
+      if (view === "ai-chat") setChatKey(k => k + 1);
     }
   }, [currentView, currentUser?.email]);
 
@@ -782,7 +784,7 @@ function App() {
             />
           ) : currentView === "ai-chat" ? (
             <div className="h-full">
-              <Chat />
+              <Chat key={chatKey} />
             </div>
           ) : currentView === "integrations" ? (
             <div className="h-full overflow-y-auto">
@@ -801,10 +803,6 @@ function App() {
             <SimbiotPage />
           ) : currentView === "settings" ? (
             <Settings onError={(error) => setError(error)} />
-          ) : currentView === "assets" ? (
-            <div className="h-full overflow-y-auto">
-              <AssetWorkflowDashboard />
-            </div>
           ) : currentView === "maintenance" ? (
             <div className="h-full overflow-y-auto">
               <AssetWorkflowDashboard />

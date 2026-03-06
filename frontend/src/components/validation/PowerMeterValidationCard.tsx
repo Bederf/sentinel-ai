@@ -92,12 +92,12 @@ function mapPowerMeterResponse(raw: PowerMeterValidationRaw): PowerMeterValidati
 }
 
 interface PowerMeterValidationCardProps {
-  buildingId?: string;
+  siteId?: string;
   className?: string;
 }
 
 export function PowerMeterValidationCard({
-  buildingId = "S002",
+  siteId = "S002",
   className = "",
 }: PowerMeterValidationCardProps) {
   const [validation, setValidation] = useState<PowerMeterValidation | null>(null);
@@ -110,7 +110,7 @@ export function PowerMeterValidationCard({
         setLoading(true);
         const token = localStorage.getItem("sentinel_token");
         const response = await fetch(
-          `/api/validation/power-meter/baseline?site_id=${buildingId}`,
+          `/api/validation/power-meter/baseline?site_id=${siteId}`,
           {
             headers: {
               Authorization: `Bearer ${token || ""}`,
@@ -132,7 +132,7 @@ export function PowerMeterValidationCard({
     fetchValidation();
 
     return () => clearInterval(interval);
-  }, [buildingId]);
+  }, [siteId]);
 
   if (loading) {
     return (

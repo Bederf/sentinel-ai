@@ -12,15 +12,15 @@ class EnergyConsumptionRepository:
         """Initialize the repository with a Supabase client."""
         self.client = get_supabase_client()
 
-    def get_by_building(
+    def get_by_site(
         self,
-        building_id: str,
+        site_id: str,
         days: int = 30,
     ) -> List[Dict[str, Any]]:
         """Get energy consumption history for a building.
 
         Args:
-            building_id: Building code (e.g., "site-002", "demo-office")
+            site_id: Building code (e.g., "site-002", "demo-office")
             days: Number of days to retrieve (default 30, max 365)
 
         Returns:
@@ -35,7 +35,7 @@ class EnergyConsumptionRepository:
         response = (
             self.client.table("energy_consumption_history")
             .select("*")
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .gte("date", start_date.isoformat())
             .lte("date", end_date.isoformat())
             .order("date", desc=False)  # Ascending for charts
@@ -44,7 +44,7 @@ class EnergyConsumptionRepository:
 
         return response.data
 
-    def get_all_buildings(
+    def get_all_sites(
         self,
         days: int = 30,
     ) -> List[Dict[str, Any]]:
@@ -75,14 +75,14 @@ class EnergyConsumptionRepository:
 
     def get_by_date_range(
         self,
-        building_id: str,
+        site_id: str,
         start_date: date,
         end_date: date,
     ) -> List[Dict[str, Any]]:
         """Get energy consumption for a building within a date range.
 
         Args:
-            building_id: Building code
+            site_id: Building code
             start_date: Start date (inclusive)
             end_date: End date (inclusive)
 
@@ -92,7 +92,7 @@ class EnergyConsumptionRepository:
         response = (
             self.client.table("energy_consumption_history")
             .select("*")
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .gte("date", start_date.isoformat())
             .lte("date", end_date.isoformat())
             .order("date", desc=False)
@@ -101,11 +101,11 @@ class EnergyConsumptionRepository:
 
         return response.data
 
-    def get_latest_date(self, building_id: str) -> Optional[date]:
+    def get_latest_date(self, site_id: str) -> Optional[date]:
         """Get the latest consumption date for a building.
 
         Args:
-            building_id: Building code
+            site_id: Building code
 
         Returns:
             Latest date or None if no data exists
@@ -113,7 +113,7 @@ class EnergyConsumptionRepository:
         response = (
             self.client.table("energy_consumption_history")
             .select("date")
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .order("date", desc=True)
             .limit(1)
             .execute()
@@ -125,19 +125,19 @@ class EnergyConsumptionRepository:
 
     def get_daily_summary(
         self,
-        building_id: str,
+        site_id: str,
         days: int = 30,
     ) -> Dict[str, Any]:
         """Get daily summary statistics for a building.
 
         Args:
-            building_id: Building code
+            site_id: Building code
             days: Number of days to summarize
 
         Returns:
             Dictionary with summary statistics
         """
-        records = self.get_by_building(building_id, days)
+        records = self.get_by_site(site_id, days)
 
         if not records:
             return {
@@ -166,7 +166,7 @@ class EnergyConsumptionRepository:
 
     def upsert(
         self,
-        building_id: str,
+        site_id: str,
         consumption_date: date,
         hvac_kwh: float,
         lighting_kwh: float,
@@ -175,7 +175,7 @@ class EnergyConsumptionRepository:
         """Insert or update energy consumption record.
 
         Args:
-            building_id: Building code
+            site_id: Building code
             consumption_date: Date of consumption
             hvac_kwh: HVAC consumption in kWh
             lighting_kwh: Lighting consumption in kWh
@@ -185,7 +185,7 @@ class EnergyConsumptionRepository:
             Created or updated record
         """
         data = {
-            "building_id": building_id,
+            "site_id": site_id,
             "date": consumption_date.isoformat(),
             "hvac_kwh": hvac_kwh,
             "lighting_kwh": lighting_kwh,
@@ -193,9 +193,7 @@ class EnergyConsumptionRepository:
         }
 
         # Use upsert to handle duplicate dates
-        response = (
-            self.client.table("energy_consumption_history").upsert(data, on_conflict="building_id,date").execute()
-        )
+        response = self.client.table("energy_consumption_history").upsert(data, on_conflict="site_id,date").execute()
 
         return response.data[0]
 
@@ -206,7 +204,7 @@ class EnergyConsumptionRepository:
         """Insert or update multiple energy consumption records.
 
         Args:
-            records: List of records with building_id, date, hvac_kwh, lighting_kwh, other_kwh
+            records: List of records with site_id, date, hvac_kwh, lighting_kwh, other_kwh
 
         Returns:
             Created or updated records
@@ -214,38 +212,36 @@ class EnergyConsumptionRepository:
         if not records:
             return []
 
-        response = (
-            self.client.table("energy_consumption_history").upsert(records, on_conflict="building_id,date").execute()
-        )
+        response = self.client.table("energy_consumption_history").upsert(records, on_conflict="site_id,date").execute()
 
         return response.data
 
-    def delete_by_building(
+    def delete_by_site(
         self,
-        building_id: str,
+        site_id: str,
     ) -> int:
         """Delete all energy consumption records for a building.
 
         Args:
-            building_id: Building code
+            site_id: Building code
 
         Returns:
             Number of records deleted
         """
-        response = self.client.table("energy_consumption_history").delete().eq("building_id", building_id).execute()
+        response = self.client.table("energy_consumption_history").delete().eq("site_id", site_id).execute()
 
         return len(response.data)
 
     def delete_by_date_range(
         self,
-        building_id: str,
+        site_id: str,
         start_date: date,
         end_date: date,
     ) -> int:
         """Delete energy consumption records within a date range.
 
         Args:
-            building_id: Building code
+            site_id: Building code
             start_date: Start date (inclusive)
             end_date: End date (inclusive)
 
@@ -255,7 +251,7 @@ class EnergyConsumptionRepository:
         response = (
             self.client.table("energy_consumption_history")
             .delete()
-            .eq("building_id", building_id)
+            .eq("site_id", site_id)
             .gte("date", start_date.isoformat())
             .lte("date", end_date.isoformat())
             .execute()

@@ -73,7 +73,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
         setIsRefreshing(true);
       }
 
-      const occupancy = await lightingApi.getBuildingOccupancy(selectedSiteId || undefined);
+      const occupancy = await lightingApi.getSiteOccupancy(selectedSiteId || undefined);
       // Stagger subsequent requests by 250ms to avoid 429 rate limiting
       await new Promise((resolve) => setTimeout(resolve, 250));
       const stats = await lightingApi.getStats();
@@ -350,8 +350,8 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
           {/* Floor Summary Bars */}
           <div className="space-y-2">
             {buildingOccupancy.floors.map((floor) => {
-              // When simulation is running, show simulated occupancy for all floors
-              const floorOccupancy = running ? displayOccupancy : floor.occupancy_percent;
+              // Prefer real per-floor data from lighting API; only use sim scalar as fallback
+              const floorOccupancy = floor.occupancy_percent > 0 ? floor.occupancy_percent : (running ? displayOccupancy : 0);
               return (
                 <div key={floor.floor} className="flex items-center gap-2">
                   <span
