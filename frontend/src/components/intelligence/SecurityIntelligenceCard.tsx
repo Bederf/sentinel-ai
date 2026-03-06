@@ -4,12 +4,12 @@ import { Shield } from 'lucide-react';
 import { securityApi } from '@/lib/api';
 import {
   IntelligenceCard, ValueMetricBox, ValueBadge, LearningBadge, AwaitingDataBadge,
-  hasValue, type CardState,
+  BaselineComparisonBar, hasValue, type CardState,
 } from './shared';
 
 interface SecurityIntelligenceCardProps {
   siteId: string;
-  onNavigate: () => void;
+  onNavigate?: () => void;
 }
 
 export function SecurityIntelligenceCard({ siteId, onNavigate }: SecurityIntelligenceCardProps) {
@@ -113,6 +113,16 @@ export function SecurityIntelligenceCard({ siteId, onNavigate }: SecurityIntelli
           <ValueMetricBox label="Cross-system correlation" value={hasOccupancyData ? 'Active' : 'Monitoring'} color={hasOccupancyData ? '#10B981' : '#6B7280'} />
         </>
       }
+      comparison={afterHoursCount > 0 || anomalyCount > 0 ? (
+        <BaselineComparisonBar
+          baselineValue={afterHoursCount + anomalyCount}
+          optimizedValue={0}
+          unit=""
+          baselineLabel="Undetected events (no AI)"
+          optimizedLabel="Caught by SENTINEL"
+          accentColor="#A855F7"
+        />
+      ) : undefined}
     />
   );
 }

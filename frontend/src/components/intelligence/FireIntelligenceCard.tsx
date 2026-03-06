@@ -4,12 +4,12 @@ import { Flame } from 'lucide-react';
 import { authorizedFetch } from '@/lib/api';
 import {
   IntelligenceCard, ValueMetricBox, ValueBadge, LearningBadge, AwaitingDataBadge,
-  type CardState,
+  BaselineComparisonBar, type CardState,
 } from './shared';
 
 interface FireIntelligenceCardProps {
   siteId: string;
-  onNavigate: () => void;
+  onNavigate?: () => void;
 }
 
 interface FireHealthData {
@@ -107,6 +107,16 @@ export function FireIntelligenceCard({ siteId, onNavigate }: FireIntelligenceCar
           <ValueMetricBox label="Overdue" value={overdue > 0 ? `${overdue}` : 'All current'} color={overdue > 0 ? '#EF4444' : '#22C55E'} />
         </>
       }
+      comparison={equipCount > 0 ? (
+        <BaselineComparisonBar
+          baselineValue={equipCount}
+          optimizedValue={inspectedCount}
+          unit=""
+          baselineLabel="Total fire assets"
+          optimizedLabel="Inspected by SENTINEL"
+          accentColor="#EF4444"
+        />
+      ) : undefined}
     />
   );
 }

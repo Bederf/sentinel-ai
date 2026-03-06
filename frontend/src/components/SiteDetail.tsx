@@ -1566,17 +1566,24 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
         <div className="min-h-[400px]">
           {/* HVAC — Zone temps, equipment status, optimization */}
           {activeMainTab === "hvac" && (
-            <HVACDashboard siteId={siteId} />
+            <>
+              <div className="mb-4"><HVACIntelligenceCard siteId={siteId} /></div>
+              <HVACDashboard siteId={siteId} />
+            </>
           )}
 
           {/* Energy — Optimization (control features gated by energy_control) */}
           {activeMainTab === "energy" && (
-            <OptimizationPage />
+            <>
+              <div className="mb-4"><EnergyIntelligenceCard siteId={siteId} /></div>
+              <OptimizationPage />
+            </>
           )}
 
           {/* Lighting — Lighting | Occupancy | Analytics | Correlation */}
           {activeMainTab === "lighting" && (
             <>
+              <div className="mb-4"><LightingIntelligencePanel siteId={siteId} compact /></div>
               <div className="flex overflow-x-auto gap-2 mb-4 scrollbar-hide">
                 {(["Lighting", "Occupancy", "Analytics", "Correlation"] as LightingSub[]).map(sub => (
                   <button
@@ -1604,6 +1611,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           {/* Solar & BESS — Dashboard | AEGIS (AEGIS gated by solar_control) */}
           {activeMainTab === "solar-bess" && (
             <>
+              <div className="mb-4"><SolarIntelligenceCard siteId={siteId} /></div>
               <div className="flex overflow-x-auto gap-2 mb-4 scrollbar-hide">
                 {(["Dashboard", ...(isModuleActive('solar_control') ? ["AEGIS"] : [])] as SolarBessSub[]).map(sub => (
                   <button
@@ -1625,13 +1633,28 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           )}
 
           {/* Water */}
-          {activeMainTab === "water" && <WaterPanel />}
+          {activeMainTab === "water" && (
+            <>
+              <div className="mb-4"><WaterIntelligenceCard siteId={siteId} /></div>
+              <WaterPanel />
+            </>
+          )}
 
           {/* Fire — always read-only, no control toggle */}
-          {activeMainTab === "fire" && <FireSafetyPage />}
+          {activeMainTab === "fire" && (
+            <>
+              <div className="mb-4"><FireIntelligenceCard siteId={siteId} /></div>
+              <FireSafetyPage />
+            </>
+          )}
 
           {/* Security (control features gated by security_control) */}
-          {activeMainTab === "security" && <SecurityDashboard />}
+          {activeMainTab === "security" && (
+            <>
+              <div className="mb-4"><SecurityIntelligenceCard siteId={siteId} /></div>
+              <SecurityDashboard />
+            </>
+          )}
 
           {/* Digital Twin (write actions gated by digital_twin_control) */}
           {activeMainTab === "digital-twin" && (

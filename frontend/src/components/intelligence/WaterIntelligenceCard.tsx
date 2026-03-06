@@ -5,12 +5,12 @@ import { waterApi } from '@/lib/waterApi';
 import type { WaterTrending, WaterAlert } from '@/lib/waterApi';
 import {
   IntelligenceCard, ValueMetricBox, ValueBadge, LearningBadge, AwaitingDataBadge,
-  hasValue, type CardState,
+  BaselineComparisonBar, hasValue, type CardState,
 } from './shared';
 
 interface WaterIntelligenceCardProps {
   siteId: string;
-  onNavigate: () => void;
+  onNavigate?: () => void;
 }
 
 export function WaterIntelligenceCard({ siteId, onNavigate }: WaterIntelligenceCardProps) {
@@ -109,6 +109,16 @@ export function WaterIntelligenceCard({ siteId, onNavigate }: WaterIntelligenceC
           <ValueMetricBox label="Trend" value={trendLabel} color={trendColor} />
         </>
       }
+      comparison={baselineComparison < 0 ? (
+        <BaselineComparisonBar
+          baselineValue={100}
+          optimizedValue={100 + baselineComparison}
+          unit="%"
+          baselineLabel="Baseline consumption"
+          optimizedLabel="With SENTINEL monitoring"
+          accentColor="#06B6D4"
+        />
+      ) : undefined}
     />
   );
 }
