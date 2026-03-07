@@ -300,6 +300,25 @@ class Settings(BaseSettings):
     block_booking_concierge_whatsapp: str = ""  # E.164 format
     block_booking_concierge_telegram_id: str = ""  # Telegram chat ID
 
+    # Ghost Booking & Right-Sizing Detection (Rev 1.2)
+    ghost_booking_grace_minutes: int = 15  # Wait N min after booking start before flagging
+    right_sizing_grace_minutes: int = 20  # Do not flag until meeting has been running this long
+    early_vacate_threshold_minutes: int = 90  # Room empty with >N min of booking remaining
+    sporadic_use_threshold_pct: int = 25  # Occupied < N% of total booking duration
+    brief_occupation_threshold_min: int = 30  # Occupied < N min total in the whole booking
+
+    # Focus Room Sessions (Phase 2)
+    focus_min_session_seconds: int = 180  # Discard sessions shorter than 3 min (noise)
+    focus_extended_use_seconds: int = 7200  # Flag sessions longer than 2 hours
+
+    # Plant Room Alerts — Desigo email→WhatsApp pipeline (Phase 146)
+    plant_alerts_enabled: bool = False  # Master switch for plant alert ingestion
+    desigo_sender_email: str = "noreply@fnb.co.za"  # Authorised Desigo sender address
+    whatsapp_webhook_url: str = ""  # n8n webhook URL for WhatsApp delivery
+    whatsapp_group_id: str = ""  # Target WhatsApp group ID
+    plant_site_id: str = "FLN02"  # Default site identifier for alarms
+    plant_building_name: str = "Fairland 2"  # Default building name for alarms
+
     @property
     def resolved_ingestion_mode(self) -> IngestionMode:
         """Resolve ingestion mode based on data source config and safe fallback."""

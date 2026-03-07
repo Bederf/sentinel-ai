@@ -31,6 +31,8 @@ from app.api import event_intelligence
 from app.api import control_policy
 from app.api import decision_memory
 from app.api import block_bookings
+from app.api import space
+from app.config.settings import settings
 
 
 def register_operations_routers(app: FastAPI) -> None:
@@ -152,3 +154,12 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Block Booking Detection (Space Intelligence)
     app.include_router(block_bookings.router, tags=["block-bookings"])
+
+    # Ghost Booking & Right-Sizing Detection (Space Intelligence Rev 1.2)
+    app.include_router(space.router, tags=["space-intelligence"])
+
+    # Plant Room Alerts — Desigo email->WhatsApp pipeline (Phase 146)
+    if settings.plant_alerts_enabled:
+        from app.plant.plant_alerts import router as plant_alerts_router
+
+        app.include_router(plant_alerts_router, tags=["plant-alerts"])
