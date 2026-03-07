@@ -38,7 +38,9 @@ EQUIPMENT_CATEGORIES: dict[str, str] = {
 }
 
 # Subject regex: equipment_description  alarm_type  (status)
-_SUBJECT_RE = re.compile(r"^(.+?)\s+([\w\s]+?)\s+\((\w+)\)$")
+# alarm_type starts with a known Desigo keyword; group 1 is non-greedy up to that anchor.
+_ALARM_KW = r"(?:Fail|Trip|Fault|Start|High|Low|Open|Closed|Alert|Alarm|Status)"
+_SUBJECT_RE = re.compile(rf"^(.+?)\s+({_ALARM_KW}(?:\s+\w+)*)\s+\((\w+)\)$")
 
 
 def parse_desigo_email(
