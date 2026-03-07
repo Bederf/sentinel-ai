@@ -162,3 +162,33 @@ async def send_plant_alert(alarm: DesigoBuildingAlarm) -> bool:
 
     logger.error("All WhatsApp delivery attempts exhausted for alarm %s", alarm.id)
     return False
+
+
+async def send_raw_message(message: str) -> bool:
+    """Send a pre-formatted message (e.g. flood summary) via WhatsApp.
+
+    Uses same Twilio/webhook delivery as send_plant_alert but without
+    alarm-specific formatting. Retries once on failure.
+    """
+    settings = _get_settings()
+    use_twilio = _twilio_configured(settings)
+    use_webhook = bool(settings.whatsapp_webhook_url)
+
+    if not use_twilio and not use_webhook:
+        logger.warning("No WhatsApp delivery configured; skipping raw message")
+        return False
+
+    for attempt in range(1, 3):
+        try:
+            if use_twilio:
+                await _send_via_twilio(message, settings)
+            else:
+                await _send_via_webhook(message, "warning", settings)
+
+            logger.info("Raw WhatsApp message sent (attempt %d/2)", attempt)
+            return True
+        except Exception:
+            logger.warning("Raw message attempt %d/2 failed", attempt, exc_info=True)
+
+    logger.error("Failed to send raw WhatsApp message after 2 attempts")
+    return False

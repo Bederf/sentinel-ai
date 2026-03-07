@@ -18,7 +18,12 @@ from pydantic import BaseModel, Field
 
 from app.config.settings import settings
 from app.plant import alarm_store, email_parser
-from app.plant.whatsapp_notifier import send_plant_alert
+from app.plant.notification_throttle import (
+    ThrottleAction,
+    format_flood_summary,
+    get_throttle,
+)
+from app.plant.whatsapp_notifier import send_plant_alert, send_raw_message
 
 logger = logging.getLogger(__name__)
 
@@ -103,13 +108,31 @@ async def ingest_email(req: IngestRequest):
     if not saved:
         raise HTTPException(status_code=500, detail="Failed to persist alarm.")
 
-    # 6. Send WhatsApp notification (awaited so response reflects status)
+    # 6. Send WhatsApp notification (throttle-aware)
     notified = False
     try:
-        ok = await send_plant_alert(alarm)
-        if ok:
-            await alarm_store.mark_notified(alarm.id)
-            notified = True
+        throttle = get_throttle()
+        decision = throttle.check_alarm(alarm)
+
+        if decision.action == ThrottleAction.SEND:
+            ok = await send_plant_alert(alarm)
+            if ok:
+                throttle.record_send()
+                await alarm_store.mark_notified(alarm.id)
+                notified = True
+        elif decision.action == ThrottleAction.SEND_FLOOD_SUMMARY:
+            flood_msg = format_flood_summary(
+                decision.equipment,
+                decision.flood_count,
+                throttle.flood_window_minutes,
+            )
+            ok = await send_raw_message(flood_msg)
+            if ok:
+                throttle.record_send()
+            logger.warning("Flood summary sent for %s: %s", decision.equipment, decision.reason)
+        else:
+            # SUPPRESS — alarm saved but no notification
+            logger.info("Notification suppressed: %s", decision.reason)
     except Exception:
         logger.exception("WhatsApp notification failed for alarm %s", alarm.id)
 
@@ -133,6 +156,16 @@ async def get_recent_alarms(site_id: str | None = None, limit: int = 50):
     resolved_site = site_id or settings.plant_site_id
     alarms = await alarm_store.get_recent_alarms(resolved_site, limit=limit)
     return [a.model_dump() for a in alarms]
+
+
+@router.get("/throttle/status")
+async def throttle_status():
+    """Return current throttle state — flood detection and rate limit status."""
+    throttle = get_throttle()
+    return {
+        "flood": throttle.get_flood_status(),
+        "rate_limit": throttle.get_rate_status(),
+    }
 
 
 @router.get("/{alarm_id}")
