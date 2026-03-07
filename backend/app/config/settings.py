@@ -314,10 +314,16 @@ class Settings(BaseSettings):
     # Plant Room Alerts — Desigo email→WhatsApp pipeline (Phase 146)
     plant_alerts_enabled: bool = False  # Master switch for plant alert ingestion
     desigo_sender_email: str = "noreply@fnb.co.za"  # Authorised Desigo sender address
-    whatsapp_webhook_url: str = ""  # n8n webhook URL for WhatsApp delivery
-    whatsapp_group_id: str = ""  # Target WhatsApp group ID
     plant_site_id: str = "FLN02"  # Default site identifier for alarms
     plant_building_name: str = "Fairland 2"  # Default building name for alarms
+
+    # WhatsApp delivery — Twilio (primary) or n8n webhook (fallback)
+    twilio_account_sid: str = ""  # Twilio Account SID (ACxxxx)
+    twilio_auth_token: str = ""  # Twilio Auth Token
+    twilio_whatsapp_from: str = ""  # e.g. whatsapp:+14155238886
+    twilio_whatsapp_to: str = ""  # e.g. whatsapp:+27721234567
+    whatsapp_webhook_url: str = ""  # n8n webhook fallback (used if Twilio not configured)
+    whatsapp_group_id: str = ""  # Target WhatsApp group ID (webhook mode only)
 
     @property
     def resolved_ingestion_mode(self) -> IngestionMode:
