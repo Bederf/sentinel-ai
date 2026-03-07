@@ -68,6 +68,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[ServiceNow API](03-api-reference/servicenow-api.md)** - Read-only ITSM endpoints for incidents, work orders, table queries, schema, history, and aggregates (Phase 138)
 - **[Event Bus Monitoring API](03-api-reference/event-bus-api.md)** - Metrics, history, event chain lookup, subscription listing for the async event bus (Phase 139)
 - **[Dashboard Generator API](03-api-reference/dashboard-generator-api.md)** - Auto-generate dashboard cards, monitoring rules, health weights, and module suggestions from discovered equipment (Phase 141)
+- **[Plant Alerts API](04-features/plant-room-notification-pipeline.md#api-reference)** - Desigo fault email ingest, alarm retrieval, throttle status, acknowledgement (Phase 146)
 
 ### ✨ Features
 
@@ -125,6 +126,9 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Contract Management Module](04-features/48-contract-management.md)** - Portfolio KPIs, SLA compliance tracking, budget variance analysis, profitability dashboard (Phase 48)
 - **[SLA Monitoring & Profitability](04-features/50-52-commercial-analytics.md)** - SLA compliance tracking, profitability dashboards, and risk-based pricing (Phases 50-52)
 - **[Municipal Billing Integration](04-features/49-municipal-billing.md)** - SA municipal invoice processing, cost tracking, tariff validation, variance detection, MCP tools for AI-powered workflows; NMD extraction for peak demand management (Phase 49, enhanced in Phase 081)
+
+#### Plant Room Alerts
+- **[Plant Room Notification Pipeline](04-features/plant-room-notification-pipeline.md)** - Desigo BMS fault email ingestion, severity classification, Twilio WhatsApp delivery with alarm flood protection and rate limiting (Phase 146)
 
 #### Additional Features
 - [Technician Chat](04-features/technician-chat.md) - Guided fault diagnosis (Phase 19)
