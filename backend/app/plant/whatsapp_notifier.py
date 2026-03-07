@@ -39,9 +39,9 @@ TWILIO_API_BASE = "https://api.twilio.com/2010-04-01/Accounts"
 
 def _get_settings():
     """Lazy import to avoid circular imports at module level."""
-    from app.config.settings import get_settings
+    from app.config.settings import settings
 
-    return get_settings()
+    return settings
 
 
 def format_plant_alert(alarm: DesigoBuildingAlarm) -> str:
