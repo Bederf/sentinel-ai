@@ -143,7 +143,7 @@ class PIIGuard:
 
     def _create_placeholder(self, pii_type: str, original_value: str) -> str:
         """Create unique placeholder for PII value."""
-        value_hash = hashlib.md5(original_value.encode()).hexdigest()[:8]
+        value_hash = hashlib.md5(original_value.encode(), usedforsecurity=False).hexdigest()[:8]
         return f"[{pii_type.upper()}_{value_hash}]"
 
     def _validate_sa_id(self, id_number: str) -> bool:

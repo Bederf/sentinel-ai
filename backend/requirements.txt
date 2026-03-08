@@ -9,14 +9,14 @@ pydantic==2.6.1
 pydantic-settings==2.1.0
 
 # HTTP Client (async preferred over requests)
-httpx==0.26.0
+httpx>=0.26.0
 requests>=2.31.0  # Fallback for legacy integrations
 
 # AI/LLM
 anthropic>=0.39.0
 
 # Database
-supabase==2.3.0
+supabase>=2.3.0
 psycopg2-binary==2.9.9
 
 # Time-Series Database

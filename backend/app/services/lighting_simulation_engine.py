@@ -114,7 +114,7 @@ class LightingSimulationEngine:
         # Zone-to-luminaire mapping: {zone_id: [luminaire_ids]}
         self._zone_luminaires: Dict[str, List[str]] = {}
         # Deterministic RNG seeded per building for reproducible faults
-        self._rng = random.Random(int(hashlib.md5(site_id.encode()).hexdigest()[:8], 16))
+        self._rng = random.Random(int(hashlib.md5(site_id.encode(), usedforsecurity=False).hexdigest()[:8], 16))
 
     async def calculate_lighting_power(
         self,

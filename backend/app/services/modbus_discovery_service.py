@@ -286,11 +286,11 @@ class SimulatedModbusDiscovery:
         profile = cls.DEVICE_PROFILES.get(equipment_type.lower(), cls.DEVICE_PROFILES["generator"])
 
         # Select manufacturer based on hash for consistency
-        hash_val = int(hashlib.md5(equipment_code.encode()).hexdigest()[:8], 16)
+        hash_val = int(hashlib.md5(equipment_code.encode(), usedforsecurity=False).hexdigest()[:8], 16)
         mfr = profile["manufacturers"][hash_val % len(profile["manufacturers"])]
 
         # Generate serial
-        serial_hash = hashlib.md5(f"{equipment_code}-modbus".encode()).hexdigest()[:12].upper()
+        serial_hash = hashlib.md5(f"{equipment_code}-modbus".encode(), usedforsecurity=False).hexdigest()[:12].upper()
 
         # Generate capacity and runtime
         capacity = None

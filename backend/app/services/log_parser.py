@@ -504,4 +504,4 @@ class LogParserService:
     def compute_hash(alarm: ParsedAlarm) -> str:
         """Compute deduplication hash for alarm."""
         key = f"{alarm.occurred_at.isoformat()}|{alarm.point_id}|{alarm.alarm_code or ''}"
-        return hashlib.md5(key.encode()).hexdigest()
+        return hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()

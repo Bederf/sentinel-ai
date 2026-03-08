@@ -409,7 +409,7 @@ class SolarMaintenanceService:
             # Simulate fault count (seeded per inverter, higher for older units)
             import hashlib
 
-            seed = int(hashlib.md5(inv_id.encode()).hexdigest()[:8], 16) % 20
+            seed = int(hashlib.md5(inv_id.encode(), usedforsecurity=False).hexdigest()[:8], 16) % 20
             fault_count = seed  # 0-19 faults
 
             # Simulate thermal events

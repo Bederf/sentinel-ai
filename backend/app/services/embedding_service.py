@@ -39,7 +39,7 @@ class _EmbeddingCache:
 
     @staticmethod
     def _key(text: str) -> str:
-        return hashlib.md5(text.encode()).hexdigest()
+        return hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()
 
     def get(self, text: str) -> List[float] | None:
         key = self._key(text)

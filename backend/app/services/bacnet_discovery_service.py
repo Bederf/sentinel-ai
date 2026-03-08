@@ -310,11 +310,11 @@ class SimulatedBACnetDiscovery:
         profile = cls.DEVICE_PROFILES.get(equipment_type.lower(), cls.DEVICE_PROFILES["default"])
 
         # Generate consistent device ID from equipment code
-        hash_val = int(hashlib.md5(equipment_code.encode()).hexdigest()[:8], 16)
+        hash_val = int(hashlib.md5(equipment_code.encode(), usedforsecurity=False).hexdigest()[:8], 16)
         generated_device_id = device_id or (hash_val % 900000) + 100000
 
         # Generate serial
-        serial_hash = hashlib.md5(f"{equipment_code}-serial".encode()).hexdigest()[:10].upper()
+        serial_hash = hashlib.md5(f"{equipment_code}-serial".encode(), usedforsecurity=False).hexdigest()[:10].upper()
 
         # Random object count in range
         min_obj, max_obj = profile["object_count_range"]

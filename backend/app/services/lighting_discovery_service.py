@@ -483,7 +483,7 @@ class SimulatedLightingDiscovery:
 
         # Generate consistent serial from equipment code
         hash_input = f"{equipment_code}-{dali_address}"
-        serial_hash = hashlib.md5(hash_input.encode()).hexdigest()[:12].upper()
+        serial_hash = hashlib.md5(hash_input.encode(), usedforsecurity=False).hexdigest()[:12].upper()
         serial = f"TRI{serial_hash}"
 
         # Randomize lamp hours within range
