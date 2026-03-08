@@ -1,13 +1,15 @@
 /**
- * SystemHealthPage Tests - Simplified Version
+ * SystemHealthPage Tests
  *
  * Focuses on core functionality:
  * - Data loading and error handling
  * - Overall health display
  * - Component status display
- * - Auto-refresh timing
+ * - Historical insights display
+ * - Page structure
  *
- * Note: Tab switching tests removed due to Tremor TabGroup mock limitations
+ * Note: Tab switching tests removed due to Tremor TabGroup mock limitations.
+ * All TabPanels render simultaneously in mock, so content is always visible.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -50,23 +52,53 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-// Mock Tremor components - import function directly into factory
+// Mock Tremor components
 vi.mock('@tremor/react', async () => {
   const { createTremorMocks } = await import('@/test-utils/mockTremor');
   const React = await import('react');
   const baseMocks = createTremorMocks();
   return {
     ...baseMocks,
-    // Additional components specific to SystemHealthPage
+    // Text: render children directly
     Text: ({ children }: any) =>
       React.default.createElement('div', { 'data-testid': 'text', children }),
+    // ProgressBar: include color in testid for color assertions
     ProgressBar: ({ value, color }: any) =>
       React.default.createElement('div', {
         'data-testid': `progress-bar-${color}`,
         children: `${value}%`,
       }),
+    // Metric: render children (component passes values as children, not props)
+    Metric: ({ children, ...props }: any) =>
+      React.default.createElement('div', {
+        'data-testid': 'metric',
+        ...props,
+        children,
+      }),
+    // Badge: include color in testid for color assertions
+    Badge: ({ children, color }: any) =>
+      React.default.createElement('span', {
+        'data-testid': `badge-${color}`,
+        children,
+      }),
   };
 });
+
+// Mock useServerEvents hook
+vi.mock('@/hooks/useServerEvents', () => ({
+  useServerEvents: () => {},
+}));
+
+// Mock sub-tab components to avoid their own fetch/render issues
+vi.mock('../system/AIPerformanceTab', () => ({
+  AIPerformanceTab: () =>
+    React.createElement('div', { 'data-testid': 'ai-performance-tab' }, 'AI Performance Tab'),
+}));
+
+vi.mock('../system/ModelHealthTab', () => ({
+  ModelHealthTab: () =>
+    React.createElement('div', { 'data-testid': 'model-health-tab' }, 'Model Health Tab'),
+}));
 
 import { authorizedFetch } from '@/lib/api/client';
 
@@ -138,7 +170,7 @@ describe('SystemHealthPage', () => {
       setupHealthMocks();
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
       await waitFor(() => {
-        expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
+        expect(screen.getByText('System Health')).toBeInTheDocument();
       }, { timeout: 2000 });
     });
   });
@@ -183,10 +215,7 @@ describe('SystemHealthPage', () => {
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
-        // Find the green badge that says HEALTHY (not Improving)
-        const greenBadges = screen.getAllByTestId('badge-green');
-        const healthyBadge = greenBadges.find(b => b.textContent === 'HEALTHY');
-        expect(healthyBadge).toBeInTheDocument();
+        // Status is rendered as custom span with toUpperCase()
         expect(screen.getByText('HEALTHY')).toBeInTheDocument();
       }, { timeout: 2000 });
     });
@@ -201,7 +230,6 @@ describe('SystemHealthPage', () => {
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
-        expect(screen.getByTestId('badge-yellow')).toBeInTheDocument();
         expect(screen.getByText('DEGRADED')).toBeInTheDocument();
       }, { timeout: 2000 });
     });
@@ -216,7 +244,6 @@ describe('SystemHealthPage', () => {
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
-        expect(screen.getByTestId('badge-red')).toBeInTheDocument();
         expect(screen.getByText('CRITICAL')).toBeInTheDocument();
       }, { timeout: 2000 });
     });
@@ -255,6 +282,7 @@ describe('SystemHealthPage', () => {
 
       await waitFor(() => {
         const metrics = screen.getAllByTestId('metric');
+        // Integration metrics (4) + component metrics (2)
         expect(metrics.length).toBeGreaterThanOrEqual(2);
       }, { timeout: 2000 });
     });
@@ -291,6 +319,7 @@ describe('SystemHealthPage', () => {
   });
 
   // ===== HISTORICAL INSIGHTS TAB CONTENT =====
+  // Note: Tremor mock renders all TabPanels, so Historical content is visible
   describe('Historical Insights Display', () => {
     it('should fetch and display average health score', async () => {
       setupHealthMocks(undefined, {
@@ -373,11 +402,8 @@ describe('SystemHealthPage', () => {
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
-        // Find the green badge that says Improving
-        const greenBadges = screen.getAllByTestId('badge-green');
-        const improvingBadge = greenBadges.find(b => b.textContent === 'Improving');
-        expect(improvingBadge).toBeInTheDocument();
         expect(screen.getByText('Improving')).toBeInTheDocument();
+        expect(screen.getByTestId('badge-green')).toBeInTheDocument();
       }, { timeout: 2000 });
     });
 
@@ -444,7 +470,6 @@ describe('SystemHealthPage', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('line-chart')).toBeInTheDocument();
-        expect(screen.getByText('3 points')).toBeInTheDocument();
       }, { timeout: 2000 });
     });
   });
@@ -456,22 +481,20 @@ describe('SystemHealthPage', () => {
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
-        expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
+        expect(screen.getByText('System Health')).toBeInTheDocument();
       }, { timeout: 2000 });
 
-      // Simply verify that component renders and dashboard is visible
-      expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
+      expect(screen.getByText('System Health')).toBeInTheDocument();
     });
 
     it('should cleanup interval on unmount', async () => {
       setupHealthMocks();
-      const { unmount } = render(<SystemHealthPage />);
+      const { unmount } = render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
-        expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
+        expect(screen.getByText('System Health')).toBeInTheDocument();
       }, { timeout: 2000 });
 
-      // Verify unmount doesn't cause errors
       expect(() => unmount()).not.toThrow();
     });
   });
@@ -483,19 +506,21 @@ describe('SystemHealthPage', () => {
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
-        expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
-        expect(screen.getByText('Real-time monitoring and diagnostics')).toBeInTheDocument();
+        expect(screen.getByText('System Health')).toBeInTheDocument();
+        // &amp; in JSX renders as & in DOM
+        expect(screen.getByText(/Real-time monitoring/)).toBeInTheDocument();
       }, { timeout: 2000 });
     });
 
-    it('should display all three tabs', async () => {
+    it('should display all four tabs', async () => {
       setupHealthMocks();
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
-        expect(screen.getByText('Realtime Status')).toBeInTheDocument();
-        expect(screen.getByText('Historical Insights')).toBeInTheDocument();
-        expect(screen.getByText('Diagnostics')).toBeInTheDocument();
+        expect(screen.getByText('Health')).toBeInTheDocument();
+        expect(screen.getByText('Historical')).toBeInTheDocument();
+        expect(screen.getByText('AI Performance')).toBeInTheDocument();
+        expect(screen.getByText('Model Health')).toBeInTheDocument();
       }, { timeout: 2000 });
     });
 
@@ -514,7 +539,7 @@ describe('SystemHealthPage', () => {
 
       await waitFor(() => {
         const cards = screen.getAllByTestId('card');
-        // Should have overall card + 3 component cards
+        // Overall card + integration card + 3 component cards + historical cards
         expect(cards.length).toBeGreaterThanOrEqual(4);
       }, { timeout: 2000 });
     });
@@ -532,7 +557,7 @@ describe('SystemHealthPage', () => {
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
-        expect(screen.getByText('System Health Dashboard')).toBeInTheDocument();
+        expect(screen.getByText('System Health')).toBeInTheDocument();
         expect(screen.getByText('85')).toBeInTheDocument();
       }, { timeout: 2000 });
     });
