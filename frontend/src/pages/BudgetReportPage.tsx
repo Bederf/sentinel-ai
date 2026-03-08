@@ -52,7 +52,7 @@ export function BudgetReportPage() {
         if (!selectedContractId && data.length > 0) {
           setSelectedContractId(data[0].id || data[0].contract_code);
         }
-      } catch (err) {
+      } catch (_err) {
         setError("Failed to load contracts");
       } finally {
         setLoading(false);
@@ -60,6 +60,7 @@ export function BudgetReportPage() {
     };
 
     loadContracts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -77,7 +78,7 @@ export function BudgetReportPage() {
         );
         setReport(data);
         setError(null);
-      } catch (err) {
+      } catch (_err) {
         setError("Failed to load budget report");
         setReport(null);
       }

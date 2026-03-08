@@ -22,7 +22,7 @@ import {
   createMockPrediction,
   createMockEnergyDataPoint,
 } from '@/test-utils/factories';
-import type { DashboardStats, Site, Prediction } from '@/lib/api';
+// Types available from '@/lib/api' if needed
 
 // Mock Tremor components - import function directly into factory
 vi.mock('@tremor/react', async () => {

@@ -63,6 +63,7 @@ export const EscalationAlerts: React.FC<EscalationAlertsProps> = ({
       const interval = setInterval(fetchAlerts, refreshInterval);
       return () => clearInterval(interval);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefresh, refreshInterval]);
 
   const playAlert = () => {
@@ -81,7 +82,7 @@ export const EscalationAlerts: React.FC<EscalationAlertsProps> = ({
 
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.5);
-    } catch (error) {
+    } catch (_error) {
       // Fallback: just log if audio context not available
       console.log('Alert triggered - audio not available');
     }

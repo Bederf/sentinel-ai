@@ -49,7 +49,7 @@ interface WaterAnomalyChartProps {
 
 export const WaterAnomalyChart: React.FC<WaterAnomalyChartProps> = ({
   zoneId,
-  days = 7,
+  days: _days = 7,
 }) => {
   const [timeRange, setTimeRange] = useState<"24h" | "7d" | "30d">("7d");
 

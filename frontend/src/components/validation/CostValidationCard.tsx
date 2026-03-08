@@ -20,7 +20,7 @@ import {
   ProgressBar,
   Button,
 } from "@tremor/react";
-import { DollarSign, AlertTriangle, TrendingUp, Upload, FileText, Loader2, CheckCircle } from "lucide-react";
+import { DollarSign, AlertTriangle, TrendingUp, Upload, Loader2, CheckCircle } from "lucide-react";
 
 interface CostValidationRaw {
   // API field names

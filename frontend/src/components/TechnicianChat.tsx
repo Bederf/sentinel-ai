@@ -21,14 +21,10 @@ import {
   setupOfflineListeners,
   getCachedFaultCodes,
   getCachedRepairProcedures,
-  cacheEquipment,
-  getOfflineWorkOrders,
-  saveWorkOrderOffline,
-  queueForSync,
   clearSyncQueue,
 } from '../lib/offlineStorage';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const _API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // Message types for conversation
 interface Message {
@@ -309,7 +305,7 @@ export default function TechnicianChat() {
       if (!isOnlineMode) {
         // Try to use cached data
         const cachedCodes = await getCachedFaultCodes();
-        const cachedProcedures = await getCachedRepairProcedures();
+        const _cachedProcedures = await getCachedRepairProcedures();
 
         // Simple offline search in cached data
         const searchLower = text.toLowerCase();

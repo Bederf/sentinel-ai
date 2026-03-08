@@ -28,7 +28,7 @@ vi.mock('@/lib/profitabilityApi', () => ({
 
 // Mock chart components - let them render but suppress errors
 vi.mock('recharts', () => ({
-  LineChart: ({ children, data }: any) => <div data-testid="line-chart">{children}</div>,
+  LineChart: ({ children, data: _data }: any) => <div data-testid="line-chart">{children}</div>,
   Line: () => <div />,
   XAxis: () => <div />,
   YAxis: () => <div />,

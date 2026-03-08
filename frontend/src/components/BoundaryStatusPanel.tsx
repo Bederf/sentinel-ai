@@ -34,6 +34,7 @@ export const BoundaryStatusPanel: React.FC<BoundaryStatusPanelProps> = ({
     fetchBoundaryStatus();
     const interval = setInterval(fetchBoundaryStatus, 5000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceId]);
 
   const getSeverityBadge = (escalationLevel: number) => {

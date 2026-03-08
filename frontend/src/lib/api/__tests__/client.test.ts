@@ -15,12 +15,10 @@ import {
   fetchApi,
   clearAuthStorage,
   AUTH_EXPIRED_EVENT,
-  getAccessToken,
   setTokens,
-  getRefreshToken,
 } from '../client';
 
-const API_BASE_URL = 'http://localhost:9095';
+const _API_BASE_URL = 'http://localhost:9095';
 
 // Mock fetch globally
 const mockFetch = vi.fn();

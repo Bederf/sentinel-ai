@@ -17,6 +17,7 @@ export const RecommendationsDashboard: React.FC<
 
   useEffect(() => {
     loadRecommendations()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteId])
 
   const loadRecommendations = async () => {

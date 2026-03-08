@@ -303,7 +303,7 @@ describe('useDemandForecasting', () => {
       });
 
       const data = result.current.data!;
-      const criticalHours = data.forecast_hours.filter(
+      const _criticalHours = data.forecast_hours.filter(
         (h) => h.risk_level === 'critical'
       );
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 import React, { useState, useMemo, useEffect } from 'react'
 import {
@@ -7,7 +8,7 @@ import {
   Text,
   BarChart,
   PieChart,
-  LineChart,
+
   Table,
   TableHead,
   TableRow,
@@ -22,7 +23,7 @@ import {
   SelectItem,
   Metric,
 } from '@tremor/react'
-import { ArrowUpIcon, ArrowDownIcon, DocumentDownloadIcon } from '@heroicons/react/24/solid'
+import { DocumentDownloadIcon } from '@heroicons/react/24/solid'
 import { pricingApi } from '@/lib/api'
 import type { EquipmentBenchmarkResponse, WinLossAnalysisResponse, PortfolioBenchmarkResponse } from '@/lib/api'
 
@@ -58,7 +59,7 @@ export function BenchmarkingAnalysis() {
     loadData()
   }, [selectedEquipmentType, selectedSlaTier])
 
-  const marketComparisonChart = useMemo(() => {
+  const _marketComparisonChart = useMemo(() => {
     if (!benchmarkData) return []
     const avgFee = typeof benchmarkData.avg_fee_zar === 'string'
       ? parseFloat(benchmarkData.avg_fee_zar)

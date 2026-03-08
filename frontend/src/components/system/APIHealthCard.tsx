@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Server, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
+import { Server } from 'lucide-react';
 import type { SystemHealthSnapshot } from '@/lib/api/system';
 
 interface APIHealthCardProps {

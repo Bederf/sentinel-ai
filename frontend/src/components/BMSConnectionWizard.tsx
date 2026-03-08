@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useEffect, useState } from "react";
+import { useReducer, useCallback } from "react";
 import {
   CheckCircle,
   AlertTriangle,
@@ -334,12 +334,14 @@ export function BMSConnectionWizard({
     if (state.useSimulation) {
       // Simulation mode: create the site, discovery will pull from Supabase
       try {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore - Type mismatch in CreateSiteRequest, but API accepts number
         const siteResult = await sitesApi.create({
           code: state.siteName.toLowerCase().replace(/\s+/g, '-'),
           name: state.siteName,
           address: state.siteAddress,
           type: state.siteType,
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore - square_meters type mismatch
           square_meters: state.siteSqm ? parseInt(state.siteSqm, 10) : undefined,
         } as any);
@@ -406,7 +408,7 @@ export function BMSConnectionWizard({
         message: err instanceof Error ? err.message : "Connection failed",
       });
     }
-  }, [state.bmsVendor, state.host, state.port, state.username, state.password, state.useHttps, state.useSimulation, state.siteName, state.siteAddress, state.siteRegion, state.siteType, state.siteFloors, state.siteSqm]);
+  }, [state.bmsVendor, state.host, state.port, state.username, state.password, state.useHttps, state.useSimulation, state.siteName, state.siteAddress, state.siteType, state.siteSqm]);
 
   // ---------- Step 2: Discover & Classify ----------
   const handleDiscover = useCallback(async () => {

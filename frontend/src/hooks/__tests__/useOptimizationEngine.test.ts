@@ -15,9 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
-import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
 
 // Mock batchers used by optimization endpoints
 vi.mock('@/lib/api/batchers', () => ({
@@ -47,7 +45,7 @@ function createTestQueryClient() {
   });
 }
 
-function createWrapper(queryClient: QueryClient) {
+function _createWrapper(queryClient: QueryClient) {
   return ({ children }: { children: ReactNodeType }) =>
     React.createElement(QueryClientProvider, { client: queryClient }, children);
 }
@@ -120,7 +118,7 @@ function createMockOptimizationResult(
   };
 }
 
-function createMockAIResponse(
+function _createMockAIResponse(
   overrides?: Partial<MockAIResponse>
 ): MockAIResponse {
   return {
@@ -137,7 +135,7 @@ describe('useOptimizationEngine Hook', () => {
   let queryClient: QueryClient;
   let mockRecommendationBatcher: any;
   let mockValidationBatcher: any;
-  let mockFetchApi: any;
+  let _mockFetchApi: any;
 
   beforeEach(() => {
     queryClient = createTestQueryClient();
@@ -145,7 +143,7 @@ describe('useOptimizationEngine Hook', () => {
     // Get mocked modules
     mockRecommendationBatcher = vi.mocked(recommendationBatcher);
     mockValidationBatcher = vi.mocked(validationBatcher);
-    mockFetchApi = vi.mocked(fetchApi);
+    _mockFetchApi = vi.mocked(fetchApi);
 
     vi.clearAllMocks();
   });
@@ -323,7 +321,7 @@ describe('useOptimizationEngine Hook', () => {
      * - SafetyEngine.validate() blocks violations
      */
     it('should reject optimization violating safety constraints (temperature range)', async () => {
-      const mockEquipState = createMockEquipmentState({
+      const _mockEquipState = createMockEquipmentState({
         type: 'CHILLER',
         temperature_celsius: 8, // Already below safe minimum (16°C)
       });
@@ -364,7 +362,7 @@ describe('useOptimizationEngine Hook', () => {
       });
 
       // Scenario 1: Empty zone (0% occupancy) → Aggressive optimization
-      const emptyZoneState = { ...baseEquipState, occupancy_percent: 0 };
+      const _emptyZoneState = { ...baseEquipState, occupancy_percent: 0 };
       const aggressiveRec = {
         setpoint_delta: 4, // Can increase by 4°C
         confidence: 0.95,
@@ -374,7 +372,7 @@ describe('useOptimizationEngine Hook', () => {
       expect(aggressiveRec.comfort_impact).toBe('none');
 
       // Scenario 2: Moderate occupancy (30%) → Balanced
-      const moderateZoneState = { ...baseEquipState, occupancy_percent: 30 };
+      const _moderateZoneState = { ...baseEquipState, occupancy_percent: 30 };
       const balancedRec = {
         setpoint_delta: 2, // Moderate 2°C adjustment
         confidence: 0.75,
@@ -384,7 +382,7 @@ describe('useOptimizationEngine Hook', () => {
       expect(balancedRec.comfort_impact).toBe('minor');
 
       // Scenario 3: High occupancy (80%) → Conservative
-      const highZoneState = { ...baseEquipState, occupancy_percent: 80 };
+      const _highZoneState = { ...baseEquipState, occupancy_percent: 80 };
       const conservativeRec = {
         setpoint_delta: 1, // Only 1°C adjustment
         confidence: 0.65,
@@ -394,7 +392,7 @@ describe('useOptimizationEngine Hook', () => {
       expect(conservativeRec.comfort_impact).toBe('minimal');
 
       // Scenario 4: Full occupancy (100%) → Safety-only
-      const fullZoneState = { ...baseEquipState, occupancy_percent: 100 };
+      const _fullZoneState = { ...baseEquipState, occupancy_percent: 100 };
       const safetyOnlyRec = {
         setpoint_delta: 0, // No adjustment
         confidence: 1.0,
@@ -447,7 +445,7 @@ describe('useOptimizationEngine Hook', () => {
      */
     it('should update recommendations when demand or occupancy changes', async () => {
       // Initial state: Normal demand, 60% occupancy
-      const initialState = createMockEquipmentState({
+      const _initialState = createMockEquipmentState({
         occupancy_percent: 60,
         power_kw: 125,
       });
@@ -459,7 +457,7 @@ describe('useOptimizationEngine Hook', () => {
       });
 
       // Demand spike: occupancy rises to 95%, demand increases
-      const spikeState = createMockEquipmentState({
+      const _spikeState = createMockEquipmentState({
         occupancy_percent: 95,
         power_kw: 180, // +55 kW from peak load
       });
@@ -487,7 +485,7 @@ describe('useOptimizationEngine Hook', () => {
      * - Ollama service fails → escalate to Claude, or use defaults
      */
     it('should fall back to rule-based defaults if AI service unavailable', async () => {
-      const mockEquipState = createMockEquipmentState({
+      const _mockEquipState2 = createMockEquipmentState({
         type: 'CHILLER',
         health_score: 45, // Low health
       });
@@ -558,7 +556,7 @@ describe('useOptimizationEngine Hook', () => {
      */
     it('should execute batch zone optimizations atomically (all-or-nothing)', async () => {
       // Multiple zones with recommendations
-      const batchRequest = {
+      const _batchRequest = {
         site_id: 'S002',
         zone_ids: ['Zone-001', 'Zone-101', 'Zone-200'],
         recommendations: [

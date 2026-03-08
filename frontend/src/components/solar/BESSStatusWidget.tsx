@@ -14,7 +14,6 @@
  */
 
 import { Battery, TrendingDown, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react';
-import type { BESSStatusData } from '@/lib/api/solar';
 import { useBESSStatus } from '@/hooks/useSolarDashboard';
 
 interface BESSStatusWidgetProps {

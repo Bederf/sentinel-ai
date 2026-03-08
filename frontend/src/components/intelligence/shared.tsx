@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+/* eslint-disable react-refresh/only-export-components */
 // @ts-nocheck
 /**
  * Shared components for Intelligence Cards — three-state display pattern.

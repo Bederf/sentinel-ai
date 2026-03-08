@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/purity */
 import { useState } from 'react';
 import type { Equipment } from '@/lib/api/sites';
 

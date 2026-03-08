@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import React from 'react';
@@ -36,7 +36,7 @@ function createTestQueryClient() {
   });
 }
 
-function createWrapper(queryClient: QueryClient) {
+function _createWrapper(queryClient: QueryClient) {
   return ({ children }: { children: ReactNode }) =>
     React.createElement(QueryClientProvider, { client: queryClient }, children);
 }
@@ -298,7 +298,7 @@ describe('Integration Scenarios - Phase 68-03', () => {
       await act(async () => {
         try {
           await attemptApprovalWorkflow();
-        } catch (err) {
+        } catch (_err) {
           await rollbackChanges();
         }
       });
@@ -423,7 +423,7 @@ describe('Integration Scenarios - Phase 68-03', () => {
             executeOptimization('opt-2', 23),
             executeOptimization('opt-3', 25),
           ]);
-        } catch (err) {
+        } catch (_err) {
           // Rollback all
           optimizations.forEach(opt => {
             opt.value = opt.original;

@@ -11,7 +11,7 @@
  */
 
 import { TrendingUp, TrendingDown, HelpCircle, AlertCircle, RefreshCw } from 'lucide-react';
-import type { PerformanceSummary } from '@/lib/api/solar';
+// PerformanceSummary type available from '@/lib/api/solar' if needed
 import { useSolarPerformance } from '@/hooks/useSolarDashboard';
 
 interface SolarPerformanceWidgetsProps {
@@ -66,7 +66,7 @@ function PerformanceError({
  */
 function TrendIndicator({
   trend,
-  isImproving = true,
+  isImproving: _isImproving = true,
 }: {
   trend: 'improving' | 'stable' | 'declining';
   isImproving?: boolean;

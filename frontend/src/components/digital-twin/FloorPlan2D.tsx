@@ -12,7 +12,6 @@ import { EquipmentMarker2D } from './EquipmentMarker2D';
 import { OccupancyMarkers2D } from './OccupancyMarkers2D';
 import {
   extractFloor,
-  extractZoneLetter,
   type ZoneBounds,
   type EquipmentPosition,
 } from '@/utils/equipmentPositioning';
@@ -47,7 +46,7 @@ const FLOOR_ID: Record<string, number> = {
  * - Yellow (#f59e0b): 30-60%
  * - Red (#ef4444): <30%
  */
-function getHealthColor(healthScore: number | undefined | null): string {
+function _getHealthColor(healthScore: number | undefined | null): string {
   const score = healthScore || 100;
   if (score >= 60) return '#22c55e';
   if (score >= 30) return '#f59e0b';

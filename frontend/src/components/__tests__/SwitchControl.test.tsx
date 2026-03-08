@@ -111,7 +111,7 @@ describe('SwitchControl', () => {
 
     it('should update state optimistically', async () => {
       const onChange = vi.fn();
-      const { rerender } = render(
+      const { rerender: _rerender } = render(
         <SwitchControl {...defaultProps} value={false} onChange={onChange} />
       );
 

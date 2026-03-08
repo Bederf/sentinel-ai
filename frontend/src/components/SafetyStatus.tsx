@@ -66,6 +66,7 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
   // Initial fetch
   useEffect(() => {
     fetchSafetyStatuses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteId, deviceType]);
 
   // Auto-refresh
@@ -74,6 +75,7 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
 
     const intervalId = setInterval(fetchSafetyStatuses, refreshInterval);
     return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefresh, refreshInterval, siteId, deviceType]);
 
   // Filter safety statuses

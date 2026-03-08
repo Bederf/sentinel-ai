@@ -5,7 +5,6 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import type { WorkOrder, EquipmentAlert } from '../lib/api/equipment_history';
 import { equipmentHistoryApi } from '../lib/api/equipment_history';
 
 /**

@@ -9,7 +9,7 @@
  * - Request payload validation
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { devicesApi } from '../devices';
 import type { Device, DeviceStatus, DeviceSafetyStatus, DeviceControlResponse } from '../devices';
 

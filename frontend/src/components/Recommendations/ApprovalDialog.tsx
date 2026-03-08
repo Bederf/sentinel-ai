@@ -21,7 +21,6 @@ import {
   AlertTriangle,
   Shield,
   Loader,
-  Send,
   XCircle,
 } from 'lucide-react'
 import { approvalsApi } from '@/lib/api/approvals'
@@ -91,6 +90,7 @@ export const ApprovalDialog: React.FC<ApprovalDialogProps> = ({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
   const handleClose = () => {
@@ -110,6 +110,7 @@ export const ApprovalDialog: React.FC<ApprovalDialogProps> = ({
     } else {
       setActiveTab('details')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recommendation?.id])
 
   const handleApprove = async () => {
@@ -200,7 +201,7 @@ export const ApprovalDialog: React.FC<ApprovalDialogProps> = ({
   if (!isOpen || !recommendation) return null
 
   const confidenceLevel = recommendation.confidence || 'unknown'
-  const isSafe = activeTab === 'approve' // SafetyEngine validation handled by backend
+  const _isSafe = activeTab === 'approve' // SafetyEngine validation handled by backend
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">

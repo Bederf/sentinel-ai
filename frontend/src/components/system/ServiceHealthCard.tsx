@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Zap, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Zap, CheckCircle } from 'lucide-react';
 import type { SystemHealthSnapshot } from '@/lib/api/system';
 
 interface ServiceHealthCardProps {

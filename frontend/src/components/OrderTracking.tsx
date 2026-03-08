@@ -21,6 +21,7 @@ export default function OrderTracking({ orderId }: OrderTrackingProps) {
 
   useEffect(() => {
     fetchTracking();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
   const fetchTracking = async () => {
@@ -151,7 +152,7 @@ export default function OrderTracking({ orderId }: OrderTrackingProps) {
       <div className="mb-6">
         <p className="text-sm font-medium text-gray-700 mb-3">Delivery Timeline</p>
         <div className="space-y-2">
-          {timelineSteps.map((step, idx) => {
+          {timelineSteps.map((step, _idx) => {
             const isCompleted = step.completed.includes(tracking.status);
             const isCurrent = step.status === tracking.status;
 

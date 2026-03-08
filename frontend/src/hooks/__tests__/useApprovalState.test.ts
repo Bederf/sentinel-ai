@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import React from 'react';
@@ -21,7 +21,7 @@ function useApprovalState(recommendationId: string | undefined) {
   const [error, setError] = React.useState<string | null>(null);
   const [executionResult, setExecutionResult] = React.useState<any>(null);
 
-  const approve = React.useCallback(async (notes: string) => {
+  const approve = React.useCallback(async (_notes: string) => {
     if (!recommendationId) throw new Error('No recommendation ID');
     setLoading(true);
     setError(null);
@@ -39,7 +39,7 @@ function useApprovalState(recommendationId: string | undefined) {
     }
   }, [recommendationId]);
 
-  const reject = React.useCallback(async (reason: string) => {
+  const reject = React.useCallback(async (_reason: string) => {
     if (!recommendationId) throw new Error('No recommendation ID');
     setLoading(true);
     setError(null);
@@ -54,7 +54,7 @@ function useApprovalState(recommendationId: string | undefined) {
     }
   }, [recommendationId]);
 
-  const rollback = React.useCallback(async (reason?: string) => {
+  const rollback = React.useCallback(async (_reason?: string) => {
     if (!recommendationId) throw new Error('No recommendation ID');
     if (status !== 'executed') throw new Error('Can only rollback executed approvals');
     setLoading(true);

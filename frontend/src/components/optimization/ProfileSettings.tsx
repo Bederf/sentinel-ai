@@ -19,6 +19,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
 
   useEffect(() => {
     loadProfileConfig()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteId])
 
   const loadProfileConfig = async () => {

@@ -9,7 +9,7 @@
  * - Tab 5: Access Points (list of readers, locks, sensors with status)
  */
 
-import { useContext, useState, useEffect } from 'react';
+import { useContext, useState } from 'react';
 import type { ReactElement } from 'react';
 import {
   Card,
@@ -25,19 +25,15 @@ import {
   TabPanels,
   TabPanel,
   Grid,
-  ProgressBar,
-  Icon,
 } from '@tremor/react';
 import {
   Lock,
   Users,
   AlertTriangle,
   Clock,
-  MapPin,
   CheckCircle,
   XCircle,
   Shield,
-  LogOut,
 } from 'lucide-react';
 import {
   useSecurityOverview,
@@ -88,7 +84,7 @@ export function SecurityPanel({ siteId: propSiteId }: SecurityPanelProps): React
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const formatDate = (isoString: string) => {
+  const _formatDate = (isoString: string) => {
     const date = new Date(isoString);
     return date.toLocaleDateString();
   };

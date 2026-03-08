@@ -15,7 +15,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import React from 'react';
-import { useHealthTrends, type HealthTrendDataPoint, type EquipmentAlert } from '../useHealthTrends';
+import { useHealthTrends, type EquipmentAlert } from '../useHealthTrends';
 
 // Mock the equipment history API
 vi.mock('@/lib/api/equipment_history', () => ({
@@ -550,7 +550,7 @@ describe('useHealthTrends', () => {
         expect(result.current.data_points.length).toBeGreaterThan(0);
       });
 
-      const initialCount = result.current.data_points.length;
+      const _initialCount = result.current.data_points.length;
 
       // Invalidate cache
       await queryClient.invalidateQueries({
@@ -578,7 +578,7 @@ describe('useHealthTrends', () => {
         expect(result.current.predictions).toBeDefined();
       });
 
-      const firstPredictions = result.current.predictions;
+      const _firstPredictions = result.current.predictions;
 
       // Simulate new alerts
       const updatedAlerts = [...alerts, createMockAlert()];

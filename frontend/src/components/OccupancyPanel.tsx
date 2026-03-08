@@ -109,6 +109,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
       setLoading(false);
       setIsRefreshing(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch sites on mount and auto-select first
@@ -127,6 +128,7 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
       }
     }
     loadSites();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Initial fetch

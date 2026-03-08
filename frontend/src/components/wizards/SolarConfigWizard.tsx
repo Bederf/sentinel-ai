@@ -32,8 +32,6 @@ import type {
 import {
   solarConfigApi,
   isValidEquipmentCode,
-  calculateInverterCoverage,
-  suggestEquipmentId,
 } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -141,7 +139,7 @@ export function SolarConfigWizard({ onComplete }: SolarConfigWizardProps = {}) {
       if (!inverter.modbus_ip?.trim()) return 'IP address is required';
 
       // Check for duplicate equipment IDs
-      const allInverters = Object.values(state.plants).flatMap((p) =>
+      const _allInverters = Object.values(state.plants).flatMap((p) =>
         state.selectedPlantForInverter === p.plant_id ? [] : []
       );
 
@@ -192,7 +190,7 @@ export function SolarConfigWizard({ onComplete }: SolarConfigWizardProps = {}) {
     }
 
     setState((s) => {
-      const inverters = { ...s.plants };
+      const _inverters = { ...s.plants };
       if (!s.plants[state.selectedPlantForInverter!]) {
         s.plants[state.selectedPlantForInverter!] = [];
       }
@@ -225,7 +223,7 @@ export function SolarConfigWizard({ onComplete }: SolarConfigWizardProps = {}) {
       default:
         return false;
     }
-  }, [state.step, state.siteId, state.siteName, state.isNewSite, state.latitude, state.longitude, state.plants, validateSite]);
+  }, [state.step, state.plants, validateSite]);
 
   const handleNextStep = () => {
     if (!canProceedToStep()) {
@@ -282,7 +280,7 @@ export function SolarConfigWizard({ onComplete }: SolarConfigWizardProps = {}) {
       }
 
       // Submit configuration
-      const response = await solarConfigApi.createSolarSite(request);
+      const _response = await solarConfigApi.createSolarSite(request);
 
       setState((s) => ({ ...s, success: true, loading: false }));
       toast.success('Solar site configured successfully!');

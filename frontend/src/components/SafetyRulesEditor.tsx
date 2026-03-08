@@ -55,6 +55,7 @@ export function SafetyRulesEditor({ onError, onSuccess, readOnly = false }: Safe
 
   useEffect(() => {
     loadRules();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadRules = async () => {

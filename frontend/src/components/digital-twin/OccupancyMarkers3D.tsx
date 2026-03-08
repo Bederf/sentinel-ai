@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * 3D OCCUPANCY MARKERS COMPONENT
  *
@@ -31,7 +32,7 @@ export const OccupancyMarkers3D: React.FC<OccupancyMarkers3DProps> = ({
   THREE,
   scene,
   floorHeight = 3.5,
-  scale = 1,
+  scale: _scale = 1,
 }) => {
   const meshesRef = useRef<Map<string, any>>(new Map());
   const groupRef = useRef<any>(null);
@@ -120,7 +121,7 @@ export const OccupancyMarkers3D: React.FC<OccupancyMarkers3DProps> = ({
         mesh.material.opacity = 1.0;
       }
     }
-  }, [people, THREE, scene]);
+  }, [people, THREE, scene, floorHeight]);
 
   // Animation loop (smooth interpolation + walking effect)
   // This hook doesn't directly run the animation; instead it marks meshes as needing updates
@@ -173,7 +174,7 @@ export function updateOccupancyMarkers3D(
   meshes: Map<string, any>,
   deltaTime: number,
   time: number,
-  THREE: any
+  _THREE: any
 ) {
   for (const mesh of meshes.values()) {
     if (!mesh.userData.targetX) continue;

@@ -13,12 +13,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import type {
-  LiveSystemData,
-  PerformanceSummary,
-  GridComplianceStatus,
-  BESSStatusData,
-} from '@/lib/api/solar';
+// Types available from '@/lib/api/solar' if needed
 import {
   fetchLiveSystemData,
   fetchPerformanceSummary,

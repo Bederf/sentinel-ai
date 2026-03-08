@@ -13,7 +13,7 @@
  * - Backend batch endpoints (POST /api/devices/batch/*)
  */
 
-import { secureConsoleLog, sanitizeUrl } from './security-utils';
+import { secureConsoleLog } from './security-utils';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 const ACCESS_TOKEN_KEY = "sentinel_token";
@@ -73,7 +73,7 @@ async function tryRefreshAccessToken(): Promise<string | null> {
       if (!data.access_token) return null;
       setTokens(data.access_token, data.refresh_token);
       return data.access_token;
-    } catch (error) {
+    } catch (_error) {
       // Log error safely without exposing tokens
       if (import.meta.env.DEV) {
         secureConsoleLog.error('Token refresh failed');

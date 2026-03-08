@@ -5,7 +5,7 @@ import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { X, Snowflake, Wind, Zap, BarChart3, Lightbulb, Flame, Droplet, Video, Lock, Radio, Circle, Wrench, Gauge, Thermometer, ChevronDown, Users } from 'lucide-react';
 import { OccupancySimulation, type Person } from '@/lib/occupancySimulation';
 import { BuildingSelector } from '@/components/BuildingSelector';
-import type { Site } from '@/lib/api/sites';
+
 import { BuildingModel } from './BuildingModel';
 import { EquipmentMarkers } from './EquipmentMarkers';
 import { EquipmentDetailPanel } from './EquipmentDetailPanel';
@@ -136,6 +136,7 @@ export function DigitalTwin() {
       // Auto-select ALL floors so all equipment is visible immediately
       setSelectedFloors(new Set(dynamicFloors.map(f => f.id)));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dynamicFloors]);
 
   // Initialize occupancy simulation engine

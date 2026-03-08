@@ -29,6 +29,7 @@ export function SecurityAnomaliesPanel({
 
   useEffect(() => {
     fetchAnomalies();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey, siteId]);
 
   const fetchAnomalies = async () => {

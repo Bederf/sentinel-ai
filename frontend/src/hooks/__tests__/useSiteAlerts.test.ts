@@ -117,7 +117,7 @@ describe('useSiteAlerts', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      const alerts = result.current.data?.alerts!;
+      const alerts = result.current.data?.alerts;
       expect(alerts[0].id).toBe('alert-001');
       expect(alerts[0].equipment_name).toBe('Chiller A');
       expect(alerts[0].severity).toBe('critical');
@@ -224,7 +224,7 @@ describe('useSiteAlerts', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      const alerts = result.current.data?.alerts!;
+      const alerts = result.current.data?.alerts;
       const severities = alerts.map((a) => a.severity);
       expect(severities).toContain('critical');
       expect(severities).toContain('warning');
@@ -497,7 +497,7 @@ describe('useSiteAlerts', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      const alert = result.current.data?.alerts[0]!;
+      const alert = result.current.data?.alerts[0];
       expect(alert).toHaveProperty('id');
       expect(alert).toHaveProperty('equipment_id');
       expect(alert).toHaveProperty('equipment_name');

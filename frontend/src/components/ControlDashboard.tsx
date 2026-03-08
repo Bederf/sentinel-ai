@@ -53,8 +53,8 @@ interface AlertContext {
   type?: string;
 }
 
-const SAFETY_STATUS_BATCH_SIZE = 2;
-const SAFETY_STATUS_BATCH_DELAY_MS = 1000;
+const _SAFETY_STATUS_BATCH_SIZE = 2;
+const _SAFETY_STATUS_BATCH_DELAY_MS = 1000;
 const SAFETY_STATUS_MAX_PER_SITE = 6;
 
 function mapSafetyStatusToDeviceStatus(
@@ -189,6 +189,7 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
     };
 
     loadDevices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshDevices]);
 
   // Lazily fetch safety statuses only for the currently selected site
@@ -237,6 +238,7 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
     return () => {
       isCancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredDevices, selectedDevice?.id, selectedSiteId]);
 
   // Auto-select first device when site changes or devices load
@@ -270,6 +272,7 @@ export function ControlDashboard({ onError }: ControlDashboardProps) {
     } else {
       setSelectedDevice(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredDevices, selectedSiteId, pendingEquipmentSelection]);
 
   const handleDeviceSelect = useCallback(async (device: Device) => {

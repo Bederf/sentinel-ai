@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 /**
  * Electrical Compliance Panel
@@ -156,6 +157,7 @@ export function ElectricalCompliancePanel({ siteCode }: ElectricalCompliancePane
             <TableBody>
               {certificates.map((cert) => {
                 const expiryDate = new Date(cert.expiry_date)
+                // eslint-disable-next-line react-hooks/purity
                 const daysUntilExpiry = Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
 
                 return (
@@ -199,6 +201,7 @@ export function ElectricalCompliancePanel({ siteCode }: ElectricalCompliancePane
         <div className="mt-4 space-y-2">
           {certificates.map((cert) => {
             const expiryDate = new Date(cert.expiry_date)
+            // eslint-disable-next-line react-hooks/purity
             const daysUntilExpiry = Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
             const yearsLeft = (daysUntilExpiry / 365).toFixed(1)
 

@@ -4,13 +4,13 @@
  * Shows SIMBIOT diagnostic results with polling status.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useDiagnostics } from '@/lib/api';
 
 export function DiagnosticsResults() {
-  const { result, loading, diagnosticId, runDiagnostics } = useDiagnostics();
-  const [pollError, setPollError] = useState<string | null>(null);
+  const { result, loading, diagnosticId, runDiagnostics: _runDiagnostics } = useDiagnostics();
+  const [_pollError, _setPollError] = useState<string | null>(null);
 
   const statusColors: Record<string, any> = {
     pending: { bg: 'rgba(59, 130, 246, 0.15)', color: 'var(--color-sentinel-blue)', label: 'Pending' },

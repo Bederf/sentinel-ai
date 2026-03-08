@@ -55,10 +55,12 @@ export const DecisionHistory: React.FC<DecisionHistoryProps> = ({
     fetchDecisions();
     const interval = setInterval(fetchDecisions, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maxResults]);
 
   useEffect(() => {
     applyFilters(decisions);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, decisions]);
 
   const applyFilters = (data: Decision[]) => {

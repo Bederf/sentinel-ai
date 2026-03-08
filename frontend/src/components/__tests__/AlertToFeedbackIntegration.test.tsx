@@ -8,9 +8,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import React from 'react'
+import { QueryClient } from '@tanstack/react-query'
 
 // Type definitions
 interface Alert {
@@ -75,7 +74,7 @@ vi.mock('@/lib/api', () => ({
 import { alertsApi, workOrdersApi, serviceFeedbackApi, equipmentApi, dashboardApi } from '@/lib/api'
 
 // Mock component orchestrating the full flow
-function EndToEndFlowComponent({
+function _EndToEndFlowComponent({
   onFlowComplete,
 }: {
   onFlowComplete: (result: {
@@ -85,6 +84,7 @@ function EndToEndFlowComponent({
     restoredHealth: number
   }) => void
 }) {
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [step, setStep] = React.useState<'alert' | 'feedback' | 'complete'>('alert')
 
   const handleCreateAlert = async () => {
@@ -188,11 +188,11 @@ function createMockServiceFeedback(overrides?: Partial<ServiceFeedback>): Servic
 
 // Tests
 describe('AlertToFeedbackIntegration', () => {
-  let queryClient: QueryClient
+  let _queryClient: QueryClient
 
   beforeEach(() => {
     vi.clearAllMocks()
-    queryClient = new QueryClient({
+    _queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
         mutations: { retry: false },
@@ -304,7 +304,7 @@ describe('AlertToFeedbackIntegration', () => {
         { ...mockWO, status: 'completed' as const },
       ]
 
-      statusTransitions.forEach((wo, i) => {
+      statusTransitions.forEach((wo, _i) => {
         vi.mocked(workOrdersApi.updateStatus).mockResolvedValueOnce(wo)
       })
 
@@ -326,7 +326,7 @@ describe('AlertToFeedbackIntegration', () => {
       const restoredHealth = 85
       const expectedChange = 20
 
-      const equipment = createMockEquipment({
+      const _equipment = createMockEquipment({
         health_score: restoredHealth,
       })
 
@@ -486,8 +486,8 @@ describe('AlertToFeedbackIntegration', () => {
     it('should maintain correct timeline: alert → WO → feedback → health', async () => {
       const alertTime = new Date('2026-02-13T10:00:00Z')
       const woTime = new Date('2026-02-13T10:01:00Z')
-      const feedbackTime = new Date('2026-02-13T10:30:00Z')
-      const healthTime = new Date('2026-02-13T10:31:00Z')
+      const _feedbackTime = new Date('2026-02-13T10:30:00Z')
+      const _healthTime = new Date('2026-02-13T10:31:00Z')
 
       const alert = createMockAlert({ created_at: alertTime.toISOString() })
       const workOrder = createMockWorkOrder({ created_at: woTime.toISOString() })
@@ -501,13 +501,10 @@ describe('AlertToFeedbackIntegration', () => {
 
       const createdAlert = await (alertsApi.create as any)({})
       const createdWO = await (workOrdersApi.create as any)({})
-      const createdFeedback = await (serviceFeedbackApi.submit as any)({})
-      const updatedEquipment = await (equipmentApi.getById as any)({})
+      const _createdFeedback = await (serviceFeedbackApi.submit as any)({})
+      const _updatedEquipment = await (equipmentApi.getById as any)({})
 
       expect(new Date(createdAlert.created_at) <= new Date(createdWO.created_at)).toBe(true)
     })
   })
 })
-
-// Import React
-import React from 'react'

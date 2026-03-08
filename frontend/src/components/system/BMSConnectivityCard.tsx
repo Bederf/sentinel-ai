@@ -19,7 +19,7 @@ export function BMSConnectivityCard({ health }: BMSConnectivityCardProps) {
     score: 0,
   };
 
-  const statusIcons: Record<string, React.ReactNode> = {
+  const _statusIcons: Record<string, React.ReactNode> = {
     healthy: <CheckCircle className="w-4 h-4" style={{ color: 'var(--color-sentinel-green)' }} />,
     degraded: <AlertTriangle className="w-4 h-4" style={{ color: 'var(--color-sentinel-amber)' }} />,
     critical: <XCircle className="w-4 h-4" style={{ color: 'var(--color-sentinel-red)' }} />,

@@ -11,7 +11,7 @@
  */
 
 import React, { useState } from 'react'
-import { CheckCircle, XCircle, AlertTriangle, ChevronRight } from 'lucide-react'
+import { CheckCircle, AlertTriangle, ChevronRight } from 'lucide-react'
 import { ApprovalDialog, type Recommendation } from './ApprovalDialog'
 import type { ApprovalResponse } from '@/lib/api/approvals'
 

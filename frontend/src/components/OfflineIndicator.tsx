@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { WifiOff, RefreshCw } from 'lucide-react';
 import { getSyncQueue } from '../lib/offlineStorage';
 
 interface OfflineIndicatorProps {

@@ -5,13 +5,13 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Filter, RefreshCw } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { systemApi, type ErrorLog } from '@/lib/api/system';
 
 export function ErrorLogsTable() {
   const [logs, setLogs] = useState<ErrorLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
 
   // Filters
   const [categoryFilter, setCategoryFilter] = useState<string | undefined>();

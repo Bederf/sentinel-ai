@@ -169,7 +169,7 @@ describe('ServiceFeedbackFlow', () => {
       vi.mocked(serviceFeedbackApi.submit).mockResolvedValueOnce(mockFeedback)
 
       const onSubmitted = vi.fn()
-      const { container } = render(
+      const { container: _container } = render(
         <QueryClientProvider client={queryClient}>
           <ServiceFeedbackComponent
             workOrderCode="WO-2026-0001"

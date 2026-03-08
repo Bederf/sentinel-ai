@@ -68,6 +68,7 @@ class EventSourceMock {
   constructor(url: string) {
     this.url = url;
     this.readyState = 0; // CONNECTING
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     mockEventSourceInstance = this;
 
     // Simulate opening connection on next tick

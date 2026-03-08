@@ -32,7 +32,7 @@ import {
   ChevronLeft,
   TrendingUp,
 } from 'lucide-react'
-import type { QuoteResponse, SLATier } from '@/lib/api/pricing'
+import type { QuoteResponse } from '@/lib/api/pricing'
 import QuoteGenerator from './QuoteGenerator'
 import SensitivityAnalysis from './SensitivityAnalysis'
 import QuotePreview from './QuotePreview'
@@ -58,7 +58,7 @@ export default function CommercialIntelligenceDashboard({
   const [equipmentCodes, setEquipmentCodes] = useState<string[]>([])
   const [slaTier, setSlaTier] = useState<string>('standard')
   const [contractMonths, setContractMonths] = useState(12)
-  const [selectedContractId, setSelectedContractId] = useState<string | undefined>()
+  const [selectedContractId, _setSelectedContractId] = useState<string | undefined>()
 
   // Handle quote generation
   const handleQuoteGenerated = (quote: QuoteResponse, codes: string[], tier: string, months: number) => {

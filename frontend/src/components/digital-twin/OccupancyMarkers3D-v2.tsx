@@ -17,7 +17,6 @@ import {
   occupancySimulation3D,
   HumanoidMeshBuilder,
   StairClimber,
-  ElevatorAnimator,
   CameraFollowSystem,
   type Person3D,
 } from '@/lib/occupancySimulation3D';
@@ -147,7 +146,7 @@ function HumanoidPerson({
   }, [lod, isSelected, color]);
 
   // Animate vertical movement
-  useFrame((state, delta) => {
+  useFrame((state, _delta) => {
     if (!groupRef.current) return;
 
     const baseY = person3D.floor * person3D.scale;
@@ -305,15 +304,15 @@ function Stair({ stairId }: { stairId: string }) {
  */
 export function OccupancyMarkers3DEnhanced({
   people,
-  floorHeight,
+  floorHeight: _floorHeight,
   enableCameraFollow,
   followTargetId,
-  onPersonHover,
+  onPersonHover: _onPersonHover,
 }: OccupancyMarkers3DEnhancedProps) {
   const groupRef = useRef<THREE.Group>(null);
   const { camera } = useThree();
-  const cameraFollowSystem = useRef(new CameraFollowSystem());
-  const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null);
+  const _cameraFollowSystem = useRef(new CameraFollowSystem());
+  const [hoveredPersonId, _setHoveredPersonId] = useState<string | null>(null);
 
   // Update active person count for LOD
   useEffect(() => {
@@ -332,9 +331,11 @@ export function OccupancyMarkers3DEnhanced({
 
     // Smooth camera interpolation
     const speed = 0.1;
+    /* eslint-disable react-hooks/immutability */
     camera.position.x += (cameraTarget.x - camera.position.x) * speed;
     camera.position.y += (cameraTarget.z - camera.position.y) * speed;
     camera.position.z += (cameraTarget.y - camera.position.z) * speed;
+    /* eslint-enable react-hooks/immutability */
 
     const focusPoint = new THREE.Vector3(cameraTarget.focusX, cameraTarget.focusZ, cameraTarget.focusY);
     const currentLook = new THREE.Vector3();

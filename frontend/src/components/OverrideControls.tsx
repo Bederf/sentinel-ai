@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Card } from './Card';
-import { Badge } from './Badge';
 import { AlertCircle, ToggleLeft, ToggleRight, Clock } from 'lucide-react';
 import { api } from '@/lib/api';
 

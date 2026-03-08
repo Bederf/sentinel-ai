@@ -50,12 +50,14 @@ export function ModuleProvider({
     if (initialSiteId && initialSiteId !== siteId) {
       setSiteIdState(initialSiteId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSiteId]);
 
   useEffect(() => {
     if (initialSiteName && initialSiteName !== siteName) {
       setSiteNameState(initialSiteName);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSiteName]);
 
   // Define loaders as useCallback to satisfy exhaustive-deps

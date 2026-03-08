@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useTheme, THEME_IDS, THEMES, type ThemeId } from "../contexts/ThemeContext";
+import { useTheme, THEME_IDS, THEMES } from "../contexts/ThemeContext";
 
 /**
  * ThemeSwitcher — compact dropdown for the header bar.

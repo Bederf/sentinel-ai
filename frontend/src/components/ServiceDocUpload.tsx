@@ -67,6 +67,7 @@ export default function ServiceDocUpload({
     sitesApi.getEquipment(siteId).then((res) => {
       setEquipmentList(res.equipment || []);
     }).catch(() => { /* silent — tech can still type manually */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showForm, siteId]);
 
   // Close dropdown on outside click
@@ -127,7 +128,7 @@ export default function ServiceDocUpload({
 
     setUploading(true);
     try {
-      const response = await documentsApi.uploadDocument({
+      const _response = await documentsApi.uploadDocument({
         siteId,
         file: selectedFile,
         title: title || undefined,

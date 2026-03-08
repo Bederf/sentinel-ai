@@ -16,6 +16,7 @@ export const RecommendationHistory: React.FC<
 
   useEffect(() => {
     loadHistory()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteId, filter])
 
   const loadHistory = async () => {

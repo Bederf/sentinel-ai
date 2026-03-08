@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 import React, { useState, useMemo } from 'react'
 import {
@@ -22,7 +23,7 @@ import {
 } from '@tremor/react'
 import { ArrowUpIcon, ArrowDownIcon, CheckCircleIcon } from '@heroicons/react/24/solid'
 import { pricingApi } from '@/lib/api'
-import type { RenewalQuote, RenegotiationAnalysis, RenegotiationOption } from '@/lib/api'
+import type { RenewalQuote, RenegotiationAnalysis } from '@/lib/api'
 
 interface RenewalPricingDashboardProps {
   selectedContractId?: string
@@ -74,7 +75,7 @@ export function RenewalPricingDashboard({ selectedContractId }: RenewalPricingDa
     }
   }
 
-  const getFeeChangeColor = (changePct: number) => {
+  const _getFeeChangeColor = (changePct: number) => {
     if (changePct > 10) return 'rose'
     if (changePct > 0) return 'amber'
     return 'emerald'
@@ -84,7 +85,7 @@ export function RenewalPricingDashboard({ selectedContractId }: RenewalPricingDa
     if (!renewalData || renewalData.drivers.length === 0) return []
     // Create approximate distribution
     const baseImpact = 100 / renewalData.drivers.length
-    return renewalData.drivers.map((driver, idx) => ({
+    return renewalData.drivers.map((driver, _idx) => ({
       name: driver,
       value: baseImpact,
     }))

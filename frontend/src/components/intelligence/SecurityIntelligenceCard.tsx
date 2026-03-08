@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 import { useState, useEffect } from 'react';
 import { Shield } from 'lucide-react';
 import { securityApi } from '@/lib/api';
 import {
   IntelligenceCard, ValueMetricBox, ValueBadge, LearningBadge, AwaitingDataBadge,
-  BaselineComparisonBar, hasValue, type CardState,
+  BaselineComparisonBar, type CardState,
 } from './shared';
 
 interface SecurityIntelligenceCardProps {

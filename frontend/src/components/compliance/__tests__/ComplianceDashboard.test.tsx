@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
@@ -20,7 +20,7 @@ vi.mock('@tremor/react', async () => {
       React.createElement('h3', { 'data-testid': 'title', ...props }, children),
     Text: ({ children, ...props }: any) =>
       React.createElement('span', { 'data-testid': 'text', ...props }, children),
-    Button: ({ children, onClick, size, ...props }: any) =>
+    Button: ({ children, onClick, size: _size, ...props }: any) =>
       React.createElement('button', { onClick, ...props }, children),
     Table: ({ children, ...props }: any) =>
       React.createElement('table', props, children),

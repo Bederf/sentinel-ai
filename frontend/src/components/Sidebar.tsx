@@ -82,7 +82,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
     if (!userEmail) return items;
     const allowed = getAllowedViews(userEmail, items.map(i => i.id));
     return items.filter(item => allowed.includes(item.id));
-  }, [userEmail, userRole, isAdmin, isDemoUser, activeModules]);
+  }, [userEmail, isAdmin, isDemoUser, activeModules]);
 
   const handleNavClick = (view: View) => {
     onViewChange(view);
@@ -337,10 +337,12 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
                     ? "fixed z-50 w-72 max-h-96 overflow-y-auto"
                     : "relative"
                 }`}
+                /* eslint-disable react-hooks/refs */
                 style={isCollapsed && aboutBtnRef.current ? {
                   left: aboutBtnRef.current.getBoundingClientRect().right + 12,
                   bottom: Math.max(8, window.innerHeight - aboutBtnRef.current.getBoundingClientRect().bottom),
                 } : undefined}
+                /* eslint-enable react-hooks/refs */
               >
                 <div
                   className="rounded p-3 text-xs space-y-3"

@@ -217,8 +217,8 @@ export function initializeSecurityProtections(): void {
   if (!import.meta.env.DEV) {
     // Keep warn and error for critical alerts, disable info/debug/log
     const originalLog = console.log;
-    const originalDebug = console.debug;
-    const originalInfo = console.info;
+    const _originalDebug = console.debug;
+    const _originalInfo = console.info;
 
     console.log = () => {};
     console.debug = () => {};

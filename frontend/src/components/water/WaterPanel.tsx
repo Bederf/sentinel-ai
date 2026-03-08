@@ -49,7 +49,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
   const [selectedSiteId, setSelectedSiteId] = useState<string>(propSiteId || "");
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
   const [buildings, setBuildings] = useState<Building[]>([]);
-  const [currentFlow, setCurrentFlow] = useState<CurrentFlowResponse | null>(null);
+  const [_currentFlow, setCurrentFlow] = useState<CurrentFlowResponse | null>(null);
   const [consumptionData, setConsumptionData] = useState<WaterConsumption[]>([]);
   const [alerts, setAlerts] = useState<WaterAlert[]>([]);
   const [trending, setTrending] = useState<WaterTrending | null>(null);
@@ -213,10 +213,10 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
     })
     .reduce((sum, d) => sum + d.volume_liters, 0);
 
-  const monthlyVolume = consumptionData.reduce((sum, d) => sum + d.volume_liters, 0);
+  const _monthlyVolume = consumptionData.reduce((sum, d) => sum + d.volume_liters, 0);
 
   // Handle alert resolution
-  const handleResolveAlert = async (alertId: string) => {
+  const _handleResolveAlert = async (alertId: string) => {
     try {
       await waterApi.resolveAlert(alertId, {
         notes: "Resolved via dashboard",

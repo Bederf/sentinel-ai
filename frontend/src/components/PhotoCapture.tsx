@@ -213,6 +213,7 @@ export default function PhotoCapture({
     if (inputRef.current) {
       inputRef.current.value = '';
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analysisType, context, onAnalysisComplete, onError]);
 
   // Cancel preview

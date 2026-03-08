@@ -17,7 +17,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import React from 'react';
 import { useZoneBounds } from '../useZoneBounds';
-import type { Desk, ZoneBounds } from '@/lib/api/sites';
+import type { Desk } from '@/lib/api/sites';
 
 // Mock the sites API
 vi.mock('@/lib/api/sites', () => ({
@@ -506,7 +506,7 @@ describe('useZoneBounds', () => {
         expect(result.current['Zone-001']).toBeDefined();
       });
 
-      const initialBounds = result.current['Zone-001'];
+      const _initialBounds = result.current['Zone-001'];
 
       // Invalidate cache
       await queryClient.invalidateQueries({

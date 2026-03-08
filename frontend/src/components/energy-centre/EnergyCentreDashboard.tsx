@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Title, Text, Grid, Badge, Flex, Tab, TabGroup, TabList, TabPanel, TabPanels } from '@tremor/react';
+import { Card, Text, Grid, Badge, Flex, Tab, TabGroup, TabList, TabPanel, TabPanels } from '@tremor/react';
 import { Activity } from 'lucide-react';
 import { energyCentreApi } from '../../lib/energyCentreApi';
 import type { SCADAOverview } from '../../lib/energyCentreApi';

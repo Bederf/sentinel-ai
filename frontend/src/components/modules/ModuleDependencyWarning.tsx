@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * Module Dependency Warning Modal
  *
@@ -5,7 +6,6 @@
  * Example: Deactivating CONTROL will also disable SOLAR & LIGHTING
  */
 
-import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import type { ModuleType } from '../../lib/moduleRegistry';
 

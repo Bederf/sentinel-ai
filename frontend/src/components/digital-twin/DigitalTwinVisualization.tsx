@@ -6,9 +6,8 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import * as THREE from 'three';
-import { OccupancyMarkers3D, updateOccupancyMarkers3D } from './OccupancyMarkers3D';
+import { updateOccupancyMarkers3D } from './OccupancyMarkers3D';
 import type { Person } from '@/lib/occupancySimulation';
 import { getPersonaColor } from '@/lib/occupancySimulation';
 
@@ -18,7 +17,7 @@ import { getPersonaColor } from '@/lib/occupancySimulation';
 // Phase 3: Occupancy visualization component
 // Equipment detail panels deferred to Phase 4
 
-const TYPE_COLORS: Record<string, string> = {
+const _TYPE_COLORS: Record<string, string> = {
   ahu: '#2E86AB',
   vav: '#3AAFDE',
   fcu: '#6366F1',
@@ -36,7 +35,7 @@ const TYPE_COLORS: Record<string, string> = {
   access: '#7C3AED',
 };
 
-const STATUS_COLORS: Record<string, string> = {
+const _STATUS_COLORS: Record<string, string> = {
   online: '#22C55E',
   warning: '#F59E0B',
   offline: '#6B7280',
@@ -45,7 +44,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 const FLOOR_NAMES = ['Ground Floor', 'First Floor', 'Second Floor', 'Third Floor', 'Roof'];
 
-const LABELS: Record<string, string> = {
+const _LABELS: Record<string, string> = {
   supply_temp: 'Supply Temp',
   return_temp: 'Return Temp',
   fan_speed: 'Fan Speed',
@@ -121,7 +120,7 @@ function personaColorToHex(cssColor: string): number {
   return 0xffffff;
 }
 
-const UNITS: Record<string, string> = {
+const _UNITS: Record<string, string> = {
   supply_temp: '°C',
   return_temp: '°C',
   fan_speed: '%',
@@ -177,7 +176,7 @@ interface DigitalTwinVisualizationProps {
 }
 
 export const DigitalTwinVisualization: React.FC<DigitalTwinVisualizationProps> = ({
-  siteId = '',
+  siteId: _siteId = '',
   occupancyEnabled = false,
   people = [],
 }) => {
@@ -303,7 +302,7 @@ export const DigitalTwinVisualization: React.FC<DigitalTwinVisualizationProps> =
 
     // Build floors
     const floorGroups: THREE.Group[] = [];
-    const equipMeshes: THREE.Mesh[] = [];
+    const _equipMeshes: THREE.Mesh[] = [];
 
     for (let f = 0; f < 5; f++) {
       const group = new THREE.Group();
@@ -336,7 +335,7 @@ export const DigitalTwinVisualization: React.FC<DigitalTwinVisualizationProps> =
     }
 
     // Camera setup
-    let sph = { theta: Math.PI / 4, phi: Math.PI / 3.5, radius: 32 };
+    const sph = { theta: Math.PI / 4, phi: Math.PI / 3.5, radius: 32 };
     const lookY = (5 * FLOOR_H) / 2;
 
     const updateCam = () => {
@@ -422,6 +421,7 @@ export const DigitalTwinVisualization: React.FC<DigitalTwinVisualizationProps> =
       }
       sceneRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

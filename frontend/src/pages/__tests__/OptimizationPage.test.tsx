@@ -11,8 +11,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import OptimizationPage from '../OptimizationPage';
 import { createTestQueryClient } from '@/test-utils/mockQueryClient';
@@ -21,7 +20,6 @@ import {
   createMockOptimizationStatus,
   createMockSite,
 } from '@/test-utils/factories';
-import type { OptimizationScenario, OptimizationStatusResponse, Site } from '@/lib/api';
 
 // Mock API module
 vi.mock('@/lib/api', () => ({

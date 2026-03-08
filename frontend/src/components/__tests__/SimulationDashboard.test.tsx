@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SimulationDashboard } from '../SimulationDashboard';
 
@@ -107,7 +107,7 @@ describe('SimulationDashboard', () => {
     });
 
     it('should handle tab switching via onIndexChange', async () => {
-      const { rerender } = render(<SimulationDashboard />);
+      const { rerender: _rerender } = render(<SimulationDashboard />);
 
       await waitFor(() => {
         expect(screen.getByTestId('tab-group')).toBeInTheDocument();
@@ -174,7 +174,7 @@ describe('SimulationDashboard', () => {
     });
 
     it('should disable controls while loading', async () => {
-      const { getByText } = render(<SimulationDashboard />);
+      const { getByText: _getByText } = render(<SimulationDashboard />);
 
       await waitFor(() => {
         expect(screen.getByText(/scenario/i)).toBeInTheDocument();

@@ -14,7 +14,7 @@
 
 import { Zap, AlertTriangle, CheckCircle, AlertCircle, RefreshCw, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
-import type { GridComplianceStatus } from '@/lib/api/solar';
+// GridComplianceStatus type available from '@/lib/api/solar' if needed
 import { useGridCompliance } from '@/hooks/useSolarDashboard';
 
 interface GridComplianceWidgetProps {

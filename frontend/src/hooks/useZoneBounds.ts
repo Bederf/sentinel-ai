@@ -7,7 +7,7 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { sitesApi, type Desk } from '@/lib/api/sites';
+import { sitesApi } from '@/lib/api/sites';
 import { calculateZoneBoundsFromCoords, type ZoneBounds } from '@/utils/equipmentPositioning';
 
 /**

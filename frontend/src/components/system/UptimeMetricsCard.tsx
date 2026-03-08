@@ -30,7 +30,7 @@ export function UptimeMetricsCard() {
   }, [selectedRange]);
 
   const ranges: Array<'24h' | '7d' | '30d'> = ['24h', '7d', '30d'];
-  const rangeLabels = {
+  const _rangeLabels = {
     '24h': '24 Hours',
     '7d': '7 Days',
     '30d': '30 Days',

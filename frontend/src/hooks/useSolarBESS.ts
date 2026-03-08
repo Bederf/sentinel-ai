@@ -5,12 +5,7 @@ import {
   fetchPerformance,
   fetchFinancialSummary,
 } from '@/lib/solarApi';
-import type {
-  BESSStatus,
-  InverterListResponse,
-  PerformanceMetrics,
-  FinancialSummary,
-} from '@/lib/solarApi';
+// Types available from '@/lib/solarApi' if needed
 
 /**
  * Hook to fetch BESS container status (SOC, mode, power, health)

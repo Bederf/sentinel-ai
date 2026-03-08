@@ -9,7 +9,7 @@
  * - Persona-based coloring (worker, security, cleaner, visitor)
  */
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { OccupancyMarkers3DEnhanced } from './digital-twin/OccupancyMarkers3D-v2';
@@ -71,7 +71,7 @@ function extractOccupancyFromEvents(events: LiveEvent[]): Person[] {
 export function Simulation3DViewer({
   events,
   isRunning,
-  simulatedHour
+  simulatedHour: _simulatedHour
 }: Simulation3DViewerProps) {
   const [people, setPeople] = useState<Person[]>([]);
 
@@ -147,7 +147,7 @@ export function Simulation3DViewer({
             people={people}
             floorHeight={3.5}
             enableCameraFollow={false}
-            onPersonHover={(personId) => {
+            onPersonHover={(_personId) => {
               // Optional: handle person hover
             }}
           />

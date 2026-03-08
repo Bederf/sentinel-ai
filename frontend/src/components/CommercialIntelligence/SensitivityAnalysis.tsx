@@ -34,10 +34,9 @@ import {
   Copy,
   TrendingUp,
   TrendingDown,
-  DollarSign,
   AlertCircle,
 } from 'lucide-react'
-import { pricingApi, formatZAR, formatPercent } from '@/lib/api/pricing'
+import { formatZAR } from '@/lib/api/pricing'
 import type { QuoteResponse } from '@/lib/api/pricing'
 
 interface SensitivityAnalysisProps {

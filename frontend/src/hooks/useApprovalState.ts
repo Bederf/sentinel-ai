@@ -13,8 +13,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { approvalsApi, type ApprovalResponse, type ApprovalStatus } from '@/lib/api/approvals';
-import type { Recommendation } from '@/lib/api/optimization';
+import { approvalsApi } from '@/lib/api/approvals';
 
 /**
  * Hook for managing approval workflow state
@@ -84,7 +83,7 @@ export function useApprovalState(siteId: string, enabled: boolean = true) {
   });
 
   // Get approval status for a specific recommendation
-  const statusQuery = useQuery({
+  const _statusQuery = useQuery({
     queryKey: ['recommendation-status', ''],
     queryFn: async (context) => {
       const [, recommendationId] = context.queryKey;

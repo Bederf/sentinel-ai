@@ -11,8 +11,7 @@
  * Auto-refreshes every 10 seconds via React Query
  */
 
-import { Zap, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react';
-import type { LiveSystemData } from '@/lib/api/solar';
+import { Zap, AlertCircle, RefreshCw } from 'lucide-react';
 import { useSolarSystemOverview } from '@/hooks/useSolarDashboard';
 
 interface SolarSystemOverviewProps {

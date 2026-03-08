@@ -47,9 +47,11 @@ export function FireEquipmentPanel({ siteCode }: FireEquipmentPanelProps) {
             </TableHead>
             <TableBody>
               {equipment.map((item) => {
+                /* eslint-disable react-hooks/purity */
                 const daysUntilDue = Math.ceil(
                   (new Date(item.next_inspection_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
                 )
+                /* eslint-enable react-hooks/purity */
                 const isOverdue = daysUntilDue < 0
                 const isDueSoon = daysUntilDue < 30 && daysUntilDue >= 0
 

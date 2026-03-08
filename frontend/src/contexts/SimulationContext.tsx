@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react'
 
 /**
@@ -160,6 +161,7 @@ export function SimulationProvider({ children, siteId }: SimulationProviderProps
 
   useEffect(() => {
     lastPollHourRef.current = state.simulatedHour
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.lastUpdated]) // only reset on actual backend poll
 
   const secondsPerHour = state.secondsPerHour

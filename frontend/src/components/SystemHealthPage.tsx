@@ -21,7 +21,6 @@ import {
   Text,
   ProgressBar,
   LineChart,
-  BarChart,
   Badge,
 } from '@tremor/react';
 import {
@@ -41,13 +40,13 @@ import { PageLoading } from './PageLoading';
 import { AIPerformanceTab } from './system/AIPerformanceTab';
 import { ModelHealthTab } from './system/ModelHealthTab';
 
-interface HealthComponent {
+interface _HealthComponent {
   name: string;
   status: 'healthy' | 'degraded' | 'critical';
   score: number;
 }
 
-interface HealthSnapshot {
+interface _HealthSnapshot {
   timestamp: string;
   overall_score: number;
   overall_status: string;

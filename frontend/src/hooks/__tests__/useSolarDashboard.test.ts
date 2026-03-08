@@ -585,7 +585,7 @@ describe('Solar Dashboard Hooks', () => {
       );
       vi.mocked(fetchBESSStatusData).mockResolvedValueOnce(createMockBESSStatusData());
 
-      const { result } = renderHook(() => useSolarDashboard('site-002'), {
+      const { result: _result } = renderHook(() => useSolarDashboard('site-002'), {
         wrapper: createWrapper(queryClient),
       });
 
@@ -835,7 +835,7 @@ describe('Solar Dashboard Hooks', () => {
       );
       vi.mocked(fetchBESSStatusData).mockResolvedValueOnce(createMockBESSStatusData());
 
-      const { result } = renderHook(() => useSolarDashboard('site-002'), {
+      const { result: _result } = renderHook(() => useSolarDashboard('site-002'), {
         wrapper: createWrapper(queryClient),
       });
 

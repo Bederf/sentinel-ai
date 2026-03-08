@@ -105,6 +105,7 @@ export function createModuleContextWrapper(
   >
 ) {
   const queryClient = createTestQueryClient();
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { ModuleProvider } = require('../contexts/ModuleContext');
 
   return function Wrapper({ children }: { children: ReactNode }) {

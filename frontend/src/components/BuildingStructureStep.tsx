@@ -80,6 +80,7 @@ export function BuildingStructureStep({
       // Remove floors
       setFloors(floors.slice(0, numberOfFloors));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [numberOfFloors]);
 
   const validateForm = () => {

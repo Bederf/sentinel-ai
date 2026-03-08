@@ -30,7 +30,7 @@ export function SolarFinancialReport({ siteId }: SolarFinancialReportProps) {
       const data = await fetchFinancialSummary(siteId);
       setSummary(data);
       setError(null);
-    } catch (e) {
+    } catch (_e) {
       // Fallback to demo data
       const demoData: FinancialSummary = {
         site_id: siteId,

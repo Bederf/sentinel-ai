@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Briefcase, Clock, CheckCircle, AlertCircle, Package } from 'lucide-react'
+import { Briefcase, Clock, CheckCircle, Package } from 'lucide-react'
 import type { ReactElement } from 'react'
 import { authorizedFetch } from '../lib/api/client'
 

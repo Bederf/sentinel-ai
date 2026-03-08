@@ -85,6 +85,7 @@ export function SplashScreen({ onComplete, minDisplayTime = 2500 }: SplashScreen
       video.removeEventListener("error", handleError);
       clearTimeout(maxTimeout);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onComplete, minDisplayTime]);
 
   return (

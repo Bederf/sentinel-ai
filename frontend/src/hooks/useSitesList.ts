@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { sitesApi, type Site } from '@/lib/api/sites';
+import { sitesApi } from '@/lib/api/sites';
 
 /**
  * Hook to fetch list of all sites

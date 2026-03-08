@@ -372,7 +372,7 @@ describe('usePeakDemandStatus', () => {
         .mockResolvedValueOnce(mockData1)
         .mockResolvedValueOnce(mockData2);
 
-      const { result, rerender } = renderHook(
+      const { result, rerender: _rerender } = renderHook(
         ({ siteId }) => usePeakDemandStatus(siteId),
         {
           wrapper: createWrapper(queryClient),

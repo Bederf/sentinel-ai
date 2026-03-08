@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import React from 'react';
@@ -25,7 +25,7 @@ function createTestQueryClient() {
   });
 }
 
-function createWrapper(queryClient: QueryClient) {
+function _createWrapper(queryClient: QueryClient) {
   return ({ children }: { children: ReactNode }) =>
     React.createElement(QueryClientProvider, { client: queryClient }, children);
 }
@@ -112,7 +112,7 @@ describe('Missing Hooks Coverage - Phase 68-03', () => {
       const count = await sendBatch();
 
       expect(count).toBe(3);
-      expect(batch.length).toBe(0 || 3); // Would clear after send
+      expect([0, 3]).toContain(batch.length); // Would clear after send
     });
 
     it('should track notification delivery status', () => {

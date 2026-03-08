@@ -211,7 +211,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   const { thresholds } = useHealthThresholds();
 
   // Module gating for site-specific intelligence panels
-  const { isModuleActive, activeModules } = useModules();
+  const { isModuleActive, activeModules: _activeModules } = useModules();
 
   // SENTINEL processing state — gates all intelligence panels
   const sentinelEnabled = site?.sentinel_processing_enabled !== false;

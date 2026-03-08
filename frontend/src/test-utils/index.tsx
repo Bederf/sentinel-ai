@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * Test utilities for React Testing Library
  * Provides custom render function with providers

@@ -143,6 +143,7 @@ export function DemoControlPanel({
 
       return () => clearTimeout(timer);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRunning, activeScenario, selectedScenario.id, scenarioStep]);
 
   const safetyStatus = getSafetyStatus();

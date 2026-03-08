@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { useEffect, useMemo } from 'react';
 import * as React from 'react';
 import { Lightbulb, X, Zap, ThermometerSun, Lamp, ChevronRight, CheckCircle2, Lock } from 'lucide-react';
 import { toast } from 'sonner';

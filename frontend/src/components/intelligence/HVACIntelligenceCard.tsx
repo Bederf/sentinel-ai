@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 import { useState, useEffect } from 'react';
 import { Thermometer } from 'lucide-react';
@@ -7,7 +8,7 @@ import type { HVACOverview, ThermalRunway } from '@/lib/hvacApi';
 import type { PredictionsResponse } from '@/lib/api';
 import {
   IntelligenceCard, ValueMetricBox, ValueBadge, LearningBadge, AwaitingDataBadge,
-  BaselineComparisonBar, hasValue, formatCurrencyZAR, type CardState,
+  BaselineComparisonBar, formatCurrencyZAR, type CardState,
 } from './shared';
 
 const HVAC_TYPES = ['chiller', 'ahu', 'fcu', 'vav', 'split', 'ct', 'crac'];

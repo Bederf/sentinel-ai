@@ -6,13 +6,13 @@
  */
 
 import { useState } from 'react';
-import { Card, Title, Text, Badge, Flex, Grid } from '@tremor/react';
+import { Card, Text, Badge, Flex, Grid } from '@tremor/react';
 import { useModules } from '../../contexts/ModuleHooks';
 import { MODULE_COLORS } from '../../lib/moduleRegistry';
 import type { ModuleType, ModuleDefinition } from '../../lib/moduleRegistry';
 import { MANDATORY_MODULES } from '../../lib/mandatoryModules';
 import {
-  Wind, Zap, Lock, Lightbulb, Sun, Droplets, Flame, KeyRound,
+  Wind, Zap, Lock, Lightbulb, Sun, Droplets, Flame,
   Brain, Leaf, FileText, Gamepad2, Package, Plug, Link2, Bell
 } from 'lucide-react';
 import { ModuleDependencyWarning } from './ModuleDependencyWarning';
@@ -254,6 +254,31 @@ interface ModuleCardProps {
   onToggle: () => void;
 }
 
+// SENTINEL custom switch component - defined outside ModuleCard to avoid re-creation
+const SentinelSwitch = ({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled: boolean }) => (
+  <button
+    onClick={onChange}
+    disabled={disabled}
+    className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+    style={{
+      background: checked ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-bg-secondary)',
+      border: `1px solid ${checked ? 'var(--color-sentinel-green)' : 'var(--glass-border)'}`,
+      opacity: disabled ? 0.5 : 1,
+      cursor: disabled ? 'not-allowed' : 'pointer',
+    }}
+    aria-checked={checked}
+    role="switch"
+    type="button"
+  >
+    <span
+      className="inline-block h-4 w-4 rounded-full bg-white transition-transform"
+      style={{
+        transform: checked ? 'translateX(22px)' : 'translateX(2px)',
+      }}
+    />
+  </button>
+);
+
 function ModuleCard({
   module,
   isActive,
@@ -265,31 +290,6 @@ function ModuleCard({
 }: ModuleCardProps) {
   const color = MODULE_COLORS[module.module_type] || 'gray';
   const IconComponent = MODULE_ICONS[module.module_type] || Zap;
-
-  // SENTINEL custom switch component
-  const SentinelSwitch = ({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled: boolean }) => (
-    <button
-      onClick={onChange}
-      disabled={disabled}
-      className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-      style={{
-        background: checked ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-bg-secondary)',
-        border: `1px solid ${checked ? 'var(--color-sentinel-green)' : 'var(--glass-border)'}`,
-        opacity: disabled ? 0.5 : 1,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-      }}
-      aria-checked={checked}
-      role="switch"
-      type="button"
-    >
-      <span
-        className="inline-block h-4 w-4 rounded-full bg-white transition-transform"
-        style={{
-          transform: checked ? 'translateX(22px)' : 'translateX(2px)',
-        }}
-      />
-    </button>
-  );
 
   return (
     <Card

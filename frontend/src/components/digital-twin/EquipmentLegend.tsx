@@ -57,7 +57,7 @@ export function EquipmentLegend({ equipment }: EquipmentLegendProps) {
             gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
           }}
         >
-          {types.map(([type, count]) => {
+          {types.map(([type, _count]) => {
             const color = TYPE_COLORS[type] || '#666666';
             return (
               <div key={type} className="flex items-center gap-2">

@@ -62,7 +62,7 @@ export interface HealthTrend {
  */
 function aggregateAlertsToTrend(
   alerts: EquipmentAlert[],
-  period: '7d' | '30d' | '90d'
+  _period: '7d' | '30d' | '90d'
 ): HealthTrendDataPoint[] {
   if (!alerts || alerts.length === 0) {
     return [];

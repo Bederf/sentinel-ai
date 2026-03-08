@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/purity */
 /**
  * SecurityDashboard - Main Security Module Dashboard
  *
@@ -30,8 +31,6 @@ import {
   ShieldCheck,
   Users,
   Camera,
-  TrendingUp,
-  Link2,
   AlertTriangle,
   CheckCircle,
   Video,
@@ -42,7 +41,6 @@ import {
   Zap,
   Sun,
   Thermometer,
-  RefreshCw,
 } from "lucide-react";
 import { SentinelValueCard } from "../SentinelValueCard";
 import { securityApi } from "@/lib/api";
@@ -97,10 +95,10 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
     total_occupancy: number;
     zones: SecurityOccupancy[];
   }>({ total_occupancy: 0, zones: [] });
-  const [trendData, setTrendData] = useState<TrendPoint[]>([]);
-  const [cameras, setCameras] = useState<CameraInfo[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [trendData, _setTrendData] = useState<TrendPoint[]>([]);
+  const [cameras, _setCameras] = useState<CameraInfo[]>([]);
+  const [_isRefreshing, _setIsRefreshing] = useState(false);
+  const [_lastUpdated, _setLastUpdated] = useState<Date | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -121,13 +119,13 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
+  const _handleRefresh = async () => {
+    _setIsRefreshing(true);
     await fetchData();
-    setIsRefreshing(false);
+    _setIsRefreshing(false);
   };
 
-  const formatTime = (date: Date) =>
+  const _formatTime = (date: Date) =>
     date.toLocaleTimeString("en-ZA", {
       hour: "2-digit",
       minute: "2-digit",

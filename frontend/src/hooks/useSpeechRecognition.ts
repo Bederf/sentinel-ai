@@ -88,6 +88,7 @@ export function useSpeechRecognition(
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const onResultRef = useRef(onResult);
+  // eslint-disable-next-line react-hooks/refs
   onResultRef.current = onResult;
 
   // Cleanup on unmount
@@ -171,7 +172,7 @@ export function useSpeechRecognition(
 
     try {
       recognition.start();
-    } catch (e) {
+    } catch (_e) {
       setError("Failed to start speech recognition");
       setIsListening(false);
     }

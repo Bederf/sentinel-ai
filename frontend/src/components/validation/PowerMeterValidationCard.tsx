@@ -170,9 +170,9 @@ export function PowerMeterValidationCard({
       ? (validation.cop_current / validation.cop_design) * 100
       : 0;
   const isAnomalous = validation.anomaly_detected || false;
-  const isWarning = validation.severity === "warning";
+  const _isWarning = validation.severity === "warning";
   const isCritical = validation.severity === "critical";
-  const hasCurrentReading = validation.reading_kwh !== undefined;
+  const _hasCurrentReading = validation.reading_kwh !== undefined;
   const hasCOPData =
     validation.cop_current !== undefined && validation.cop_design !== undefined;
 

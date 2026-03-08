@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 /**
  * OHS Act Compliance Panel
@@ -5,7 +6,7 @@
  * Generates and tracks safety compliance checklists across zones.
  */
 
-import { Card, Title, Text, Button, Grid, Badge } from '@tremor/react'
+import { Card, Title, Text, Button, Grid } from '@tremor/react'
 import { useGenerateOhsChecklist } from '@/lib/api/compliance'
 
 interface OHSPanelProps {

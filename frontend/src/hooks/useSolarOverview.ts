@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchSolarOverview } from '@/lib/solarApi';
-import type { SolarOverview } from '@/lib/solarApi';
+// SolarOverview type available from '@/lib/solarApi' if needed
 
 /**
  * Hook to fetch solar installation overview (generation, BESS SOC, grid flow)

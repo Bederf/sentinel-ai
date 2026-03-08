@@ -36,7 +36,7 @@ interface WaterAlertPanelProps {
 }
 
 const FILTER_OPTIONS = ["all", "unacknowledged", "critical", "in_progress", "resolved"] as const;
-type FilterStatus = (typeof FILTER_OPTIONS)[number];
+type _FilterStatus = (typeof FILTER_OPTIONS)[number];
 
 export const WaterAlertPanel: React.FC<WaterAlertPanelProps> = ({
   siteId,

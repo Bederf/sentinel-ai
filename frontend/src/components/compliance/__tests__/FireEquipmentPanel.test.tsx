@@ -20,7 +20,7 @@ vi.mock('@tremor/react', async () => {
       React.createElement('h3', { 'data-testid': 'title', ...props }, children),
     Text: ({ children, ...props }: any) =>
       React.createElement('span', { 'data-testid': 'text', ...props }, children),
-    Button: ({ children, onClick, size, ...props }: any) =>
+    Button: ({ children, onClick, size: _size, ...props }: any) =>
       React.createElement('button', { onClick, ...props }, children),
     Table: ({ children, ...props }: any) =>
       React.createElement('table', props, children),

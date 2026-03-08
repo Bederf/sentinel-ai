@@ -57,6 +57,7 @@ export const SafetyBoundaryConfig: React.FC<SafetyBoundaryConfigProps> = ({
 
   useEffect(() => {
     fetchBoundaries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceId]);
 
   const handleEditBoundary = (boundary: BoundaryConfig) => {

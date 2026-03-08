@@ -126,7 +126,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
   const { isModuleActive } = useModules();
 
   // State
-  const [sites, setSites] = useState<Site[]>([]);
+  const [_sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
   const [allScenarios, setAllScenarios] = useState<OptimizationScenario[]>([]);
   const [scenarios, setScenarios] = useState<ScenarioComparison[]>([]);
@@ -248,6 +248,7 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
     };
 
     loadOptimizationData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSiteId]);
 
   const handleExecuteOptimization = (scenarioId: string) => {

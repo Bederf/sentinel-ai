@@ -204,7 +204,7 @@ describe('usePeakDemandForecast', () => {
       });
 
       const hours = result.current.data?.forecast_hours;
-      expect(hours?.[0].forecasted_demand_kw).toBeLessThan(hours?.[23].forecasted_demand_kw!);
+      expect(hours?.[0].forecasted_demand_kw).toBeLessThan(hours?.[23].forecasted_demand_kw);
     });
 
     it('should identify falling trend', async () => {
@@ -226,7 +226,7 @@ describe('usePeakDemandForecast', () => {
       });
 
       const hours = result.current.data?.forecast_hours;
-      expect(hours?.[0].forecasted_demand_kw).toBeGreaterThan(hours?.[23].forecasted_demand_kw!);
+      expect(hours?.[0].forecasted_demand_kw).toBeGreaterThan(hours?.[23].forecasted_demand_kw);
     });
 
     it('should identify stable trend', async () => {

@@ -5,7 +5,7 @@
 
 import { authorizedFetch } from "./api/client";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+const _API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 // ============= Response Interfaces =============
 

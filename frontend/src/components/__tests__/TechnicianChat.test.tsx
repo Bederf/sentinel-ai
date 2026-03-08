@@ -46,7 +46,7 @@ vi.mock('../DiagnosisFlow', () => ({
 
 // Mock PhotoCapture component
 vi.mock('../PhotoCapture', () => ({
-  default: ({ onAnalysisComplete, onError, disabled }: any) => (
+  default: ({ onAnalysisComplete, _onError, disabled }: any) => (
     <button
       data-testid="photo-capture"
       disabled={disabled}

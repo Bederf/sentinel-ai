@@ -29,7 +29,7 @@ export function ForecastActualChart({ siteId }: ForecastActualChartProps) {
       const result = await fetchForecastWithActual(siteId);
       setData(result);
       setError(null);
-    } catch (e) {
+    } catch (_e) {
       // Fallback to demo data
       const demoData: ForecastWithActual = {
         site_id: siteId,

@@ -53,6 +53,16 @@ interface ModularDashboardProps {
   showRecommendations?: boolean;
 }
 
+// Loading fallback - defined outside component to avoid re-creation
+const LoadingFallback = () => (
+  <Card>
+    <div className="animate-pulse">
+      <div className="h-6 bg-gray-200 rounded w-1/3 mb-4" />
+      <div className="h-64 bg-gray-100 rounded" />
+    </div>
+  </Card>
+);
+
 export function ModularDashboard({
   siteId: propSiteId,
   siteName: propSiteName,
@@ -66,7 +76,7 @@ export function ModularDashboard({
 
   // Use provided siteId or fall back to context siteId
   const siteId = propSiteId || contextSiteId || '';
-  const siteName = propSiteName || siteId;
+  const _siteName = propSiteName || siteId;
 
   // Set site on mount if prop provided
   useEffect(() => {
@@ -131,16 +141,6 @@ export function ModularDashboard({
         );
     }
   };
-
-  // Loading fallback
-  const LoadingFallback = () => (
-    <Card>
-      <div className="animate-pulse">
-        <div className="h-6 bg-gray-200 rounded w-1/3 mb-4" />
-        <div className="h-64 bg-gray-100 rounded" />
-      </div>
-    </Card>
-  );
 
   // No modules active
   if (activeModules.length === 0) {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 import { useState, useEffect } from 'react';
 import { Droplets } from 'lucide-react';
@@ -5,7 +6,7 @@ import { waterApi } from '@/lib/waterApi';
 import type { WaterTrending, WaterAlert } from '@/lib/waterApi';
 import {
   IntelligenceCard, ValueMetricBox, ValueBadge, LearningBadge, AwaitingDataBadge,
-  BaselineComparisonBar, hasValue, type CardState,
+  BaselineComparisonBar, type CardState,
 } from './shared';
 
 interface WaterIntelligenceCardProps {

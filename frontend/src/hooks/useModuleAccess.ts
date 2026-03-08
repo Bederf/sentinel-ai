@@ -108,6 +108,7 @@ export function useModuleAccess(module: ModuleType | string): ModuleAccessState 
     }
 
     checkModuleAccess()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [module])
 
   return state

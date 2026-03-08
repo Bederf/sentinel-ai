@@ -4064,7 +4064,7 @@ export const securityApi = {
         active_alerts: response.metrics?.open_alerts ?? 0,
         occupancy_total: response.metrics?.active_visitors ?? 0,
       };
-    } catch (error) {
+    } catch (_error) {
       return {
         total_doors: 0,
         doors_secure: 0,
@@ -4110,7 +4110,7 @@ export const securityApi = {
         reason: event.status || "unknown",
       }));
       return { events: mapped, count: response.event_count ?? mapped.length };
-    } catch (error) {
+    } catch (_error) {
       return { events: [], count: 0 };
     }
   },
@@ -4121,7 +4121,7 @@ export const securityApi = {
       const result = await securityApi.getEvents({ site, limit: 200 });
       const denied = result.events.filter((event) => !event.granted);
       return { events: denied, count: denied.length };
-    } catch (error) {
+    } catch (_error) {
       return { events: [], count: 0 };
     }
   },
@@ -4130,7 +4130,7 @@ export const securityApi = {
   getAfterHoursEvents: async (site: string) => {
     try {
       return await securityApi.getEvents({ site, limit: 200, after_hours: true });
-    } catch (error) {
+    } catch (_error) {
       return { events: [], count: 0 };
     }
   },
@@ -4139,7 +4139,7 @@ export const securityApi = {
   getCameras: async (_site: string) => {
     try {
       return { cameras: [], count: 0, online: 0 };
-    } catch (error) {
+    } catch (_error) {
       return { cameras: [], count: 0, online: 0 };
     }
   },
@@ -4148,7 +4148,7 @@ export const securityApi = {
   getAlarmZones: async (_site: string) => {
     try {
       return { alarm_zones: [], count: 0, armed: 0 };
-    } catch (error) {
+    } catch (_error) {
       return { alarm_zones: [], count: 0, armed: 0 };
     }
   },
@@ -4208,7 +4208,7 @@ export const securityApi = {
         total_occupancy: response.total_occupancy || 0,
         zones,
       };
-    } catch (error) {
+    } catch (_error) {
       return { total_occupancy: 0, zones: [] };
     }
   },
@@ -4241,7 +4241,7 @@ export const securityApi = {
       });
 
       return { recommendations: mapped, count: response.recommendation_count ?? mapped.length };
-    } catch (error) {
+    } catch (_error) {
       return { recommendations: [], count: 0 };
     }
   },
@@ -4252,7 +4252,7 @@ export const securityApi = {
       return await fetchApi<{ anomalies: any[]; anomaly_count: number }>(
         `/api/security/events/anomalies?site=${encodeURIComponent(site)}&days_back=${daysBack}`
       );
-    } catch (error) {
+    } catch (_error) {
       return { anomalies: [], anomaly_count: 0 };
     }
   },

@@ -352,7 +352,7 @@ describe('ModularDashboard', () => {
     });
 
     it('should allow tab switching via TabGroup', async () => {
-      const user = userEvent.setup();
+      const _user = userEvent.setup();
       render(<ModularDashboard />);
 
       // Overview tab should be visible by default

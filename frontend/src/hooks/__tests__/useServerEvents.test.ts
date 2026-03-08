@@ -39,7 +39,7 @@ describe('useServerEvents', () => {
   describe('Connection Management', () => {
     it('should connect to SSE stream on mount', async () => {
       const wrapper = createQueryWrapper();
-      const { result } = renderHook(() => useServerEvents(), { wrapper });
+      const { result: _result } = renderHook(() => useServerEvents(), { wrapper });
 
       // Allow connection to establish
       await waitFor(() => {

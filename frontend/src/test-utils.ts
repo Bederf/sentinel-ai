@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 /**
  * Test utilities for SENTINEL BMS frontend
@@ -41,6 +42,7 @@ export function render(
 
     // Wrap with ModuleProvider if moduleContext is provided
     if (moduleContext) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { ModuleProvider } = require('./contexts/ModuleContext');
       // Create a mock provider that injects the moduleContext
       content = React.createElement(

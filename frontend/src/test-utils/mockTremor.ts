@@ -91,7 +91,7 @@ export function createTremorMocks() {
       }),
 
     // Chart components (render as divs - canvas not testable in jsdom)
-    BarChart: ({ data, categories, index, colors, ...props }: any) =>
+    BarChart: ({ data, categories, index, colors: _colors, ...props }: any) =>
       React.createElement('div', {
         'data-testid': 'bar-chart',
         'data-categories': JSON.stringify(categories),
@@ -101,7 +101,7 @@ export function createTremorMocks() {
         children: 'Bar Chart',
       }),
 
-    LineChart: ({ data, categories, index, colors, ...props }: any) =>
+    LineChart: ({ data, categories, index, colors: _colors, ...props }: any) =>
       React.createElement('div', {
         'data-testid': 'line-chart',
         'data-categories': JSON.stringify(categories),
@@ -111,7 +111,7 @@ export function createTremorMocks() {
         children: 'Line Chart',
       }),
 
-    AreaChart: ({ data, categories, index, colors, ...props }: any) =>
+    AreaChart: ({ data, categories, index, colors: _colors, ...props }: any) =>
       React.createElement('div', {
         'data-testid': 'area-chart',
         'data-categories': JSON.stringify(categories),

@@ -113,6 +113,7 @@ export function useDeviceControl(options: UseDeviceControlOptions = {}) {
         error: err instanceof Error ? err.message : "Failed to load device",
       }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Check safety status
@@ -245,7 +246,7 @@ export function useDeviceControl(options: UseDeviceControlOptions = {}) {
     return Object.entries(state.device.points)
       .filter(([_, point]) => point.writable)
       .map(([pointName, point]) => {
-        const { name, ...rest } = point;
+        const { name: _name, ...rest } = point;
         return { name: pointName, ...rest };
       });
   }, [state.device]);
@@ -256,7 +257,7 @@ export function useDeviceControl(options: UseDeviceControlOptions = {}) {
     return Object.entries(state.device.points)
       .filter(([_, point]) => !point.writable)
       .map(([pointName, point]) => {
-        const { name, ...rest } = point;
+        const { name: _name, ...rest } = point;
         return { name: pointName, ...rest };
       });
   }, [state.device]);

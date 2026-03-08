@@ -46,6 +46,7 @@ export function PointMatchingStep({ siteId, columnMappings: _columnMappings, onN
   // Load point matches
   useEffect(() => {
     loadMatches();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadMatches = async () => {

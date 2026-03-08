@@ -143,7 +143,7 @@ describe('BatchAggregator - Basic Operation', () => {
     });
 
     // Await the result to ensure timer fires and completes within this test
-    const result = await batcher('id-1');
+    const _result = await batcher('id-1');
     expect(apiFetch).toHaveBeenCalled();
   });
 });
@@ -452,7 +452,7 @@ describe('BatchAggregator - Error Handling', () => {
   });
 
   it('should reject missing items with 404 error', async () => {
-    (apiFetch as any).mockImplementation(async (endpoint: string, options: any) => {
+    (apiFetch as any).mockImplementation(async (_endpoint: string, _options: any) => {
       // Only return id-1, not id-2
       return { 'id-1': { id: 'id-1', value: 'test' } };
     });
@@ -541,7 +541,7 @@ describe('BatchAggregator - Recursive Flush', () => {
       return createBatchResponse(body.device_ids);
     });
 
-    const batcher = createBatchAggregator<MockBatchItem>({
+    const _batcher = createBatchAggregator<MockBatchItem>({
       endpoint: '/api/batch',
       maxBatchSize: 1,
       windowMs: 5,
