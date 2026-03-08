@@ -9,7 +9,7 @@ pydantic[email]==2.6.1
 pydantic-settings==2.1.0
 
 # HTTP Client (async preferred over requests)
-httpx>=0.26.0
+httpx>=0.26.0,<0.28
 requests>=2.31.0  # Fallback for legacy integrations
 
 # AI/LLM
