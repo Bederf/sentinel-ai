@@ -104,6 +104,7 @@ def mock_client():
     """Create a mock BACnet client."""
     mock = MagicMock()
     mock.is_running = True
+    mock._bac0_unavailable = False
     mock.read_point = AsyncMock()
     mock.write_point = AsyncMock(return_value=True)
     mock.read_point_list = AsyncMock(return_value=[])

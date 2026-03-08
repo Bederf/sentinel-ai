@@ -204,9 +204,11 @@ class TestTier3WriteFailureLogging:
             mock_repo.get_by_id = AsyncMock(return_value=mock_rec)
             mock_safety.return_value = {"is_safe": True}
             mock_gate.return_value = _mock_gate_pass()
-            # Mock device_manager.read_value for current value
+            # Mock device_manager.read_device_value for current value
             service.device_manager = MagicMock()
-            service.device_manager.read_value = AsyncMock(return_value={"success": True, "value": 24.0})
+            mock_device_value = MagicMock()
+            mock_device_value.value = 24.0
+            service.device_manager.read_device_value = AsyncMock(return_value=mock_device_value)
             mock_write.return_value = {"success": False, "error": "Device offline"}
 
             mock_parasite = MagicMock()
@@ -268,9 +270,11 @@ class TestTier3SuccessLogging:
             mock_repo.upsert = AsyncMock(return_value=True)
             mock_safety.return_value = {"is_safe": True}
             mock_gate.return_value = _mock_gate_pass()
-            # Mock device_manager.read_value for current value
+            # Mock device_manager.read_device_value for current value
             service.device_manager = MagicMock()
-            service.device_manager.read_value = AsyncMock(return_value={"success": True, "value": 24.0})
+            mock_device_value = MagicMock()
+            mock_device_value.value = 24.0
+            service.device_manager.read_device_value = AsyncMock(return_value=mock_device_value)
             mock_write.return_value = {"success": True}
 
             mock_cov_service = AsyncMock()

@@ -92,9 +92,10 @@ class TestEnergyTelemetry:
         """Zone power is distributed roughly evenly across luminaires."""
         telemetry = engine_with_telemetry.get_latest_telemetry()
         zone_001_lums = [r for r in telemetry["luminaires"] if r["zone_id"] == "Zone-001"]
-        # 1.2 kW = 1200W across 10 luminaires → ~120W each (±5% noise)
+        # 1.2 kW requested but rated power caps at 80W (80sqm * 10 W/sqm / 10 lums)
+        # With ±5% noise: 76–84W per luminaire
         for lum in zone_001_lums:
-            assert 100 < lum["active_power_w"] < 140, f"Power {lum['active_power_w']}W outside range"
+            assert 70 < lum["active_power_w"] < 90, f"Power {lum['active_power_w']}W outside range"
 
     def test_accumulated_energy_increases(self, engine):
         """Energy accumulates across multiple simulation steps."""
