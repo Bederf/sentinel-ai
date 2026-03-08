@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, createElement } from 'react';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -8,7 +8,6 @@ import {
   Activity,
   Calendar,
   Wrench,
-  Shield,
   ChevronRight,
   ArrowLeft,
   RefreshCw,
@@ -453,11 +452,8 @@ function EquipmentWorkflowDetail({
   onBack: () => void;
   maintenanceActive: boolean;
 }) {
-  // Get icon component and render it - must use useMemo to avoid creating component during render
-  const stateIconElement = useMemo(() => {
-    const IconComponent = getStateIcon(workflowState.current_state);
-    return <IconComponent className="h-3.5 w-3.5" />;
-  }, [workflowState.current_state]);
+  // Use createElement to avoid react-hooks/static-components lint error
+  const stateIconElement = createElement(getStateIcon(workflowState.current_state), { className: "h-3.5 w-3.5" });
 
   return (
     <div className="space-y-4">
