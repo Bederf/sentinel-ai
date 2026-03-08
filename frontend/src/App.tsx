@@ -10,12 +10,8 @@ import { useBuildingsList } from "./hooks/useBuildingsList";
 // Security: Prevent console logging in production (Phase 75-07)
 import { initializeSecurityProtections } from "./lib/api/security-utils";
 import { Chat } from "./components/Chat";
-import { TechnicianPortalGated } from "./components/TechnicianPortalGated";
 import { Dashboard } from "./components/Dashboard";
-import { DigitalTwin } from "./components/digital-twin";
-import { ControlDashboard } from "./components/ControlDashboard";
 import { ControlAuditTrail } from "./components/ControlAuditTrail";
-import { OptimizationPage } from "./pages/OptimizationPage";
 import { Settings } from "./components/Settings";
 import { Sidebar } from "./components/Sidebar";
 import { SplashScreen } from "./components/SplashScreen";
@@ -24,24 +20,10 @@ import { AlertFeed } from "./components/AlertFeed";
 import { CalendarPicker } from "./components/CalendarPicker";
 import SystemHealthPage from "./components/SystemHealthPage";
 import { AssetWorkflowDashboard } from "./components/AssetWorkflowDashboard";
-import { OccupancyPanel } from "./components/OccupancyPanel";
-import { OccupancyAnalyticsPage } from "./pages/OccupancyAnalyticsPage";
-import { OccupancyEnergyCorrelationPage } from "./pages/OccupancyEnergyCorrelationPage";
-import { LightingPage } from "./components/lighting/LightingPage";
-import { SecurityDashboard } from "./components/SecurityDashboard";
 import { SimbiotPage } from "./components/SimbiotPage";
-import { SimulationDashboard } from "./components/SimulationDashboard";
 import { FleetInsights } from "./components/FleetInsights";
-import { MLMetrics } from "./components/MLMetrics";
 import { ESGPage } from "./components/sustainability/ESGPage";
-import { SolarDashboard } from "./components/solar/SolarDashboard";
-import { WaterPanel } from "./components/water";
 import { ContractManagementPage } from "./pages/ContractManagementPage";
-import { BudgetReportPage } from "./pages/BudgetReportPage";
-import { ProfitabilityDashboardPage } from "./pages/ProfitabilityDashboardPage";
-import { AegisConsolePage } from "./pages/AegisConsolePage";
-import { ModularDashboard } from "./components/modules/ModularDashboard";
-import { SolarConfigWizard } from "./components/wizards/SolarConfigWizard";
 import { ModuleProvider } from "./contexts/ModuleContext";
 import { useModules } from "./contexts/ModuleHooks";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -81,7 +63,7 @@ function ViewGuard({
       }
     }
     // Simulation is now a building tab, not a sidebar view
-  }, [currentView, isModuleActive, userRole, onRedirect]);
+  }, [currentView, isModuleActive, loading, siteId, userRole, onRedirect]);
 
   return <>{children}</>;
 }
@@ -145,7 +127,7 @@ function App() {
         const response = await fetch(statusEndpoint);
         const data = await response.json();
         setSimulationRunning(data.running === true);
-      } catch (error) {
+      } catch (_error) {
         // Fail silently - simulation might not be running
         setSimulationRunning(false);
       }
@@ -158,7 +140,9 @@ function App() {
   }, [demoTaskId, primarySiteId]);
 
   // AI Recommendation card state
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RecommendationData type not exported from RecommendationToast
   const [selectedRec, setSelectedRec] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleShowRecCard = useCallback((rec: any) => setSelectedRec(rec), []);
   const handleApproveRec = useCallback(async (id: string) => {
     try {
@@ -171,7 +155,7 @@ function App() {
         },
         body: JSON.stringify({ approved_by: 'dashboard' }),
       });
-    } catch (e) { /* silent */ }
+    } catch (_e) { /* silent */ }
     setSelectedRec(null);
   }, []);
 
@@ -198,11 +182,10 @@ function App() {
         });
 
         if (response.ok) {
-          const result = await response.json();
-          console.debug('Devices initialized:', result.result);
+          await response.json();
         }
-      } catch (error) {
-        console.debug('Device initialization skipped:', error);
+      } catch (_error) {
+        // Device initialization skipped silently
       }
     };
 
