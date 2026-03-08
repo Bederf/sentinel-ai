@@ -311,9 +311,9 @@ class TestExposureModifiers:
         """Test south-facing zones get low modifier midday (SA: sun in NORTH sky)."""
         device = self._create_device_with_exposure(ExposureDirection.SOUTH)
 
-        # Mock datetime to midday (12:00)
-        with patch("app.services.ai_optimizer.datetime") as mock_dt:
-            mock_dt.now.return_value = datetime(2026, 1, 30, 12, 0)
+        # Mock get_effective_now to midday (12:00) — _get_exposure_modifier uses this, not datetime.now
+        with patch("app.services.lifecycle_orchestrator.get_effective_now") as mock_now:
+            mock_now.return_value = datetime(2026, 1, 30, 12, 0)
             modifier = self.optimizer._get_exposure_modifier(device, 30.0)
 
         # In SA, south-facing gets minimal direct sun (diffuse/reflected only)
@@ -323,9 +323,9 @@ class TestExposureModifiers:
         """Test west-facing zones get modifier in afternoon."""
         device = self._create_device_with_exposure(ExposureDirection.WEST)
 
-        # Mock datetime to afternoon (15:00)
-        with patch("app.services.ai_optimizer.datetime") as mock_dt:
-            mock_dt.now.return_value = datetime(2026, 1, 30, 15, 0)
+        # Mock get_effective_now to afternoon (15:00)
+        with patch("app.services.lifecycle_orchestrator.get_effective_now") as mock_now:
+            mock_now.return_value = datetime(2026, 1, 30, 15, 0)
             modifier = self.optimizer._get_exposure_modifier(device, 30.0)
 
         assert modifier == 1.0  # Afternoon heat

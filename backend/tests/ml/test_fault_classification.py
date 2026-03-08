@@ -281,13 +281,13 @@ class TestTrainAllIncludesClassifier:
 class TestHealthCheckIncludesClassifier:
     """ML health check reports classifier model counts."""
 
-    def test_health_check_has_classifier_field(self, registry_with_classifiers):
+    @pytest.mark.asyncio
+    async def test_health_check_has_classifier_field(self, registry_with_classifiers):
         """Health check includes classifier_models_active count."""
         with patch("ml.registry.get_model_registry", return_value=registry_with_classifiers):
-            import asyncio
             from app.api.ml_predictions import ml_health_check
 
-            result = asyncio.get_event_loop().run_until_complete(ml_health_check())
+            result = await ml_health_check()
 
             assert "classifier_models_active" in result
             assert result["classifier_models_active"] == 2

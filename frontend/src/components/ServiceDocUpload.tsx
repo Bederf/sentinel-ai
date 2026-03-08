@@ -128,15 +128,12 @@ export default function ServiceDocUpload({
 
     setUploading(true);
     try {
-      const _response = await documentsApi.uploadDocument({
+      const _response = await documentsApi.uploadDocument(
         siteId,
-        file: selectedFile,
-        title: title || undefined,
+        selectedFile,
+        title || undefined,
         documentType,
-        equipmentId: equipmentId || undefined,
-        vendor: vendor || undefined,
-        serviceDate: serviceDate || undefined,
-      });
+      );
 
       onUploadComplete?.(title || selectedFile.name);
       resetForm();

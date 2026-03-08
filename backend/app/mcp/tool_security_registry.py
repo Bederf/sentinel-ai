@@ -57,7 +57,7 @@ def _r(profile: ToolSecurityProfile) -> None:
 
 _r(
     ToolSecurityProfile(
-        name="get_buildings",
+        name="get_sites",
         audit_fields=frozenset({"status_filter", "region"}),
     )
 )
@@ -120,7 +120,7 @@ _r(
 
 _r(
     ToolSecurityProfile(
-        name="list_managed_buildings",
+        name="list_managed_sites",
         audit_fields=frozenset(),
     )
 )
@@ -265,7 +265,7 @@ _r(
 
 _r(
     ToolSecurityProfile(
-        name="create_building",
+        name="create_site",
         mutating=True,
         high_risk=True,
         rate_class="mutate",
@@ -277,7 +277,7 @@ _r(
 
 _r(
     ToolSecurityProfile(
-        name="activate_building",
+        name="activate_site",
         mutating=True,
         high_risk=True,
         rate_class="mutate",
@@ -300,7 +300,7 @@ _r(
 
 _r(
     ToolSecurityProfile(
-        name="add_building_desks",
+        name="add_site_desks",
         mutating=True,
         rate_class="mutate",
         min_role=SentinelRole.ADMIN,
@@ -379,7 +379,7 @@ _r(
 
 _r(
     ToolSecurityProfile(
-        name="add_building_contract",
+        name="add_site_contract",
         mutating=True,
         rate_class="mutate",
         min_role=SentinelRole.ADMIN,

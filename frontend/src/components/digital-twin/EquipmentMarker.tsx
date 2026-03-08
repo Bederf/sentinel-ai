@@ -11,7 +11,8 @@ interface EquipmentMarkerProps {
 }
 
 // ─── Matrix Cyberpunk Color Palette ──────────────────────────────────────
-const TYPE_COLORS: Record<string, string> = {
+// eslint-disable-next-line react-refresh/only-export-components
+export const TYPE_COLORS: Record<string, string> = {
   // HVAC - Various green shades
   ahu: '#00A541', vav: '#008B37', fcu: '#00712D', fcuventilation: '#00712D',
   // Power/Electrical - Bright green/emerald

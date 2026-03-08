@@ -414,16 +414,16 @@ class SiteBase(BaseModel):
     address: str
     region: str
     type: str
-    sqm: int
-    floors: int
-    year_built: int
-    operating_hours: OperatingHours
+    sqm: int = 0
+    floors: int = 0
+    year_built: int = 0
+    operating_hours: Optional[OperatingHours] = None
     timezone: str = "Africa/Johannesburg"  # IANA timezone
-    occupancy_pattern: str
-    latitude: float
-    longitude: float
-    contact_email: str
-    contact_phone: str
+    occupancy_pattern: str = ""
+    latitude: float = 0.0
+    longitude: float = 0.0
+    contact_email: str = ""
+    contact_phone: str = ""
 
 
 class EquipmentStatusBreakdown(BaseModel):
@@ -437,6 +437,8 @@ class EquipmentStatusBreakdown(BaseModel):
 
 class SiteResponse(SiteBase):
     """Site response with computed fields."""
+
+    model_config = {"extra": "ignore"}
 
     equipment_count: int = 0
     active_alerts: int = 0
@@ -648,8 +650,20 @@ async def list_sites(
         status = calculate_site_status(site_alerts)
         alert_count = len(site_alerts)
 
+        # Remove fields that will be set explicitly to avoid duplicate kwargs
+        site_clean = {
+            k: v
+            for k, v in site.items()
+            if k
+            not in (
+                "equipment_count",
+                "active_alerts",
+                "alert_count",
+                "status",
+            )
+        }
         site_response = SiteResponse(
-            **site,
+            **site_clean,
             equipment_count=asset_counts["total_assets"],
             active_alerts=alert_count,
             alert_count=alert_count,
@@ -1129,8 +1143,21 @@ async def get_site(site_id: str) -> SiteResponse:
     alert_count = len(site_alerts)
     status = calculate_site_status(site_alerts)
 
+    # Remove fields that will be set explicitly to avoid duplicate kwargs
+    site_clean = {
+        k: v
+        for k, v in site.items()
+        if k
+        not in (
+            "equipment_count",
+            "active_alerts",
+            "alert_count",
+            "location",
+            "status",
+        )
+    }
     return SiteResponse(
-        **site,
+        **site_clean,
         equipment_count=asset_counts["total_assets"],
         active_alerts=alert_count,
         alert_count=alert_count,

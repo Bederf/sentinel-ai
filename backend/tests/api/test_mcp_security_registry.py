@@ -158,14 +158,14 @@ class TestPolicyDecisionRecord:
         assert decision["reason_code"] == "FORBIDDEN"
         assert decision["risk_tier"] == "high_risk"
         assert decision["required_role"] == "operator"
-        assert decision["required_module"] == "control"
+        assert decision["required_module"] == "hvac_control"
         assert decision["required_approval"] is True
 
     def test_mutating_tool_decision_has_role_and_module(self):
         from app.mcp.audit import build_policy_decision
 
         decision = build_policy_decision(
-            tool_name="create_building",
+            tool_name="create_site",
             user_id="admin-1",
             auth_method="bearer_token",
             site_id="S002",

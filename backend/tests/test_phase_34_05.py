@@ -293,6 +293,7 @@ class TestDispatchPrediction:
             current_hour=12,
             current_soc_pct=50.0,
             price_forecasts=forecast_dicts,
+            temperature_forecast=[5.0] * 24,  # Pass temps to predictor too
         )
 
         # Should not charge when too cold

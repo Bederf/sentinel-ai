@@ -53,7 +53,7 @@ _PUBLIC_PREFIXES = (
     "/api/lifecycle/",  # Lifecycle simulation status endpoints (frontend health checks)
     "/api/recommendations/",  # Recommendations endpoints (can be public for UI)
 )
-_ADMIN_RATE_LIMIT_PER_MINUTE = 300
+_ADMIN_RATE_LIMIT_PER_MINUTE = 30
 _admin_requests_by_ip: dict[str, list[datetime]] = defaultdict(list)
 
 

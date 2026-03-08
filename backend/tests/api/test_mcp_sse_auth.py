@@ -11,7 +11,7 @@ Validates:
 
 import uuid
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import jwt as pyjwt
 import pytest
@@ -306,15 +306,15 @@ class TestCheckMCPToolAccess:
         assert allowed is False
         assert "Insufficient role" in reason
 
-    def test_operator_cannot_create_building(self):
+    def test_operator_cannot_create_site(self):
         ctx = _operator_auth_ctx()
-        allowed, reason = check_mcp_tool_access("create_building", ctx, None)
+        allowed, reason = check_mcp_tool_access("create_site", ctx, None)
         assert allowed is False
         assert "Insufficient role" in reason
 
-    def test_admin_can_create_building(self):
+    def test_admin_can_create_site(self):
         ctx = _admin_auth_ctx()
-        allowed, reason = check_mcp_tool_access("create_building", ctx, None)
+        allowed, reason = check_mcp_tool_access("create_site", ctx, None)
         assert allowed is True
 
     @patch("app.services.module_registry_service.module_registry")
@@ -403,13 +403,27 @@ class TestCallToolAuthGating:
         server.tool_handlers["write_device_point"] = spy_handler
 
         try:
-            await server.call_tool(
-                "write_device_point",
-                device_id="S002-AHU-001",
-                point_name="temp",
-                value=22,
-                _auth_context=ctx,
-            )
+            # Mock control policy to SUPERVISED so write_device_point is allowed
+            with patch("app.services.control_policy_engine.get_control_policy_engine") as mock_policy:
+                from app.models.control_policy import ControlMode
+
+                mock_engine = MagicMock()
+                mock_engine.get_control_mode.return_value = ControlMode.SUPERVISED
+                # evaluate_action is async and must return an envelope-like object
+                mock_envelope = MagicMock()
+                mock_envelope.policy_check_passed = True
+                mock_envelope.requires_approval = False
+                mock_envelope.envelope_id = "test-envelope"
+                mock_engine.evaluate_action = AsyncMock(return_value=mock_envelope)
+                mock_policy.return_value = mock_engine
+
+                await server.call_tool(
+                    "write_device_point",
+                    device_id="S002-AHU-001",
+                    point_name="temp",
+                    value=22,
+                    _auth_context=ctx,
+                )
             assert captured.get("user") == "mcp:alice@example.com"
         finally:
             server.tool_handlers["write_device_point"] = original_handler

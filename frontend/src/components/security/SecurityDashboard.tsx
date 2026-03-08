@@ -106,7 +106,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
       const occ = await securityApi.getOccupancy(siteId);
       setOccupancyData(occ);
 
-      setLastUpdated(new Date());
+      _setLastUpdated(new Date());
       setLoading(false);
     } catch {
       setLoading(false);

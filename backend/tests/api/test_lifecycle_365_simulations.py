@@ -159,6 +159,13 @@ def mock_supabase_for_lifecycle():
     mock_orchestrator.site_schedule = None
     mock_orchestrator._get_sentinel_status = lambda: {"tier1_auto": 0, "tier2_logged": 0, "tier3_escalated": 0}
 
+    # Mock sentinel_sync.ml_feeder.get_buffer_stats() to return a dict (not Mock)
+    mock_ml_feeder = Mock()
+    mock_ml_feeder.get_buffer_stats.return_value = {"buffered": 0, "flushed": 0}
+    mock_sentinel_sync = Mock()
+    mock_sentinel_sync.ml_feeder = mock_ml_feeder
+    mock_orchestrator.sentinel_sync = mock_sentinel_sync
+
     mock_scenario = Mock()
     mock_scenario.name = "sentinel_annual"
     mock_orchestrator.current_scenario = mock_scenario

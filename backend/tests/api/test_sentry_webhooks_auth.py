@@ -12,6 +12,7 @@ def preserve_settings_state():
     original_ingestion_mode = settings.ingestion_mode
     original_secret = settings.sentry_webhook_secret
     original_sentry_api_key = settings.sentry_bot_api_key
+    original_site002 = settings.site002_source_enabled
     try:
         yield
     finally:
@@ -19,6 +20,7 @@ def preserve_settings_state():
         settings.ingestion_mode = original_ingestion_mode
         settings.sentry_webhook_secret = original_secret
         settings.sentry_bot_api_key = original_sentry_api_key
+        settings.site002_source_enabled = original_site002
 
 
 @pytest.fixture
@@ -64,6 +66,7 @@ async def test_live_mode_missing_secret_fails_closed(
     """Live modes fail closed when SENTRY_WEBHOOK_SECRET is missing."""
     settings.demo_mode = False
     settings.ingestion_mode = "shadow_live"
+    settings.site002_source_enabled = False  # ensure resolved_ingestion_mode uses ingestion_mode
     settings.sentry_webhook_secret = ""
     settings.sentry_bot_api_key = "test-sentry-api-key"
     monkeypatch.delenv("SENTRY_WEBHOOK_SECRET", raising=False)

@@ -11,7 +11,8 @@
 
 import { ArrowRight } from 'lucide-react';
 
-export { formatCurrencyZAR } from '@/lib/locale';
+import { formatCurrencyZAR } from '@/lib/locale';
+export { formatCurrencyZAR };
 
 /** Card display state */
 export type CardState = 'no-data' | 'learning' | 'active';

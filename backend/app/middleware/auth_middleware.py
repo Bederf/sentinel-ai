@@ -626,8 +626,10 @@ def require_auth(level: AuthLevel = AuthLevel.AUTHENTICATED):
             request.state.auth = public_ctx
             return public_ctx
 
-        # Authenticate the request
-        auth_ctx = await _authenticate_request(request)
+        # Reuse auth context from middleware (e.g. TESTING bypass) if already set
+        auth_ctx = getattr(request.state, "auth", None)
+        if auth_ctx is None:
+            auth_ctx = await _authenticate_request(request)
 
         if auth_ctx is None:
             logger.warning(

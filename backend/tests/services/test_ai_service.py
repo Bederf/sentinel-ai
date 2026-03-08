@@ -228,7 +228,7 @@ class TestAIStreaming:
 
         # Try streaming request
         try:
-            with httpx.Client(timeout=30.0) as client:
+            with httpx.Client(timeout=3.0) as client:
                 with client.stream(
                     "POST", "http://localhost:9095/api/chat", json={"query": "What is BMS?"}
                 ) as response:

@@ -5170,9 +5170,8 @@ MCP_TOOLS = [
         "name": "control_dali_device",
         "description": (
             "Send a control command to a DALI/LUM device via SIMBIOT. "
-            "Tridonic handles routine lighting natively (daylight, occupancy). "
-            "Use this for SENTINEL overrides: emergency shutoff, demand response dimming, "
-            "maintenance lockout, scene override, or remote on/off. "
+            "Tridonic handles routine lighting natively; use this for SENTINEL overrides "
+            "(emergency shutoff, demand response dimming, maintenance lockout, scene override, remote on/off). "
             "Requires a reason for audit trail. Routes through SafetyEngine."
         ),
         "input_schema": {

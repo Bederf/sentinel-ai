@@ -104,6 +104,7 @@ async def test_discover_tridonic_gateway_equipment_code_format():
 
 
 @pytest.mark.asyncio
+@pytest.mark.timeout(60)
 async def test_discover_tridonic_gateway_different_site_id_formats():
     """Test equipment code generation with different building ID formats."""
     from app.mcp.simbiot_server import discover_tridonic_gateway_tool

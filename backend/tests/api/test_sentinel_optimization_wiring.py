@@ -116,7 +116,10 @@ class TestSentinelOptimization:
         orchestrator._cached_sentinel_recs = [{"equipment": "S002-FCU-L1-A", "cached": True}]
 
         equipment = [{"code": "S002-FCU-L1-A", "type": "FCU"}]
-        recs = await orchestrator._sentinel_optimization(equipment, "hour_10", 50, 50, 10)
+        with patch("app.config.settings.settings") as mock_settings:
+            mock_settings.simulation_optimization_mode = "sentinel"
+            mock_settings.local_ai_only = False
+            recs = await orchestrator._sentinel_optimization(equipment, "hour_10", 50, 50, 10)
 
         assert len(recs) == 1
         assert recs[0].get("cached") is True

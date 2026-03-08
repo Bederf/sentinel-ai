@@ -26,17 +26,17 @@ logger = logging.getLogger(__name__)
 MCP_TOOL_MODULE_REQUIREMENTS: dict[str, ModuleType] = {
     "write_device_point": ModuleType.HVAC_CONTROL,
     "create_work_order": ModuleType.MAINTENANCE,
-    "create_building": ModuleType.SIMBIOT,
-    "activate_building": ModuleType.SIMBIOT,
+    "create_site": ModuleType.SIMBIOT,
+    "activate_site": ModuleType.SIMBIOT,
     "add_site_zones": ModuleType.SIMBIOT,
-    "add_building_desks": ModuleType.SIMBIOT,
+    "add_site_desks": ModuleType.SIMBIOT,
     "add_site_devices": ModuleType.SIMBIOT,
     "import_point_list": ModuleType.SIMBIOT,
     "import_controller_list": ModuleType.SIMBIOT,
     "control_dali_device": ModuleType.SIMBIOT,
     "discover_tridonic_gateway": ModuleType.SIMBIOT,
     "configure_asset_metrics": ModuleType.ASSETS,
-    "add_building_contract": ModuleType.FINANCIAL,
+    "add_site_contract": ModuleType.FINANCIAL,
     "process_municipal_bill": ModuleType.ENERGY,
 }
 
@@ -47,17 +47,17 @@ MCP_TOOL_MODULE_REQUIREMENTS: dict[str, ModuleType] = {
 MCP_TOOL_MIN_ROLE: dict[str, SentinelRole] = {
     "write_device_point": SentinelRole.OPERATOR,
     "create_work_order": SentinelRole.OPERATOR,
-    "create_building": SentinelRole.ADMIN,
-    "activate_building": SentinelRole.ADMIN,
+    "create_site": SentinelRole.ADMIN,
+    "activate_site": SentinelRole.ADMIN,
     "add_site_zones": SentinelRole.ADMIN,
-    "add_building_desks": SentinelRole.ADMIN,
+    "add_site_desks": SentinelRole.ADMIN,
     "add_site_devices": SentinelRole.ADMIN,
     "import_point_list": SentinelRole.ADMIN,
     "import_controller_list": SentinelRole.ADMIN,
     "control_dali_device": SentinelRole.OPERATOR,
     "discover_tridonic_gateway": SentinelRole.OPERATOR,
     "configure_asset_metrics": SentinelRole.OPERATOR,
-    "add_building_contract": SentinelRole.ADMIN,
+    "add_site_contract": SentinelRole.ADMIN,
     "process_municipal_bill": SentinelRole.OPERATOR,
 }
 
@@ -80,8 +80,8 @@ PUBLIC_TOOLS: set[str] = set()
 
 HIGH_RISK_TOOLS: set[str] = {
     "write_device_point",
-    "create_building",
-    "activate_building",
+    "create_site",
+    "activate_site",
 }
 
 
