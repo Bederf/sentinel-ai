@@ -30,7 +30,7 @@ interface UseOccupancySyncOptions {
  * Ensures 3D animation stays in sync with backend lifecycle simulation.
  */
 export function useOccupancySync({
-  siteId,
+  siteId: _siteId,
   simulationRef,
   enabled,
 }: UseOccupancySyncOptions) {

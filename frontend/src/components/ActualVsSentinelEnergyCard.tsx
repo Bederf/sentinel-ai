@@ -200,7 +200,7 @@ function computeComparison(
   }
 }
 
-export function ActualVsSentinelEnergyCard({ siteId }: ActualVsSentinelEnergyCardProps) {
+export function ActualVsSentinelEnergyCard({ siteId: _siteId }: ActualVsSentinelEnergyCardProps) {
   const {
     running,
     simulatedHour,

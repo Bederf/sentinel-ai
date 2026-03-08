@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 /**
  * Solar Annual Performance Summary Card
@@ -23,15 +24,15 @@ interface SolarAnnualCardProps {
   siteId: string
 }
 
-export function SolarAnnualCard({ siteId }: SolarAnnualCardProps) {
+export function SolarAnnualCard({ siteId: _siteId }: SolarAnnualCardProps) {
   const {
     running,
     daysSimulated,
-    simulatedHour,
-    solarEfficiency,
-    cloudCover,
-    occupancyPercent,
-    currentSeason,
+    simulatedHour: _simulatedHour,
+    solarEfficiency: _solarEfficiency,
+    cloudCover: _cloudCover,
+    occupancyPercent: _occupancyPercent,
+    currentSeason: _currentSeason,
   } = useSimulation()
 
   // Compute cumulative annual metrics from simulation state
@@ -91,7 +92,7 @@ export function SolarAnnualCard({ siteId }: SolarAnnualCardProps) {
     const selfConsumptionPct = totalSolarKwh > 0
       ? Math.round((selfConsumptionKwh / totalSolarKwh) * 1000) / 10
       : 0
-    const gridExportKwh = Math.max(0, totalSolarKwh - selfConsumptionKwh)
+    const _gridExportKwh = Math.max(0, totalSolarKwh - selfConsumptionKwh)
     const gridImportKwh = Math.max(0, totalBuildingLoad - selfConsumptionKwh)
 
     // Savings: based on AI learning curve position
