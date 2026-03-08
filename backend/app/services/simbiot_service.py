@@ -7,7 +7,12 @@ Auto-creates work orders when AI detects equipment anomalies or occupants raise 
 import logging
 from typing import Optional
 
-from simbiot_concept import ConceptConnector, ConceptConfig, SentinelAnomaly
+try:
+    from simbiot_concept import ConceptConnector, ConceptConfig, SentinelAnomaly
+except ImportError:
+    ConceptConnector = None  # type: ignore[misc,assignment]
+    ConceptConfig = None  # type: ignore[misc,assignment]
+    SentinelAnomaly = None  # type: ignore[misc,assignment]
 
 logger = logging.getLogger("sentinel.simbiot")
 
@@ -19,9 +24,12 @@ class SimbiotService:
         self._connector: Optional[ConceptConnector] = None
         self._enabled = False
 
-    async def initialise(self, config: ConceptConfig):
+    async def initialise(self, config):
         """Start the connector. Call from FastAPI startup."""
         try:
+            if ConceptConnector is None:
+                logger.warning("simbiot_concept package not installed — CAFM integration disabled")
+                return
             self._connector = ConceptConnector(config)
             await self._connector.initialise()
             self._enabled = True

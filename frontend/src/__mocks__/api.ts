@@ -17,8 +17,6 @@ import type {
   DeviceControlResponse,
   HealthResponse,
   EnergyResponse,
-  DashboardPreferencesResponse,
-  DashboardPreferences,
 } from '@/lib/api';
 import {
   createMockSite,
@@ -32,9 +30,7 @@ import {
   createMockOptimizationStatus,
   createMockDeviceStatus,
   createMockDeviceSafetyStatus,
-  createMockEnergyDataPoint,
   createMockEnergyResponse,
-  createMockBuildingEquipmentItem,
 } from '../test-utils/factories';
 
 /**
