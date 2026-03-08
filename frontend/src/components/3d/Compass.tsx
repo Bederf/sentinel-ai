@@ -5,8 +5,6 @@ import { Html } from '@react-three/drei';
  * Positioned at world origin, scales with camera distance
  */
 export function Compass() {
-  const compassSize = 2;
-  const tickLength = 0.3;
   const ringRadius = 1.2;
 
   return (
