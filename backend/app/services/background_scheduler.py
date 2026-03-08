@@ -2959,6 +2959,53 @@ class BackgroundSchedulerService:
         if total_events > 0:
             logger.info("Event intelligence cycle complete: %d events across %d sites", total_events, len(site_ids))
 
+    # -----------------------------------------------------------------
+    # Space Occupancy — Sensor health monitor
+    # -----------------------------------------------------------------
+
+    def add_space_sensor_health_job(self, interval_seconds: int = 60, site_id: str = "FLN02"):
+        """Add a periodic job to check sensor health for the space occupancy POC.
+
+        Detects sensors that have gone offline (no heartbeat within threshold).
+
+        Args:
+            interval_seconds: How often to check (default: 60s).
+            site_id: The site to monitor.
+        """
+        job_id = f"space_sensor_health_{site_id}"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+        self.scheduler.add_job(
+            func=self._run_space_sensor_health,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name=f"Space Sensor Health ({site_id})",
+            replace_existing=True,
+            kwargs={"site_id": site_id},
+        )
+        logger.info("Added space sensor health job for %s (%ds interval)", site_id, interval_seconds)
+
+    def _run_space_sensor_health(self, site_id: str = "FLN02"):
+        """Sync wrapper for async sensor health check."""
+        try:
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._run_space_sensor_health_async(site_id),
+                    self._main_loop,
+                )
+                future.result(timeout=30)
+            else:
+                asyncio.run(self._run_space_sensor_health_async(site_id))
+        except Exception as e:
+            logger.error("Space sensor health check failed: %s", e, exc_info=True)
+
+    async def _run_space_sensor_health_async(self, site_id: str = "FLN02"):
+        """Run the async sensor health check."""
+        from app.space.sensor_monitor import check_sensor_health
+
+        await check_sensor_health(site_id=site_id)
+
 
 # Global scheduler instance
 scheduler_service = BackgroundSchedulerService()

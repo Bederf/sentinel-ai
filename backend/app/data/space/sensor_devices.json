@@ -1,0 +1,7 @@
+[
+  {"device_token": "tkn_FA2-1Q1-MR-01_a3f9c2", "room_code": "FA2-1Q1-MR-01", "sensor_id": "LD2410C-FA2-1Q1-MR-01", "site_id": "FLN02", "enabled": true},
+  {"device_token": "tkn_FA2-1Q1-MR-02_b7e4d1", "room_code": "FA2-1Q1-MR-02", "sensor_id": "LD2410C-FA2-1Q1-MR-02", "site_id": "FLN02", "enabled": true},
+  {"device_token": "tkn_FA2-1Q1-MR-05_c2a8f5", "room_code": "FA2-1Q1-MR-05", "sensor_id": "LD2410C-FA2-1Q1-MR-05", "site_id": "FLN02", "enabled": true},
+  {"device_token": "tkn_FA2-1Q1-MR-06_d9b3e7", "room_code": "FA2-1Q1-MR-06", "sensor_id": "LD2410C-FA2-1Q1-MR-06", "site_id": "FLN02", "enabled": true},
+  {"device_token": "tkn_FA2-1Q2-MR-08_e5c6a9", "room_code": "FA2-1Q2-MR-08", "sensor_id": "LD2410C-FA2-1Q2-MR-08", "site_id": "FLN02", "enabled": true}
+]

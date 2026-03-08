@@ -601,6 +601,13 @@ async def startup_event(app: FastAPI) -> None:
     # Error auto-resolution job (daily) - resolves errors if component healthy for 24+ hours
     scheduler_service.add_error_auto_resolve_job(interval_seconds=86400)
 
+    # Space Occupancy POC — sensor health monitor (every 60 seconds)
+    try:
+        scheduler_service.add_space_sensor_health_job(interval_seconds=60, site_id="FLN02")
+        _logger.info("Space sensor health monitor initialized for FLN02 (60s interval)")
+    except Exception as e:
+        _logger.warning(f"Space sensor health monitor initialization failed: {e}")
+
     # Event Intelligence evaluation (every 2 minutes)
     # Converts raw telemetry into structured operational events (temp deviations,
     # energy spikes, sensor failures, comfort violations, ML anomalies).
