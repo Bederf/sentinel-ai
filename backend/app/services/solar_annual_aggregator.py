@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from enum import Enum
 
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +176,7 @@ class SolarAnnualAggregator:
     THEORETICAL_SOLAR_KWH_PER_KWP_DAY = 5.2
 
     def __init__(self, site_id: str | None = None):
-        self.site_id = site_id or get_primary_site() or "unknown"
+        self.site_id = site_id or get_primary_site_code() or "unknown"
         self.month_names = [
             "January",
             "February",

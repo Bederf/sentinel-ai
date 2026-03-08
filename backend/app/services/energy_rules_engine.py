@@ -16,7 +16,7 @@ Rules:
 from datetime import date
 from typing import Optional, List
 from app.models.energy_rules import BuildingState, RuleResult, RulesEngineOutput, SystemBreakdown, LearningCurvePhase
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 
 # ==================== RULE THRESHOLDS (Tunable) ====================
 
@@ -82,7 +82,7 @@ class EnergyRulesEngine:
                            If None, tries to get from lifecycle orchestrator,
                            then falls back to DEFAULT_DEPLOYMENT_DATE
         """
-        self.site_id = site_id or get_primary_site() or "unknown"
+        self.site_id = site_id or get_primary_site_code() or "unknown"
 
         # Get deployment date, trying orchestrator first
         if deployment_date is None:

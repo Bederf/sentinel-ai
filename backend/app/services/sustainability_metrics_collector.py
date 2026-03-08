@@ -22,7 +22,7 @@ from datetime import date
 from pathlib import Path
 from typing import Dict, Optional
 
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 from app.models.sustainability import (
     DailySustainabilityWrite,
     EmissionFactors,
@@ -268,7 +268,7 @@ class SustainabilityMetricsCollector:
 
         # Check if site has solar (primary site does)
         # For now, use default capacity; future: read from site config
-        capacity_kwp = DEFAULT_SOLAR_CAPACITY_KWP if self.site_id == get_primary_site() else 0.0
+        capacity_kwp = DEFAULT_SOLAR_CAPACITY_KWP if self.site_id == get_primary_site_code() else 0.0
         if capacity_kwp <= 0:
             return 0.0
 

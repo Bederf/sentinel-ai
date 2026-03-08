@@ -187,8 +187,12 @@ class TestMFAFailureHandling:
         email = "mfa-user@example.com"
         auth_api._login_attempts[email] = []
 
+        # Mock user lookup so we get past the "User not registered" check
+        mock_user = {"email": email, "role": "operator", "user_id": "user-mfa"}
+
         # Mock the MFA service to fail verification
-        with patch("app.api.auth.get_mfa_service") as mock_mfa:
+        with patch("app.api.auth.get_mfa_service") as mock_mfa, patch("app.api.auth._user_repo") as mock_repo:
+            mock_repo.get_user_by_email.return_value = mock_user
             service = MagicMock()
             service.verify_code.return_value = (False, "Invalid TOTP code")
             service.verify_backup_code.return_value = False
@@ -213,8 +217,12 @@ class TestMFAFailureHandling:
         email = "mfa-lockout@example.com"
         auth_api._login_attempts[email] = []
 
+        # Mock user lookup so we get past the "User not registered" check
+        mock_user = {"email": email, "role": "operator", "user_id": "user-lockout"}
+
         # Mock the MFA service
-        with patch("app.api.auth.get_mfa_service") as mock_mfa:
+        with patch("app.api.auth.get_mfa_service") as mock_mfa, patch("app.api.auth._user_repo") as mock_repo:
+            mock_repo.get_user_by_email.return_value = mock_user
             service = MagicMock()
             service.verify_code.return_value = (False, "Invalid TOTP code")
             service.verify_backup_code.return_value = False

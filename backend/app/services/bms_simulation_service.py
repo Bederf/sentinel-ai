@@ -22,7 +22,7 @@ from dataclasses import dataclass, asdict
 import logging
 
 from app.services.health_threshold_service import get_health_thresholds
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 from app.services.sentry_integration.alert_notifier import alert_notifier
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ class BMSimulationService:
 
         # Simulation configuration
         self.config = {
-            "site_id": get_primary_site() or "unknown",  # Simulate equipment for registered site
+            "site_id": get_primary_site_code() or "unknown",  # Simulate equipment for registered site
             "site_name": "Sandton City Office Tower",
             "demand_sites": ["site-002", "site-004"],
             "use_supabase_equipment": True,  # Load real equipment from Supabase
@@ -120,7 +120,7 @@ class BMSimulationService:
     async def _initialize_equipment(self):
         """Initialize simulated equipment from Supabase or fallback to generated"""
         self.equipment = {}
-        site_id = self.config.get("site_id") or get_primary_site() or "unknown"
+        site_id = self.config.get("site_id") or get_primary_site_code() or "unknown"
         site_name = self.config.get("site_name", "Sandton City Office Tower")
 
         # Try to load equipment from Supabase
@@ -989,7 +989,7 @@ class BMSimulationService:
             "id": f"SIM-ALERT-{self._alert_id_counter}",
             "equipment_id": equipment.id,
             "equipment_name": equipment.name,
-            "site_id": self.config.get("site_id") or get_primary_site() or "unknown",
+            "site_id": self.config.get("site_id") or get_primary_site_code() or "unknown",
             "site_name": self.config.get("site_name", "Sandton City Office Tower"),
             "type": alert_type,
             "severity": severity,

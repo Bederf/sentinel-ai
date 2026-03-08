@@ -230,6 +230,12 @@ class AIOptimizerService:
         # Gather ML model outputs for Claude context injection
         ml_context = await self._gather_ml_context(site_id, equipment_inventory)
 
+        # Gather decision memory (learned patterns from past outcomes)
+        decision_memory_text = await self._gather_decision_memory(site_id)
+
+        # Gather module success rates from feedback loop
+        feedback_rates_text = self._gather_feedback_success_rates(site_id)
+
         # Build optimization prompt for Claude with ALL available equipment
         prompt = self._build_optimization_prompt(
             site,
@@ -240,6 +246,8 @@ class AIOptimizerService:
             lighting_zones,
             profile=profile,
             ml_context=ml_context,
+            decision_memory_text=decision_memory_text,
+            feedback_rates_text=feedback_rates_text,
         )
 
         try:
@@ -700,6 +708,89 @@ class AIOptimizerService:
             "currency": "ZAR",
         }
 
+    async def _gather_decision_memory(self, site_id: str) -> str:
+        """Gather learned decision patterns for this site from Decision Memory Service.
+
+        Returns formatted text for prompt injection, or empty string if no patterns exist.
+        """
+        try:
+            from app.services.decision_memory_service import get_decision_memory_service
+
+            dms = get_decision_memory_service()
+            dms._ensure_loaded()
+
+            # Filter patterns relevant to this site
+            site_patterns = [
+                p for p in dms._patterns if not hasattr(p, "site_id") or getattr(p, "site_id", None) in (None, site_id)
+            ]
+
+            # Get recent resolved decisions for this site
+            site_records = [r for r in dms._records if r.site_id == site_id and r.outcome.value != "pending"]
+            # Keep most recent 10
+            site_records.sort(
+                key=lambda r: r.outcome_evaluated_at or r.created_at,
+                reverse=True,
+            )
+            site_records = site_records[:10]
+
+            text = dms.format_for_prompt(
+                patterns=site_patterns if site_patterns else None,
+                records=site_records if site_records else None,
+            )
+
+            if text:
+                logger.info(
+                    "Decision memory: %d patterns, %d recent records for %s",
+                    len(site_patterns),
+                    len(site_records),
+                    site_id,
+                )
+            return text
+
+        except Exception as e:
+            logger.debug("Decision memory unavailable: %s", e)
+            return ""
+
+    def _gather_feedback_success_rates(self, site_id: str) -> str:
+        """Get per-module recommendation success rates from ML feedback.
+
+        Returns formatted text for prompt injection, or empty string if no data.
+        """
+        try:
+            from app.services.ml_feedback_service import get_ml_feedback_service
+
+            ml_fb = get_ml_feedback_service()
+            summary = ml_fb.get_module_feedback_summary(site_id=site_id)
+
+            success_rates = summary.get("success_rates", {})
+            counts = summary.get("counts", {})
+            if not success_rates:
+                return ""
+
+            lines = []
+            for module_name, rate in sorted(success_rates.items()):
+                total = counts.get(module_name, 0)
+                if total == 0:
+                    continue
+                guidance = ""
+                if rate < 60:
+                    guidance = " (act conservatively — verify conditions before recommending)"
+                elif rate >= 90:
+                    guidance = " (proven reliable)"
+                lines.append(
+                    f"- {module_name.upper()} actions: {rate:.0f}% success rate ({total} recorded outcomes){guidance}"
+                )
+
+            if not lines:
+                return ""
+
+            logger.info("Feedback success rates for %s: %s", site_id, success_rates)
+            return "\n".join(lines)
+
+        except Exception as e:
+            logger.debug("Feedback success rates unavailable: %s", e)
+            return ""
+
     async def _gather_ml_context(self, site_id: str, equipment_inventory: Dict[str, List[Device]]) -> Dict[str, Any]:
         """Gather ML model outputs for injection into Claude's optimisation prompt.
 
@@ -924,6 +1015,38 @@ class AIOptimizerService:
             "consider future equipment behaviour, not just current state.\n\n" + "\n\n".join(sections) + "\n"
         )
 
+    def _format_feedback_loop_section(
+        self,
+        decision_memory_text: Optional[str],
+        feedback_rates_text: Optional[str],
+    ) -> str:
+        """Format decision memory and feedback success rates for prompt injection.
+
+        Only adds sections when data exists. Returns empty string if no feedback data.
+        """
+        sections = []
+
+        if feedback_rates_text:
+            sections.append(
+                "**RECOMMENDATION SUCCESS RATES (from recorded outcomes at this site):**\n"
+                f"{feedback_rates_text}\n\n"
+                "Adjust your confidence scores accordingly. For equipment types with <60% success rate, "
+                "only recommend when the condition is clearly anomalous, not as routine optimization."
+            )
+
+        if decision_memory_text:
+            sections.append(
+                "**HISTORICAL PATTERN MEMORY (what has worked at this site before):**\n"
+                f"{decision_memory_text}\n\n"
+                "Use this history to inform your recommendations. If a pattern shows a previous action "
+                "failed, do not repeat it without a specific reason to believe conditions have changed."
+            )
+
+        if not sections:
+            return ""
+
+        return "\n" + "\n\n".join(sections) + "\n"
+
     def _build_optimization_prompt(
         self,
         site: Dict[str, Any],
@@ -934,6 +1057,8 @@ class AIOptimizerService:
         lighting_zones: Optional[Dict[str, Any]] = None,
         profile: Optional[Dict[str, Any]] = None,
         ml_context: Optional[Dict[str, Any]] = None,
+        decision_memory_text: Optional[str] = None,
+        feedback_rates_text: Optional[str] = None,
     ) -> str:
         """Build optimization prompt for Claude with ALL available equipment.
 
@@ -1073,6 +1198,7 @@ class AIOptimizerService:
 {self._format_equipment_health(current_conditions)}
 {self._format_solar_bess_telemetry(current_conditions)}
 {self._format_ml_context_section(ml_context) if ml_context else ""}
+{self._format_feedback_loop_section(decision_memory_text, feedback_rates_text)}
 **Weather Forecast (next 4 hours):**
 {json.dumps(weather_forecast, indent=2)}
 

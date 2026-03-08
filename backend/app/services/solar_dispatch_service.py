@@ -26,7 +26,7 @@ from app.services.solar_arbitrage_engine import (
     DispatchActionType,
 )
 from app.services.solar_config_service import get_site_solar_config
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +145,7 @@ class SolarDispatchService:
             self.BESS_RATED_POWER_KW = cfg.bess.rated_power_kw
         except Exception:
             pass
-        self._seed_demo_history(get_primary_site() or "unknown")
+        self._seed_demo_history(get_primary_site_code() or "unknown")
 
     # === Demo seed ===
 

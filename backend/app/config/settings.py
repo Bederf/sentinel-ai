@@ -311,6 +311,10 @@ class Settings(BaseSettings):
     focus_min_session_seconds: int = 180  # Discard sessions shorter than 3 min (noise)
     focus_extended_use_seconds: int = 7200  # Flag sessions longer than 2 hours
 
+    # Telegram alert delivery
+    telegram_bot_token: str = ""  # Bot token from BotFather
+    telegram_alert_chat_id: str = ""  # Default chat/group ID for plant alerts
+
     # Plant Room Alerts — Desigo email→WhatsApp pipeline (Phase 146)
     plant_alerts_enabled: bool = False  # Master switch for plant alert ingestion
     desigo_sender_email: str = "noreply@fnb.co.za"  # Authorised Desigo sender address

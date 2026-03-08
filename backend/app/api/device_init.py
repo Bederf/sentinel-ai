@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request, HTTPException
 from app.middleware.auth_middleware import require_auth, AuthLevel
 from app.models.auth import AuthContext
 from app.services.device_status_initializer import initialize_demo_devices
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 from app.database.repositories.user_site_access_repository import (
     get_user_site_access_repository,
 )
@@ -85,7 +85,7 @@ async def init_default_devices(
         HTTPException: 403 if user lacks access to the default site
     """
     try:
-        site_id = get_primary_site() or "unknown"
+        site_id = get_primary_site_code() or "unknown"
 
         # Verify user has access to default site (Security: Authorization check)
         site_access_repo = get_user_site_access_repository()

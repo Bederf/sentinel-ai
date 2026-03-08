@@ -21,6 +21,35 @@ Consolidated documentation of completed and in-progress phases, including implem
 
 All phases organized by number with implementation status, completion date, and key deliverables.
 
+### Phase 147: Sentry Telegram Conversation Flow
+
+**Status:** COMPLETE (pending gateway smoke test) | **Date:** 2026-03-07
+
+**Achievement:** Replaced the Sentry gateway's free-text-to-Claude passthrough with intent-first routing. All non-slash-command Telegram messages are now classified by the backend, routed to the correct conversation flow, and replied to with inline keyboards -- no LLM involvement in routing. 81 tests, 0 failures.
+
+**Key deliverables:**
+
+- **Telegram Message Sender** (`telegram_message_sender.py`): Wraps Telegram Bot API with `InlineButton`/`InlineKeyboard` dataclasses for inline keyboard support. Singleton `get_telegram_sender()`.
+- **Intent Classifier** (`telegram_intent_classifier.py`): Synchronous 9-rule priority cascade -- callback+session, callback parse, session+text, WO pattern, equipment ID, tech vocab, issue classifier reuse, ad-hoc keywords, unknown. No LLM calls. Returns `(TelegramIntent, confidence)`.
+- **Conversation Manager** (`telegram_conversation_manager.py`): In-memory `ConversationSession` dataclass keyed by `chat_id`, 30-minute expiry, cleanup via background scheduler tick.
+- **Flow Handlers** (`telegram_flow_handlers.py`): 5 conversation flows:
+  - Client Complaint (4 steps: category keyboard -> location -> duration -> photo/skip -> WO)
+  - Technician Report (6-question AHU checklist with follow-up branching on non-Good answers, auto-WO creation for critical findings)
+  - WO Update (stateless: extract WO code, lookup, status buttons)
+  - Ad-Hoc Fault (2 steps: ask location -> create WO)
+  - Unknown/Orientation (3-button menu: Report problem / Start inspection / Check WO)
+- **API Endpoints** (`sentry_webhooks.py`): `POST /api/sentry/telegram/message` and `POST /api/sentry/telegram/callback` with dual auth (API key + webhook secret), prompt guard, POPIA consent gate
+- **Gateway Workspace Updates**: `SOUL.md` message routing delegation section, `TOOLS.md` endpoint documentation, `sentry-call-logging` SKILL.md deprecated
+- **Background Scheduler Wiring**: Session cleanup in existing 30s tick
+
+**Files created:** 4 production (`telegram_message_sender.py`, `telegram_intent_classifier.py`, `telegram_conversation_manager.py`, `telegram_flow_handlers.py`), 5 test files (81 tests total)
+
+**Files modified:** `sentry_webhooks.py` (+2 endpoints), `background_scheduler.py` (+session cleanup), gateway workspace files (`SOUL.md`, `TOOLS.md`, `SKILL.md`)
+
+**Remaining:** Gateway restart (blocked by Anthropic API credit exhaustion), `callback_query` forwarding in openclaw engine (needs investigation)
+
+---
+
 ### Phase 132: ML→Claude Context Bridge
 
 **Status:** ✅ Complete | **Date:** 2026-02-27

@@ -56,11 +56,11 @@ class TestBaselinePower:
     """Verify baseline power constants and per-zone calculation."""
 
     def test_baseline_power_per_zone(self, engine):
-        """15 LED panels x 120W = 1.8 kW baseline per zone."""
-        assert engine.BASELINE_POWER_PER_ZONE == 1.8
+        """450 sqm x 10 W/sqm = 4.5 kW baseline per zone."""
+        assert engine.BASELINE_POWER_PER_ZONE == 4.5
 
     def test_total_building_baseline_8_zones(self, engine):
-        """8 zones at full occupancy, no daylight -> 8 x 1.8 kW = 14.4 kW total."""
+        """8 zones at full occupancy, no daylight -> 8 x 4.5 kW = 36.0 kW total."""
         total = 0.0
         for zone_id in engine._zone_cache:
             power = engine._calculate_zone_lighting_power(
@@ -72,7 +72,7 @@ class TestBaselinePower:
                 zone_config=engine._zone_cache[zone_id],
             )
             total += power
-        assert abs(total - (1.8 * 8)) < 0.1, f"Expected ~14.4 kW, got {total:.2f} kW"
+        assert abs(total - (4.5 * 8)) < 0.1, f"Expected ~36.0 kW, got {total:.2f} kW"
 
 
 # ------------------------------------------------------------------
@@ -121,8 +121,8 @@ class TestOccupancyScaling:
             is_raining=False,
             zone_config=engine._zone_cache["Zone-002"],
         )
-        # Formula: 1.8 * (1.0 - 0.6 + 0.6 * 0.5) = 1.8 * (0.4 + 0.3) = 1.8 * 0.7 = 1.26
-        assert abs(power - 1.26) < 0.01, f"Expected ~1.26 kW, got {power:.3f}"
+        # Formula: 4.5 * (1.0 - 0.6 + 0.6 * 0.5) = 4.5 * (0.4 + 0.3) = 4.5 * 0.7 = 3.15
+        assert abs(power - 3.15) < 0.01, f"Expected ~3.15 kW, got {power:.3f}"
 
     def test_100_percent_occupancy_gives_full_power(self, engine):
         """100% occupancy -> full baseline power."""
@@ -134,7 +134,7 @@ class TestOccupancyScaling:
             is_raining=False,
             zone_config=engine._zone_cache["Zone-002"],
         )
-        assert abs(power - 1.8) < 0.01
+        assert abs(power - 4.5) < 0.01
 
 
 # ------------------------------------------------------------------
@@ -157,9 +157,9 @@ class TestDaylightHarvesting:
         )
         # daylight_excess = 500 - 300 = 200
         # daylight_factor = max(0.05, 1.0 - (200/500) * 0.8) = max(0.05, 1.0 - 0.32) = 0.68
-        # power = 1.8 * 0.68 = 1.224
-        assert power < 1.8, "Window zone with 500 lux should dim below baseline"
-        assert power > engine.DALI_MIN_DIM * 1.8, "Should not go below DALI minimum"
+        # power = 4.5 * 0.68 = 3.06
+        assert power < 4.5, "Window zone with 500 lux should dim below baseline"
+        assert power > engine.DALI_MIN_DIM * 4.5, "Should not go below DALI minimum"
 
     def test_interior_zone_no_daylight_harvesting(self, engine):
         """Interior zone (Zone-002) ignores daylight."""
@@ -191,7 +191,7 @@ class TestDaylightHarvesting:
             is_raining=False,
             zone_config=engine._zone_cache["Zone-001"],
         )
-        assert abs(power - 1.8) < 0.01, "Below 300 lux should give full power"
+        assert abs(power - 4.5) < 0.01, "Below 300 lux should give full power"
 
     def test_cloud_cover_reduces_effective_daylight(self, engine):
         """High cloud cover reduces effective lux via CLOUDY_REDUCTION."""
@@ -224,18 +224,18 @@ class TestZoneClassification:
     """Verify window/interior zone classification."""
 
     def test_window_zones_identified_correctly(self, engine):
-        """Zone-001, Zone-101, Zone-201, Entry are window zones."""
-        assert engine.WINDOW_ZONES["Zone-001"] is True
-        assert engine.WINDOW_ZONES["Zone-101"] is True
-        assert engine.WINDOW_ZONES["Zone-201"] is True
-        assert engine.WINDOW_ZONES["Entry"] is True
+        """Perimeter zones (North, East, South) are window zones."""
+        assert engine.WINDOW_ZONES["Zone-001"] is True  # L0 North
+        assert engine.WINDOW_ZONES["Zone-101"] is True  # L1 North
+        assert engine.WINDOW_ZONES["Zone-201"] is True  # L2 North
+        assert engine.WINDOW_ZONES["Zone-081"] is True  # L0 South
 
     def test_interior_zones_identified_correctly(self, engine):
-        """Zone-002, Zone-102, Zone-202, Zone-R are interior zones."""
-        assert engine.WINDOW_ZONES["Zone-002"] is False
-        assert engine.WINDOW_ZONES["Zone-102"] is False
-        assert engine.WINDOW_ZONES["Zone-202"] is False
-        assert engine.WINDOW_ZONES["Zone-R"] is False
+        """Central/West zones are interior (no windows)."""
+        assert engine.WINDOW_ZONES["Zone-041"] is False  # L0 Central
+        assert engine.WINDOW_ZONES["Zone-141"] is False  # L1 Central
+        assert engine.WINDOW_ZONES["Zone-061"] is False  # L0 West
+        assert engine.WINDOW_ZONES["Zone-161"] is False  # L1 West
 
     def test_rain_reduces_effective_daylight_further(self, engine):
         """Rain reduces daylight by 60%, leading to less harvesting."""
@@ -277,7 +277,7 @@ class TestEdgeCases:
             is_raining=False,
             zone_config=engine._zone_cache["Zone-001"],
         )
-        min_power = engine.DALI_MIN_DIM * engine.BASELINE_POWER_PER_ZONE  # 0.05 * 1.8 = 0.09
+        min_power = engine.DALI_MIN_DIM * engine.BASELINE_POWER_PER_ZONE  # 0.05 * 4.5 = 0.225
         assert power >= min_power, f"Power {power} should not go below DALI min {min_power}"
 
     def test_singleton_returns_same_instance(self):

@@ -28,7 +28,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class OccupancyControlService:
         Returns:
             Summary dict with actions_taken, zones_checked, errors.
         """
-        site_id = site_id or get_primary_site() or "unknown"
+        site_id = site_id or get_primary_site_code() or "unknown"
         from app.config.settings import settings
 
         correlation_id = f"occ-{uuid.uuid4().hex[:8]}"

@@ -1,5 +1,5 @@
 """
-Notification provider implementations — Telegram, WhatsApp (Meta), SMS (BulkSMS).
+Notification provider implementations — Telegram, WhatsApp (Meta/Twilio), SMS (BulkSMS).
 
 Each provider handles one channel independently. They're called by NotificationService
 which orchestrates routing based on technician preferences.

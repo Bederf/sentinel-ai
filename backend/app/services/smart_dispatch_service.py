@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 from app.services.remote_monitoring_service import get_remote_monitoring_service
 from app.services.device_abstraction import device_manager
 from app.services.work_order_service import work_order_service
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 
 logger = logging.getLogger(__name__)
 
@@ -822,7 +822,7 @@ class SmartDispatchService:
         Loads from buildings data or returns demo defaults.
         """
         # Default for the primary registered site
-        if site_id == get_primary_site():
+        if site_id == get_primary_site_code():
             return {
                 "name": "Sandton City Office Tower",
                 "address": "83 Rivonia Road, Sandton, 2196",
@@ -949,7 +949,7 @@ class SmartDispatchService:
         Maps S002 -> site-002.
         """
         if not equipment_id:
-            return get_primary_site() or "unknown"
+            return get_primary_site_code() or "unknown"
         parts = equipment_id.split("-")
         if parts and parts[0].startswith("S"):
             try:
@@ -957,7 +957,7 @@ class SmartDispatchService:
                 return f"site-{site_num:03d}"
             except ValueError:
                 pass
-        return get_primary_site() or "unknown"
+        return get_primary_site_code() or "unknown"
 
     @staticmethod
     def _equipment_type_from_id(equipment_id: str) -> str:

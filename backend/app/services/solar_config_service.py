@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Optional
 
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 
 logger = logging.getLogger(__name__)
 
@@ -326,7 +326,7 @@ _site_configs: Dict[str, SiteConfig] = {}
 
 def get_site_solar_config(site_id: str | None = None) -> SiteConfig:
     """Get solar/BESS/tariff config for a site. Cached after first load."""
-    site_id = site_id or get_primary_site() or "unknown"
+    site_id = site_id or get_primary_site_code() or "unknown"
     if site_id not in _site_configs:
         _site_configs[site_id] = _load_site_config(site_id)
         logger.info(

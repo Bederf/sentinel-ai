@@ -102,7 +102,7 @@ class TestToolSecurityRegistry:
         assert get_risk_tier("write_device_point") == "high_risk"
         assert get_risk_tier("create_work_order") == "mutating"
         assert get_risk_tier("search_alarms") == "search"
-        assert get_risk_tier("get_buildings") == "read"
+        assert get_risk_tier("get_sites") == "read"
         assert get_risk_tier("unknown_tool_xyz") == "read"
 
     def test_get_audit_fields(self):
@@ -127,14 +127,14 @@ class TestPolicyDecisionRecord:
         from app.mcp.audit import build_policy_decision
 
         decision = build_policy_decision(
-            tool_name="get_buildings",
+            tool_name="get_sites",
             user_id="user-1",
             auth_method="bearer_token",
             site_id="S002",
             result="allow",
         )
 
-        assert decision["tool"] == "get_buildings"
+        assert decision["tool"] == "get_sites"
         assert decision["risk_tier"] == "read"
         assert decision["auth_method"] == "bearer_token"
         assert decision["user"] == "user-1"
@@ -186,7 +186,7 @@ class TestPolicyDecisionRecord:
         from app.mcp.audit import log_mcp_tool_call
 
         log_mcp_tool_call(
-            tool_name="get_buildings",
+            tool_name="get_sites",
             user_id="user-1",
             arguments={"status_filter": "all"},
             result_code="SUCCESS",
@@ -200,7 +200,7 @@ class TestPolicyDecisionRecord:
         metadata = call_kwargs["metadata"]
         assert "policy_decision" in metadata
         pd = metadata["policy_decision"]
-        assert pd["tool"] == "get_buildings"
+        assert pd["tool"] == "get_sites"
         assert pd["result"] == "allow"
         assert pd["risk_tier"] == "read"
 
@@ -230,7 +230,7 @@ class TestSecretZeroOutputFilter:
         from app.mcp.schema_validator import scan_output_for_secrets
 
         output = {"authorization": "Bearer secret123", "data": [1, 2, 3]}
-        result = scan_output_for_secrets("get_buildings", output)
+        result = scan_output_for_secrets("get_sites", output)
         assert result["authorization"] == "***REDACTED_BY_SECRET_ZERO_FILTER***"
         assert result["data"] == [1, 2, 3]
 
@@ -262,7 +262,7 @@ class TestSecretZeroOutputFilter:
             ),
             "user": "alice",
         }
-        result = scan_output_for_secrets("get_buildings", output)
+        result = scan_output_for_secrets("get_sites", output)
         assert result["session"] == "***REDACTED_BY_SECRET_ZERO_FILTER***"
         assert result["user"] == "alice"
 
@@ -280,7 +280,7 @@ class TestSecretZeroOutputFilter:
             "sites": [{"id": "S002", "name": "Sandton", "health": 85}],
             "count": 1,
         }
-        result = scan_output_for_secrets("get_buildings", output)
+        result = scan_output_for_secrets("get_sites", output)
         assert result == output
 
     def test_non_dict_output_passes_through(self):
@@ -327,14 +327,14 @@ class TestCrossTenantIsolation:
 
         # Exhaust user-a's limit
         for _ in range(3):
-            check_rate_limit("tenant-a-user", "get_buildings")
+            check_rate_limit("tenant-a-user", "get_sites")
 
         # user-a is blocked
-        allowed_a, _, _ = check_rate_limit("tenant-a-user", "get_buildings")
+        allowed_a, _, _ = check_rate_limit("tenant-a-user", "get_sites")
         assert allowed_a is False
 
         # user-b is independent
-        allowed_b, _, _ = check_rate_limit("tenant-b-user", "get_buildings")
+        allowed_b, _, _ = check_rate_limit("tenant-b-user", "get_sites")
         assert allowed_b is True
 
     def test_rate_limits_isolated_by_category(self, monkeypatch):
@@ -344,10 +344,10 @@ class TestCrossTenantIsolation:
         from app.mcp.rate_limiter import check_rate_limit
 
         for _ in range(2):
-            check_rate_limit("user-1", "get_buildings")
+            check_rate_limit("user-1", "get_sites")
 
         # Read limit hit
-        allowed_read, _, _ = check_rate_limit("user-1", "get_buildings")
+        allowed_read, _, _ = check_rate_limit("user-1", "get_sites")
         assert allowed_read is False
 
         # Mutate limit still open
@@ -417,18 +417,18 @@ class TestCrossTenantIsolation:
             return {"status": "ok"}
 
         # Temporarily replace handler
-        original = server.tool_handlers.get("get_buildings")
-        server.tool_handlers["get_buildings"] = tracking_handler
+        original = server.tool_handlers.get("get_sites")
+        server.tool_handlers["get_sites"] = tracking_handler
 
         try:
             ctx_a = _operator_ctx(user_id="tenant-a", email="a@corp.com")
             ctx_b = _operator_ctx(user_id="tenant-b", email="b@corp.com")
 
-            await server.call_tool("get_buildings", _transport="sse", _auth_context=ctx_a)
-            await server.call_tool("get_buildings", _transport="sse", _auth_context=ctx_b)
+            await server.call_tool("get_sites", _transport="sse", _auth_context=ctx_a)
+            await server.call_tool("get_sites", _transport="sse", _auth_context=ctx_b)
 
             # Both calls should execute (read tools don't inject user param
             # unless they're mutating), but neither should leak the other's context
             assert len(captured_users) == 2
         finally:
-            server.tool_handlers["get_buildings"] = original
+            server.tool_handlers["get_sites"] = original

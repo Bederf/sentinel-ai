@@ -134,7 +134,7 @@ from app.database.repositories.site_repository import SiteRepository  # noqa: E4
 from app.database.repositories.equipment_repository import EquipmentRepository  # noqa: E402
 from app.services.log_parser import LogParserService  # noqa: E402
 from app.services.point_matcher import PointMatcherService  # noqa: E402
-from app.core.site_resolver import get_primary_site  # noqa: E402
+from app.core.site_resolver import get_primary_site_code  # noqa: E402
 from app.services.commissioning_service import CommissioningService  # noqa: E402
 from app.models.commissioning import TruthCheckSubmission  # noqa: E402
 
@@ -997,7 +997,7 @@ async def seed_integration_data():
     import random
 
     # Get primary registered building UUID
-    _primary_site = get_primary_site() or "unknown"
+    _primary_site = get_primary_site_code() or "unknown"
     building = building_repo.get_by_id(_primary_site)
     if not building:
         raise HTTPException(status_code=404, detail=f"Primary building '{_primary_site}' not found")

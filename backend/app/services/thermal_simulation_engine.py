@@ -306,16 +306,13 @@ class ThermalSimulationEngine:
         wall_loss_rate = 0.04  # How much zone temp approaches ambient per hour (well-insulated 9000 sqm)
         ambient_loss = (ambient_temp - prev_temp) * wall_loss_rate
 
-        # === Thermal Inertia ===
-        # Building mass resists temperature changes (~70% of previous temp remains)
-        inertia_contribution = prev_temp * self.THERMAL_MASS_FACTOR
-
         # === Final Temperature Calculation ===
         # Temperature change per hour (simplified)
         temp_change = (total_heat_generation / 1000) + hvac_effect + ambient_loss
 
-        # New temperature: blend previous temp (inertia) with change
-        new_temp = (inertia_contribution + temp_change) / (self.THERMAL_MASS_FACTOR + 1)
+        # Thermal inertia: building mass retains most of previous temperature
+        # Only (1 - THERMAL_MASS_FACTOR) of the change applies per hour
+        new_temp = prev_temp + temp_change * (1 - self.THERMAL_MASS_FACTOR)
 
         # Building safety floor: BMS night setback keeps zones above 19°C
         # (heating kicks in before reaching the 18°C safety minimum)

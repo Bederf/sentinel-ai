@@ -1,0 +1,407 @@
+{
+  "metadata": {
+    "discovery_id": "csv-78435d67",
+    "device_ip": "test-mixed",
+    "site_id": "site-002",
+    "device_id": null,
+    "status": "complete",
+    "started_at": "2026-03-07T05:06:31.210699",
+    "completed_at": "2026-03-07T05:06:31.211269",
+    "points_count": 10,
+    "classified_count": 10,
+    "summary": {
+      "total_points": 10,
+      "equipment_type_counts": {
+        "ahu": 2,
+        "chiller": 1,
+        "fcu": 1,
+        "dali": 5,
+        "meter": 1
+      },
+      "confidence_counts": {
+        "high": 6,
+        "medium": 4
+      },
+      "point_type_counts": {
+        "sensor": 8,
+        "status": 2
+      },
+      "unique_equipment": {
+        "ahu": 1,
+        "chiller": 1,
+        "fcu": 1,
+        "dali": 1,
+        "meter": 1
+      },
+      "equipment_ids": {
+        "ahu": [
+          "AHU-01"
+        ],
+        "chiller": [
+          "CH-01"
+        ],
+        "fcu": [
+          "FCU-01"
+        ],
+        "dali": [
+          "DALI-01"
+        ],
+        "meter": [
+          "MTR-MAIN"
+        ]
+      },
+      "needs_review": 0,
+      "lighting_points": {
+        "total": 5,
+        "by_equipment_type": {
+          "dali": 5
+        },
+        "by_category": {
+          "brightness": 1,
+          "power": 1,
+          "lux": 1,
+          "status": 1,
+          "emergency_battery": 1
+        }
+      }
+    },
+    "error": null
+  },
+  "classified_points": [
+    {
+      "original_name": "STC/RF/AHU-01/SupplyAirTemp",
+      "original_description": "Supply air temperature",
+      "equipment_type": "ahu",
+      "equipment_id": "AHU-01",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "AHU-01/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "ahu",
+        "Air_Handling_Unit",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 1000,
+      "present_value": 15.2,
+      "writable": false
+    },
+    {
+      "original_name": "STC/RF/AHU-01/FanStatus",
+      "original_description": "Fan on/off status",
+      "equipment_type": "ahu",
+      "equipment_id": "AHU-01",
+      "point_type": "status",
+      "point_category": "status",
+      "brick_class": "Status",
+      "standardized_name": "AHU-01/status_status",
+      "unit": "",
+      "confidence": "medium",
+      "tags": [
+        "ahu",
+        "Air_Handling_Unit",
+        "status",
+        "status",
+        "point"
+      ],
+      "object_type": "binaryValue",
+      "instance": 1002,
+      "present_value": 1.0,
+      "writable": true
+    },
+    {
+      "original_name": "STC/B1/CH-01/ChwSupplyTemp",
+      "original_description": "Chilled water supply temperature",
+      "equipment_type": "chiller",
+      "equipment_id": "CH-01",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "CH-01/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "chiller",
+        "Chiller",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 1006,
+      "present_value": 7.0,
+      "writable": false
+    },
+    {
+      "original_name": "STC/L1/FCU-01/RoomTemp",
+      "original_description": "Room temperature",
+      "equipment_type": "fcu",
+      "equipment_id": "FCU-01",
+      "point_type": "sensor",
+      "point_category": "temperature",
+      "brick_class": "Temperature_Sensor",
+      "standardized_name": "FCU-01/temperature_sensor",
+      "unit": "degC",
+      "confidence": "high",
+      "tags": [
+        "fcu",
+        "Fan_Coil_Unit",
+        "temperature",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 1011,
+      "present_value": 22.8,
+      "writable": false
+    },
+    {
+      "original_name": "STC/L1/DALI-01/Lum01_DimLevel",
+      "original_description": "Luminaire 01 dimming level",
+      "equipment_type": "dali",
+      "equipment_id": "DALI-01",
+      "point_type": "sensor",
+      "point_category": "brightness",
+      "brick_class": "Brightness_Sensor",
+      "standardized_name": "DALI-01/brightness_sensor",
+      "unit": "%",
+      "confidence": "high",
+      "tags": [
+        "dali",
+        "brightness",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogOutput",
+      "instance": 3000,
+      "present_value": 85.0,
+      "writable": true
+    },
+    {
+      "original_name": "STC/L1/DALI-01/Lum01_ActivePower",
+      "original_description": "Luminaire 01 active power",
+      "equipment_type": "dali",
+      "equipment_id": "DALI-01",
+      "point_type": "sensor",
+      "point_category": "power",
+      "brick_class": "Power_Sensor",
+      "standardized_name": "DALI-01/power_sensor",
+      "unit": "watt",
+      "confidence": "medium",
+      "tags": [
+        "dali",
+        "power",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 3001,
+      "present_value": 42.5,
+      "writable": false
+    },
+    {
+      "original_name": "STC/L1/DALI-01/Sens01_Lux",
+      "original_description": "Sensor 01 ambient lux level",
+      "equipment_type": "dali",
+      "equipment_id": "DALI-01",
+      "point_type": "sensor",
+      "point_category": "lux",
+      "brick_class": "Luminance_Sensor",
+      "standardized_name": "DALI-01/lux_sensor",
+      "unit": "lux",
+      "confidence": "medium",
+      "tags": [
+        "dali",
+        "lux",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 3020,
+      "present_value": 485.0,
+      "writable": false
+    },
+    {
+      "original_name": "STC/L1/DALI-01/Ctrl_Status",
+      "original_description": "DALI controller online",
+      "equipment_type": "dali",
+      "equipment_id": "DALI-01",
+      "point_type": "status",
+      "point_category": "status",
+      "brick_class": "Status",
+      "standardized_name": "DALI-01/status_status",
+      "unit": "",
+      "confidence": "medium",
+      "tags": [
+        "dali",
+        "status",
+        "status",
+        "point"
+      ],
+      "object_type": "binaryInput",
+      "instance": 3040,
+      "present_value": 1.0,
+      "writable": false
+    },
+    {
+      "original_name": "STC/L1/DALI-01/Em01_BattLevel",
+      "original_description": "Emergency battery level",
+      "equipment_type": "dali",
+      "equipment_id": "DALI-01",
+      "point_type": "sensor",
+      "point_category": "emergency_battery",
+      "brick_class": "Emergency_Battery_Sensor",
+      "standardized_name": "DALI-01/emergency_battery_sensor",
+      "unit": "%",
+      "confidence": "high",
+      "tags": [
+        "dali",
+        "emergency_battery",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 3030,
+      "present_value": 96.0,
+      "writable": false
+    },
+    {
+      "original_name": "STC/B1/MTR-MAIN/kW",
+      "original_description": "Main meter power",
+      "equipment_type": "meter",
+      "equipment_id": "MTR-MAIN",
+      "point_type": "sensor",
+      "point_category": "power",
+      "brick_class": "Power_Sensor",
+      "standardized_name": "MTR-MAIN/power_sensor",
+      "unit": "kW",
+      "confidence": "high",
+      "tags": [
+        "meter",
+        "Meter",
+        "power",
+        "sensor",
+        "point",
+        "cur"
+      ],
+      "object_type": "analogInput",
+      "instance": 1100,
+      "present_value": 450.0,
+      "writable": false
+    }
+  ],
+  "raw_points": [
+    {
+      "name": "STC/RF/AHU-01/SupplyAirTemp",
+      "description": "Supply air temperature",
+      "object_type": "analogInput",
+      "instance": 1000,
+      "units": "degC",
+      "present_value": 15.2,
+      "writable": false,
+      "_equipment_id": "AHU-01"
+    },
+    {
+      "name": "STC/RF/AHU-01/FanStatus",
+      "description": "Fan on/off status",
+      "object_type": "binaryValue",
+      "instance": 1002,
+      "units": "",
+      "present_value": 1.0,
+      "writable": true,
+      "_equipment_id": "AHU-01"
+    },
+    {
+      "name": "STC/B1/CH-01/ChwSupplyTemp",
+      "description": "Chilled water supply temperature",
+      "object_type": "analogInput",
+      "instance": 1006,
+      "units": "degC",
+      "present_value": 7.0,
+      "writable": false,
+      "_equipment_id": "CH-01"
+    },
+    {
+      "name": "STC/L1/FCU-01/RoomTemp",
+      "description": "Room temperature",
+      "object_type": "analogInput",
+      "instance": 1011,
+      "units": "degC",
+      "present_value": 22.8,
+      "writable": false,
+      "_equipment_id": "FCU-01"
+    },
+    {
+      "name": "STC/L1/DALI-01/Lum01_DimLevel",
+      "description": "Luminaire 01 dimming level",
+      "object_type": "analogOutput",
+      "instance": 3000,
+      "units": "percent",
+      "present_value": 85.0,
+      "writable": true,
+      "_equipment_id": "DALI-01"
+    },
+    {
+      "name": "STC/L1/DALI-01/Lum01_ActivePower",
+      "description": "Luminaire 01 active power",
+      "object_type": "analogInput",
+      "instance": 3001,
+      "units": "watt",
+      "present_value": 42.5,
+      "writable": false,
+      "_equipment_id": "DALI-01"
+    },
+    {
+      "name": "STC/L1/DALI-01/Sens01_Lux",
+      "description": "Sensor 01 ambient lux level",
+      "object_type": "analogInput",
+      "instance": 3020,
+      "units": "lux",
+      "present_value": 485.0,
+      "writable": false,
+      "_equipment_id": "DALI-01"
+    },
+    {
+      "name": "STC/L1/DALI-01/Ctrl_Status",
+      "description": "DALI controller online",
+      "object_type": "binaryInput",
+      "instance": 3040,
+      "units": "",
+      "present_value": 1.0,
+      "writable": false,
+      "_equipment_id": "DALI-01"
+    },
+    {
+      "name": "STC/L1/DALI-01/Em01_BattLevel",
+      "description": "Emergency battery level",
+      "object_type": "analogInput",
+      "instance": 3030,
+      "units": "percent",
+      "present_value": 96.0,
+      "writable": false,
+      "_equipment_id": "DALI-01"
+    },
+    {
+      "name": "STC/B1/MTR-MAIN/kW",
+      "description": "Main meter power",
+      "object_type": "analogInput",
+      "instance": 1100,
+      "units": "kW",
+      "present_value": 450.0,
+      "writable": false,
+      "_equipment_id": "MTR-MAIN"
+    }
+  ]
+}

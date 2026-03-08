@@ -219,6 +219,9 @@ async def startup_event(app: FastAPI) -> None:
     # Start AI recommendation generation job (rule-based, sim-time gated)
     scheduler_service.add_recommendation_generation_job(interval_seconds=600)  # 10 min real-time fallback
 
+    # Start outcome verification job (checks executed recs after 30-min settling)
+    scheduler_service.add_outcome_verification_job(interval_seconds=300)  # 5 min
+
     # Start integration sync job (runs every 15 minutes)
     # Updates last_sync_at on all active log sources so System Health dashboard stays fresh
     scheduler_service.add_integration_sync_job(interval_seconds=900)  # 15 minutes

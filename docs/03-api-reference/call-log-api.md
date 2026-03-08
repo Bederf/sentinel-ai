@@ -2,9 +2,11 @@
 
 ## Overview
 
+> **Phase 147 Update (2026-03-07):** Free-text complaint routing from Telegram is now handled by the backend conversation system via `POST /api/sentry/telegram/message` and `POST /api/sentry/telegram/callback`. These new endpoints handle intent classification, multi-step conversation flows with inline keyboards, and work order creation automatically. The call log endpoints below remain available for WhatsApp, mobile app, and email channels, and as a programmatic API for direct WO creation from classified complaints.
+
 Call log endpoints support the Sentry bot's general staff defect reporting workflow. Non-technical users (office workers, cleaners, security guards) report building issues via Telegram, WhatsApp, mobile app, or email. The bot classifies the complaint against a fixed taxonomy and creates an inspection work order.
 
-Three endpoints:
+Five endpoints (3 original + 2 new):
 
 1. **`POST /api/sentry/call-log`** — Create an inspection work order from a classified complaint
 2. **`POST /api/sentry/call-log/escalate`** — Escalate an unclassifiable complaint to the facilities supervisor
@@ -301,12 +303,113 @@ python3 $SENTRY_HOME/tools/call_log.py categories
 
 ---
 
+---
+
+## POST /api/sentry/telegram/message (Phase 147)
+
+Delegates a free-text Telegram message to the backend conversation system. The backend classifies intent, manages conversation sessions, runs the appropriate flow, and sends the reply (with inline keyboards) directly to Telegram. The caller should NOT send any additional reply.
+
+**Authentication:** Required -- both `X-Sentry-API-Key` and `X-Sentry-Secret` headers.
+
+**Request Body:**
+
+```json
+{
+  "chat_id": "123456789",
+  "user_id": "987654321",
+  "username": "johndoe",
+  "display_name": "John Doe",
+  "text": "it's too hot on level 3",
+  "has_photo": false,
+  "message_id": 42
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `chat_id` | string | Yes | Telegram chat ID |
+| `user_id` | string | Yes | Telegram user ID |
+| `username` | string | No | Telegram username |
+| `display_name` | string | No | User display name |
+| `text` | string | No | Message text |
+| `has_photo` | boolean | No | Whether message includes a photo |
+| `photo_file_id` | string | No | Telegram file ID for photo |
+| `message_id` | integer | No | Telegram message ID |
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "intent": "client_complaint",
+  "confidence": 0.85
+}
+```
+
+**Error responses:**
+
+| Code | Condition |
+|------|-----------|
+| 403 | Missing or invalid `X-Sentry-Secret` / `X-Sentry-API-Key` |
+| 200 | `{"success": false, "error": "blocked by prompt guard"}` -- prompt injection detected |
+| 200 | `{"success": false, "requires_consent": true}` -- POPIA consent not granted |
+
+---
+
+## POST /api/sentry/telegram/callback (Phase 147)
+
+Handles inline keyboard button taps (Telegram `callback_query`). Dismisses the button spinner, classifies intent from `callback_data`, and routes to the appropriate flow handler. The backend sends the next reply directly to Telegram.
+
+**Authentication:** Required -- both `X-Sentry-API-Key` and `X-Sentry-Secret` headers.
+
+**Request Body:**
+
+```json
+{
+  "callback_query_id": "cbq-123",
+  "chat_id": "123456789",
+  "user_id": "987654321",
+  "message_id": 42,
+  "data": "complaint:category:hvac"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `callback_query_id` | string | Yes | Telegram callback query ID |
+| `chat_id` | string | Yes | Telegram chat ID |
+| `user_id` | string | Yes | Telegram user ID |
+| `message_id` | integer | Yes | Message ID of the keyboard message |
+| `data` | string | Yes | Callback data string (format: `{flow}:{action}:{value}`) |
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "intent": "checklist_reply",
+  "confidence": 1.0
+}
+```
+
+**Error responses:**
+
+| Code | Condition |
+|------|-----------|
+| 403 | Missing or invalid `X-Sentry-Secret` / `X-Sentry-API-Key` |
+
+---
+
 ## Implementation
 
-- Handler: `$SENTRY_HOME/handlers/call_log_handler.py`
-- CLI tool: `$SENTRY_HOME/tools/call_log.py`
-- Skill doc: `$SENTRY_HOME/skills/sentry_call_logging.md`
+- Handler (legacy): `$SENTRY_HOME/handlers/call_log_handler.py`
+- CLI tool (legacy): `$SENTRY_HOME/tools/call_log.py`
+- Skill doc (deprecated): `$SENTRY_HOME/skills/sentry_call_logging.md`
 - Backend endpoints: `backend/app/api/sentry_webhooks.py`
+- Intent classifier: `backend/app/services/telegram_intent_classifier.py`
+- Conversation manager: `backend/app/services/telegram_conversation_manager.py`
+- Flow handlers: `backend/app/services/telegram_flow_handlers.py`
+- Message sender: `backend/app/services/telegram_message_sender.py`
 - Reporter memory repository: `backend/app/database/repositories/reporter_location_repository.py`
 - Reporter memory fallback store: `backend/app/data/reporter_location_memory.json`
 - Escalation log: `backend/app/data/call_log_escalations.json`

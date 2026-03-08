@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL Concierge Workflow Simulator</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a25;
+    --border: #2a2a3a;
+    --text: #e0e0e8;
+    --text-dim: #8888a0;
+    --accent: #00d4aa;
+    --accent-dim: #00d4aa33;
+    --warn: #ff6b6b;
+    --warn-dim: #ff6b6b22;
+    --info: #6ba3ff;
+    --amber: #ffb347;
+    --purple: #b388ff;
+    --cyan: #00e5ff;
+    --step-active: #00d4aa;
+    --step-done: #00d4aa55;
+    --step-pending: #2a2a3a;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 12px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header h1 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 1px;
+  }
+  header .tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: var(--warn-dim);
+    color: var(--warn);
+  }
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  .controls {
+    width: 300px;
+    min-width: 300px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 16px;
+  }
+  .preview {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .control-group {
+    margin-bottom: 16px;
+  }
+  .control-group h3 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .preset-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+    font-family: inherit;
+    background: var(--surface2);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover, .preset-btn.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  label span.val {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  input[type="range"] {
+    width: 100%;
+    margin-bottom: 10px;
+    accent-color: var(--accent);
+  }
+  select, input[type="text"] {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-family: inherit;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 10px;
+  }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .toggle-row span { font-size: 11px; color: var(--text-dim); }
+  .toggle {
+    position: relative;
+    width: 36px;
+    height: 20px;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle .slider {
+    position: absolute;
+    inset: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .toggle .slider::before {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    left: 2px;
+    top: 2px;
+    background: var(--text-dim);
+    border-radius: 50%;
+    transition: 0.2s;
+  }
+  .toggle input:checked + .slider {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+  }
+  .toggle input:checked + .slider::before {
+    transform: translateX(16px);
+    background: var(--accent);
+  }
+  .separator {
+    height: 1px;
+    background: var(--border);
+    margin: 12px 0;
+  }
+  .action-btn {
+    width: 100%;
+    padding: 10px;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 8px;
+  }
+  .action-btn.primary {
+    background: var(--accent);
+    color: var(--bg);
+  }
+  .action-btn.primary:hover { filter: brightness(1.1); }
+  .action-btn.primary:disabled {
+    background: var(--surface2);
+    color: var(--text-dim);
+    cursor: not-allowed;
+  }
+  .action-btn.danger {
+    background: var(--warn-dim);
+    color: var(--warn);
+    border: 1px solid var(--warn);
+  }
+  .action-btn.danger:hover { background: var(--warn); color: var(--bg); }
+  .action-btn.secondary {
+    background: var(--surface2);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+  .action-btn.secondary:hover { color: var(--text); border-color: var(--text-dim); }
+
+  /* Workflow pipeline */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow-x: auto;
+  }
+  .step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 110px;
+    position: relative;
+  }
+  .step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    border: 2px solid var(--step-pending);
+    background: var(--bg);
+    color: var(--text-dim);
+    transition: all 0.3s;
+    z-index: 1;
+  }
+  .step.done .step-circle {
+    border-color: var(--accent);
+    background: var(--step-done);
+    color: var(--accent);
+  }
+  .step.active .step-circle {
+    border-color: var(--step-active);
+    background: var(--accent);
+    color: var(--bg);
+    box-shadow: 0 0 12px var(--accent-dim);
+    animation: pulse 1.5s infinite;
+  }
+  .step.error .step-circle {
+    border-color: var(--warn);
+    background: var(--warn-dim);
+    color: var(--warn);
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 8px var(--accent-dim); }
+    50% { box-shadow: 0 0 20px var(--accent-dim); }
+  }
+  .step-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    text-align: center;
+    max-width: 100px;
+  }
+  .step.active .step-label { color: var(--accent); }
+  .step.done .step-label { color: var(--accent); opacity: 0.7; }
+  .step-connector {
+    flex: 1;
+    height: 2px;
+    background: var(--step-pending);
+    min-width: 30px;
+    transition: background 0.3s;
+  }
+  .step-connector.done { background: var(--accent); }
+
+  /* Panels */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .panel h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* Room visualisation */
+  .room-visual {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 120px;
+    background: var(--surface2);
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  .room-visual .room-icon {
+    font-size: 48px;
+    opacity: 0.3;
+  }
+  .room-visual .room-status {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    font-size: 10px;
+    text-align: center;
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+  .room-visual.booked { border: 1px solid var(--info); }
+  .room-visual.empty { border: 1px solid var(--warn); }
+  .room-visual.occupied { border: 1px solid var(--accent); }
+  .room-visual.released { border: 1px solid var(--purple); }
+  .room-visual.booked .room-status { background: rgba(107,163,255,0.15); color: var(--info); }
+  .room-visual.empty .room-status { background: var(--warn-dim); color: var(--warn); }
+  .room-visual.occupied .room-status { background: var(--accent-dim); color: var(--accent); }
+  .room-visual.released .room-status { background: rgba(179,136,255,0.15); color: var(--purple); }
+
+  /* Sensor viz */
+  .sensor-bar {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    margin: 8px 0;
+    overflow: hidden;
+  }
+  .sensor-bar .fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s;
+  }
+
+  /* Notification cards */
+  .notif-card {
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 8px;
+    border-left: 3px solid var(--border);
+    font-size: 11px;
+    line-height: 1.5;
+    opacity: 0.3;
+    transition: all 0.3s;
+  }
+  .notif-card.active {
+    opacity: 1;
+    border-left-color: var(--accent);
+  }
+  .notif-card.warn {
+    opacity: 1;
+    border-left-color: var(--warn);
+  }
+  .notif-card.info {
+    opacity: 1;
+    border-left-color: var(--info);
+  }
+  .notif-card .notif-time {
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .notif-card .notif-from {
+    font-size: 9px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  /* Charge breakdown */
+  .charge-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 11px;
+    border-bottom: 1px solid var(--border);
+  }
+  .charge-row:last-child { border-bottom: none; }
+  .charge-row .charge-label { color: var(--text-dim); }
+  .charge-row .charge-val { font-weight: 600; }
+  .charge-total {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0 0;
+    margin-top: 4px;
+    border-top: 2px solid var(--border);
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .charge-total .charge-val { color: var(--warn); }
+
+  /* Log */
+  .log-entry {
+    font-size: 10px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(42,42,58,0.5);
+    display: flex;
+    gap: 8px;
+  }
+  .log-entry .log-time { color: var(--text-dim); min-width: 55px; }
+  .log-entry .log-source { color: var(--accent); min-width: 70px; }
+  .log-entry .log-msg { color: var(--text); }
+
+  /* Prompt output */
+  .prompt-section {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 16px 20px;
+  }
+  .prompt-section h3 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .prompt-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text);
+    position: relative;
+    min-height: 60px;
+  }
+  .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 4px 10px;
+    font-size: 10px;
+    font-family: inherit;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .copy-btn:hover { background: var(--accent); color: var(--bg); }
+  .copy-btn.copied { background: var(--accent); color: var(--bg); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SENTINEL CONCIERGE WORKFLOW</h1>
+  <span class="tag">SIMULATOR</span>
+</header>
+
+<div class="main">
+  <div class="controls">
+    <div class="control-group">
+      <h3>Scenario Presets</h3>
+      <div class="presets">
+        <button class="preset-btn active" onclick="applyPreset('standard')">Standard Ghost</button>
+        <button class="preset-btn" onclick="applyPreset('reoccupied')">Reoccupied</button>
+        <button class="preset-btn" onclick="applyPreset('repeat')">Repeat Offender</button>
+        <button class="preset-btn" onclick="applyPreset('no_charge')">No Charge</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h3>Booking Details</h3>
+      <label>Room</label>
+      <select id="roomName" onchange="resetSim()">
+        <option value="FA2-1Q1-MR-01">Boardroom A (MR-01, cap 12)</option>
+        <option value="FA2-1Q1-MR-03">Meeting 3 (MR-03, cap 6)</option>
+        <option value="FA2-1Q1-MR-05">Focus Room 1 (MR-05, cap 4)</option>
+        <option value="FA2-1Q1-MR-08">Huddle 1 (MR-08, cap 3)</option>
+      </select>
+      <label>Organiser</label>
+      <input type="text" id="organiser" value="Bronwyn Mollentze" oninput="resetSim()">
+      <label>Cost Centre</label>
+      <input type="text" id="costCentre" value="MKT-001" oninput="resetSim()">
+      <label>Booking Duration (min) <span class="val" id="v_duration">60</span></label>
+      <input type="range" id="bookingDuration" min="15" max="180" step="15" value="60" oninput="resetSim()">
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="control-group">
+      <h3>Detection Settings</h3>
+      <label>Grace Period (min) <span class="val" id="v_grace">15</span></label>
+      <input type="range" id="gracePeriod" min="5" max="30" value="15" oninput="resetSim()">
+      <label>Concierge Walk Time (min) <span class="val" id="v_walk">5</span></label>
+      <input type="range" id="walkTime" min="1" max="15" value="5" oninput="resetSim()">
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="control-group">
+      <h3>Charge Configuration</h3>
+      <div class="toggle-row">
+        <span>Cost Centre Charging</span>
+        <label class="toggle"><input type="checkbox" id="chargingEnabled" checked onchange="resetSim()"><span class="slider"></span></label>
+      </div>
+      <label>Charge Amount (R) <span class="val" id="v_charge">150</span></label>
+      <input type="range" id="chargeAmount" min="0" max="500" step="25" value="150" oninput="resetSim()">
+      <div class="toggle-row">
+        <span>Escalate to Manager</span>
+        <label class="toggle"><input type="checkbox" id="escalateManager" onchange="resetSim()"><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span>ServiceNow Ticket</span>
+        <label class="toggle"><input type="checkbox" id="serviceNow" checked onchange="resetSim()"><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="control-group">
+      <h3>Simulation Controls</h3>
+      <button class="action-btn primary" id="nextBtn" onclick="advanceStep()">Start Simulation</button>
+      <button class="action-btn secondary" onclick="resetSim()">Reset</button>
+      <button class="action-btn danger" id="reoccupyBtn" onclick="triggerReoccupation()" style="display:none">Simulate Reoccupation</button>
+    </div>
+
+    <div class="control-group">
+      <h3>Event Log</h3>
+      <div id="logPanel" style="max-height:200px;overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <div class="preview" id="preview">
+    <!-- Rendered by JS -->
+  </div>
+</div>
+
+<div class="prompt-section">
+  <h3>Generated Prompt</h3>
+  <div class="prompt-box" id="promptBox">
+    <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy</button>
+    <span id="promptText"></span>
+  </div>
+</div>
+
+<script>
+const STEPS = [
+  { id: 'booked', label: 'Room Booked', icon: '1' },
+  { id: 'sensor', label: 'Sensor: No Movement', icon: '2' },
+  { id: 'grace', label: 'Grace Period Elapsed', icon: '3' },
+  { id: 'notify', label: 'Concierge Notified', icon: '4' },
+  { id: 'inspect', label: 'Physical Inspection', icon: '5' },
+  { id: 'confirm', label: 'Confirm & Release', icon: '6' },
+  { id: 'charge', label: 'Charge Applied', icon: '7' },
+];
+
+let currentStep = -1;
+let reoccupied = false;
+let logs = [];
+
+const PRESETS = {
+  standard: { gracePeriod: 15, walkTime: 5, chargeAmount: 150, chargingEnabled: true, escalateManager: false, serviceNow: true, bookingDuration: 60, organiser: 'Bronwyn Mollentze', costCentre: 'MKT-001' },
+  reoccupied: { gracePeriod: 15, walkTime: 8, chargeAmount: 150, chargingEnabled: true, escalateManager: false, serviceNow: false, bookingDuration: 60, organiser: 'Craig Henderson', costCentre: 'LEG-002' },
+  repeat: { gracePeriod: 10, walkTime: 5, chargeAmount: 350, chargingEnabled: true, escalateManager: true, serviceNow: true, bookingDuration: 120, organiser: 'Bronwyn Mollentze', costCentre: 'MKT-001' },
+  no_charge: { gracePeriod: 20, walkTime: 5, chargeAmount: 0, chargingEnabled: false, escalateManager: false, serviceNow: false, bookingDuration: 60, organiser: 'Fatima Patel', costCentre: 'FIN-003' },
+};
+
+function getState() {
+  return {
+    roomName: document.getElementById('roomName').value,
+    roomLabel: document.getElementById('roomName').selectedOptions[0].text,
+    organiser: document.getElementById('organiser').value,
+    costCentre: document.getElementById('costCentre').value,
+    bookingDuration: +document.getElementById('bookingDuration').value,
+    gracePeriod: +document.getElementById('gracePeriod').value,
+    walkTime: +document.getElementById('walkTime').value,
+    chargingEnabled: document.getElementById('chargingEnabled').checked,
+    chargeAmount: +document.getElementById('chargeAmount').value,
+    escalateManager: document.getElementById('escalateManager').checked,
+    serviceNow: document.getElementById('serviceNow').checked,
+  };
+}
+
+function applyPreset(name) {
+  const p = PRESETS[name];
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  for (const [k, v] of Object.entries(p)) {
+    const el = document.getElementById(k);
+    if (el) {
+      if (el.type === 'checkbox') el.checked = v;
+      else el.value = v;
+    }
+  }
+  resetSim();
+}
+
+function addLog(source, msg) {
+  const t = new Date();
+  const time = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
+  logs.push({ time, source, msg });
+  renderLog();
+}
+
+function renderLog() {
+  const el = document.getElementById('logPanel');
+  el.innerHTML = logs.map(l =>
+    `<div class="log-entry"><span class="log-time">${l.time}</span><span class="log-source">${l.source}</span><span class="log-msg">${l.msg}</span></div>`
+  ).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function resetSim() {
+  currentStep = -1;
+  reoccupied = false;
+  logs = [];
+  updateLabels();
+  renderAll();
+  document.getElementById('nextBtn').textContent = 'Start Simulation';
+  document.getElementById('nextBtn').disabled = false;
+  document.getElementById('reoccupyBtn').style.display = 'none';
+}
+
+function updateLabels() {
+  const s = getState();
+  document.getElementById('v_duration').textContent = s.bookingDuration;
+  document.getElementById('v_grace').textContent = s.gracePeriod;
+  document.getElementById('v_walk').textContent = s.walkTime;
+  document.getElementById('v_charge').textContent = s.chargeAmount;
+}
+
+function advanceStep() {
+  if (currentStep >= STEPS.length - 1) return;
+  currentStep++;
+  const s = getState();
+  const step = STEPS[currentStep];
+
+  // Log events per step
+  switch(step.id) {
+    case 'booked':
+      addLog('BOOKING', `${s.roomLabel} booked by ${s.organiser} for ${s.bookingDuration} min`);
+      addLog('SENSOR', `LD2410C-${s.roomName} initialised, monitoring presence`);
+      document.getElementById('reoccupyBtn').style.display = 'block';
+      break;
+    case 'sensor':
+      addLog('SENSOR', `LD2410C-${s.roomName}: occupied=false (no movement detected)`);
+      addLog('SENTINEL', `Ghost booking timer started: ${s.gracePeriod} min grace period`);
+      break;
+    case 'grace':
+      addLog('SENTINEL', `Grace period elapsed (${s.gracePeriod} min). Ghost booking CONFIRMED.`);
+      addLog('SENTINEL', `Finding created: ghost_${s.roomName}_${Date.now().toString(36)}`);
+      break;
+    case 'notify':
+      addLog('DISPATCH', `Concierge Maria notified via app: "Inspect ${s.roomLabel}"`);
+      addLog('DISPATCH', `Two-tap verify link sent: /api/space/findings/.../concierge-confirm`);
+      document.getElementById('reoccupyBtn').style.display = 'block';
+      break;
+    case 'inspect':
+      addLog('CONCIERGE', `Maria arrived at ${s.roomLabel} (${s.walkTime} min walk time)`);
+      addLog('CONCIERGE', `Physical inspection: room confirmed EMPTY`);
+      document.getElementById('reoccupyBtn').style.display = 'none';
+      break;
+    case 'confirm':
+      addLog('CONCIERGE', `Maria tapped CONFIRM EMPTY. Finding status -> released`);
+      addLog('SENTINEL', `Room ${s.roomLabel} released and available for walk-in booking`);
+      if (s.serviceNow) addLog('SERVICENOW', `Incident RITM001247 created: ghost booking by ${s.organiser}`);
+      break;
+    case 'charge':
+      if (s.chargingEnabled && s.chargeAmount > 0) {
+        addLog('BILLING', `Cost centre ${s.costCentre} charged R${s.chargeAmount} (ghost booking penalty)`);
+        addLog('NOTIFY', `${s.organiser} notified: "Your booking of ${s.roomLabel} was released — R${s.chargeAmount} charged to ${s.costCentre}"`);
+      } else {
+        addLog('SENTINEL', `No charge applied. Room released without penalty.`);
+        addLog('NOTIFY', `${s.organiser} notified: "Your booking of ${s.roomLabel} was released."`);
+      }
+      if (s.escalateManager) {
+        addLog('ESCALATE', `Manager escalation: ${s.organiser} flagged for repeat ghost bookings`);
+      }
+      break;
+  }
+
+  // Button state
+  if (currentStep >= STEPS.length - 1) {
+    document.getElementById('nextBtn').textContent = 'Simulation Complete';
+    document.getElementById('nextBtn').disabled = true;
+  } else {
+    const nextLabels = ['Detect No Movement', 'Grace Period Elapsed', 'Notify Concierge', 'Inspect Room', 'Confirm Empty', 'Apply Charge', 'Done'];
+    document.getElementById('nextBtn').textContent = 'Next: ' + nextLabels[currentStep];
+  }
+
+  renderAll();
+  updatePrompt();
+}
+
+function triggerReoccupation() {
+  if (currentStep < 1 || currentStep > 4) return;
+  reoccupied = true;
+  const s = getState();
+  addLog('SENSOR', `LD2410C-${s.roomName}: occupied=true (movement detected!)`);
+  addLog('SENTINEL', `Auto-resolving ghost finding: room is occupied`);
+  if (currentStep >= 3) {
+    addLog('DISPATCH', `Concierge Maria stood down — room now occupied`);
+  }
+  addLog('SENTINEL', `Finding status -> verified_occupied. No further action.`);
+  document.getElementById('nextBtn').textContent = 'Reoccupied — Simulation End';
+  document.getElementById('nextBtn').disabled = true;
+  document.getElementById('reoccupyBtn').style.display = 'none';
+  renderAll();
+  updatePrompt();
+}
+
+function renderAll() {
+  const s = getState();
+
+  // Pipeline
+  let pipelineHTML = '<div class="pipeline">';
+  STEPS.forEach((step, i) => {
+    let cls = '';
+    if (reoccupied && i > currentStep) cls = '';
+    else if (reoccupied && i === currentStep) cls = 'error';
+    else if (i < currentStep) cls = 'done';
+    else if (i === currentStep) cls = 'active';
+
+    if (i > 0) {
+      const connDone = i <= currentStep && !reoccupied ? 'done' : '';
+      pipelineHTML += `<div class="step-connector ${connDone}"></div>`;
+    }
+    const icon = reoccupied && i >= currentStep ? (i === currentStep ? 'X' : step.icon) : (i < currentStep ? '>' : step.icon);
+    pipelineHTML += `<div class="step ${cls}">
+      <div class="step-circle">${icon}</div>
+      <div class="step-label">${step.label}</div>
+    </div>`;
+  });
+  pipelineHTML += '</div>';
+
+  // Room visual
+  let roomState = 'booked';
+  let roomStatusText = 'Booked — Waiting';
+  if (currentStep >= 1 && !reoccupied) { roomState = 'empty'; roomStatusText = 'No movement detected'; }
+  if (currentStep >= 5 && !reoccupied) { roomState = 'released'; roomStatusText = 'Released — Available'; }
+  if (reoccupied) { roomState = 'occupied'; roomStatusText = 'Reoccupied — Finding resolved'; }
+
+  // Sensor reading
+  let sensorPct = currentStep < 0 ? 0 : (currentStep === 0 ? 80 : (reoccupied ? 90 : 5));
+  let sensorColor = sensorPct > 30 ? 'var(--accent)' : 'var(--warn)';
+
+  // Notifications
+  const notifs = [];
+  if (currentStep >= 2) notifs.push({ active: true, cls: 'warn', from: 'SENTINEL', time: `+${s.gracePeriod}m`, text: `Ghost booking detected: ${s.roomLabel} booked by ${s.organiser}, empty for ${s.gracePeriod} minutes after booking start.` });
+  if (currentStep >= 3) notifs.push({ active: true, cls: 'info', from: 'CONCIERGE APP', time: `+${s.gracePeriod+1}m`, text: `Please inspect ${s.roomLabel}. Tap link to confirm if room is empty.` });
+  if (currentStep >= 5 && !reoccupied) notifs.push({ active: true, cls: 'active', from: 'SENTINEL', time: `+${s.gracePeriod + s.walkTime + 2}m`, text: `${s.roomLabel} confirmed empty by concierge Maria. Room released for walk-in booking.` });
+  if (reoccupied) notifs.push({ active: true, cls: 'active', from: 'SENTINEL', time: 'now', text: `Movement detected in ${s.roomLabel}. Ghost finding auto-resolved. Room is occupied.` });
+  if (currentStep >= 6 && s.chargingEnabled && s.chargeAmount > 0 && !reoccupied) notifs.push({ active: true, cls: 'warn', from: 'BILLING', time: `+${s.gracePeriod + s.walkTime + 3}m`, text: `R${s.chargeAmount} charged to ${s.costCentre} (${s.organiser}).` });
+
+  let notifsHTML = notifs.length === 0
+    ? '<div style="color:var(--text-dim);font-size:11px;text-align:center;padding:20px;">No notifications yet. Start the simulation.</div>'
+    : notifs.map(n => `<div class="notif-card ${n.cls}"><div class="notif-from">${n.from}</div><div class="notif-time">${n.time}</div>${n.text}</div>`).join('');
+
+  // Charge breakdown
+  let chargeHTML = '';
+  if (currentStep >= 6 && !reoccupied) {
+    if (s.chargingEnabled && s.chargeAmount > 0) {
+      chargeHTML = `
+        <div class="charge-row"><span class="charge-label">Ghost booking penalty</span><span class="charge-val">R${s.chargeAmount}</span></div>
+        <div class="charge-row"><span class="charge-label">Cost Centre</span><span class="charge-val">${s.costCentre}</span></div>
+        <div class="charge-row"><span class="charge-label">Organiser</span><span class="charge-val">${s.organiser}</span></div>
+        <div class="charge-row"><span class="charge-label">Room</span><span class="charge-val">${s.roomLabel.split('(')[0].trim()}</span></div>
+        <div class="charge-row"><span class="charge-label">Vacant Duration</span><span class="charge-val">${s.gracePeriod + s.walkTime + 2} min</span></div>
+        <div class="charge-total"><span>Total Charge</span><span class="charge-val">R${s.chargeAmount}</span></div>
+      `;
+    } else {
+      chargeHTML = '<div style="color:var(--text-dim);font-size:11px;text-align:center;padding:10px;">Charging disabled — room released without penalty.</div>';
+    }
+  } else if (reoccupied) {
+    chargeHTML = '<div style="color:var(--accent);font-size:11px;text-align:center;padding:10px;">No charge — room was reoccupied before confirmation.</div>';
+  } else {
+    chargeHTML = '<div style="color:var(--text-dim);font-size:11px;text-align:center;padding:10px;">Charge breakdown will appear after confirmation.</div>';
+  }
+
+  const preview = document.getElementById('preview');
+  preview.innerHTML = `
+    ${pipelineHTML}
+
+    <div class="grid-3">
+      <div class="panel">
+        <h4>Room Status</h4>
+        <div class="room-visual ${roomState}">
+          <span class="room-icon">${roomState === 'empty' ? '[ ]' : roomState === 'occupied' ? '[*]' : roomState === 'released' ? '[~]' : '[B]'}</span>
+          <div class="room-status">${roomStatusText}</div>
+        </div>
+        <div style="margin-top:8px;font-size:10px;color:var(--text-dim)">${s.roomLabel}</div>
+      </div>
+
+      <div class="panel">
+        <h4>mmWave Sensor</h4>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px">LD2410C-${s.roomName}</div>
+        <div style="font-size:10px;margin-bottom:2px">Presence: <span style="color:${sensorPct > 30 ? 'var(--accent)' : 'var(--warn)'}; font-weight:600">${sensorPct > 30 ? 'OCCUPIED' : 'EMPTY'}</span></div>
+        <div class="sensor-bar"><div class="fill" style="width:${sensorPct}%;background:${sensorColor}"></div></div>
+        <div style="font-size:9px;color:var(--text-dim);margin-top:4px">24GHz FMCW | Through ceiling tile | Zone: 0-6m</div>
+        <div style="font-size:9px;color:var(--text-dim);margin-top:2px">Grace: ${s.gracePeriod} min | ${currentStep >= 2 && !reoccupied ? 'ELAPSED' : currentStep >= 1 && !reoccupied ? 'COUNTING...' : 'STANDBY'}</div>
+      </div>
+
+      <div class="panel">
+        <h4>Charge Breakdown</h4>
+        ${chargeHTML}
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h4>Notifications</h4>
+        ${notifsHTML}
+      </div>
+
+      <div class="panel">
+        <h4>Workflow State</h4>
+        <div style="font-size:11px;line-height:1.8">
+          <div>Finding Status: <span style="color:${reoccupied ? 'var(--accent)' : currentStep >= 5 ? 'var(--purple)' : currentStep >= 3 ? 'var(--amber)' : currentStep >= 2 ? 'var(--warn)' : 'var(--text-dim)'};font-weight:600">${reoccupied ? 'verified_occupied' : currentStep >= 5 ? 'released' : currentStep >= 3 ? 'pending_inspection' : currentStep >= 2 ? 'open' : 'n/a'}</span></div>
+          <div>Concierge: <span style="color:var(--text-dim)">${currentStep >= 4 && !reoccupied ? 'Maria (inspecting)' : currentStep >= 3 && !reoccupied ? 'Maria (en route)' : 'Not dispatched'}</span></div>
+          <div>Room Available: <span style="color:${currentStep >= 5 && !reoccupied ? 'var(--accent)' : 'var(--text-dim)'}">${currentStep >= 5 && !reoccupied ? 'Yes — walk-in OK' : 'No'}</span></div>
+          <div>API Endpoint: <span style="color:var(--info);font-size:9px">${currentStep >= 4 && !reoccupied ? 'POST /api/space/findings/{id}/concierge-confirm' : currentStep >= 0 ? 'POST /api/space/occupancy-event' : '-'}</span></div>
+          ${s.serviceNow && currentStep >= 5 && !reoccupied ? '<div>ServiceNow: <span style="color:var(--info)">RITM001247</span></div>' : ''}
+          ${s.escalateManager && currentStep >= 6 && !reoccupied ? '<div style="color:var(--warn)">Manager Escalation: ACTIVE</div>' : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function updatePrompt() {
+  const s = getState();
+  const parts = [];
+
+  parts.push(`Implement a concierge ghost-booking inspection workflow for ${s.roomLabel.split('(')[0].trim()}.`);
+  parts.push(`When the LD2410C mmWave sensor reports occupied=false for ${s.gracePeriod} minutes (grace period), create a ghost booking finding.`);
+
+  if (s.walkTime !== 5) parts.push(`Allow ${s.walkTime} minutes for concierge walk time.`);
+
+  parts.push('Concierge receives a push notification with a two-tap verify link.');
+  parts.push('After physical inspection, concierge confirms room is empty via POST /api/space/findings/{id}/concierge-confirm.');
+
+  if (s.chargingEnabled && s.chargeAmount > 0) {
+    parts.push(`On confirmation, charge R${s.chargeAmount} to cost centre ${s.costCentre} and notify the organiser (${s.organiser}).`);
+  } else {
+    parts.push('Release the room without charging.');
+  }
+
+  parts.push('If the sensor detects movement before confirmation, auto-resolve the finding (status=verified_occupied) and stand down the concierge.');
+
+  if (s.escalateManager) parts.push('Escalate to the organiser\'s manager for repeat offenders.');
+  if (s.serviceNow) parts.push('Auto-create a ServiceNow incident for each confirmed ghost booking.');
+
+  if (reoccupied) {
+    parts.push(`In this scenario, the room was reoccupied at step ${currentStep + 1} — the finding was auto-resolved with no charge applied.`);
+  }
+
+  document.getElementById('promptText').textContent = parts.join(' ');
+}
+
+function copyPrompt() {
+  const text = document.getElementById('promptText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+  });
+}
+
+// Init
+updateLabels();
+renderAll();
+updatePrompt();
+</script>
+</body>
+</html>

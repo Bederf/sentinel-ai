@@ -4,7 +4,7 @@ import json
 import logging
 from pathlib import Path
 
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 
 logger = logging.getLogger(__name__)
 
@@ -303,7 +303,7 @@ class FMContextService:
         Returns:
             Markdown-formatted agent memory section, or empty string if none.
         """
-        site_id = site_id or get_primary_site() or "unknown"
+        site_id = site_id or get_primary_site_code() or "unknown"
         try:
             from app.database.repositories.agent_memory_repository import (
                 get_agent_memory_repository,

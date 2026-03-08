@@ -20,7 +20,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 
 from app.services.solar_config_service import get_site_solar_config
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 
 logger = logging.getLogger(__name__)
 
@@ -218,7 +218,7 @@ class SolarSelfConsumptionService:
             self.EXPORT_LIMIT_KW = cfg.grid.max_export_kw
         except Exception:
             pass
-        self._seed_demo_data(get_primary_site() or "unknown")
+        self._seed_demo_data(get_primary_site_code() or "unknown")
 
     def _seed_demo_data(self, site_id: str) -> None:
         """Seed a full day energy balance for demo."""

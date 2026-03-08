@@ -41,7 +41,7 @@ class WhatsAppService:
         elif provider == "twilio":
             self.account_sid = os.getenv("TWILIO_ACCOUNT_SID", "")
             self.auth_token = os.getenv("TWILIO_AUTH_TOKEN", "")
-            self.twilio_whatsapp = os.getenv("TWILIO_WHATSAPP_NUMBER", "")
+            self.twilio_whatsapp = os.getenv("TWILIO_WHATSAPP_FROM", os.getenv("TWILIO_WHATSAPP_NUMBER", ""))
             self.webhook_token = os.getenv("WHATSAPP_WEBHOOK_TOKEN", "secret")
 
             if self.account_sid and self.auth_token and self.twilio_whatsapp:
@@ -155,9 +155,20 @@ _whatsapp_service: Optional[WhatsAppService] = None
 
 
 def get_whatsapp_service(provider: Optional[str] = None) -> WhatsAppService:
-    """Get or create WhatsApp service singleton."""
+    """Get or create WhatsApp service singleton.
+
+    Auto-detects provider: explicit arg > WHATSAPP_PROVIDER env > Twilio if SID set > meta fallback.
+    """
     global _whatsapp_service
     if _whatsapp_service is None:
-        provider_env = provider or os.getenv("WHATSAPP_PROVIDER", "meta")
-        _whatsapp_service = WhatsAppService(provider_env)
+        if provider:
+            resolved = provider
+        else:
+            resolved = os.getenv("WHATSAPP_PROVIDER", "")
+            if not resolved:
+                if os.getenv("TWILIO_ACCOUNT_SID"):
+                    resolved = "twilio"
+                else:
+                    resolved = "meta"
+        _whatsapp_service = WhatsAppService(resolved)
     return _whatsapp_service

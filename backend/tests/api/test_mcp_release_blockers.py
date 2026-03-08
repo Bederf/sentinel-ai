@@ -271,7 +271,7 @@ class TestJSONRPCEnvelopeValidation:
                 "jsonrpc": "2.0",
                 "id": 1,
                 "method": "tools/call",
-                "params": {"name": "get_buildings"},
+                "params": {"name": "get_sites"},
             }
         )
         assert valid is True
@@ -299,10 +299,10 @@ class TestSSEErrorLeakage:
                 "/app/mcp/simbiot_server.py line 42: db connection failed at postgresql://user:pass@host"
             )
 
-        server.server.tool_handlers["get_buildings"] = boom
+        server.server.tool_handlers["get_sites"] = boom
 
         result = await server.handle_tools_call(
-            {"name": "get_buildings", "arguments": {}},
+            {"name": "get_sites", "arguments": {}},
             auth_ctx=_operator_ctx(),
         )
 
@@ -354,10 +354,10 @@ class TestSSEErrorLeakage:
         async def bad_input(**kwargs):
             raise ValueError("Expected integer at /app/config/settings.py:42")
 
-        server.server.tool_handlers["get_buildings"] = bad_input
+        server.server.tool_handlers["get_sites"] = bad_input
 
         result = await server.handle_tools_call(
-            {"name": "get_buildings", "arguments": {}},
+            {"name": "get_sites", "arguments": {}},
             auth_ctx=_operator_ctx(),
         )
 

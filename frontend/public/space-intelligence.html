@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL — Space Intelligence · Fairland 2(FNB)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111418;
+    --surface2: #161b22;
+    --border: #1e252e;
+    --border2: #252d38;
+    --text: #e2e8f0;
+    --text2: #8b9ab0;
+    --text3: #4a5568;
+    --accent: #00d4ff;
+    --accent2: #0099cc;
+    --red: #ff4444;
+    --red2: #cc2222;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --teal: #0d9488;
+    --sentinel: #00d4ff;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.4;
+  }
+
+  /* ── ALERT BANNER ── */
+  .alert-banner {
+    background: linear-gradient(90deg, rgba(255,68,68,0.12) 0%, rgba(255,68,68,0.04) 100%);
+    border-bottom: 1px solid rgba(255,68,68,0.3);
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: slideDown 0.4s ease;
+  }
+
+  @keyframes slideDown {
+    from { transform: translateY(-8px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .alert-icon {
+    width: 20px;
+    height: 20px;
+    background: var(--red);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    color: white;
+  }
+
+  .alert-text {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: #ff8888;
+    letter-spacing: 0.04em;
+    flex: 1;
+  }
+
+  .alert-text strong { color: var(--red); }
+
+  .alert-action {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--red);
+    border: 1px solid rgba(255,68,68,0.4);
+    padding: 4px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .alert-action:hover { background: rgba(255,68,68,0.1); }
+
+  .alert-ts {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text3);
+  }
+
+  /* ── LAYOUT ── */
+  .main {
+    padding: 24px;
+    overflow-x: hidden;
+  }
+
+  /* ── PAGE HEADER ── */
+  .page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+
+  .page-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+  }
+
+  .page-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 0.04em;
+  }
+
+  .page-sub span {
+    color: var(--text2);
+  }
+
+  .header-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text2);
+  }
+
+  .btn:hover { color: var(--text); border-color: var(--text3); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0a0c0f;
+    border-color: var(--accent);
+    font-weight: 500;
+  }
+
+  .btn-primary:hover { background: var(--accent2); border-color: var(--accent2); color: white; }
+
+  .btn-danger {
+    background: rgba(255,68,68,0.1);
+    color: var(--red);
+    border-color: rgba(255,68,68,0.3);
+  }
+
+  .btn-danger:hover { background: rgba(255,68,68,0.2); }
+
+  /* ── KPI ROW ── */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .kpi-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .kpi-card.red::after { background: var(--red); }
+  .kpi-card.amber::after { background: var(--amber); }
+  .kpi-card.green::after { background: var(--green); }
+  .kpi-card.blue::after { background: var(--accent); }
+  .kpi-card.teal::after { background: var(--teal); }
+
+  .kpi-card:hover { border-color: var(--border2); }
+
+  .kpi-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .kpi-value {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 28px;
+    line-height: 1;
+    margin-bottom: 6px;
+    letter-spacing: -0.02em;
+  }
+
+  .kpi-card.red .kpi-value { color: var(--red); }
+  .kpi-card.amber .kpi-value { color: var(--amber); }
+  .kpi-card.green .kpi-value { color: var(--green); }
+  .kpi-card.blue .kpi-value { color: var(--accent); }
+  .kpi-card.teal .kpi-value { color: var(--teal); }
+
+  .kpi-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text3);
+  }
+
+  .kpi-trend {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+  }
+
+  .trend-up { color: var(--red); }
+  .trend-down { color: var(--green); }
+
+  /* ── GRID ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-title-icon {
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .card-body { padding: 16px; }
+
+  .card-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--border2);
+    color: var(--text3);
+  }
+
+  .card-tag.red { color: var(--red); border-color: rgba(255,68,68,0.3); background: rgba(255,68,68,0.08); }
+  .card-tag.amber { color: var(--amber); border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.08); }
+
+  /* ── OFFENDER TABLE ── */
+  .offender-table { width: 100%; border-collapse: collapse; }
+
+  .offender-table th {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    text-align: left;
+    padding: 0 12px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .offender-table td {
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  .offender-table tr:last-child td { border-bottom: none; }
+
+  .offender-table tr {
+    transition: background 0.12s;
+  }
+
+  .offender-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .offender-row-critical td:first-child {
+    border-left: 2px solid var(--red);
+  }
+
+  .offender-row-high td:first-child {
+    border-left: 2px solid var(--amber);
+  }
+
+  .offender-name {
+    font-weight: 500;
+    color: var(--text);
+    font-size: 12px;
+  }
+
+  .offender-dept {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text3);
+    margin-top: 2px;
+  }
+
+  .severity-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-weight: 500;
+  }
+
+  .severity-critical { background: rgba(255,68,68,0.15); color: var(--red); border: 1px solid rgba(255,68,68,0.3); }
+  .severity-high { background: rgba(245,158,11,0.12); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
+  .severity-medium { background: rgba(0,212,255,0.08); color: var(--accent); border: 1px solid rgba(0,212,255,0.2); }
+
+  .mono-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text2);
+  }
+
+  .mono-num.red { color: var(--red); }
+  .mono-num.amber { color: var(--amber); }
+
+  .action-btn-small {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text3);
+    transition: all 0.12s;
+  }
+
+  .action-btn-small:hover {
+    color: var(--text);
+    border-color: var(--text3);
+  }
+
+  .action-btn-small.red {
+    color: var(--red);
+    border-color: rgba(255,68,68,0.3);
+  }
+
+  .action-btn-small.red:hover {
+    background: rgba(255,68,68,0.1);
+  }
+
+  /* ── HEATMAP ── */
+  .heatmap-grid {
+    display: grid;
+    grid-template-columns: 120px repeat(5, 1fr);
+    gap: 2px;
+  }
+
+  .heatmap-header {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text3);
+    text-align: center;
+    padding-bottom: 6px;
+  }
+
+  .heatmap-room-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    padding-right: 8px;
+    letter-spacing: 0.04em;
+  }
+
+  .heatmap-cell {
+    height: 28px;
+    border-radius: 2px;
+    position: relative;
+    cursor: pointer;
+    transition: opacity 0.12s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .heatmap-cell:hover { opacity: 0.8; }
+
+  .heatmap-cell .cell-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 8px;
+    color: rgba(255,255,255,0.7);
+    letter-spacing: 0.04em;
+    text-align: center;
+    padding: 0 2px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+
+  .cell-free { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.2); }
+  .cell-partial { background: rgba(245,158,11,0.25); border: 1px solid rgba(245,158,11,0.3); }
+  .cell-block { background: rgba(255,68,68,0.35); border: 1px solid rgba(255,68,68,0.5); }
+  .cell-block-ghost { background: rgba(255,68,68,0.2); border: 1px dashed rgba(255,68,68,0.5); }
+
+  .heatmap-legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--text3);
+    letter-spacing: 0.04em;
+  }
+
+  .legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+  }
+
+  /* ── TIMELINE ── */
+  .timeline { position: relative; }
+
+  .timeline-item {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+  }
+
+  .timeline-item:last-child { border-bottom: none; }
+
+  .timeline-date {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text3);
+    padding-top: 2px;
+    letter-spacing: 0.04em;
+  }
+
+  .timeline-content { }
+
+  .timeline-title {
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 500;
+    margin-bottom: 3px;
+  }
+
+  .timeline-desc {
+    font-size: 11px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  .timeline-tag {
+    display: inline-flex;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 2px;
+    margin-right: 6px;
+    margin-top: 4px;
+  }
+
+  .timeline-tag.auto { background: rgba(0,212,255,0.1); color: var(--accent); border: 1px solid rgba(0,212,255,0.2); }
+  .timeline-tag.manual { background: rgba(139,154,176,0.1); color: var(--text3); border: 1px solid var(--border2); }
+  .timeline-tag.alert { background: rgba(255,68,68,0.1); color: var(--red); border: 1px solid rgba(255,68,68,0.2); }
+
+  /* ── RECOMMENDATION CARD ── */
+  .rec-card {
+    border: 1px solid var(--border2);
+    border-radius: 5px;
+    padding: 14px;
+    margin-bottom: 10px;
+    background: var(--surface2);
+    position: relative;
+    transition: border-color 0.15s;
+  }
+
+  .rec-card:hover { border-color: var(--accent2); }
+
+  .rec-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 5px 0 0 5px;
+  }
+
+  .rec-card.priority-high::before { background: var(--red); }
+  .rec-card.priority-med::before { background: var(--amber); }
+  .rec-card.priority-low::before { background: var(--accent); }
+
+  .rec-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    gap: 12px;
+  }
+
+  .rec-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.4;
+  }
+
+  .rec-body {
+    font-size: 11px;
+    color: var(--text2);
+    line-height: 1.6;
+    margin-bottom: 10px;
+  }
+
+  .rec-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .rec-impact {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--green);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* ── SERVICENOW PANEL ── */
+  .snow-panel {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 16px;
+    margin-top: 16px;
+  }
+
+  .snow-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .snow-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .snow-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: rgba(0,212,255,0.1);
+    color: var(--accent);
+    border: 1px solid rgba(0,212,255,0.2);
+  }
+
+  .snow-ticket {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 8px 12px;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
+  .snow-key {
+    font-family: 'DM Mono', monospace;
+    color: var(--text3);
+    font-size: 10px;
+  }
+
+  .snow-val {
+    color: var(--text2);
+  }
+
+  .snow-val.accent { color: var(--accent); font-family: 'DM Mono', monospace; font-size: 10px; }
+  .snow-val.red { color: var(--red); }
+
+  /* ── CAPACITY BAR ── */
+  .cap-bar-wrap {
+    margin-bottom: 12px;
+  }
+
+  .cap-bar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .cap-room-name {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text2);
+    letter-spacing: 0.04em;
+  }
+
+  .cap-pct {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+  }
+
+  .cap-bar-bg {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+
+  .cap-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 1s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .cap-bar-fill.blocked { background: linear-gradient(90deg, var(--red), #ff7777); }
+  .cap-bar-fill.partial { background: linear-gradient(90deg, var(--amber), #fcd34d); }
+  .cap-bar-fill.healthy { background: linear-gradient(90deg, var(--green), #34d399); }
+
+  /* ── FOOTER ── */
+  .footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--surface);
+  }
+
+  .footer-left {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text3);
+  }
+
+  .footer-right {
+    display: flex;
+    gap: 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text3);
+  }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+
+  .tab {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 9px 16px;
+    cursor: pointer;
+    color: var(--text3);
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    margin-bottom: -1px;
+  }
+
+  .tab:hover { color: var(--text2); }
+
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* ── MINI STATS ── */
+  .mini-stats {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .mini-stat {
+    flex: 1;
+    padding: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    text-align: center;
+  }
+
+  .mini-stat-val {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    color: var(--text);
+    display: block;
+    margin-bottom: 3px;
+  }
+
+  .mini-stat-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text3);
+  }
+
+  /* scroll reveal */
+  .reveal {
+    opacity: 0;
+    transform: translateY(12px);
+    animation: reveal 0.4s ease forwards;
+  }
+
+  @keyframes reveal {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .reveal:nth-child(1) { animation-delay: 0.05s; }
+  .reveal:nth-child(2) { animation-delay: 0.1s; }
+  .reveal:nth-child(3) { animation-delay: 0.15s; }
+  .reveal:nth-child(4) { animation-delay: 0.2s; }
+  .reveal:nth-child(5) { animation-delay: 0.25s; }
+</style>
+</head>
+<body>
+
+<!-- ALERT BANNER -->
+<div class="alert-banner">
+  <div class="alert-icon">!</div>
+  <div class="alert-text">
+    <strong>POLICY BREACH DETECTED</strong> — 1 user holds overlapping full-day bookings across 4 rooms simultaneously on Mon–Fri this week. Effective capacity reduction: <strong>34%</strong>. ServiceNow ticket auto-raised.
+  </div>
+  <div class="alert-ts">Detected 06 Mar 2026 · 00:14</div>
+  <div class="alert-action">View Ticket</div>
+</div>
+
+<div class="main">
+
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <div>
+      <div class="page-title">1st Floor Meeting Rooms</div>
+      <div class="page-sub">
+        <span>Fairland 2(FNB)</span> · <span>Week: 09–13 Mar 2026</span> · <span>18 rooms · 236 seats total</span>
+      </div>
+    </div>
+    <div class="header-controls">
+      <div class="btn">Prev Week</div>
+      <div class="btn btn-primary">Export Report</div>
+      <div class="btn btn-danger">Release Blocked Rooms</div>
+    </div>
+  </div>
+
+  <!-- KPI ROW -->
+  <div class="kpi-row">
+    <div class="kpi-card red reveal">
+      <div class="kpi-label">Effective Capacity Lost</div>
+      <div class="kpi-value">34%</div>
+      <div class="kpi-sub">Due to block bookings</div>
+      <div class="kpi-trend trend-up">+12% vs last week</div>
+    </div>
+    <div class="kpi-card red reveal">
+      <div class="kpi-label">Ghost Booking Rate</div>
+      <div class="kpi-value">61%</div>
+      <div class="kpi-sub">Booked, sensor shows empty</div>
+      <div class="kpi-trend trend-up">High</div>
+    </div>
+    <div class="kpi-card amber reveal">
+      <div class="kpi-label">Block Booking Incidents</div>
+      <div class="kpi-value">1</div>
+      <div class="kpi-sub">This week · 4 rooms affected</div>
+    </div>
+    <div class="kpi-card teal reveal">
+      <div class="kpi-label">Capacity Wastage</div>
+      <div class="kpi-value">320</div>
+      <div class="kpi-sub">seat·hours locked this week</div>
+    </div>
+    <div class="kpi-card green reveal">
+      <div class="kpi-label">Rooms Truly Available</div>
+      <div class="kpi-value">10</div>
+      <div class="kpi-sub">of 18 on floor · Mon–Fri</div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <div class="tab active">Block Booking Analysis</div>
+    <div class="tab">Heatmap</div>
+    <div class="tab">AI Recommendations</div>
+    <div class="tab">Escalation Log</div>
+  </div>
+
+  <!-- ROW 1: OFFENDER TABLE + CAPACITY BARS -->
+  <div class="grid-3">
+
+    <!-- OFFENDER TABLE -->
+    <div class="card reveal">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="card-title-icon">&#9670;</span>
+          Block Booking Offenders · Week of 09 Mar 2026
+        </div>
+        <div class="card-actions">
+          <div class="card-tag red">1 Critical</div>
+          <div class="card-tag amber">2 High</div>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0">
+        <table class="offender-table">
+          <thead>
+            <tr>
+              <th>Organiser</th>
+              <th>Rooms Held</th>
+              <th>Pattern</th>
+              <th>Overlap</th>
+              <th>Severity</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="offender-row-critical">
+              <td>
+                <div class="offender-name">Bronwyn Mollentze</div>
+                <div class="offender-dept">Unknown BU · Fairland 2</div>
+              </td>
+              <td><span class="mono-num red">4 rooms</span></td>
+              <td><span class="mono-num">Mon–Fri · 09:00–17:00</span></td>
+              <td><span class="mono-num red">Yes — simultaneous</span></td>
+              <td><span class="severity-badge severity-critical">Critical</span></td>
+              <td>
+                <button class="action-btn-small red">Raise Ticket</button>
+              </td>
+            </tr>
+            <tr class="offender-row-high">
+              <td>
+                <div class="offender-name">iCustomer Team</div>
+                <div class="offender-dept">iCustomer · Q3 Floor</div>
+              </td>
+              <td><span class="mono-num amber">2 rooms</span></td>
+              <td><span class="mono-num">Mon–Fri · 08:00–17:00</span></td>
+              <td><span class="mono-num">Partial overlap</span></td>
+              <td><span class="severity-badge severity-high">High</span></td>
+              <td>
+                <button class="action-btn-small">Review</button>
+              </td>
+            </tr>
+            <tr class="offender-row-high">
+              <td>
+                <div class="offender-name">Kaycee Lazic</div>
+                <div class="offender-dept">Unknown BU · Q3 Floor</div>
+              </td>
+              <td><span class="mono-num amber">1 room</span></td>
+              <td><span class="mono-num">Mon–Fri · 07:00–17:00</span></td>
+              <td><span class="mono-num">—</span></td>
+              <td><span class="severity-badge severity-high">High</span></td>
+              <td>
+                <button class="action-btn-small">Review</button>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div class="offender-name">Ashik Thakoordeen</div>
+                <div class="offender-dept">Unknown BU · Q3 Floor</div>
+              </td>
+              <td><span class="mono-num">1 room</span></td>
+              <td><span class="mono-num">Mon–Thu · 07:00–17:00</span></td>
+              <td><span class="mono-num">—</span></td>
+              <td><span class="severity-badge severity-medium">Medium</span></td>
+              <td>
+                <button class="action-btn-small">Review</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CAPACITY PANEL -->
+    <div class="card reveal" style="display:flex;flex-direction:column">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="card-title-icon">&#9610;</span>
+          Room Availability This Week
+        </div>
+      </div>
+      <div class="card-body" style="flex:1">
+        <div class="mini-stats">
+          <div class="mini-stat">
+            <span class="mini-stat-val" style="color:var(--red)">4</span>
+            <span class="mini-stat-label">Locked</span>
+          </div>
+          <div class="mini-stat">
+            <span class="mini-stat-val" style="color:var(--amber)">4</span>
+            <span class="mini-stat-label">Contested</span>
+          </div>
+          <div class="mini-stat">
+            <span class="mini-stat-val" style="color:var(--green)">10</span>
+            <span class="mini-stat-label">Available</span>
+          </div>
+        </div>
+
+        <div class="cap-bar-wrap">
+          <div class="cap-bar-header">
+            <div class="cap-room-name">FA2-1Q1-MR-01 (20 seats)</div>
+            <div class="cap-pct" style="color:var(--red)">100% blocked</div>
+          </div>
+          <div class="cap-bar-bg">
+            <div class="cap-bar-fill blocked" style="width:100%"></div>
+          </div>
+        </div>
+        <div class="cap-bar-wrap">
+          <div class="cap-bar-header">
+            <div class="cap-room-name">FA2-1Q1-MR-02 (12 seats)</div>
+            <div class="cap-pct" style="color:var(--red)">100% blocked</div>
+          </div>
+          <div class="cap-bar-bg">
+            <div class="cap-bar-fill blocked" style="width:100%"></div>
+          </div>
+        </div>
+        <div class="cap-bar-wrap">
+          <div class="cap-bar-header">
+            <div class="cap-room-name">FA2-1Q1-MR-05 (12 seats)</div>
+            <div class="cap-pct" style="color:var(--red)">90% blocked</div>
+          </div>
+          <div class="cap-bar-bg">
+            <div class="cap-bar-fill blocked" style="width:90%"></div>
+          </div>
+        </div>
+        <div class="cap-bar-wrap">
+          <div class="cap-bar-header">
+            <div class="cap-room-name">FA2-1Q1-MR-06 (20 seats)</div>
+            <div class="cap-pct" style="color:var(--red)">100% blocked</div>
+          </div>
+          <div class="cap-bar-bg">
+            <div class="cap-bar-fill blocked" style="width:100%"></div>
+          </div>
+        </div>
+        <div class="cap-bar-wrap">
+          <div class="cap-bar-header">
+            <div class="cap-room-name">FA2-1Q3-MR-19 (12 seats)</div>
+            <div class="cap-pct" style="color:var(--amber)">85% contested</div>
+          </div>
+          <div class="cap-bar-bg">
+            <div class="cap-bar-fill partial" style="width:85%"></div>
+          </div>
+        </div>
+        <div class="cap-bar-wrap">
+          <div class="cap-bar-header">
+            <div class="cap-room-name">FA2-1Q3-MR-20 (12 seats)</div>
+            <div class="cap-pct" style="color:var(--amber)">75% contested</div>
+          </div>
+          <div class="cap-bar-bg">
+            <div class="cap-bar-fill partial" style="width:75%"></div>
+          </div>
+        </div>
+        <div class="cap-bar-wrap">
+          <div class="cap-bar-header">
+            <div class="cap-room-name">FA2-1Q4-MR-28 (12 seats)</div>
+            <div class="cap-pct" style="color:var(--green)">40% used</div>
+          </div>
+          <div class="cap-bar-bg">
+            <div class="cap-bar-fill healthy" style="width:40%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 2: AI RECOMMENDATIONS + ESCALATION LOG -->
+  <div class="grid-2">
+
+    <!-- AI RECOMMENDATIONS -->
+    <div class="card reveal">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="card-title-icon">&#10022;</span>
+          AI Recommendations
+        </div>
+        <div class="card-tag">Haiku · Generated 06 Mar 00:14</div>
+      </div>
+      <div class="card-body">
+
+        <div class="rec-card priority-high">
+          <div class="rec-header">
+            <div class="rec-title">Release Bronwyn Mollentze's simultaneous bookings across FA2-1Q1-MR-01, -02, -05 and -06</div>
+            <span class="severity-badge severity-critical">Critical</span>
+          </div>
+          <div class="rec-body">
+            One organiser holds 4 rooms simultaneously Mon–Fri 09:00–17:00. Occupancy sensors confirm zero presence in at least 3 of these rooms during all monitored slots. This pattern has recurred for 9 weeks. Releasing overlapping bookings would restore <strong style="color:var(--green)">64 seat·hours per day</strong> of usable capacity to the floor.
+          </div>
+          <div class="rec-footer">
+            <div class="rec-impact">+34% floor capacity recovery</div>
+            <button class="action-btn-small red" style="margin-left:auto">Auto-Release + Notify</button>
+            <button class="action-btn-small">Escalate to REMS</button>
+          </div>
+        </div>
+
+        <div class="rec-card priority-med">
+          <div class="rec-header">
+            <div class="rec-title">Require 48h confirmation for recurring full-day bookings beyond 2 weeks</div>
+            <span class="severity-badge severity-high">Policy</span>
+          </div>
+          <div class="rec-body">
+            Current policy allows unlimited advance full-day reservations without confirmation. Implementing a 48-hour re-confirmation gate for recurring full-day bookings &gt;2 weeks out would reduce speculative lock-up while protecting legitimate project war-rooms. Exemption list: EXCO sessions, approved project codes.
+          </div>
+          <div class="rec-footer">
+            <div class="rec-impact">Est. 20–40% chronic capacity improvement</div>
+            <button class="action-btn-small" style="margin-left:auto">Draft Policy Note</button>
+          </div>
+        </div>
+
+        <div class="rec-card priority-low">
+          <div class="rec-header">
+            <div class="rec-title">Right-size: FA2-1Q3-MR-31 (40 seats) used for single-person recurring sessions</div>
+            <span class="severity-badge severity-medium">Efficiency</span>
+          </div>
+          <div class="rec-body">
+            Sensor data shows FA2-1Q3-MR-31 consistently occupied by 1–3 people despite 40-seat capacity. Recommend reassigning these bookings to FA2-1Q2-MR-11 (8 seats) or FA2-1Q4-MR-27 (8 seats), freeing the 40-seater for larger sessions.
+          </div>
+          <div class="rec-footer">
+            <div class="rec-impact">40-seat room freed ~4hrs/day</div>
+            <button class="action-btn-small" style="margin-left:auto">Suggest Reassignment</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ESCALATION + TIMELINE -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+
+      <!-- SERVICENOW AUTO-TICKET -->
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="card-title-icon">&#8593;</span>
+            ServiceNow Auto-Ticket
+          </div>
+          <div class="snow-badge">Auto-raised by SENTINEL</div>
+        </div>
+        <div class="card-body">
+          <div class="snow-ticket">
+            <div class="snow-key">Ticket No.</div>
+            <div class="snow-val accent">INC-2026-0847</div>
+            <div class="snow-key">Raised</div>
+            <div class="snow-val">06 Mar 2026 · 00:14 (auto)</div>
+            <div class="snow-key">Assigned To</div>
+            <div class="snow-val">Evans Khorommbi · REMS FM</div>
+            <div class="snow-key">Priority</div>
+            <div class="snow-val red">P2 — High</div>
+            <div class="snow-key">Subject</div>
+            <div class="snow-val">Block booking policy breach · Fairland 2 1F · Week 09–13 Mar</div>
+            <div class="snow-key">Description</div>
+            <div class="snow-val">SENTINEL detected 1 organiser holding 4 simultaneous full-day bookings. Effective capacity loss: 34%. Ghost booking rate: 61%. Recommend release of overlapping slots before Monday 09 Mar 07:00.</div>
+            <div class="snow-key">Status</div>
+            <div class="snow-val accent">Open · Awaiting FM action</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INCIDENT HISTORY -->
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="card-title-icon">&#9678;</span>
+            Incident History · Fairland 2 1F
+          </div>
+        </div>
+        <div class="card-body" style="padding:8px 16px">
+          <div class="timeline">
+            <div class="timeline-item">
+              <div class="timeline-date">05 Jan 2026</div>
+              <div class="timeline-content">
+                <div class="timeline-title">Initial complaint raised via REMS Helpdesk</div>
+                <div class="timeline-desc">Shaun Grose reported >50% first-floor capacity blocked for week of 9–13 Mar.</div>
+                <span class="timeline-tag manual">Manual · Email</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-date">06 Jan 2026</div>
+              <div class="timeline-content">
+                <div class="timeline-title">Escalated to Keryn Norman, REMS</div>
+                <div class="timeline-desc">No enforcement action taken. Monitoring requested.</div>
+                <span class="timeline-tag manual">Manual</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-date">22 Jan 2026</div>
+              <div class="timeline-content">
+                <div class="timeline-title">Follow-up — no progress reported</div>
+                <div class="timeline-desc">Issue unresolved 17 days after initial raise.</div>
+                <span class="timeline-tag alert">Escalation</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-date">02 Feb 2026</div>
+              <div class="timeline-content">
+                <div class="timeline-title">COO-level escalation · Peter Marshall CC'd</div>
+                <div class="timeline-desc">28 days elapsed. Block bookers asked to reconsider by Wednesday. No automated enforcement.</div>
+                <span class="timeline-tag alert">COO Escalation</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-date">06 Mar 2026</div>
+              <div class="timeline-content">
+                <div class="timeline-title">SENTINEL auto-detected · ServiceNow INC-2026-0847 raised</div>
+                <div class="timeline-desc">Pattern still active. SENTINEL flagged on first scan. FM team notified before week begins.</div>
+                <span class="timeline-tag auto">SENTINEL Auto</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- HEATMAP -->
+  <div class="card reveal" style="margin-bottom:16px">
+    <div class="card-header">
+      <div class="card-title">
+        <span class="card-title-icon">&#8803;</span>
+        Room Utilisation Heatmap · Week of 09–13 Mar 2026
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="card-tag">FM-Systems · ResourceScheduler</div>
+        <div class="card-tag">BMS Occupancy Sensors</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="heatmap-grid">
+        <!-- Headers -->
+        <div class="heatmap-header" style="text-align:left;padding-left:0">Room</div>
+        <div class="heatmap-header">Mon 09</div>
+        <div class="heatmap-header">Tue 10</div>
+        <div class="heatmap-header">Wed 11</div>
+        <div class="heatmap-header">Thu 12</div>
+        <div class="heatmap-header">Fri 13</div>
+
+        <!-- MR-01 -->
+        <div class="heatmap-room-label">FA2-1Q1-MR-01 (20)</div>
+        <div class="heatmap-cell cell-block"><span class="cell-label">Bronwyn M · GHOST</span></div>
+        <div class="heatmap-cell cell-block"><span class="cell-label">Simnikiwe L</span></div>
+        <div class="heatmap-cell cell-block"><span class="cell-label">Bronwyn M · GHOST</span></div>
+        <div class="heatmap-cell cell-block"><span class="cell-label">Fleet Manco</span></div>
+        <div class="heatmap-cell cell-block"><span class="cell-label">Bronwyn M · GHOST</span></div>
+
+        <!-- MR-02 -->
+        <div class="heatmap-room-label">FA2-1Q1-MR-02 (12)</div>
+        <div class="heatmap-cell cell-block"><span class="cell-label">Bronwyn T 09–16</span></div>
+        <div class="heatmap-cell cell-partial"><span class="cell-label">Mixed</span></div>
+        <div class="heatmap-cell cell-block"><span class="cell-label">Bronwyn M · GHOST</span></div>
+        <div class="heatmap-cell cell-partial"><span class="cell-label">Zanobia P</span></div>
+        <div class="heatmap-cell cell-block"><span class="cell-label">Bronwyn M · GHOST</span></div>
+
+        <!-- MR-05 -->
+        <div class="heatmap-room-label">FA2-1Q1-MR-05 (12)</div>
+        <div class="heatmap-cell cell-partial"><span class="cell-label">Shiloh H + Bronwyn M</span></div>
+        <div class="heatmap-cell cell-partial"><span class="cell-label">Mixed</span></div>
+        <div class="heatmap-cell cell-block"><span class="cell-label">Bronwyn M · GHOST</span></div>
+        <div class="heatmap-cell cell-partial"><span class="cell-label">Mixed</span></div>
+        <div class="heatmap-cell cell-block"><span class="cell-label">Bronwyn M · GHOST</span></div>
+
+        <!-- MR-06 -->
+        <div class="heatmap-room-label">FA2-1Q1-MR-06 (20)</div>
+        <div class="heatmap-cell cell-block"><span class="cell-label">Bronwyn M · GHOST</span></div>
+        <div class="heatmap-cell cell-partial"><span class="cell-label">Hanno Z 09–16</span></div>
+        <div class="heatmap-cell cell-block"><span class="cell-label">Bronwyn M · GHOST</span></div>
+        <div class="heatmap-cell cell-partial"><span class="cell-label">Memory B</span></div>
+        <div class="heatmap-cell cell-block"><span class="cell-label">Bronwyn M · GHOST</span></div>
+
+        <!-- MR-16 -->
+        <div class="heatmap-room-label">FA2-1Q3-MR-16 (12)</div>
+        <div class="heatmap-cell cell-partial"><span class="cell-label">Team Meeting</span></div>
+        <div class="heatmap-cell cell-block"><span class="cell-label">iCustomer 08–17</span></div>
+        <div class="heatmap-cell cell-block"><span class="cell-label">iCustomer 08–17</span></div>
+        <div class="heatmap-cell cell-partial"><span class="cell-label">Nicole S</span></div>
+        <div class="heatmap-cell cell-partial"><span class="cell-label">Simnikiwe</span></div>
+
+        <!-- MR-28 -->
+        <div class="heatmap-room-label">FA2-1Q4-MR-28 (12)</div>
+        <div class="heatmap-cell cell-partial"><span class="cell-label">Paula M</span></div>
+        <div class="heatmap-cell cell-free"><span class="cell-label">Free</span></div>
+        <div class="heatmap-cell cell-partial"><span class="cell-label">Paula M</span></div>
+        <div class="heatmap-cell cell-free"><span class="cell-label">Free</span></div>
+        <div class="heatmap-cell cell-partial"><span class="cell-label">Paula M</span></div>
+
+        <!-- MR-27 -->
+        <div class="heatmap-room-label">FA2-1Q4-MR-27 (8)</div>
+        <div class="heatmap-cell cell-free"><span class="cell-label">Free</span></div>
+        <div class="heatmap-cell cell-partial"><span class="cell-label">Jaco G</span></div>
+        <div class="heatmap-cell cell-free"><span class="cell-label">Free</span></div>
+        <div class="heatmap-cell cell-partial"><span class="cell-label">Jaco G</span></div>
+        <div class="heatmap-cell cell-free"><span class="cell-label">Free</span></div>
+      </div>
+
+      <div class="heatmap-legend">
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:rgba(255,68,68,0.35);border:1px solid rgba(255,68,68,0.5)"></div>
+          Full-day block booking (confirmed occupied)
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:rgba(255,68,68,0.2);border:1px dashed rgba(255,68,68,0.5)"></div>
+          Ghost booking (booked · sensor shows empty)
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:rgba(245,158,11,0.25);border:1px solid rgba(245,158,11,0.3)"></div>
+          Partial / contested
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.2)"></div>
+          Available
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-left">
+    SENTINEL Space Intelligence · Site S-002 Fairland 2(FNB) · Data sources: FM-Systems ResourceScheduler · BMS Occupancy (PIR) · Access Control
+  </div>
+  <div class="footer-right">
+    <span>Last sync: 06 Mar 2026 · 06:00</span>
+    <span>·</span>
+    <span>Next: 06 Mar 2026 · 12:00</span>
+    <span>·</span>
+    <span style="color:var(--green)">All sensors nominal</span>
+  </div>
+</div>
+
+<script>
+  // Animate capacity bars on load
+  window.addEventListener('load', () => {
+    const fills = document.querySelectorAll('.cap-bar-fill');
+    fills.forEach(f => {
+      const w = f.style.width;
+      f.style.width = '0';
+      requestAnimationFrame(() => {
+        setTimeout(() => { f.style.width = w; }, 200);
+      });
+    });
+  });
+
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>

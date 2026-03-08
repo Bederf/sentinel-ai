@@ -47,6 +47,53 @@ For Telegram-driven AI chat and hybrid routing:
 
 ## Architecture
 
+### Current Architecture (Phase 147+)
+
+Free-text messages and inline keyboard callbacks are now routed through the backend's intent-first conversation system. Slash commands remain unchanged.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Telegram User                             │
+│           (Tenant / Technician / FM)                         │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                    ┌─────────┴─────────┐
+                    ▼                   ▼
+            Slash commands         Free-text / Callbacks
+            (/info_, /WO_,         ("too hot", "broken tap",
+             /inspect_, etc.)       button taps)
+                    │                   │
+                    ▼                   ▼
+┌──────────────────────┐  ┌──────────────────────────────────┐
+│   Sentry Gateway     │  │   SENTINEL Backend               │
+│   (Claude via        │  │   POST /api/sentry/telegram/     │
+│    openclaw engine)  │  │        message | callback        │
+│                      │  │                                  │
+│   Reads SOUL.md,     │  │   Intent Classifier (9 rules)    │
+│   TOOLS.md, runs     │  │        ↓                         │
+│   tool scripts       │  │   Conversation Manager (sessions)│
+│                      │  │        ↓                         │
+│   Delegates free-    │  │   Flow Handlers:                 │
+│   text to backend    │  │   - Client Complaint (4 steps)   │
+│   endpoints          │  │   - Tech Checklist (6 items)     │
+│                      │  │   - WO Update (stateless)        │
+│                      │  │   - Ad-Hoc Fault (2 steps)       │
+│                      │  │   - Orientation Menu             │
+└──────────────────────┘  │        ↓                         │
+         │                │   TelegramMessageSender          │
+         ▼                │   (sends reply + inline keyboard │
+┌──────────────────────┐  │    directly to Telegram API)     │
+│ Tool scripts:        │  └──────────────────────────────────┘
+│ bms_query.py         │
+│ bms_inspect.py       │
+│ bms_wo.py            │
+│ bms_reset.py         │
+│ bms_note.py          │
+└──────────────────────┘
+```
+
+### Legacy Architecture (pre-Phase 147)
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Telegram User                             │
@@ -492,7 +539,92 @@ When FM clicks `/WO_`, the bot asks for title, description, and priority before 
 
 For observations that don't require action. Bot asks the FM for the note text, then logs it against the equipment record.
 
+## Telegram Conversation Flow (Phase 147)
+
+Backend-driven intent classification and multi-step conversation flows with inline keyboard support. Replaces the previous approach where all free-text messages were forwarded to Claude for processing.
+
+### Intent Classification
+
+The `TelegramIntentClassifier` uses a 9-rule priority cascade (no LLM):
+
+| Priority | Rule | Intent | Confidence |
+|----------|------|--------|------------|
+| 1 | Callback + active session | CHECKLIST_REPLY | 1.0 |
+| 2 | Callback, no session | Parse from callback prefix | 0.95 |
+| 3 | Active session + free text | CHECKLIST_REPLY | 0.9 |
+| 4 | WO-XXXX-XXXX pattern | WO_UPDATE | 0.95 |
+| 5 | Equipment ID pattern (S00X-, AHU, FCU...) | TECHNICIAN_REPORT | 0.85 |
+| 6 | Technical vocabulary (inspection, vibration...) | TECHNICIAN_REPORT | 0.75 |
+| 7 | Issue classifier match (reuses `classify_issue()`) | CLIENT_COMPLAINT | varies |
+| 8 | Ad-hoc keywords (chair, door, tap...) | AD_HOC_FAULT | 0.7 |
+| 9 | Fallback | UNKNOWN | 0.0 |
+
+### Conversation Flows
+
+**Client Complaint** (4 steps):
+1. Category selection (inline keyboard: Temperature, Water, Lighting, Noise, Access, Other)
+2. Location (free text, uses `extract_floor_from_message()`)
+3. Duration (inline keyboard: Just started / A few hours / Since yesterday / Several days)
+4. Optional photo, then WO creation
+
+**Technician Report / AHU Checklist** (6 items with follow-up branching):
+- Filter Condition, Filter Pressure Drop, Fan Vibration, Belt Condition, Coil Condition, Damper Operation
+- Non-Good answers trigger context-specific follow-ups (e.g., "Blocked" -> "Can you replace now?")
+- Auto-creates WOs for critical findings (Blocked/Excessive/Stuck -> CRITICAL priority)
+
+**WO Update** (stateless): Extract WO code -> lookup -> status buttons (Completed / In progress / Blocked)
+
+**Ad-Hoc Fault** (2 steps): Ask location -> create WO
+
+**Unknown/Orientation**: 3-button menu (Report a problem / Start inspection / Check work order)
+
+### API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/sentry/telegram/message` | POST | Classify and handle free-text messages |
+| `/api/sentry/telegram/callback` | POST | Handle inline keyboard button taps |
+
+Both require `X-Sentry-API-Key` and `X-Sentry-Secret` headers. Both pass through prompt guard and POPIA consent gate.
+
+The backend sends replies directly to Telegram via `TelegramMessageSender` (calls `api.telegram.org`). The gateway does NOT send a reply -- it delegates entirely.
+
+### Session Management
+
+- In-memory `ConversationSession` keyed by `chat_id`
+- 30-minute timeout, cleaned up by background scheduler (30s tick)
+- Fields: intent, flow, current_step, answers, equipment_id, wo_codes
+
+### Callback Data Format
+
+`{flow}:{action}:{value}` -- max 64 bytes per Telegram API limit.
+
+Examples: `complaint:category:hvac`, `wo:status:completed`, `menu:start:complaint`, `inspect:filter:good`
+
+### Files
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `telegram_message_sender.py` | `backend/app/services/` | Telegram Bot API wrapper (send_text, answer_callback, edit_reply_markup) |
+| `telegram_intent_classifier.py` | `backend/app/services/` | 9-rule intent classification |
+| `telegram_conversation_manager.py` | `backend/app/services/` | Session CRUD + expiry |
+| `telegram_flow_handlers.py` | `backend/app/services/` | All 5 conversation flows + router |
+| `sentry_webhooks.py` | `backend/app/api/` | `/telegram/message` and `/telegram/callback` endpoints |
+
+### Tests
+
+81 tests across 5 files:
+- `test_telegram_message_sender.py` (9 tests)
+- `test_telegram_intent_classifier.py` (27 tests)
+- `test_telegram_conversation_manager.py` (12 tests)
+- `test_telegram_conversation_flow.py` (26 tests)
+- `test_telegram_intent_routing.py` (7 tests)
+
+---
+
 ## Call Logging Skill — General Staff Defect Reporting
+
+> **Note (Phase 147):** Free-text complaint routing is now handled by the backend conversation system via `POST /api/sentry/telegram/message`. The call logging skill (`call_log.py`) and gateway handler (`call_log_handler.py`) are retained as reference/fallback only. The `sentry-call-logging` SKILL.md is marked DEPRECATED.
 
 The call logging skill allows non-technical users (office workers, cleaners, security guards) to report building defects via natural language Telegram messages. The bot runs a guided discovery conversation, classifies the issue against a fixed taxonomy, and creates an inspection work order.
 
@@ -913,7 +1045,11 @@ All corrections tracked for ML data quality:
 - `backend/app/api/complaints.py` - Complaint endpoints
 - `backend/app/api/alerts.py` - Alert and dispatch endpoints
 - `backend/app/api/ocr.py` - OCR processing endpoints
-- `backend/app/api/sentry_webhooks.py` - Sentry webhook endpoints (WO + OCR + inspection)
+- `backend/app/api/sentry_webhooks.py` - Sentry webhook endpoints (WO + OCR + inspection + Telegram conversation flow)
+- `backend/app/services/telegram_message_sender.py` - Telegram Bot API wrapper (inline keyboards)
+- `backend/app/services/telegram_intent_classifier.py` - 9-rule intent classification
+- `backend/app/services/telegram_conversation_manager.py` - Session management with 30-min expiry
+- `backend/app/services/telegram_flow_handlers.py` - 5 conversation flows (complaint, checklist, WO, ad-hoc, orientation)
 - `backend/app/api/inspection.py` - Standard inspection task endpoints
 - `backend/app/services/complaint_handler.py` - Diagnosis logic
 - `backend/app/services/checklist_service.py` - Inspection checklist template service

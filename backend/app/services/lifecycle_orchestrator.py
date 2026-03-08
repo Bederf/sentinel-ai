@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
 
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.prediction_repository import PredictionRepository
 from app.database.repositories.work_order_repository import get_work_order_repository
@@ -258,9 +258,7 @@ class LifecycleOrchestrator:
 
     def __init__(self, task_id: str | None = None, site_id: str | None = None):
         self.task_id = task_id  # For database task tracking
-        _primary = get_primary_site()
-        _primary_code = _primary.get("code", "unknown") if isinstance(_primary, dict) else _primary
-        self.site_id = site_id or _primary_code or "unknown"
+        self.site_id = site_id or get_primary_site_code() or "unknown"
         self.running = False
         self.paused = False
         self.current_scenario: ScenarioConfig | None = None

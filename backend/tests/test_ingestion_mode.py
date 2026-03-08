@@ -46,14 +46,14 @@ class TestIngestionModeEnum:
     def test_shadow_live_without_demo(self):
         from app.config.settings import Settings, IngestionMode
 
-        s = Settings(demo_mode=False, ingestion_mode="shadow_live")
+        s = Settings(demo_mode=False, ingestion_mode="shadow_live", site002_source_enabled=False)
         assert s.resolved_ingestion_mode == IngestionMode.SHADOW_LIVE
         assert s.is_live_mode
 
     def test_live_control_without_demo(self):
         from app.config.settings import Settings, IngestionMode
 
-        s = Settings(demo_mode=False, ingestion_mode="live_control")
+        s = Settings(demo_mode=False, ingestion_mode="live_control", site002_source_enabled=False)
         assert s.resolved_ingestion_mode == IngestionMode.LIVE_CONTROL
         assert s.is_live_mode
 
@@ -140,8 +140,8 @@ class TestLiveModeFallbackBlock:
             assert result.get("tool") == "read_device_point"
 
     @pytest.mark.asyncio
-    async def test_get_buildings_blocks_json_in_live_mode(self):
-        """get_buildings_tool returns LIVE_DATA_REQUIRED when repo unavailable in live mode."""
+    async def test_get_sites_blocks_json_in_live_mode(self):
+        """get_sites_tool returns LIVE_DATA_REQUIRED when repo unavailable in live mode."""
         from app.config.settings import IngestionMode
 
         mock_settings = MagicMock()
@@ -150,13 +150,13 @@ class TestLiveModeFallbackBlock:
 
         # Simulate repository import failure
         with patch("app.config.settings.settings", mock_settings):
-            from app.mcp.simbiot_server import get_buildings_tool
+            from app.mcp.simbiot_server import get_sites_tool
 
             # The SiteRepository import will attempt Supabase connection and fail
             # in test env, returning the LIVE_DATA_REQUIRED error
-            result = await get_buildings_tool()
+            result = await get_sites_tool()
             assert result.get("code") == "LIVE_DATA_REQUIRED"
-            assert result.get("tool") == "get_buildings"
+            assert result.get("tool") == "get_sites"
 
     @pytest.mark.asyncio
     async def test_simulation_mode_allows_json_fallback(self):
@@ -269,6 +269,7 @@ class TestStartupLiveModeGuard:
         s = Settings(
             demo_mode=False,
             ingestion_mode="shadow_live",
+            site002_source_enabled=False,
             supabase_url="",
             supabase_key="",
             jwt_secret_key="test-secret-key-32-chars-minimum!",
@@ -284,6 +285,7 @@ class TestStartupLiveModeGuard:
         s = Settings(
             demo_mode=False,
             ingestion_mode="shadow_live",
+            site002_source_enabled=False,
             jwt_secret_key="test-secret-key-32-chars-minimum!",
         )
         assert s.resolved_ingestion_mode == IngestionMode.SHADOW_LIVE

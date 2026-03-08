@@ -22,14 +22,14 @@ class TestMCPServer:
 
     def test_mcp_tool_execution(self, test_client):
         """Test MCP tool can be executed via REST API."""
-        payload = {"tool_name": "get_buildings", "parameters": {}}
+        payload = {"tool_name": "get_sites", "parameters": {}}
 
         response = test_client.post("/api/mcp/simbiot/tools/execute", json=payload)
         # 405 if endpoint only supports GET
         assert response.status_code in [200, 404, 405, 422]
 
-    def test_mcp_get_buildings(self, test_client):
-        """Test get_buildings MCP tool."""
+    def test_mcp_get_sites(self, test_client):
+        """Test get_sites MCP tool."""
         response = test_client.get("/api/mcp/simbiot/buildings")
         assert response.status_code in [200, 404]
 

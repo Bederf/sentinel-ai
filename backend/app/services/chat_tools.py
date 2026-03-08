@@ -1849,7 +1849,6 @@ async def discover_niagara_points(
         result = await discovery_service.discover_and_classify(
             device_ip=device_ip,
             site_id=site_id,
-            use_demo=True,
         )
 
         if result.status == "error":

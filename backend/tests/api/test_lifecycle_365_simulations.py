@@ -209,6 +209,7 @@ def sentinel_annual_scenario() -> Dict[str, Any]:
         "scenario": "sentinel_annual",
         "duration_minutes": 30.0,
         "start_hour": 6,
+        "site_id": "site-002",
         "expected_events_per_day": 8,
         "expected_recommendations_per_day": 3,  # Hours 6, 10, 14
         "total_days": 365,
@@ -244,6 +245,7 @@ class TestHourlyEventProcessing:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -291,6 +293,7 @@ class TestHourlyEventProcessing:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -325,6 +328,7 @@ class TestHourlyEventProcessing:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -372,6 +376,7 @@ class TestSeasonalVariations:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -400,6 +405,7 @@ class TestSeasonalVariations:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -439,6 +445,7 @@ class TestSeasonalVariations:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -485,6 +492,7 @@ class TestAIRecommendations:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -525,6 +533,7 @@ class TestAIRecommendations:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -564,6 +573,7 @@ class TestAIRecommendations:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -613,6 +623,7 @@ class TestCheckpointRecovery:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -649,6 +660,7 @@ class TestCheckpointRecovery:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -703,6 +715,7 @@ class TestProgressTracking:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -740,6 +753,7 @@ class TestProgressTracking:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -781,6 +795,7 @@ class TestSentinelAnnualScenario:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -815,6 +830,7 @@ class TestSentinelAnnualScenario:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -850,6 +866,7 @@ class TestSentinelAnnualScenario:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -894,6 +911,7 @@ class TestSimulationStress:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": sentinel_annual_scenario["duration_minutes"],
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": sentinel_annual_scenario["site_id"],
             },
         )
 
@@ -927,6 +945,7 @@ class TestSimulationStress:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": 10,  # Shorter for testing
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": "site-001",
             },
         )
 
@@ -936,6 +955,7 @@ class TestSimulationStress:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": 10,  # Shorter for testing
                 "start_hour": sentinel_annual_scenario["start_hour"],
+                "site_id": "site-002",
             },
         )
 
@@ -982,6 +1002,7 @@ class TestSimulationErrorHandling:
                 "scenario": "invalid_nonexistent_scenario",
                 "duration_minutes": 30.0,
                 "start_hour": 6,
+                "site_id": "site-002",
             },
         )
 
@@ -999,6 +1020,7 @@ class TestSimulationErrorHandling:
                 "scenario": sentinel_annual_scenario["scenario"],
                 "duration_minutes": 30.0,
                 "start_hour": 25,  # Invalid: > 23
+                "site_id": "site-002",
             },
         )
 

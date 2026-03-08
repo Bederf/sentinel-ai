@@ -428,9 +428,9 @@ def _seed_demo_values() -> None:
         return
     _DEMO_SEEDED = True
 
-    from app.core.site_resolver import get_primary_site
+    from app.core.site_resolver import get_primary_site_code
 
-    _site = get_primary_site() or "unknown"
+    _site = get_primary_site_code() or "unknown"
 
     # Quality gate evaluations
     sentinel_quality_gate_evaluations_total.labels(site_id=_site, status="pass").inc(142)

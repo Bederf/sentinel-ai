@@ -1,6 +1,8 @@
-# Sentry Desk Complaint Agent — Full Specification
+# Sentry Desk Complaint Agent -- Full Specification
 
-> **Version:** 1.1 | **Last Updated:** 2026-02-25 | **Location:** `/home/bederf/.sentry/`
+> **Version:** 1.2 | **Last Updated:** 2026-03-07 | **Location:** `/home/bederf/.sentry/`
+>
+> **Phase 147 Note:** Telegram free-text complaint routing is now handled by the backend conversation system (`POST /api/sentry/telegram/message`) with inline keyboard flows. The gateway delegates to the backend instead of routing through `sentry_ai_bridge.py` for free-text messages. Slash commands and the desk diagnosis tool remain unchanged. See `docs/05-integrations/SENTRY_INTEGRATION.md` for the updated architecture.
 
 ## 1. Goals & Success Metrics
 

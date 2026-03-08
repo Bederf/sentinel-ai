@@ -17,7 +17,7 @@ import httpx
 
 
 from app.config.settings import settings
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -512,7 +512,7 @@ class SystemHealthService:
             try:
                 results["dali_gateway"] = await self._call_simbiot_tool(
                     "discover_tridonic_gateway",
-                    {"site_code": site_code or get_primary_site() or "unknown"},
+                    {"site_code": site_code or get_primary_site_code() or "unknown"},
                 )
             except Exception as e:
                 results["dali_gateway"] = {"error": str(e)}
@@ -529,7 +529,7 @@ class SystemHealthService:
             try:
                 results["alarms"] = await self._call_simbiot_tool(
                     "search_alarms",
-                    {"site_code": site_code or get_primary_site() or "unknown"},
+                    {"site_code": site_code or get_primary_site_code() or "unknown"},
                 )
             except Exception as e:
                 results["alarms"] = {"error": str(e)}
@@ -539,7 +539,7 @@ class SystemHealthService:
             try:
                 results["health_score"] = await self._call_simbiot_tool(
                     "get_health_score",
-                    {"site_code": site_code or get_primary_site() or "unknown"},
+                    {"site_code": site_code or get_primary_site_code() or "unknown"},
                 )
             except Exception as e:
                 results["health_score"] = {"error": str(e)}
@@ -548,7 +548,7 @@ class SystemHealthService:
             try:
                 results["asset_details"] = await self._call_simbiot_tool(
                     "get_asset_detail",
-                    {"site_code": site_code or get_primary_site() or "unknown"},
+                    {"site_code": site_code or get_primary_site_code() or "unknown"},
                 )
             except Exception as e:
                 results["asset_details"] = {"error": str(e)}

@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL — Block Booking Detection Workflow</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0a0e17;
+    color: #e2e8f0;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .header {
+    text-align: center;
+    padding: 40px 20px 20px;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #60a5fa, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 6px;
+  }
+  .header p {
+    color: #64748b;
+    font-size: 14px;
+  }
+
+  .playground {
+    display: flex;
+    gap: 0;
+    padding: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* Left: Controls */
+  .controls {
+    width: 300px;
+    flex-shrink: 0;
+    padding: 20px;
+    background: #111827;
+    border-radius: 12px 0 0 12px;
+    border: 1px solid #1e293b;
+    border-right: none;
+    overflow-y: auto;
+    max-height: 80vh;
+  }
+  .controls h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: #64748b;
+    margin-bottom: 12px;
+  }
+  .control-group {
+    margin-bottom: 20px;
+  }
+  .control-group label {
+    display: block;
+    font-size: 12px;
+    color: #94a3b8;
+    margin-bottom: 4px;
+  }
+  .control-group input, .control-group select {
+    width: 100%;
+    padding: 8px 10px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .control-group input:focus, .control-group select:focus {
+    outline: none;
+    border-color: #60a5fa;
+  }
+
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+  .preset-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover { background: #334155; color: #e2e8f0; }
+  .preset-btn.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+
+  .booking-list {
+    margin-top: 12px;
+  }
+  .booking-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: #1e293b;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 11px;
+  }
+  .booking-item .room-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .booking-item .details { flex: 1; }
+  .booking-item .time { color: #64748b; }
+  .booking-item .remove {
+    background: none; border: none; color: #ef4444;
+    cursor: pointer; font-size: 14px; padding: 0 4px;
+  }
+  .add-booking-btn {
+    width: 100%;
+    padding: 8px;
+    background: #1e293b;
+    border: 1px dashed #334155;
+    border-radius: 6px;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 12px;
+    margin-top: 6px;
+    transition: all 0.15s;
+  }
+  .add-booking-btn:hover { border-color: #60a5fa; color: #60a5fa; }
+
+  /* Right: Preview */
+  .preview {
+    flex: 1;
+    background: #111827;
+    border-radius: 0 12px 12px 0;
+    border: 1px solid #1e293b;
+    padding: 30px;
+    overflow-y: auto;
+    max-height: 80vh;
+  }
+
+  /* Workflow diagram */
+  .workflow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .step {
+    width: 100%;
+    max-width: 520px;
+    position: relative;
+    transition: all 0.3s;
+  }
+  .step-box {
+    padding: 18px 22px;
+    border-radius: 10px;
+    border: 1px solid;
+    position: relative;
+    transition: all 0.3s;
+  }
+  .step-box .step-num {
+    position: absolute;
+    top: -10px;
+    left: 16px;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+  }
+  .step-box h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .step-box p {
+    font-size: 12px;
+    color: #94a3b8;
+    line-height: 1.5;
+  }
+
+  /* Step colors */
+  .step-email .step-box { background: rgba(59, 130, 246, 0.08); border-color: #1e40af; }
+  .step-email .step-num { background: #1e40af; color: #93c5fd; }
+  .step-email h4 { color: #60a5fa; }
+
+  .step-parse .step-box { background: rgba(139, 92, 246, 0.08); border-color: #5b21b6; }
+  .step-parse .step-num { background: #5b21b6; color: #c4b5fd; }
+  .step-parse h4 { color: #a78bfa; }
+
+  .step-store .step-box { background: rgba(20, 184, 166, 0.08); border-color: #115e59; }
+  .step-store .step-num { background: #115e59; color: #5eead4; }
+  .step-store h4 { color: #2dd4bf; }
+
+  .step-detect .step-box { background: rgba(245, 158, 11, 0.08); border-color: #78350f; }
+  .step-detect .step-num { background: #78350f; color: #fcd34d; }
+  .step-detect h4 { color: #fbbf24; }
+
+  .step-alert .step-box { background: rgba(239, 68, 68, 0.08); border-color: #7f1d1d; }
+  .step-alert .step-num { background: #7f1d1d; color: #fca5a5; }
+  .step-alert h4 { color: #f87171; }
+
+  .step-notify .step-box { background: rgba(34, 197, 94, 0.08); border-color: #14532d; }
+  .step-notify .step-num { background: #14532d; color: #86efac; }
+  .step-notify h4 { color: #4ade80; }
+
+  .step.dimmed { opacity: 0.25; }
+  .step.active { opacity: 1; }
+
+  /* Arrow connector */
+  .arrow {
+    width: 2px;
+    height: 28px;
+    background: #334155;
+    position: relative;
+    transition: background 0.3s;
+  }
+  .arrow::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: -4px;
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #334155;
+    transition: border-color 0.3s;
+  }
+  .arrow.lit { background: #3b82f6; }
+  .arrow.lit::after { border-top-color: #3b82f6; }
+
+  /* Timeline */
+  .timeline-container {
+    margin-top: 24px;
+    width: 100%;
+    max-width: 520px;
+  }
+  .timeline-header {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #64748b;
+    margin-bottom: 10px;
+  }
+  .timeline {
+    position: relative;
+    background: #1e293b;
+    border-radius: 8px;
+    padding: 16px;
+    min-height: 80px;
+  }
+  .time-axis {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #475569;
+    margin-bottom: 10px;
+    padding: 0 2px;
+  }
+  .timeline-row {
+    position: relative;
+    height: 28px;
+    margin-bottom: 4px;
+  }
+  .timeline-row .room-label {
+    position: absolute;
+    left: 0;
+    top: 4px;
+    font-size: 10px;
+    color: #94a3b8;
+    width: 80px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .timeline-bar {
+    position: absolute;
+    height: 20px;
+    top: 4px;
+    border-radius: 4px;
+    font-size: 9px;
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: all 0.3s;
+  }
+  .overlap-zone {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: rgba(239, 68, 68, 0.08);
+    border-left: 1px dashed rgba(239, 68, 68, 0.3);
+    border-right: 1px dashed rgba(239, 68, 68, 0.3);
+    z-index: 0;
+    transition: all 0.3s;
+  }
+  .overlap-label {
+    position: absolute;
+    top: -18px;
+    font-size: 9px;
+    color: #f87171;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* Alert preview */
+  .alert-preview {
+    margin-top: 24px;
+    width: 100%;
+    max-width: 520px;
+  }
+  .alert-preview .alert-header {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #64748b;
+    margin-bottom: 10px;
+  }
+  .alert-box {
+    background: #1e293b;
+    border-radius: 8px;
+    border-left: 3px solid #ef4444;
+    padding: 16px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #cbd5e1;
+    white-space: pre-wrap;
+    transition: all 0.3s;
+  }
+  .alert-box.no-alert {
+    border-left-color: #22c55e;
+    color: #64748b;
+    text-align: center;
+    font-family: inherit;
+  }
+
+  /* Prompt output */
+  .prompt-section {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 20px 40px;
+  }
+  .prompt-box {
+    background: #111827;
+    border: 1px solid #1e293b;
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+  }
+  .prompt-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #64748b;
+    margin-bottom: 10px;
+  }
+  .prompt-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #94a3b8;
+    min-height: 40px;
+  }
+  .copy-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    padding: 6px 14px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { background: #334155; color: #e2e8f0; }
+  .copy-btn.copied { background: #14532d; border-color: #22c55e; color: #4ade80; }
+
+  /* Animation */
+  .step-box, .arrow, .timeline-bar, .alert-box {
+    transition: all 0.4s ease;
+  }
+
+  /* Playback controls */
+  .playback {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .play-btn {
+    padding: 8px 16px;
+    background: #3b82f6;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.15s;
+  }
+  .play-btn:hover { background: #2563eb; }
+  .play-btn:disabled { opacity: 0.4; cursor: default; }
+  .step-indicator {
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .room-colors { display: none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Block Booking Detection</h1>
+  <p>Interactive workflow — add bookings and watch SENTINEL detect overlaps</p>
+</div>
+
+<div class="playground">
+  <!-- Controls -->
+  <div class="controls">
+    <h3>Presets</h3>
+    <div class="presets">
+      <button class="preset-btn active" onclick="loadPreset('shaun')">Shaun (4 rooms)</button>
+      <button class="preset-btn" onclick="loadPreset('partial')">Partial overlap</button>
+      <button class="preset-btn" onclick="loadPreset('clean')">No overlap</button>
+      <button class="preset-btn" onclick="loadPreset('multi')">2 organisers</button>
+    </div>
+
+    <h3>Organiser</h3>
+    <div class="control-group">
+      <label>Name</label>
+      <input type="text" id="orgName" value="Shaun Grose" oninput="updateAll()">
+    </div>
+    <div class="control-group">
+      <label>Email</label>
+      <input type="text" id="orgEmail" value="shaun.grose@example.com" oninput="updateAll()">
+    </div>
+
+    <h3>Detection</h3>
+    <div class="control-group">
+      <label>Min rooms for alert</label>
+      <select id="minRooms" onchange="updateAll()">
+        <option value="2" selected>2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+      </select>
+    </div>
+
+    <h3>Bookings</h3>
+    <div class="booking-list" id="bookingList"></div>
+    <button class="add-booking-btn" onclick="addBooking()">+ Add booking</button>
+
+    <div style="margin-top: 24px">
+      <h3>Walkthrough</h3>
+      <div class="playback">
+        <button class="play-btn" id="playBtn" onclick="playWorkflow()">Play</button>
+        <span class="step-indicator" id="stepIndicator">Ready</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview">
+    <div class="workflow" id="workflow"></div>
+    <div class="timeline-container" id="timelineContainer"></div>
+    <div class="alert-preview" id="alertPreview"></div>
+  </div>
+</div>
+
+<div class="prompt-section">
+  <div class="prompt-box">
+    <div class="prompt-label">Prompt Output</div>
+    <div class="prompt-text" id="promptText"></div>
+    <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy</button>
+  </div>
+</div>
+
+<script>
+const ROOM_COLORS = [
+  '#3b82f6', '#a78bfa', '#f59e0b', '#ef4444',
+  '#22c55e', '#ec4899', '#06b6d4', '#f97316'
+];
+
+const PRESETS = {
+  shaun: {
+    orgName: 'Shaun Grose',
+    orgEmail: 'shaun.grose@example.com',
+    minRooms: 2,
+    bookings: [
+      { room: 'Boardroom 1', start: 9, end: 17 },
+      { room: 'Boardroom 2', start: 9, end: 17 },
+      { room: 'Meeting Room 3A', start: 10, end: 14 },
+      { room: 'Training Room B', start: 9, end: 12 },
+    ]
+  },
+  partial: {
+    orgName: 'Jane Smith',
+    orgEmail: 'jane.smith@example.com',
+    minRooms: 2,
+    bookings: [
+      { room: 'Boardroom 1', start: 9, end: 11 },
+      { room: 'Boardroom 2', start: 10, end: 12 },
+    ]
+  },
+  clean: {
+    orgName: 'Mark Evans',
+    orgEmail: 'mark.evans@example.com',
+    minRooms: 2,
+    bookings: [
+      { room: 'Boardroom 1', start: 9, end: 10 },
+      { room: 'Boardroom 2', start: 10, end: 11 },
+      { room: 'Meeting Room 3A', start: 14, end: 16 },
+    ]
+  },
+  multi: {
+    orgName: 'Shaun Grose',
+    orgEmail: 'shaun.grose@example.com',
+    minRooms: 2,
+    bookings: [
+      { room: 'Boardroom 1', start: 9, end: 11, org: 'shaun.grose@example.com' },
+      { room: 'Boardroom 2', start: 9, end: 11, org: 'jane.smith@example.com' },
+      { room: 'Meeting Room 3A', start: 9, end: 11, org: 'shaun.grose@example.com' },
+    ]
+  }
+};
+
+let state = {
+  orgName: 'Shaun Grose',
+  orgEmail: 'shaun.grose@example.com',
+  minRooms: 2,
+  bookings: [...PRESETS.shaun.bookings],
+  activeStep: -1,
+  playing: false,
+};
+
+function loadPreset(name) {
+  const p = PRESETS[name];
+  state.orgName = p.orgName;
+  state.orgEmail = p.orgEmail;
+  state.minRooms = p.minRooms;
+  state.bookings = JSON.parse(JSON.stringify(p.bookings));
+  state.activeStep = -1;
+  state.playing = false;
+
+  document.getElementById('orgName').value = p.orgName;
+  document.getElementById('orgEmail').value = p.orgEmail;
+  document.getElementById('minRooms').value = p.minRooms;
+
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  updateAll();
+}
+
+function addBooking() {
+  const rooms = ['Boardroom 1','Boardroom 2','Meeting Room 3A','Training Room B','Conference Room C','Huddle Space 1'];
+  const used = new Set(state.bookings.map(b => b.room));
+  const available = rooms.filter(r => !used.has(r));
+  const room = available.length > 0 ? available[0] : `Room ${state.bookings.length + 1}`;
+  state.bookings.push({ room, start: 9, end: 11 });
+  updateAll();
+}
+
+function removeBooking(i) {
+  state.bookings.splice(i, 1);
+  updateAll();
+}
+
+function updateBooking(i, field, value) {
+  state.bookings[i][field] = field === 'room' ? value : parseInt(value);
+  updateAll();
+}
+
+function updateAll() {
+  state.orgName = document.getElementById('orgName').value;
+  state.orgEmail = document.getElementById('orgEmail').value;
+  state.minRooms = parseInt(document.getElementById('minRooms').value);
+
+  renderBookingList();
+  renderWorkflow();
+  renderTimeline();
+  renderAlert();
+  updatePrompt();
+}
+
+function renderBookingList() {
+  const list = document.getElementById('bookingList');
+  list.innerHTML = state.bookings.map((b, i) => `
+    <div class="booking-item">
+      <div class="room-dot" style="background: ${ROOM_COLORS[i % ROOM_COLORS.length]}"></div>
+      <div class="details">
+        <input type="text" value="${b.room}"
+          style="background:none;border:none;color:#e2e8f0;font-size:11px;width:100%;padding:0"
+          oninput="updateBooking(${i},'room',this.value)">
+        <div class="time">
+          <select style="background:#111827;border:1px solid #334155;color:#94a3b8;font-size:10px;border-radius:3px;padding:1px 2px"
+            onchange="updateBooking(${i},'start',this.value)">
+            ${timeOptions(b.start)}
+          </select>
+          –
+          <select style="background:#111827;border:1px solid #334155;color:#94a3b8;font-size:10px;border-radius:3px;padding:1px 2px"
+            onchange="updateBooking(${i},'end',this.value)">
+            ${timeOptions(b.end)}
+          </select>
+        </div>
+      </div>
+      <button class="remove" onclick="removeBooking(${i})">×</button>
+    </div>
+  `).join('');
+}
+
+function timeOptions(selected) {
+  let html = '';
+  for (let h = 7; h <= 20; h++) {
+    const label = `${h.toString().padStart(2,'0')}:00`;
+    html += `<option value="${h}" ${h === selected ? 'selected' : ''}>${label}</option>`;
+  }
+  return html;
+}
+
+function renderWorkflow() {
+  const overlaps = findOverlaps();
+  const hasOverlap = overlaps.length > 0;
+  const as = state.activeStep;
+  const playing = state.playing;
+
+  const steps = [
+    { cls: 'step-email', num: '1', title: 'Booking Email Received',
+      desc: `BCC confirmation from booking system for ${state.bookings.length} room${state.bookings.length !== 1 ? 's' : ''}` },
+    { cls: 'step-parse', num: '2', title: 'Parse Email',
+      desc: `Extract organiser (${state.orgName}), room, date, start/end time` },
+    { cls: 'step-store', num: '3', title: 'Store & Dedup',
+      desc: 'SHA-256 hash check → persist BookingRecord' },
+    { cls: 'step-detect', num: '4', title: 'Overlap Detection',
+      desc: `Group by organiser → check time overlaps → ${hasOverlap ? overlaps.length + ' overlap' + (overlaps.length > 1 ? 's' : '') + ' found' : 'no overlaps'}` },
+    { cls: 'step-alert', num: '5', title: hasOverlap ? 'Alert Generated' : 'No Alert Needed',
+      desc: hasOverlap ? `${overlaps[0].rooms.length} rooms held simultaneously by ${state.orgName}` : 'All bookings are non-overlapping — no action required' },
+    { cls: 'step-notify', num: '6', title: hasOverlap ? 'Notify Concierge' : 'Done',
+      desc: hasOverlap ? 'EventBus → SentryNotificationRouter → Telegram / WhatsApp / Email' : 'Booking stored. Monitoring continues.' },
+  ];
+
+  const wf = document.getElementById('workflow');
+  wf.innerHTML = steps.map((s, i) => {
+    let cls = `step ${s.cls}`;
+    if (playing) cls += (i <= as) ? ' active' : ' dimmed';
+    const arrowCls = (playing && i < as) ? 'arrow lit' : 'arrow';
+    const showArrow = i < steps.length - 1;
+    // Hide steps 5-6 if no overlap and not in play mode
+    if (!hasOverlap && i >= 4 && !playing) {
+      if (i === 4) {
+        return `<div class="${cls}"><div class="step-box">
+          <span class="step-num">${s.num}</span>
+          <h4 style="color: #4ade80">✓ No Overlap Detected</h4>
+          <p>All bookings for ${state.orgName} are sequential — no alert needed</p>
+        </div></div>`;
+      }
+      return '';
+    }
+    return `
+      <div class="${cls}">
+        <div class="step-box">
+          <span class="step-num">${s.num}</span>
+          <h4>${s.title}</h4>
+          <p>${s.desc}</p>
+        </div>
+      </div>
+      ${showArrow ? `<div class="${arrowCls}"></div>` : ''}
+    `;
+  }).join('');
+}
+
+function findOverlaps() {
+  // Group by organiser
+  const byOrg = {};
+  state.bookings.forEach(b => {
+    const org = b.org || state.orgEmail;
+    if (!byOrg[org]) byOrg[org] = [];
+    byOrg[org].push(b);
+  });
+
+  const overlaps = [];
+  Object.entries(byOrg).forEach(([org, bookings]) => {
+    if (bookings.length < state.minRooms) return;
+    // Find overlapping clusters
+    const sorted = [...bookings].sort((a, b) => a.start - b.start);
+    for (let i = 0; i < sorted.length; i++) {
+      const cluster = [sorted[i]];
+      for (let j = i + 1; j < sorted.length; j++) {
+        if (cluster.some(c => c.start < sorted[j].end && sorted[j].start < c.end)) {
+          cluster.push(sorted[j]);
+        }
+      }
+      if (cluster.length >= state.minRooms) {
+        overlaps.push({
+          org,
+          rooms: cluster.map(c => c.room),
+          start: Math.min(...cluster.map(c => c.start)),
+          end: Math.max(...cluster.map(c => c.end)),
+          overlapStart: Math.max(...cluster.map(c => c.start)),
+          overlapEnd: Math.min(...cluster.map(c => c.end)),
+        });
+        break; // one overlap per organiser is enough
+      }
+    }
+  });
+  return overlaps;
+}
+
+function renderTimeline() {
+  const container = document.getElementById('timelineContainer');
+  if (state.bookings.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const minH = Math.min(...state.bookings.map(b => b.start), 7);
+  const maxH = Math.max(...state.bookings.map(b => b.end), 18);
+  const span = maxH - minH;
+  const overlaps = findOverlaps();
+
+  // Time axis
+  const axisLabels = [];
+  for (let h = minH; h <= maxH; h += Math.ceil(span / 8) || 1) {
+    axisLabels.push(`${h.toString().padStart(2, '0')}:00`);
+  }
+
+  // Overlap zones
+  let overlapHTML = '';
+  overlaps.forEach(o => {
+    if (o.overlapStart < o.overlapEnd) {
+      const left = ((o.overlapStart - minH) / span) * 100;
+      const width = ((o.overlapEnd - o.overlapStart) / span) * 100;
+      overlapHTML += `<div class="overlap-zone" style="left:calc(80px + ${left}% * (100% - 80px) / 100);width:calc(${width}% * (100% - 80px) / 100)">
+        <span class="overlap-label" style="left:50%;transform:translateX(-50%)">OVERLAP</span>
+      </div>`;
+    }
+  });
+
+  const rows = state.bookings.map((b, i) => {
+    const left = ((b.start - minH) / span) * 100;
+    const width = ((b.end - b.start) / span) * 100;
+    const color = ROOM_COLORS[i % ROOM_COLORS.length];
+    const isOverlapping = overlaps.some(o => o.rooms.includes(b.room));
+    const border = isOverlapping ? `border: 1px solid ${color}; box-shadow: 0 0 8px ${color}40` : '';
+    return `<div class="timeline-row">
+      <span class="room-label">${b.room}</span>
+      <div class="timeline-bar" style="left:calc(80px + ${left}% * (100% - 80px) / 100);width:calc(${width}% * (100% - 80px) / 100);background:${color}30;color:${color};${border}">
+        ${b.start}:00–${b.end}:00
+      </div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="timeline-header">Room Timeline</div>
+    <div class="timeline" style="position:relative">
+      ${overlapHTML}
+      <div class="time-axis">
+        ${axisLabels.map(l => `<span>${l}</span>`).join('')}
+      </div>
+      ${rows}
+    </div>
+  `;
+}
+
+function renderAlert() {
+  const container = document.getElementById('alertPreview');
+  const overlaps = findOverlaps();
+
+  if (overlaps.length === 0) {
+    container.innerHTML = `
+      <div class="alert-header">Notification Preview</div>
+      <div class="alert-box no-alert">No overlaps detected — no notification sent</div>
+    `;
+    return;
+  }
+
+  const o = overlaps[0];
+  const orgName = state.orgName;
+  const orgEmail = o.org;
+  const roomLines = o.rooms.map(r => {
+    const b = state.bookings.find(bk => bk.room === r);
+    return `  - ${r} — ${b ? b.start + ':00' : ''} to ${b ? b.end + ':00' : ''}`;
+  }).join('\n');
+  const now = new Date();
+  const ts = now.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+
+  const msg = `Block Booking Detected — Sandton City
+
+${orgName} (${orgEmail}) holds ${o.rooms.length} rooms simultaneously on Monday, 02 March 2026:
+${roomLines}
+
+Window: ${o.overlapStart}:00 - ${o.overlapEnd}:00
+
+One person cannot occupy multiple rooms at the same time.
+Please contact the organiser to confirm which rooms are genuinely
+required and release any that are not needed.
+
+SENTINEL · Sandton City · ${ts}`;
+
+  container.innerHTML = `
+    <div class="alert-header">Notification Preview</div>
+    <div class="alert-box">${escapeHtml(msg)}</div>
+  `;
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function updatePrompt() {
+  const overlaps = findOverlaps();
+  const parts = [];
+
+  parts.push(`SENTINEL monitors room booking confirmation emails for overlapping reservations.`);
+
+  if (state.bookings.length > 0) {
+    parts.push(`${state.orgName} has ${state.bookings.length} bookings: ${state.bookings.map(b => `${b.room} (${b.start}:00–${b.end}:00)`).join(', ')}.`);
+  }
+
+  if (state.minRooms !== 2) {
+    parts.push(`Alert threshold set to ${state.minRooms} simultaneous rooms (default is 2).`);
+  }
+
+  if (overlaps.length > 0) {
+    const o = overlaps[0];
+    parts.push(`OVERLAP DETECTED: ${o.rooms.length} rooms held simultaneously from ${o.overlapStart}:00 to ${o.overlapEnd}:00. Concierge notified immediately via Telegram/WhatsApp.`);
+  } else {
+    parts.push(`No overlaps detected — all bookings are sequential or held by different organisers.`);
+  }
+
+  document.getElementById('promptText').textContent = parts.join(' ');
+}
+
+function copyPrompt() {
+  const text = document.getElementById('promptText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+  });
+}
+
+async function playWorkflow() {
+  if (state.playing) return;
+  state.playing = true;
+  const btn = document.getElementById('playBtn');
+  btn.disabled = true;
+  btn.textContent = 'Playing...';
+
+  const totalSteps = findOverlaps().length > 0 ? 6 : 5;
+
+  for (let i = 0; i < totalSteps; i++) {
+    state.activeStep = i;
+    document.getElementById('stepIndicator').textContent = `Step ${i + 1} of ${totalSteps}`;
+    renderWorkflow();
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  await new Promise(r => setTimeout(r, 1500));
+  state.activeStep = -1;
+  state.playing = false;
+  btn.disabled = false;
+  btn.textContent = 'Play';
+  document.getElementById('stepIndicator').textContent = 'Done';
+  renderWorkflow();
+}
+
+// Init
+updateAll();
+</script>
+</body>
+</html>

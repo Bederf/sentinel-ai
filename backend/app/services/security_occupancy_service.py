@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from app.database.repositories.security_repository import get_security_repository
 from app.models.security import OccupancySource, SecurityOccupancy
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 from app.services.profile_service import get_profile_service
 
 logger = logging.getLogger(__name__)
@@ -109,7 +109,7 @@ class SecurityOccupancyService:
             total += occ_data["occupancy_count"]
 
         return {
-            "site_id": get_primary_site() or "unknown",
+            "site_id": get_primary_site_code() or "unknown",
             "site_name": "Sandton City Office Tower",
             "total_occupancy": total,
             "zones": zone_occupancies,

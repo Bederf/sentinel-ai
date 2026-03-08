@@ -144,7 +144,7 @@ class TestCorrectPointClassificationTool:
         # Correct a point
         result = await correct_point_classification(
             discovery_id=discovery_id,
-            point_name="CH-1_CHW_Supply_Temp",
+            point_name="S002-CHILLER-B1-001.temperature",
             correct_point_type="setpoint",
         )
 
@@ -191,7 +191,7 @@ class TestEndToEndWorkflow:
         # Step 3: Correct (optional)
         correct_result = await correct_point_classification(
             discovery_id=discovery_id,
-            point_name="CH-1_CHW_Supply_Temp",
+            point_name="S002-CHILLER-B1-001.temperature",
             correct_point_type="sensor",
         )
         assert correct_result["success"] is True
@@ -227,6 +227,9 @@ class TestToolRegistration:
         assert "correct_point_classification" in TOOL_HANDLERS
 
     def test_tool_count_matches(self):
-        """Verify CHAT_TOOLS and TOOL_HANDLERS have same count."""
-        assert len(CHAT_TOOLS) == len(TOOL_HANDLERS)
+        """Verify every CHAT_TOOL has a handler (handlers may have extras like process_recommendation)."""
+        tool_names = {t["name"] for t in CHAT_TOOLS}
+        handler_names = set(TOOL_HANDLERS.keys())
+        missing_handlers = tool_names - handler_names
+        assert not missing_handlers, f"Tools without handlers: {missing_handlers}"
         assert len(CHAT_TOOLS) >= 15  # At least the original 15 tools

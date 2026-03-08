@@ -154,6 +154,74 @@ class NotificationService:
             result["errors"]["system"] = str(e)
             return result
 
+    async def broadcast_alert(
+        self,
+        title: str,
+        body: str,
+        alert_level: AlertLevel = AlertLevel.CRITICAL,
+        notification_type: str = "plant_alert",
+    ) -> dict:
+        """Broadcast alert to all technicians with plant alert preferences.
+
+        For deployments without technician DB configured, falls back to
+        sending directly via each enabled provider to the default chat/number.
+
+        Returns:
+            {"success": bool, "recipients_notified": int, "errors": [...]}
+        """
+        result = {"success": False, "recipients_notified": 0, "errors": []}
+
+        # Try per-technician routing first
+        try:
+            tech_ids = await self.notification_repo.get_alert_subscribers(
+                alert_level=alert_level,
+                notification_type=notification_type,
+            )
+            if tech_ids:
+                for tech_id in tech_ids:
+                    tech_result = await self.notify_technician(
+                        technician_id=tech_id,
+                        title=title,
+                        body=body,
+                        alert_level=alert_level,
+                        notification_type=notification_type,
+                    )
+                    if tech_result["success"]:
+                        result["recipients_notified"] += 1
+                    else:
+                        result["errors"].extend(tech_result.get("errors", {}).values())
+                result["success"] = result["recipients_notified"] > 0
+                return result
+        except Exception as e:
+            logger.warning(f"Technician lookup failed, falling back to direct send: {e}")
+
+        # Fallback: send directly via each enabled provider to default recipient
+        for channel_type, provider in self.providers.items():
+            if not provider.is_enabled():
+                continue
+            try:
+                default_recipient = self._get_default_recipient(channel_type)
+                if not default_recipient:
+                    continue
+                send_result = await provider.send(default_recipient, title, body)
+                if send_result.success:
+                    result["recipients_notified"] += 1
+            except Exception as e:
+                result["errors"].append(f"{channel_type}: {e}")
+
+        result["success"] = result["recipients_notified"] > 0
+        return result
+
+    def _get_default_recipient(self, channel_type: ChannelType) -> str:
+        """Get default recipient for a channel when no technician DB available."""
+        from app.config.settings import settings
+
+        if channel_type == ChannelType.TELEGRAM:
+            return settings.telegram_alert_chat_id
+        elif channel_type == ChannelType.WHATSAPP:
+            return settings.twilio_whatsapp_to.replace("whatsapp:", "") if settings.twilio_whatsapp_to else ""
+        return ""
+
     async def _send_to_channel(
         self,
         channel: TechnicianNotificationChannel,

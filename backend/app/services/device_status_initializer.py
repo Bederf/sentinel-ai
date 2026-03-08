@@ -15,7 +15,7 @@ from typing import Dict, Optional, Any
 
 from app.database.supabase_client import get_supabase_client
 from app.services.solar_connector_simulation import SimulatedSolarConnector
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class DeviceStatusInitializer:
         """Get site configuration."""
         try:
             # For demo, return config for the primary registered site
-            primary = get_primary_site()
+            primary = get_primary_site_code()
             if site_id == primary:
                 return {
                     "site_id": site_id,
@@ -270,6 +270,6 @@ async def initialize_demo_devices(site_id: str | None = None) -> Dict[str, Any]:
     Returns:
         Initialization status and counts
     """
-    site_id = site_id or get_primary_site() or "unknown"
+    site_id = site_id or get_primary_site_code() or "unknown"
     initializer = DeviceStatusInitializer()
     return await initializer.initialize_site_devices(site_id)

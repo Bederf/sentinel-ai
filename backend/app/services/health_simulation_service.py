@@ -17,7 +17,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ class HealthSimulationService:
             "min_health": 10,  # Don't go below 10%
             "max_health": 98,  # Don't go above 98%
             "target_equipment_per_cycle": 10,  # How many to update per cycle
-            "site_id": get_primary_site() or "unknown",  # Target building for simulation
+            "site_id": get_primary_site_code() or "unknown",  # Target building for simulation
             "business_hours_only": True,  # Only run during business hours
             "business_hours_start": 8,  # 08:00
             "business_hours_end": 17,  # 17:00

@@ -333,6 +333,39 @@ class BackgroundSchedulerService:
 
         self._run_optimization_analysis()
 
+    def _is_optimization_enabled(self, site_id: str) -> bool:
+        """Check if optimization_enabled is True for a given site.
+
+        Checks Supabase first, falls back to sites.json.
+        Returns False if the flag is missing or explicitly False.
+        """
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            resp = client.table("sites").select("optimization_enabled").eq("code", site_id).limit(1).execute()
+            if resp.data:
+                return bool(resp.data[0].get("optimization_enabled"))
+        except Exception:
+            pass
+
+        # JSON fallback
+        try:
+            import json
+            from pathlib import Path
+
+            sites_path = Path(__file__).parent.parent / "data" / "sites.json"
+            if sites_path.exists():
+                with open(sites_path) as f:
+                    sites = json.load(f)
+                for site in sites:
+                    if site.get("code") == site_id:
+                        return bool(site.get("optimization_enabled"))
+        except Exception:
+            pass
+
+        return False
+
     def _run_optimization_analysis(self):
         """
         Run AI optimization analysis for all registered sites and persist
@@ -407,6 +440,14 @@ class BackgroundSchedulerService:
                                 continue
                     except Exception as gate_err:
                         logger.debug(f"[AI-OPT] Mode gate check failed for {site_id}: {gate_err}")
+
+                    # Optimization toggle gate: skip if optimization_enabled is off
+                    if not self._is_optimization_enabled(site_id):
+                        logger.info(
+                            f"[AI-OPT] Skipping LLM optimization for {site_id} "
+                            f"(optimization_enabled=False in site settings)"
+                        )
+                        continue
 
                     # Normalize site_id for storage: "site-002" → "S002"
                     # (the recommendation service queries with this format)
@@ -876,6 +917,59 @@ class BackgroundSchedulerService:
             f"(first run at {first_run.strftime('%H:%M:%S')})"
         )
 
+    def add_outcome_verification_job(self, interval_seconds: int = 300):
+        """Add a job to verify recommendation outcomes periodically.
+
+        Runs every 5 real minutes. Finds executed recommendations past the
+        30-minute settling period and verifies whether they achieved their
+        predicted impact by comparing actual sensor readings.
+
+        Args:
+            interval_seconds: Real-time interval between checks (default 5 min)
+        """
+        if self.scheduler.get_job("outcome_verification"):
+            self.scheduler.remove_job("outcome_verification")
+
+        first_run = datetime.now() + timedelta(seconds=120)  # 2-min warmup
+
+        self.scheduler.add_job(
+            func=self._run_outcome_verification,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="outcome_verification",
+            name="Recommendation Outcome Verification",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+        )
+        logger.info(
+            "Added outcome verification job: every %ds (first run at %s)",
+            interval_seconds,
+            first_run.strftime("%H:%M:%S"),
+        )
+
+    def _run_outcome_verification(self):
+        """Process pending outcome verifications for executed recommendations."""
+        try:
+            import asyncio
+
+            from app.services.recommendation_outcome_service import (
+                process_pending_verifications,
+            )
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                results = loop.run_until_complete(process_pending_verifications())
+                if results:
+                    logger.info(
+                        "[OUTCOME] Verified %d recommendation outcomes",
+                        len(results),
+                    )
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error("Outcome verification job failed: %s", e)
+
     def _run_recommendation_generation_gated(self):
         """Sim-time gate wrapper around _run_recommendation_generation."""
         import app.services.lifecycle_orchestrator as _orch_mod
@@ -949,15 +1043,28 @@ class BackgroundSchedulerService:
                         state = policy_service._load_state(sid, policy)
                         current_stage = state.get("current_stage", "commissioning")
                         if current_stage == "automatic":
-                            automatic_site_ids.add(sid)
+                            # Also check optimization_enabled toggle
+                            if self._is_optimization_enabled(sid):
+                                automatic_site_ids.add(sid)
+                            else:
+                                logger.info(
+                                    f"[AI-REC] Skipping recommendations for {sid} "
+                                    f"(optimization_enabled=False in site settings)"
+                                )
                         else:
                             logger.info(
                                 f"[AI-REC] Skipping recommendations for {sid} "
                                 f"(mode={current_stage}, requires 'automatic')"
                             )
                     else:
-                        # No policy file — allow by default (no gate)
-                        automatic_site_ids.add(sid)
+                        # No policy file — still check optimization_enabled toggle
+                        if self._is_optimization_enabled(sid):
+                            automatic_site_ids.add(sid)
+                        else:
+                            logger.info(
+                                f"[AI-REC] Skipping recommendations for {sid} "
+                                f"(optimization_enabled=False in site settings)"
+                            )
             except Exception as gate_err:
                 logger.debug(f"[AI-REC] Mode gate check failed: {gate_err}")
                 automatic_site_ids = None  # Disable gate on error
@@ -1724,6 +1831,14 @@ class BackgroundSchedulerService:
 
         except Exception as e:
             logger.error(f"Failed to process Sentry notifications: {e}", exc_info=True)
+
+        # Clean up expired Telegram conversation sessions
+        try:
+            from app.services.telegram_conversation_manager import get_conversation_manager
+
+            get_conversation_manager().cleanup_expired()
+        except Exception as e:
+            logger.debug(f"Telegram session cleanup: {e}")
 
     def add_simulation_queue_processor_job(self, interval_seconds: int = 10) -> None:
         """

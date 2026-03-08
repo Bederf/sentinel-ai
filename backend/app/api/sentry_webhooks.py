@@ -1352,3 +1352,147 @@ async def sentry_call_log_escalate(
         "supervisor_notified": supervisor_notified,
         "message": "Complaint flagged for supervisor review",
     }
+
+
+# ============================================================================
+# Telegram Conversation Flow Endpoints (Phase 147)
+# ============================================================================
+
+
+class TelegramMessagePayload(BaseModel):
+    """Incoming Telegram message forwarded by the gateway."""
+
+    chat_id: str
+    user_id: str
+    username: str = ""
+    display_name: str = ""
+    text: str = ""
+    has_photo: bool = False
+    photo_file_id: Optional[str] = None
+    message_id: Optional[int] = None
+
+
+class TelegramCallbackPayload(BaseModel):
+    """Incoming Telegram callback_query forwarded by the gateway."""
+
+    callback_query_id: str
+    chat_id: str
+    user_id: str
+    message_id: int
+    data: str
+
+
+@router.post("/telegram/message", status_code=status.HTTP_200_OK)
+async def handle_telegram_message(
+    payload: TelegramMessagePayload,
+    x_sentry_secret: Optional[str] = Header(None),
+):
+    """Handle incoming Telegram free-text message via conversation flow.
+
+    The gateway forwards non-slash-command messages here for intent
+    classification and multi-step conversation handling.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="telegram_message")
+
+    # Prompt guard
+    if payload.text:
+        guard_result = score_prompt(payload.text, "webhook")
+        if not guard_result.allow:
+            logger.warning(
+                "Telegram message blocked by prompt guard: user=%s score=%.2f",
+                payload.user_id,
+                guard_result.score,
+            )
+            return {"success": False, "error": "Message blocked by security filter"}
+
+    # POPIA consent check
+    consent_decision = evaluate_ingress_processing_consent(
+        data_subject_id=payload.user_id,
+        platform="telegram",
+        message_text=payload.text,
+    )
+    if not consent_decision.allow_processing:
+        return {
+            "success": False,
+            "requires_consent": True,
+            "consent_status": consent_decision.status,
+        }
+
+    # Classify and route
+    from app.services.telegram_conversation_manager import get_conversation_manager
+    from app.services.telegram_intent_classifier import classify_intent
+    from app.services.telegram_flow_handlers import route_to_handler
+
+    mgr = get_conversation_manager()
+    session = mgr.get_session(payload.chat_id)
+    has_session = session is not None
+
+    intent, confidence = classify_intent(payload.text, has_session)
+
+    try:
+        await route_to_handler(
+            intent,
+            payload.chat_id,
+            payload.text,
+            message_id=payload.message_id,
+        )
+    except Exception as e:
+        logger.error("Telegram flow handler error: %s", e, exc_info=True)
+        return {"success": False, "error": "Internal flow error"}
+
+    return {
+        "success": True,
+        "intent": intent.value,
+        "confidence": confidence,
+    }
+
+
+@router.post("/telegram/callback", status_code=status.HTTP_200_OK)
+async def handle_telegram_callback(
+    payload: TelegramCallbackPayload,
+    x_sentry_secret: Optional[str] = Header(None),
+):
+    """Handle incoming Telegram callback_query (inline button tap).
+
+    The gateway forwards button presses here. We dismiss the spinner,
+    classify intent with callback_data, and route to the flow handler.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="telegram_callback")
+
+    # Dismiss spinner
+    from app.services.telegram_message_sender import get_telegram_sender
+
+    try:
+        sender = get_telegram_sender()
+        await sender.answer_callback_query(payload.callback_query_id)
+    except Exception as e:
+        logger.warning("Failed to answer callback query: %s", e)
+
+    # Classify and route
+    from app.services.telegram_conversation_manager import get_conversation_manager
+    from app.services.telegram_intent_classifier import classify_intent
+    from app.services.telegram_flow_handlers import route_to_handler
+
+    mgr = get_conversation_manager()
+    session = mgr.get_session(payload.chat_id)
+    has_session = session is not None
+
+    intent, confidence = classify_intent("", has_session, callback_data=payload.data)
+
+    try:
+        await route_to_handler(
+            intent,
+            payload.chat_id,
+            "",
+            callback_data=payload.data,
+            message_id=payload.message_id,
+        )
+    except Exception as e:
+        logger.error("Telegram callback handler error: %s", e, exc_info=True)
+        return {"success": False, "error": "Internal flow error"}
+
+    return {
+        "success": True,
+        "intent": intent.value,
+        "confidence": confidence,
+    }

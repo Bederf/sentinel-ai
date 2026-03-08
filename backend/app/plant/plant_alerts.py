@@ -23,7 +23,7 @@ from app.plant.notification_throttle import (
     format_flood_summary,
     get_throttle,
 )
-from app.plant.whatsapp_notifier import send_plant_alert, send_raw_message
+from app.plant.plant_notifier import send_plant_alert, send_raw_message
 
 logger = logging.getLogger(__name__)
 

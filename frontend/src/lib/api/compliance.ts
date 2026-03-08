@@ -169,15 +169,10 @@ export const complianceApi = {
    * Fire Equipment - List fire equipment by site/zone
    */
   listFireEquipment: (siteCode: string, zoneId?: string) =>
-    fetchApi<FireEquipmentItem[]>('/api/compliance/fire/equipment', {
-      method: 'GET',
-      headers: {
-        'X-Query-Params': JSON.stringify({
-          site_code: siteCode,
-          ...(zoneId && { zone_id: zoneId }),
-        }),
-      },
-    }),
+    fetchApi<FireEquipmentItem[]>(
+      `/api/compliance/fire/equipment?site_code=${encodeURIComponent(siteCode)}${zoneId ? `&zone_id=${encodeURIComponent(zoneId)}` : ''}`,
+      { method: 'GET' },
+    ),
 
   /**
    * Fire Equipment - Schedule inspection

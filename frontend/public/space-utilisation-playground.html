@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL Space Utilisation Dashboard Playground</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a25;
+    --border: #2a2a3a;
+    --text: #e0e0e8;
+    --text-dim: #8888a0;
+    --accent: #00d4aa;
+    --accent-dim: #00d4aa33;
+    --warn: #ff6b6b;
+    --warn-dim: #ff6b6b22;
+    --info: #6ba3ff;
+    --amber: #ffb347;
+    --purple: #b388ff;
+    --cyan: #00e5ff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 12px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header h1 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 1px;
+  }
+  header .tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  .controls {
+    width: 320px;
+    min-width: 320px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 16px;
+  }
+  .preview {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+  }
+  .control-group {
+    margin-bottom: 16px;
+  }
+  .control-group h3 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .preset-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+    font-family: inherit;
+    background: var(--surface2);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover, .preset-btn.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  label span.val {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  input[type="range"] {
+    width: 100%;
+    margin-bottom: 10px;
+    accent-color: var(--accent);
+    background: transparent;
+  }
+  select, input[type="text"] {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-family: inherit;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 10px;
+  }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .toggle-row span {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .toggle {
+    position: relative;
+    width: 36px;
+    height: 20px;
+  }
+  .toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .toggle .slider {
+    position: absolute;
+    inset: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .toggle .slider::before {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    left: 2px;
+    top: 2px;
+    background: var(--text-dim);
+    border-radius: 50%;
+    transition: 0.2s;
+  }
+  .toggle input:checked + .slider {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+  }
+  .toggle input:checked + .slider::before {
+    transform: translateX(16px);
+    background: var(--accent);
+  }
+
+  /* Preview styles */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+  }
+  .kpi-card .kpi-value {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .kpi-card .kpi-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .kpi-card .kpi-delta {
+    font-size: 10px;
+    margin-top: 4px;
+  }
+  .kpi-card .kpi-delta.good { color: var(--accent); }
+  .kpi-card .kpi-delta.bad { color: var(--warn); }
+
+  .alert-banner {
+    background: var(--warn-dim);
+    border: 1px solid var(--warn);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+  }
+  .alert-banner .icon { font-size: 18px; }
+  .alert-banner.hidden { display: none; }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .panel h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .heatmap {
+    display: grid;
+    grid-template-columns: 60px repeat(10, 1fr);
+    gap: 2px;
+    font-size: 9px;
+  }
+  .heatmap .label {
+    display: flex;
+    align-items: center;
+    color: var(--text-dim);
+    padding-right: 4px;
+    justify-content: flex-end;
+  }
+  .heatmap .hour-label {
+    text-align: center;
+    color: var(--text-dim);
+    padding-bottom: 4px;
+  }
+  .heatmap .cell {
+    aspect-ratio: 1.6;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    color: rgba(255,255,255,0.5);
+    min-height: 18px;
+  }
+
+  .offender-table {
+    width: 100%;
+    font-size: 11px;
+    border-collapse: collapse;
+  }
+  .offender-table th {
+    text-align: left;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .offender-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .offender-table tr:hover { background: var(--surface2); }
+  .badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 600;
+  }
+  .badge.ghost { background: var(--warn-dim); color: var(--warn); }
+  .badge.early { background: #6ba3ff22; color: var(--info); }
+  .badge.brief { background: #ffb34722; color: var(--amber); }
+  .badge.sporadic { background: #b388ff22; color: var(--purple); }
+
+  .capacity-bars .bar-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+    gap: 8px;
+  }
+  .capacity-bars .bar-label {
+    width: 90px;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .capacity-bars .bar-track {
+    flex: 1;
+    height: 14px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+  .capacity-bars .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s;
+  }
+  .capacity-bars .bar-val {
+    width: 36px;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .ai-rec {
+    padding: 10px 12px;
+    background: var(--surface2);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 4px 4px 0;
+    margin-bottom: 8px;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .ai-rec .rec-type {
+    font-size: 9px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .timeline-item {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 11px;
+  }
+  .timeline-item .time {
+    width: 50px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .timeline-item .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+  .timeline-item .content { flex: 1; }
+
+  /* Prompt output */
+  .prompt-section {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 16px 20px;
+  }
+  .prompt-section h3 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .prompt-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text);
+    position: relative;
+    min-height: 60px;
+  }
+  .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 4px 10px;
+    font-size: 10px;
+    font-family: inherit;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .copy-btn:hover { background: var(--accent); color: var(--bg); }
+  .copy-btn.copied { background: var(--accent); color: var(--bg); }
+
+  .separator {
+    height: 1px;
+    background: var(--border);
+    margin: 12px 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SENTINEL SPACE INTELLIGENCE</h1>
+  <span class="tag">PLAYGROUND</span>
+</header>
+
+<div class="main">
+  <div class="controls">
+    <div class="control-group">
+      <h3>Presets</h3>
+      <div class="presets">
+        <button class="preset-btn active" onclick="applyPreset('healthy')">Healthy Floor</button>
+        <button class="preset-btn" onclick="applyPreset('ghost_heavy')">Ghost Heavy</button>
+        <button class="preset-btn" onclick="applyPreset('underutilised')">Underutilised</button>
+        <button class="preset-btn" onclick="applyPreset('peak_day')">Peak Day</button>
+        <button class="preset-btn" onclick="applyPreset('worst_case')">Worst Case</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h3>Building</h3>
+      <select id="building" onchange="updateAll()">
+        <option value="Fairland 2 (FNB)">Fairland 2 (FNB)</option>
+        <option value="Sandton HQ">Sandton HQ</option>
+        <option value="Rosebank Tower">Rosebank Tower</option>
+      </select>
+      <label>Total Meeting Rooms <span class="val" id="v_rooms">20</span></label>
+      <input type="range" id="totalRooms" min="5" max="60" value="20" oninput="updateAll()">
+      <label>Floor <span class="val" id="v_floor">1Q1</span></label>
+      <select id="floor" onchange="updateAll()">
+        <option value="1Q1">1Q1 (Ground)</option>
+        <option value="1Q2">1Q2 (First)</option>
+        <option value="1Q3">1Q3 (Second)</option>
+      </select>
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="control-group">
+      <h3>Ghost Bookings</h3>
+      <label>Ghost Rate % <span class="val" id="v_ghost">15</span></label>
+      <input type="range" id="ghostRate" min="0" max="60" value="15" oninput="updateAll()">
+      <label>Grace Period (min) <span class="val" id="v_grace">15</span></label>
+      <input type="range" id="gracePeriod" min="5" max="30" value="15" oninput="updateAll()">
+      <div class="toggle-row">
+        <span>Concierge Dispatch</span>
+        <label class="toggle"><input type="checkbox" id="conciergeEnabled" checked onchange="updateAll()"><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span>Cost Centre Charging</span>
+        <label class="toggle"><input type="checkbox" id="chargingEnabled" checked onchange="updateAll()"><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="control-group">
+      <h3>Right-Sizing Patterns</h3>
+      <label>Early Vacate Thresh (min) <span class="val" id="v_earlyVac">90</span></label>
+      <input type="range" id="earlyVacateThresh" min="30" max="120" value="90" oninput="updateAll()">
+      <label>Brief Occupation (min) <span class="val" id="v_brief">30</span></label>
+      <input type="range" id="briefThresh" min="10" max="60" value="30" oninput="updateAll()">
+      <label>Sporadic Use % <span class="val" id="v_sporadic">25</span></label>
+      <input type="range" id="sporadicThresh" min="10" max="50" value="25" oninput="updateAll()">
+      <label>Right-Sizing Rate % <span class="val" id="v_rsRate">20</span></label>
+      <input type="range" id="rsRate" min="0" max="50" value="20" oninput="updateAll()">
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="control-group">
+      <h3>Utilisation</h3>
+      <label>Peak Occupancy % <span class="val" id="v_peak">72</span></label>
+      <input type="range" id="peakOccupancy" min="10" max="100" value="72" oninput="updateAll()">
+      <label>Avg Occupancy % <span class="val" id="v_avg">48</span></label>
+      <input type="range" id="avgOccupancy" min="5" max="95" value="48" oninput="updateAll()">
+      <label>Bookings Today <span class="val" id="v_bookings">34</span></label>
+      <input type="range" id="bookingsToday" min="0" max="100" value="34" oninput="updateAll()">
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="control-group">
+      <h3>Offenders</h3>
+      <label>Repeat Offender Count <span class="val" id="v_offenders">3</span></label>
+      <input type="range" id="offenderCount" min="0" max="10" value="3" oninput="updateAll()">
+      <div class="toggle-row">
+        <span>Show ServiceNow Tickets</span>
+        <label class="toggle"><input type="checkbox" id="showTickets" checked onchange="updateAll()"><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span>AI Recommendations</span>
+        <label class="toggle"><input type="checkbox" id="showAI" checked onchange="updateAll()"><span class="slider"></span></label>
+      </div>
+    </div>
+  </div>
+
+  <div class="preview" id="preview">
+    <!-- Rendered by JS -->
+  </div>
+</div>
+
+<div class="prompt-section">
+  <h3>Generated Prompt</h3>
+  <div class="prompt-box" id="promptBox">
+    <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy</button>
+    <span id="promptText"></span>
+  </div>
+</div>
+
+<script>
+const DEFAULTS = {
+  totalRooms: 20, ghostRate: 15, gracePeriod: 15, conciergeEnabled: true,
+  chargingEnabled: true, earlyVacateThresh: 90, briefThresh: 30, sporadicThresh: 25,
+  rsRate: 20, peakOccupancy: 72, avgOccupancy: 48, bookingsToday: 34,
+  offenderCount: 3, showTickets: true, showAI: true, building: 'Fairland 2 (FNB)',
+  floor: '1Q1'
+};
+
+const PRESETS = {
+  healthy: { totalRooms: 20, ghostRate: 5, gracePeriod: 15, rsRate: 8, peakOccupancy: 82, avgOccupancy: 65, bookingsToday: 40, offenderCount: 1, conciergeEnabled: true, chargingEnabled: false },
+  ghost_heavy: { totalRooms: 20, ghostRate: 40, gracePeriod: 15, rsRate: 15, peakOccupancy: 55, avgOccupancy: 35, bookingsToday: 38, offenderCount: 5, conciergeEnabled: true, chargingEnabled: true },
+  underutilised: { totalRooms: 30, ghostRate: 10, gracePeriod: 20, rsRate: 45, peakOccupancy: 40, avgOccupancy: 22, bookingsToday: 15, offenderCount: 2, conciergeEnabled: true, chargingEnabled: false },
+  peak_day: { totalRooms: 20, ghostRate: 8, gracePeriod: 10, rsRate: 12, peakOccupancy: 95, avgOccupancy: 78, bookingsToday: 52, offenderCount: 2, conciergeEnabled: true, chargingEnabled: true },
+  worst_case: { totalRooms: 20, ghostRate: 55, gracePeriod: 15, rsRate: 40, peakOccupancy: 30, avgOccupancy: 18, bookingsToday: 42, offenderCount: 8, conciergeEnabled: true, chargingEnabled: true },
+};
+
+const OFFENDER_NAMES = [
+  { name: 'Bronwyn Mollentze', dept: 'Marketing', email: 'bronwyn.m@fnb.co.za' },
+  { name: 'Craig Henderson', dept: 'Legal', email: 'craig.h@fnb.co.za' },
+  { name: 'Sipho Ndlovu', dept: 'IT', email: 'sipho.n@fnb.co.za' },
+  { name: 'Fatima Patel', dept: 'Finance', email: 'fatima.p@fnb.co.za' },
+  { name: 'James van Wyk', dept: 'Operations', email: 'james.vw@fnb.co.za' },
+  { name: 'Lisa Botha', dept: 'HR', email: 'lisa.b@fnb.co.za' },
+  { name: 'David Nkosi', dept: 'Strategy', email: 'david.n@fnb.co.za' },
+  { name: 'Anita Govender', dept: 'Compliance', email: 'anita.g@fnb.co.za' },
+  { name: 'Mark du Plessis', dept: 'Facilities', email: 'mark.dp@fnb.co.za' },
+  { name: 'Nomsa Dlamini', dept: 'Procurement', email: 'nomsa.d@fnb.co.za' },
+];
+
+const ROOM_NAMES = [
+  'Boardroom A', 'Collab Hub', 'Focus Room 1', 'Focus Room 2', 'Meeting 3',
+  'Meeting 4', 'Meeting 5', 'Boardroom B', 'Huddle 1', 'Huddle 2',
+  'Training Room', 'Executive Suite', 'Quiet Room', 'Innovation Lab', 'Meeting 6',
+  'Meeting 7', 'Meeting 8', 'Meeting 9', 'Boardroom C', 'Breakout 1'
+];
+
+function getState() {
+  return {
+    totalRooms: +document.getElementById('totalRooms').value,
+    ghostRate: +document.getElementById('ghostRate').value,
+    gracePeriod: +document.getElementById('gracePeriod').value,
+    conciergeEnabled: document.getElementById('conciergeEnabled').checked,
+    chargingEnabled: document.getElementById('chargingEnabled').checked,
+    earlyVacateThresh: +document.getElementById('earlyVacateThresh').value,
+    briefThresh: +document.getElementById('briefThresh').value,
+    sporadicThresh: +document.getElementById('sporadicThresh').value,
+    rsRate: +document.getElementById('rsRate').value,
+    peakOccupancy: +document.getElementById('peakOccupancy').value,
+    avgOccupancy: +document.getElementById('avgOccupancy').value,
+    bookingsToday: +document.getElementById('bookingsToday').value,
+    offenderCount: +document.getElementById('offenderCount').value,
+    showTickets: document.getElementById('showTickets').checked,
+    showAI: document.getElementById('showAI').checked,
+    building: document.getElementById('building').value,
+    floor: document.getElementById('floor').value,
+  };
+}
+
+function applyPreset(name) {
+  const p = PRESETS[name];
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  for (const [k, v] of Object.entries(p)) {
+    const el = document.getElementById(k);
+    if (el) {
+      if (el.type === 'checkbox') el.checked = v;
+      else el.value = v;
+    }
+  }
+  updateAll();
+}
+
+function updateAll() {
+  const s = getState();
+  // Update value displays
+  document.getElementById('v_rooms').textContent = s.totalRooms;
+  document.getElementById('v_ghost').textContent = s.ghostRate;
+  document.getElementById('v_grace').textContent = s.gracePeriod;
+  document.getElementById('v_earlyVac').textContent = s.earlyVacateThresh;
+  document.getElementById('v_brief').textContent = s.briefThresh;
+  document.getElementById('v_sporadic').textContent = s.sporadicThresh;
+  document.getElementById('v_rsRate').textContent = s.rsRate;
+  document.getElementById('v_peak').textContent = s.peakOccupancy;
+  document.getElementById('v_avg').textContent = s.avgOccupancy;
+  document.getElementById('v_bookings').textContent = s.bookingsToday;
+  document.getElementById('v_offenders').textContent = s.offenderCount;
+  document.getElementById('v_floor').textContent = s.floor;
+
+  renderPreview(s);
+  updatePrompt(s);
+}
+
+function renderPreview(s) {
+  const ghostCount = Math.round(s.bookingsToday * s.ghostRate / 100);
+  const rsCount = Math.round(s.bookingsToday * s.rsRate / 100);
+  const activeNow = Math.round(s.totalRooms * s.peakOccupancy / 100);
+  const wasted = ghostCount + rsCount;
+  const hoursWasted = (wasted * 1.2).toFixed(1);
+
+  const alertClass = ghostCount >= 3 ? '' : 'hidden';
+  const alertMsg = ghostCount >= 5
+    ? `CRITICAL: ${ghostCount} ghost bookings detected this session. ${s.conciergeEnabled ? 'Concierge dispatched.' : 'No concierge dispatch configured.'} ${s.chargingEnabled ? 'Cost centres will be charged.' : ''}`
+    : `WARNING: ${ghostCount} ghost bookings detected. ${s.conciergeEnabled ? 'Concierge notified.' : ''}`;
+
+  // Generate heatmap data
+  const hours = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00'];
+  const rooms = ROOM_NAMES.slice(0, Math.min(s.totalRooms, 8));
+
+  let heatmapHTML = '<div class="heatmap"><div class="label"></div>';
+  hours.forEach(h => heatmapHTML += `<div class="hour-label">${h}</div>`);
+
+  rooms.forEach((room, ri) => {
+    heatmapHTML += `<div class="label">${room.length > 10 ? room.slice(0,9)+'...' : room}</div>`;
+    hours.forEach((_, hi) => {
+      const peak = hi >= 2 && hi <= 6;
+      const base = peak ? s.avgOccupancy + 15 : s.avgOccupancy - 10;
+      const occ = Math.min(100, Math.max(0, base + (Math.sin(ri * 3 + hi * 2) * 25)));
+      const isGhost = occ < 10 && Math.random() < s.ghostRate / 100;
+      let color;
+      if (isGhost) color = `rgba(255,107,107,0.7)`;
+      else if (occ > 75) color = `rgba(0,212,170,${0.3 + occ/200})`;
+      else if (occ > 40) color = `rgba(255,179,71,${0.2 + occ/300})`;
+      else if (occ > 10) color = `rgba(107,163,255,${0.15 + occ/400})`;
+      else color = `rgba(255,255,255,0.04)`;
+      heatmapHTML += `<div class="cell" style="background:${color}">${isGhost ? 'G' : ''}</div>`;
+    });
+  });
+  heatmapHTML += '</div>';
+
+  // Generate offender table
+  let offenderHTML = '';
+  const offenders = OFFENDER_NAMES.slice(0, s.offenderCount);
+  offenders.forEach((o, i) => {
+    const ghosts = Math.max(1, Math.round((s.offenderCount - i) * s.ghostRate / 20));
+    const types = ['ghost', 'early', 'brief', 'sporadic'];
+    const type = types[i % types.length];
+    const typeLabel = type === 'ghost' ? 'Ghost' : type === 'early' ? 'Early Vacate' : type === 'brief' ? 'Brief Use' : 'Sporadic';
+    offenderHTML += `<tr>
+      <td>${o.name}</td>
+      <td>${o.dept}</td>
+      <td>${ghosts} this week</td>
+      <td><span class="badge ${type}">${typeLabel}</span></td>
+      <td>${s.showTickets ? `<span style="color:var(--info)">RITM00${1240 + i}</span>` : '-'}</td>
+    </tr>`;
+  });
+
+  // Capacity bars
+  const capacities = [
+    { name: 'Boardroom A', cap: 12, pct: Math.min(100, s.peakOccupancy + 10) },
+    { name: 'Collab Hub', cap: 8, pct: s.peakOccupancy },
+    { name: 'Focus Room 1', cap: 4, pct: Math.max(0, s.avgOccupancy - 5) },
+    { name: 'Training Room', cap: 20, pct: Math.min(100, s.avgOccupancy + 20) },
+    { name: 'Executive Suite', cap: 6, pct: Math.max(0, s.peakOccupancy - 15) },
+  ];
+
+  let capHTML = '';
+  capacities.forEach(c => {
+    const col = c.pct > 80 ? 'var(--accent)' : c.pct > 50 ? 'var(--amber)' : c.pct > 20 ? 'var(--info)' : 'var(--text-dim)';
+    capHTML += `<div class="bar-row">
+      <div class="bar-label">${c.name}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${c.pct}%;background:${col}"></div></div>
+      <div class="bar-val">${c.pct}%</div>
+    </div>`;
+  });
+
+  // AI recommendations
+  let aiHTML = '';
+  if (s.showAI) {
+    if (s.ghostRate > 30) {
+      aiHTML += `<div class="ai-rec"><div class="rec-type">Policy</div>Ghost booking rate of ${s.ghostRate}% exceeds 20% threshold. Recommend implementing auto-release after ${s.gracePeriod}-minute grace period with mandatory cost centre charging at R150/incident.</div>`;
+    }
+    if (s.avgOccupancy < 40) {
+      aiHTML += `<div class="ai-rec"><div class="rec-type">Right-Sizing</div>Average occupancy at ${s.avgOccupancy}% suggests ${Math.ceil(s.totalRooms * 0.3)} rooms could be decommissioned or repurposed. Estimated annual saving: R${(s.totalRooms * 0.3 * 2400).toLocaleString()}.</div>`;
+    }
+    if (s.peakOccupancy > 85) {
+      aiHTML += `<div class="ai-rec"><div class="rec-type">Capacity</div>Peak utilisation at ${s.peakOccupancy}% — booking contention likely between 10:00-14:00. Consider staggered meeting times or overflow to ${s.floor === '1Q1' ? '1Q2' : '1Q1'} floor.</div>`;
+    }
+    if (s.rsRate > 25) {
+      aiHTML += `<div class="ai-rec"><div class="rec-type">Behaviour</div>${s.rsRate}% of bookings show right-sizing patterns. Top pattern: early vacate (>90 min unused). Recommend 45-minute default booking slots instead of 60-minute.</div>`;
+    }
+    if (!aiHTML) {
+      aiHTML = `<div class="ai-rec"><div class="rec-type">Status</div>Space utilisation within normal parameters. No immediate action required. Next review scheduled for Monday.</div>`;
+    }
+  }
+
+  // Timeline
+  const timelineEvents = [];
+  if (ghostCount > 0) {
+    timelineEvents.push({ time: '09:22', color: 'var(--warn)', text: `Ghost booking detected: Boardroom A booked by ${offenders[0]?.name || 'Unknown'}, empty after ${s.gracePeriod} min` });
+    if (s.conciergeEnabled) timelineEvents.push({ time: '09:23', color: 'var(--amber)', text: 'Concierge Maria dispatched to Boardroom A for physical inspection' });
+    timelineEvents.push({ time: '09:28', color: 'var(--accent)', text: `Boardroom A confirmed empty. ${s.chargingEnabled ? 'Cost centre MKT-001 charged R150.' : 'Room released, no charge.'}` });
+  }
+  if (rsCount > 0) {
+    timelineEvents.push({ time: '10:45', color: 'var(--info)', text: `Early vacate: Meeting 3 emptied 95 min before booking end. Room offered to waitlist.` });
+    timelineEvents.push({ time: '11:30', color: 'var(--purple)', text: `Brief occupation: Focus Room 2 used for 18 min of 60-min booking.` });
+  }
+  timelineEvents.push({ time: '14:00', color: 'var(--text-dim)', text: `Daily summary: ${s.bookingsToday} bookings, ${ghostCount} ghosts, ${rsCount} right-sizing flags, ${hoursWasted}h wasted.` });
+
+  let timelineHTML = timelineEvents.map(e =>
+    `<div class="timeline-item"><div class="time">${e.time}</div><div class="dot" style="background:${e.color}"></div><div class="content">${e.text}</div></div>`
+  ).join('');
+
+  const preview = document.getElementById('preview');
+  preview.innerHTML = `
+    <div class="alert-banner ${alertClass}">
+      <span class="icon">${ghostCount >= 5 ? '!!!' : '!'}</span>
+      <span>${alertMsg}</span>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-value" style="color:var(--accent)">${activeNow}/${s.totalRooms}</div>
+        <div class="kpi-label">Rooms Active Now</div>
+        <div class="kpi-delta ${s.peakOccupancy > 60 ? 'good' : 'bad'}">${s.peakOccupancy}% peak</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" style="color:${ghostCount > 5 ? 'var(--warn)' : ghostCount > 2 ? 'var(--amber)' : 'var(--accent)'}">${ghostCount}</div>
+        <div class="kpi-label">Ghost Bookings</div>
+        <div class="kpi-delta bad">${s.ghostRate}% rate</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" style="color:var(--info)">${rsCount}</div>
+        <div class="kpi-label">Right-Sizing Flags</div>
+        <div class="kpi-delta ${s.rsRate > 25 ? 'bad' : 'good'}">${s.rsRate}% rate</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" style="color:var(--amber)">${hoursWasted}h</div>
+        <div class="kpi-label">Hours Wasted</div>
+        <div class="kpi-delta bad">${wasted} bookings</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value" style="color:var(--text)">${s.bookingsToday}</div>
+        <div class="kpi-label">Bookings Today</div>
+        <div class="kpi-delta ${s.avgOccupancy > 50 ? 'good' : 'bad'}">${s.avgOccupancy}% avg</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h4>Room Heatmap (Presence)</h4>
+        ${heatmapHTML}
+      </div>
+      <div class="panel capacity-bars">
+        <h4>Room Capacity Utilisation</h4>
+        ${capHTML}
+      </div>
+    </div>
+
+    ${s.offenderCount > 0 ? `<div class="panel" style="margin-bottom:20px">
+      <h4>Repeat Offenders${s.showTickets ? ' + ServiceNow' : ''}</h4>
+      <table class="offender-table">
+        <tr><th>Name</th><th>Department</th><th>Incidents</th><th>Pattern</th><th>${s.showTickets ? 'Ticket' : ''}</th></tr>
+        ${offenderHTML}
+      </table>
+    </div>` : ''}
+
+    <div class="grid-2">
+      ${s.showAI ? `<div class="panel">
+        <h4>AI Recommendations</h4>
+        ${aiHTML}
+      </div>` : ''}
+      <div class="panel">
+        <h4>Incident Timeline</h4>
+        ${timelineHTML}
+      </div>
+    </div>
+  `;
+}
+
+function updatePrompt(s) {
+  const parts = [];
+  parts.push(`Build a Space Intelligence dashboard for ${s.building}, floor ${s.floor}, monitoring ${s.totalRooms} meeting rooms.`);
+
+  if (s.ghostRate !== DEFAULTS.ghostRate) parts.push(`Ghost booking rate is ${s.ghostRate}% (${s.ghostRate > 20 ? 'critical' : 'elevated'}).`);
+  if (s.gracePeriod !== DEFAULTS.gracePeriod) parts.push(`Grace period set to ${s.gracePeriod} minutes before flagging.`);
+  if (!s.conciergeEnabled) parts.push('Concierge dispatch is disabled.');
+  if (s.chargingEnabled && s.ghostRate > 10) parts.push('Cost centre charging enabled for ghost bookings at R150/incident.');
+  if (!s.chargingEnabled) parts.push('Cost centre charging is disabled.');
+
+  if (s.rsRate > 25) parts.push(`Right-sizing rate at ${s.rsRate}% — recommend reducing default booking slots to 45 minutes.`);
+  if (s.earlyVacateThresh !== DEFAULTS.earlyVacateThresh) parts.push(`Early vacate threshold: ${s.earlyVacateThresh} minutes remaining.`);
+  if (s.briefThresh !== DEFAULTS.briefThresh) parts.push(`Brief occupation threshold: ${s.briefThresh} minutes.`);
+  if (s.sporadicThresh !== DEFAULTS.sporadicThresh) parts.push(`Sporadic use threshold: ${s.sporadicThresh}% of booking duration.`);
+
+  if (s.peakOccupancy > 85) parts.push(`Peak utilisation at ${s.peakOccupancy}% — capacity pressure detected.`);
+  if (s.avgOccupancy < 35) parts.push(`Average occupancy only ${s.avgOccupancy}% — significant underutilisation.`);
+
+  if (s.offenderCount > 3) parts.push(`${s.offenderCount} repeat offenders identified for escalation.`);
+  if (s.showTickets) parts.push('Include ServiceNow auto-ticket integration.');
+  if (s.showAI) parts.push('Include AI-powered recommendations panel.');
+
+  document.getElementById('promptText').textContent = parts.join(' ');
+}
+
+function copyPrompt() {
+  const text = document.getElementById('promptText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+  });
+}
+
+// Init
+updateAll();
+</script>
+</body>
+</html>

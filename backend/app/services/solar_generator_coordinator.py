@@ -29,7 +29,7 @@ from datetime import datetime, timezone, timedelta
 from enum import Enum
 from typing import Dict, List, Optional, Any
 
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 from app.services.solar_config_service import get_site_solar_config
 
 logger = logging.getLogger(__name__)
@@ -252,7 +252,7 @@ class SolarGeneratorCoordinator:
 
     def _seed_demo_events(self) -> None:
         """Seed realistic generator event history for demo."""
-        site_id = get_primary_site() or "unknown"
+        site_id = get_primary_site_code() or "unknown"
         events: List[GeneratorEvent] = []
         now = datetime.now(timezone.utc)
 

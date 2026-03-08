@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 from app.database.supabase_client import get_supabase_client
 from app.services.tariff_schedule_service import TariffScheduleService
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class EnergyCostService:
     """Calculate energy costs from simulated power consumption."""
 
     def __init__(self, site_id: str | None = None, municipality: str = "City Power Johannesburg"):
-        self.site_id = site_id or get_primary_site() or "unknown"
+        self.site_id = site_id or get_primary_site_code() or "unknown"
         self.municipality = municipality
         self.supabase = get_supabase_client()
         self.tariff_svc = TariffScheduleService()

@@ -83,7 +83,7 @@ class TestRateLimitBurst:
         results = []
         for i in range(limit + 5):
             result = await server.call_tool(
-                "get_buildings",
+                "get_sites",
                 _auth_context=ctx,
                 _transport="sse",
             )
@@ -275,9 +275,9 @@ class TestMixedAbuse:
         # Exhaust read limit
         read_limit = settings.mcp_read_rate_limit
         for _ in range(read_limit):
-            allowed, _, _ = check_rate_limit(identity, "get_buildings")
+            allowed, _, _ = check_rate_limit(identity, "get_sites")
             # Should be allowed until limit
-        allowed, _, _ = check_rate_limit(identity, "get_buildings")
+        allowed, _, _ = check_rate_limit(identity, "get_sites")
         assert allowed is False, "Read limit should be exhausted"
 
         # Write limit should still have capacity
@@ -306,19 +306,19 @@ class TestToolTimeout:
         server = SIMBIOTMCPServer()
 
         # Replace handler with slow one
-        original = server.tool_handlers.get("get_buildings")
+        original = server.tool_handlers.get("get_sites")
 
         async def slow_handler(**kwargs):
             await asyncio.sleep(60)  # Way over any timeout
             return {"sites": []}
 
-        server.tool_handlers["get_buildings"] = slow_handler
+        server.tool_handlers["get_sites"] = slow_handler
 
         try:
             # Override timeout to 1s for test speed
             with patch("app.mcp.rate_limiter.get_tool_timeout", return_value=1):
                 result = await server.call_tool(
-                    "get_buildings",
+                    "get_sites",
                     _auth_context=_operator_ctx(),
                     _transport="sse",
                 )
@@ -327,7 +327,7 @@ class TestToolTimeout:
             assert result.get("code") == "TIMEOUT"
             assert "timed out" in result.get("error", "").lower()
         finally:
-            server.tool_handlers["get_buildings"] = original
+            server.tool_handlers["get_sites"] = original
 
 
 # ---------------------------------------------------------------------------

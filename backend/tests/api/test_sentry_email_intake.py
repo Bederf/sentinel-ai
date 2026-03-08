@@ -16,6 +16,7 @@ os.environ.setdefault("EMAIL_INTAKE_ENABLED", "true")
 
 from app.main import app  # noqa: E402
 from app.config.settings import settings  # noqa: E402
+from app.security.webhook_auth import _set_allowed_domains_for_testing  # noqa: E402
 
 client = TestClient(app)
 
@@ -39,6 +40,7 @@ def _setup_auth_and_clean_json():
     settings.sentry_bot_api_key = _TEST_API_KEY
     settings.sentry_webhook_secret = _TEST_SECRET
     settings.email_intake_enabled = True
+    _set_allowed_domains_for_testing([])  # Open mode: allow all domains in tests
     settings.email_intake_auto_wo_enabled = False
     # Disable AI agent for these tests — they test the keyword pipeline
     settings.email_intake_agent_enabled = False

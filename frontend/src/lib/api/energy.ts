@@ -53,8 +53,14 @@ const API_BASE = '/api'
 export async function fetchEnergyComparisonSummary(
   siteId: string,
 ): Promise<ComparisonSummary> {
+  const token = localStorage.getItem('sentinel_token')
+  const headers: Record<string, string> = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
   const response = await fetch(
     `${API_BASE}/energy/comparison-summary?site_id=${encodeURIComponent(siteId)}`,
+    { headers },
   )
   if (!response.ok) {
     throw new Error(`Failed to fetch energy comparison: ${response.statusText}`)

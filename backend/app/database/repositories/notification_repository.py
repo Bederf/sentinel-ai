@@ -87,6 +87,37 @@ class NotificationRepository:
         except Exception as e:
             logger.error(f"Error saving JSON to {json_file}: {e}")
 
+    # ========== Alert Subscribers ==========
+
+    async def get_alert_subscribers(
+        self,
+        alert_level: str = "critical",
+        notification_type: str = "plant_alert",
+    ) -> List[UUID]:
+        """Get technician IDs subscribed to alerts at this level."""
+        if self.use_json:
+            data = self._load_json_data(self.preferences_file)
+            result = []
+            for tid, prefs in data.items():
+                min_level = prefs.get("alert_level_min", "warning")
+                if min_level in self._level_includes(alert_level):
+                    result.append(UUID(tid))
+            return result
+
+        try:
+            result = self.client.table("technician_notification_preferences").select("technician_id").execute()
+            return [UUID(r["technician_id"]) for r in (result.data or [])]
+        except Exception as e:
+            logger.error(f"Error fetching alert subscribers: {e}")
+            return []
+
+    @staticmethod
+    def _level_includes(level: str) -> list:
+        """Return alert levels that would receive a notification at the given level."""
+        hierarchy = ["info", "warning", "critical"]
+        idx = hierarchy.index(level) if level in hierarchy else 0
+        return hierarchy[: idx + 1]
+
     # ========== Notification Channels ==========
 
     async def get_notification_channels(

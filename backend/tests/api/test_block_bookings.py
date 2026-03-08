@@ -51,7 +51,7 @@ MOCK_ALERT = BlockBookingAlert(
 # 9. GET /api/block-bookings/alerts
 class TestListAlerts:
     @patch(
-        "app.api.block_bookings.get_booking_store",
+        "app.services.block_booking_detector.booking_store.get_booking_store",
     )
     def test_list_open_alerts(self, mock_get_store, client):
         mock_store = MagicMock()
@@ -72,7 +72,7 @@ class TestListAlerts:
 # 10. POST /api/block-bookings/alerts/{id}/dismiss
 class TestDismissAlert:
     @patch(
-        "app.api.block_bookings.get_booking_store",
+        "app.services.block_booking_detector.booking_store.get_booking_store",
     )
     def test_dismiss_alert(self, mock_get_store, client):
         dismissed_alert = BlockBookingAlert(
@@ -104,7 +104,7 @@ class TestDismissAlert:
         assert data["dismissed_by"] == "concierge@example.com"
 
     @patch(
-        "app.api.block_bookings.get_booking_store",
+        "app.services.block_booking_detector.booking_store.get_booking_store",
     )
     def test_dismiss_nonexistent_alert_404(self, mock_get_store, client):
         mock_store = MagicMock()

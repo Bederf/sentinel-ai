@@ -73,6 +73,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
 
   // Fetch current flow rate (poll every 30 seconds)
   useEffect(() => {
+    if (!selectedSiteId) return;
     const fetchFlow = async () => {
       try {
         const flow = await waterApi.getCurrentFlow(selectedSiteId);
@@ -96,6 +97,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
 
   // Fetch consumption data (last 7 days)
   useEffect(() => {
+    if (!selectedSiteId) return;
     const fetchConsumption = async () => {
       try {
         await new Promise((resolve) => setTimeout(resolve, 400));
@@ -131,6 +133,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
 
   // Fetch alerts
   useEffect(() => {
+    if (!selectedSiteId) return;
     const fetchAlerts = async () => {
       try {
         await new Promise((resolve) => setTimeout(resolve, 500));
@@ -174,6 +177,7 @@ export function WaterPanel({ siteId: propSiteId }: WaterPanelProps) {
 
   // Fetch trending data
   useEffect(() => {
+    if (!selectedSiteId) return;
     const fetchTrending = async () => {
       try {
         await new Promise((resolve) => setTimeout(resolve, 600));

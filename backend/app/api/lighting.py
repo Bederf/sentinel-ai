@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Query
 
 from app.database.supabase_client import get_supabase_client
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 
 router = APIRouter()
 
@@ -1103,7 +1103,7 @@ async def get_detailed_occupancy(
                 # Map site_id to site_id for file path
                 site_id = site_id.replace("-", "_")
                 if site_id == "gateway-centre":  # Legacy mapping
-                    site_id = get_primary_site() or "unknown"
+                    site_id = get_primary_site_code() or "unknown"
 
                 zones_json_path = f"/opt/bms-intelligence/backend/app/data/buildings/{site_id}/zones.json"
                 logger.debug(f"Trying to load zones from: {zones_json_path}")

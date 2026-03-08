@@ -14,7 +14,7 @@ The simulation layer (simulation_persistence.py) writes JSON only.
 
 import json
 import logging
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 import os
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -26,7 +26,7 @@ class SentinelDataSync:
     """SENTINEL Supabase sync + ML pipeline feeder."""
 
     def __init__(self, site_id: str | None = None):
-        self.site_id = site_id or get_primary_site() or "unknown"
+        self.site_id = site_id or get_primary_site_code() or "unknown"
 
         # ML feeder — accumulates sensor data and triggers training
         from app.services.sentinel_ml_feeder import SentinelMLFeeder

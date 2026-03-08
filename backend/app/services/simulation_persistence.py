@@ -13,7 +13,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 from app.services.simulation_store import get_simulation_store
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ class SimulationPersistence:
     """BMS simulation persistence: JSON store only."""
 
     def __init__(self, site_id: str | None = None):
-        self.site_id = site_id or get_primary_site() or "unknown"
+        self.site_id = site_id or get_primary_site_code() or "unknown"
         self.store = get_simulation_store(site_id)
 
     async def persist_hourly_state(

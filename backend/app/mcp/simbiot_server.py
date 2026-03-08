@@ -24,7 +24,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from collections import defaultdict
 
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 from app.services.device_abstraction import device_manager
 from app.services.site_loader import get_site_loader
 
@@ -2186,7 +2186,7 @@ async def activate_site_tool(
 async def get_site_config_tool(site_id: str) -> Dict[str, Any]:
     """Get a site's full configuration."""
     # Resolve to primary registered site if not specified
-    site_id = site_id or get_primary_site() or "unknown"
+    site_id = site_id or get_primary_site_code() or "unknown"
 
     loader = get_site_loader()
     site = loader.get_site(site_id)
@@ -4455,7 +4455,7 @@ async def get_solar_overview_tool(site_id: str | None = None) -> Dict[str, Any]:
 
     MCP Tool: get_solar_overview
     """
-    site_id = site_id or get_primary_site() or "unknown"
+    site_id = site_id or get_primary_site_code() or "unknown"
 
     try:
         from app.services.solar_ingestion_service import get_solar_ingestion_service
@@ -4475,7 +4475,7 @@ async def get_bess_status_tool(site_id: str | None = None) -> Dict[str, Any]:
 
     MCP Tool: get_bess_status
     """
-    site_id = site_id or get_primary_site() or "unknown"
+    site_id = site_id or get_primary_site_code() or "unknown"
 
     try:
         from app.services.solar_ingestion_service import get_solar_ingestion_service
@@ -4509,7 +4509,7 @@ async def get_solar_savings_tool(
 
     MCP Tool: get_solar_savings
     """
-    site_id = site_id or get_primary_site() or "unknown"
+    site_id = site_id or get_primary_site_code() or "unknown"
     try:
         from app.services.solar_financial_service import get_solar_financial_service
 
@@ -4529,7 +4529,7 @@ async def get_solar_forecast_tool(
 
     MCP Tool: get_solar_forecast
     """
-    site_id = site_id or get_primary_site() or "unknown"
+    site_id = site_id or get_primary_site_code() or "unknown"
     try:
         from app.services.solar_forecast_service import get_solar_forecast_service
 
@@ -4546,7 +4546,7 @@ async def get_solar_diagnostics_tool(site_id: str | None = None) -> Dict[str, An
 
     MCP Tool: get_solar_diagnostics
     """
-    site_id = site_id or get_primary_site() or "unknown"
+    site_id = site_id or get_primary_site_code() or "unknown"
 
     try:
         from app.services.solar_performance_service import get_solar_performance_service

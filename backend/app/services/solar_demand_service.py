@@ -24,7 +24,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 
 from app.services.solar_config_service import get_site_solar_config
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 
 logger = logging.getLogger(__name__)
 
@@ -328,8 +328,8 @@ class SolarDemandService:
         self._demand_history: Dict[str, List[DemandInterval]] = {}
         self._monthly_peaks: Dict[str, List[MonthlyPeak]] = {}
         self._nmd_cache: Dict[str, float] = {}
-        self._load_config(get_primary_site() or "unknown")
-        self._seed_demo_data(get_primary_site() or "unknown")
+        self._load_config(get_primary_site_code() or "unknown")
+        self._seed_demo_data(get_primary_site_code() or "unknown")
 
     def _load_config(self, site_id: str):
         """Load site parameters from solar_config_service."""

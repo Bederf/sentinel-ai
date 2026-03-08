@@ -33,7 +33,7 @@ import jwt as pyjwt
 from fastapi import HTTPException, Request, status
 
 from app.config.settings import settings
-from app.core.site_resolver import get_primary_site
+from app.core.site_resolver import get_primary_site_code
 from app.database.repositories.user_entitlements_repository import (
     get_user_entitlements_repository,
 )
@@ -784,7 +784,7 @@ def require_module(*required_modules: "ModuleType"):
             )
 
         # Get site_id from request headers or context
-        site_id = request.headers.get("X-Site-Id") or get_primary_site() or "unknown"
+        site_id = request.headers.get("X-Site-Id") or get_primary_site_code() or "unknown"
 
         # Check if all required modules are active
         for module in required_modules:
