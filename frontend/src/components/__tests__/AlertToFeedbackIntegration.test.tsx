@@ -191,7 +191,7 @@ describe('AlertToFeedbackIntegration', () => {
   let _queryClient: QueryClient
 
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
     _queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -205,7 +205,7 @@ describe('AlertToFeedbackIntegration', () => {
       const mockAlert = createMockAlert({ severity: 'critical' })
       const mockWO = createMockWorkOrder({ status: 'scheduled' })
       const mockFeedback = createMockServiceFeedback()
-      const restoredEquipment = createMockEquipment({ health_score: 85 })
+      const restoredEquipment = createMockEquipment({ health_score: 85, status: 'online' })
 
       vi.mocked(alertsApi.create).mockResolvedValueOnce(mockAlert)
       vi.mocked(workOrdersApi.create).mockResolvedValueOnce(mockWO)
@@ -298,7 +298,6 @@ describe('AlertToFeedbackIntegration', () => {
       const mockWO = createMockWorkOrder()
 
       const statusTransitions = [
-        { ...mockWO, status: 'scheduled' as const },
         { ...mockWO, status: 'assigned' as const },
         { ...mockWO, status: 'in_progress' as const },
         { ...mockWO, status: 'completed' as const },

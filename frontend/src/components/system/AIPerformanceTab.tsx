@@ -250,7 +250,7 @@ export function AIPerformanceTab() {
     );
   }
 
-  if (runs.length === 0) {
+  if (!runs || runs.length === 0) {
     return (
       <div
         className="rounded-md p-8 text-center"

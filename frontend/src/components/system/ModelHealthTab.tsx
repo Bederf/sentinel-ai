@@ -342,7 +342,7 @@ export function ModelHealthTab() {
       )}
 
       {/* Model Status Table */}
-      {modelStatus && modelStatus.models.length > 0 && (
+      {modelStatus && modelStatus.models?.length > 0 && (
         <div
           className="rounded-md overflow-hidden"
           style={{
@@ -374,7 +374,7 @@ export function ModelHealthTab() {
                 </tr>
               </thead>
               <tbody>
-                {modelStatus.models.map((m, i) => (
+                {(modelStatus.models ?? []).map((m, i) => (
                   <tr key={i} style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
                     <td className="px-4 py-2 font-mono uppercase" style={{ color: "var(--color-sentinel-text-primary)" }}>
                       {m.model_type}
@@ -421,7 +421,7 @@ export function ModelHealthTab() {
       )}
 
       {/* A/B Tests */}
-      {abTests.length > 0 && (
+      {abTests?.length > 0 && (
         <div
           className="rounded-md overflow-hidden"
           style={{
@@ -484,7 +484,7 @@ export function ModelHealthTab() {
       )}
 
       {/* Empty state when no A/B tests */}
-      {abTests.length === 0 && !loading && (
+      {(!abTests || abTests.length === 0) && !loading && (
         <div
           className="rounded-md p-5"
           style={{

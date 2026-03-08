@@ -7,6 +7,15 @@ import { render, screen } from '@/test-utils';
 import ControlPanel from '../ControlPanel';
 import { createMockDevice } from '@/test-utils/factories';
 
+// Mock the module hooks so ControlPanel doesn't require ModuleProvider
+vi.mock('@/contexts/ModuleHooks', () => ({
+  useModules: () => ({
+    isModuleActive: () => true,
+    activeModules: [],
+    loading: false,
+  }),
+}));
+
 describe('ControlPanel', () => {
   const mockDevice = createMockDevice({
     id: 'device-001',
