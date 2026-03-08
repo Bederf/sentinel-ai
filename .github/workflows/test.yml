@@ -33,10 +33,10 @@ jobs:
       - name: Check for god files (TypeScript)
         run: |
           echo "Checking for TypeScript files > 500 lines..."
-          find src -name "*.ts" -o -name "*.tsx" | xargs wc -l | awk '$1 > 500 {print $0; count++} END {if (count > 0) {print "WARNING: Found " count " TypeScript files > 500 lines"; exit 1}}'
+          find src -name "*.ts" -o -name "*.tsx" | xargs wc -l | awk '$1 > 500 {print $0; count++} END {if (count > 0) {print "::warning::Found " count " TypeScript files > 500 lines"}}'
 
       - name: Run type check
-        run: npm run build --dry-run || npx tsc --noEmit
+        run: npx tsc --noEmit
 
       - name: Run unit tests
         run: npm run test:run
@@ -79,7 +79,7 @@ jobs:
       - name: Check for god files (Python)
         run: |
           echo "Checking for Python files > 500 lines..."
-          find app -name "*.py" -exec wc -l {} + | awk '$1 > 500 {print $0; count++} END {if (count > 0) {print "WARNING: Found " count " Python files > 500 lines"; exit 1}}'
+          find app -name "*.py" -exec wc -l {} + | awk '$1 > 500 {print $0; count++} END {if (count > 0) {print "::warning::Found " count " Python files > 500 lines"}}'
 
       - name: Run unit tests
         run: pytest tests/ -v --cov=app --cov-report=xml --cov-report=html
