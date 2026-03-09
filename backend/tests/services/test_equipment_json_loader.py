@@ -75,7 +75,7 @@ class TestLoadSiteEquipment:
 
     def test_malformed_json_skipped(self, tmp_path):
         """Malformed JSON files should be skipped with a warning, not crash."""
-        import app.services.equipment_json_loader as loader
+        from unittest.mock import patch
 
         equip_dir = tmp_path / "test-site" / "equipment"
         equip_dir.mkdir(parents=True)
@@ -87,13 +87,8 @@ class TestLoadSiteEquipment:
         # Write a malformed file
         (equip_dir / "BAD.json").write_text("{invalid json", encoding="utf-8")
 
-        # Save and restore _DATA_ROOT to avoid monkeypatch issues in CI
-        original = loader._DATA_ROOT
-        try:
-            loader._DATA_ROOT = tmp_path
+        with patch("app.services.equipment_json_loader._DATA_ROOT", tmp_path):
             equipment = load_site_equipment("test-site")
-        finally:
-            loader._DATA_ROOT = original
         assert len(equipment) == 1
         assert equipment[0]["code"] == "T001-AHU-001"
 
