@@ -24,7 +24,7 @@ describe('SolarConfigWizard Router Fix', () => {
         <SolarConfigWizard onComplete={mockOnComplete} />
       </QueryClientProvider>
     )
-    expect(screen.getByText(/Solar Configuration/i)).toBeInTheDocument()
+    expect(screen.getByText(/Solar Setup Wizard/i)).toBeInTheDocument()
   })
 
   it('should call onComplete callback instead of using useNavigate', async () => {
@@ -59,6 +59,6 @@ describe('SolarConfigWizard Router Fix', () => {
         <SolarConfigWizard onComplete={() => {}} />
       </QueryClientProvider>
     )
-    expect(screen.getByText(/Solar Configuration/i)).toBeInTheDocument()
+    expect(screen.getByText(/Solar Setup Wizard/i)).toBeInTheDocument()
   })
 })

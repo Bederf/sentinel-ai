@@ -33,15 +33,18 @@ class TestIngestionModeEnum:
     def test_demo_mode_overrides_shadow_live(self):
         from app.config.settings import Settings, IngestionMode
 
-        s = Settings(demo_mode=True, ingestion_mode="shadow_live")
-        assert s.resolved_ingestion_mode == IngestionMode.SIMULATION
-        assert not s.is_live_mode
+        # v36.0: DEMO_MODE no longer forces SIMULATION; it only bypasses auth
+        s = Settings(demo_mode=True, ingestion_mode="shadow_live", site002_source_enabled=False)
+        assert s.resolved_ingestion_mode == IngestionMode.SHADOW_LIVE
+        assert s.is_live_mode
 
     def test_demo_mode_overrides_live_control(self):
         from app.config.settings import Settings, IngestionMode
 
-        s = Settings(demo_mode=True, ingestion_mode="live_control")
-        assert s.resolved_ingestion_mode == IngestionMode.SIMULATION
+        # v36.0: DEMO_MODE no longer forces SIMULATION; it only bypasses auth
+        s = Settings(demo_mode=True, ingestion_mode="live_control", site002_source_enabled=False)
+        assert s.resolved_ingestion_mode == IngestionMode.LIVE_CONTROL
+        assert s.is_live_mode
 
     def test_shadow_live_without_demo(self):
         from app.config.settings import Settings, IngestionMode

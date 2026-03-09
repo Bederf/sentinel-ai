@@ -15,10 +15,14 @@ Specification:
 - Rate-limit violations logged to audit trail
 """
 
+import os
 import pytest
 from datetime import datetime
 from fastapi import Request
 from starlette.testclient import TestClient
+
+# Ensure JWT_SECRET_KEY is available for token creation in CI
+os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
 
 from app.api import auth as auth_api
 from app.main import app

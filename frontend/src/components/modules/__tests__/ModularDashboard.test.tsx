@@ -362,9 +362,10 @@ describe('ModularDashboard', () => {
     it('should show module health scores in tabs', () => {
       render(<ModularDashboard />);
 
-      // Health badge should be rendered (exact text may vary due to badge markup)
-      const badges = screen.getAllByRole('status');
-      expect(badges.length).toBeGreaterThan(0);
+      // Health badges are rendered as Badge components with health scores
+      // Look for health score text in the overview panel
+      expect(screen.getByText(/Health: 85%/)).toBeInTheDocument();
+      expect(screen.getByText(/Health: 65%/)).toBeInTheDocument();
     });
 
     it('should display all active modules in overview panel', () => {

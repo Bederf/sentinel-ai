@@ -83,10 +83,12 @@ describe('useDeviceControl', () => {
 
   beforeEach(() => {
     queryClient = createTestQueryClient();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.clearAllMocks();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     queryClient.clear();
   });
 

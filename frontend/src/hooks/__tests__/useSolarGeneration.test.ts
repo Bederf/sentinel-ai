@@ -29,8 +29,7 @@ function createTestQueryClient() {
     defaultOptions: {
       queries: {
         retry: 0,  // Disable all retries in tests
-        gcTime: 0,  // No garbage collection in tests
-        staleTime: Infinity,
+        gcTime: 5 * 60 * 1000,  // Keep cache for 5 minutes (match hook)
       },
     },
   });
@@ -98,7 +97,10 @@ describe('useSolarGeneration Hook (via useSolarOverview)', () => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Cancel all in-flight queries and clear cache to prevent mock value leaks
+    await queryClient.cancelQueries();
+    queryClient.removeQueries();
     queryClient.clear();
   });
 
@@ -242,12 +244,10 @@ describe('useSolarGeneration Hook (via useSolarOverview)', () => {
     it('should reflect changes in generation power', async () => {
       const sequence = createMockSolarGenerationSequence();
 
-      // Simulate gradual generation increase and decrease through day
-      for (const data of sequence) {
-        mockFetchSolarOverview.mockResolvedValueOnce(data);
-      }
+      // First fetch returns morning data
+      mockFetchSolarOverview.mockResolvedValueOnce(sequence[0]);
 
-      const { result, rerender } = renderHook(
+      const { result, unmount } = renderHook(
         () => useSolarOverview('site-002'),
         { wrapper: createWrapper(queryClient) }
       );
@@ -259,22 +259,26 @@ describe('useSolarGeneration Hook (via useSolarOverview)', () => {
       // Verify first measurement (morning)
       expect(result.current.data?.current_generation_kw).toBe(10.2);
 
-      // Rerender to get next reading
-      rerender();
+      // Set up the next response before invalidating
+      mockFetchSolarOverview.mockResolvedValueOnce(sequence[1]);
+
+      // Invalidate the query to force a refetch with the next mock value
+      await queryClient.invalidateQueries({ queryKey: ['solar-overview', 'site-002'] });
 
       await waitFor(() => {
         expect(result.current.data?.current_generation_kw).toBe(45.5);
       });
+
+      unmount();
     });
 
     it('should track BESS discharge pattern throughout day', async () => {
       const sequence = createMockSolarGenerationSequence();
 
-      for (const data of sequence) {
-        mockFetchSolarOverview.mockResolvedValueOnce(data);
-      }
+      // First fetch returns full charge
+      mockFetchSolarOverview.mockResolvedValueOnce(sequence[0]);
 
-      const { result, rerender } = renderHook(
+      const { result, unmount } = renderHook(
         () => useSolarOverview('site-002'),
         { wrapper: createWrapper(queryClient) }
       );
@@ -285,11 +289,17 @@ describe('useSolarGeneration Hook (via useSolarOverview)', () => {
 
       expect(result.current.data?.bess_soc_percent).toBe(95);
 
-      // Verify SOC decreases with discharge
-      rerender();
+      // Set up the next response before invalidating
+      mockFetchSolarOverview.mockResolvedValueOnce(sequence[1]);
+
+      // Invalidate the query to force a refetch
+      await queryClient.invalidateQueries({ queryKey: ['solar-overview', 'site-002'] });
+
       await waitFor(() => {
         expect(result.current.data?.bess_soc_percent).toBeLessThan(95);
       });
+
+      unmount();
     });
   });
 

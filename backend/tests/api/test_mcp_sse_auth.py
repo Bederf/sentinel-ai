@@ -9,12 +9,16 @@ Validates:
   - Real user identity propagation (replaces "mcp_tool")
 """
 
+import os
 import uuid
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import jwt as pyjwt
 import pytest
+
+# Ensure JWT_SECRET_KEY is available for token creation/validation in CI
+os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
 
 from app.config.settings import settings
 from app.mcp.auth import _validate_mcp_token, extract_mcp_token, require_mcp_auth
@@ -221,6 +225,7 @@ class TestRequireMCPAuth:
     @pytest.mark.asyncio
     async def test_accepts_jwt_bearer(self, monkeypatch):
         monkeypatch.setattr(settings, "demo_mode", False)
+        monkeypatch.setattr(settings, "jwt_secret_key", "test-only-jwt-secret-for-ci-at-least-32-chars")
         jwt_token = _make_jwt(email="alice@example.com", role="admin", user_id="alice-1")
 
         req = _make_request(headers={"Authorization": f"Bearer {jwt_token}"})

@@ -103,8 +103,8 @@ export function useDeviceControl(options: UseDeviceControlOptions = {}) {
         lastUpdate: new Date().toISOString(),
       }));
 
-      // Check safety status
-      await checkSafetyStatus(id);
+      // Check safety status (pass device directly to avoid stale closure)
+      await checkSafetyStatus(id, device);
     } catch (err) {
       console.error("Failed to fetch device:", err);
       setState((prev) => ({
@@ -117,11 +117,11 @@ export function useDeviceControl(options: UseDeviceControlOptions = {}) {
   }, []);
 
   // Check safety status
-  const checkSafetyStatus = useCallback(async (_id: string) => {
+  const checkSafetyStatus = useCallback(async (_id: string, deviceOverride?: Device | null) => {
     try {
       // TODO: Integrate with safety API from Plan 6-02
       // For now, simulate safety status based on device type
-      const device = state.device;
+      const device = deviceOverride ?? state.device;
       if (!device) return;
 
       let status: SafetyStatus = { status: "safe" };

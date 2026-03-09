@@ -14,6 +14,7 @@ async def test_chat_uses_local_fallback_when_cross_border_consent_missing(client
         yield "LOCAL_FALLBACK_RESPONSE"
 
     monkeypatch.setattr("app.api.chat.should_allow_cloud_processing", lambda _subject: False)
+    monkeypatch.setattr("app.api.chat.hybrid_ai_service.is_local_ai_only_mode", lambda: False)
     monkeypatch.setattr("app.api.chat.hybrid_ai_service.stream_response", _local_stream)
     monkeypatch.setattr(
         "app.api.chat.claude_service.stream_response",

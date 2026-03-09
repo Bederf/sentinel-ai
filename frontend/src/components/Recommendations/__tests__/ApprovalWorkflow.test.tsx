@@ -57,6 +57,23 @@ const mockRecommendations: Recommendation[] = [
   },
 ]
 
+/**
+ * Helper to click the "Approve" tab button inside the dialog.
+ * The dialog is rendered via createPortal to document.body.
+ * There are multiple "Approve" buttons: the list items' approve buttons
+ * and the dialog's tab button. The dialog tab button has class "text-sm".
+ */
+const clickDialogApproveTab = async (user: ReturnType<typeof userEvent.setup>) => {
+  const allApproveButtons = screen.getAllByRole('button', { name: /^approve$/i })
+  // The dialog tab button is the one with 'text-sm' class (smaller than list buttons)
+  const dialogApproveTab = allApproveButtons.find(btn =>
+    btn.className.includes('text-sm') && btn.className.includes('rounded') && !btn.className.includes('bg-blue-600')
+  )
+  if (dialogApproveTab) {
+    await user.click(dialogApproveTab)
+  }
+}
+
 describe('ApprovalWorkflow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -196,21 +213,15 @@ describe('ApprovalWorkflow', () => {
       )
       expect(dialogTitle).toBeInTheDocument()
 
-      // Scope queries to dialog to avoid matching list items
-      const dialog = dialogTitle.closest('[role="dialog"]') || document
+      // Check for equipment details in the dialog
+      expect(screen.getAllByText('S002-CHILLER-B1-001').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getByText('setpoint = 20°C')).toBeInTheDocument()
 
-      // Check for equipment details within dialog
-      expect(
-        within(dialog as HTMLElement).getAllByText('S002-CHILLER-B1-001')[0]
-      ).toBeInTheDocument()
-      expect(
-        within(dialog as HTMLElement).getByText('setpoint = 20°C')
-      ).toBeInTheDocument()
+      // Navigate to approve tab inside dialog to see the name input
+      await clickDialogApproveTab(user)
 
       // Verify dialog contains technician name input (core functionality)
-      expect(
-        within(dialog as HTMLElement).getByLabelText(/Your Name/i)
-      ).toBeInTheDocument()
+      expect(screen.getByLabelText(/Your Name/i)).toBeInTheDocument()
     })
 
     it('should require technician name before approval', async () => {
@@ -233,6 +244,9 @@ describe('ApprovalWorkflow', () => {
           screen.getByText('Approve Equipment Control')
         ).toBeInTheDocument()
       })
+
+      // Navigate to approve tab inside dialog
+      await clickDialogApproveTab(user)
 
       // Approve button should be disabled initially
       const approveDialogButton = screen.getByRole('button', {
@@ -283,6 +297,9 @@ describe('ApprovalWorkflow', () => {
           screen.getByText('Approve Equipment Control')
         ).toBeInTheDocument()
       })
+
+      // Navigate to approve tab inside dialog
+      await clickDialogApproveTab(user)
 
       // Fill form
       const nameInput = screen.getByPlaceholderText('e.g., John Smith')
@@ -349,6 +366,9 @@ describe('ApprovalWorkflow', () => {
         ).toBeInTheDocument()
       })
 
+      // Navigate to approve tab inside dialog
+      await clickDialogApproveTab(user)
+
       const nameInput = screen.getByPlaceholderText('e.g., John Smith')
       await user.type(nameInput, 'John Smith')
 
@@ -393,6 +413,9 @@ describe('ApprovalWorkflow', () => {
           screen.getByText('Approve Equipment Control')
         ).toBeInTheDocument()
       })
+
+      // Navigate to approve tab inside dialog
+      await clickDialogApproveTab(user)
 
       const nameInput = screen.getByPlaceholderText('e.g., John Smith')
       await user.type(nameInput, 'John Smith')
@@ -443,6 +466,9 @@ describe('ApprovalWorkflow', () => {
         ).toBeInTheDocument()
       })
 
+      // Navigate to approve tab inside dialog
+      await clickDialogApproveTab(user)
+
       const nameInput = screen.getByPlaceholderText('e.g., John Smith')
       await user.type(nameInput, 'John Smith')
 
@@ -489,6 +515,9 @@ describe('ApprovalWorkflow', () => {
         ).toBeInTheDocument()
       })
 
+      // Navigate to approve tab inside dialog
+      await clickDialogApproveTab(user)
+
       const nameInput = screen.getByPlaceholderText('e.g., John Smith')
       await user.type(nameInput, 'John Smith')
 
@@ -528,6 +557,9 @@ describe('ApprovalWorkflow', () => {
           screen.getByText('Approve Equipment Control')
         ).toBeInTheDocument()
       })
+
+      // Navigate to approve tab inside dialog
+      await clickDialogApproveTab(user)
 
       const nameInput = screen.getByPlaceholderText('e.g., John Smith')
       await user.type(nameInput, 'John Smith')
@@ -572,7 +604,10 @@ describe('ApprovalWorkflow', () => {
         ).toBeInTheDocument()
       })
 
-      // Verify the dialog has both tabs and name input
+      // Navigate to approve tab inside dialog to see the name input
+      await clickDialogApproveTab(user)
+
+      // Verify the dialog has name input on approve tab
       expect(screen.getByPlaceholderText('e.g., John Smith')).toBeInTheDocument()
 
       // Note: Tab switching and rejection submission are tested at dialog component level
@@ -676,6 +711,9 @@ describe('ApprovalWorkflow', () => {
           screen.getByText('Approve Equipment Control')
         ).toBeInTheDocument()
       })
+
+      // Navigate to approve tab inside dialog
+      await clickDialogApproveTab(user)
 
       const nameInput = screen.getByPlaceholderText('e.g., John Smith')
       await user.type(nameInput, 'John Smith')

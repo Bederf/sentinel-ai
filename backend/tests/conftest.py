@@ -9,6 +9,7 @@ import warnings
 # allows requests without a real JWT token (localhost bypass).
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("TESTING", "true")
+os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
 warnings.filterwarnings(
     "ignore",
     message="Please use `import python_multipart` instead.",

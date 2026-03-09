@@ -144,10 +144,9 @@ class TestDXFParserBenchmark:
         for i in range(10):
             msp.add_circle((20 + i * 10, 40, 0), radius=1.5, dxfattribs={"layer": "AE-HVAC"})
 
-        stream = io.BytesIO()
+        stream = io.StringIO()
         doc.write(stream)
-        stream.seek(0)
-        dxf_bytes = stream.read()
+        dxf_bytes = stream.getvalue().encode("utf-8")
 
         start_time = time.time()
         config = await parser.parse_dxf_file(dxf_bytes, "site-002", "Test")

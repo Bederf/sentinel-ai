@@ -94,9 +94,13 @@ describe('ApprovalDialog', () => {
       />
     )
 
+    // Dialog opens on "details" tab by default, click "Approve" tab first
+    const approveTab = screen.getByRole('button', { name: /^approve$/i })
+    await user.click(approveTab)
+
     expect(screen.getByText('Approval Notes (optional)')).toBeInTheDocument()
 
-    const rejectTab = screen.getByRole('button', { name: /reject/i })
+    const rejectTab = screen.getByRole('button', { name: /^reject$/i })
     await user.click(rejectTab)
 
     expect(screen.getByText('Rejection Reason *')).toBeInTheDocument()
@@ -113,6 +117,10 @@ describe('ApprovalDialog', () => {
         onClose={mockOnClose}
       />
     )
+
+    // Navigate to approve tab first
+    const approveTab = screen.getByRole('button', { name: /^approve$/i })
+    await user.click(approveTab)
 
     const approveButton = screen.getByRole('button', {
       name: /approve & execute/i,
@@ -153,6 +161,10 @@ describe('ApprovalDialog', () => {
         onClose={mockOnClose}
       />
     )
+
+    // Navigate to approve tab first
+    const approveTab = screen.getByRole('button', { name: /^approve$/i })
+    await user.click(approveTab)
 
     const nameInput = screen.getByPlaceholderText('e.g., John Smith')
     await user.type(nameInput, 'John Smith')
@@ -203,6 +215,10 @@ describe('ApprovalDialog', () => {
       />
     )
 
+    // Navigate to approve tab first
+    const approveTab = screen.getByRole('button', { name: /^approve$/i })
+    await user.click(approveTab)
+
     const nameInput = screen.getByPlaceholderText('e.g., John Smith')
     await user.type(nameInput, 'John Smith')
 
@@ -245,6 +261,10 @@ describe('ApprovalDialog', () => {
         onClose={mockOnClose}
       />
     )
+
+    // Navigate to approve tab to see the name input
+    const approveTab = screen.getByRole('button', { name: /^approve$/i })
+    await user.click(approveTab)
 
     const nameInput = screen.getByPlaceholderText('e.g., John Smith')
     await user.type(nameInput, 'John Smith')

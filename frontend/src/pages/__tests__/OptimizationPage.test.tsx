@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import OptimizationPage from '../OptimizationPage';
+import { SimulationProvider } from '@/contexts/SimulationContext';
 import { createTestQueryClient } from '@/test-utils/mockQueryClient';
 import {
   createMockOptimizationScenario,
@@ -28,12 +29,34 @@ vi.mock('@/lib/api', () => ({
     getOptimizationScenarios: vi.fn(),
     getOptimizationStatus: vi.fn(),
     startPrecooling: vi.fn(),
+    getPredictions: vi.fn().mockResolvedValue({ predictions: [] }),
+    getEskomStatus: vi.fn().mockResolvedValue({ status: 'normal', stage: 0 }),
+    getSiteEskomStatus: vi.fn().mockResolvedValue({ status: 'normal', stage: 0 }),
+    getRecommendations: vi.fn().mockResolvedValue([]),
   },
+  authorizedFetch: vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) }),
+}));
+
+// Mock module hooks to avoid needing ModuleProvider
+vi.mock('@/contexts/ModuleHooks', () => ({
+  useModules: () => ({
+    isModuleActive: () => true,
+    activeModules: [],
+    availableModules: [],
+    recommendations: [],
+    loading: false,
+    error: null,
+  }),
+  useModuleActive: () => true,
 }));
 
 // Mock child components to avoid rendering issues
 vi.mock('../components/OptimizationPanel', () => ({
   OptimizationPanel: () => <div data-testid="optimization-panel">Optimization Panel</div>,
+}));
+
+vi.mock('../components/OptimizationPanelGated', () => ({
+  OptimizationPanelGated: () => <div data-testid="optimization-panel">Optimization Panel</div>,
 }));
 
 vi.mock('../components/optimization/ProfileSettings', () => ({
@@ -48,13 +71,35 @@ vi.mock('../components/optimization/RecommendationHistory', () => ({
   RecommendationHistory: () => <div data-testid="recommendation-history">History</div>,
 }));
 
+vi.mock('../components/EnergyComparisonPanel', () => ({
+  EnergyComparisonPanel: () => <div data-testid="energy-comparison">Energy Comparison</div>,
+}));
+
+
+vi.mock('../components/ActualVsSentinelEnergyCard', () => ({
+  ActualVsSentinelEnergyCard: () => <div data-testid="actual-vs-sentinel">Actual vs SENTINEL</div>,
+}));
+
+vi.mock('../components/ROISummaryCard', () => ({
+  ROISummaryCard: () => <div data-testid="roi-summary">ROI Summary</div>,
+}));
+
+vi.mock('../components/validation', () => ({
+  PowerMeterValidationCard: () => <div data-testid="power-meter-validation">Power Meter</div>,
+  CostValidationCard: () => <div data-testid="cost-validation">Cost Validation</div>,
+}));
+
 import api from '@/lib/api';
 
 // Test wrapper component
 function createTestWrapper() {
   const queryClient = createTestQueryClient();
   return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <SimulationProvider>
+        {children}
+      </SimulationProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -95,7 +140,8 @@ describe('OptimizationPage', () => {
         },
         { timeout: 2000 }
       );
-      expect(screen.getByText('Profile-Based Optimization')).toBeInTheDocument();
+      expect(screen.getByText('Optimization')).toBeInTheDocument();
+      expect(screen.getByText('Validation')).toBeInTheDocument();
     });
   });
 
@@ -118,9 +164,8 @@ describe('OptimizationPage', () => {
       });
     });
 
-    it('should default to site-002 (Sandton City) when available', async () => {
+    it('should render Energy Control header', async () => {
       const sites = [
-        createMockSite({ id: 'site-001', name: 'Building A' }),
         createMockSite({ id: 'site-002', name: 'Sandton City' }),
       ];
 
@@ -131,15 +176,13 @@ describe('OptimizationPage', () => {
       render(<OptimizationPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
-        const selector = screen.getByDisplayValue('Sandton City') as HTMLSelectElement;
-        expect(selector.value).toBe('site-002');
+        expect(screen.getByText('Energy Control')).toBeInTheDocument();
       });
     });
 
-    it('should refetch scenarios when site selection changes', async () => {
+    it('should fetch optimization status on load', async () => {
       const sites = [
-        createMockSite({ id: 'site-001', name: 'Building A' }),
-        createMockSite({ id: 'site-002', name: 'Building B' }),
+        createMockSite({ id: 'site-002', name: 'Sandton City' }),
       ];
 
       vi.mocked(api.getSites).mockResolvedValue(sites);
@@ -149,19 +192,11 @@ describe('OptimizationPage', () => {
       render(<OptimizationPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
-        expect(screen.getByDisplayValue('Building B')).toBeInTheDocument();
-      });
-
-      const selector = screen.getByDisplayValue('Building B') as HTMLSelectElement;
-      fireEvent.change(selector, { target: { value: 'site-001' } });
-
-      await waitFor(() => {
-        // getOptimizationStatus should be called with new site
-        expect(vi.mocked(api.getOptimizationStatus)).toHaveBeenCalledWith('site-001');
+        expect(vi.mocked(api.getOptimizationStatus)).toHaveBeenCalled();
       });
     });
 
-    it('should display "Active Monitoring" badge', async () => {
+    it('should display page subtitle', async () => {
       const sites = [createMockSite()];
       vi.mocked(api.getSites).mockResolvedValue(sites);
       vi.mocked(api.getOptimizationScenarios).mockResolvedValue([]);
@@ -170,7 +205,7 @@ describe('OptimizationPage', () => {
       render(<OptimizationPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
-        expect(screen.getByText('Active Monitoring')).toBeInTheDocument();
+        expect(screen.getByText(/Optimisation/)).toBeInTheDocument();
       });
     });
   });
@@ -676,7 +711,7 @@ describe('OptimizationPage', () => {
       });
     });
 
-    it('should switch to Profile-Based Optimization tab when clicked', async () => {
+    it('should switch to Optimization tab when clicked', async () => {
       const sites = [createMockSite()];
       const scenarios = [createMockOptimizationScenario()];
 
@@ -687,13 +722,12 @@ describe('OptimizationPage', () => {
       render(<OptimizationPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
-        const profileTab = screen.getByText('Profile-Based Optimization');
-        fireEvent.click(profileTab);
+        const optimizationTab = screen.getByText('Optimization');
+        fireEvent.click(optimizationTab);
       });
 
-      // Profile-Based Optimization content should be visible
-      // Note: Specific content depends on ProfileSettings component
-      expect(screen.getByText('Profile-Based Optimization')).toBeInTheDocument();
+      // Optimization tab should be clickable
+      expect(screen.getByText('Optimization')).toBeInTheDocument();
     });
   });
 

@@ -41,9 +41,16 @@ def test_addon_feedback_eligible_with_site_id_normalization(monkeypatch):
     monkeypatch.setattr(MLFeedbackService, "_load_state", lambda self: None)
     service = MLFeedbackService()
 
-    from app.services import module_registry_service as registry_module
+    import app.services.module_registry_service as registry_module
 
     dummy_registry = _DummyModuleRegistry({"site-002": {"control"}})
     monkeypatch.setattr(registry_module, "module_registry", dummy_registry)
 
-    assert service._is_module_eligible_for_feedback("S002", "control") is True
+    result = service._is_module_eligible_for_feedback("S002", "control")
+    # The service normalises "S002" to "site-002" via _candidate_site_ids
+    # and checks the dummy registry which has "control" active for "site-002".
+    assert result is True, (
+        f"Expected True but got {result}. "
+        f"Candidate IDs: {service._candidate_site_ids('S002')}, "
+        f"Registry sites: {dummy_registry._active_modules_by_site}"
+    )

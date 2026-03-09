@@ -11,11 +11,15 @@ Validates:
 
 import asyncio
 import json
+import os
 import time
 import uuid
 from datetime import datetime, timedelta
 
 import pytest
+
+# Ensure JWT_SECRET_KEY is available for token creation/validation in CI
+os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
 
 from app.config.settings import settings
 from app.models.auth import AuthContext, SentinelRole
@@ -42,6 +46,11 @@ def _operator_ctx(user_id: str = "user-1") -> AuthContext:
 
 class TestJWTIssuerAudience:
     """JWT tokens must have correct iss and aud claims."""
+
+    def setup_method(self):
+        """Ensure jwt_secret_key is set for CI environments."""
+        if not settings.jwt_secret_key and not settings.supabase_key:
+            object.__setattr__(settings, "jwt_secret_key", "test-only-jwt-secret-for-ci-at-least-32-chars")
 
     def test_valid_token_passes(self):
         """Token with correct iss and aud passes validation."""

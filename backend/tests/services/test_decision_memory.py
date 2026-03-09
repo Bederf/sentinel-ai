@@ -16,19 +16,37 @@ from app.services.decision_memory_service import (
 )
 
 
-@pytest.fixture
-def svc(tmp_path):
-    """Create a fresh service with temporary storage."""
-    reset_decision_memory_service()
-    service = DecisionMemoryService()
-    # Redirect storage to tmp
+@pytest.fixture(autouse=True)
+def _reset_decision_memory(tmp_path):
+    """Reset singleton and module-level paths before each test to prevent state pollution."""
     import app.services.decision_memory_service as mod
 
+    orig_data_dir = mod.DATA_DIR
+    orig_records = mod.RECORDS_FILE
+    orig_patterns = mod.PATTERNS_FILE
+
+    reset_decision_memory_service()
     mod.DATA_DIR = tmp_path
     mod.RECORDS_FILE = tmp_path / "decision_records.json"
     mod.PATTERNS_FILE = tmp_path / "decision_patterns.json"
     (tmp_path / "decision_records.json").write_text("[]")
     (tmp_path / "decision_patterns.json").write_text("[]")
+
+    yield
+
+    # Restore original paths so other test modules aren't affected
+    reset_decision_memory_service()
+    mod.DATA_DIR = orig_data_dir
+    mod.RECORDS_FILE = orig_records
+    mod.PATTERNS_FILE = orig_patterns
+
+
+@pytest.fixture
+def svc(tmp_path):
+    """Create a fresh service with temporary storage."""
+    reset_decision_memory_service()
+    service = DecisionMemoryService()
+    # Paths already redirected by autouse _reset_decision_memory fixture
     service._loaded = False
     return service
 

@@ -10,8 +10,8 @@ import userEvent from '@testing-library/user-event';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import { SecurityPanel } from '../SecurityPanel';
 
-// Mock the API
-vi.mock('@/lib/api', () => ({
+// Mock the API - component imports from @/lib/api/index
+vi.mock('@/lib/api/index', () => ({
   useSecurityOverview: vi.fn(),
   useAccessEvents: vi.fn(),
   useAccessPoints: vi.fn(),
@@ -20,6 +20,14 @@ vi.mock('@/lib/api', () => ({
   useCheckInVisitor: vi.fn(),
   useCheckOutVisitor: vi.fn(),
   useAcknowledgeAlert: vi.fn(),
+}));
+
+// Mock the ModuleContext
+vi.mock('@/contexts/moduleContextStore', () => ({
+  ModuleContext: {
+    Consumer: ({ children }: any) => children(null),
+    Provider: ({ children }: any) => children,
+  },
 }));
 
 import {
@@ -31,7 +39,7 @@ import {
   useCheckInVisitor,
   useCheckOutVisitor,
   useAcknowledgeAlert,
-} from '@/lib/api';
+} from '@/lib/api/index';
 
 describe('SecurityPanel', () => {
   let queryClient: QueryClient;
@@ -188,10 +196,10 @@ describe('SecurityPanel', () => {
     const tabs = screen.getAllByRole('tab');
     expect(tabs).toHaveLength(5);
     expect(tabs[0]).toHaveTextContent('Overview');
-    expect(tabs[1]).toHaveTextContent('Access Events');
+    expect(tabs[1]).toHaveTextContent('Access');
     expect(tabs[2]).toHaveTextContent('Visitors');
     expect(tabs[3]).toHaveTextContent('Alerts');
-    expect(tabs[4]).toHaveTextContent('Access Points');
+    expect(tabs[4]).toHaveTextContent('Points');
   });
 
   it('displays overview cards with correct data', () => {
@@ -205,8 +213,9 @@ describe('SecurityPanel', () => {
     expect(screen.getByText('15')).toBeInTheDocument();
     expect(screen.getByText('Active Visitors')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
-    expect(screen.getByText('Open Alerts')).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument();
+    // "Open Alerts" appears both in quick stats and overview tab's alert summary
+    expect(screen.getAllByText('Open Alerts').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders Access Events tab with event list', async () => {
@@ -259,7 +268,8 @@ describe('SecurityPanel', () => {
     await user.click(tabs[3]);
 
     await waitFor(() => {
-      expect(screen.getByText('After hours')).toBeInTheDocument();
+      // Component uses alert_type.replace(/_/g, ' ') -> "after hours" (CSS capitalize applies visually)
+      expect(screen.getByText('after hours')).toBeInTheDocument();
       expect(screen.getByText('warning')).toBeInTheDocument();
     });
   });

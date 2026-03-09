@@ -22,6 +22,17 @@ from unittest.mock import Mock, patch
 from httpx import AsyncClient
 
 
+@pytest.fixture(autouse=True)
+def enable_site002_source():
+    """Enable SITE002 source so lifecycle simulation endpoints return real data."""
+    from app.config.settings import settings as app_settings
+
+    original = app_settings.site002_source_enabled
+    app_settings.site002_source_enabled = True
+    yield
+    app_settings.site002_source_enabled = original
+
+
 # Simple wrapper class for mock events
 class MockEvent:
     """Minimal event wrapper for endpoint compatibility."""

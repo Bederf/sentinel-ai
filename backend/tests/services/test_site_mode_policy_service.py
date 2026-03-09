@@ -160,13 +160,19 @@ async def test_repromotion_stability_blocks_automatic_promotion(tmp_path, monkey
     now = datetime(2026, 2, 21, 12, 0, 0, tzinfo=UTC)
     monkeypatch.setattr("app.services.site_mode_policy_service._utcnow", lambda: now)
 
+    demoted_at = now - timedelta(hours=1)
     state_path = tmp_path / "site-002-mode-policy-state.json"
     state_path.write_text(
         json.dumps(
             {
                 "site_id": "site-002",
                 "current_stage": "supervised",
-                "last_demoted_at": (now - timedelta(hours=1)).isoformat(),
+                "candidate_stage": None,
+                "candidate_since": None,
+                "violation_stage": None,
+                "violation_since": None,
+                "last_demoted_at": demoted_at.isoformat(),
+                "last_evaluated_at": None,
             },
             indent=2,
         ),
@@ -187,7 +193,11 @@ async def test_repromotion_stability_blocks_automatic_promotion(tmp_path, monkey
 
     result = await svc.evaluate_site("site-002")
 
-    assert result["decision"] == "hold"
+    assert result["decision"] == "hold", (
+        f"Expected 'hold' but got '{result['decision']}'. "
+        f"Reasons: {result.get('reasons')}, "
+        f"last_demoted_at={demoted_at.isoformat()}, now={now.isoformat()}"
+    )
     assert result["state_before"] == "supervised"
     assert result["state_after"] == "supervised"
     assert any("repromotion_stability" in reason for reason in result["reasons"])

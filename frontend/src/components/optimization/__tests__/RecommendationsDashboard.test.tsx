@@ -100,7 +100,7 @@ describe('RecommendationsDashboard', () => {
     await waitFor(() => {
       expect(optimization.optimizationApi.approve).toHaveBeenCalledWith(
         'rec-1',
-        'User approved'
+        'dashboard'
       )
     })
   })
@@ -151,6 +151,7 @@ describe('RecommendationsDashboard', () => {
     await waitFor(() => {
       expect(optimization.optimizationApi.reject).toHaveBeenCalledWith(
         'rec-1',
+        'dashboard',
         'Too risky'
       )
     })

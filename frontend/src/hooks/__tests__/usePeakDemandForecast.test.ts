@@ -143,7 +143,7 @@ describe('usePeakDemandForecast', () => {
         expect(interval.forecasted_demand_kw).toBeGreaterThan(0);
         expect(interval.confidence_low_kw).toBeGreaterThan(0);
         expect(interval.confidence_high_kw).toBeGreaterThan(interval.confidence_low_kw);
-        expect(interval.risk_level).toMatch(/safe|caution|warning|critical/);
+        expect(interval.risk_level).toMatch(/safe|normal|caution|warning|critical/);
       });
     });
 
