@@ -411,19 +411,19 @@ class SiteBase(BaseModel):
 
     id: str
     name: str
-    address: str
-    region: str
-    type: str
-    sqm: int = 0
-    floors: int = 0
-    year_built: int = 0
+    address: str = ""
+    region: str = ""
+    type: str = "unknown"
+    sqm: Optional[int] = 0
+    floors: Optional[int] = 0
+    year_built: Optional[int] = 0
     operating_hours: Optional[OperatingHours] = None
     timezone: str = "Africa/Johannesburg"  # IANA timezone
-    occupancy_pattern: str = ""
-    latitude: float = 0.0
-    longitude: float = 0.0
-    contact_email: str = ""
-    contact_phone: str = ""
+    occupancy_pattern: Optional[str] = ""
+    latitude: Optional[float] = 0.0
+    longitude: Optional[float] = 0.0
+    contact_email: Optional[str] = ""
+    contact_phone: Optional[str] = ""
 
 
 class EquipmentStatusBreakdown(BaseModel):
