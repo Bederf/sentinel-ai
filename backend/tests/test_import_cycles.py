@@ -11,60 +11,72 @@ from pathlib import Path
 import pytest
 
 
-def _import_all_service_modules():
-    """Attempt to import all service modules to detect circular imports.
+def _check_circular_imports(base_path: Path, label: str):
+    """Check for circular imports without polluting sys.modules.
 
-    This function clears the module cache and imports all service modules
-    to ensure they can be imported without circular dependency errors.
-
-    Returns:
-        list: List of (module_path, success, error_message) tuples
+    Saves and restores original module references so singletons
+    and closures in other tests are not broken.
     """
-    services_path = Path(__file__).parent.parent / "app" / "services"
     results = []
-
-    # Find all Python files in services directory
-    py_files = list(services_path.rglob("*.py"))
+    py_files = list(base_path.rglob("*.py"))
+    saved_modules: dict[str, object] = {}
 
     for py_file in py_files:
-        # Skip __init__ and test files
         if py_file.name.startswith("__") or py_file.name.startswith("test_"):
             continue
 
-        # Calculate module path
         rel_path = py_file.relative_to(Path(__file__).parent.parent)
-        module_path = str(rel_path).replace("/", ".")[:-3]  # Remove .py
+        module_path = str(rel_path).replace("/", ".")[:-3]
 
-        # Clear module to force fresh import
         if module_path in sys.modules:
+            saved_modules[module_path] = sys.modules[module_path]
             del sys.modules[module_path]
 
-        # Try to import
         try:
             __import__(module_path)
             results.append((module_path, True, None))
         except ImportError as e:
             results.append((module_path, False, str(e)))
 
+    # Restore original modules to prevent singleton pollution
+    for mod_path, original_mod in saved_modules.items():
+        sys.modules[mod_path] = original_mod
+
     return results
 
 
-def test_no_circular_imports_in_services():
-    """Check for circular imports in services modules.
+def _check_import_order(modules: list[str]):
+    """Check modules can be imported in any order without circular deps.
 
-    This test attempts to import all service modules and ensures
-    that none fail due to circular import errors.
+    Saves and restores original module references after each attempt.
     """
-    results = _import_all_service_modules()
+    for service in modules:
+        saved = {}
+        for mod in modules:
+            if mod in sys.modules:
+                saved[mod] = sys.modules[mod]
+                del sys.modules[mod]
 
-    # Collect failures
-    failures = [(path, error) for path, success, error in results if not success]
+        try:
+            __import__(service)
+        except ImportError as e:
+            if "circular import" in str(e).lower():
+                pytest.fail(f"Circular import detected when importing {service}: {e}")
+        finally:
+            # Restore original modules
+            for mod_path, original_mod in saved.items():
+                sys.modules[mod_path] = original_mod
 
-    # If there are failures, check if they're circular import errors
+
+def test_no_circular_imports_in_services():
+    """Check for circular imports in services modules."""
+    services_path = Path(__file__).parent.parent / "app" / "services"
+    results = _check_circular_imports(services_path, "services")
+
     circular_import_failures = [
         (path, error)
-        for path, error in failures
-        if "circular import" in error.lower() or "partially initialized" in error.lower()
+        for path, success, error in results
+        if not success and ("circular import" in error.lower() or "partially initialized" in error.lower())
     ]
 
     if circular_import_failures:
@@ -75,89 +87,35 @@ def test_no_circular_imports_in_services():
 
 
 def test_ai_services_import_order():
-    """Test that AI services can be imported in any order.
-
-    This specifically tests the AI services chain that previously had
-    circular import issues:
-    - ai_optimizer → claude_service → chat_tools → ai_optimizer
-    """
-    ai_services = [
-        "app.services.ai_optimizer",
-        "app.services.chat_tools",
-        "app.services.claude_service",
-    ]
-
-    # Test each import order
-    for service in ai_services:
-        # Clear modules
-        for mod in ai_services:
-            if mod in sys.modules:
-                del sys.modules[mod]
-
-        # Import should succeed
-        try:
-            __import__(service)
-        except ImportError as e:
-            if "circular import" in str(e).lower():
-                pytest.fail(f"Circular import detected when importing {service}: {e}")
+    """Test that AI services can be imported in any order."""
+    _check_import_order(
+        [
+            "app.services.ai_optimizer",
+            "app.services.chat_tools",
+            "app.services.claude_service",
+        ]
+    )
 
 
 def test_device_abstraction_import_order():
-    """Test that device abstraction modules can be imported in any order.
-
-    This specifically tests the device abstraction chain:
-    - device_abstraction → simulated_adapter/bacnet_adapter → device_abstraction
-    """
-    device_modules = [
-        "app.services.device_abstraction",
-        "app.services.bms_simulator.adapters.simulated_adapter",
-        "app.services.niagara.bacnet_adapter",
-    ]
-
-    # Test each import order
-    for module in device_modules:
-        # Clear modules
-        for mod in device_modules:
-            if mod in sys.modules:
-                del sys.modules[mod]
-
-        # Import should succeed
-        try:
-            __import__(module)
-        except ImportError as e:
-            if "circular import" in str(e).lower():
-                pytest.fail(f"Circular import detected when importing {module}: {e}")
+    """Test that device abstraction modules can be imported in any order."""
+    _check_import_order(
+        [
+            "app.services.device_abstraction",
+            "app.services.bms_simulator.adapters.simulated_adapter",
+            "app.services.niagara.bacnet_adapter",
+        ]
+    )
 
 
 def test_api_imports():
     """Test that API modules can be imported without circular dependencies."""
     api_path = Path(__file__).parent.parent / "app" / "api"
-    results = []
+    results = _check_circular_imports(api_path, "api")
 
-    # Find all Python files in api directory
-    py_files = list(api_path.rglob("*.py"))
-
-    for py_file in py_files:
-        if py_file.name.startswith("__") or py_file.name.startswith("test_"):
-            continue
-
-        rel_path = py_file.relative_to(Path(__file__).parent.parent)
-        module_path = str(rel_path).replace("/", ".")[:-3]
-
-        if module_path in sys.modules:
-            del sys.modules[module_path]
-
-        try:
-            __import__(module_path)
-            results.append((module_path, True, None))
-        except ImportError as e:
-            if "circular import" in str(e).lower():
-                results.append((module_path, False, str(e)))
-            else:
-                results.append((module_path, True, None))  # Other import errors are OK
-
-    # Check for circular import failures
-    circular_failures = [(path, error) for path, success, error in results if not success]
+    circular_failures = [
+        (path, error) for path, success, error in results if not success and "circular import" in error.lower()
+    ]
 
     if circular_failures:
         pytest.fail(

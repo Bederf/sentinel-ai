@@ -8,6 +8,9 @@ Tests verify:
 
 import time
 
+import pytest
+
+import app.services.bess_dispatch_engine as bde_module
 from app.services.arbitrage_optimizer import (
     get_price_forecaster,
     get_arbitrage_analyzer,
@@ -20,6 +23,14 @@ from app.services.bess_dispatch_engine import (
 from app.ml.models.dispatch_predictor import (
     get_dispatch_predictor,
 )
+
+
+@pytest.fixture(autouse=True)
+def reset_bess_singleton():
+    """Reset BESS dispatch engine singleton to prevent state pollution from other tests."""
+    bde_module._bess_dispatch_engine = None
+    yield
+    bde_module._bess_dispatch_engine = None
 
 
 # === Task 1: Price Forecasting & Arbitrage Analysis ===
