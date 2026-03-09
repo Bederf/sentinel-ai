@@ -416,15 +416,16 @@ function ChannelsTab({
               <select
                 value={channelType}
                 onChange={(e) => setChannelType(e.target.value as typeof channelType)}
-                className="w-full px-3 py-2 rounded text-sm border-0"
+                className="w-full px-3 py-2 rounded text-sm appearance-auto cursor-pointer"
                 style={{
                   background: "var(--color-sentinel-bg-panel)",
                   color: "var(--color-sentinel-text-primary)",
+                  border: "1px solid var(--color-sentinel-border)",
                 }}
               >
-                <option value="telegram">Telegram</option>
-                <option value="whatsapp">WhatsApp</option>
-                <option value="sms">SMS</option>
+                <option value="telegram" style={{ background: "#1a1a2e", color: "#e0e0e0" }}>Telegram</option>
+                <option value="whatsapp" style={{ background: "#1a1a2e", color: "#e0e0e0" }}>WhatsApp</option>
+                <option value="sms" style={{ background: "#1a1a2e", color: "#e0e0e0" }}>SMS</option>
               </select>
             </div>
             <div>
