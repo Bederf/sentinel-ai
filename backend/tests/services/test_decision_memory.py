@@ -17,37 +17,27 @@ from app.services.decision_memory_service import (
 
 
 @pytest.fixture(autouse=True)
-def _reset_decision_memory(tmp_path):
-    """Reset singleton and module-level paths before each test to prevent state pollution."""
-    import app.services.decision_memory_service as mod
-
-    orig_data_dir = mod.DATA_DIR
-    orig_records = mod.RECORDS_FILE
-    orig_patterns = mod.PATTERNS_FILE
-
+def _reset_decision_memory():
+    """Reset singleton before and after each test to prevent state pollution."""
     reset_decision_memory_service()
-    mod.DATA_DIR = tmp_path
-    mod.RECORDS_FILE = tmp_path / "decision_records.json"
-    mod.PATTERNS_FILE = tmp_path / "decision_patterns.json"
-    (tmp_path / "decision_records.json").write_text("[]")
-    (tmp_path / "decision_patterns.json").write_text("[]")
-
     yield
-
-    # Restore original paths so other test modules aren't affected
     reset_decision_memory_service()
-    mod.DATA_DIR = orig_data_dir
-    mod.RECORDS_FILE = orig_records
-    mod.PATTERNS_FILE = orig_patterns
 
 
 @pytest.fixture
 def svc(tmp_path):
-    """Create a fresh service with temporary storage."""
+    """Create a fresh service with temporary storage using explicit path overrides."""
     reset_decision_memory_service()
-    service = DecisionMemoryService()
-    # Paths already redirected by autouse _reset_decision_memory fixture
-    service._loaded = False
+    records_file = tmp_path / "decision_records.json"
+    patterns_file = tmp_path / "decision_patterns.json"
+    records_file.write_text("[]")
+    patterns_file.write_text("[]")
+
+    service = DecisionMemoryService(
+        data_dir=tmp_path,
+        records_file=records_file,
+        patterns_file=patterns_file,
+    )
     return service
 
 

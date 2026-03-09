@@ -5,9 +5,6 @@ type normalization works, and edge cases are handled gracefully.
 """
 
 import json
-import os
-import tempfile
-
 
 from app.services.equipment_json_loader import (
     JSON_TYPE_ALIASES,
@@ -76,34 +73,25 @@ class TestLoadSiteEquipment:
         equipment = load_site_equipment("site-999-nonexistent")
         assert equipment == []
 
-    def test_malformed_json_skipped(self):
+    def test_malformed_json_skipped(self, tmp_path, monkeypatch):
         """Malformed JSON files should be skipped with a warning, not crash."""
-        # Create a temp directory mimicking the equipment structure
-        with tempfile.TemporaryDirectory() as tmpdir:
-            equip_dir = os.path.join(tmpdir, "test-site", "equipment")
-            os.makedirs(equip_dir)
+        import app.services.equipment_json_loader as loader
 
-            # Write a valid file
-            valid = {"id": "T001-AHU-001", "equipment_type": "ahu", "name": "Test AHU"}
-            with open(os.path.join(equip_dir, "T001-AHU-001.json"), "w") as f:
-                json.dump(valid, f)
+        equip_dir = tmp_path / "test-site" / "equipment"
+        equip_dir.mkdir(parents=True)
 
-            # Write a malformed file
-            with open(os.path.join(equip_dir, "BAD.json"), "w") as f:
-                f.write("{invalid json")
+        # Write a valid file
+        valid = {"id": "T001-AHU-001", "equipment_type": "ahu", "name": "Test AHU"}
+        (equip_dir / "T001-AHU-001.json").write_text(json.dumps(valid), encoding="utf-8")
 
-            # Patch the data root to use our temp dir
-            import app.services.equipment_json_loader as loader
-            from pathlib import Path
+        # Write a malformed file
+        (equip_dir / "BAD.json").write_text("{invalid json", encoding="utf-8")
 
-            original_root = loader._DATA_ROOT
-            try:
-                loader._DATA_ROOT = Path(tmpdir)
-                equipment = load_site_equipment("test-site")
-                assert len(equipment) == 1
-                assert equipment[0]["code"] == "T001-AHU-001"
-            finally:
-                loader._DATA_ROOT = original_root
+        # Patch the data root to use our temp dir
+        monkeypatch.setattr(loader, "_DATA_ROOT", tmp_path)
+        equipment = load_site_equipment("test-site")
+        assert len(equipment) == 1
+        assert equipment[0]["code"] == "T001-AHU-001"
 
     def test_points_and_metadata_preserved(self):
         """Points and metadata from JSON should be passed through."""

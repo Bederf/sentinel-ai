@@ -45,10 +45,31 @@ class DecisionMemoryService:
 
     _instance: Optional[DecisionMemoryService] = None
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        data_dir: Optional[Path] = None,
+        records_file: Optional[Path] = None,
+        patterns_file: Optional[Path] = None,
+    ) -> None:
         self._records: List[DecisionRecord] = []
         self._patterns: List[DecisionPattern] = []
         self._loaded = False
+        # Allow explicit path overrides for testing isolation
+        self._data_dir_override = data_dir
+        self._records_file_override = records_file
+        self._patterns_file_override = patterns_file
+
+    @property
+    def _data_dir(self) -> Path:
+        return self._data_dir_override if self._data_dir_override is not None else DATA_DIR
+
+    @property
+    def _records_file(self) -> Path:
+        return self._records_file_override if self._records_file_override is not None else RECORDS_FILE
+
+    @property
+    def _patterns_file(self) -> Path:
+        return self._patterns_file_override if self._patterns_file_override is not None else PATTERNS_FILE
 
     def _ensure_loaded(self) -> None:
         """Lazy-load records and patterns from disk."""
@@ -407,9 +428,10 @@ class DecisionMemoryService:
         return None
 
     def _load_records(self) -> List[DecisionRecord]:
+        records_file = self._records_file
         try:
-            if RECORDS_FILE.exists():
-                with open(RECORDS_FILE) as f:
+            if records_file.exists():
+                with open(records_file) as f:
                     data = json.load(f)
                 return [DecisionRecord.from_dict(d) for d in data]
         except Exception as e:
@@ -417,9 +439,10 @@ class DecisionMemoryService:
         return []
 
     def _load_patterns(self) -> List[DecisionPattern]:
+        patterns_file = self._patterns_file
         try:
-            if PATTERNS_FILE.exists():
-                with open(PATTERNS_FILE) as f:
+            if patterns_file.exists():
+                with open(patterns_file) as f:
                     data = json.load(f)
                 return [DecisionPattern.from_dict(d) for d in data]
         except Exception as e:
@@ -428,16 +451,16 @@ class DecisionMemoryService:
 
     def _save_records(self) -> None:
         try:
-            DATA_DIR.mkdir(parents=True, exist_ok=True)
-            with open(RECORDS_FILE, "w") as f:
+            self._data_dir.mkdir(parents=True, exist_ok=True)
+            with open(self._records_file, "w") as f:
                 json.dump([r.to_dict() for r in self._records], f, indent=2)
         except Exception as e:
             logger.error("Failed to save decision records: %s", e)
 
     def _save_patterns(self) -> None:
         try:
-            DATA_DIR.mkdir(parents=True, exist_ok=True)
-            with open(PATTERNS_FILE, "w") as f:
+            self._data_dir.mkdir(parents=True, exist_ok=True)
+            with open(self._patterns_file, "w") as f:
                 json.dump([p.to_dict() for p in self._patterns], f, indent=2)
         except Exception as e:
             logger.error("Failed to save decision patterns: %s", e)

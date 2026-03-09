@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-import uuid
-from datetime import datetime
-from unittest.mock import MagicMock, patch
+import os
 
-import pytest
-from fastapi.testclient import TestClient
+os.environ.setdefault("DEMO_MODE", "true")
+os.environ.setdefault("TESTING", "true")
 
-from app.models.booking_record import BlockBookingAlert
+import uuid  # noqa: E402
+from datetime import datetime  # noqa: E402
+from unittest.mock import MagicMock, patch  # noqa: E402
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.models.booking_record import BlockBookingAlert  # noqa: E402
 
 
 @pytest.fixture

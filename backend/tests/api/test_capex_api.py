@@ -1,16 +1,26 @@
 """Tests for CapEx Planning API endpoints (Phase 128)."""
 
-from fastapi.testclient import TestClient
+import os
 
-from app.main import app
+os.environ.setdefault("DEMO_MODE", "true")
+os.environ.setdefault("TESTING", "true")
 
-client = TestClient(app)
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.main import app  # noqa: E402
+
+
+@pytest.fixture
+def client():
+    """Create a test client with auth bypass."""
+    return TestClient(app)
 
 
 class TestCapExAnalysisEndpoint:
     """Test GET /api/capex/analysis/{equipment_code}."""
 
-    def test_analysis_concept_asset(self):
+    def test_analysis_concept_asset(self, client):
         """Analysis works for known Concept Evolution asset."""
         resp = client.get("/api/capex/analysis/GW-HVAC-CH-001")
         assert resp.status_code == 200
@@ -20,7 +30,7 @@ class TestCapExAnalysisEndpoint:
         assert "npv_replace_zar" in data
         assert "npv_repair_zar" in data
 
-    def test_analysis_with_overrides(self):
+    def test_analysis_with_overrides(self, client):
         """Analysis accepts query parameter overrides."""
         resp = client.get(
             "/api/capex/analysis/S002-CHILLER-B1-001",
@@ -36,7 +46,7 @@ class TestCapExAnalysisEndpoint:
         assert data["replacement_cost_zar"] == 1500000
         assert data["discount_rate"] == 0.12
 
-    def test_analysis_unknown_equipment_uses_defaults(self):
+    def test_analysis_unknown_equipment_uses_defaults(self, client):
         """Unknown equipment code falls back to type defaults."""
         resp = client.get(
             "/api/capex/analysis/UNKNOWN-AHU-001",
@@ -46,7 +56,7 @@ class TestCapExAnalysisEndpoint:
         data = resp.json()
         assert data["equipment_type"] == "ahu"
 
-    def test_analysis_invalid_health_score(self):
+    def test_analysis_invalid_health_score(self, client):
         """Health score > 100 returns 422."""
         resp = client.get(
             "/api/capex/analysis/TEST-001",
@@ -58,7 +68,7 @@ class TestCapExAnalysisEndpoint:
 class TestCapExPortfolioEndpoint:
     """Test GET /api/capex/portfolio/{site_id}."""
 
-    def test_portfolio_returns_analysis(self):
+    def test_portfolio_returns_analysis(self, client):
         """Portfolio endpoint returns categorized equipment."""
         resp = client.get("/api/capex/portfolio/site-002")
         assert resp.status_code == 200
@@ -69,7 +79,7 @@ class TestCapExPortfolioEndpoint:
         assert "monitor_candidates" in data
         assert data["total_equipment"] > 0
 
-    def test_portfolio_with_custom_horizon(self):
+    def test_portfolio_with_custom_horizon(self, client):
         """Portfolio accepts custom horizon."""
         resp = client.get(
             "/api/capex/portfolio/site-002",
@@ -83,7 +93,7 @@ class TestCapExPortfolioEndpoint:
 class TestCapExBudgetForecastEndpoint:
     """Test GET /api/capex/budget-forecast/{site_id}."""
 
-    def test_budget_forecast_returns_yearly(self):
+    def test_budget_forecast_returns_yearly(self, client):
         """Budget forecast returns yearly CapEx projections."""
         resp = client.get(
             "/api/capex/budget-forecast/site-002",
@@ -99,7 +109,7 @@ class TestCapExBudgetForecastEndpoint:
 class TestCapExScenarioEndpoint:
     """Test POST /api/capex/scenario."""
 
-    def test_scenario_analysis(self):
+    def test_scenario_analysis(self, client):
         """Scenario endpoint runs multiple what-if analyses."""
         resp = client.post(
             "/api/capex/scenario",
@@ -118,7 +128,7 @@ class TestCapExScenarioEndpoint:
         assert data["scenario_count"] == 2
         assert "dominant_recommendation" in data
 
-    def test_scenario_empty_list_rejected(self):
+    def test_scenario_empty_list_rejected(self, client):
         """Empty scenario list returns 422."""
         resp = client.post(
             "/api/capex/scenario",
@@ -131,7 +141,7 @@ class TestCapExScenarioEndpoint:
         )
         assert resp.status_code == 422
 
-    def test_scenario_too_many_rejected(self):
+    def test_scenario_too_many_rejected(self, client):
         """More than 10 scenarios returns 422."""
         resp = client.post(
             "/api/capex/scenario",
@@ -148,7 +158,7 @@ class TestCapExScenarioEndpoint:
 class TestCapExReferenceEndpoints:
     """Test reference data endpoints."""
 
-    def test_type_financials(self):
+    def test_type_financials(self, client):
         """Type financials endpoint returns equipment cost data."""
         resp = client.get("/api/capex/type-financials")
         assert resp.status_code == 200
@@ -156,7 +166,7 @@ class TestCapExReferenceEndpoints:
         assert "chiller" in data
         assert "_defaults" in data
 
-    def test_concept_assets(self):
+    def test_concept_assets(self, client):
         """Concept assets endpoint returns CSV data."""
         resp = client.get("/api/capex/concept-assets")
         assert resp.status_code == 200

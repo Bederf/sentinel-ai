@@ -10,14 +10,23 @@ Tests verify:
 5. Header parsing
 """
 
-import pytest
-from fastapi.testclient import TestClient
+import os
 
-from app.main import app
-from app.database.repositories.preferences_repository import PreferencesRepository
-from app.api.preferences import DashboardPreferences, DEFAULT_KPI_CARDS, DEFAULT_SECTIONS
+os.environ.setdefault("DEMO_MODE", "true")
+os.environ.setdefault("TESTING", "true")
 
-client = TestClient(app)
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.main import app  # noqa: E402
+from app.database.repositories.preferences_repository import PreferencesRepository  # noqa: E402
+from app.api.preferences import DashboardPreferences, DEFAULT_KPI_CARDS, DEFAULT_SECTIONS  # noqa: E402
+
+
+@pytest.fixture
+def client():
+    """Create a test client with auth bypass."""
+    return TestClient(app)
 
 
 # ============================================================================
@@ -75,7 +84,7 @@ def mock_supabase_unavailable(monkeypatch):
 class TestGetDashboardPreferences:
     """Tests for GET /api/preferences/dashboard endpoint."""
 
-    def test_get_dashboard_preferences_default_user(self, default_preferences):
+    def test_get_dashboard_preferences_default_user(self, client, default_preferences):
         """Test getting preferences for default user (no X-User-ID header)."""
         response = client.get("/api/preferences/dashboard")
 
@@ -86,7 +95,7 @@ class TestGetDashboardPreferences:
         assert data["preferences"]["visible_kpi_cards"] == DEFAULT_KPI_CARDS
         assert data["preferences"]["default_energy_period"] == 30
 
-    def test_get_dashboard_preferences_named_user(self):
+    def test_get_dashboard_preferences_named_user(self, client):
         """Test getting preferences for named user (with X-User-ID header)."""
         response = client.get("/api/preferences/dashboard", headers={"X-User-ID": "user-123"})
 
@@ -95,7 +104,7 @@ class TestGetDashboardPreferences:
         assert data["user_id"] == "user-123"
         assert "preferences" in data
 
-    def test_get_dashboard_preferences_not_found(self):
+    def test_get_dashboard_preferences_not_found(self, client):
         """Test getting preferences for new user returns defaults."""
         response = client.get("/api/preferences/dashboard", headers={"X-User-ID": "new-user-xyz"})
 
@@ -105,7 +114,7 @@ class TestGetDashboardPreferences:
         assert data["preferences"]["visible_kpi_cards"] == DEFAULT_KPI_CARDS
         assert data["preferences"]["default_energy_period"] == 30
 
-    def test_get_default_preferences_endpoint(self, default_preferences):
+    def test_get_default_preferences_endpoint(self, client, default_preferences):
         """Test GET /api/preferences/dashboard/defaults endpoint."""
         response = client.get("/api/preferences/dashboard/defaults")
 
@@ -119,7 +128,7 @@ class TestGetDashboardPreferences:
 class TestUpdateDashboardPreferences:
     """Tests for PUT /api/preferences/dashboard endpoint."""
 
-    def test_update_dashboard_preferences_upsert(self, custom_preferences):
+    def test_update_dashboard_preferences_upsert(self, client, custom_preferences):
         """Test creating new preferences (upsert for new user)."""
         response = client.put(
             "/api/preferences/dashboard", json=custom_preferences, headers={"X-User-ID": "test-user-update"}
@@ -132,7 +141,7 @@ class TestUpdateDashboardPreferences:
         assert data["preferences"]["default_energy_period"] == 45
         assert data["preferences"]["default_energy_site_id"] == "site-001"
 
-    def test_update_dashboard_preferences_update_existing(self, custom_preferences):
+    def test_update_dashboard_preferences_update_existing(self, client, custom_preferences):
         """Test updating existing preferences."""
         user_id = "test-user-update-existing"
 
@@ -157,7 +166,7 @@ class TestUpdateDashboardPreferences:
         data = response2.json()
         assert data["preferences"]["default_energy_period"] == 45
 
-    def test_update_preserves_fields(self):
+    def test_update_preserves_fields(self, client):
         """Test that update preserves all fields correctly."""
         user_id = "test-user-preserve"
         prefs = {
@@ -182,7 +191,7 @@ class TestUpdateDashboardPreferences:
 class TestResetDashboardPreferences:
     """Tests for DELETE /api/preferences/dashboard endpoint."""
 
-    def test_reset_dashboard_preferences(self):
+    def test_reset_dashboard_preferences(self, client):
         """Test resetting preferences to defaults."""
         user_id = "test-user-reset"
 
@@ -218,7 +227,7 @@ class TestValidation:
     """Tests for Pydantic model validation."""
 
     @pytest.mark.parametrize("invalid_period", [6, 91, 100, 0, -1])
-    def test_invalid_energy_period(self, invalid_period):
+    def test_invalid_energy_period(self, client, invalid_period):
         """Test that invalid energy periods are rejected (must be 7-90)."""
         response = client.put(
             "/api/preferences/dashboard",
@@ -235,7 +244,7 @@ class TestValidation:
         # Should fail validation (422 Unprocessable Entity)
         assert response.status_code == 422
 
-    def test_valid_energy_period_boundaries(self):
+    def test_valid_energy_period_boundaries(self, client):
         """Test that valid energy periods are accepted (7-90)."""
         for period in [7, 30, 90]:
             response = client.put(
@@ -254,7 +263,7 @@ class TestValidation:
             data = response.json()
             assert data["preferences"]["default_energy_period"] == period
 
-    def test_missing_fields_use_defaults(self):
+    def test_missing_fields_use_defaults(self, client):
         """Test that missing fields use default values."""
         response = client.put(
             "/api/preferences/dashboard",
@@ -282,7 +291,7 @@ class TestValidation:
 class TestHeaderParsing:
     """Tests for X-User-ID header extraction."""
 
-    def test_x_user_id_header_extraction(self):
+    def test_x_user_id_header_extraction(self, client):
         """Test that X-User-ID header is correctly extracted."""
         user_id = "custom-user-123"
         response = client.get("/api/preferences/dashboard", headers={"X-User-ID": user_id})
@@ -291,7 +300,7 @@ class TestHeaderParsing:
         data = response.json()
         assert data["user_id"] == user_id
 
-    def test_missing_x_user_id_defaults_to_default_user(self):
+    def test_missing_x_user_id_defaults_to_default_user(self, client):
         """Test that missing X-User-ID defaults to 'default-user'."""
         response = client.get("/api/preferences/dashboard")
 
@@ -299,7 +308,7 @@ class TestHeaderParsing:
         data = response.json()
         assert data["user_id"] == "default-user"
 
-    def test_empty_x_user_id_defaults_to_default_user(self):
+    def test_empty_x_user_id_defaults_to_default_user(self, client):
         """Test that empty X-User-ID defaults to 'default-user'."""
         response = client.get("/api/preferences/dashboard", headers={"X-User-ID": ""})
 
@@ -405,7 +414,7 @@ class TestPreferencesRepository:
 class TestIntegration:
     """Integration tests for complete workflows."""
 
-    def test_complete_user_preference_lifecycle(self):
+    def test_complete_user_preference_lifecycle(self, client):
         """Test complete lifecycle: create -> read -> update -> delete."""
         user_id = "lifecycle-test-user"
 
@@ -453,7 +462,7 @@ class TestIntegration:
         delete_response = client.delete("/api/preferences/dashboard", headers={"X-User-ID": user_id})
         assert delete_response.status_code == 200
 
-    def test_multiple_users_isolation(self):
+    def test_multiple_users_isolation(self, client):
         """Test that different users' preferences are isolated."""
         # Create preferences for user 1
         response1 = client.put(

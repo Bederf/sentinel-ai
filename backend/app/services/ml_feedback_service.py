@@ -763,29 +763,41 @@ class MLFeedbackService:
 
         try:
             from app.models.module_registry import ModuleType
-            from app.services.module_registry_service import NON_DEACTIVATABLE_MODULES, module_registry
+        except Exception as e:
+            logger.debug("Cannot import ModuleType for eligibility check: %s", e)
+            return False
 
+        try:
+            module_enum = ModuleType(module_type)
+        except ValueError:
+            return False
+
+        try:
+            import app.services.module_registry_service as _registry_mod
+
+            non_deactivatable = _registry_mod.NON_DEACTIVATABLE_MODULES
+            registry = _registry_mod.module_registry
+        except Exception as e:
+            logger.debug("Cannot import module_registry for eligibility check: %s", e)
+            return False
+
+        # Base pack modules are always eligible for the shared ML loop.
+        if module_enum in non_deactivatable:
+            return True
+
+        # For add-on modules, resolve across site-id variants and fail closed.
+        for candidate in self._candidate_site_ids(site_id):
             try:
-                module_enum = ModuleType(module_type)
-            except ValueError:
-                return False
-
-            # Base pack modules are always eligible for the shared ML loop.
-            if module_enum in NON_DEACTIVATABLE_MODULES:
-                return True
-
-            # For add-on modules, resolve across site-id variants and fail closed.
-            for candidate in self._candidate_site_ids(site_id):
-                site_config = module_registry.get_site_config(candidate)
+                site_config = registry.get_site_config(candidate)
                 if site_config is None:
                     continue
-                if module_registry.is_module_active(candidate, module_enum):
+                if registry.is_module_active(candidate, module_enum):
                     return True
+            except Exception as e:
+                logger.debug("Module check failed for candidate %s: %s", candidate, e)
+                continue
 
-            return False
-        except Exception as e:
-            logger.debug("Module eligibility check failed for %s/%s: %s", site_id, module_type, e)
-            return False
+        return False
 
     def _compute_effectiveness_score(
         self,
