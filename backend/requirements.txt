@@ -97,3 +97,7 @@ pymodbus>=3.6.0                # Modbus TCP client for Huawei LUNA2000 BESS regi
 
 # Email Reply Service (Phase 131.2b — threaded SMTP replies)
 aiosmtplib>=2.0.0              # Async SMTP client for RFC 822 threaded email replies
+
+# MCP Server & Schema Validation
+jsonschema>=4.20.0             # JSON Schema validation for MCP tool inputs
+email-validator>=2.0.0         # Email address validation (Pydantic[email] runtime dep)
