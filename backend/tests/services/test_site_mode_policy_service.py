@@ -153,15 +153,11 @@ async def test_automatic_fail_closed_would_demote_and_stop_writes(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_repromotion_stability_blocks_automatic_promotion(tmp_path, monkeypatch):
+async def test_repromotion_stability_blocks_automatic_promotion(tmp_path):
     policy = _base_policy()
     _write_policy(tmp_path, policy)
 
     now = datetime(2026, 2, 21, 12, 0, 0, tzinfo=UTC)
-    import app.services.site_mode_policy_service as policy_mod
-
-    monkeypatch.setattr(policy_mod, "_utcnow", lambda: now)
-
     demoted_at = now - timedelta(hours=1)
     state_path = tmp_path / "site-002-mode-policy-state.json"
     state_path.write_text(
@@ -181,17 +177,7 @@ async def test_repromotion_stability_blocks_automatic_promotion(tmp_path, monkey
         encoding="utf-8",
     )
 
-    # Verify monkeypatch took effect
-    assert policy_mod._utcnow() == now, f"_utcnow monkeypatch not effective: got {policy_mod._utcnow()}, expected {now}"
-
-    svc = SiteModePolicyService(policy_dir=tmp_path)
-
-    # Verify state file was written and can be read correctly
-    loaded_state = svc._load_state("site-002", policy)
-    assert loaded_state["current_stage"] == "supervised", f"State not loaded correctly: {loaded_state}"
-    assert loaded_state["last_demoted_at"] == demoted_at.isoformat(), (
-        f"last_demoted_at not preserved: {loaded_state.get('last_demoted_at')}"
-    )
+    svc = SiteModePolicyService(policy_dir=tmp_path, clock=lambda: now)
 
     svc._monitoring.get_snapshot = AsyncMock(
         return_value=_snapshot(

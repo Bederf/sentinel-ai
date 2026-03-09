@@ -41,9 +41,10 @@ def _parse_iso(value: str | None) -> datetime | None:
 class SiteModePolicyService:
     """Evaluates deterministic site onboarding thresholds in dry-run mode."""
 
-    def __init__(self, policy_dir: Path | None = None) -> None:
+    def __init__(self, policy_dir: Path | None = None, *, clock=None) -> None:
         self._policy_dir = policy_dir or (Path(__file__).resolve().parent.parent / "data" / "policies")
         self._monitoring = MonitoringService()
+        self._clock = clock or _utcnow
 
     def _policy_path(self, site_id: str) -> Path:
         return self._policy_dir / f"{site_id}-mode-policy.json"
@@ -202,7 +203,7 @@ class SiteModePolicyService:
 
     async def evaluate_site(self, site_id: str) -> dict[str, Any]:
         """Evaluate onboarding policy for a site and persist dry-run state."""
-        now = _utcnow()
+        now = self._clock()
         policy = self.load_policy(site_id)
         state = self._load_state(site_id, policy)
 

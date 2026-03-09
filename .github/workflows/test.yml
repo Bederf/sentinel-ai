@@ -83,6 +83,10 @@ jobs:
 
       - name: Run unit tests
         run: pytest tests/ -v --cov=app --cov-report=xml --cov-report=html
+        env:
+          TESTING: "true"
+          DEMO_MODE: "true"
+          JWT_SECRET_KEY: "test-only-jwt-secret-for-ci-at-least-32-chars"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

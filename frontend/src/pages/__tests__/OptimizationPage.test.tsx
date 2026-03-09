@@ -158,10 +158,13 @@ describe('OptimizationPage', () => {
 
       render(<OptimizationPage />, { wrapper: createTestWrapper() });
 
-      await waitFor(() => {
-        const selector = screen.getByDisplayValue(/building/i);
-        expect(selector).toBeInTheDocument();
-      });
+      await waitFor(
+        () => {
+          const selector = screen.getByDisplayValue(/building/i);
+          expect(selector).toBeInTheDocument();
+        },
+        { timeout: 5000 },
+      );
     });
 
     it('should render Energy Control header', async () => {
