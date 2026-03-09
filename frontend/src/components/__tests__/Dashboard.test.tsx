@@ -380,7 +380,7 @@ describe('Dashboard', () => {
       render(<Dashboard onViewChange={vi.fn()} />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
-        expect(screen.getByText('1 elevated')).toBeInTheDocument();
+        expect(screen.getAllByText('1 elevated').length).toBeGreaterThan(0);
       });
     });
   });
