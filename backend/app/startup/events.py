@@ -233,6 +233,26 @@ async def startup_event(app: FastAPI) -> None:
     except Exception as e:
         _logger.warning(f"Fuel MQTT listener startup failed: {e}")
 
+    # Fuel alert service — subscribes to fuel.* events for notifications (Phase 150)
+    if settings.fuel_monitoring_enabled:
+        try:
+            from app.services.event_bus import get_event_bus
+            from app.services.fuel_alert_service import get_fuel_alert_service
+
+            _fuel_alert_svc = get_fuel_alert_service()
+            _fuel_bus = get_event_bus()
+            for _fuel_event_type in [
+                "fuel.theft_alert",
+                "fuel.leak_detected",
+                "fuel.low_fuel",
+                "fuel.temp_alert",
+                "fuel.sensor_fault",
+            ]:
+                _fuel_bus.subscribe(_fuel_event_type, _fuel_alert_svc.handle_fuel_event)
+            _logger.info("Fuel alert service registered on event bus (5 event types)")
+        except Exception as e:
+            _logger.warning(f"Fuel alert service registration failed: {e}")
+
     # Optional: Fuel event processor — subscribes to fuel.telemetry events (Phase 149)
     if settings.fuel_event_processor_enabled:
         try:
