@@ -65,6 +65,8 @@ class EquipmentIDConverter:
         "medgas": "MEDGAS",
         # Controllers
         "jace": "JACE",
+        # Fuel
+        "tank": "TANK",
         # Other
         "fire": "FIRE",
         "acc": "ACC",

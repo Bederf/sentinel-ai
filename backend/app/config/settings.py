@@ -292,7 +292,7 @@ class Settings(BaseSettings):
 
     # Block Booking Detection
     block_booking_enabled: bool = False  # Master switch
-    block_booking_min_rooms: int = 2  # Flag when same person holds N+ rooms
+    block_booking_min_rooms: int = 3  # Flag when same person holds N+ rooms
     block_booking_mailbox_email: str = ""  # IMAP mailbox for BCC'd confirmations
     block_booking_mailbox_password: str = ""
     block_booking_mailbox_host: str = ""  # e.g. outlook.office365.com
@@ -306,6 +306,14 @@ class Settings(BaseSettings):
     early_vacate_threshold_minutes: int = 90  # Room empty with >N min of booking remaining
     sporadic_use_threshold_pct: int = 25  # Occupied < N% of total booking duration
     brief_occupation_threshold_min: int = 30  # Occupied < N min total in the whole booking
+    space_mqtt_enabled: bool = False
+    space_mqtt_broker: str = ""
+    space_mqtt_port: int = 1883
+    space_mqtt_username: str = ""
+    space_mqtt_password: str = ""
+    space_mqtt_client_id: str = "sentinel-space-backend"
+    space_mqtt_topic: str = "sentinel/nodes/+/presence"
+    space_default_site_id: str = "site-002"
 
     # Focus Room Sessions (Phase 2)
     focus_min_session_seconds: int = 180  # Discard sessions shorter than 3 min (noise)
@@ -314,6 +322,17 @@ class Settings(BaseSettings):
     # Telegram alert delivery
     telegram_bot_token: str = ""  # Bot token from BotFather
     telegram_alert_chat_id: str = ""  # Default chat/group ID for plant alerts
+
+    # Fuel Tank MQTT Ingestion (Phase 148)
+    fuel_mqtt_enabled: bool = False
+    fuel_mqtt_broker: str = ""
+    fuel_mqtt_port: int = 1883
+    fuel_mqtt_username: str = ""
+    fuel_mqtt_password: str = ""
+    fuel_mqtt_client_id: str = "sentinel-fuel-backend"
+    fuel_mqtt_topic_level: str = "sentinel/fuel/+/level"
+    fuel_mqtt_topic_events: str = "sentinel/fuel/+/events"
+    fuel_mqtt_topic_status: str = "sentinel/fuel/+/status"
 
     # Plant Room Alerts — Desigo email→WhatsApp pipeline (Phase 146)
     plant_alerts_enabled: bool = False  # Master switch for plant alert ingestion
