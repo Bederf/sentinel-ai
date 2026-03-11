@@ -334,6 +334,17 @@ class Settings(BaseSettings):
     fuel_mqtt_topic_events: str = "sentinel/fuel/+/events"
     fuel_mqtt_topic_status: str = "sentinel/fuel/+/status"
 
+    # Fuel Event Processor (Phase 149)
+    fuel_event_processor_enabled: bool = False
+    fuel_low_alert_pct_1: float = 30.0  # Primary low fuel warning
+    fuel_low_alert_pct_2: float = 15.0  # Critical low fuel
+    fuel_theft_rate_threshold_lpm: float = 2.0  # Litres per minute loss rate
+    fuel_consumption_anomaly_pct: float = 20.0  # Deviation from spec %
+    fuel_temp_min_c: float = 5.0
+    fuel_temp_max_c: float = 40.0
+    fuel_refill_jump_pct: float = 10.0  # Minimum level jump to detect refill
+    fuel_leak_sustained_minutes: int = 30  # Sustained slow loss duration
+
     # Plant Room Alerts — Desigo email→WhatsApp pipeline (Phase 146)
     plant_alerts_enabled: bool = False  # Master switch for plant alert ingestion
     desigo_sender_email: str = "noreply@fnb.co.za"  # Authorised Desigo sender address

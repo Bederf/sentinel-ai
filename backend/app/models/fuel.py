@@ -11,9 +11,22 @@ import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import StrEnum
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
+
+
+class FuelEventType(StrEnum):
+    """All classified fuel event types produced by FuelEventProcessor (Phase 149)."""
+
+    REFILL_DETECTED = "refill_detected"
+    THEFT_ALERT = "theft_alert"
+    LOW_FUEL = "low_fuel"
+    LEAK_DETECTED = "leak_detected"
+    RUNTIME_COMPLETE = "runtime_complete"
+    TEMP_ALERT = "temp_alert"
+    SENSOR_FAULT = "sensor_fault"
 
 
 @dataclass
