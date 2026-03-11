@@ -233,6 +233,19 @@ async def startup_event(app: FastAPI) -> None:
     except Exception as e:
         _logger.warning(f"Fuel MQTT listener startup failed: {e}")
 
+    # Optional: Fuel event processor — subscribes to fuel.telemetry events (Phase 149)
+    if settings.fuel_event_processor_enabled:
+        try:
+            from app.services.event_bus import get_event_bus
+            from app.services.fuel_event_processor import get_fuel_event_processor
+
+            processor = get_fuel_event_processor()
+            bus = get_event_bus()
+            bus.subscribe("fuel.telemetry", processor.handle_telemetry_event)
+            _logger.info("Fuel event processor registered on event bus (fuel.telemetry)")
+        except Exception as e:
+            _logger.warning(f"Fuel event processor registration failed: {e}")
+
     # Start outcome verification job (checks executed recs after 30-min settling)
     scheduler_service.add_outcome_verification_job(interval_seconds=300)  # 5 min
 
