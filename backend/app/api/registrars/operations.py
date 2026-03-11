@@ -158,6 +158,12 @@ def register_operations_routers(app: FastAPI) -> None:
     # Ghost Booking & Right-Sizing Detection (Space Intelligence Rev 1.2)
     app.include_router(space.router, tags=["space-intelligence"])
 
+    # Fuel Monitoring (Phase 150)
+    if settings.fuel_monitoring_enabled:
+        from app.api.fuel import router as fuel_router
+
+        app.include_router(fuel_router, tags=["fuel"])
+
     # Plant Room Alerts — Desigo email->WhatsApp pipeline (Phase 146)
     if settings.plant_alerts_enabled:
         from app.plant.plant_alerts import router as plant_alerts_router

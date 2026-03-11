@@ -56,6 +56,9 @@ class ModuleType(str, Enum):
     SIMULATION = "simulation"
     FLEET_ML = "fleet_ml"
     BLOCK_BOOKING = "block_booking"  # Block booking detection (Space Intelligence)
+    SPACE_OPTIMIZATION = "space_optimization"  # Ghost bookings, right-sizing, focus rooms
+    FUEL = "fuel"  # Fuel tank monitoring (generators, diesel)
+    FUEL_ALERTS = "fuel_alerts"  # Fuel alert notifications (theft, leak, low fuel)
 
 
 # 15 mandatory base modules — must exist and be active for every site.
@@ -630,6 +633,38 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         integrates_with=[ModuleType.ASSETS, ModuleType.HVAC, ModuleType.ENERGY],
         telemetry_points=["work_order_count", "mttr_hours", "first_fix_rate"],
         ai_features=["work_order_prioritization", "technician_dispatch"],
+    ),
+    ModuleType.FUEL: ModuleDefinition(
+        module_type=ModuleType.FUEL,
+        name="Fuel Monitoring",
+        version="1.0.0",
+        description="Diesel/fuel tank monitoring, consumption tracking, and theft detection",
+        capabilities=[
+            ModuleCapability("fuel_monitoring", "Fuel Monitoring", "Real-time fuel level and temperature monitoring"),
+            ModuleCapability(
+                "consumption_forecasting",
+                "Consumption Forecasting",
+                "Predict days-to-empty and consumption rate trends",
+            ),
+            ModuleCapability("alert_management", "Alert Management", "Theft, leak, low fuel, and temperature alerts"),
+        ],
+        integrates_with=[ModuleType.ENERGY, ModuleType.ASSETS],
+        telemetry_points=["fuel_level_pct", "fuel_temp_c", "consumption_rate_lph", "days_to_empty"],
+        ai_features=["consumption_forecasting", "theft_detection", "leak_detection"],
+    ),
+    ModuleType.FUEL_ALERTS: ModuleDefinition(
+        module_type=ModuleType.FUEL_ALERTS,
+        name="Fuel Alerts",
+        version="1.0.0",
+        description="Fuel event notifications — theft, leak, low fuel alerts to WhatsApp/Telegram",
+        capabilities=[
+            ModuleCapability(
+                "fuel_notifications", "Fuel Notifications", "Route critical fuel events to notification channels"
+            ),
+        ],
+        integrates_with=[ModuleType.FUEL],
+        telemetry_points=["fuel_alerts_sent"],
+        ai_features=["alert_prioritization"],
     ),
     ModuleType.DIGITAL_TWIN: ModuleDefinition(
         module_type=ModuleType.DIGITAL_TWIN,

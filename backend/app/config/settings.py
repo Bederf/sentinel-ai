@@ -334,6 +334,9 @@ class Settings(BaseSettings):
     fuel_mqtt_topic_events: str = "sentinel/fuel/+/events"
     fuel_mqtt_topic_status: str = "sentinel/fuel/+/status"
 
+    # Fuel Monitoring Module (Phase 150)
+    fuel_monitoring_enabled: bool = True  # Enable fuel API endpoints + module
+
     # Fuel Event Processor (Phase 149)
     fuel_event_processor_enabled: bool = False
     fuel_low_alert_pct_1: float = 30.0  # Primary low fuel warning
