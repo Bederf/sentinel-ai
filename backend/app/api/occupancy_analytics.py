@@ -13,9 +13,11 @@ Endpoints:
 - GET  /api/occupancy/control/history       — audit trail from Supabase
 """
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException
 from datetime import datetime
 from typing import Optional
+
+from app.middleware.auth_middleware import require_query_site_access
 
 router = APIRouter(prefix="/occupancy/analytics", tags=["occupancy-analytics"])
 control_router = APIRouter(prefix="/occupancy/control", tags=["occupancy-control"])
@@ -106,7 +108,10 @@ async def get_hourly_occupancy_trend(
 
 
 @router.get("/zone-utilization")
-async def get_zone_utilization(site_id: str = Query(..., description="Building ID")):
+async def get_zone_utilization(
+    site_id: str = Query(..., description="Building ID"),
+    _auth=Depends(require_query_site_access("site_id")),
+):
     """
     Get current zone utilization metrics.
 

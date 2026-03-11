@@ -21,6 +21,8 @@ import {
   Droplets,
   Lightbulb,
   Sliders,
+  LayoutGrid,
+  Fuel,
 } from "lucide-react";
 import type { ModuleType } from "./moduleRegistry";
 
@@ -112,7 +114,9 @@ export type BuildingTabId =
   | "security"
   | "digital-twin"
   | "controls"
-  | "simulation";
+  | "simulation"
+  | "space"
+  | "fuel";
 
 export interface BuildingTabItem {
   id: BuildingTabId;
@@ -143,6 +147,8 @@ export const BUILDING_TAB_ITEMS: BuildingTabItem[] = [
   { id: "digital-twin", label: "Digital Twin", icon: Activity, controlModule: "digital_twin_control" },
   { id: "controls", label: "Controls", icon: Sliders },
   { id: "simulation", label: "Simulation", icon: Activity, requiredModule: "simulation" },
+  { id: "space", label: "Space", icon: LayoutGrid, requiredModule: "space_optimization" },
+  { id: "fuel", label: "Fuel", icon: Fuel, requiredModule: "fuel_monitoring" },
 ];
 
 // ─── Helpers ──

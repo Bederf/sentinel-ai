@@ -105,7 +105,15 @@ async def format_sensor_with_zone_and_desks(sensor_data: Dict[str, Any]) -> Dict
     # Try to find by name/sensor_id match
     try:
         # Search for Equipment records with matching code (equipment.code contains sensor_id)
-        result = client.table("equipment").select("*").ilike("code", f"%{sensor_id}%").eq("type", "dali").execute()
+        from app.utils import escape_like
+
+        result = (
+            client.table("equipment")
+            .select("*")
+            .ilike("code", f"%{escape_like(sensor_id)}%")
+            .eq("type", "dali")
+            .execute()
+        )
 
         if result.data:
             equipment_record = result.data[0]  # Take first match

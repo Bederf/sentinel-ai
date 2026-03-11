@@ -330,9 +330,18 @@ class BookingStore:
 
         self._mark_alert_notified_json(alert_id, now)
 
-    def has_open_alert_for(self, site_id: str, organiser_email: str, booking_date: date) -> bool:
-        """Check if an undismissed alert already exists for this organiser+date."""
+    def has_open_alert_for(
+        self,
+        site_id: str,
+        organiser_email: str,
+        booking_date: date,
+        overlap_start: datetime,
+        overlap_end: datetime,
+    ) -> bool:
+        """Check if an undismissed alert already exists for this organiser+slot."""
         date_str = booking_date.isoformat()
+        overlap_start_iso = overlap_start.isoformat()
+        overlap_end_iso = overlap_end.isoformat()
         if self.client:
             try:
                 result = (
@@ -341,8 +350,8 @@ class BookingStore:
                     .eq("site_id", site_id)
                     .eq("organiser_email", organiser_email)
                     .eq("dismissed", False)
-                    .gte("overlap_window_start", f"{date_str}T00:00:00")
-                    .lte("overlap_window_start", f"{date_str}T23:59:59")
+                    .eq("overlap_window_start", overlap_start_iso)
+                    .eq("overlap_window_end", overlap_end_iso)
                     .limit(1)
                     .execute()
                 )
@@ -350,7 +359,13 @@ class BookingStore:
             except Exception as exc:
                 logger.error("BookingStore.has_open_alert_for Supabase failed: %s", exc)
 
-        return self._has_open_alert_for_json(site_id, organiser_email, date_str)
+        return self._has_open_alert_for_json(
+            site_id,
+            organiser_email,
+            date_str,
+            overlap_start_iso,
+            overlap_end_iso,
+        )
 
     # ------------------------------------------------------------------
     # JSON fallback helpers
@@ -463,7 +478,14 @@ class BookingStore:
                 a["notification_sent_at"] = now
         self._save_json(ALERTS_JSON, alerts)
 
-    def _has_open_alert_for_json(self, site_id: str, organiser_email: str, date_str: str) -> bool:
+    def _has_open_alert_for_json(
+        self,
+        site_id: str,
+        organiser_email: str,
+        date_str: str,
+        overlap_start_iso: str,
+        overlap_end_iso: str,
+    ) -> bool:
         alerts = self._load_json(ALERTS_JSON)
         for a in alerts:
             if (
@@ -471,6 +493,8 @@ class BookingStore:
                 and a.get("organiser_email") == organiser_email
                 and not a.get("dismissed", False)
                 and a.get("overlap_window_start", "").startswith(date_str)
+                and a.get("overlap_window_start") == overlap_start_iso
+                and a.get("overlap_window_end") == overlap_end_iso
             ):
                 return True
         return False

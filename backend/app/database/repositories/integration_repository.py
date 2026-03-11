@@ -369,7 +369,10 @@ class IntegrationRepository:
         """Get severity mappings (global or per-source)."""
         query = self.client.table("severity_mappings").select("*")
         if source_id:
-            query = query.or_(f"log_source_id.eq.{source_id},log_source_id.is.null")
+            import re
+
+            safe_source_id = re.sub(r"[,.()\s]", "", source_id)
+            query = query.or_(f"log_source_id.eq.{safe_source_id},log_source_id.is.null")
         else:
             query = query.is_("log_source_id", "null")
         response = query.execute()

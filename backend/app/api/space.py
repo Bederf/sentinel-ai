@@ -4,7 +4,8 @@ POST /api/space/occupancy-event       — ingest mmWave presence event
 GET  /api/space/ghost-findings        — list ghost booking findings
 GET  /api/space/rightsizing-findings   — list right-sizing findings
 POST /api/space/findings/{id}/dismiss  — dismiss a finding
-POST /api/space/findings/{id}/concierge-confirm — concierge confirms empty
+POST /api/space/findings/{id}/concierge-confirm — legacy empty confirmation
+POST /api/space/findings/{id}/inspection-outcome — occupied/empty inspection outcome
 GET  /api/space/focus-sessions         — list focus room sessions
 GET  /api/space/focus-analytics        — focus room usage analytics
 """
@@ -54,11 +55,16 @@ class DismissRequest(BaseModel):
 
 
 class ConciergeConfirmRequest(BaseModel):
-    """Concierge confirms room is empty after physical inspection."""
+    """Legacy concierge confirmation payload."""
 
     confirmed_by: str = Field(..., description="Concierge name or ID")
-    cost_centre: str = Field(default="", description="Organiser's cost centre to charge")
-    charge_amount: float = Field(default=0.0, description="Penalty amount for the ghost booking")
+    cost_centre: str = Field(default="", description="Unused legacy field")
+    charge_amount: float = Field(default=0.0, description="Unused legacy field")
+
+
+class InspectionOutcomeRequest(BaseModel):
+    confirmed_by: str = Field(..., description="Concierge name or channel identifier")
+    occupied: bool = Field(..., description="True if the room is occupied, false if empty")
 
 
 # ---------------------------------------------------------------------------
@@ -76,87 +82,18 @@ async def ingest_occupancy_event(
 
     If ``count`` is present in the payload, it is silently ignored.
     """
-    from app.models.space_occupancy import OccupancyEvent
-    from app.services import occupancy_store
-    from app.services.ghost_booking_detector import (
-        auto_dismiss_rightsizing_on_reoccupation,
-        auto_resolve_ghost_on_occupation,
-        detect_ghost_booking,
-        detect_right_sizing_patterns,
-    )
+    from app.services.space_event_service import process_occupancy_event
 
     resolved_site = body.site_id or site_id
-    now = body.timestamp or datetime.utcnow()
-
-    # Save the event
-    event = OccupancyEvent(
+    return await process_occupancy_event(
         site_id=resolved_site,
         room_code=body.room_code,
         sensor_id=body.sensor_id,
         occupied=body.occupied,
-        timestamp=now,
         source=body.source,
-        received_at=datetime.utcnow(),
+        room_type=body.room_type,
+        timestamp=body.timestamp or datetime.utcnow(),
     )
-    occupancy_store.save_event(event)
-
-    result: dict[str, Any] = {
-        "success": True,
-        "event_id": event.id,
-        "room_code": body.room_code,
-        "occupied": body.occupied,
-    }
-
-    # Focus room session tracking (Phase 2)
-    if body.room_type == "focus":
-        from app.services.focus_room_session_service import process_focus_room_event
-
-        session_result = process_focus_room_event(
-            site_id=resolved_site,
-            room_code=body.room_code,
-            sensor_id=body.sensor_id,
-            occupied=body.occupied,
-            timestamp=now,
-            source=body.source,
-            room_type="focus",
-        )
-        result["focus_session"] = session_result
-        return result
-
-    # Get active bookings for this room (meeting rooms only)
-    active_bookings = _get_active_bookings_for_room(resolved_site, body.room_code, now)
-
-    if not body.occupied and active_bookings:
-        # Room went empty with active booking — check for ghost & right-sizing
-        ghost_findings = []
-        for booking in active_bookings:
-            ghost = detect_ghost_booking(booking, now=now, room_code=body.room_code)
-            if ghost:
-                ghost_findings.append(ghost.id)
-
-        rs_findings = detect_right_sizing_patterns(
-            site_id=resolved_site,
-            bookings=active_bookings,
-            now=now,
-        )
-
-        result["ghost_findings_created"] = len(ghost_findings)
-        result["rightsizing_findings_created"] = len(rs_findings)
-
-    elif body.occupied and active_bookings:
-        # Room became occupied — auto-resolve ghost and dismiss right-sizing
-        resolved_count = 0
-        dismissed_count = 0
-        for booking in active_bookings:
-            if auto_resolve_ghost_on_occupation(booking.id):
-                resolved_count += 1
-            if auto_dismiss_rightsizing_on_reoccupation(booking.id):
-                dismissed_count += 1
-
-        result["ghost_findings_resolved"] = resolved_count
-        result["rightsizing_findings_dismissed"] = dismissed_count
-
-    return result
 
 
 @router.get("/ghost-findings")
@@ -183,6 +120,10 @@ async def list_ghost_findings(
                 "detected_at": f.detected_at.isoformat(),
                 "status": f.status,
                 "notification_sent": f.notification_sent,
+                "email_notified_at": f.email_notified_at.isoformat() if f.email_notified_at else None,
+                "whatsapp_notified_at": f.whatsapp_notified_at.isoformat() if f.whatsapp_notified_at else None,
+                "whatsapp_message_id": f.whatsapp_message_id,
+                "response_text": f.response_text,
             }
             for f in findings
         ],
@@ -253,18 +194,7 @@ async def concierge_confirm_empty(
     finding_id: str,
     body: ConciergeConfirmRequest,
 ) -> dict[str, Any]:
-    """Concierge confirms a ghost booking room is empty after physical inspection.
-
-    Workflow:
-      1. Sensor detects no movement for 20 minutes -> ghost finding created
-      2. Concierge receives notification to inspect the room
-      3. Concierge walks to room, verifies it is empty
-      4. Concierge calls this endpoint to confirm
-      5. Room status -> 'released', organiser's cost centre charged
-
-    If the room was reoccupied before the concierge confirms, the finding
-    will already be in 'verified_occupied' status and this endpoint returns 409.
-    """
+    """Legacy endpoint: concierge confirms the room is empty."""
     from app.services.ghost_booking_detector import concierge_confirm_empty as confirm_fn
     from app.services.occupancy_store import get_ghost_finding_by_id
 
@@ -292,19 +222,49 @@ async def concierge_confirm_empty(
     return {
         "success": True,
         "finding_id": finding_id,
-        "status": "released",
+        "status": "confirmed_empty",
         "room_code": result.room_code,
         "room_name": result.room_name,
         "confirmed_by": body.confirmed_by,
-        "cost_centre": body.cost_centre,
-        "charge_amount": body.charge_amount,
-        "charge_reason": result.charge_reason,
         "organiser_email": result.organiser_email,
         "organiser_name": result.organiser_name,
-        "message": f"Room {result.room_name} released. "
-        f"Charge of {body.charge_amount} applied to cost centre '{body.cost_centre}'."
-        if body.charge_amount > 0
-        else f"Room {result.room_name} released. No charge applied.",
+        "message": f"Room {result.room_name} confirmed empty.",
+    }
+
+
+@router.post("/findings/{finding_id}/inspection-outcome")
+async def submit_inspection_outcome(
+    finding_id: str,
+    body: InspectionOutcomeRequest,
+) -> dict[str, Any]:
+    """Store an occupied/empty ghost-room inspection outcome."""
+    from app.services.ghost_booking_detector import concierge_confirm_empty, concierge_confirm_occupied
+    from app.services.occupancy_store import get_ghost_finding_by_id
+
+    finding = get_ghost_finding_by_id(finding_id)
+    if not finding:
+        raise HTTPException(status_code=404, detail="Ghost finding not found")
+
+    if finding.status not in ("open", "pending_inspection"):
+        raise HTTPException(status_code=409, detail=f"Finding already resolved: status={finding.status}")
+
+    if body.occupied:
+        result = concierge_confirm_occupied(finding_id, body.confirmed_by)
+        message = f"Room {finding.room_code} confirmed occupied."
+        status = "verified_occupied"
+    else:
+        result = concierge_confirm_empty(finding_id, body.confirmed_by)
+        message = f"Room {finding.room_code} confirmed empty."
+        status = "confirmed_empty"
+
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to update finding")
+
+    return {
+        "success": True,
+        "finding_id": finding_id,
+        "status": status,
+        "message": message,
     }
 
 
@@ -352,29 +312,3 @@ async def focus_room_analytics(
     from app.services.focus_room_session_service import get_focus_room_analytics
 
     return get_focus_room_analytics(site_id)
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _get_active_bookings_for_room(site_id: str, room_code: str, now: datetime) -> list:
-    """Get active bookings for a room at the given time.
-
-    Looks up bookings via the block booking store, filtering by room and time.
-    """
-
-    try:
-        from app.services.block_booking_detector.booking_store import get_booking_store
-
-        store = get_booking_store()
-        day_bookings = store.get_bookings_for_site(site_id, now.date())
-        return [
-            b
-            for b in day_bookings
-            if (b.room_id == room_code or b.room_name == room_code) and b.start_time <= now <= b.end_time
-        ]
-    except Exception:
-        logger.debug("Could not load bookings from store", exc_info=True)
-        return []

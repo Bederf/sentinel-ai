@@ -960,6 +960,10 @@ class LifecycleOrchestrator:
         self.paused = False
         logger.info(f"[SIMULATION] Resumed at {self.simulated_time}")
 
+    def resume(self):
+        """Backward-compatible alias for resuming a paused simulation."""
+        self.unpause()
+
     def get_status(self) -> dict[str, Any]:
         """Get current simulation status including weather and seasonal data."""
         elapsed_real = (datetime.now() - self.real_start_time).total_seconds() if self.real_start_time else 0

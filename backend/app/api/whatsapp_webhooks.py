@@ -1,18 +1,23 @@
-"""
-WhatsApp webhook endpoint for receiving incoming messages.
-Integrates with FastAPI for webhook verification and message handling.
-"""
+"""WhatsApp webhook endpoints for receiving incoming messages."""
 
-from fastapi import APIRouter, Depends, Request, HTTPException, Query
+from __future__ import annotations
+
+import base64
+import hashlib
+import hmac
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Any, Dict
+
+from fastapi import APIRouter, Depends, Form, Header, HTTPException, Query, Request
+
 from app.handlers.whatsapp_handler import get_whatsapp_handler
 from app.integrations.whatsapp_service import get_whatsapp_service
 from app.security.prompt_guard import score_prompt
 from app.security.webhook_auth import verify_whatsapp_webhook as verify_whatsapp_signature
 from app.services.popia_consent_guard import evaluate_ingress_processing_consent
-import logging
-from typing import Any, Dict
-import json
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/whatsapp", tags=["whatsapp"])
@@ -179,7 +184,15 @@ async def handle_whatsapp_message(
             return {"status": "ok"}
 
         # Route message to appropriate handler
-        await route_incoming_message(from_number, content, message_type, message_id)
+        reply_to_message_id = message.get("context", {}).get("id")
+
+        await route_incoming_message(
+            from_number,
+            content,
+            message_type,
+            message_id,
+            reply_to_message_id=reply_to_message_id,
+        )
 
         return {"status": "ok"}
 
@@ -188,7 +201,63 @@ async def handle_whatsapp_message(
         return {"status": "error", "message": str(e)}
 
 
-async def route_incoming_message(from_number: str, content: str, message_type: str, message_id: str) -> None:
+def _normalise_whatsapp_number(value: str) -> str:
+    return value.replace("whatsapp:", "").replace(" ", "").strip()
+
+
+def _verify_twilio_signature(request_url: str, params: dict[str, str], signature: str | None) -> bool:
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN", "")
+    if not auth_token:
+        return True
+    if not signature:
+        return False
+    payload = request_url + "".join(f"{key}{params[key]}" for key in sorted(params))
+    digest = hmac.new(auth_token.encode("utf-8"), payload.encode("utf-8"), hashlib.sha1).digest()
+    expected = base64.b64encode(digest).decode("utf-8")
+    return hmac.compare_digest(expected, signature)
+
+
+@router.post("/twilio")
+async def handle_twilio_whatsapp_message(
+    request: Request,
+    Body: str = Form(""),
+    From: str = Form(""),
+    MessageSid: str = Form(""),
+    OriginalRepliedMessageSid: str = Form(""),
+    X_Twilio_Signature: str | None = Header(default=None, alias="X-Twilio-Signature"),
+) -> Dict[str, str]:
+    """Handle incoming Twilio WhatsApp replies."""
+    params = {
+        "Body": Body,
+        "From": From,
+        "MessageSid": MessageSid,
+        "OriginalRepliedMessageSid": OriginalRepliedMessageSid,
+    }
+    if not _verify_twilio_signature(str(request.url), params, X_Twilio_Signature):
+        raise HTTPException(status_code=403, detail="Invalid Twilio signature")
+
+    from_number = _normalise_whatsapp_number(From)
+    if not from_number or not Body:
+        return {"status": "ok"}
+
+    await route_incoming_message(
+        from_number,
+        Body,
+        "text",
+        MessageSid,
+        reply_to_message_id=OriginalRepliedMessageSid or None,
+    )
+    return {"status": "ok"}
+
+
+async def route_incoming_message(
+    from_number: str,
+    content: str,
+    message_type: str,
+    message_id: str,
+    *,
+    reply_to_message_id: str | None = None,
+) -> None:
     """
     Route incoming WhatsApp message to appropriate handler.
 
@@ -203,6 +272,24 @@ async def route_incoming_message(from_number: str, content: str, message_type: s
     try:
         # Log interaction
         logger.debug(f"Routing message from {from_number}: {content}")
+
+        # --- Ghost-room concierge reply ---
+        try:
+            from app.services.ghost_room_notifier import process_concierge_whatsapp_reply
+
+            result = await process_concierge_whatsapp_reply(
+                from_number,
+                content,
+                reply_to_message_id=reply_to_message_id,
+                message_id=message_id,
+            )
+            if result.get("handled"):
+                response_message = result.get("response_message")
+                if response_message:
+                    await whatsapp_service.send_text_message(from_number, response_message)
+                return
+        except Exception as e:
+            logger.warning(f"Ghost-room reply handler error: {e}")
 
         # --- Comfort complaint agent (multi-turn) ---
         try:

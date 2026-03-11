@@ -1,6 +1,6 @@
 # SENTINEL · Space Intelligence
 
-## Phase 2.0 — Focus Room Continuous Occupancy Monitoring
+## Phase 3 — Focus Room Continuous Occupancy Monitoring
 
 **Rev 1.0 · March 2026**
 **Fairland 2 (FNB)**
@@ -9,7 +9,7 @@
 
 ## Overview
 
-Phase 2 introduces monitoring of focus rooms and single-occupancy work pods where no booking system exists.
+Phase 3 introduces monitoring of focus rooms and single-occupancy work pods where no booking system exists.
 
 The objective is to detect extended continuous use of a focus room beyond a recommended duration (typically 2 hours) and provide facilities teams with usage insights.
 
@@ -34,13 +34,13 @@ Session duration is calculated on the backend.
 
 ## Occupancy Detection Hardware
 
-Hardware remains identical to Phase 1.
+Hardware remains aligned with the current ESP32 meeting-room occupancy node.
 
 | Component | Model |
 |-----------|-------|
 | Radar sensor | HLK-LD2410C 24GHz mmWave presence radar |
-| Microcontroller | Wemos D1 Mini (ESP8266) |
-| Detection mode | Digital OUT pin |
+| Microcontroller | NodeMCU-32S (ESP32) |
+| Detection mode | ESP32 publishes presence events over MQTT |
 | Delay | 180 second unmanned delay |
 
 The LD2410C radar detects moving and stationary humans, including micro-movements such as breathing. This prevents false vacancy events when users sit still for long periods.
@@ -174,7 +174,7 @@ A single sensor covers the entire room. No door bleed suppression needed — the
 
 ## Future Extensions
 
-Phase 2 creates the foundation for additional smart workspace features.
+Phase 3 creates the foundation for additional smart workspace features.
 
 **Potential extensions:**
 - Real-time focus room availability display
@@ -241,5 +241,5 @@ Phase 2 creates the foundation for additional smart workspace features.
 
 ---
 
-**SENTINEL · Space Intelligence · Phase 2.0 Focus Rooms · Rev 1.0 · March 2026**
+**SENTINEL · Space Intelligence · Phase 3 Focus Rooms · Rev 1.0 · March 2026**
 **Fairland 2 (FNB) · Confidential**

@@ -5,7 +5,7 @@ Endpoints for 365-day solar/BESS simulation results and aggregations.
 
 import logging
 from typing import Optional, Dict, Any
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from datetime import datetime
 import asyncio
 
@@ -14,6 +14,8 @@ from app.services.solar_annual_aggregator import (
     AnnualSummary,
     HourlySnapshot,
 )
+from app.middleware.auth_middleware import require_site_access
+from app.models.auth import AuthContext
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -29,6 +31,7 @@ async def get_annual_summary(
     site_id: str,
     year: Optional[int] = None,
     current_user: Dict = None,
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> AnnualSummary:
     """
     Get cached 365-day simulation results.
@@ -87,6 +90,7 @@ async def start_annual_simulation(
     duration_minutes: float = 30.0,
     background_tasks: BackgroundTasks = None,
     current_user: Dict = None,
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> Dict[str, Any]:
     """
     Start 365-day simulation in background (30 minutes real-time by default).
@@ -140,6 +144,7 @@ async def get_simulation_status(
     site_id: str,
     task_id: str,
     current_user: Dict = None,
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> Dict[str, Any]:
     """
     Poll simulation progress.

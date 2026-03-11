@@ -70,11 +70,12 @@ class DemandAwareCoordinator:
                 logger.debug(f"No demand data available for site {site_id}")
                 return None
 
-            current_demand_kw = demand_status.get("current_demand_kw", 0)
-            nmd_limit_kva = demand_status.get("nmd_limit_kva", 1820)
+            # DemandStatus is a dataclass, not a dict — use attribute access
+            current_demand_kw = getattr(demand_status, "current_demand_kw", 0)
+            nmd_limit_kva = getattr(demand_status, "nmd_limit_kva", 1820)
             headroom_kw = nmd_limit_kva - current_demand_kw
             headroom_percent = (headroom_kw / nmd_limit_kva * 100) if nmd_limit_kva > 0 else 100
-            demand_trend = demand_status.get("demand_trend", "stable")
+            demand_trend = getattr(demand_status, "demand_trend", "stable")
 
             logger.info(
                 f"Site {site_id}: Demand {current_demand_kw:.0f}kW, NMD {nmd_limit_kva:.0f}kVA, "

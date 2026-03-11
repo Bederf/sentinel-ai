@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from app.middleware.auth_middleware import require_query_site_access
 from app.middleware.rate_limiter import limiter
 from pydantic import BaseModel
 
@@ -382,6 +383,7 @@ async def list_anomalies(
     site_id: Optional[str] = Query(None, description="Filter by site ID"),
     severity: Optional[str] = Query(None, description="Filter by severity"),
     urgency: Optional[str] = Query(None, description="Filter by urgency (critical, high, medium, low)"),
+    _auth=Depends(require_query_site_access("site_id")),
 ) -> AnomalyListResponse:
     """
     List all detected anomalies with details.

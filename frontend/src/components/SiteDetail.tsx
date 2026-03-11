@@ -96,6 +96,10 @@ const SecurityDashboard = lazy(() => import("./security").then(m => ({ default: 
 const DigitalTwin = lazy(() => import("./digital-twin").then(m => ({ default: m.DigitalTwin })));
 // Simulation
 const SimulationDashboard = lazy(() => import("./SimulationDashboard").then(m => ({ default: m.SimulationDashboard  })));
+// Space Optimization
+const SpaceOptimizationPage = lazy(() => import("./SpaceOptimizationPage").then(m => ({ default: m.SpaceOptimizationPage })));
+// Fuel
+const FuelDashboard = lazy(() => import("./fuel/FuelDashboard").then(m => ({ default: m.FuelDashboard })));
 
 // ─── Sub-tab types for discipline tabs ────────────────────────────
 type LightingSub = "Lighting" | "Occupancy" | "Analytics" | "Correlation";
@@ -1669,6 +1673,16 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
           {/* Simulation — only visible when simulation add-on is active */}
           {activeMainTab === "simulation" && isModuleActive('simulation') && (
             <SimulationDashboard />
+          )}
+
+          {/* Space Optimization — only visible when space_optimization add-on is active */}
+          {activeMainTab === "space" && isModuleActive('space_optimization') && (
+            <SpaceOptimizationPage />
+          )}
+
+          {/* Fuel — only visible when fuel_monitoring add-on is active */}
+          {activeMainTab === "fuel" && isModuleActive('fuel_monitoring') && (
+            <FuelDashboard siteId={siteId} />
           )}
         </div>
       </Suspense>

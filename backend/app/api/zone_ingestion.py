@@ -9,9 +9,11 @@ Provides endpoints for:
 
 import logging
 from typing import List, Dict, Any
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, Field
 
+from app.middleware.auth_middleware import require_site_access
+from app.models.auth import AuthContext
 from app.services.zone_ingestion_service import ZoneIngestionService
 
 logger = logging.getLogger(__name__)
@@ -109,6 +111,7 @@ class AllCentroidsResponse(BaseModel):
 async def ingest_zones(
     site_id: str = Path(..., description="Building UUID"),
     request: ZoneIngestionRequest = None,
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> IngestionResponse:
     """Ingest zone configuration for a building.
 
@@ -170,6 +173,7 @@ async def ingest_zones(
 async def ingest_desks(
     site_id: str = Path(..., description="Building UUID"),
     request: DeskIngestionRequest = None,
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> IngestionResponse:
     """Ingest desk configuration for a building.
 
@@ -233,6 +237,7 @@ async def ingest_desks(
 async def get_zone_centroid(
     site_id: str = Path(..., description="Building UUID"),
     zone_id: str = Path(..., description="Zone ID (e.g., Zone-L1-A)"),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> ZoneCentroidResponse:
     """Get zone centroid calculated from desk positions.
 
@@ -271,6 +276,7 @@ async def get_zone_centroid(
 @router.get("/{site_id}/zone-ingestion/centroids", response_model=AllCentroidsResponse)
 async def get_all_zone_centroids(
     site_id: str = Path(..., description="Building UUID"),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> AllCentroidsResponse:
     """Get centroids for all zones in a building.
 
@@ -304,6 +310,7 @@ async def get_all_zone_centroids(
 @router.get("/{site_id}/zone-ingestion/validate")
 async def validate_zone_structure(
     site_id: str = Path(..., description="Building UUID"),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> Dict[str, Any]:
     """Validate zone and desk structure for a building.
 

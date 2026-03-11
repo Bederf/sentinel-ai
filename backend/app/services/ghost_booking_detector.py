@@ -272,20 +272,7 @@ def concierge_confirm_empty(
     cost_centre: str = "",
     charge_amount: float = 0.0,
 ) -> GhostBookingFinding | None:
-    """Concierge confirms room is empty after physical inspection.
-
-    Workflow:
-      1. Concierge receives notification (ghost booking detected, no movement)
-      2. Concierge walks to room, confirms it is indeed empty
-      3. Calls this function → status='released', charge recorded
-      4. Room is freed for other bookings
-
-    Args:
-        finding_id: Ghost finding to confirm.
-        confirmed_by: Concierge name or ID.
-        cost_centre: Organiser's cost centre to charge.
-        charge_amount: Penalty amount for the ghost booking.
-    """
+    """Concierge confirms room is empty after physical inspection."""
     finding = occupancy_store.get_ghost_finding_by_id(finding_id)
     if not finding:
         return None
@@ -298,29 +285,61 @@ def concierge_confirm_empty(
         )
         return None
 
-    wasted_minutes = int((datetime.utcnow() - finding.booking_start).total_seconds() / 60)
-    charge_reason = (
-        f"Ghost booking - {finding.room_name} ({finding.room_code}) unused for "
-        f"{wasted_minutes} minutes. Organiser: {finding.organiser_name} "
-        f"({finding.organiser_email}). Confirmed empty by {confirmed_by}."
+    inspection_note = (
+        f"Ghost booking inspection: {finding.room_name} ({finding.room_code}) confirmed empty by {confirmed_by}."
     )
 
     updated = occupancy_store.update_ghost_finding_status(
         finding_id,
-        "released",
+        "confirmed_empty",
         inspected_by=confirmed_by,
         cost_centre=cost_centre,
         charge_amount=charge_amount,
-        charge_reason=charge_reason,
+        charge_reason=inspection_note,
     )
     if updated:
         logger.info(
-            "Ghost booking confirmed empty: room=%s booking=%s confirmed_by=%s charge=%.2f cost_centre=%s",
+            "Ghost booking confirmed empty: room=%s booking=%s confirmed_by=%s",
             finding.room_code,
             finding.booking_id,
             confirmed_by,
-            charge_amount,
-            cost_centre,
+        )
+    return updated
+
+
+def concierge_confirm_occupied(
+    finding_id: str,
+    confirmed_by: str,
+    *,
+    response_message_id: str | None = None,
+    response_text: str | None = None,
+) -> GhostBookingFinding | None:
+    """Concierge confirms the room is occupied after inspection."""
+    finding = occupancy_store.get_ghost_finding_by_id(finding_id)
+    if not finding:
+        return None
+
+    if finding.status not in ("open", "pending_inspection"):
+        logger.warning(
+            "Cannot confirm occupied for finding %s: status=%s",
+            finding_id,
+            finding.status,
+        )
+        return None
+
+    updated = occupancy_store.update_ghost_finding_status(
+        finding_id,
+        "verified_occupied",
+        inspected_by=confirmed_by,
+        response_message_id=response_message_id,
+        response_text=response_text,
+    )
+    if updated:
+        logger.info(
+            "Ghost booking confirmed occupied: room=%s booking=%s confirmed_by=%s",
+            finding.room_code,
+            finding.booking_id,
+            confirmed_by,
         )
     return updated
 
@@ -417,17 +436,7 @@ def format_ghost_booking_notification(
     site_name: str,
     confirm_url: str | None = None,
 ) -> str:
-    """Format a ghost booking notification for the concierge.
-
-    The concierge is asked to physically inspect the room and confirm
-    whether it is empty. If confirmed, the room is released and the
-    organiser's cost centre is charged.
-
-    Args:
-        finding: The ghost booking finding.
-        site_name: Human-readable site name.
-        confirm_url: URL for the concierge to confirm (e.g. deep link or API).
-    """
+    """Format a ghost booking notification for the concierge."""
     lines = [
         f"Ghost Booking -- Inspection Required -- {site_name}",
         "",
@@ -437,8 +446,7 @@ def format_ghost_booking_notification(
         "",
         "ACTION REQUIRED:",
         f"  Please inspect {finding.room_name} ({finding.room_code}).",
-        "  If the room is empty, confirm via SENTINEL to release it.",
-        "  The organiser's cost centre will be charged.",
+        "  Confirm whether the room is occupied or empty.",
         "",
         f"Organiser: {finding.organiser_name} ({finding.organiser_email})",
         f"Booked until: {finding.booking_end.strftime('%H:%M')}",

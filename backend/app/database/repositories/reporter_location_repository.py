@@ -71,7 +71,11 @@ class ReporterLocationRepository:
             try:
                 query = self.client.table("reporter_location_memory").select("*")
                 if norm_phone and telegram_id:
-                    query = query.or_(f"reporter_phone.eq.{norm_phone},reporter_telegram_id.eq.{telegram_id}")
+                    import re
+
+                    safe_phone = re.sub(r"[,.()\s]", "", norm_phone)
+                    safe_tg = re.sub(r"[,.()\s]", "", telegram_id)
+                    query = query.or_(f"reporter_phone.eq.{safe_phone},reporter_telegram_id.eq.{safe_tg}")
                 elif norm_phone:
                     query = query.eq("reporter_phone", norm_phone)
                 else:

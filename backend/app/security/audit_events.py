@@ -43,6 +43,8 @@ SECURITY_EVENTS: set[str] = {
     "CONFIG_CHANGE",
     "PERMISSION_CHANGE",
     "RATE_LIMIT_EXCEEDED",
+    "BOLA_SITE_DENIED",
+    "BOLA_EQUIPMENT_DENIED",
 }
 
 # Subset of SECURITY_EVENTS that trigger a Telegram alert to the FM team
@@ -70,6 +72,8 @@ _EVENT_SEVERITY: dict[str, str] = {
     "CONFIG_CHANGE": "medium",
     "PERMISSION_CHANGE": "high",
     "RATE_LIMIT_EXCEEDED": "low",
+    "BOLA_SITE_DENIED": "high",
+    "BOLA_EQUIPMENT_DENIED": "high",
 }
 
 
@@ -359,4 +363,62 @@ def audit_rate_limit_exceeded(
         "RATE_LIMIT_EXCEEDED",
         source_ip=source_ip,
         metadata={"path": path},
+    )
+
+
+def audit_bola_site_denied(
+    user_id: str,
+    email: str,
+    role: str,
+    site_id: str,
+    path: str,
+    method: str = "GET",
+    source_ip: Optional[str] = None,
+) -> str:
+    """Audit a BOLA site access denial.
+
+    Emitted when a user attempts to access a site they are not authorized for.
+    Repeated events from the same user/IP may indicate probing.
+    """
+    return write_security_audit(
+        "BOLA_SITE_DENIED",
+        user=user_id,
+        source_ip=source_ip,
+        metadata={
+            "email": email,
+            "role": role,
+            "target_site": site_id,
+            "endpoint": path,
+            "method": method,
+        },
+    )
+
+
+def audit_bola_equipment_denied(
+    user_id: str,
+    email: str,
+    role: str,
+    equipment_code: str,
+    derived_site: str,
+    path: str,
+    method: str = "GET",
+    source_ip: Optional[str] = None,
+) -> str:
+    """Audit a BOLA equipment access denial.
+
+    Emitted when a user attempts to access equipment belonging to a site
+    they are not authorized for. The site is derived from the equipment code.
+    """
+    return write_security_audit(
+        "BOLA_EQUIPMENT_DENIED",
+        user=user_id,
+        source_ip=source_ip,
+        metadata={
+            "email": email,
+            "role": role,
+            "target_equipment": equipment_code,
+            "derived_site": derived_site,
+            "endpoint": path,
+            "method": method,
+        },
     )

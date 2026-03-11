@@ -22,7 +22,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, Depends
 
-from app.middleware.auth_middleware import require_auth
+from app.middleware.auth_middleware import require_equipment_access
 from app.models.auth import AuthContext, AuthLevel
 from app.security.step_up import require_step_up
 from app.services.device_control_service import (
@@ -113,7 +113,9 @@ async def list_controllable_equipment(
 
 
 @router.get("/{equipment_code}")
-async def get_device_controls(equipment_code: str) -> Dict[str, Any]:
+async def get_device_controls(
+    equipment_code: str, auth: AuthContext = Depends(require_equipment_access("equipment_code"))
+) -> Dict[str, Any]:
     """
     Get device details and available control points.
 
@@ -184,6 +186,7 @@ async def validate_control_value(
     equipment_code: str,
     control_point: str,
     value: Any,
+    auth: AuthContext = Depends(require_equipment_access("equipment_code")),
 ) -> Dict[str, Any]:
     """
     Validate a control value before submission.
@@ -210,7 +213,9 @@ async def validate_control_value(
 
 
 @router.get("/{equipment_code}/status")
-async def get_device_status(equipment_code: str) -> Dict[str, Any]:
+async def get_device_status(
+    equipment_code: str, auth: AuthContext = Depends(require_equipment_access("equipment_code"))
+) -> Dict[str, Any]:
     """
     Get current control state and readings.
 
@@ -237,6 +242,7 @@ async def recommend_control(
     suggested_point: str,
     suggested_value: Any,
     rec_repo: RecommendationRepository = Depends(lambda: get_recommendation_repository()),
+    auth: AuthContext = Depends(require_equipment_access("equipment_code")),
 ) -> Dict[str, Any]:
     """
     Generate a control recommendation (typically from complaint system).
@@ -321,7 +327,7 @@ async def execute_control(
     target_value: Any,
     reason: str,
     operator_id: str,
-    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
+    auth: AuthContext = Depends(require_equipment_access("equipment_code", AuthLevel.OPERATOR)),
     _step_up: None = Depends(require_step_up()),
     rec_repo: RecommendationRepository = Depends(lambda: get_recommendation_repository()),
 ) -> Dict[str, Any]:
@@ -409,6 +415,7 @@ async def get_control_history(
     equipment_code: str,
     limit: int = Query(50, ge=1, le=500),
     rec_repo: RecommendationRepository = Depends(lambda: get_recommendation_repository()),
+    auth: AuthContext = Depends(require_equipment_access("equipment_code")),
 ) -> Dict[str, Any]:
     """
     Get history of control actions on this equipment.

@@ -472,6 +472,12 @@ class N8nService:
         if not self._config.is_configured:
             return {"success": False, "reason": "n8n not configured"}
 
+        # SSRF prevention: webhook_path must be a simple slug (no slashes, dots, or scheme)
+        import re
+
+        if not re.match(r"^[a-zA-Z0-9_-]+$", webhook_path):
+            return {"success": False, "reason": f"Invalid webhook path: {webhook_path}"}
+
         prefix = "webhook-test" if test else "webhook"
         base = self._config.webhook_base.rsplit("/webhook", 1)[0]
         url = f"{base}/{prefix}/{webhook_path}"

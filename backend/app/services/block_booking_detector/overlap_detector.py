@@ -1,9 +1,9 @@
-"""Detect overlapping room bookings by the same organiser.
+"""Detect same-slot room bookings by the same organiser.
 
 Core detection logic:
 1. Group bookings by organiser
 2. For each organiser, group by date
-3. Check for time overlaps where the same person holds N+ rooms
+3. Check for identical time windows where the same person holds N+ rooms
 4. Generate BlockBookingAlert for each overlap cluster
 
 De-duplicates against existing open alerts.
@@ -26,45 +26,9 @@ from app.services.block_booking_detector.booking_store import BookingStore
 logger = logging.getLogger(__name__)
 
 
-def _times_overlap(a: BookingRecord, b: BookingRecord) -> bool:
-    """Return True if two bookings have overlapping time windows."""
-    return a.start_time < b.end_time and b.start_time < a.end_time
-
-
-def _find_overlap_clusters(
-    bookings: list[BookingRecord],
-) -> list[list[BookingRecord]]:
-    """Find clusters of mutually overlapping bookings.
-
-    Uses a simple greedy approach: for each booking, find all others that
-    overlap with it. If the resulting group has 2+ bookings, it's a cluster.
-    """
-    if len(bookings) < 2:
-        return []
-
-    # Sort by start time
-    sorted_bookings = sorted(bookings, key=lambda b: b.start_time)
-    clusters: list[list[BookingRecord]] = []
-    used: set[str] = set()
-
-    for i, booking in enumerate(sorted_bookings):
-        if booking.id in used:
-            continue
-        cluster = [booking]
-        for j in range(i + 1, len(sorted_bookings)):
-            other = sorted_bookings[j]
-            if other.id in used:
-                continue
-            # Check if this booking overlaps with ANY booking in the cluster
-            if any(_times_overlap(c, other) for c in cluster):
-                cluster.append(other)
-
-        if len(cluster) >= 2:
-            for b in cluster:
-                used.add(b.id)
-            clusters.append(cluster)
-
-    return clusters
+def _time_slot_key(booking: BookingRecord) -> tuple[str, str]:
+    """Return a stable key for an exact booking time window."""
+    return (booking.start_time.isoformat(), booking.end_time.isoformat())
 
 
 def detect_overlaps(
@@ -73,7 +37,7 @@ def detect_overlaps(
     config: BlockBookingConfig,
     store: Optional[BookingStore] = None,
 ) -> list[BlockBookingAlert]:
-    """Scan bookings for overlapping reservations by the same organiser.
+    """Scan bookings for same-slot reservations by the same organiser.
 
     Args:
         site_id: The site to scan
@@ -104,47 +68,59 @@ def detect_overlaps(
             if len(day_bookings) < config.min_rooms_for_alert:
                 continue
 
-            # Find overlap clusters
-            clusters = _find_overlap_clusters(day_bookings)
+            by_slot: dict[tuple[str, str], list[BookingRecord]] = defaultdict(list)
+            for booking in day_bookings:
+                by_slot[_time_slot_key(booking)].append(booking)
 
-            for cluster in clusters:
-                if len(cluster) < config.min_rooms_for_alert:
+            for slot_bookings in by_slot.values():
+                rooms = sorted({b.room_name for b in slot_bookings})
+                if len(rooms) < config.min_rooms_for_alert:
                     continue
 
+                slot_start = slot_bookings[0].start_time
+                slot_end = slot_bookings[0].end_time
+                booking_date = slot_bookings[0].booking_date
+
                 # De-duplicate: skip if open alert already exists
-                booking_date = cluster[0].booking_date
-                if store and store.has_open_alert_for(site_id, organiser_email, booking_date):
+                if store and store.has_open_alert_for(
+                    site_id,
+                    organiser_email,
+                    booking_date,
+                    slot_start,
+                    slot_end,
+                ):
                     logger.debug(
-                        "Skipping duplicate alert for %s on %s",
+                        "Skipping duplicate alert for %s on %s %s-%s",
                         organiser_email,
                         date_str,
+                        slot_start.strftime("%H:%M"),
+                        slot_end.strftime("%H:%M"),
                     )
                     continue
 
                 # Build alert
-                overlap_start = min(b.start_time for b in cluster)
-                overlap_end = max(b.end_time for b in cluster)
-                rooms = list({b.room_name for b in cluster})
-                organiser_name = cluster[0].organiser_name
+                organiser_name = slot_bookings[0].organiser_name
 
                 alert = BlockBookingAlert(
                     site_id=site_id,
                     organiser_email=organiser_email,
                     organiser_name=organiser_name,
-                    overlap_window_start=overlap_start,
-                    overlap_window_end=overlap_end,
+                    overlap_window_start=slot_start,
+                    overlap_window_end=slot_end,
                     rooms=rooms,
                     room_count=len(rooms),
-                    booking_ids=[b.id for b in cluster],
+                    booking_ids=[b.id for b in slot_bookings],
                     detected_at=datetime.utcnow(),
                 )
 
                 new_alerts.append(alert)
                 logger.info(
-                    "Block booking detected: %s holds %d rooms on %s",
+                    "Block booking detected: %s holds %d rooms on %s for %s-%s",
                     organiser_email,
                     len(rooms),
                     date_str,
+                    slot_start.strftime("%H:%M"),
+                    slot_end.strftime("%H:%M"),
                 )
 
     return new_alerts

@@ -129,9 +129,9 @@ else
 fi
 
 # Supabase Studio
-curl -sf -m 5 -o /dev/null http://localhost:54323 2>/dev/null \
-  && check "Supabase Studio :54323" 0 "serving" \
-  || check "Supabase Studio :54323" 2 "unreachable (optional)"
+curl -sf -m 5 -o /dev/null http://localhost:55323 2>/dev/null \
+  && check "Supabase Studio :55323" 0 "serving" \
+  || check "Supabase Studio :55323" 2 "unreachable (optional)"
 
 # --- Summary ---
 $QUIET || echo ""

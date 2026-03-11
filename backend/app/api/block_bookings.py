@@ -74,6 +74,11 @@ def _get_config(site_id: str) -> BlockBookingConfig:
     return _site_configs[site_id]
 
 
+def get_block_booking_config(site_id: str) -> BlockBookingConfig:
+    """Public accessor for per-site concierge and threshold configuration."""
+    return _get_config(site_id)
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------

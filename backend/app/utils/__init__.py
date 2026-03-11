@@ -9,6 +9,15 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
+def escape_like(value: str) -> str:
+    """Escape PostgREST LIKE/ILIKE wildcard characters in user input.
+
+    Prevents users from injecting % or _ wildcards to broaden queries
+    beyond intended scope.
+    """
+    return value.replace("%", r"\%").replace("_", r"\_")
+
+
 async def retry_on_rate_limit(
     func: Callable[..., T],
     *args,

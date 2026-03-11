@@ -11,7 +11,10 @@ import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.middleware.auth_middleware import require_equipment_access
+from app.models.auth import AuthContext
 from pydantic import BaseModel, Field
 
 from app.models.baseline import (
@@ -82,7 +85,11 @@ class ComparisonResponse(BaseModel):
 
 
 @router.post("/{equipment_id}", response_model=EquipmentBaseline, status_code=201)
-async def capture_equipment_baseline(equipment_id: str, request: BaselineCaptureRequest) -> EquipmentBaseline:
+async def capture_equipment_baseline(
+    equipment_id: str,
+    request: BaselineCaptureRequest,
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
+) -> EquipmentBaseline:
     """
     Capture baseline for equipment.
 
@@ -125,7 +132,9 @@ async def capture_equipment_baseline(equipment_id: str, request: BaselineCapture
 
 
 @router.get("/{equipment_id}", response_model=EquipmentBaseline)
-async def get_latest_baseline(equipment_id: str) -> EquipmentBaseline:
+async def get_latest_baseline(
+    equipment_id: str, auth: AuthContext = Depends(require_equipment_access("equipment_id"))
+) -> EquipmentBaseline:
     """
     Get latest active baseline for equipment.
 
@@ -150,7 +159,9 @@ async def get_latest_baseline(equipment_id: str) -> EquipmentBaseline:
 
 @router.get("/{equipment_id}/history", response_model=List[EquipmentBaseline])
 async def get_baseline_history(
-    equipment_id: str, limit: int = Query(10, ge=1, le=100, description="Number of records to return")
+    equipment_id: str,
+    limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
 ) -> List[EquipmentBaseline]:
     """
     Get baseline history for equipment.
@@ -171,7 +182,11 @@ async def get_baseline_history(
 
 
 @router.post("/{equipment_id}/compare", response_model=ComparisonResponse)
-async def compare_to_baseline(equipment_id: str, request: CurrentDataRequest) -> ComparisonResponse:
+async def compare_to_baseline(
+    equipment_id: str,
+    request: CurrentDataRequest,
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
+) -> ComparisonResponse:
     """
     Compare current readings to baseline.
 
@@ -258,7 +273,9 @@ async def compare_to_baseline(equipment_id: str, request: CurrentDataRequest) ->
 
 
 @router.get("/{equipment_id}/summary")
-async def get_baseline_summary(equipment_id: str) -> Dict[str, Any]:
+async def get_baseline_summary(
+    equipment_id: str, auth: AuthContext = Depends(require_equipment_access("equipment_id"))
+) -> Dict[str, Any]:
     """
     Get baseline summary statistics for equipment.
 
@@ -284,6 +301,7 @@ async def get_baseline_summary(equipment_id: str) -> Dict[str, Any]:
 async def get_baseline_report(
     equipment_id: str,
     baseline_id: Optional[str] = Query(None, description="Specific baseline ID (uses latest if None)"),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
 ):
     """
     Generate PDF baseline report.

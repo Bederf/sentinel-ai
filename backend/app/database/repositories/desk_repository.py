@@ -174,13 +174,18 @@ class DeskRepository:
             if site_uuid:
                 query = query.eq("site_id", site_uuid)
 
+        # Escape LIKE wildcards in user input
+        from app.utils import escape_like
+
+        safe = escape_like(normalized)
+
         # Try exact match first
-        response = query.ilike("desk_id", normalized).execute()
+        response = query.ilike("desk_id", safe).execute()
         if response.data:
             return response.data[0]
 
         # Try suffix match (e.g., '201' matches 'L12-D201')
-        response = query.ilike("desk_id", f"%{normalized}").execute()
+        response = query.ilike("desk_id", f"%{safe}").execute()
         if response.data:
             return response.data[0]
 

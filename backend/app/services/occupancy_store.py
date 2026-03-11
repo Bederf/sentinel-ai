@@ -184,6 +184,13 @@ def _ghost_to_dict(f: GhostBookingFinding) -> dict:
         "resolved_at": _dt_to_str(f.resolved_at) if f.resolved_at else None,
         "inspected_by": f.inspected_by,
         "inspected_at": _dt_to_str(f.inspected_at) if f.inspected_at else None,
+        "concierge_email": f.concierge_email,
+        "concierge_whatsapp": f.concierge_whatsapp,
+        "email_notified_at": _dt_to_str(f.email_notified_at) if f.email_notified_at else None,
+        "whatsapp_notified_at": _dt_to_str(f.whatsapp_notified_at) if f.whatsapp_notified_at else None,
+        "whatsapp_message_id": f.whatsapp_message_id,
+        "response_message_id": f.response_message_id,
+        "response_text": f.response_text,
         "cost_centre": f.cost_centre,
         "charge_amount": f.charge_amount,
         "charge_reason": f.charge_reason,
@@ -191,6 +198,10 @@ def _ghost_to_dict(f: GhostBookingFinding) -> dict:
 
 
 def _dict_to_ghost(d: dict) -> GhostBookingFinding:
+    status = d.get("status", "open")
+    if status == "released":
+        status = "confirmed_empty"
+
     return GhostBookingFinding(
         id=d["id"],
         site_id=d.get("site_id", ""),
@@ -205,10 +216,17 @@ def _dict_to_ghost(d: dict) -> GhostBookingFinding:
         detected_at=_str_to_dt(d["detected_at"]),
         notification_sent=d.get("notification_sent", False),
         notification_sent_at=_str_to_dt(d["notification_sent_at"]) if d.get("notification_sent_at") else None,
-        status=d.get("status", "open"),
+        status=status,
         resolved_at=_str_to_dt(d["resolved_at"]) if d.get("resolved_at") else None,
         inspected_by=d.get("inspected_by"),
         inspected_at=_str_to_dt(d["inspected_at"]) if d.get("inspected_at") else None,
+        concierge_email=d.get("concierge_email"),
+        concierge_whatsapp=d.get("concierge_whatsapp"),
+        email_notified_at=_str_to_dt(d["email_notified_at"]) if d.get("email_notified_at") else None,
+        whatsapp_notified_at=_str_to_dt(d["whatsapp_notified_at"]) if d.get("whatsapp_notified_at") else None,
+        whatsapp_message_id=d.get("whatsapp_message_id"),
+        response_message_id=d.get("response_message_id"),
+        response_text=d.get("response_text"),
         cost_centre=d.get("cost_centre"),
         charge_amount=d.get("charge_amount"),
         charge_reason=d.get("charge_reason"),
@@ -240,17 +258,25 @@ def update_ghost_finding_status(
     cost_centre: str | None = None,
     charge_amount: float | None = None,
     charge_reason: str | None = None,
+    response_message_id: str | None = None,
+    response_text: str | None = None,
 ) -> GhostBookingFinding | None:
     with _lock:
         rows = _load_json(_GHOST_FILE)
         for r in rows:
             if r["id"] == finding_id:
+                if status == "released":
+                    status = "confirmed_empty"
                 r["status"] = status
-                if status in ("verified_occupied", "released", "dismissed"):
+                if status in ("verified_occupied", "confirmed_empty", "dismissed"):
                     r["resolved_at"] = _dt_to_str(datetime.utcnow())
                 if inspected_by:
                     r["inspected_by"] = inspected_by
                     r["inspected_at"] = _dt_to_str(datetime.utcnow())
+                if response_message_id:
+                    r["response_message_id"] = response_message_id
+                if response_text:
+                    r["response_text"] = response_text
                 if cost_centre:
                     r["cost_centre"] = cost_centre
                 if charge_amount is not None:
@@ -278,6 +304,75 @@ def get_open_or_pending_ghost_finding(booking_id: str) -> GhostBookingFinding | 
         if r.get("booking_id") == booking_id and r.get("status") in ("open", "pending_inspection"):
             return _dict_to_ghost(r)
     return None
+
+
+def _normalise_whatsapp_number(value: str | None) -> str:
+    if not value:
+        return ""
+    return value.replace("whatsapp:", "").replace(" ", "").strip()
+
+
+def mark_ghost_finding_notified(
+    finding_id: str,
+    *,
+    concierge_email: str | None = None,
+    concierge_whatsapp: str | None = None,
+    email_sent: bool = False,
+    whatsapp_sent: bool = False,
+    whatsapp_message_id: str | None = None,
+) -> GhostBookingFinding | None:
+    with _lock:
+        rows = _load_json(_GHOST_FILE)
+        for r in rows:
+            if r["id"] != finding_id:
+                continue
+
+            now_str = _dt_to_str(datetime.utcnow())
+            r["notification_sent"] = bool(r.get("notification_sent")) or email_sent or whatsapp_sent
+            r["notification_sent_at"] = now_str
+            if concierge_email:
+                r["concierge_email"] = concierge_email
+            if concierge_whatsapp:
+                r["concierge_whatsapp"] = _normalise_whatsapp_number(concierge_whatsapp)
+            if email_sent:
+                r["email_notified_at"] = now_str
+            if whatsapp_sent:
+                r["whatsapp_notified_at"] = now_str
+            if whatsapp_message_id:
+                r["whatsapp_message_id"] = whatsapp_message_id
+            if r.get("status") == "open":
+                r["status"] = "pending_inspection"
+            _save_json(_GHOST_FILE, rows)
+            return _dict_to_ghost(r)
+    return None
+
+
+def find_pending_ghost_for_whatsapp(
+    concierge_whatsapp: str,
+    *,
+    reply_to_message_id: str | None = None,
+) -> GhostBookingFinding | None:
+    target = _normalise_whatsapp_number(concierge_whatsapp)
+    if not target:
+        return None
+
+    rows = _load_json(_GHOST_FILE)
+    candidates = [
+        r
+        for r in rows
+        if r.get("status") in ("open", "pending_inspection")
+        and _normalise_whatsapp_number(r.get("concierge_whatsapp")) == target
+    ]
+    if not candidates:
+        return None
+
+    if reply_to_message_id:
+        for row in candidates:
+            if row.get("whatsapp_message_id") == reply_to_message_id:
+                return _dict_to_ghost(row)
+
+    candidates.sort(key=lambda item: item.get("notification_sent_at") or item.get("detected_at") or "", reverse=True)
+    return _dict_to_ghost(candidates[0])
 
 
 def get_ghost_findings(site_id: str, status: str | None = None) -> list[GhostBookingFinding]:

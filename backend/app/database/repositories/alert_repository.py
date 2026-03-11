@@ -123,11 +123,13 @@ class AlertRepository:
             List of active alerts for this equipment code
         """
         try:
+            from app.utils import escape_like
+
             response = (
                 self.client.table("alerts")
                 .select("id, title, severity, status")
                 .eq("status", "active")
-                .ilike("title", f"%{equipment_code}%")
+                .ilike("title", f"%{escape_like(equipment_code)}%")
                 .execute()
             )
             return response.data or []

@@ -758,8 +758,14 @@ class PointDiscoveryService:
             # Try to find equipment via buildings table first
             equipment_rows = []
             try:
+                import re
+
+                safe_site_id = re.sub(r"[,.()\s]", "", site_id)
                 buildings_resp = (
-                    client.table("sites").select("id").or_(f"code.eq.{site_id},site_id.eq.{site_id}").execute()
+                    client.table("sites")
+                    .select("id")
+                    .or_(f"code.eq.{safe_site_id},site_id.eq.{safe_site_id}")
+                    .execute()
                 )
                 site_ids = [b["id"] for b in (buildings_resp.data or [])]
 

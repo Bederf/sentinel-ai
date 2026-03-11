@@ -196,12 +196,30 @@ frontend/src/
     └── mocks.ts
 ```
 
+## BOLA (Object-Level Authorization) Tests
+
+Location: `tests/api/test_bola_authorization.py` — **57 tests**
+
+Validates that `require_site_access()` and `require_equipment_access()` block cross-site access.
+Uses two mock users: an owner (admin, site-002) and an attacker (operator, site-003 only).
+Covers GET/POST/PATCH/DELETE across 17 API files (~158 protected endpoints).
+
+```bash
+# Run BOLA tests only
+pytest tests/api/test_bola_authorization.py -v
+
+# All security tests (includes BOLA + compliance)
+pytest -m security tests/api/ -v
+```
+
+See `docs/09-security/bola-scanner-and-object-level-authorization.md` for full details.
+
 ## Pre-Commit Tests (REQUIRED)
 
 ```bash
 # Run these BEFORE git push:
 
-# 1. Security tests (REQUIRED)
+# 1. Security tests (REQUIRED — includes 57 BOLA + 2 compliance tests)
 pytest -m security tests/api/ -v
 
 # 2. Unit tests

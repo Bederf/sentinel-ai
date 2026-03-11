@@ -9,8 +9,10 @@ Endpoints:
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.middleware.auth_middleware import require_site_access
+from app.models.auth import AuthContext
 from app.services.load_forecast_service import get_load_forecast_service
 
 logger = logging.getLogger(__name__)
@@ -22,6 +24,7 @@ router = APIRouter(prefix="/api/load-forecast", tags=["load-forecast"])
 async def get_load_forecast(
     site_id: str,
     intervals: Optional[int] = Query(96, ge=1, le=672, description="Number of 15-min intervals (max 672 = 7 days)"),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """Get 15-minute building load forecast.
 
@@ -41,7 +44,7 @@ async def get_load_forecast(
 
 
 @router.get("/{site_id}/accuracy")
-async def get_load_forecast_accuracy(site_id: str):
+async def get_load_forecast_accuracy(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """Get model accuracy metrics (RMSE, MAE, R²)."""
     service = get_load_forecast_service()
     accuracy = service.get_accuracy(site_id)
@@ -60,7 +63,7 @@ async def get_load_forecast_accuracy(site_id: str):
 
 
 @router.post("/{site_id}/retrain")
-async def retrain_load_forecast(site_id: str):
+async def retrain_load_forecast(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """Trigger model retraining for a site.
 
     Re-generates synthetic training data and fits a new GBR model.

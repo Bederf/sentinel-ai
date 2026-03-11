@@ -7,9 +7,11 @@ REST endpoints for creating, retrieving, and managing building 3D configurations
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from app.middleware.auth_middleware import require_site_access
+from app.models.auth import AuthContext
 from app.database.repositories.site_repository import SiteRepository
 from app.services.site_3d_config_service import get_site_3d_config_service
 
@@ -98,6 +100,7 @@ router = APIRouter(prefix="/buildings", tags=["buildings-3d"])
 async def create_or_update_config(
     site_id: str,
     request: Site3DConfigRequest,
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> Site3DConfigResponse:
     """Create or update 3D configuration for a building.
 
@@ -215,7 +218,7 @@ async def create_or_update_config(
     summary="Get building 3D configuration",
     responses={404: {"description": "Configuration not found"}},
 )
-async def get_config(site_id: str) -> Site3DConfigResponse:
+async def get_config(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))) -> Site3DConfigResponse:
     """Retrieve 3D configuration for a building.
 
     Args:
@@ -266,7 +269,9 @@ async def get_config(site_id: str) -> Site3DConfigResponse:
     summary="Get building 3D viewer data",
     responses={404: {"description": "Configuration not found"}},
 )
-async def get_viewer_data(site_id: str) -> Building3DViewerDataResponse:
+async def get_viewer_data(
+    site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))
+) -> Building3DViewerDataResponse:
     """Retrieve 3D viewer-formatted data for a building.
 
     Data includes floors, equipment positions, and metadata
@@ -326,7 +331,9 @@ async def get_viewer_data(site_id: str) -> Building3DViewerDataResponse:
     summary="Get stored equipment positions for a building",
     responses={404: {"description": "No stored positions"}},
 )
-async def get_equipment_positions(site_id: str) -> Dict[str, Any]:
+async def get_equipment_positions(
+    site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))
+) -> Dict[str, Any]:
     """Retrieve stored equipment positions for frontend rendering.
 
     Returns a map of equipment_id -> {floor, x, y} for all stored positions.
@@ -375,6 +382,7 @@ async def update_equipment_position(
     site_id: str,
     equipment_id: str,
     position: EquipmentPosition,
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> Dict[str, Any]:
     """Update or add a single equipment position within the 3D config.
 
@@ -449,7 +457,7 @@ async def update_equipment_position(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete building 3D configuration",
 )
-async def delete_config(site_id: str) -> None:
+async def delete_config(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))) -> None:
     """Delete 3D configuration for a building.
 
     Args:

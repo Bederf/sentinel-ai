@@ -15,7 +15,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from app.api.dependencies.module_access import require_active_module
+from app.middleware.auth_middleware import require_auth
 from app.middleware.rate_limiter import limiter
+from app.models.auth import AuthContext, AuthLevel
 from app.models.module_registry import ModuleType
 from app.database.repositories.security_repository import SecurityRepository
 from app.models.security import (
@@ -288,7 +290,11 @@ async def get_access_anomalies(
 
 @limiter.limit("120/minute")
 @router.get("/events/{event_id}")
-async def get_access_event(request: Request, event_id: str):
+async def get_access_event(
+    request: Request,
+    event_id: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+):
     """Get single access event details."""
     try:
         repo = SecurityRepository()
@@ -350,7 +356,11 @@ async def get_access_points(request: Request, site: str = Query(...)):
 
 @limiter.limit("120/minute")
 @router.get("/access-points/{point_id}")
-async def get_access_point_details(request: Request, point_id: str):
+async def get_access_point_details(
+    request: Request,
+    point_id: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+):
     """Get details for single access point including recent events."""
     try:
         repo = SecurityRepository()
@@ -416,7 +426,11 @@ async def register_visitor(request: Request, data: RegisterVisitorRequest, site:
 
 @limiter.limit("120/minute")
 @router.post("/visitors/{visitor_id}/checkin")
-async def checkin_visitor(request: Request, visitor_id: str):
+async def checkin_visitor(
+    request: Request,
+    visitor_id: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+):
     """Record visitor check-in."""
     try:
         repo = SecurityRepository()
@@ -435,7 +449,11 @@ async def checkin_visitor(request: Request, visitor_id: str):
 
 @limiter.limit("120/minute")
 @router.post("/visitors/{visitor_id}/checkout")
-async def checkout_visitor(request: Request, visitor_id: str):
+async def checkout_visitor(
+    request: Request,
+    visitor_id: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+):
     """Record visitor check-out."""
     try:
         repo = SecurityRepository()
@@ -454,7 +472,11 @@ async def checkout_visitor(request: Request, visitor_id: str):
 
 @limiter.limit("10/minute")
 @router.put("/visitors/{visitor_id}/revoke")
-async def revoke_visitor(request: Request, visitor_id: str):
+async def revoke_visitor(
+    request: Request,
+    visitor_id: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
+):
     """Immediately revoke visitor access."""
     try:
         _repo = SecurityRepository()
@@ -704,7 +726,11 @@ class AccessEventCreate(BaseModel):
 
 @limiter.limit("120/minute")
 @router.get("/occupancy/zone/{zone_id}")
-async def get_zone_occupancy(request: Request, zone_id: str):
+async def get_zone_occupancy(
+    request: Request,
+    zone_id: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+):
     """Get current occupancy for a specific zone.
 
     Returns zone occupancy count, max capacity, and percent full.
@@ -722,7 +748,11 @@ async def get_zone_occupancy(request: Request, zone_id: str):
 
 @limiter.limit("120/minute")
 @router.get("/occupancy/floor/{floor}")
-async def get_floor_occupancy(request: Request, floor: str):
+async def get_floor_occupancy(
+    request: Request,
+    floor: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+):
     """Get aggregate occupancy for all zones on a floor.
 
     Returns total occupancy across all zones on the specified floor.
@@ -771,6 +801,7 @@ async def get_access_log(
     zone_id: str,
     limit: int = Query(50, ge=1, le=500),
     last_hours: int = Query(24, ge=1, le=168),
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ):
     """Get recent access log for a specific zone.
 
@@ -808,7 +839,11 @@ async def get_access_log(
 
 @limiter.limit("120/minute")
 @router.get("/cameras/{zone_id}")
-async def get_zone_cameras(request: Request, zone_id: str):
+async def get_zone_cameras(
+    request: Request,
+    zone_id: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+):
     """Get cameras in a specific zone.
 
     Returns camera list with stream URLs and status.
@@ -868,6 +903,7 @@ async def get_occupancy_trend(
     request: Request,
     zone_id: str,
     hours: int = Query(24, ge=1, le=168),
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ):
     """Get hourly occupancy trend data for a zone.
 

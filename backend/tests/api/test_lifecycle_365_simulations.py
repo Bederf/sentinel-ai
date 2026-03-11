@@ -156,6 +156,7 @@ def mock_supabase_for_lifecycle():
         return resume_fn
 
     mock_orchestrator.pause = make_pause_fn()
+    mock_orchestrator.unpause = make_resume_fn()
     mock_orchestrator.resume = make_resume_fn()
 
     now = datetime.now()
@@ -709,6 +710,30 @@ class TestCheckpointRecovery:
         assert status_resumed.status_code == 200
         resumed_data = status_resumed.json()
         assert resumed_data.get("paused") is False, "Simulation should be resumed"
+
+    @pytest.mark.asyncio
+    async def test_default_resume_endpoint_unpauses_active_simulation(self, async_client: AsyncClient):
+        """Verify /api/lifecycle/resume resumes the active simulation without a task id."""
+        mock_orchestrator = Mock()
+        mock_orchestrator.running = True
+        mock_orchestrator.paused = True
+
+        def unpause_fn():
+            mock_orchestrator.paused = False
+
+        mock_orchestrator.unpause = unpause_fn
+        mock_orchestrator.resume = Mock()
+
+        with patch(
+            "app.services.simulation_orchestrator.get_all_active_simulations",
+            return_value={"task-123": mock_orchestrator},
+        ):
+            response = await async_client.post("/api/lifecycle/resume")
+
+        assert response.status_code == 200
+        assert response.json().get("status") == "running"
+        assert mock_orchestrator.paused is False
+        mock_orchestrator.resume.assert_not_called()
 
 
 # ============================================================================

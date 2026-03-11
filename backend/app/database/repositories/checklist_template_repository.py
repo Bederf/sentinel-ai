@@ -118,16 +118,20 @@ class ChecklistTemplateRepository:
                 query = query.eq("inspection_type", inspection_type)
 
             # Use ilike for case-insensitive name matching
-            query = query.ilike("template_name", f"%{manufacturer}%")
+            from app.utils import escape_like
+
+            safe_mfr = escape_like(manufacturer)
+            query = query.ilike("template_name", f"%{safe_mfr}%")
 
             if model:
+                safe_model = escape_like(model)
                 # Try with model first for more specific match
                 model_query = (
                     self.client.table(self._table)
                     .select("*")
                     .eq("equipment_type", equipment_type)
                     .eq("is_active", True)
-                    .ilike("template_name", f"%{manufacturer}%{model}%")
+                    .ilike("template_name", f"%{safe_mfr}%{safe_model}%")
                 )
                 if inspection_type:
                     model_query = model_query.eq("inspection_type", inspection_type)

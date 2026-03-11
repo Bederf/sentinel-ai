@@ -22,6 +22,8 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 from app.api.dependencies.module_access import require_active_module
+from app.middleware.auth_middleware import require_site_access
+from app.models.auth import AuthContext
 from app.models.module_registry import ModuleType
 from app.services.sustainability_service import sustainability_service
 from app.services.carbon_calculator import get_carbon_calculator
@@ -62,7 +64,7 @@ class ConfigUpdateRequest(BaseModel):
 
 
 @router.get("/{site_id}/summary")
-async def get_sustainability_summary(site_id: str):
+async def get_sustainability_summary(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """Dashboard summary: current month, YTD, trend, targets, Green Star progress."""
     try:
         return sustainability_service.get_summary(site_id)
@@ -75,6 +77,7 @@ async def get_sustainability_summary(site_id: str):
 async def get_emissions_history(
     site_id: str,
     months: int = Query(default=12, ge=1, le=36),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """Monthly emissions history with scope 1/2/3 breakdown."""
     try:
@@ -90,7 +93,7 @@ async def get_emissions_history(
 
 
 @router.get("/{site_id}/emissions/current")
-async def get_current_emissions(site_id: str):
+async def get_current_emissions(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """Current month emissions snapshot."""
     try:
         snapshot = sustainability_service.calculate_current_emissions(site_id)
@@ -101,7 +104,7 @@ async def get_current_emissions(site_id: str):
 
 
 @router.get("/{site_id}/emissions/breakdown")
-async def get_emissions_breakdown(site_id: str):
+async def get_emissions_breakdown(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """Emissions breakdown by scope and system."""
     try:
         current = sustainability_service.calculate_current_emissions(site_id)
@@ -133,7 +136,7 @@ async def get_emissions_breakdown(site_id: str):
 
 
 @router.get("/{site_id}/efficiency")
-async def get_efficiency_metrics(site_id: str):
+async def get_efficiency_metrics(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """Energy and carbon intensity with SA office benchmarks."""
     try:
         return sustainability_service.get_efficiency_metrics(site_id)
@@ -143,7 +146,7 @@ async def get_efficiency_metrics(site_id: str):
 
 
 @router.get("/{site_id}/green-star")
-async def get_green_star_assessment(site_id: str):
+async def get_green_star_assessment(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """Green Star SA self-assessment tracker."""
     try:
         assessment = sustainability_service.get_green_star_assessment(site_id)
@@ -158,6 +161,7 @@ async def update_green_star_score(
     site_id: str,
     category_id: str,
     request: GreenStarUpdateRequest,
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """Update a Green Star category score."""
     try:
@@ -173,7 +177,7 @@ async def update_green_star_score(
 
 
 @router.get("/{site_id}/config")
-async def get_sustainability_config(site_id: str):
+async def get_sustainability_config(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """Get site sustainability configuration."""
     try:
         config = sustainability_service.get_config(site_id)
@@ -187,6 +191,7 @@ async def get_sustainability_config(site_id: str):
 async def update_sustainability_config(
     site_id: str,
     request: ConfigUpdateRequest,
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """Update site sustainability configuration."""
     try:
@@ -231,6 +236,7 @@ async def get_monthly_emissions(
     site_id: str,
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """
     Get monthly emissions breakdown by scope.
@@ -369,7 +375,7 @@ async def get_monthly_emissions(
 
 
 @router.get("/buildings/{site_id}/emissions/summary")
-async def get_emissions_summary(site_id: str):
+async def get_emissions_summary(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """
     Get current year emissions summary with scope totals and source breakdown.
     """
@@ -444,6 +450,7 @@ async def get_emissions_summary(site_id: str):
 async def get_emissions_by_source(
     site_id: str,
     months: int = Query(12, ge=1, le=36),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """
     Get emissions breakdown by source for pie chart.
@@ -501,7 +508,7 @@ async def get_emissions_by_source(
 
 
 @router.get("/portfolio/emissions/benchmark")
-async def get_emissions_benchmark(site_id: str):
+async def get_emissions_benchmark(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """
     Compare building carbon intensity to portfolio average and industry benchmark.
     Returns percentile ranking (0-100, where 0 is worst).
@@ -552,7 +559,7 @@ async def get_emissions_benchmark(site_id: str):
 
 
 @router.get("/buildings/{site_id}/esg-metrics")
-async def get_esg_metrics(site_id: str):
+async def get_esg_metrics(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """
     Get overall ESG score and component metrics.
     Weighted: Carbon 40%, Energy 30%, Waste 20%, Water 10%
@@ -592,7 +599,7 @@ async def get_esg_metrics(site_id: str):
 
 
 @router.get("/buildings/{site_id}/certifications")
-async def get_certifications(site_id: str):
+async def get_certifications(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """
     Get Green Star/LEED/Carbon Trust certification progress.
     """
@@ -637,6 +644,7 @@ async def get_certifications(site_id: str):
 async def update_emissions(
     site_id: str,
     request: EmissionsUpdateRequest,
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """
     Record emissions data from energy systems.
@@ -711,6 +719,7 @@ async def update_emissions(
 async def update_daily_metrics(
     site_id: str,
     request: DailyMetricsUpdateRequest,
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """
     Record daily sustainability metrics to daily_sustainability_metrics table.
@@ -752,7 +761,7 @@ async def update_daily_metrics(
 
 
 @router.get("/buildings/{site_id}/emissions/forecast")
-async def get_emissions_forecast(site_id: str):
+async def get_emissions_forecast(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """
     12-month emissions projection based on seasonal patterns.
     Assumes 10% year-over-year reduction target.
@@ -813,6 +822,7 @@ async def export_sustainability_report(
     site_id: str,
     format: str = Query("csv", pattern="^(csv|html)$"),
     months: int = Query(12, ge=1, le=36),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """Export sustainability report as CSV or HTML."""
     try:

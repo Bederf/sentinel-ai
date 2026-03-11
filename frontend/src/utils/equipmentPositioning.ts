@@ -27,6 +27,49 @@ export interface EquipmentPosition {
   z: number;
 }
 
+const BUILDING_MIN_X = -14;
+const BUILDING_MAX_X = 14;
+const BUILDING_MIN_Z = -9;
+const BUILDING_MAX_Z = 9;
+const ZONE_COUNT_PER_FLOOR = 5;
+const ZONE_STRIP_WIDTH = (BUILDING_MAX_X - BUILDING_MIN_X) / ZONE_COUNT_PER_FLOOR;
+const PLANT_ZONE_SUFFIX = 'plant';
+
+function normalizeFloorCode(floor: string): string {
+  return floor === 'G' ? 'L0' : floor;
+}
+
+export function isPlantFloor(floor: string): boolean {
+  const normalized = normalizeFloorCode(floor).toUpperCase();
+  return normalized === 'R' || /^B\d+$/.test(normalized);
+}
+
+function fullFloorBounds(): ZoneBounds {
+  return {
+    minX: BUILDING_MIN_X,
+    maxX: BUILDING_MAX_X,
+    minZ: BUILDING_MIN_Z,
+    maxZ: BUILDING_MAX_Z,
+    centerX: (BUILDING_MIN_X + BUILDING_MAX_X) / 2,
+    centerZ: (BUILDING_MIN_Z + BUILDING_MAX_Z) / 2,
+    width: BUILDING_MAX_X - BUILDING_MIN_X,
+    depth: BUILDING_MAX_Z - BUILDING_MIN_Z,
+  };
+}
+
+function normalizeZoneIndex(rawZone: number): number {
+  if (!Number.isFinite(rawZone)) return 1;
+  const lastDigit = Math.abs(rawZone) % 10;
+  if (lastDigit === 0) return ZONE_COUNT_PER_FLOOR;
+  return ((lastDigit - 1) % ZONE_COUNT_PER_FLOOR) + 1;
+}
+
+function zoneIndexFromLetter(letter: string): number | null {
+  const normalized = letter.trim().toUpperCase();
+  if (!/^[A-E]$/.test(normalized)) return null;
+  return normalized.charCodeAt(0) - 64;
+}
+
 /**
  * Extract floor code from equipment code.
  * Delegates to floorExtraction.ts which handles:
@@ -59,21 +102,20 @@ export function extractZoneNumber(code: string): number {
     // Check if 3rd part is a number (zone-based equipment)
     const thirdPart = parseInt(parts[2], 10);
     if (!isNaN(thirdPart)) {
-      // Floor-relative zone: strip the floor hundreds digit
-      return thirdPart % 100;
+      return normalizeZoneIndex(thirdPart);
     }
 
     // Plant equipment: S002-TYPE-FLOOR-SEQ (e.g., S002-CHILLER-B1-001)
     // Use the sequence number as zone
     if (parts.length >= 4) {
       const fourthPart = parseInt(parts[3], 10);
-      if (!isNaN(fourthPart)) return fourthPart;
+      if (!isNaN(fourthPart)) return normalizeZoneIndex(fourthPart);
     }
   }
 
   // Fallback: last numeric segment
   const numMatch = code.match(/-(\d+)$/);
-  if (numMatch) return parseInt(numMatch[1], 10) % 100;
+  if (numMatch) return normalizeZoneIndex(parseInt(numMatch[1], 10));
 
   return 0;
 }
@@ -83,7 +125,11 @@ export function extractZoneNumber(code: string): number {
  * Returns "Zone-{floor}-{zoneNum}" for zone-grid placement.
  */
 export function buildZoneKey(code: string): string {
-  const floor = extractFloor(code);
+  const floor = normalizeFloorCode(extractFloor(code));
+  if (isPlantFloor(floor)) {
+    return `Zone-${floor}-${PLANT_ZONE_SUFFIX}`;
+  }
+
   const zoneNum = extractZoneNumber(code);
   return `Zone-${floor}-${zoneNum}`;
 }
@@ -159,22 +205,27 @@ export function distributeEquipmentInZone(
     return positions;
   }
 
-  // Multiple items → adaptive grid
-  const cols = Math.ceil(Math.sqrt(count));
-  const rows = Math.ceil(count / cols);
+  const sortedEquipment = [...equipment].sort((a, b) => {
+    const codeA = ((a as { code?: string }).code || a.id || '').toString();
+    const codeB = ((b as { code?: string }).code || b.id || '').toString();
+    return codeA.localeCompare(codeB);
+  });
 
-  const usableWidth = zoneBounds.width * 0.7;
-  const usableDepth = zoneBounds.depth * 0.7;
+  // Multiple items → adaptive grid that fills the full zone rectangle.
+  const aspectRatio = zoneBounds.width / Math.max(zoneBounds.depth, 0.01);
+  const cols = Math.max(1, Math.ceil(Math.sqrt(count * aspectRatio)));
+  const rows = Math.max(1, Math.ceil(count / cols));
 
-  const spacingX = usableWidth / (cols + 1);
-  const spacingZ = usableDepth / (rows + 1);
+  const paddingX = Math.min(zoneBounds.width * 0.12, 0.6);
+  const paddingZ = Math.min(zoneBounds.depth * 0.1, 0.9);
+  const usableWidth = Math.max(zoneBounds.width - paddingX * 2, zoneBounds.width * 0.5);
+  const usableDepth = Math.max(zoneBounds.depth - paddingZ * 2, zoneBounds.depth * 0.5);
+  const spacingX = cols === 1 ? 0 : usableWidth / (cols - 1);
+  const spacingZ = rows === 1 ? 0 : usableDepth / (rows - 1);
+  const startX = zoneBounds.minX + paddingX;
+  const startZ = zoneBounds.minZ + paddingZ;
 
-  const marginX = (zoneBounds.width - usableWidth) / 2;
-  const marginZ = (zoneBounds.depth - usableDepth) / 2;
-  const startX = zoneBounds.minX + marginX + spacingX;
-  const startZ = zoneBounds.minZ + marginZ + spacingZ;
-
-  equipment.forEach((eq, idx) => {
+  sortedEquipment.forEach((eq, idx) => {
     const col = idx % cols;
     const row = Math.floor(idx / cols);
 
@@ -182,11 +233,11 @@ export function distributeEquipmentInZone(
     let z = startZ + row * spacingZ;
 
     // Seeded jitter for deterministic placement
-    x = addJitter(x, 0.08, idx * 7 + 1);
-    z = addJitter(z, 0.08, idx * 13 + 3);
+    x = addJitter(x, 0.03, idx * 7 + 1);
+    z = addJitter(z, 0.03, idx * 13 + 3);
 
-    x = clamp(x, -14, 14);
-    z = clamp(z, -9, 9);
+    x = clamp(x, zoneBounds.minX + paddingX * 0.4, zoneBounds.maxX - paddingX * 0.4);
+    z = clamp(z, zoneBounds.minZ + paddingZ * 0.4, zoneBounds.maxZ - paddingZ * 0.4);
 
     positions.set(eq.id, { x, y: floorY, z });
   });
@@ -194,65 +245,68 @@ export function distributeEquipmentInZone(
   return positions;
 }
 
-/**
- * Generate zone bounds for a floor using a grid layout.
- * Creates up to 25 zone cells (5 cols × 5 rows) across the building footprint.
- * Building footprint: X [-14..14] (28m), Z [-9..9] (18m)
- *
- * Zone numbers 0-24 map to grid positions:
- *   Row 0 (Z top):    zones 0-4
- *   Row 1:            zones 5-9
- *   Row 2 (center):   zones 10-14
- *   Row 3:            zones 15-19
- *   Row 4 (Z bottom): zones 20-24
- */
-const GRID_COLS = 5;
-const GRID_ROWS = 5;
-const BUILDING_MIN_X = -14;
-const BUILDING_MAX_X = 14;
-const BUILDING_MIN_Z = -9;
-const BUILDING_MAX_Z = 9;
-const CELL_WIDTH = (BUILDING_MAX_X - BUILDING_MIN_X) / GRID_COLS;   // 5.6m
-const CELL_DEPTH = (BUILDING_MAX_Z - BUILDING_MIN_Z) / GRID_ROWS;   // 3.6m
-
-function makeZoneBounds(col: number, row: number): ZoneBounds {
-  const minX = BUILDING_MIN_X + col * CELL_WIDTH;
-  const maxX = minX + CELL_WIDTH;
-  const minZ = BUILDING_MIN_Z + row * CELL_DEPTH;
-  const maxZ = minZ + CELL_DEPTH;
+function makeZoneBounds(zoneIndex: number): ZoneBounds {
+  const normalizedZoneIndex = Math.min(Math.max(zoneIndex, 1), ZONE_COUNT_PER_FLOOR);
+  const minX = BUILDING_MIN_X + (normalizedZoneIndex - 1) * ZONE_STRIP_WIDTH;
+  const maxX = minX + ZONE_STRIP_WIDTH;
   return {
-    minX, maxX, minZ, maxZ,
+    minX,
+    maxX,
+    minZ: BUILDING_MIN_Z,
+    maxZ: BUILDING_MAX_Z,
     centerX: (minX + maxX) / 2,
-    centerZ: (minZ + maxZ) / 2,
-    width: CELL_WIDTH,
-    depth: CELL_DEPTH,
+    centerZ: (BUILDING_MIN_Z + BUILDING_MAX_Z) / 2,
+    width: ZONE_STRIP_WIDTH,
+    depth: BUILDING_MAX_Z - BUILDING_MIN_Z,
   };
 }
 
 /**
  * Generate synthetic zone bounds for a floor.
- * Maps zone numbers (0-99) to grid cells across the building footprint.
- * Zone number → grid position: col = zoneNum % GRID_COLS, row = floor(zoneNum / GRID_COLS) % GRID_ROWS
+ * Non-plant floors are split into 5 full-depth strips across the 28m × 18m floor plate.
+ * Plant floors (B1/R) share the full floor area for all equipment.
  */
 export function generateSyntheticZoneBounds(floorCode: string): Record<string, ZoneBounds> {
+  const normalizedFloor = normalizeFloorCode(floorCode);
   const bounds: Record<string, ZoneBounds> = {};
 
-  // Generate bounds for zones 0-24 (covering 5×5 grid)
-  for (let zn = 0; zn < GRID_COLS * GRID_ROWS; zn++) {
-    const col = zn % GRID_COLS;
-    const row = Math.floor(zn / GRID_COLS) % GRID_ROWS;
-    bounds[`Zone-${floorCode}-${zn}`] = makeZoneBounds(col, row);
+  if (isPlantFloor(normalizedFloor)) {
+    bounds[`Zone-${normalizedFloor}-${PLANT_ZONE_SUFFIX}`] = fullFloorBounds();
+    return bounds;
   }
 
-  // Also add some higher zone numbers that wrap around
-  // (handles zones like 50, 60 etc. that exceed 25)
-  for (let zn = 25; zn < 100; zn++) {
-    const col = zn % GRID_COLS;
-    const row = Math.floor(zn / GRID_COLS) % GRID_ROWS;
-    bounds[`Zone-${floorCode}-${zn}`] = makeZoneBounds(col, row);
+  for (let zoneIndex = 1; zoneIndex <= ZONE_COUNT_PER_FLOOR; zoneIndex++) {
+    bounds[`Zone-${normalizedFloor}-${zoneIndex}`] = makeZoneBounds(zoneIndex);
   }
 
   return bounds;
+}
+
+export function normalizeDeskZoneKey(zoneId: string, floorHint?: string | number): string | null {
+  const rawZoneId = zoneId?.trim();
+  const floorHintString = typeof floorHint === 'number'
+    ? `L${Math.max(0, floorHint)}`
+    : floorHint?.trim();
+  const floorMatch = rawZoneId?.match(/(?:^|-)((?:B\d)|(?:L\d+)|G|R)(?:-|$)/i);
+  const floor = normalizeFloorCode((floorMatch?.[1] || floorHintString || 'L0').toUpperCase());
+
+  if (isPlantFloor(floor)) {
+    return `Zone-${floor}-${PLANT_ZONE_SUFFIX}`;
+  }
+
+  const letterMatch = rawZoneId?.match(/-([A-E])$/i);
+  const letterZone = letterMatch ? zoneIndexFromLetter(letterMatch[1]) : null;
+  if (letterZone) {
+    return `Zone-${floor}-${letterZone}`;
+  }
+
+  const numericMatches = rawZoneId?.match(/\d+/g);
+  const lastNumeric = numericMatches?.length ? parseInt(numericMatches[numericMatches.length - 1], 10) : NaN;
+  if (!Number.isNaN(lastNumeric)) {
+    return `Zone-${floor}-${normalizeZoneIndex(lastNumeric)}`;
+  }
+
+  return null;
 }
 
 /**

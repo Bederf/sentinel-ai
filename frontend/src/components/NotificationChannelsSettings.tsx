@@ -8,7 +8,7 @@
  * - Test channel verification
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   MessageCircle,
   Phone,
@@ -99,7 +99,11 @@ export function NotificationChannelsSettings({
   const [testingChannelId, setTestingChannelId] = useState<string | null>(null);
   const [savingPreferences, setSavingPreferences] = useState(false);
 
-  // Load all data
+  // Stable ref for callbacks to avoid re-render loops
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+
+  // Load all data — only re-run when technician_id changes
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -137,11 +141,11 @@ export function NotificationChannelsSettings({
         setDeliveryLogs(await logsRes.json());
       }
     } catch (error) {
-      onError?.(`Failed to load notification settings: ${error}`);
+      onErrorRef.current?.(`Failed to load notification settings: ${error}`);
     } finally {
       setLoading(false);
     }
-  }, [technician_id, onError]);
+  }, [technician_id]);
 
   useEffect(() => {
     loadData();
@@ -416,11 +420,15 @@ function ChannelsTab({
               <select
                 value={channelType}
                 onChange={(e) => setChannelType(e.target.value as typeof channelType)}
-                className="w-full px-3 py-2 rounded text-sm appearance-auto cursor-pointer"
+                className="w-full px-3 py-2 rounded text-sm cursor-pointer"
                 style={{
+                  WebkitAppearance: "menulist",
+                  appearance: "menulist",
                   background: "var(--color-sentinel-bg-panel)",
                   color: "var(--color-sentinel-text-primary)",
                   border: "1px solid var(--color-sentinel-border)",
+                  position: "relative",
+                  zIndex: 10,
                 }}
               >
                 <option value="telegram" style={{ background: "#1a1a2e", color: "#e0e0e0" }}>Telegram</option>

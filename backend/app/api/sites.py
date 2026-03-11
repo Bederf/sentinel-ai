@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from app.config.settings import settings
 from app.database.repositories import SiteRepository
-from app.middleware.auth_middleware import require_auth
+from app.middleware.auth_middleware import require_auth, require_site_access
 from app.models.auth import AuthContext, AuthLevel, SentinelRole
 
 router = APIRouter()
@@ -1056,7 +1056,10 @@ async def is_site_processing_enabled(site_id: str) -> bool:
 
 
 @router.get("/sites/{site_id}/processing", response_model=ProcessingToggleResponse)
-async def get_site_processing(site_id: str) -> ProcessingToggleResponse:
+async def get_site_processing(
+    site_id: str,
+    auth: AuthContext = Depends(require_site_access("site_id")),
+) -> ProcessingToggleResponse:
     """Get SENTINEL processing state for a site."""
     enabled = await is_site_processing_enabled(site_id)
     return ProcessingToggleResponse(site_id=site_id, sentinel_processing_enabled=enabled)
@@ -1066,6 +1069,7 @@ async def get_site_processing(site_id: str) -> ProcessingToggleResponse:
 async def toggle_site_processing(
     site_id: str,
     request: ProcessingToggleRequest,
+    auth: AuthContext = Depends(require_site_access("site_id", auth_level=AuthLevel.OPERATOR)),
 ) -> ProcessingToggleResponse:
     """Toggle SENTINEL processing for a site.
 
@@ -1102,7 +1106,10 @@ async def toggle_site_processing(
 
 
 @router.get("/sites/{site_id}", response_model=SiteResponse)
-async def get_site(site_id: str) -> SiteResponse:
+async def get_site(
+    site_id: str,
+    auth: AuthContext = Depends(require_site_access("site_id")),
+) -> SiteResponse:
     """Get a single site by ID."""
 
     # Try Supabase first

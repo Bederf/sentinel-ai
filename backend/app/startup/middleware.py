@@ -4,6 +4,7 @@ This module contains all middleware setup and configuration, extracted
 from main.py to improve maintainability and separation of concerns.
 """
 
+import hmac
 import os
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -48,6 +49,7 @@ _PUBLIC_PATHS = {
 }
 _PUBLIC_PREFIXES = (
     "/api/sentry-webhooks",  # Telegram bot callbacks (authenticated via webhook secret)
+    "/api/whatsapp/",  # WhatsApp/Twilio webhooks (authenticated at webhook layer)
     "/api/mcp/sse",  # MCP SSE transport for Claude Desktop (authenticated at MCP layer)
     "/api/mcp/openai",  # MCP OpenAI endpoints for ChatGPT/M365 Copilot (authenticated at MCP layer)
     "/api/lifecycle/",  # Lifecycle simulation status endpoints (frontend health checks)
@@ -55,6 +57,7 @@ _PUBLIC_PREFIXES = (
 )
 _ADMIN_RATE_LIMIT_PER_MINUTE = 30
 _admin_requests_by_ip: dict[str, list[datetime]] = defaultdict(list)
+_SAFE_HTTP_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
 def _check_admin_rate_limit(source_ip: str) -> JSONResponse | None:
@@ -74,6 +77,11 @@ def _check_admin_rate_limit(source_ip: str) -> JSONResponse | None:
 
     recent.append(now)
     return None
+
+
+def _should_rate_limit_admin_request(request: Request) -> bool:
+    """Reserve admin throttling for mutating requests, not dashboard reads."""
+    return request.method.upper() not in _SAFE_HTTP_METHODS
 
 
 def _get_cors_headers(request: Request | None = None) -> dict:
@@ -196,7 +204,7 @@ def register_middleware(app: FastAPI) -> None:
         # /api/hvac/, /api/energy/, etc. for building monitoring.
         if settings.sentry_bot_api_key:
             api_key = request.headers.get("X-Sentry-API-Key", "")
-            if api_key == settings.sentry_bot_api_key:
+            if hmac.compare_digest(api_key, settings.sentry_bot_api_key):
                 _logger.info(f"Sentry bot API key authenticated for {path}")
                 return await call_next(request)
             # If API key provided but wrong, reject immediately
@@ -243,7 +251,7 @@ def register_middleware(app: FastAPI) -> None:
                 headers=headers,
             )
 
-        if auth_ctx.role.value == "admin":
+        if auth_ctx.role.value == "admin" and _should_rate_limit_admin_request(request):
             source_ip = _extract_ip_address(request)
             admin_limit_response = _check_admin_rate_limit(source_ip)
             if admin_limit_response is not None:

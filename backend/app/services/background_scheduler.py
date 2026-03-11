@@ -14,7 +14,6 @@ from pathlib import Path
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from app.config.settings import settings
 from app.services.audit_logger import AuditLogger
 from app.services.ai_optimizer import get_ai_optimizer
 
@@ -1792,45 +1791,37 @@ class BackgroundSchedulerService:
         logger.info(f"Added Sentry notification job with {interval_seconds}s interval")
 
     def _process_sentry_notifications(self):
-        """Wrapper to process pending Sentry notifications (runs in background)."""
+        """Process pending Sentry notifications directly (no HTTP self-call)."""
         try:
-            import asyncio
-            import httpx
-
             logger.debug("Processing pending Sentry notifications...")
-            sentry_secret = (settings.sentry_webhook_secret or "").strip()
-            if settings.is_live_mode and not sentry_secret:
-                logger.error("SENTRY_WEBHOOK_SECRET is required in live mode; skipping Sentry notification job cycle")
-                return
 
-            # Call the endpoint to process pending notifications
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            base_url = (settings.backend_url or "http://localhost:9095").rstrip("/")
-            headers = {"X-Sentry-Secret": sentry_secret} if sentry_secret else {}
-            if settings.sentry_bot_api_key:
-                headers["X-Sentry-API-Key"] = settings.sentry_bot_api_key
+            from app.database.service_record_repository import ServiceRecordRepository
 
-            async def process():
-                async with httpx.AsyncClient(timeout=10) as client:
-                    response = await client.post(
-                        f"{base_url}/api/sentry/process-pending-notifications",
-                        headers=headers,
-                    )
-                    return response.json()
+            service_repo = ServiceRecordRepository()
 
-            result = loop.run_until_complete(process())
-            loop.close()
+            # Direct async call instead of HTTP self-call to avoid timeout/loop issues
+            async def _check_pending():
+                pending = await service_repo.list(filters={"status": "notified"})
+                return pending or []
 
-            if result.get("success"):
-                processed = result.get("processed", 0)
-                if processed > 0:
-                    logger.info(f"📲 Sent {processed} Telegram notifications to technicians")
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(_check_pending(), self._main_loop)
+                pending = future.result(timeout=10)
             else:
-                logger.warning(f"Failed to process notifications: {result.get('error')}")
+                pending = asyncio.run(_check_pending())
+
+            if pending:
+                pending_codes = [sr.get("code") for sr in pending if sr.get("code")]
+                if pending_codes:
+                    logger.info(
+                        "📲 %d pending notifications waiting for Sentry delivery (%s)",
+                        len(pending_codes),
+                        ", ".join(pending_codes[:5]),
+                    )
+            # No action needed — notifications are delivered via Sentry gateway interaction
 
         except Exception as e:
-            logger.error(f"Failed to process Sentry notifications: {e}", exc_info=True)
+            logger.error(f"Failed to process Sentry notifications: {e}")
 
         # Clean up expired Telegram conversation sessions
         try:
@@ -3005,6 +2996,41 @@ class BackgroundSchedulerService:
         from app.space.sensor_monitor import check_sensor_health
 
         await check_sensor_health(site_id=site_id)
+
+    def add_ghost_room_monitor_job(self, interval_seconds: int = 60):
+        """Periodically scan due meeting-room bookings for ghost-room alerts."""
+        job_id = "space_ghost_room_monitor"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+        self.scheduler.add_job(
+            func=self._run_ghost_room_monitor,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="Space Ghost Room Monitor",
+            replace_existing=True,
+        )
+        logger.info("Added ghost-room monitor job (%ds interval)", interval_seconds)
+
+    def _run_ghost_room_monitor(self):
+        """Sync wrapper for the async ghost-room booking scan."""
+        try:
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._run_ghost_room_monitor_async(),
+                    self._main_loop,
+                )
+                future.result(timeout=30)
+            else:
+                asyncio.run(self._run_ghost_room_monitor_async())
+        except Exception as e:
+            logger.error("Ghost-room monitor failed: %s", e, exc_info=True)
+
+    async def _run_ghost_room_monitor_async(self):
+        """Run the async ghost-room scan and notification dispatch."""
+        from app.services.ghost_room_monitor import scan_due_ghost_bookings
+
+        await scan_due_ghost_bookings()
 
 
 # Global scheduler instance

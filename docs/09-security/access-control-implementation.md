@@ -436,7 +436,9 @@ Emergency modes:
 ### Usage Pattern
 
 ```python
-from app.middleware.auth_middleware import require_auth, require_role
+from app.middleware.auth_middleware import (
+    require_auth, require_role, require_site_access, require_equipment_access
+)
 from app.models.auth import AuthLevel, SentinelRole
 
 # Require authentication level
@@ -449,11 +451,38 @@ async def get_equipment(auth: AuthContext = Depends(require_auth(AuthLevel.AUTHE
 async def control_device(auth: AuthContext = Depends(require_role(SentinelRole.OPERATOR))):
     ...
 
+# BOLA prevention: site-level access control (added 2026-03-11)
+@router.get("/api/sites/{site_id}")
+async def get_site(
+    site_id: str,
+    auth: AuthContext = Depends(require_site_access("site_id")),
+):
+    ...  # User must have access to this specific site
+
+# BOLA prevention: equipment-level access control (derives site from code)
+@router.get("/api/equipment/{equipment_id}/controls")
+async def get_controls(
+    equipment_id: str,
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
+):
+    ...  # S002-AHU-B1-001 -> checks user has access to site-002
+
 # PII redaction before LLM processing
 from app.middleware.pii_guard import pii_guard
 result = pii_guard.redact("Technician SA ID: 8801235111089")
 # result.redacted_text contains placeholders instead of PII
 ```
+
+### Object-Level Authorization (BOLA Prevention)
+
+Added 2026-03-11. Two new dependencies prevent Broken Object Level Authorization:
+
+| Dependency | Protects | Check |
+|-----------|----------|-------|
+| `require_site_access(param)` | `{site_id}`, `{building_id}` | Demo config → Supabase `user_site_access` |
+| `require_equipment_access(param)` | `{equipment_id}`, `{equipment_code}` | Derives site from code, then site check |
+
+ADMIN role always bypasses. **~158 endpoints protected across 17 API files**, validated by 57 integration tests in `tests/api/test_bola_authorization.py`. See `docs/09-security/bola-scanner-and-object-level-authorization.md` for full details.
 
 ### Demo Mode Behavior
 

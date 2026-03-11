@@ -2,7 +2,7 @@
 
 ## Room Occupancy Sensor — Hardware Specification
 
-**Rev 1.4 · Wemos D1 Mini + HLK-LD2410C · Hidden Above-Ceiling Installation**
+**Rev 1.5 · ESP32 + HLK-LD2410C · Hidden Above-Ceiling Installation**
 **Fairland 2 (FNB) · 20 Meeting Rooms · March 2026**
 
 ---
@@ -16,6 +16,7 @@
 | 1.2 | Hidden above-ceiling install | Sensor hidden above tile. Basic DIN clip box. Presence-only (no count). Pattern-based right-sizing. |
 | 1.3 | Takachi PFF13-4-9W | Proper flanged enclosure specified. Dimensionally verified against ESP32 + LD2410C. Replaces generic DIN clip box. |
 | 1.4 | Wemos D1 Mini + OUT pin mode | MCU changed to Wemos D1 Mini (ESP8266). OUT pin mode confirmed. D4 GPIO. Door bleed suppression profile. HLKRadarTool commissioning procedure. Sensor delay replaces firmware debounce. |
+| 1.5 | ESP32 current design | MCU returns to ESP32. Presence events are published over MQTT into the SENTINEL space utilisation pipeline. |
 
 ---
 
@@ -34,26 +35,26 @@ The LD2410C detects **presence vs absence only** — not headcount. All logic us
 
 ## Components
 
-### Wemos D1 Mini (ESP8266)
+### NodeMCU-32S (ESP32)
 
 | Spec | Value |
 |------|-------|
-| MCU | ESP8266 |
-| Supply voltage (VIN) | 5V via Micro-USB |
+| MCU | ESP32 |
+| Supply voltage (VIN) | 5V via USB |
 | Logic voltage | 3.3V |
 | WiFi | 802.11 b/g/n 2.4GHz |
-| Flash | 4MB |
-| Dimensions | ~34 x 25mm |
-| WiFi provisioning | WiFiManager (browser on first boot) |
+| Flash | 4MB typical |
+| Dimensions | ~58 x 28mm |
+| WiFi provisioning | Configured for building WiFi / FMB WiFi |
 | OTA updates | ArduinoOTA |
-| USB-Serial | CH340 |
+| USB-Serial | CP2102 or CH340 depending on board variant |
 
 ### HLK-LD2410C mmWave Sensor
 
 | Spec | Value |
 |------|-------|
-| Supply voltage | 5V–12V (connect to D1 Mini 5V pin) |
-| Logic output | 3.3V — safe for ESP8266 GPIO direct |
+| Supply voltage | 5V–12V (connect to ESP32 5V/VIN pin as applicable) |
+| Logic output | 3.3V — safe for ESP32 GPIO direct |
 | Interface used | OUT pin (digital GPIO) |
 | Detection range | 0.75m – 5m (configurable) |
 | Detection angle | +/-60 degrees |
@@ -89,13 +90,13 @@ The LD2410C detects **presence vs absence only** — not headcount. All logic us
 
 Only 3 wires required. TX and RX pins on the LD2410C are left unconnected in OUT pin mode.
 
-LD2410C OUT is a 3.3V logic signal — safe for ESP8266 GPIO input. No level shifting required.
+LD2410C OUT is a 3.3V logic signal — safe for ESP32 GPIO input. No level shifting required.
 
-| LD2410C Pin | D1 Mini Pin | Wire | Notes |
-|-------------|-------------|------|-------|
-| VCC | 5V | Red | Radar powered from USB 5V rail |
-| GND | G | Black | Common ground |
-| OUT | D4 (GPIO2) | Blue | Occupancy signal — HIGH=occupied, LOW=empty |
+| LD2410C Pin | ESP32 Pin | Wire | Notes |
+|-------------|-----------|------|-------|
+| VCC | 5V / VIN | Red | Radar powered from board 5V rail |
+| GND | GND | Black | Common ground |
+| OUT | GPIO4 | Blue | Occupancy signal — HIGH=occupied, LOW=empty |
 | TX | — | — | Not connected |
 | RX | — | — | Not connected |
 
@@ -106,7 +107,7 @@ LD2410C OUT is a 3.3V logic signal — safe for ESP8266 GPIO input. No level shi
 | HIGH | 3.3V | Person present (motion or stationary) |
 | LOW | 0V | Room empty |
 
-> **D4 note:** D4 on the D1 Mini is also connected to the onboard LED. During testing the LED mirrors the OUT pin state — a free visual indicator of detected presence with no extra code.
+> **GPIO4 note:** GPIO4 is the standard OUT-pin occupancy input on the current ESP32 node design.
 
 ---
 
@@ -224,11 +225,11 @@ Only **ROOM_CODE** and **SENSOR_ID** change per unit. All other config (WiFi cre
 | Cursor IDE | Firmware editing |
 | Arduino IDE 2 | Compile + initial flash (required for first flash per unit) |
 | ArduinoOTA | All subsequent firmware updates over WiFi |
-| Board package | esp8266 by ESP8266 Community |
-| Board selection | LOLIN(WEMOS) D1 mini |
-| Libraries | WiFiManager (tzapu), ESP8266HTTPClient (built-in), ArduinoOTA (built-in) |
+| Board package | esp32 by Espressif Systems |
+| Board selection | NodeMCU-32S / ESP32 Dev Module |
+| Libraries | WiFi, PubSubClient, ArduinoJson, ArduinoOTA |
 
-**Board manager URL:** `http://arduino.esp8266.com/stable/package_esp8266com_index.json`
+**Board manager URL:** `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`
 
 ### SENTINEL API Endpoint
 
@@ -308,7 +309,7 @@ Complete this procedure for every room after hardware installation.
 
 | Qty | Component | Part | Supplier | Cost |
 |-----|-----------|------|----------|------|
-| 1 | ESP8266 Dev Board | Wemos D1 Mini | Local / online | R80 |
+| 1 | ESP32 Dev Board | NodeMCU-32S | Local / online | R120 |
 | 1 | mmWave Sensor | HLK-LD2410C | PiShop | R94.90 |
 | 1 | Enclosure | Takachi PFF13-4-9W | RS Components | ~R120 |
 | 1 | USB Power Supply | 5V 1A Micro-USB adapter | — | R40 |
@@ -338,4 +339,4 @@ Complete this procedure for every room after hardware installation.
 ---
 
 **SENTINEL · Space Intelligence · Hardware Specification · Rev 1.4 · March 2026**
-**Fairland 2 (FNB) · Wemos D1 Mini + HLK-LD2410C · Above-Ceiling · Confidential**
+**Fairland 2 (FNB) · ESP32 + HLK-LD2410C · Above-Ceiling · Confidential**

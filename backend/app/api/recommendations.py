@@ -9,10 +9,12 @@ Provides endpoints for managing recommendations through the control tier workflo
 
 import logging
 from typing import Any, Dict, Optional
-from fastapi import APIRouter, Request, HTTPException, Query, Body
+from fastapi import APIRouter, Depends, Request, HTTPException, Query, Body
 from pydantic import BaseModel
 
+from app.middleware.auth_middleware import require_site_access
 from app.middleware.rate_limiter import limiter
+from app.models.auth import AuthContext
 from app.services.recommendation_service import get_recommendation_service
 from app.utils.ai_provenance import get_ml_provenance
 
@@ -49,7 +51,12 @@ class CreateRecommendationRequest(BaseModel):
 
 @limiter.limit("20/minute")
 @router.get("/{site_id}")
-async def get_pending_recommendations(request: Request, site_id: str, limit: int = Query(10, ge=1, le=100)):
+async def get_pending_recommendations(
+    request: Request,
+    site_id: str,
+    limit: int = Query(10, ge=1, le=100),
+    auth: AuthContext = Depends(require_site_access("site_id")),
+):
     """Get pending recommendations for a site (Tier 2 approval queue).
 
     Returns recommendations awaiting operator approval, newest first.
@@ -83,6 +90,7 @@ async def get_recommendation_history(
     site_id: str,
     filters: Dict[str, Any] = Body(default={"status": None, "risk_level": None}),
     limit: int = Query(50, ge=1, le=500),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """Get historical recommendations for a site with optional filters.
 
@@ -343,6 +351,7 @@ async def trigger_recommendation_processing(
     request: Request,
     site_id: str,
     body: ProcessPendingRequest = ProcessPendingRequest(),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """Trigger the recommendation agent to process pending recommendations.
 

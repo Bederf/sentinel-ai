@@ -1,8 +1,4 @@
-"""Send block booking alert notifications to the concierge.
-
-Uses the existing EventBus for event-driven notification routing.
-Falls back to direct Telegram via AlertNotifier if event bus delivery fails.
-"""
+"""Send block booking alert notifications to the concierge."""
 
 from __future__ import annotations
 
@@ -13,6 +9,7 @@ from app.models.booking_record import BlockBookingAlert, BlockBookingConfig
 from app.services.block_booking_detector.booking_store import (
     get_booking_store,
 )
+from app.services.n8n_service import get_n8n_service
 
 logger = logging.getLogger(__name__)
 
@@ -35,15 +32,61 @@ def format_alert_message(alert: BlockBookingAlert, site_name: str = "") -> str:
     msg = (
         f"Block Booking Detected — {site_label}\n\n"
         f"{alert.organiser_name} ({alert.organiser_email}) "
-        f"holds {alert.room_count} rooms simultaneously on {date_str}:\n"
+        f"holds {alert.room_count} rooms for the same time slot on {date_str}:\n"
         f"{rooms_text}\n"
         f"Window: {time_start} - {time_end}\n\n"
-        f"One person cannot occupy multiple rooms at the same time. "
-        f"Please contact the organiser to confirm which rooms are genuinely "
-        f"required and release any that are not needed.\n\n"
+        "Please contact the organiser to confirm which rooms are genuinely "
+        "required. SENTINEL is flagging the anomaly only and is not cancelling "
+        "or changing any bookings.\n\n"
         f"SENTINEL · {site_label} · {timestamp}"
     )
     return msg
+
+
+async def _send_email_notification(
+    alert: BlockBookingAlert,
+    config: BlockBookingConfig,
+    message: str,
+    site_name: str,
+) -> bool:
+    """Send the block-booking alert to n8n for concierge email delivery."""
+    if not config.concierge_email:
+        return False
+
+    site_label = site_name or alert.site_id
+    subject = f"Block booking alert: {alert.room_count} rooms held by {alert.organiser_name or alert.organiser_email}"
+    result = await get_n8n_service().trigger_webhook(
+        webhook_path="space-block-booking-alert",
+        payload={
+            "site_id": alert.site_id,
+            "site_name": site_label,
+            "alert_id": alert.id,
+            "to_email": config.concierge_email,
+            "subject": subject,
+            "message": message,
+            "organiser_email": alert.organiser_email,
+            "organiser_name": alert.organiser_name,
+            "room_count": alert.room_count,
+            "rooms": alert.rooms,
+            "window_start": alert.overlap_window_start.isoformat(),
+            "window_end": alert.overlap_window_end.isoformat(),
+        },
+    )
+    if not result.get("success"):
+        logger.warning(
+            "Block booking alert n8n dispatch failed: organiser=%s reason=%s",
+            alert.organiser_email,
+            result.get("reason") or result.get("status_code"),
+        )
+        return False
+
+    logger.info(
+        "Block booking concierge email queued via n8n: site=%s organiser=%s to=%s",
+        site_label,
+        alert.organiser_email,
+        config.concierge_email,
+    )
+    return True
 
 
 async def send_block_booking_alert(
@@ -53,13 +96,18 @@ async def send_block_booking_alert(
 ) -> bool:
     """Send a notification to the concierge about a detected block booking.
 
-    Uses the EventBus to emit a space.block_booking_detected event.
-    The SentryNotificationRouter picks this up and delivers via configured
-    channels (Telegram, WhatsApp, email).
-
-    Returns True if the event was emitted successfully.
+    Sends the concierge email via n8n. Falls back to the event bus so existing
+    notification plumbing still receives the event if n8n is unavailable.
     """
     message = format_alert_message(alert, site_name)
+    store = get_booking_store()
+
+    try:
+        if await _send_email_notification(alert, config, message, site_name):
+            store.mark_alert_notified(alert.id)
+            return True
+    except Exception as exc:
+        logger.error("Failed to send block booking concierge email: %s", exc)
 
     try:
         from app.services.event_bus import Importance, SentinelEvent, get_event_bus
@@ -83,8 +131,6 @@ async def send_block_booking_alert(
         )
         await bus.emit(event)
 
-        # Mark notification as sent
-        store = get_booking_store()
         store.mark_alert_notified(alert.id)
 
         logger.info(

@@ -5,7 +5,7 @@ Provides real-time demand monitoring and multi-module peak shaving recommendatio
 Coordinates HVAC, Solar/BESS, and Energy modules for NMD headroom management.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import logging
@@ -16,6 +16,8 @@ from app.services.solar_config_service import get_site_solar_config
 from app.services.demand_ratchet import get_demand_ratchet_service
 from app.services.module_registry_service import module_registry
 from app.services.approval_service import get_approval_service
+from app.middleware.auth_middleware import require_site_access
+from app.models.auth import AuthContext
 from app.models.module_registry import ModuleType
 
 logger = logging.getLogger(__name__)
@@ -106,7 +108,7 @@ class DemandForecastResponse(BaseModel):
 
 
 @router.get("/{site_id}/status", response_model=DemandStatusResponse)
-async def get_demand_status(site_id: str):
+async def get_demand_status(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """
     Get current demand status with NMD headroom and active modules.
 
@@ -194,7 +196,7 @@ async def get_demand_status(site_id: str):
 
 
 @router.get("/{site_id}/forecast-24h", response_model=DemandForecastResponse)
-async def get_demand_forecast(site_id: str):
+async def get_demand_forecast(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """
     Get 24-hour demand forecast with NMD headroom predictions.
 
@@ -295,7 +297,7 @@ async def get_demand_forecast(site_id: str):
 
 
 @router.get("/{site_id}/recommendations", response_model=List[MultiModuleRecommendationResponse])
-async def get_peak_shaving_recommendations(site_id: str):
+async def get_peak_shaving_recommendations(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """
     Get available multi-module peak shaving recommendations.
 
@@ -341,7 +343,9 @@ async def get_peak_shaving_recommendations(site_id: str):
 
 
 @router.post("/{site_id}/approve-recommendation")
-async def approve_peak_shaving_recommendation(site_id: str, request: ApproveRecommendationRequest):
+async def approve_peak_shaving_recommendation(
+    site_id: str, request: ApproveRecommendationRequest, auth: AuthContext = Depends(require_site_access("site_id"))
+):
     """
     Approve a multi-module peak shaving recommendation.
 
@@ -386,7 +390,7 @@ async def approve_peak_shaving_recommendation(site_id: str, request: ApproveReco
 
 
 @router.get("/{site_id}/summary")
-async def get_demand_summary(site_id: str):
+async def get_demand_summary(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """
     Get demand management summary for dashboard display.
 

@@ -93,7 +93,7 @@ def _make_booking(
 
 DEFAULT_CONFIG = BlockBookingConfig(
     site_id=SITE_ID,
-    min_rooms_for_alert=2,
+    min_rooms_for_alert=3,
     enabled=True,
 )
 
@@ -146,17 +146,14 @@ class TestEmailParser:
 
 
 class TestOverlapDetector:
-    # 4. Two rooms, same organiser, same time -> alert
+    # 4. Two rooms, same organiser, same time -> no alert (threshold is 3)
     def test_two_rooms_same_time_same_organiser(self):
         bookings = [
             _make_booking(room="Boardroom 1", start_hour=9, end_hour=11),
             _make_booking(room="Boardroom 2", start_hour=9, end_hour=11),
         ]
         alerts = detect_overlaps(SITE_ID, bookings, DEFAULT_CONFIG)
-        assert len(alerts) == 1
-        assert alerts[0].room_count == 2
-        assert set(alerts[0].rooms) == {"Boardroom 1", "Boardroom 2"}
-        assert alerts[0].organiser_email == "shaun@example.com"
+        assert len(alerts) == 0
 
     # 5. Two rooms, same organiser, non-overlapping times -> no alert
     def test_two_rooms_non_overlapping(self):
@@ -191,6 +188,7 @@ class TestOverlapDetector:
         bookings = [
             _make_booking(room="Boardroom 1", start_hour=9, end_hour=11),
             _make_booking(room="Boardroom 2", start_hour=9, end_hour=11),
+            _make_booking(room="Boardroom 3", start_hour=9, end_hour=11),
         ]
         mock_store = MagicMock()
         mock_store.has_open_alert_for.return_value = True
@@ -199,11 +197,11 @@ class TestOverlapDetector:
         assert len(alerts) == 0
 
     def test_three_rooms_same_organiser(self):
-        """Three rooms overlapping should produce one alert with room_count=3."""
+        """Three rooms in the same slot should produce one alert with room_count=3."""
         bookings = [
             _make_booking(room="Boardroom 1", start_hour=9, end_hour=11),
-            _make_booking(room="Boardroom 2", start_hour=10, end_hour=12),
-            _make_booking(room="Boardroom 3", start_hour=9, end_hour=10),
+            _make_booking(room="Boardroom 2", start_hour=9, end_hour=11),
+            _make_booking(room="Boardroom 3", start_hour=9, end_hour=11),
         ]
         alerts = detect_overlaps(SITE_ID, bookings, DEFAULT_CONFIG)
         assert len(alerts) == 1
@@ -214,29 +212,45 @@ class TestOverlapDetector:
         bookings = [
             _make_booking(room="Boardroom 1", start_hour=9, end_hour=11),
             _make_booking(room="Boardroom 2", start_hour=9, end_hour=11),
+            _make_booking(room="Boardroom 3", start_hour=9, end_hour=11),
         ]
         config = BlockBookingConfig(site_id=SITE_ID, enabled=False)
         alerts = detect_overlaps(SITE_ID, bookings, config)
         assert len(alerts) == 0
 
     def test_partial_overlap(self):
-        """Bookings that partially overlap should still trigger an alert."""
+        """Bookings that only partially overlap should not trigger an alert."""
         bookings = [
             _make_booking(room="Boardroom 1", start_hour=9, end_hour=11),
             _make_booking(room="Boardroom 2", start_hour=10, end_hour=12),
+            _make_booking(room="Boardroom 3", start_hour=9, end_hour=11),
         ]
         alerts = detect_overlaps(SITE_ID, bookings, DEFAULT_CONFIG)
-        assert len(alerts) == 1
+        assert len(alerts) == 0
 
     def test_min_rooms_threshold(self):
         """Only flag when room count meets min_rooms_for_alert."""
         bookings = [
             _make_booking(room="Boardroom 1", start_hour=9, end_hour=11),
             _make_booking(room="Boardroom 2", start_hour=9, end_hour=11),
+            _make_booking(room="Boardroom 3", start_hour=9, end_hour=11),
         ]
-        config = BlockBookingConfig(site_id=SITE_ID, min_rooms_for_alert=3, enabled=True)
+        config = BlockBookingConfig(site_id=SITE_ID, min_rooms_for_alert=4, enabled=True)
         alerts = detect_overlaps(SITE_ID, bookings, config)
         assert len(alerts) == 0
+
+    def test_multiple_time_slots_same_day_create_distinct_alerts(self):
+        """Separate same-day slots should each alert once."""
+        bookings = [
+            _make_booking(room="Boardroom 1", start_hour=9, end_hour=11),
+            _make_booking(room="Boardroom 2", start_hour=9, end_hour=11),
+            _make_booking(room="Boardroom 3", start_hour=9, end_hour=11),
+            _make_booking(room="Boardroom 4", start_hour=13, end_hour=14),
+            _make_booking(room="Boardroom 5", start_hour=13, end_hour=14),
+            _make_booking(room="Boardroom 6", start_hour=13, end_hour=14),
+        ]
+        alerts = detect_overlaps(SITE_ID, bookings, DEFAULT_CONFIG)
+        assert len(alerts) == 2
 
 
 # ---------------------------------------------------------------------------
@@ -266,4 +280,5 @@ class TestNotifier:
         assert "Boardroom 2" in msg
         assert "2 rooms" in msg
         assert "Sandton City" in msg
-        assert "cannot occupy multiple rooms" in msg
+        assert "same time slot" in msg
+        assert "not cancelling" in msg

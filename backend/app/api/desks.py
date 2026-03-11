@@ -9,8 +9,10 @@ Provides endpoints for:
 import logging
 import re
 from typing import List, Dict, Optional, Any
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 
+from app.middleware.auth_middleware import require_site_access
+from app.models.auth import AuthContext
 from app.database.repositories.desk_repository import DeskRepository
 from app.database.repositories.zone_repository import ZoneRepository
 
@@ -69,6 +71,7 @@ class CentroidsMapResponse(dict):
 async def get_desks(
     site_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
     floor: Optional[str] = Query(None, description="Optional floor filter (L0, L1, L2, etc.)"),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> List[Dict[str, Any]]:
     """Get desk data for a building.
 
@@ -140,6 +143,7 @@ async def get_desks(
 async def get_desks_by_zone(
     site_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
     zone_id: str = Path(..., description="Zone ID (e.g., Zone-L1-A)"),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> List[Dict[str, Any]]:
     """Get all desks in a specific zone.
 
@@ -185,6 +189,7 @@ async def get_desks_by_zone(
 async def get_zone_centroid(
     site_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
     zone_id: str = Path(..., description="Zone ID (e.g., Zone-L1-A)"),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> Dict[str, Any]:
     """Get centroid for a specific zone.
 
@@ -254,6 +259,7 @@ async def get_zone_centroid(
 @router.get("/{site_id}/desks/centroids")
 async def get_all_zone_centroids(
     site_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> Dict[str, Any]:
     """Get centroids for all zones in a building.
 
@@ -337,6 +343,7 @@ async def get_all_zone_centroids(
 @router.get("/{site_id}/desks/stats")
 async def get_desk_statistics(
     site_id: str = Path(..., description="Building UUID or code (e.g., 'site-002' or UUID)"),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> Dict[str, Any]:
     """Get desk statistics for a building.
 

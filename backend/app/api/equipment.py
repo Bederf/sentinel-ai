@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 import httpx
@@ -15,6 +15,8 @@ from app.database.repositories.equipment_repository import EquipmentRepository
 from app.database.repositories.sensor_repository import SensorRepository
 from app.services.csv_loader import AssetData, AlarmData as CSVAlarmData
 from app.services.health_threshold_service import get_health_thresholds
+from app.middleware.auth_middleware import require_equipment_access
+from app.models.auth import AuthContext
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -563,7 +565,10 @@ async def list_equipment(
 
 
 @router.get("/equipment/{equipment_id}", response_model=EquipmentResponse)
-async def get_equipment(equipment_id: str) -> EquipmentResponse:
+async def get_equipment(
+    equipment_id: str,
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
+) -> EquipmentResponse:
     """
     Get a single equipment item by ID.
 
@@ -612,7 +617,10 @@ async def get_equipment(equipment_id: str) -> EquipmentResponse:
 
 
 @router.get("/equipment/{equipment_id}/controls")
-async def get_equipment_controls(equipment_id: str):
+async def get_equipment_controls(
+    equipment_id: str,
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
+):
     """
     Get equipment with control points from Supabase or JSON fallback.
 
@@ -804,6 +812,7 @@ async def get_equipment_controls(equipment_id: str):
 async def control_equipment(
     equipment_id: str,
     request: Request,
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
 ):
     """
     Control an equipment point (write value to Supabase).

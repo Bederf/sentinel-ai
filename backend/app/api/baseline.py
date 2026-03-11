@@ -14,6 +14,9 @@ from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 
+from app.middleware.auth_middleware import require_equipment_access
+from app.models.auth import AuthContext
+
 from app.models.baseline import (
     EquipmentBaseline,
     ElementBaseline,
@@ -47,7 +50,10 @@ router = APIRouter(prefix="/api/equipment", tags=["baseline"])
     description="Capture baseline readings for equipment. Can be manual entry or automated from BMS sensors.",
 )
 async def capture_equipment_baseline(
-    equipment_id: str, request: ManualBaselineCaptureRequest, current_user: User = Depends(get_current_user)
+    equipment_id: str,
+    request: ManualBaselineCaptureRequest,
+    current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
 ):
     """Capture a new baseline for equipment."""
     service = get_baseline_service()
@@ -90,6 +96,7 @@ async def capture_automated_baseline(
     baseline_type: str = "periodic",
     captured_by: str = "automated",
     current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
 ):
     """Capture automated baseline from BMS sensor averages."""
     service = get_baseline_service()
@@ -119,7 +126,11 @@ async def capture_automated_baseline(
     summary="Get current active baseline",
     description="Retrieve the most recent active baseline for equipment",
 )
-async def get_active_baseline(equipment_id: str, current_user: User = Depends(get_current_user)):
+async def get_active_baseline(
+    equipment_id: str,
+    current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
+):
     """Get current active baseline for equipment."""
     service = get_baseline_service()
 
@@ -142,6 +153,7 @@ async def get_baseline_history(
     equipment_id: str,
     limit: int = Query(10, ge=1, le=100, description="Maximum number of baselines to return"),
     current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
 ):
     """Get baseline history for equipment."""
     service = get_baseline_service()
@@ -156,7 +168,12 @@ async def get_baseline_history(
     summary="Archive a baseline",
     description="Archive a baseline record (set status to archived)",
 )
-async def archive_baseline(equipment_id: str, baseline_id: str, current_user: User = Depends(get_current_user)):
+async def archive_baseline(
+    equipment_id: str,
+    baseline_id: str,
+    current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
+):
     """Archive a baseline record."""
     service = get_baseline_service()
 
@@ -184,6 +201,7 @@ async def compare_to_baseline(
     current_values: Optional[Dict[str, Any]] = None,
     data_source: str = "bms_sensor",
     current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
 ):
     """Compare current readings to equipment baseline."""
     service = get_baseline_service()
@@ -224,6 +242,7 @@ async def get_comparison_history(
     equipment_id: str,
     limit: int = Query(10, ge=1, le=50, description="Maximum comparisons to return"),
     current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
 ):
     """Get recent baseline comparisons for equipment."""
     service = get_baseline_service()
@@ -242,6 +261,7 @@ async def get_critical_deviations(
     equipment_id: str,
     days: int = Query(30, ge=1, le=365, description="Lookback period in days"),
     current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
 ):
     """Get critical baseline deviations for equipment."""
     service = get_baseline_service()
@@ -267,6 +287,7 @@ async def capture_element_baseline(
     element_id: str,
     request: ElementBaselineCaptureRequest,
     current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
 ):
     """Capture baseline for equipment element."""
     service = get_baseline_service()
@@ -304,7 +325,11 @@ async def capture_element_baseline(
     summary="List equipment elements",
     description="Get all elements defined for equipment",
 )
-async def list_equipment_elements(equipment_id: str, current_user: User = Depends(get_current_user)):
+async def list_equipment_elements(
+    equipment_id: str,
+    current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
+):
     """List all elements for equipment."""
     service = get_baseline_service()
 
@@ -319,7 +344,10 @@ async def list_equipment_elements(equipment_id: str, current_user: User = Depend
     description="Get the most recent active baseline for an element",
 )
 async def get_active_element_baseline(
-    equipment_id: str, element_id: str, current_user: User = Depends(get_current_user)
+    equipment_id: str,
+    element_id: str,
+    current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
 ):
     """Get active baseline for equipment element."""
     service = get_baseline_service()
@@ -352,7 +380,11 @@ async def get_active_element_baseline(
     summary="Generate baseline report",
     description="Generate comprehensive baseline assessment report for equipment",
 )
-async def get_baseline_report(equipment_id: str, current_user: User = Depends(get_current_user)):
+async def get_baseline_report(
+    equipment_id: str,
+    current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
+):
     """Generate comprehensive baseline report for equipment."""
     service = get_baseline_service()
 
@@ -371,7 +403,11 @@ async def get_baseline_report(equipment_id: str, current_user: User = Depends(ge
     summary="Get baseline summary",
     description="Get summary statistics about baseline status for equipment",
 )
-async def get_baseline_summary(equipment_id: str, current_user: User = Depends(get_current_user)):
+async def get_baseline_summary(
+    equipment_id: str,
+    current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
+):
     """Get baseline summary for equipment."""
     service = get_baseline_service()
 
@@ -389,6 +425,7 @@ async def generate_json_report(
     include_elements: bool = Query(True, description="Include element-level baselines"),
     include_history: bool = Query(True, description="Include comparison history"),
     current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
 ):
     """Generate JSON baseline report."""
     report_service = get_baseline_report_service()
@@ -407,7 +444,11 @@ async def generate_json_report(
     summary="Generate HTML baseline report",
     description="Generate comprehensive baseline assessment report in HTML format",
 )
-async def generate_html_report(equipment_id: str, current_user: User = Depends(get_current_user)):
+async def generate_html_report(
+    equipment_id: str,
+    current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
+):
     """Generate HTML baseline report."""
     report_service = get_baseline_report_service()
 
@@ -423,7 +464,11 @@ async def generate_html_report(equipment_id: str, current_user: User = Depends(g
     summary="Generate PDF baseline report",
     description="Generate comprehensive baseline assessment report in PDF format",
 )
-async def generate_pdf_report(equipment_id: str, current_user: User = Depends(get_current_user)):
+async def generate_pdf_report(
+    equipment_id: str,
+    current_user: User = Depends(get_current_user),
+    auth: AuthContext = Depends(require_equipment_access("equipment_id")),
+):
     """Generate PDF baseline report."""
     report_service = get_baseline_report_service()
 

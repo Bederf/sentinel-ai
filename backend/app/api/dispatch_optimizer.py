@@ -11,8 +11,10 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from app.middleware.auth_middleware import require_site_access
+from app.models.auth import AuthContext
 from app.config.settings import settings
 from app.services.mip_dispatch_optimizer import get_mip_dispatch_optimizer
 
@@ -22,7 +24,7 @@ router = APIRouter(prefix="/api/dispatch-optimizer", tags=["dispatch-optimizer"]
 
 
 @router.get("/{site_id}/schedule")
-async def get_dispatch_schedule(site_id: str):
+async def get_dispatch_schedule(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """Get the current optimal dispatch schedule.
 
     Returns the cached MIP-optimized schedule if available,
@@ -39,7 +41,7 @@ async def get_dispatch_schedule(site_id: str):
 
 
 @router.get("/{site_id}/compare")
-async def compare_dispatch_strategies(site_id: str):
+async def compare_dispatch_strategies(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """Compare MIP-optimized vs rules-based dispatch side by side.
 
     Returns both schedules with total cost comparison and savings.
@@ -82,6 +84,7 @@ async def compare_dispatch_strategies(site_id: str):
 async def solve_dispatch(
     site_id: str,
     initial_soc_kwh: Optional[float] = Query(100.0, ge=0, le=200, description="Initial SOC in kWh"),
+    auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """Trigger a fresh MIP optimization solve.
 

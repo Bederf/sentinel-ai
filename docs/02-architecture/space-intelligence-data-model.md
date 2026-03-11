@@ -104,7 +104,7 @@
 3. **meeting_audit** compares the two
 4. Ghost booking = booking exists AND no `occupied=true` event within 20 minutes of `start_time`
 
-### Phase 2: Focus Rooms
+### Phase 3: Focus Rooms
 
 1. No booking table is needed for room use logic
 2. **occupancy_events** are converted into **focus_room_sessions**
@@ -128,7 +128,7 @@ For the lean demo and 5-room pilot, build these first:
 This is enough for:
 - Ghost booking detection
 - 5-room pilot
-- Focus room overstay in Phase 2
+- Focus room overstay in Phase 3
 - Dashboard metrics
 
 ---

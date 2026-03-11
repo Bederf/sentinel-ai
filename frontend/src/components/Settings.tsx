@@ -1,8 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Settings as SettingsIcon, Bell, Monitor, Shield, Lock, Unlock, Zap, Gauge, Play, Pause } from "lucide-react";
 import { useHealthThresholds } from "../hooks/useHealthThresholds";
 import { useGlassTheme } from "../hooks/useGlassTheme";
 import { GLASS_PRESETS } from "../lib/settings";
+import { AUTH_EXPIRED_EVENT } from "../lib/api";
 import { ThresholdEditor } from "./ThresholdEditor";
 import { SafetyRulesEditor } from "./SafetyRulesEditor";
 import { PasswordModal } from "./PasswordModal";
@@ -69,6 +70,7 @@ const ADDON_TOGGLE_CARDS: FeatureToggleCard[] = [
   { id: "compliance-addon", label: "Compliance", moduleType: "compliance", description: "Carbon Tax, Green Star, SANS, ESG." },
   { id: "simulation-addon", label: "Simulation", moduleType: "simulation", description: "What-if scenarios and ROI modelling." },
   { id: "fleet-ml-addon", label: "Fleet ML", moduleType: "fleet_ml", description: "Cross-portfolio analytics and benchmarking." },
+  { id: "space-optimization-addon", label: "Space Optimization", moduleType: "space_optimization", description: "Ghost booking detection, room right-sizing, focus room analytics." },
 ];
 
 export function Settings({ onError }: SettingsProps) {
@@ -94,6 +96,7 @@ export function Settings({ onError }: SettingsProps) {
       return "auditor";
     }
   })();
+  const hasSessionToken = !!localStorage.getItem("sentinel_token");
   const demoUserEmails = ['grant@grantdemo.co.za', 'bederf@protonmail.com', 'bederf@gmail.com'];
   const isDemoUser = !!(currentUserEmail && demoUserEmails.includes(currentUserEmail.toLowerCase()));
   const canManageFeatureAccess = currentUserRole === "admin";
@@ -101,6 +104,12 @@ export function Settings({ onError }: SettingsProps) {
   const [settingsPageUnlocked, setSettingsPageUnlocked] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [togglingCardId, setTogglingCardId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (currentUserEmail && !hasSessionToken) {
+      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+    }
+  }, [currentUserEmail, hasSessionToken]);
 
   const handleFeatureToggle = async (card: FeatureToggleCard) => {
     // Demo users need to unlock Settings page first
@@ -354,6 +363,8 @@ export function Settings({ onError }: SettingsProps) {
 
         {/* Notification Settings */}
         <NotificationSettingsPanel
+          currentUserEmail={currentUserEmail}
+          hasAuthenticatedSession={hasSessionToken}
           onError={onError}
           onSuccess={() => {
             setSaveSuccess(true);
@@ -563,9 +574,9 @@ export function Settings({ onError }: SettingsProps) {
           </div>
         </div>
 
-        {/* Simulation Controls */}
+        {/* Simulation Controls — always interactive (operational, not configuration) */}
         <SimulationControlsPanel
-          readOnly={!!(isDemoUser && !settingsPageUnlocked)}
+          readOnly={false}
           onError={onError}
         />
       </div>
@@ -676,7 +687,7 @@ function SimulationControlsPanel({
           </div>
         ) : (
           <div className="space-y-5">
-            {/* Current Speed + Day Progress */}
+            {/* Current Speed + Day Progress + Energy */}
             <div className="flex flex-col sm:flex-row gap-4">
               <div
                 className="flex-1 rounded-lg p-3"
@@ -730,6 +741,28 @@ function SimulationControlsPanel({
                     }}
                   />
                 </div>
+              </div>
+              <div
+                className="flex-1 rounded-lg p-3"
+                style={{
+                  background: "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--glass-border)",
+                }}
+              >
+                <p className="text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  Energy Consumed
+                </p>
+                <p className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {sim.totalEnergyKwh >= 1000
+                    ? `${(sim.totalEnergyKwh / 1000).toFixed(1)} MWh`
+                    : `${Math.round(sim.totalEnergyKwh)} kWh`}
+                  <span
+                    className="text-sm font-normal ml-2"
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                  >
+                    {sim.currentHourPowerKw > 0 ? `${sim.currentHourPowerKw.toFixed(1)} kW now` : ""}
+                  </span>
+                </p>
               </div>
             </div>
 
@@ -1077,26 +1110,49 @@ function GlassThemeControls() {
  * Combines SENTRY bot settings with Phase 102 multi-channel notifications
  */
 function NotificationSettingsPanel({
+  currentUserEmail,
+  hasAuthenticatedSession,
   onError,
   onSuccess,
 }: {
+  currentUserEmail: string;
+  hasAuthenticatedSession: boolean;
   onError?: (msg: string) => void;
   onSuccess?: () => void;
 }) {
   const [notifTab, setNotifTab] = useState<"sentry" | "channels">("channels");
-  const currentUserEmail = (() => {
-    try {
-      const raw = localStorage.getItem("sentinel_user");
-      if (!raw) return "";
-      const parsed = JSON.parse(raw) as { email?: string };
-      return parsed.email || "";
-    } catch {
-      return "";
-    }
-  })();
+  const technicianId = currentUserEmail;
 
-  // Pass email — backend resolves to technician UUID via email lookup
-  const technicianId = currentUserEmail || "technician";
+  if (!hasAuthenticatedSession || !technicianId) {
+    return (
+      <div className="glass-panel overflow-hidden">
+        <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+          <div className="flex items-center gap-3">
+            <div
+              className="p-2 rounded"
+              style={{
+                background: "rgba(245, 158, 11, 0.15)",
+                color: "var(--color-sentinel-amber)",
+              }}
+            >
+              <Bell className="h-5 w-5" />
+            </div>
+            <div>
+              <h2
+                className="text-lg font-semibold"
+                style={{ color: "var(--color-sentinel-text-primary)" }}
+              >
+                Notification Settings
+              </h2>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Sign in again to manage multi-channel notifications and SENTRY bot preferences.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="glass-panel overflow-hidden">

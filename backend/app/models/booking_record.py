@@ -57,7 +57,7 @@ class BlockBookingConfig:
     """Per-site configuration for block booking detection."""
 
     site_id: str = ""
-    min_rooms_for_alert: int = 2
+    min_rooms_for_alert: int = 3
     full_day_threshold_hours: float = 6.0
     lookahead_days: int = 14
     enabled: bool = True

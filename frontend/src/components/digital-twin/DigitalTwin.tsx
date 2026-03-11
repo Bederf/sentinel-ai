@@ -23,9 +23,9 @@ import { useSitesList } from '@/hooks/useSitesList';
 import { useZoneBounds } from '@/hooks/useZoneBounds';
 import { useStoredPositions } from '@/hooks/useStoredPositions';
 import {
+  buildZoneKey,
   distributeEquipmentInZone,
   extractFloor,
-  extractZoneNumber,
   generateSyntheticZoneBounds,
   type EquipmentPosition,
 } from '@/utils/equipmentPositioning';
@@ -249,10 +249,33 @@ export function DigitalTwin() {
     });
   }, [equipment, equipmentTypeFilter]);
 
+  const resolvedZoneBounds = useMemo(() => {
+    const mergedBounds: Record<string, import('@/utils/equipmentPositioning').ZoneBounds> = { ...zoneBounds };
+    const floorsNeeded = new Set<string>();
+
+    filteredEquipment.forEach((eq) => {
+      const code = (eq as any).code || eq.id || '';
+      const floor = extractFloor(code);
+      floorsNeeded.add(floor === 'G' ? 'L0' : floor);
+    });
+
+    if (floorsNeeded.size === 0) {
+      dynamicFloors.forEach((floor) => {
+        floorsNeeded.add(floor.code === 'G' ? 'L0' : floor.code);
+      });
+    }
+
+    floorsNeeded.forEach((floor) => {
+      Object.assign(mergedBounds, generateSyntheticZoneBounds(floor));
+    });
+
+    return mergedBounds;
+  }, [dynamicFloors, filteredEquipment, zoneBounds]);
+
   // Pre-calculate equipment positions with 3-tier priority:
   // 1. Stored positions from site_3d_configs (user-placed, persistent)
-  // 2. Desk-derived zone bounds (adaptive grid within zones)
-  // 3. Synthetic grid fallback (5x5 building grid)
+  // 2. Canonical per-floor zone strips spanning the full slab
+  // 3. Center-of-floor fallback if a position still cannot be resolved
   const equipmentPositions = useMemo(() => {
     const positions = new Map<string, EquipmentPosition>();
 
@@ -274,35 +297,17 @@ export function DigitalTwin() {
     if (needsAlgorithmic.length > 0) {
       // Group by zone key
       const byZone: Record<string, typeof needsAlgorithmic> = {};
-      const floorsNeeded = new Set<string>();
-
       needsAlgorithmic.forEach((eq) => {
         const code = (eq as any).code || eq.id || '';
-        const floor = extractFloor(code);
-        const normalizedFloor = floor === 'G' ? 'L0' : floor;
-        const zoneNum = extractZoneNumber(code);
-        const zoneKey = `Zone-${normalizedFloor}-${zoneNum}`;
+        const zoneKey = buildZoneKey(code);
 
         if (!byZone[zoneKey]) byZone[zoneKey] = [];
         byZone[zoneKey].push(eq);
-        floorsNeeded.add(normalizedFloor);
       });
-
-      // Merge desk-derived bounds with synthetic bounds for missing floors
-      const allBounds: Record<string, import('@/utils/equipmentPositioning').ZoneBounds> = { ...zoneBounds };
-      for (const floor of floorsNeeded) {
-        const hasFloorBounds = Object.keys(allBounds).some(
-          (key) => key.startsWith(`Zone-${floor}-`)
-        );
-        if (!hasFloorBounds) {
-          const synthetic = generateSyntheticZoneBounds(floor);
-          Object.assign(allBounds, synthetic);
-        }
-      }
 
       // Distribute within zones
       Object.entries(byZone).forEach(([zoneKey, zoneEquipment]) => {
-        const bounds = allBounds[zoneKey];
+        const bounds = resolvedZoneBounds[zoneKey];
         if (!bounds) return;
 
         const floor = zoneKey.split('-')[1] || 'L0';
@@ -324,7 +329,7 @@ export function DigitalTwin() {
     }
 
     return positions;
-  }, [filteredEquipment, zoneBounds, storedPositions]);
+  }, [filteredEquipment, resolvedZoneBounds, storedPositions]);
 
   // Find selected equipment data
   const selectedEquipmentData = useMemo(
@@ -577,7 +582,7 @@ export function DigitalTwin() {
           <FloorPlan2D
             equipment={filteredEquipment}
             selectedFloors={selectedFloors}
-            zoneBounds={zoneBounds}
+            zoneBounds={resolvedZoneBounds}
             equipmentPositions={equipmentPositions}
             onEquipmentClick={setSelectedEquipment}
             selectedEquipment={selectedEquipment}

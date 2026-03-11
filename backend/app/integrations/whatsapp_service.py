@@ -29,7 +29,11 @@ class WhatsAppService:
             self.phone_id = os.getenv("WHATSAPP_PHONE_ID", "")
             self.api_token = os.getenv("WHATSAPP_API_TOKEN", "")
             self.business_id = os.getenv("WHATSAPP_BUSINESS_ID", "")
-            self.webhook_token = os.getenv("WHATSAPP_WEBHOOK_TOKEN", "secret")
+            self.webhook_token = os.getenv("WHATSAPP_WEBHOOK_TOKEN", "")
+            if self.webhook_token in ("", "secret"):
+                logger.warning(
+                    "WHATSAPP_WEBHOOK_TOKEN not set or uses insecure default — webhook verification disabled"
+                )
 
             if self.phone_id and self.api_token:
                 self.api_url = f"https://graph.instagram.com/v18.0/{self.phone_id}/messages"
@@ -42,7 +46,11 @@ class WhatsAppService:
             self.account_sid = os.getenv("TWILIO_ACCOUNT_SID", "")
             self.auth_token = os.getenv("TWILIO_AUTH_TOKEN", "")
             self.twilio_whatsapp = os.getenv("TWILIO_WHATSAPP_FROM", os.getenv("TWILIO_WHATSAPP_NUMBER", ""))
-            self.webhook_token = os.getenv("WHATSAPP_WEBHOOK_TOKEN", "secret")
+            self.webhook_token = os.getenv("WHATSAPP_WEBHOOK_TOKEN", "")
+            if self.webhook_token in ("", "secret"):
+                logger.warning(
+                    "WHATSAPP_WEBHOOK_TOKEN not set or uses insecure default — webhook verification disabled"
+                )
 
             if self.account_sid and self.auth_token and self.twilio_whatsapp:
                 self.api_url = f"https://api.twilio.com/2010-04-01/Accounts/{self.account_sid}/Messages.json"

@@ -49,8 +49,9 @@ class GhostBookingFinding:
     Workflow:
       1. Sensor reports no movement for grace_period_minutes -> status='open'
       2. Concierge notified -> status='pending_inspection'
-      3. Concierge physically inspects and confirms empty -> status='released'
-         - charge_amount and cost_centre recorded against organiser
+      3. Concierge physically inspects and confirms outcome:
+         - occupied -> status='verified_occupied'
+         - empty -> status='confirmed_empty'
       4. OR sensor detects movement -> status='verified_occupied' (auto-resolved)
     """
 
@@ -67,15 +68,22 @@ class GhostBookingFinding:
     detected_at: datetime = field(default_factory=datetime.utcnow)
     notification_sent: bool = False
     notification_sent_at: Optional[datetime] = None
-    status: str = "open"  # 'open' | 'pending_inspection' | 'verified_occupied' | 'released' | 'dismissed'
+    status: str = "open"  # 'open' | 'pending_inspection' | 'verified_occupied' | 'confirmed_empty' | 'dismissed'
     resolved_at: Optional[datetime] = None
     # Concierge inspection fields
     inspected_by: Optional[str] = None  # Concierge name/ID who confirmed
     inspected_at: Optional[datetime] = None
-    # Charge fields — recorded when concierge confirms room empty
-    cost_centre: Optional[str] = None  # Organiser's cost centre / department
-    charge_amount: Optional[float] = None  # Penalty amount (currency from site config)
-    charge_reason: Optional[str] = None  # e.g. "Ghost booking - room unused for 45 minutes"
+    concierge_email: Optional[str] = None
+    concierge_whatsapp: Optional[str] = None
+    email_notified_at: Optional[datetime] = None
+    whatsapp_notified_at: Optional[datetime] = None
+    whatsapp_message_id: Optional[str] = None
+    response_message_id: Optional[str] = None
+    response_text: Optional[str] = None
+    # Legacy fields retained for backward compatibility with older stored records.
+    cost_centre: Optional[str] = None
+    charge_amount: Optional[float] = None
+    charge_reason: Optional[str] = None
 
 
 @dataclass

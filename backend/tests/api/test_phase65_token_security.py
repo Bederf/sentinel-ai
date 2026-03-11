@@ -6,14 +6,14 @@ from starlette.requests import Request
 
 from app.api import auth as auth_api
 from app.config.settings import settings
-from app.startup.middleware import _admin_requests_by_ip, _check_admin_rate_limit
+from app.startup.middleware import _admin_requests_by_ip, _check_admin_rate_limit, _should_rate_limit_admin_request
 from app.middleware.auth_middleware import validate_jwt_token
 
 
-def _make_request(path: str = "/api/auth/refresh") -> Request:
+def _make_request(path: str = "/api/auth/refresh", method: str = "POST") -> Request:
     scope = {
         "type": "http",
-        "method": "POST",
+        "method": method,
         "path": path,
         "headers": [],
         "query_string": b"",
@@ -143,3 +143,20 @@ def test_admin_rate_limit_blocks_31st_request():
     blocked = _check_admin_rate_limit(ip)
     assert blocked is not None
     assert blocked.status_code == 429
+
+
+def test_admin_rate_limit_skips_dashboard_get_requests():
+    predictions_request = _make_request(path="/api/predictions", method="GET")
+    recommendations_request = _make_request(
+        path="/api/modules/site/site-002/recommendations",
+        method="GET",
+    )
+
+    assert _should_rate_limit_admin_request(predictions_request) is False
+    assert _should_rate_limit_admin_request(recommendations_request) is False
+
+
+def test_admin_rate_limit_applies_to_mutating_requests():
+    request = _make_request(path="/api/settings/notifications", method="POST")
+
+    assert _should_rate_limit_admin_request(request) is True

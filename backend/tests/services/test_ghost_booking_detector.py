@@ -478,10 +478,10 @@ class TestAPIPayload:
 
 
 class TestConciergeInspectionWorkflow:
-    """Full workflow: no movement -> notify concierge -> inspect -> confirm -> charge."""
+    """Full workflow: no movement -> notify concierge -> inspect -> confirm outcome."""
 
     def test_full_concierge_workflow(self):
-        """Ghost detected -> concierge confirms empty -> released + charged."""
+        """Ghost detected -> concierge confirms empty -> confirmed_empty."""
         from app.services.ghost_booking_detector import (
             concierge_confirm_empty,
             detect_ghost_booking,
@@ -505,15 +505,11 @@ class TestConciergeInspectionWorkflow:
         confirmed = concierge_confirm_empty(
             finding_id=finding.id,
             confirmed_by="John the Concierge",
-            cost_centre="CC-FINANCE-001",
-            charge_amount=150.00,
         )
         assert confirmed is not None
-        assert confirmed.status == "released"
+        assert confirmed.status == "confirmed_empty"
         assert confirmed.inspected_by == "John the Concierge"
-        assert confirmed.cost_centre == "CC-FINANCE-001"
-        assert confirmed.charge_amount == 150.00
-        assert "unused" in confirmed.charge_reason.lower()
+        assert "confirmed empty" in confirmed.charge_reason.lower()
         assert confirmed.resolved_at is not None
 
     def test_concierge_cannot_confirm_already_resolved(self):
@@ -586,13 +582,13 @@ class TestConciergeInspectionWorkflow:
         assert "no movement" in msg.lower()
         assert "20 minutes" in msg
         assert "Please inspect" in msg
-        assert "cost centre" in msg.lower()
+        assert "occupied or empty" in msg.lower()
         assert "test-finding-001" in msg
         assert "https://sentinel.example.com" in msg
         assert "SENTINEL" in msg
 
-    def test_charge_reason_includes_details(self):
-        """Charge reason contains room, organiser, and concierge details."""
+    def test_confirmation_note_includes_details(self):
+        """Inspection note contains room and concierge details."""
         from app.services.ghost_booking_detector import (
             concierge_confirm_empty,
             detect_ghost_booking,
@@ -611,11 +607,8 @@ class TestConciergeInspectionWorkflow:
         confirmed = concierge_confirm_empty(
             finding_id=finding.id,
             confirmed_by="Sarah Concierge",
-            cost_centre="CC-HR-002",
-            charge_amount=200.00,
         )
 
         assert "Board Room A" in confirmed.charge_reason
         assert "MR-01" in confirmed.charge_reason
-        assert "Alice Smith" in confirmed.charge_reason
         assert "Sarah Concierge" in confirmed.charge_reason

@@ -740,6 +740,400 @@ require_operator = require_auth(AuthLevel.OPERATOR)
 
 
 # =============================================================================
+# Site Access Control (BOLA Prevention)
+# =============================================================================
+
+
+def require_site_access(
+    site_param: str = "site_id",
+    auth_level: AuthLevel = AuthLevel.AUTHENTICATED,
+):
+    """FastAPI dependency that requires authentication AND site-level access.
+
+    Prevents BOLA (Broken Object Level Authorization) by verifying the
+    authenticated user has access to the site referenced in the path parameter.
+
+    ADMIN role always has access. Other roles are checked against:
+    1. demo_configs (allowedSites)
+    2. user_site_access table (Supabase)
+    3. Default deny
+
+    Usage:
+        @router.get("/api/sites/{site_id}")
+        async def get_site(
+            site_id: str,
+            auth: AuthContext = Depends(require_site_access("site_id")),
+        ):
+            ...
+
+        @router.get("/api/buildings/{building_id}/equipment")
+        async def get_equipment(
+            building_id: str,
+            auth: AuthContext = Depends(require_site_access("building_id")),
+        ):
+            ...
+
+    Args:
+        site_param: Name of the path parameter containing the site/building ID
+        auth_level: Minimum auth level required (default AUTHENTICATED)
+
+    Returns:
+        FastAPI dependency function returning AuthContext
+    """
+
+    async def _dependency(request: Request) -> AuthContext:
+        # First authenticate
+        auth_ctx = getattr(request.state, "auth", None)
+        if auth_ctx is None:
+            auth_ctx = await _authenticate_request(request)
+
+        if auth_ctx is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Check auth level
+        if not auth_ctx.has_auth_level(auth_level):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Required level: {auth_level.value}",
+            )
+
+        # ADMIN always has access
+        if auth_ctx.role == SentinelRole.ADMIN:
+            request.state.auth = auth_ctx
+            return auth_ctx
+
+        # Extract site_id from path params
+        site_code = request.path_params.get(site_param)
+        if not site_code:
+            # No site param in path — fall through (endpoint may not need site check)
+            request.state.auth = auth_ctx
+            return auth_ctx
+
+        # Check site access: demo config first, then Supabase DB
+        from app.config.demo_configs import get_demo_config_for_email, has_demo_site_access
+
+        email = getattr(auth_ctx, "email", None) or ""
+
+        # Step 1: Demo config check (if user has a demo config)
+        demo_config = get_demo_config_for_email(email) if email else None
+        if demo_config:
+            # User has demo config — use it as the authority
+            if not has_demo_site_access(email, site_code):
+                logger.warning(
+                    "Site access denied (demo config): user=%s site=%s path=%s",
+                    auth_ctx.user_id,
+                    site_code,
+                    request.url.path,
+                )
+                _emit_bola_site_event(auth_ctx, site_code, request)
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"You do not have access to site {site_code}",
+                )
+            # Demo config allows it — skip DB check
+        else:
+            # Step 2: No demo config — check database (Supabase user_site_access)
+            try:
+                from app.database.repositories.user_site_access_repository import (
+                    UserSiteAccessRepository,
+                )
+
+                repo = UserSiteAccessRepository()
+                if not repo.has_access_to_site_code(email, auth_ctx.role, site_code):
+                    logger.warning(
+                        "Site access denied (database): user=%s site=%s path=%s",
+                        auth_ctx.user_id,
+                        site_code,
+                        request.url.path,
+                    )
+                    _emit_bola_site_event(auth_ctx, site_code, request)
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"You do not have access to site {site_code}",
+                    )
+            except HTTPException:
+                raise
+            except Exception as e:
+                # Supabase unavailable — allow (fail-open for non-demo users)
+                # Production should use strict mode; demo mode is permissive
+                logger.debug("Site access DB check failed, allowing: %s", e)
+
+        request.state.auth = auth_ctx
+        return auth_ctx
+
+    return _dependency
+
+
+def require_query_site_access(
+    site_param: str = "site_id",
+    auth_level: AuthLevel = AuthLevel.AUTHENTICATED,
+):
+    """FastAPI dependency that validates site access for query-parameter-based endpoints.
+
+    Same authorization logic as require_site_access, but reads site_id from
+    query parameters instead of path parameters. Used for list/collection
+    endpoints like GET /equipment?site_id=site-002.
+
+    If site_id query param is absent, the endpoint handler is responsible for
+    scoping results to the user's allowed sites (available via auth_ctx).
+
+    Args:
+        site_param: Name of the query parameter containing the site ID
+        auth_level: Minimum auth level required
+    """
+
+    async def _dependency(request: Request) -> AuthContext:
+        # Authenticate
+        auth_ctx = getattr(request.state, "auth", None)
+        if auth_ctx is None:
+            auth_ctx = await _authenticate_request(request)
+
+        if auth_ctx is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        if not auth_ctx.has_auth_level(auth_level):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Required level: {auth_level.value}",
+            )
+
+        # ADMIN always has access
+        if auth_ctx.role == SentinelRole.ADMIN:
+            request.state.auth = auth_ctx
+            return auth_ctx
+
+        # Extract site_id from query params
+        site_code = request.query_params.get(site_param)
+        if not site_code:
+            # No site filter — endpoint must scope results itself
+            request.state.auth = auth_ctx
+            return auth_ctx
+
+        # Check site access (same logic as require_site_access)
+        from app.config.demo_configs import get_demo_config_for_email, has_demo_site_access
+
+        email = getattr(auth_ctx, "email", None) or ""
+        demo_config = get_demo_config_for_email(email) if email else None
+
+        if demo_config:
+            if not has_demo_site_access(email, site_code):
+                logger.warning(
+                    "Query site access denied (demo config): user=%s site=%s path=%s",
+                    auth_ctx.user_id,
+                    site_code,
+                    request.url.path,
+                )
+                _emit_bola_site_event(auth_ctx, site_code, request)
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"You do not have access to site {site_code}",
+                )
+        else:
+            try:
+                from app.database.repositories.user_site_access_repository import (
+                    UserSiteAccessRepository,
+                )
+
+                repo = UserSiteAccessRepository()
+                if not repo.has_access_to_site_code(email, auth_ctx.role, site_code):
+                    logger.warning(
+                        "Query site access denied (database): user=%s site=%s path=%s",
+                        auth_ctx.user_id,
+                        site_code,
+                        request.url.path,
+                    )
+                    _emit_bola_site_event(auth_ctx, site_code, request)
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"You do not have access to site {site_code}",
+                    )
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.debug("Query site access DB check failed, allowing: %s", e)
+
+        request.state.auth = auth_ctx
+        return auth_ctx
+
+    return _dependency
+
+
+def require_equipment_access(
+    equipment_param: str = "equipment_id",
+    auth_level: AuthLevel = AuthLevel.AUTHENTICATED,
+):
+    """FastAPI dependency that verifies access to equipment via its parent site.
+
+    Extracts the site code from the equipment code format (e.g., S002-AHU-B1-001 -> site-002)
+    and checks site-level access.
+
+    Usage:
+        @router.get("/api/equipment/{equipment_id}/controls")
+        async def get_controls(
+            equipment_id: str,
+            auth: AuthContext = Depends(require_equipment_access("equipment_id")),
+        ):
+            ...
+
+    Args:
+        equipment_param: Path parameter name for equipment code
+        auth_level: Minimum auth level
+
+    Returns:
+        FastAPI dependency function returning AuthContext
+    """
+
+    async def _dependency(request: Request) -> AuthContext:
+        # Authenticate first
+        auth_ctx = getattr(request.state, "auth", None)
+        if auth_ctx is None:
+            auth_ctx = await _authenticate_request(request)
+
+        if auth_ctx is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        if not auth_ctx.has_auth_level(auth_level):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Required level: {auth_level.value}",
+            )
+
+        # ADMIN always has access
+        if auth_ctx.role == SentinelRole.ADMIN:
+            request.state.auth = auth_ctx
+            return auth_ctx
+
+        # Extract equipment code and derive site
+        equipment_code = request.path_params.get(equipment_param, "")
+        site_code = _equipment_code_to_site(equipment_code)
+
+        if site_code:
+            from app.config.demo_configs import get_demo_config_for_email, has_demo_site_access
+
+            email = getattr(auth_ctx, "email", None) or ""
+            demo_config = get_demo_config_for_email(email) if email else None
+
+            if demo_config:
+                if not has_demo_site_access(email, site_code):
+                    logger.warning(
+                        "Equipment access denied (demo config): user=%s equipment=%s site=%s",
+                        auth_ctx.user_id,
+                        equipment_code,
+                        site_code,
+                    )
+                    _emit_bola_equipment_event(auth_ctx, equipment_code, site_code, request)
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"You do not have access to equipment {equipment_code}",
+                    )
+            else:
+                try:
+                    from app.database.repositories.user_site_access_repository import (
+                        UserSiteAccessRepository,
+                    )
+
+                    repo = UserSiteAccessRepository()
+                    if not repo.has_access_to_site_code(email, auth_ctx.role, site_code):
+                        logger.warning(
+                            "Equipment access denied (database): user=%s equipment=%s site=%s",
+                            auth_ctx.user_id,
+                            equipment_code,
+                            site_code,
+                        )
+                        _emit_bola_equipment_event(auth_ctx, equipment_code, site_code, request)
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail=f"You do not have access to equipment {equipment_code}",
+                        )
+                except HTTPException:
+                    raise
+                except Exception as e:
+                    logger.debug("Equipment site access DB check failed, allowing: %s", e)
+
+        request.state.auth = auth_ctx
+        return auth_ctx
+
+    return _dependency
+
+
+def _get_route_pattern(request) -> str:
+    """Return the normalized route pattern (e.g. /api/buildings/{site_id}/equipment).
+
+    Falls back to the concrete path if no route match is available.
+    """
+    route = getattr(request, "scope", {}).get("route")
+    if route and hasattr(route, "path"):
+        return route.path
+    return str(request.url.path)
+
+
+def _emit_bola_site_event(auth_ctx, site_code: str, request) -> None:
+    """Emit a structured BOLA_SITE_DENIED audit event (fire-and-forget)."""
+    try:
+        from app.security.audit_events import audit_bola_site_denied
+
+        audit_bola_site_denied(
+            user_id=auth_ctx.user_id,
+            email=getattr(auth_ctx, "email", "") or "",
+            role=auth_ctx.role.value if hasattr(auth_ctx.role, "value") else str(auth_ctx.role),
+            site_id=site_code,
+            path=_get_route_pattern(request),
+            method=request.method,
+            source_ip=_extract_ip_address(request),
+        )
+    except Exception as exc:
+        logger.debug("Failed to emit BOLA site audit event: %s", exc)
+
+
+def _emit_bola_equipment_event(auth_ctx, equipment_code: str, derived_site: str, request) -> None:
+    """Emit a structured BOLA_EQUIPMENT_DENIED audit event (fire-and-forget)."""
+    try:
+        from app.security.audit_events import audit_bola_equipment_denied
+
+        audit_bola_equipment_denied(
+            user_id=auth_ctx.user_id,
+            email=getattr(auth_ctx, "email", "") or "",
+            role=auth_ctx.role.value if hasattr(auth_ctx.role, "value") else str(auth_ctx.role),
+            equipment_code=equipment_code,
+            derived_site=derived_site,
+            path=_get_route_pattern(request),
+            method=request.method,
+            source_ip=_extract_ip_address(request),
+        )
+    except Exception as exc:
+        logger.debug("Failed to emit BOLA equipment audit event: %s", exc)
+
+
+def _equipment_code_to_site(equipment_code: str) -> str | None:
+    """Extract site code from equipment code.
+
+    Equipment code format: S002-AHU-B1-001 -> site prefix S002 -> site-002
+    Zone format: S002-VAV-101 -> S002 -> site-002
+    """
+    if not equipment_code:
+        return None
+    parts = equipment_code.split("-")
+    if not parts:
+        return None
+    prefix = parts[0]  # e.g., "S002"
+    if prefix.startswith("S") and len(prefix) == 4 and prefix[1:].isdigit():
+        return f"site-{prefix[1:]}"  # S002 -> site-002
+    return None
+
+
+# =============================================================================
 # Module Access Control (Module Gating)
 # =============================================================================
 

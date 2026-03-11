@@ -5,7 +5,10 @@ MV/LV switchgear, ATS, transformers, power metering, PFC, UPS.
 """
 
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.middleware.auth_middleware import require_site_access, require_auth
+from app.models.auth import AuthContext, AuthLevel
 
 from app.services.energy_centre_service import get_energy_centre_service
 
@@ -16,7 +19,7 @@ router = APIRouter(prefix="/energy-centre", tags=["energy-centre"])
 
 
 @router.get("/scada/{site_id}")
-async def get_scada_overview(site_id: str):
+async def get_scada_overview(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """Get complete SCADA overview for energy centre."""
     service = get_energy_centre_service()
     overview = service.get_scada_overview(site_id)
@@ -24,7 +27,7 @@ async def get_scada_overview(site_id: str):
 
 
 @router.get("/sld/{site_id}")
-async def get_sld_data(site_id: str):
+async def get_sld_data(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """Get single-line diagram data for visualization."""
     service = get_energy_centre_service()
     return service.get_sld_data(site_id)
@@ -63,7 +66,7 @@ async def list_ats_units(
 
 
 @router.get("/ats/{ats_id}")
-async def get_ats(ats_id: str):
+async def get_ats(ats_id: str, auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))):
     """Get single ATS unit."""
     service = get_energy_centre_service()
     ats = service.get_ats(ats_id)
@@ -73,7 +76,7 @@ async def get_ats(ats_id: str):
 
 
 @router.get("/ats/{ats_id}/status")
-async def get_ats_status(ats_id: str):
+async def get_ats_status(ats_id: str, auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))):
     """Get detailed ATS status with transfer history."""
     service = get_energy_centre_service()
     status = service.get_ats_status(ats_id)
@@ -99,7 +102,7 @@ async def list_mv_incomers(
 
 
 @router.get("/mv-incomers/{incomer_id}")
-async def get_mv_incomer(incomer_id: str):
+async def get_mv_incomer(incomer_id: str, auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))):
     """Get single MV incomer."""
     service = get_energy_centre_service()
     incomer = service.get_mv_incomer(incomer_id)
@@ -125,7 +128,7 @@ async def list_transformers(
 
 
 @router.get("/transformers/{transformer_id}")
-async def get_transformer(transformer_id: str):
+async def get_transformer(transformer_id: str, auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))):
     """Get single transformer."""
     service = get_energy_centre_service()
     transformer = service.get_transformer(transformer_id)
@@ -151,7 +154,7 @@ async def list_switchboards(
 
 
 @router.get("/switchboards/{switchboard_id}")
-async def get_switchboard(switchboard_id: str):
+async def get_switchboard(switchboard_id: str, auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))):
     """Get single switchboard."""
     service = get_energy_centre_service()
     switchboard = service.get_switchboard(switchboard_id)
@@ -178,7 +181,7 @@ async def list_meters(
 
 
 @router.get("/meters/{meter_id}")
-async def get_meter(meter_id: str):
+async def get_meter(meter_id: str, auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))):
     """Get single power meter."""
     service = get_energy_centre_service()
     meter = service.get_meter(meter_id)
@@ -188,7 +191,7 @@ async def get_meter(meter_id: str):
 
 
 @router.get("/power-summary/{site_id}")
-async def get_power_summary(site_id: str):
+async def get_power_summary(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """Get power summary from all meters at a site."""
     service = get_energy_centre_service()
     return service.get_power_summary(site_id)
@@ -211,7 +214,7 @@ async def list_pfc_banks(
 
 
 @router.get("/pfc/{pfc_id}")
-async def get_pfc(pfc_id: str):
+async def get_pfc(pfc_id: str, auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))):
     """Get single PFC bank."""
     service = get_energy_centre_service()
     pfc = service.get_pfc(pfc_id)
@@ -237,7 +240,7 @@ async def list_ups_systems(
 
 
 @router.get("/ups/{ups_id}")
-async def get_ups(ups_id: str):
+async def get_ups(ups_id: str, auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))):
     """Get single UPS system."""
     service = get_energy_centre_service()
     ups = service.get_ups(ups_id)
@@ -247,7 +250,7 @@ async def get_ups(ups_id: str):
 
 
 @router.get("/ups-summary/{site_id}")
-async def get_ups_summary(site_id: str):
+async def get_ups_summary(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))):
     """Get UPS summary for a site."""
     service = get_energy_centre_service()
     return service.get_ups_summary(site_id)

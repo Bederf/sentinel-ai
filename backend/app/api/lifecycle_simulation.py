@@ -302,7 +302,10 @@ async def resume_simulation(task_id: str):
         if not orchestrator or not orchestrator.running:
             raise HTTPException(status_code=400, detail="Simulation not running")
 
-        orchestrator.resume()
+        if hasattr(orchestrator, "unpause"):
+            orchestrator.unpause()
+        else:
+            orchestrator.resume()
         return {"success": True, "status": "running", "message": "Simulation resumed"}
     except HTTPException:
         raise
@@ -431,7 +434,10 @@ async def resume_default_simulation():
         if not orchestrator or not orchestrator.running:
             raise HTTPException(status_code=400, detail="No simulation running")
 
-        orchestrator.resume()
+        if hasattr(orchestrator, "unpause"):
+            orchestrator.unpause()
+        else:
+            orchestrator.resume()
         return {"success": True, "status": "running", "message": "Simulation resumed"}
     except HTTPException:
         raise

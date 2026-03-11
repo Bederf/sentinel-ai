@@ -20,8 +20,11 @@ import shutil
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+
+from app.middleware.auth_middleware import require_site_access
+from app.models.auth import AuthContext
 
 from app.core.site_resolver import get_registered_sites
 from app.services.site_loader import get_site_loader
@@ -218,7 +221,7 @@ async def list_sites(current_user: dict = None) -> dict:
 
 
 @router.get("/{site_id}")
-async def get_site(site_id: str) -> dict:
+async def get_site(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))) -> dict:
     """
     Get building details.
 
@@ -309,7 +312,9 @@ async def create_building(building: BuildingCreate) -> dict:
 
 
 @router.post("/{site_id}/desks")
-async def upload_desks(site_id: str, desks: List[dict]) -> dict:
+async def upload_desks(
+    site_id: str, desks: List[dict], auth: AuthContext = Depends(require_site_access("site_id"))
+) -> dict:
     """
     Upload/replace desk data for a building.
 
@@ -342,7 +347,9 @@ async def upload_desks(site_id: str, desks: List[dict]) -> dict:
 
 
 @router.post("/{site_id}/zones")
-async def upload_zones(site_id: str, zones: List[dict]) -> dict:
+async def upload_zones(
+    site_id: str, zones: List[dict], auth: AuthContext = Depends(require_site_access("site_id"))
+) -> dict:
     """
     Upload/replace zone data for a building.
 
@@ -375,7 +382,9 @@ async def upload_zones(site_id: str, zones: List[dict]) -> dict:
 
 
 @router.post("/{site_id}/activate")
-async def activate_building(site_id: str, set_default: bool = False) -> dict:
+async def activate_building(
+    site_id: str, set_default: bool = False, auth: AuthContext = Depends(require_site_access("site_id"))
+) -> dict:
     """
     Activate a building (add to registry).
 
@@ -425,7 +434,7 @@ async def activate_building(site_id: str, set_default: bool = False) -> dict:
 
 
 @router.post("/{site_id}/deactivate")
-async def deactivate_building(site_id: str) -> dict:
+async def deactivate_building(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))) -> dict:
     """
     Deactivate a building (remove from registry but keep data).
     Maps friendly names to site codes for registry operations.
@@ -468,7 +477,9 @@ async def deactivate_building(site_id: str) -> dict:
 
 
 @router.delete("/{site_id}")
-async def delete_building(site_id: str, confirm: bool = False) -> dict:
+async def delete_building(
+    site_id: str, confirm: bool = False, auth: AuthContext = Depends(require_site_access("site_id"))
+) -> dict:
     """
     Delete a building and all its data.
 
@@ -515,7 +526,7 @@ async def delete_building(site_id: str, confirm: bool = False) -> dict:
 
 
 @router.get("/{site_id}/desks")
-async def get_building_desks(site_id: str) -> List[dict]:
+async def get_building_desks(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))) -> List[dict]:
     """Get all desks for a building. Maps friendly names to site codes."""
     site_code = _building_to_site(site_id)
 
@@ -527,7 +538,7 @@ async def get_building_desks(site_id: str) -> List[dict]:
 
 
 @router.get("/{site_id}/zones")
-async def get_site_zones(site_id: str) -> List[dict]:
+async def get_site_zones(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))) -> List[dict]:
     """Get all zones for a building. Maps friendly names to site codes."""
     site_code = _building_to_site(site_id)
 
@@ -539,7 +550,7 @@ async def get_site_zones(site_id: str) -> List[dict]:
 
 
 @router.get("/{site_id}/equipment-summary")
-async def get_equipment_summary(site_id: str) -> dict:
+async def get_equipment_summary(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))) -> dict:
     """
     Get equipment count breakdown by category for a building.
 
@@ -688,7 +699,7 @@ async def get_equipment_summary(site_id: str) -> dict:
 
 
 @router.get("/{site_id}/equipment")
-async def get_site_equipment(site_id: str) -> dict:
+async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_site_access("site_id"))) -> dict:
     """
     Get all equipment for a building with status.
 
