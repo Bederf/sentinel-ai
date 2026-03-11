@@ -4568,3 +4568,111 @@ export default apiWithAuth;
 
 // Re-export modular APIs for backward compatibility
 export { systemApi, useSystemHealth, useDiagnostics } from './api/system';
+
+// ==================== Fuel Monitoring API ====================
+
+export interface FuelTank {
+  tank_id: string;
+  site_id: string;
+  name: string;
+  capacity_litres: number;
+  fuel_type: string;
+  generator_id: string | null;
+  low_fuel_pct_1: number;
+  low_fuel_pct_2: number;
+  latest_telemetry: FuelTelemetry | null;
+}
+
+export interface FuelTelemetry {
+  tank_id: string;
+  level_pct: number;
+  level_litres: number;
+  temperature_c: number | null;
+  consumption_rate_lph: number | null;
+  days_to_empty: number | null;
+  received_at: string;
+}
+
+export interface FuelEvent {
+  event_id: string;
+  event_type: string;
+  tank_id: string;
+  site_id: string;
+  ts: number;
+  severity: string;
+  details: Record<string, unknown>;
+}
+
+export interface FuelTelemetryReading {
+  tank_id: string;
+  ts: number;
+  level_pct: number;
+  level_litres: number;
+  temperature_c: number | null;
+  consumption_rate_lph: number | null;
+}
+
+export interface GeneratorRuntimeSession {
+  event_id: string;
+  event_type: string;
+  tank_id: string;
+  site_id: string;
+  ts: number;
+  details: Record<string, unknown>;
+}
+
+export interface RefillRecord {
+  event_id: string;
+  event_type: string;
+  tank_id: string;
+  site_id: string;
+  ts: number;
+  details: Record<string, unknown>;
+}
+
+export const fuelApi = {
+  /** List fuel tanks with latest telemetry */
+  async fetchTanks(siteId?: string): Promise<{ tanks: FuelTank[]; count: number }> {
+    const params = siteId ? `?site_id=${encodeURIComponent(siteId)}` : '';
+    const response = await authorizedFetch(`/api/fuel/tanks${params}`);
+    if (!response.ok) throw new Error('Failed to fetch fuel tanks');
+    return response.json();
+  },
+
+  /** Get telemetry history for a tank */
+  async fetchTankHistory(tankId: string, hours = 24): Promise<{ tank_id: string; hours: number; readings: FuelTelemetryReading[]; count: number }> {
+    const response = await authorizedFetch(`/api/fuel/tanks/${encodeURIComponent(tankId)}/history?hours=${hours}`);
+    if (!response.ok) throw new Error('Failed to fetch tank history');
+    return response.json();
+  },
+
+  /** List fuel events */
+  async fetchEvents(siteId?: string, limit = 50): Promise<{ events: FuelEvent[]; count: number }> {
+    const params = new URLSearchParams();
+    if (siteId) params.set('site_id', siteId);
+    if (limit) params.set('limit', String(limit));
+    const response = await authorizedFetch(`/api/fuel/events?${params}`);
+    if (!response.ok) throw new Error('Failed to fetch fuel events');
+    return response.json();
+  },
+
+  /** Get generator runtime sessions */
+  async fetchGeneratorRuntime(siteId?: string, limit = 50): Promise<{ sessions: GeneratorRuntimeSession[]; count: number }> {
+    const params = new URLSearchParams();
+    if (siteId) params.set('site_id', siteId);
+    if (limit) params.set('limit', String(limit));
+    const response = await authorizedFetch(`/api/fuel/generator-runtime?${params}`);
+    if (!response.ok) throw new Error('Failed to fetch generator runtime');
+    return response.json();
+  },
+
+  /** Get refill log */
+  async fetchRefillLog(siteId?: string, limit = 50): Promise<{ refills: RefillRecord[]; count: number }> {
+    const params = new URLSearchParams();
+    if (siteId) params.set('site_id', siteId);
+    if (limit) params.set('limit', String(limit));
+    const response = await authorizedFetch(`/api/fuel/refill-log?${params}`);
+    if (!response.ok) throw new Error('Failed to fetch refill log');
+    return response.json();
+  },
+};
