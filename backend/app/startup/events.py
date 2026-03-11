@@ -218,6 +218,20 @@ async def startup_event(app: FastAPI) -> None:
 
     # Start AI recommendation generation job (rule-based, sim-time gated)
     scheduler_service.add_recommendation_generation_job(interval_seconds=600)  # 10 min real-time fallback
+    scheduler_service.add_ghost_room_monitor_job(interval_seconds=60)
+
+    # Optional ESP32 MQTT listener for room-presence nodes
+    from app.services.space_mqtt_listener import get_space_mqtt_listener
+
+    await get_space_mqtt_listener().start()
+
+    # Optional: Fuel tank MQTT listener
+    try:
+        from app.services.fuel_mqtt_listener import get_fuel_mqtt_listener
+
+        await get_fuel_mqtt_listener().start()
+    except Exception as e:
+        _logger.warning(f"Fuel MQTT listener startup failed: {e}")
 
     # Start outcome verification job (checks executed recs after 30-min settling)
     scheduler_service.add_outcome_verification_job(interval_seconds=300)  # 5 min
@@ -698,6 +712,17 @@ async def shutdown_event(app: FastAPI) -> None:
     from app.services.servicenow_service import shutdown_servicenow_service
 
     await shutdown_servicenow_service()
+
+    from app.services.space_mqtt_listener import get_space_mqtt_listener
+
+    await get_space_mqtt_listener().stop()
+
+    try:
+        from app.services.fuel_mqtt_listener import get_fuel_mqtt_listener
+
+        await get_fuel_mqtt_listener().stop()
+    except Exception:
+        pass
 
     # Event bus cleanup (Phase 139)
     from app.services.event_bus import reset_event_bus
