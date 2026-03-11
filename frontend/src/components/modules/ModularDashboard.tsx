@@ -46,6 +46,11 @@ const LightingDashboard = lazy(() =>
   })
 );
 
+// Fuel Monitoring Dashboard
+const FuelDashboard = lazy(() =>
+  import('../fuel/FuelDashboard').then(m => ({ default: m.FuelDashboard }))
+);
+
 interface ModularDashboardProps {
   siteId?: string;
   siteName?: string;
@@ -132,6 +137,8 @@ export function ModularDashboard({
         return <SecurityPanel siteId={siteId} />;
       case 'lighting':
         return <LightingDashboard />;
+      case 'fuel_monitoring':
+        return <FuelDashboard siteId={siteId} />;
       default:
         return (
           <Card>
