@@ -154,6 +154,19 @@ export async function resumeSimulation(): Promise<{ success: boolean }> {
   return fetchJson("/api/lifecycle/resume", { method: "POST" });
 }
 
+/** Persist simulation stopped state so it survives restarts. */
+export async function setSimulationStopped(stopped: boolean): Promise<{ stopped: boolean }> {
+  return fetchJson("/api/settings/simulation", {
+    method: "PUT",
+    body: JSON.stringify({ stopped }),
+  });
+}
+
+/** Get persistent simulation stopped state. */
+export async function getSimulationStopped(): Promise<{ stopped: boolean }> {
+  return fetchJson("/api/settings/simulation");
+}
+
 export async function changeSimulationSpeed(
   speedMultiplier: number
 ): Promise<{ success: boolean; speed: number; seconds_per_hour: number }> {

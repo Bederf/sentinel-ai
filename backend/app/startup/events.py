@@ -323,23 +323,22 @@ async def startup_event(app: FastAPI) -> None:
     if hasattr(scheduler_service, "add_sentry_notification_job"):
         scheduler_service.add_sentry_notification_job(interval_seconds=30)  # 30 seconds
 
-    # Start ML model retraining job (runs daily)
-    # Phase 45-01: Checks model age (>30 days) and R² score (<0.65), auto-retrains stale models
-    # Retrains ONE model per cycle to avoid system overload. Models prioritized by age and performance.
-    try:
-        scheduler_service.add_ml_retraining_job(interval_seconds=86400)  # 24 hours
-        _logger.info("✅ ML model retraining job initialized - checks daily for stale/underperforming models")
-    except Exception as e:
-        _logger.warning(f"⚠️ ML retraining job initialization failed: {e}")
+    # ML background training jobs — gated by ML_BACKGROUND_TRAINING_ENABLED
+    # Disabled by default: training is CPU-intensive and starves the API on constrained VPS
+    if settings.ml_background_training_enabled:
+        try:
+            scheduler_service.add_ml_retraining_job(interval_seconds=86400)  # 24 hours
+            _logger.info("✅ ML model retraining job initialized - checks daily for stale/underperforming models")
+        except Exception as e:
+            _logger.warning(f"⚠️ ML retraining job initialization failed: {e}")
 
-    # Start drift detection job (runs hourly)
-    # Phase 45-03: Monitors for data/model drift, auto-triggers retraining when patterns change
-    # Detects when 3+ features drift or prediction accuracy drops >10%
-    try:
-        scheduler_service.add_drift_detection_job(interval_seconds=3600)  # 1 hour
-        _logger.info("✅ Drift detection job initialized - monitors hourly for model/data drift")
-    except Exception as e:
-        _logger.warning(f"⚠️ Drift detection job initialization failed: {e}")
+        try:
+            scheduler_service.add_drift_detection_job(interval_seconds=3600)  # 1 hour
+            _logger.info("✅ Drift detection job initialized - monitors hourly for model/data drift")
+        except Exception as e:
+            _logger.warning(f"⚠️ Drift detection job initialization failed: {e}")
+    else:
+        _logger.info("⏸️ ML background training disabled (ML_BACKGROUND_TRAINING_ENABLED=false)")
 
     # Start M&V verification job (runs every 15 minutes)
     # Verifies expected-vs-actual outcomes for applied optimization recommendations
@@ -357,18 +356,18 @@ async def startup_event(app: FastAPI) -> None:
     except Exception as e:
         _logger.warning(f"⚠️ Feedback scoring refresh job initialization failed: {e}")
 
-    # Start feedback-driven retraining trigger job (runs hourly)
-    # Triggers model retraining when realized module outcomes degrade below threshold
-    try:
-        scheduler_service.add_feedback_retraining_job(
-            interval_seconds=3600,  # 1 hour
-            min_records=10,
-            min_success_rate=70.0,
-            cooldown_hours=24,
-        )
-        _logger.info("✅ Feedback retraining job initialized - monitors module outcome success rates")
-    except Exception as e:
-        _logger.warning(f"⚠️ Feedback retraining job initialization failed: {e}")
+    # Feedback-driven retraining — also gated by ML_BACKGROUND_TRAINING_ENABLED
+    if settings.ml_background_training_enabled:
+        try:
+            scheduler_service.add_feedback_retraining_job(
+                interval_seconds=3600,  # 1 hour
+                min_records=10,
+                min_success_rate=70.0,
+                cooldown_hours=24,
+            )
+            _logger.info("✅ Feedback retraining job initialized - monitors module outcome success rates")
+        except Exception as e:
+            _logger.warning(f"⚠️ Feedback retraining job initialization failed: {e}")
 
     # POPIA retention enforcement (daily by default)
     if settings.popia_retention_enabled:
@@ -561,7 +560,24 @@ async def startup_event(app: FastAPI) -> None:
             _logger.error(f"Failed to deactivate simulations on startup: {e}")
 
     # === Simulation Engine (gated by ENABLE_SITE002_SOURCE) ===
-    if settings.site002_source_enabled:
+    # Check persistent "simulationStopped" flag — if admin stopped simulation via Settings,
+    # do not auto-start on restart.
+    _simulation_stopped = False
+    try:
+        import json as _json
+        from pathlib import Path as _Path
+
+        _settings_path = _Path(__file__).parent.parent / "data" / "settings.json"
+        if _settings_path.exists():
+            _sim_settings = _json.loads(_settings_path.read_text())
+            _simulation_stopped = _sim_settings.get("simulationStopped", False)
+    except Exception:
+        pass
+
+    if _simulation_stopped:
+        _logger.info("Simulation stopped by admin (simulationStopped=true in settings.json) — skipping auto-start")
+
+    if settings.site002_source_enabled and not _simulation_stopped:
         # Run crash recovery on startup (replaces old deactivate_all_simulations)
         # Re-queues simulations that have valid checkpoints, fails those without
         if not testing_mode:

@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react';
 import * as React from 'react';
 import { Lightbulb, X, Zap, ThermometerSun, Lamp, ChevronRight, CheckCircle2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { authorizedFetch } from '@/lib/api/client';
 
 // Equipment type → control module mapping for frontend gating
 const EQUIPMENT_CONTROL_MODULE: Record<string, string> = {
@@ -51,7 +52,7 @@ export function useRecommendationToasts(
 
     const poll = async () => {
       try {
-        const response = await fetch(`/api/recommendations/${siteId}`);
+        const response = await authorizedFetch(`/api/recommendations/${siteId}`);
         const data = await response.json();
 
         const pending: RecommendationData[] = data.recommendations?.filter(
@@ -119,7 +120,7 @@ export function RecommendationCard({
       setIsControlActive(controlActive ?? true);
       return;
     }
-    fetch('/api/modules/status/' + (sessionStorage.getItem('sentinel_selected_site') || ''))
+    authorizedFetch('/api/modules/status/' + (sessionStorage.getItem('sentinel_selected_site') || ''))
       .then(r => r.json())
       .then((modules: Array<{ module_type: string; status: string }>) => {
         const mod = modules.find((m) => m.module_type === controlModule);
@@ -315,7 +316,7 @@ export function RecommendationBadge({ siteId }: { siteId: string }) {
     if (!siteId) return;
     const poll = async () => {
       try {
-        const response = await fetch(`/api/recommendations/${siteId}`);
+        const response = await authorizedFetch(`/api/recommendations/${siteId}`);
         const data = await response.json();
         const pending = data.recommendations?.filter((r: RecommendationData) => r.status?.toLowerCase() === 'pending') || [];
         setPendingCount(pending.length);

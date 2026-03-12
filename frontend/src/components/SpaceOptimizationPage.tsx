@@ -149,13 +149,14 @@ export function SpaceOptimizationPage() {
       const headers = { "x-site-id": siteId };
       const trendsUrl = `/api/occupancy/analytics/hourly-trend?site_id=${encodeURIComponent(siteId)}&days=7`;
 
+      const sq = `site_id=${encodeURIComponent(siteId)}`;
       const [alertsRes, ghostRes, bookingsRes, rightsizingRes, focusRes, analyticsRes, trendsRes] = await Promise.all([
-        authorizedFetch("/api/block-bookings/alerts", { headers }),
-        authorizedFetch("/api/space/ghost-findings", { headers }),
-        authorizedFetch("/api/block-bookings/bookings", { headers }),
-        authorizedFetch("/api/space/rightsizing-findings", { headers }),
-        authorizedFetch("/api/space/focus-sessions", { headers }),
-        authorizedFetch("/api/space/focus-analytics", { headers }),
+        authorizedFetch(`/api/block-bookings/alerts?${sq}`, { headers }),
+        authorizedFetch(`/api/space/ghost-findings?${sq}`, { headers }),
+        authorizedFetch(`/api/block-bookings/bookings?${sq}`, { headers }),
+        authorizedFetch(`/api/space/rightsizing-findings?${sq}`, { headers }),
+        authorizedFetch(`/api/space/focus-sessions?${sq}`, { headers }),
+        authorizedFetch(`/api/space/focus-analytics?${sq}`, { headers }),
         authorizedFetch(trendsUrl, { headers }),
       ]);
 

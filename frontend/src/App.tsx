@@ -82,6 +82,38 @@ function App() {
   const { data: buildings = [] } = useBuildingsList({ enabled: !!currentUser });
   const primarySiteId = useMemo(() => buildings[0]?.id || null, [buildings]);
   const primarySiteName = useMemo(() => buildings[0]?.name || null, [buildings]);
+  // Auto-landing: if user only has one site with space module, go straight there
+  const [autoSelectSiteId, setAutoSelectSiteId] = useState<string | null>(null);
+  const [defaultBuildingTab, setDefaultBuildingTab] = useState<import("./lib/navigation").BuildingTabId | undefined>(undefined);
+
+  useEffect(() => {
+    if (!currentUser?.email || buildings.length === 0) return;
+    const token = localStorage.getItem("sentinel_token");
+    if (!token) return;
+    const headers = { Authorization: `Bearer ${token}` };
+
+    // Check user's site access — if they have exactly one site, auto-select it
+    fetch("/api/user-access/me/sites", { headers })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        const sites = data?.sites || [];
+        if (sites.length === 1) {
+          setAutoSelectSiteId(sites[0].site_id);
+          // Check if they only have space module for this site
+          fetch(`/api/user-access/me/modules?site_code=${encodeURIComponent(sites[0].site_code)}`, { headers })
+            .then(res => res.ok ? res.json() : null)
+            .then(modData => {
+              const modules: string[] = modData?.effective_modules || [];
+              if (modules.includes("space_optimization") && modules.length <= 2) {
+                setDefaultBuildingTab("space");
+              }
+            })
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, [currentUser?.email, buildings.length]);
+
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -764,6 +796,8 @@ function App() {
             <Dashboard
               key={viewRefreshKey}
               onViewChange={handleViewChange}
+              autoSelectSiteId={autoSelectSiteId}
+              defaultBuildingTab={defaultBuildingTab}
             />
           ) : currentView === "ai-chat" ? (
             <div className="h-full">

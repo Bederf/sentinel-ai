@@ -123,6 +123,7 @@ function TabLoading() {
 interface SiteDetailProps {
   siteId: string;
   onBack: () => void;
+  defaultMainTab?: BuildingTabId;
 }
 
 interface SiteDetailData {
@@ -156,7 +157,7 @@ interface Equipment extends BuildingEquipmentItem {
 
 type TabType = "equipment" | "alerts" | "energy" | "predictions";
 
-export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
+export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) {
   const [site, setSite] = useState<SiteDetailData | null>(null);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [equipmentCategories, setEquipmentCategories] = useState<Record<string, CategoryStatus>>({});
@@ -167,7 +168,7 @@ export function SiteDetail({ siteId, onBack }: SiteDetailProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("equipment");
-  const [activeMainTab, setActiveMainTab] = useState<BuildingTabId>("overview");
+  const [activeMainTab, setActiveMainTab] = useState<BuildingTabId>(defaultMainTab || "overview");
   const [lightingSub, setLightingSub] = useState<LightingSub>("Lighting");
   const [solarBessSub, setSolarBessSub] = useState<SolarBessSub>("Dashboard");
   const [equipmentExpanded, setEquipmentExpanded] = useState(false);

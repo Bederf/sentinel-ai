@@ -1,8 +1,16 @@
-"""Parse Outlook room booking confirmation emails into BookingRecord objects.
+"""Parse room booking confirmation emails into BookingRecord objects.
 
-Handles standard Outlook resource booking confirmations. Extracts organiser,
-room, date, start/end time from labelled fields. Detects cancellations by
-subject line and returns None (caller should remove the corresponding record).
+Supports two formats:
+  1. Resource Scheduler (resourcescheduler.com) — FNB/WesBank production format
+  2. Outlook calendar confirmations — fallback for standard Exchange environments
+
+Resource Scheduler format:
+  - Sender: noreply@resourcescheduler.com
+  - Meeting Contact: Name, email, phone (in body)
+  - Location: "Fairland 1(WB); GR Floor Meeting Rooms; FA1-GRQ1-TR-01"
+  - Date/time: "Friday, 27 March 2026 from 8:00 AM until 5:00 PM South Africa"
+  - New booking subject: "New Resource Use Notification - ..."
+  - Cancellation subject: "Cancelled Reservation - ..."
 """
 
 from __future__ import annotations
@@ -25,7 +33,13 @@ _CANCEL_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
-# Common datetime formats in Outlook confirmation bodies
+# Resource Scheduler: "Friday, 27 March 2026 from 8:00 AM until 5:00 PM South Africa"
+_RS_DATETIME_RE = re.compile(
+    r"(\w+,\s+\d{1,2}\s+\w+\s+\d{4})\s+from\s+(\d{1,2}:\d{2}\s*[AP]M)\s+until\s+(\d{1,2}:\d{2}\s*[AP]M)",
+    re.IGNORECASE,
+)
+
+# Fallback datetime formats for Outlook-style emails
 _DATETIME_FORMATS = [
     "%A, %d %B %Y %H:%M",  # Monday, 03 March 2026 14:00
     "%d %B %Y %H:%M",  # 03 March 2026 14:00
@@ -38,6 +52,9 @@ _DATETIME_FORMATS = [
     "%B %d, %Y %I:%M %p",  # March 03, 2026 2:00 PM
 ]
 
+# Resource Scheduler room code: FA1-GRQ1-TR-01
+_ROOM_CODE_RE = re.compile(r"(FA\d+)-(\w+)-(\w+)-(\d+)", re.IGNORECASE)
+
 
 def _hash_email(raw: str) -> str:
     """SHA-256 hash of the raw email for deduplication."""
@@ -47,8 +64,9 @@ def _hash_email(raw: str) -> str:
 def _parse_datetime(value: str) -> Optional[datetime]:
     """Try multiple datetime formats to parse a value string."""
     value = value.strip().rstrip(".")
-    # Remove timezone abbreviations like (UTC), (SAST)
+    # Remove timezone names like "South Africa", "(UTC)", "(SAST)"
     value = re.sub(r"\s*\([A-Z]+\)\s*$", "", value)
+    value = re.sub(r"\s+South Africa\s*$", "", value, flags=re.IGNORECASE)
     for fmt in _DATETIME_FORMATS:
         try:
             return datetime.strptime(value, fmt)
@@ -58,18 +76,105 @@ def _parse_datetime(value: str) -> Optional[datetime]:
     return None
 
 
+def _parse_rs_datetime(body: str) -> tuple[Optional[datetime], Optional[datetime]]:
+    """Parse Resource Scheduler date/time format.
+
+    "Friday, 27 March 2026 from 8:00 AM until 5:00 PM South Africa"
+    """
+    match = _RS_DATETIME_RE.search(body)
+    if not match:
+        return None, None
+
+    date_str = match.group(1).strip()  # "Friday, 27 March 2026"
+    start_str = match.group(2).strip()  # "8:00 AM"
+    end_str = match.group(3).strip()  # "5:00 PM"
+
+    # Parse date
+    date_dt = None
+    for fmt in ["%A, %d %B %Y", "%d %B %Y"]:
+        try:
+            date_dt = datetime.strptime(date_str, fmt)
+            break
+        except ValueError:
+            continue
+    if not date_dt:
+        return None, None
+
+    # Parse times
+    try:
+        start_t = datetime.strptime(start_str, "%I:%M %p")
+        end_t = datetime.strptime(end_str, "%I:%M %p")
+    except ValueError:
+        return None, None
+
+    start_dt = date_dt.replace(hour=start_t.hour, minute=start_t.minute)
+    end_dt = date_dt.replace(hour=end_t.hour, minute=end_t.minute)
+    return start_dt, end_dt
+
+
 def _extract_field(body: str, label: str) -> Optional[str]:
     """Extract a labelled field value from the email body.
 
     Matches patterns like:
-        Start: Monday, 03 March 2026 14:00
-        Location: Boardroom 1
+        Location:    Fairland 1(WB); GR Floor Meeting Rooms; FA1-GRQ1-TR-01
+        Meeting Contact:    Lemond Luxman, Lemond.Luxman@wesbank.co.za, 0681227791
     """
     pattern = rf"(?:^|\n)\s*{re.escape(label)}\s*:\s*(.+)"
     match = re.search(pattern, body, re.IGNORECASE)
     if match:
         return match.group(1).strip()
     return None
+
+
+def _extract_room_code(location: str) -> Optional[str]:
+    """Extract room code from Resource Scheduler location string.
+
+    "Fairland 1(WB); GR Floor Meeting Rooms; FA1-GRQ1-TR-01" -> "FA1-GRQ1-TR-01"
+    """
+    match = _ROOM_CODE_RE.search(location)
+    if match:
+        return match.group(0).upper()
+    # Fallback: last semicolon-delimited segment
+    parts = [p.strip() for p in location.split(";")]
+    if parts:
+        return parts[-1]
+    return None
+
+
+def _extract_site_from_room_code(room_code: str) -> Optional[str]:
+    """Extract site prefix from room code: FA1-GRQ1-TR-01 -> FA1."""
+    match = re.match(r"(FA\d+)", room_code, re.IGNORECASE)
+    return match.group(1).upper() if match else None
+
+
+def _is_resource_scheduler(body: str, from_email: str) -> bool:
+    """Detect if email is from Resource Scheduler."""
+    return (
+        "resourcescheduler" in from_email.lower()
+        or "Resource Scheduler Notification" in body
+        or "Action Performed By:" in body
+    )
+
+
+def _parse_rs_meeting_contact(body: str) -> tuple[str, str]:
+    """Parse Meeting Contact field from Resource Scheduler body.
+
+    "Meeting Contact:    Lemond Luxman, Lemond.Luxman@wesbank.co.za, 0681227791"
+    Returns (name, email).
+    """
+    field = _extract_field(body, "Meeting Contact")
+    if not field:
+        return "", ""
+
+    # Split by comma: "Name, email@domain, phone"
+    parts = [p.strip() for p in field.split(",")]
+    name = parts[0] if parts else ""
+    contact_email = ""
+    for part in parts[1:]:
+        if "@" in part:
+            contact_email = part.strip().lower()
+            break
+    return name, contact_email
 
 
 def is_cancellation(raw_email: str) -> bool:
@@ -83,22 +188,41 @@ def is_cancellation(raw_email: str) -> bool:
 
 
 def extract_cancelled_room(raw_email: str, site_id: str) -> Optional[dict]:
-    """Extract organiser + room from a cancellation email for removal lookup.
-
-    Returns dict with organiser_email, room_name, start_time (if parseable),
-    or None if unparseable.
-    """
+    """Extract organiser + room from a cancellation email for removal lookup."""
     try:
         msg = email.message_from_string(raw_email)
     except Exception:
         return None
 
+    body = _get_body(msg)
     from_header = msg.get("From", "")
     _, from_email = parseaddr(from_header)
+
+    # Resource Scheduler: organiser is in Meeting Contact, not From
+    if _is_resource_scheduler(body, from_email):
+        contact_name, contact_email = _parse_rs_meeting_contact(body)
+        if not contact_email:
+            # Fallback: use "Action Performed By" name
+            performed_by = _extract_field(body, "Action Performed By")
+            contact_name = performed_by or ""
+            # No email available — use name-based lookup
+            contact_email = ""
+
+        location = _extract_field(body, "Location") or ""
+        room_code = _extract_room_code(location)
+        start_dt, _ = _parse_rs_datetime(body)
+
+        return {
+            "organiser_email": contact_email,
+            "organiser_name": contact_name,
+            "room_name": room_code or location,
+            "start_time": start_dt,
+        }
+
+    # Outlook fallback
     if not from_email:
         return None
 
-    body = _get_body(msg)
     location = _extract_field(body, "Location")
     start_str = _extract_field(body, "Start")
     start_dt = _parse_datetime(start_str) if start_str else None
@@ -137,8 +261,9 @@ def parse_booking_confirmation(
     raw_email: str,
     site_id: str,
 ) -> Optional[BookingRecord]:
-    """Parse an Outlook room booking confirmation email.
+    """Parse a room booking confirmation email.
 
+    Supports Resource Scheduler (FNB) and Outlook formats.
     Returns a BookingRecord if the email is a valid booking confirmation.
     Returns None for cancellations, updates, or unparseable emails.
     """
@@ -151,12 +276,78 @@ def parse_booking_confirmation(
         logger.warning("Failed to parse email message")
         return None
 
-    # --- Organiser ---
+    body = _get_body(msg)
+    from_header = msg.get("From", "")
+    _, from_email = parseaddr(from_header)
+
+    # ---- Resource Scheduler path ----
+    if _is_resource_scheduler(body, from_email):
+        return _parse_resource_scheduler(raw_email, body, site_id)
+
+    # ---- Outlook fallback path ----
+    return _parse_outlook(raw_email, msg, body, site_id)
+
+
+def _parse_resource_scheduler(
+    raw_email: str,
+    body: str,
+    site_id: str,
+) -> Optional[BookingRecord]:
+    """Parse Resource Scheduler booking notification."""
+
+    # Organiser from Meeting Contact field
+    organiser_name, organiser_email = _parse_rs_meeting_contact(body)
+    if not organiser_email:
+        # Use "Action Performed By" as fallback name
+        performed_by = _extract_field(body, "Action Performed By") or ""
+        organiser_name = organiser_name or performed_by
+        if not organiser_name:
+            logger.debug("No organiser found in Resource Scheduler email")
+            return None
+
+    # Location / Room
+    location = _extract_field(body, "Location") or ""
+    room_code = _extract_room_code(location)
+    if not room_code:
+        logger.debug("No room code found in location: %s", location)
+        return None
+
+    # Extract site from room code if not provided
+    if site_id == "UNKNOWN" or not site_id:
+        site_id = _extract_site_from_room_code(room_code) or site_id
+
+    # Date and time
+    start_time, end_time = _parse_rs_datetime(body)
+    if not start_time or not end_time:
+        logger.debug("Could not parse Resource Scheduler date/time")
+        return None
+
+    return BookingRecord(
+        site_id=site_id,
+        organiser_email=organiser_email or f"{organiser_name.lower().replace(' ', '.')}@unknown",
+        organiser_name=organiser_name or (organiser_email.split("@")[0] if organiser_email else "Unknown"),
+        room_id=room_code,
+        room_name=room_code,
+        booking_date=start_time.date(),
+        start_time=start_time,
+        end_time=end_time,
+        raw_email_hash=_hash_email(raw_email),
+        ingested_at=datetime.utcnow(),
+    )
+
+
+def _parse_outlook(
+    raw_email: str,
+    msg: email.message.Message,
+    body: str,
+    site_id: str,
+) -> Optional[BookingRecord]:
+    """Parse Outlook calendar booking confirmation (legacy path)."""
+
+    # Organiser from From: header
     from_header = msg.get("From", "")
     organiser_name, organiser_email = parseaddr(from_header)
     if not organiser_email:
-        # Try Organizer: field in body
-        body = _get_body(msg)
         org_field = _extract_field(body, "Organizer") or _extract_field(body, "Organiser")
         if org_field:
             organiser_name, organiser_email = parseaddr(org_field)
@@ -164,12 +355,9 @@ def parse_booking_confirmation(
         logger.debug("No organiser email found")
         return None
 
-    body = _get_body(msg)
-
-    # --- Location / Room ---
+    # Location / Room
     location = _extract_field(body, "Location") or msg.get("X-Microsoft-Exchange-Organization-CalendarLocation", "")
     room_name = location.strip() if location else ""
-    # Use the To: resource mailbox as room_id if available
     to_header = msg.get("To", "")
     _, to_email = parseaddr(to_header)
     room_id = to_email if to_email else room_name
@@ -178,11 +366,10 @@ def parse_booking_confirmation(
         logger.debug("No room/location found")
         return None
 
-    # --- Start / End ---
+    # Start / End
     start_str = _extract_field(body, "Start")
     end_str = _extract_field(body, "End")
     if not start_str or not end_str:
-        # Try When: field (some Outlook versions)
         when = _extract_field(body, "When")
         if when and " - " in when:
             parts = when.split(" - ", 1)
@@ -193,11 +380,7 @@ def parse_booking_confirmation(
     end_time = _parse_datetime(end_str) if end_str else None
 
     if not start_time or not end_time:
-        logger.debug(
-            "Could not parse start/end times: start=%s end=%s",
-            start_str,
-            end_str,
-        )
+        logger.debug("Could not parse start/end times: start=%s end=%s", start_str, end_str)
         return None
 
     return BookingRecord(

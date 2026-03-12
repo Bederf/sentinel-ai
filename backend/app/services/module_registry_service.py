@@ -829,6 +829,7 @@ class ModuleRegistryService:
                     "status": m.status.value,
                 }
                 for m in active_modules
+                if m.module_type in MODULE_DEFINITIONS
             ],
             "active_integrations": active_integrations,
             "potential_integrations": potential_integrations,

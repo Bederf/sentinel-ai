@@ -290,6 +290,10 @@ class Settings(BaseSettings):
     email_reply_from_address: str = "workorder@sentinel-ai.co.za"
     email_reply_from_name: str = "SENTINEL Work Orders"
 
+    # ML Background Training (retraining, drift detection, feedback retraining)
+    # Disable on resource-constrained VPS — models are pre-trained and stable
+    ml_background_training_enabled: bool = False
+
     # Block Booking Detection
     block_booking_enabled: bool = False  # Master switch
     block_booking_min_rooms: int = 3  # Flag when same person holds N+ rooms

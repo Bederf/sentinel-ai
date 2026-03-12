@@ -403,6 +403,28 @@ async def get_user_module_grants(
     }
 
 
+@self_service_router.get("/me/sites")
+async def get_my_sites(
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+):
+    """Get buildings the current user has access to."""
+    repo = get_user_site_access_repository()
+    access_list = repo.get_user_access_list(auth.email)
+
+    sites = []
+    for access in access_list:
+        building = access.get("sites", {})
+        sites.append(
+            {
+                "site_id": building.get("id", ""),
+                "site_code": building.get("code", ""),
+                "site_name": building.get("name", ""),
+            }
+        )
+
+    return {"sites": sites}
+
+
 @self_service_router.get("/me/modules")
 async def get_my_effective_modules(
     site_code: str,

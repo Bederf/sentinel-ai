@@ -244,3 +244,73 @@ async def update_health_thresholds(
     audit_config_change("settings.health-thresholds", user=auth.user_id, source_ip=source_ip)
 
     return thresholds
+
+
+@router.get("/settings/ml-training")
+async def get_ml_training_status(auth: AuthContext = Depends(require_role(1))) -> Dict[str, Any]:
+    """Get ML background training status."""
+    from app.config.settings import settings as app_settings
+
+    settings_data = load_settings()
+    return {
+        "enabled": settings_data.get("mlBackgroundTraining", app_settings.ml_background_training_enabled),
+        "env_default": app_settings.ml_background_training_enabled,
+    }
+
+
+@router.put("/settings/ml-training")
+async def toggle_ml_training(
+    body: Dict[str, bool],
+    request: Request,
+    auth: AuthContext = Depends(require_role(4)),
+) -> Dict[str, Any]:
+    """Toggle ML background training. Requires ADMIN. Takes effect on next restart."""
+    enabled = body.get("enabled", False)
+
+    current_settings = load_settings()
+    current_settings["mlBackgroundTraining"] = enabled
+    save_settings(current_settings)
+
+    source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+    audit_config_change("settings.ml-training", user=auth.user_id, source_ip=source_ip)
+
+    return {
+        "enabled": enabled,
+        "message": "ML background training will be "
+        + ("enabled" if enabled else "disabled")
+        + " on next service restart.",
+    }
+
+
+@router.get("/settings/simulation")
+async def get_simulation_settings(auth: AuthContext = Depends(require_role(1))) -> Dict[str, Any]:
+    """Get simulation auto-start settings. Requires AUDITOR (level 1)."""
+    settings_data = load_settings()
+    return {
+        "stopped": settings_data.get("simulationStopped", False),
+    }
+
+
+@router.put("/settings/simulation")
+async def update_simulation_settings(
+    body: Dict[str, Any],
+    request: Request,
+    auth: AuthContext = Depends(require_role(4)),
+) -> Dict[str, Any]:
+    """Update simulation stopped state. Requires ADMIN (level 4).
+
+    When simulationStopped=true, the simulation will NOT auto-start on service restart.
+    """
+    stopped = bool(body.get("stopped", False))
+
+    current_settings = load_settings()
+    current_settings["simulationStopped"] = stopped
+    save_settings(current_settings)
+
+    source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+    audit_config_change("settings.simulation", user=auth.user_id, source_ip=source_ip)
+
+    return {
+        "stopped": stopped,
+        "message": "Simulation will " + ("not auto-start" if stopped else "auto-start") + " on next service restart.",
+    }

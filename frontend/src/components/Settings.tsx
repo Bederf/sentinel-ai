@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Settings as SettingsIcon, Bell, Monitor, Shield, Lock, Unlock, Zap, Gauge, Play, Pause } from "lucide-react";
+import { Settings as SettingsIcon, Bell, Monitor, Shield, Lock, Unlock, Zap, Gauge, Play, Square, Brain } from "lucide-react";
 import { useHealthThresholds } from "../hooks/useHealthThresholds";
 import { useGlassTheme } from "../hooks/useGlassTheme";
 import { GLASS_PRESETS } from "../lib/settings";
@@ -14,7 +14,7 @@ import { useModules } from "../contexts/ModuleHooks";
 import { useSimulation } from "../contexts/SimulationContext";
 import type { ModuleType } from "../lib/moduleRegistry";
 import { MANDATORY_MODULES } from "../lib/mandatoryModules";
-import { changeSimulationSpeed, pauseSimulation, resumeSimulation } from "../lib/simulationApi";
+import { changeSimulationSpeed, stopSimulation, startSimulation, setSimulationStopped, getSimulationStopped } from "../lib/simulationApi";
 
 interface SettingsProps {
   onError?: (error: string) => void;
@@ -104,12 +104,55 @@ export function Settings({ onError }: SettingsProps) {
   const [settingsPageUnlocked, setSettingsPageUnlocked] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [togglingCardId, setTogglingCardId] = useState<string | null>(null);
+  const [mlTrainingEnabled, setMlTrainingEnabled] = useState(false);
+  const [mlTrainingLoading, setMlTrainingLoading] = useState(true);
 
   useEffect(() => {
     if (currentUserEmail && !hasSessionToken) {
       window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
     }
   }, [currentUserEmail, hasSessionToken]);
+
+  // Fetch ML training status
+  useEffect(() => {
+    const token = localStorage.getItem("sentinel_token");
+    if (!token) { setMlTrainingLoading(false); return; }
+    fetch("/api/settings/ml-training", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setMlTrainingEnabled(!!data.enabled); })
+      .catch(() => {})
+      .finally(() => setMlTrainingLoading(false));
+  }, []);
+
+  const handleMlTrainingToggle = async () => {
+    if (isDemoUser && !settingsPageUnlocked) {
+      onError?.("Settings page is locked. Click 'Unlock to Edit' at the top to make changes.");
+      return;
+    }
+    if (!canManageFeatureAccess && !isDemoUser) {
+      onError?.("Only admins can change ML training settings.");
+      return;
+    }
+    const token = localStorage.getItem("sentinel_token");
+    if (!token) return;
+    const newValue = !mlTrainingEnabled;
+    setMlTrainingLoading(true);
+    try {
+      const res = await fetch("/api/settings/ml-training", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ enabled: newValue }),
+      });
+      if (!res.ok) throw new Error("Failed to update ML training setting");
+      setMlTrainingEnabled(newValue);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : "Failed to update ML training setting");
+    } finally {
+      setMlTrainingLoading(false);
+    }
+  };
 
   const handleFeatureToggle = async (card: FeatureToggleCard) => {
     // Demo users need to unlock Settings page first
@@ -399,6 +442,41 @@ export function Settings({ onError }: SettingsProps) {
                 </div>
               ))}
             </div>
+
+            {/* ML Background Training Toggle */}
+            <div className="mt-4 rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-1.5 rounded" style={{ background: "rgba(168, 85, 247, 0.15)", color: "rgb(168, 85, 247)" }}>
+                    <Brain className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>ML Background Training</h3>
+                    <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      Periodic model retraining, drift detection, and feedback loops. CPU-intensive — disable on resource-constrained servers.
+                    </p>
+                    <p className="mt-1 text-[10px]" style={{ color: "var(--color-sentinel-text-tertiary, var(--color-sentinel-text-secondary))" }}>
+                      Takes effect on next service restart.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => void handleMlTrainingToggle()}
+                  disabled={mlTrainingLoading || (!canManageFeatureAccess && !(isDemoUser && settingsPageUnlocked))}
+                  className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0"
+                  style={{
+                    background: mlTrainingEnabled ? "var(--color-sentinel-green)" : "var(--color-sentinel-bg-hover)",
+                    border: `1px solid ${mlTrainingEnabled ? "var(--color-sentinel-green)" : "var(--glass-border)"}`,
+                    cursor: (!canManageFeatureAccess && !(isDemoUser && settingsPageUnlocked)) ? "not-allowed" : "pointer",
+                    opacity: (!canManageFeatureAccess && !(isDemoUser && settingsPageUnlocked)) ? 0.6 : 1,
+                  }}
+                  aria-label="Toggle ML background training"
+                  type="button"
+                >
+                  <span className="inline-block h-4 w-4 rounded-full bg-white transition-transform" style={{ transform: mlTrainingEnabled ? "translateX(22px)" : "translateX(2px)" }} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -608,6 +686,16 @@ function SimulationControlsPanel({
 }) {
   const sim = useSimulation();
   const [changingSpeed, setChangingSpeed] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [persistentStopped, setPersistentStopped] = useState(false);
+
+  // Fetch persistent stopped state on mount
+  useEffect(() => {
+    getSimulationStopped()
+      .then(data => setPersistentStopped(!!data.stopped))
+      .catch(() => {});
+  }, []);
 
   const handleSpeedChange = useCallback(
     async (speed: number) => {
@@ -625,19 +713,40 @@ function SimulationControlsPanel({
     [readOnly, changingSpeed, sim, onError]
   );
 
-  const handlePauseResume = useCallback(async () => {
-    if (readOnly) return;
+  const handleStop = useCallback(async () => {
+    if (readOnly || stopping) return;
+    setStopping(true);
     try {
-      if (sim.paused) {
-        await resumeSimulation();
-      } else {
-        await pauseSimulation();
+      if (sim.running) {
+        await stopSimulation();
       }
+      await setSimulationStopped(true);
+      setPersistentStopped(true);
       await sim.refresh();
     } catch (err) {
-      onError?.(err instanceof Error ? err.message : "Failed to pause/resume");
+      onError?.(err instanceof Error ? err.message : "Failed to stop simulation");
+    } finally {
+      setStopping(false);
     }
-  }, [readOnly, sim, onError]);
+  }, [readOnly, stopping, sim, onError]);
+
+  const handleStart = useCallback(async () => {
+    if (readOnly || starting) return;
+    setStarting(true);
+    try {
+      await setSimulationStopped(false);
+      setPersistentStopped(false);
+      await startSimulation({
+        scenario: "sentinel_annual",
+        duration_minutes: 3650,
+      });
+      await sim.refresh();
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : "Failed to start simulation");
+    } finally {
+      setStarting(false);
+    }
+  }, [readOnly, starting, sim, onError]);
 
   // Convert linear slider (0-100) to log scale (0.1 - 1000)
   const speedToSlider = (speed: number) =>
@@ -675,15 +784,31 @@ function SimulationControlsPanel({
       <div className="p-6">
         {!sim.running ? (
           <div
-            className="rounded-lg p-4 text-center"
+            className="rounded-lg p-4 text-center space-y-3"
             style={{
               background: "var(--color-sentinel-bg-secondary)",
               border: "1px solid var(--glass-border)",
             }}
           >
             <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              No simulation running
+              {persistentStopped ? "Simulation stopped. Will not auto-start on restart." : "No simulation running"}
             </p>
+            <button
+              onClick={() => void handleStart()}
+              disabled={readOnly || starting}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-colors hover:brightness-110"
+              style={{
+                background: "rgba(16, 185, 129, 0.15)",
+                color: "var(--color-sentinel-green)",
+                border: "1px solid rgba(16, 185, 129, 0.3)",
+                cursor: readOnly ? "not-allowed" : "pointer",
+                opacity: readOnly || starting ? 0.6 : 1,
+              }}
+              type="button"
+            >
+              <Play className="h-4 w-4" />
+              {starting ? "Starting..." : "Start Simulation"}
+            </button>
           </div>
         ) : (
           <div className="space-y-5">
@@ -766,36 +891,23 @@ function SimulationControlsPanel({
               </div>
             </div>
 
-            {/* Pause/Resume */}
+            {/* Stop Simulation */}
             <div>
               <button
-                onClick={() => void handlePauseResume()}
-                disabled={readOnly}
+                onClick={() => void handleStop()}
+                disabled={readOnly || stopping}
                 className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-colors hover:brightness-110"
                 style={{
-                  background: sim.paused
-                    ? "rgba(16, 185, 129, 0.15)"
-                    : "rgba(245, 158, 11, 0.15)",
-                  color: sim.paused
-                    ? "var(--color-sentinel-green)"
-                    : "var(--color-sentinel-amber)",
-                  border: `1px solid ${sim.paused ? "rgba(16, 185, 129, 0.3)" : "rgba(245, 158, 11, 0.3)"}`,
+                  background: "rgba(220, 38, 38, 0.15)",
+                  color: "var(--color-sentinel-red)",
+                  border: "1px solid rgba(220, 38, 38, 0.3)",
                   cursor: readOnly ? "not-allowed" : "pointer",
-                  opacity: readOnly ? 0.6 : 1,
+                  opacity: readOnly || stopping ? 0.6 : 1,
                 }}
                 type="button"
               >
-                {sim.paused ? (
-                  <>
-                    <Play className="h-4 w-4" />
-                    Resume Simulation
-                  </>
-                ) : (
-                  <>
-                    <Pause className="h-4 w-4" />
-                    Pause Simulation
-                  </>
-                )}
+                <Square className="h-4 w-4" />
+                {stopping ? "Stopping..." : "Stop Simulation"}
               </button>
             </div>
 

@@ -56,12 +56,44 @@ class ConfigUpdateRequest(BaseModel):
 # Config helpers
 # ---------------------------------------------------------------------------
 
-# In-memory config per site (JSON-backed in future)
+# In-memory config per site, seeded from JSON then env vars as fallback
 _site_configs: dict[str, BlockBookingConfig] = {}
+_site_configs_loaded: bool = False
+
+
+def _load_site_configs() -> None:
+    """Load per-site concierge config from block_booking_sites.json."""
+    global _site_configs_loaded
+    if _site_configs_loaded:
+        return
+    _site_configs_loaded = True
+
+    import json
+    from pathlib import Path
+
+    config_path = Path(__file__).parent.parent / "data" / "block_booking_sites.json"
+    if not config_path.exists():
+        return
+
+    try:
+        data = json.loads(config_path.read_text())
+        for site_id, cfg in data.items():
+            _site_configs[site_id] = BlockBookingConfig(
+                site_id=site_id,
+                min_rooms_for_alert=cfg.get("min_rooms_for_alert", 3),
+                enabled=cfg.get("enabled", settings.block_booking_enabled),
+                concierge_email=cfg.get("concierge_email") or None,
+                concierge_whatsapp=cfg.get("concierge_whatsapp") or None,
+                concierge_telegram_chat_id=cfg.get("concierge_telegram_chat_id") or None,
+            )
+        logger.info("Loaded block booking config for %d sites", len(data))
+    except Exception as exc:
+        logger.warning("Failed to load block_booking_sites.json: %s", exc)
 
 
 def _get_config(site_id: str) -> BlockBookingConfig:
-    """Get or create config for a site, seeded from env vars."""
+    """Get or create config for a site, seeded from JSON file then env vars."""
+    _load_site_configs()
     if site_id not in _site_configs:
         _site_configs[site_id] = BlockBookingConfig(
             site_id=site_id,

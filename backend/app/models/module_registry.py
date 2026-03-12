@@ -666,6 +666,20 @@ MODULE_DEFINITIONS: Dict[ModuleType, ModuleDefinition] = {
         telemetry_points=["fuel_alerts_sent"],
         ai_features=["alert_prioritization"],
     ),
+    ModuleType.SPACE_OPTIMIZATION: ModuleDefinition(
+        module_type=ModuleType.SPACE_OPTIMIZATION,
+        name="Space Optimization",
+        version="1.0.0",
+        description="Ghost booking detection, room right-sizing, and focus room management",
+        capabilities=[
+            ModuleCapability("ghost_booking_detection", "Ghost Booking Detection", "Detect and flag unused bookings"),
+            ModuleCapability("room_utilization", "Room Utilization", "Track and analyze room usage patterns"),
+            ModuleCapability("space_right_sizing", "Space Right-Sizing", "Recommend optimal room configurations"),
+        ],
+        integrates_with=[ModuleType.ASSETS],
+        telemetry_points=["room_occupancy", "booking_utilization_pct"],
+        ai_features=["ghost_booking_detection", "space_optimization"],
+    ),
     ModuleType.DIGITAL_TWIN: ModuleDefinition(
         module_type=ModuleType.DIGITAL_TWIN,
         name="Digital Twin",

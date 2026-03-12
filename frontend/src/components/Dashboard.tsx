@@ -49,6 +49,7 @@ import { SiteCard } from "./SiteCard";
 import { SiteDetail } from "./SiteDetail";
 import { EnergyChart } from "./EnergyChart";
 import { type View } from "./Sidebar";
+import type { BuildingTabId } from "../lib/navigation";
 import { useModules } from "@/contexts/ModuleHooks";
 
 // Time period options for energy chart
@@ -64,9 +65,11 @@ type KPICardId =
 
 interface DashboardProps {
   onViewChange: (view: View) => void;
+  autoSelectSiteId?: string | null;
+  defaultBuildingTab?: BuildingTabId;
 }
 
-export function Dashboard({ onViewChange }: DashboardProps) {
+export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab }: DashboardProps) {
   // React Query hooks — filter to primary site only
   const { data: allSites = [] } = useBuildingsList();
   const buildingsList = allSites;
@@ -86,7 +89,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Site detail view state
-  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(autoSelectSiteId || null);
 
   // Energy chart state
   const [energyData, setEnergyData] = useState<EnergyDataPoint[]>([]);
@@ -335,7 +338,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
   if (selectedSiteId) {
     return (
       <div className="h-full">
-        <SiteDetail siteId={selectedSiteId} onBack={handleSiteDetailBack} />
+        <SiteDetail siteId={selectedSiteId} onBack={handleSiteDetailBack} defaultMainTab={defaultBuildingTab} />
       </div>
     );
   }

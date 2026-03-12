@@ -14,6 +14,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { approvalsApi } from '@/lib/api/approvals';
+import { authorizedFetch } from '@/lib/api/client';
 
 /**
  * Hook for managing approval workflow state
@@ -31,7 +32,7 @@ export function useApprovalState(siteId: string, enabled: boolean = true) {
     queryFn: async () => {
       // Placeholder: In real implementation, call API to fetch pending recommendations
       // For now, return empty array (tests will mock this)
-      const response = await fetch(`/api/recommendations/${siteId}?status=pending`);
+      const response = await authorizedFetch(`/api/recommendations/${siteId}?status=pending`);
       if (!response.ok) throw new Error('Failed to fetch recommendations');
       const data = await response.json();
       return data.recommendations || [];
@@ -145,7 +146,7 @@ export function useApprovalExecution(recommendationId: string) {
       reason?: string;
       initiatedBy: string;
     }) => {
-      const response = await fetch(
+      const response = await authorizedFetch(
         `/api/approvals/recommendations/${recId}/rollback`,
         {
           method: 'POST',
