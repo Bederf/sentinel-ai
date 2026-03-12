@@ -69,6 +69,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Event Bus Monitoring API](03-api-reference/event-bus-api.md)** - Metrics, history, event chain lookup, subscription listing for the async event bus (Phase 139)
 - **[Dashboard Generator API](03-api-reference/dashboard-generator-api.md)** - Auto-generate dashboard cards, monitoring rules, health weights, and module suggestions from discovered equipment (Phase 141)
 - **[Plant Alerts API](04-features/plant-room-notification-pipeline.md#api-reference)** - Desigo fault email ingest, alarm retrieval, throttle status, acknowledgement (Phase 146)
+- **[Gateway Log API](03-api-reference/gateway-log-api.md)** - Sentry gateway tool-level observability, activity log query (ADR-001)
 
 ### ✨ Features
 

@@ -30,7 +30,8 @@ router = APIRouter(prefix="/api/block-bookings", tags=["block-bookings"])
 class BookingEmailRequest(BaseModel):
     """Inbound booking confirmation email for parsing."""
 
-    raw_email: str = Field(..., description="Raw email content (RFC 822)")
+    raw_email: str = Field("", description="Raw email content (RFC 822)")
+    ics_data: Optional[str] = Field(None, description="iCalendar (.ics) content — preferred over raw_email")
     site_id: str = Field(..., description="Site code")
 
 
@@ -130,6 +131,7 @@ async def ingest_booking_email(
         extract_cancelled_room,
         is_cancellation,
         parse_booking_confirmation,
+        parse_ics_booking,
     )
     from app.services.block_booking_detector.notifier import (
         send_block_booking_alert,
@@ -142,8 +144,8 @@ async def ingest_booking_email(
 
     store = get_booking_store()
 
-    # Handle cancellations
-    if is_cancellation(body.raw_email):
+    # Handle cancellations (email path only — .ics cancellations handled below)
+    if body.raw_email and is_cancellation(body.raw_email):
         info = extract_cancelled_room(body.raw_email, body.site_id)
         if info:
             removed = store.remove_booking(
@@ -159,8 +161,21 @@ async def ingest_booking_email(
             }
         return {"success": True, "action": "cancellation_unparseable"}
 
-    # Parse booking
-    record = parse_booking_confirmation(body.raw_email, body.site_id)
+    # Parse booking — prefer .ics, fall back to raw email
+    record = None
+    parse_source = "unknown"
+
+    if body.ics_data:
+        record = parse_ics_booking(body.ics_data, body.site_id)
+        parse_source = "ics"
+        # .ics cancellation (METHOD:CANCEL) returns None — check
+        if record is None and body.ics_data and "METHOD:CANCEL" in body.ics_data.upper():
+            return {"success": True, "action": "ics_cancellation_detected"}
+
+    if not record and body.raw_email:
+        record = parse_booking_confirmation(body.raw_email, body.site_id)
+        parse_source = "email"
+
     if not record:
         return {"success": False, "reason": "Could not parse booking email"}
 
@@ -190,6 +205,7 @@ async def ingest_booking_email(
         "organiser": saved.organiser_email,
         "room": saved.room_name,
         "date": saved.booking_date.isoformat(),
+        "parse_source": parse_source,
         "alerts_generated": len(new_alerts),
         "alerts_notified": alerts_sent,
     }

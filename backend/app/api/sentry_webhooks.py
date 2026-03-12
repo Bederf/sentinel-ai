@@ -1496,3 +1496,97 @@ async def handle_telegram_callback(
         "intent": intent.value,
         "confidence": confidence,
     }
+
+
+# ---------------------------------------------------------------------------
+# Gateway observability — tool-level activity log
+# ---------------------------------------------------------------------------
+
+
+class GatewayLogEntry(BaseModel):
+    """A single gateway tool invocation record."""
+
+    tool: str = Field(..., description="Tool name (bms_query, bms_wo, bms_inspect, bms_reset, bms_note)")
+    command: str = Field(..., description="Command or action (info, summary, create_wo, reset, etc.)")
+    equipment_code: Optional[str] = Field(None, description="Equipment code if applicable")
+    telegram_user_id: str = Field("unknown", description="Telegram user who triggered the action")
+    success: bool = Field(True, description="Whether the tool invocation succeeded")
+    error: Optional[str] = Field(None, description="Error message if failed")
+    duration_ms: Optional[int] = Field(None, description="Tool execution time in ms")
+    result_summary: Optional[str] = Field(None, description="Short result (e.g. WO code created)")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional context")
+
+
+# In-memory ring buffer for gateway logs (last 1000 entries)
+_gateway_log: list = []
+_GATEWAY_LOG_MAX = 1000
+
+
+@router.post("/gateway-log")
+async def log_gateway_activity(
+    entry: GatewayLogEntry,
+    x_sentry_api_key: Optional[str] = Header(None),
+) -> dict:
+    """Record a gateway tool invocation for observability.
+
+    Called by Sentry tool scripts (bms_query.py, bms_wo.py, etc.)
+    after each command execution.
+    """
+    from datetime import timezone
+
+    record = {
+        "id": len(_gateway_log) + 1,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "tool": entry.tool,
+        "command": entry.command,
+        "equipment_code": entry.equipment_code,
+        "telegram_user_id": entry.telegram_user_id,
+        "success": entry.success,
+        "error": entry.error,
+        "duration_ms": entry.duration_ms,
+        "result_summary": entry.result_summary,
+        "metadata": entry.metadata or {},
+    }
+
+    _gateway_log.append(record)
+    if len(_gateway_log) > _GATEWAY_LOG_MAX:
+        _gateway_log[:] = _gateway_log[-_GATEWAY_LOG_MAX:]
+
+    logger.info(
+        "GATEWAY %s/%s equipment=%s user=%s success=%s%s",
+        entry.tool,
+        entry.command,
+        entry.equipment_code or "-",
+        entry.telegram_user_id,
+        entry.success,
+        f" result={entry.result_summary}" if entry.result_summary else "",
+    )
+
+    return {"logged": True}
+
+
+@router.get("/gateway-log")
+async def get_gateway_log(
+    limit: int = Query(50, ge=1, le=500),
+    tool: Optional[str] = Query(None),
+    equipment_code: Optional[str] = Query(None),
+    telegram_user_id: Optional[str] = Query(None),
+    success_only: Optional[bool] = Query(None),
+) -> dict:
+    """Query recent gateway activity log entries."""
+    entries = list(reversed(_gateway_log))
+
+    if tool:
+        entries = [e for e in entries if e["tool"] == tool]
+    if equipment_code:
+        entries = [e for e in entries if e.get("equipment_code") == equipment_code]
+    if telegram_user_id:
+        entries = [e for e in entries if e.get("telegram_user_id") == telegram_user_id]
+    if success_only is not None:
+        entries = [e for e in entries if e["success"] == success_only]
+
+    return {
+        "entries": entries[:limit],
+        "total_in_buffer": len(_gateway_log),
+        "showing": min(limit, len(entries)),
+    }

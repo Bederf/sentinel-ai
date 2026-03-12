@@ -1,8 +1,9 @@
 """Parse room booking confirmation emails into BookingRecord objects.
 
-Supports two formats:
-  1. Resource Scheduler (resourcescheduler.com) — FNB/WesBank production format
-  2. Outlook calendar confirmations — fallback for standard Exchange environments
+Supports three formats:
+  1. iCalendar (.ics) attachments — structured VEVENT data (preferred)
+  2. Resource Scheduler (resourcescheduler.com) — FNB/WesBank production format
+  3. Outlook calendar confirmations — fallback for standard Exchange environments
 
 Resource Scheduler format:
   - Sender: noreply@resourcescheduler.com
@@ -334,6 +335,116 @@ def _parse_resource_scheduler(
         raw_email_hash=_hash_email(raw_email),
         ingested_at=datetime.utcnow(),
     )
+
+
+def parse_ics_booking(
+    ics_data: str,
+    site_id: str,
+) -> Optional[BookingRecord]:
+    """Parse an iCalendar (.ics) VEVENT into a BookingRecord.
+
+    Extracts ORGANIZER, LOCATION, DTSTART, DTEND, SUMMARY from the first VEVENT.
+    Returns None if required fields are missing or the event is a cancellation.
+    """
+    try:
+        from icalendar import Calendar
+    except ImportError:
+        logger.warning("icalendar package not installed — cannot parse .ics")
+        return None
+
+    try:
+        cal = Calendar.from_ical(ics_data)
+    except Exception as exc:
+        logger.warning("Failed to parse .ics data: %s", exc)
+        return None
+
+    for component in cal.walk():
+        if component.name != "VEVENT":
+            continue
+
+        # Check for cancellation (METHOD:CANCEL or STATUS:CANCELLED)
+        method = str(cal.get("METHOD", "")).upper()
+        status = str(component.get("STATUS", "")).upper()
+        if method == "CANCEL" or status == "CANCELLED":
+            return None
+
+        # ORGANIZER — "mailto:user@example.com" or "CN=Name:mailto:..."
+        organiser_email = ""
+        organiser_name = ""
+        organiser = component.get("ORGANIZER")
+        if organiser:
+            org_str = str(organiser)
+            if "mailto:" in org_str.lower():
+                organiser_email = org_str.lower().split("mailto:")[-1].strip()
+            organiser_name = str(organiser.params.get("CN", "")) if hasattr(organiser, "params") else ""
+
+        # ATTENDEES — if no organiser, try first attendee
+        if not organiser_email:
+            attendees = component.get("ATTENDEE")
+            if attendees:
+                if not isinstance(attendees, list):
+                    attendees = [attendees]
+                for att in attendees:
+                    att_str = str(att)
+                    if "mailto:" in att_str.lower():
+                        organiser_email = att_str.lower().split("mailto:")[-1].strip()
+                        organiser_name = str(att.params.get("CN", "")) if hasattr(att, "params") else ""
+                        break
+
+        if not organiser_email:
+            logger.debug("No organiser email in .ics VEVENT")
+            return None
+
+        # LOCATION
+        location = str(component.get("LOCATION", ""))
+        room_code = _extract_room_code(location) if location else None
+        room_name = room_code or location or ""
+
+        if not room_name:
+            logger.debug("No location in .ics VEVENT")
+            return None
+
+        # Extract site from room code if not provided
+        if (not site_id or site_id == "UNKNOWN") and room_code:
+            site_id = _extract_site_from_room_code(room_code) or site_id
+
+        # DTSTART / DTEND
+        dtstart = component.get("DTSTART")
+        dtend = component.get("DTEND")
+        if not dtstart or not dtend:
+            logger.debug("No DTSTART/DTEND in .ics VEVENT")
+            return None
+
+        start_dt = dtstart.dt
+        end_dt = dtend.dt
+
+        # Convert date to datetime if needed (all-day events)
+        if not isinstance(start_dt, datetime):
+            start_dt = datetime.combine(start_dt, datetime.min.time())
+        if not isinstance(end_dt, datetime):
+            end_dt = datetime.combine(end_dt, datetime.min.time())
+
+        # Strip timezone info for naive datetime consistency
+        if start_dt.tzinfo is not None:
+            start_dt = start_dt.replace(tzinfo=None)
+        if end_dt.tzinfo is not None:
+            end_dt = end_dt.replace(tzinfo=None)
+
+        return BookingRecord(
+            site_id=site_id or "UNKNOWN",
+            organiser_email=organiser_email,
+            organiser_name=organiser_name or organiser_email.split("@")[0],
+            room_id=room_code or room_name,
+            room_name=room_name,
+            booking_date=start_dt.date(),
+            start_time=start_dt,
+            end_time=end_dt,
+            raw_email_hash=_hash_email(ics_data),
+            ingested_at=datetime.utcnow(),
+        )
+
+    logger.debug("No VEVENT found in .ics data")
+    return None
 
 
 def _parse_outlook(

@@ -12,7 +12,7 @@
       }
     ]
   },
-  "description": "SENTINEL security event monitoring: failed logins, suspicious requests, device control activity, and API error rates.",
+  "description": "SENTINEL security event monitoring: failed logins, suspicious requests, BOLA authorization denials, device control activity, and API error rates.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -26,7 +26,7 @@
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
-          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"AUTH_FAILURE|ACCESS_DENIED|SUSPICIOUS\" [24h])",
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"AUTH_FAILURE|ACCESS_DENIED|SUSPICIOUS|BOLA_\" [24h])",
           "legendFormat": "Security Events (24h)",
           "refId": "A"
         }
@@ -215,6 +215,96 @@
         "enableLogDetails": true,
         "sortOrder": "Descending"
       }
+    },
+    {
+      "title": "BOLA Denials Over Time",
+      "description": "Broken Object Level Authorization denials — users attempting to access resources outside their site scope.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BOLA_SITE_DENIED\" [10m]))",
+          "legendFormat": "Site Denials",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BOLA_EQUIPMENT_DENIED\" [10m]))",
+          "legendFormat": "Equipment Denials",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": { "mode": "normal" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Top BOLA Attacking IPs",
+      "description": "Source IPs with the most BOLA denials in the last hour.",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (source_ip) (count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BOLA_\" | json | source_ip != \"\" [1h])))",
+          "legendFormat": "{{source_ip}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "Value", "desc": true }] } }
+      ]
+    },
+    {
+      "title": "Top BOLA Targeted Endpoints",
+      "description": "Most frequently targeted endpoints in BOLA denial events.",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (endpoint) (count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BOLA_\" | json | endpoint != \"\" [1h])))",
+          "legendFormat": "{{endpoint}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "Value", "desc": true }] } }
+      ]
+    },
+    {
+      "title": "Top BOLA Targeted Sites",
+      "description": "Sites most frequently probed by unauthorized users.",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (target_site) (count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BOLA_SITE_DENIED\" | json | target_site != \"\" [1h])))",
+          "legendFormat": "{{target_site}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "Value", "desc": true }] } }
+      ]
     }
   ],
   "refresh": "30s",
@@ -228,5 +318,5 @@
   "timezone": "Africa/Johannesburg",
   "title": "SENTINEL Security Operations",
   "uid": "sentinel-security-operations",
-  "version": 1
+  "version": 2
 }

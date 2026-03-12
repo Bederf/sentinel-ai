@@ -278,3 +278,138 @@ groups:
         labels:
           alert_type: "audit_gap"
           severity: "critical"
+
+      # ================================================================
+      # Rule 7: BOLA Site Probing (Repeated Cross-Tenant Access)
+      # Trigger: >5 BOLA_SITE_DENIED from same user in 10 minutes
+      # ================================================================
+      - uid: sentinel-bola-site-probing
+        title: "BOLA Site Probing Detected"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: loki
+            model:
+              expr: |
+                sum by (user_id) (
+                  count_over_time(
+                    {job="systemd-journal", unit="sentinel-backend.service"} |~ "BOLA_SITE_DENIED" [10m]
+                  )
+                )
+              queryType: range
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    params: [5]
+                    type: gt
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        annotations:
+          summary: "Repeated BOLA site access denials for user {{ $labels.user_id }}"
+          description: "More than 5 cross-tenant site access attempts from the same user within 10 minutes. Possible authorization probing attack."
+          severity: "high"
+          fsr_domain: "4.13"
+        labels:
+          alert_type: "bola_site_probing"
+          severity: "high"
+
+      # ================================================================
+      # Rule 8: BOLA Equipment Enumeration
+      # Trigger: >10 BOLA_EQUIPMENT_DENIED from same IP in 10 minutes
+      # ================================================================
+      - uid: sentinel-bola-equipment-enum
+        title: "BOLA Equipment Enumeration Detected"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: loki
+            model:
+              expr: |
+                sum by (source_ip) (
+                  count_over_time(
+                    {job="systemd-journal", unit="sentinel-backend.service"} |~ "BOLA_EQUIPMENT_DENIED" [10m]
+                  )
+                )
+              queryType: range
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    params: [10]
+                    type: gt
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        annotations:
+          summary: "BOLA equipment enumeration from {{ $labels.source_ip }}"
+          description: "More than 10 equipment access denials from the same IP within 10 minutes. Possible asset enumeration attack."
+          severity: "high"
+          fsr_domain: "4.13"
+        labels:
+          alert_type: "bola_equipment_enum"
+          severity: "high"
+
+      # ================================================================
+      # Rule 9: BOLA Critical Burst (Auto-Block Candidate)
+      # Trigger: >20 BOLA denials from same IP in 5 minutes
+      # ================================================================
+      - uid: sentinel-bola-critical-burst
+        title: "BOLA Critical Burst - Block Candidate"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              expr: |
+                sum by (source_ip) (
+                  count_over_time(
+                    {job="systemd-journal", unit="sentinel-backend.service"} |~ "BOLA_" [5m]
+                  )
+                )
+              queryType: range
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    params: [20]
+                    type: gt
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        annotations:
+          summary: "Critical BOLA burst from {{ $labels.source_ip }} — auto-block candidate"
+          description: "More than 20 BOLA authorization denials from a single IP within 5 minutes. This IP should be blocked at the edge (Cloudflare WAF)."
+          severity: "critical"
+          fsr_domain: "4.13"
+        labels:
+          alert_type: "bola_critical_burst"
+          severity: "critical"
