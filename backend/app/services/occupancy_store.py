@@ -117,6 +117,55 @@ def get_events_for_room(
     return events
 
 
+def room_has_sensor_data(room_code: str) -> bool:
+    """Return True if we have ever received any occupancy event for this room.
+
+    Used to distinguish 'no presence detected' (ghost) from 'no sensor deployed'.
+    """
+    events = get_events_for_room(room_code)
+    return len(events) > 0
+
+
+def _get_sensor_silence_threshold() -> int:
+    """Read sensor silence threshold from space settings, fall back to config."""
+    try:
+        from app.api.space_settings import get_space_setting
+
+        val = get_space_setting("sensor_silence_threshold_minutes")
+        if val is not None:
+            return int(val)
+    except Exception:
+        pass
+    try:
+        from app.config.settings import settings
+
+        return settings.sensor_silence_threshold_minutes or 30
+    except Exception:
+        return 30
+
+
+def room_sensor_is_alive(room_code: str, max_silence_minutes: int = 0) -> bool:
+    """Return True if the sensor has reported within the last N minutes.
+
+    If the sensor has gone silent (no events for max_silence_minutes), this
+    indicates a connectivity or hardware fault — not a ghost booking.
+    Returns True if no events exist at all (defer to room_has_sensor_data).
+    """
+    if max_silence_minutes <= 0:
+        max_silence_minutes = _get_sensor_silence_threshold()
+    events = get_events_for_room(room_code)
+    if not events:
+        return True  # No data at all — handled by room_has_sensor_data
+    last = events[-1]
+    age_minutes = (datetime.utcnow() - _make_naive(last.timestamp)).total_seconds() / 60
+    return age_minutes <= max_silence_minutes
+
+
+def _make_naive(dt: datetime) -> datetime:
+    """Strip timezone info for safe comparison with naive datetimes."""
+    return dt.replace(tzinfo=None) if dt.tzinfo else dt
+
+
 def get_last_event(room_code: str) -> OccupancyEvent | None:
     """Return the most recent event for a room regardless of state."""
     events = get_events_for_room(room_code)
@@ -191,6 +240,8 @@ def _ghost_to_dict(f: GhostBookingFinding) -> dict:
         "whatsapp_message_id": f.whatsapp_message_id,
         "response_message_id": f.response_message_id,
         "response_text": f.response_text,
+        "reminder_sent": f.reminder_sent,
+        "reminder_sent_at": _dt_to_str(f.reminder_sent_at) if f.reminder_sent_at else None,
         "cost_centre": f.cost_centre,
         "charge_amount": f.charge_amount,
         "charge_reason": f.charge_reason,
@@ -227,6 +278,8 @@ def _dict_to_ghost(d: dict) -> GhostBookingFinding:
         whatsapp_message_id=d.get("whatsapp_message_id"),
         response_message_id=d.get("response_message_id"),
         response_text=d.get("response_text"),
+        reminder_sent=d.get("reminder_sent", False),
+        reminder_sent_at=_str_to_dt(d["reminder_sent_at"]) if d.get("reminder_sent_at") else None,
         cost_centre=d.get("cost_centre"),
         charge_amount=d.get("charge_amount"),
         charge_reason=d.get("charge_reason"),
@@ -242,10 +295,15 @@ def save_ghost_finding(finding: GhostBookingFinding) -> GhostBookingFinding:
 
 
 def get_open_ghost_finding(booking_id: str) -> GhostBookingFinding | None:
-    """Return open ghost finding for a booking, if any."""
+    """Return any existing ghost finding for a booking (prevents duplicates).
+
+    Once a finding exists for a booking — regardless of status — we never
+    create another one.  The scanner and event handler both call this before
+    inserting a new finding.
+    """
     rows = _load_json(_GHOST_FILE)
     for r in rows:
-        if r.get("booking_id") == booking_id and r.get("status") == "open":
+        if r.get("booking_id") == booking_id:
             return _dict_to_ghost(r)
     return None
 
@@ -347,6 +405,27 @@ def mark_ghost_finding_notified(
     return None
 
 
+def mark_ghost_finding_reminder_sent(
+    finding_id: str,
+    *,
+    whatsapp_message_id: str | None = None,
+) -> GhostBookingFinding | None:
+    """Mark that the 15-min reminder was sent for this finding."""
+    with _lock:
+        rows = _load_json(_GHOST_FILE)
+        for r in rows:
+            if r["id"] != finding_id:
+                continue
+            now_str = _dt_to_str(datetime.utcnow())
+            r["reminder_sent"] = True
+            r["reminder_sent_at"] = now_str
+            if whatsapp_message_id:
+                r["whatsapp_message_id"] = whatsapp_message_id
+            _save_json(_GHOST_FILE, rows)
+            return _dict_to_ghost(r)
+    return None
+
+
 def find_pending_ghost_for_whatsapp(
     concierge_whatsapp: str,
     *,
@@ -366,13 +445,29 @@ def find_pending_ghost_for_whatsapp(
     if not candidates:
         return None
 
-    if reply_to_message_id:
-        for row in candidates:
-            if row.get("whatsapp_message_id") == reply_to_message_id:
-                return _dict_to_ghost(row)
+    # Always require swipe-reply — match quoted message exactly
+    if not reply_to_message_id:
+        return None
 
-    candidates.sort(key=lambda item: item.get("notification_sent_at") or item.get("detected_at") or "", reverse=True)
-    return _dict_to_ghost(candidates[0])
+    for row in candidates:
+        if row.get("whatsapp_message_id") == reply_to_message_id:
+            return _dict_to_ghost(row)
+
+    return None
+
+
+def get_pending_ghost_findings_for_whatsapp(concierge_whatsapp: str) -> list[GhostBookingFinding]:
+    """Return all pending ghost findings for a concierge WhatsApp number."""
+    target = _normalise_whatsapp_number(concierge_whatsapp)
+    if not target:
+        return []
+    rows = _load_json(_GHOST_FILE)
+    return [
+        _dict_to_ghost(r)
+        for r in rows
+        if r.get("status") in ("open", "pending_inspection")
+        and _normalise_whatsapp_number(r.get("concierge_whatsapp")) == target
+    ]
 
 
 def get_ghost_findings(site_id: str, status: str | None = None) -> list[GhostBookingFinding]:

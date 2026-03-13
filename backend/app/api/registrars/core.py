@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from app.api import health, sites, settings as settings_api, settings_db, system_health
 from app.api import auth, user_access, login_audit, mfa, cache, sites_aggregation, events, user_entitlements
 from app.api import metrics as prometheus_metrics
+from app.api import space_settings
 
 
 def register_core_routers(app: FastAPI) -> None:
@@ -29,6 +30,9 @@ def register_core_routers(app: FastAPI) -> None:
     # Settings (JSON-based deprecated + Supabase-based new)
     app.include_router(settings_api.router, prefix="/api", tags=["settings"])
     app.include_router(settings_db.router, prefix="/api/db", tags=["settings-db"])
+
+    # Space optimization settings (grace periods, concierge CRUD)
+    app.include_router(space_settings.router, prefix="/api", tags=["space-settings"])
 
     # Authentication and authorization
     app.include_router(auth.router, tags=["auth"])
