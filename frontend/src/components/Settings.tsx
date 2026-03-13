@@ -11,6 +11,7 @@ import { NotificationSettings } from "./NotificationSettings";
 import { NotificationChannelsSettings } from "./NotificationChannelsSettings";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { useModules } from "../contexts/ModuleHooks";
+import { SpaceOptimizationSettings } from "./settings/SpaceOptimizationSettings";
 import { useSimulation } from "../contexts/SimulationContext";
 import type { ModuleType } from "../lib/moduleRegistry";
 import { MANDATORY_MODULES } from "../lib/mandatoryModules";
@@ -414,6 +415,18 @@ export function Settings({ onError }: SettingsProps) {
             setTimeout(() => setSaveSuccess(false), 3000);
           }}
         />
+
+        {/* Space Optimization Settings */}
+        {isModuleActive("space_optimization") && (
+          <SpaceOptimizationSettings
+            onError={onError}
+            onSuccess={() => {
+              setSaveSuccess(true);
+              setTimeout(() => setSaveSuccess(false), 3000);
+            }}
+            readOnly={!!(isDemoUser && !settingsPageUnlocked)}
+          />
+        )}
 
         {/* Section 1: Platform Base (status indicators, no toggles) */}
         <div className="glass-panel overflow-hidden">
