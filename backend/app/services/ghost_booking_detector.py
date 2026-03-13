@@ -23,6 +23,12 @@ from app.services import occupancy_store
 
 logger = logging.getLogger(__name__)
 
+
+def _make_naive(dt: datetime) -> datetime:
+    """Strip timezone info for safe comparison with naive datetimes."""
+    return dt.replace(tzinfo=None) if dt.tzinfo else dt
+
+
 # ---------------------------------------------------------------------------
 # Config — sourced from settings / env vars
 # ---------------------------------------------------------------------------
@@ -78,13 +84,18 @@ def detect_ghost_booking(
     room = room_code or booking.room_id
     grace = _grace_minutes()
 
+    # Normalize to naive UTC for safe comparison
+    now_n = _make_naive(now)
+    start_n = _make_naive(booking.start_time)
+    end_n = _make_naive(booking.end_time)
+
     # Not yet past grace period
-    elapsed = (now - booking.start_time).total_seconds() / 60
+    elapsed = (now_n - start_n).total_seconds() / 60
     if elapsed < grace:
         return None
 
     # Booking already ended
-    if now > booking.end_time:
+    if now_n > end_n:
         return None
 
     # Already have an open finding for this booking
@@ -92,8 +103,18 @@ def detect_ghost_booking(
     if existing:
         return None
 
+    # Skip rooms with no sensor deployed — no data ≠ empty room
+    if not occupancy_store.room_has_sensor_data(room):
+        logger.debug("Skipping ghost check for %s — no sensor data", room)
+        return None
+
+    # Skip rooms where sensor has gone silent — likely hardware/connectivity fault
+    if not occupancy_store.room_sensor_is_alive(room):
+        logger.warning("Skipping ghost check for %s — sensor silent (possible fault)", room)
+        return None
+
     # Check if room was ever occupied since booking start
-    occupied_mins = occupancy_store.get_occupied_minutes(room, booking.start_time, now)
+    occupied_mins = occupancy_store.get_occupied_minutes(room, start_n, now_n)
     if occupied_mins > 0:
         return None  # Room was used — not a ghost booking
 
@@ -160,10 +181,13 @@ def detect_right_sizing_patterns(
 
     for booking in bookings:
         # Only check active bookings past grace period
-        if now < booking.start_time or now > booking.end_time:
+        start_n = _make_naive(booking.start_time)
+        end_n = _make_naive(booking.end_time)
+        now_n = _make_naive(now)
+        if now_n < start_n or now_n > end_n:
             continue
 
-        elapsed_minutes = (now - booking.start_time).total_seconds() / 60
+        elapsed_minutes = (now_n - start_n).total_seconds() / 60
         if elapsed_minutes < rs_grace:
             continue
 
@@ -175,7 +199,7 @@ def detect_right_sizing_patterns(
             continue
 
         # Calculate occupancy metrics
-        occupied_mins = occupancy_store.get_occupied_minutes(room, booking.start_time, now)
+        occupied_mins = occupancy_store.get_occupied_minutes(room, start_n, now_n)
 
         # Ghost booking takes strict precedence — do NOT create right-sizing finding
         if occupied_mins == 0:
@@ -188,8 +212,8 @@ def detect_right_sizing_patterns(
         if vacancy_start is not None:
             consecutive_vacancy = int((now - vacancy_start).total_seconds() / 60)
 
-        booking_duration = int((booking.end_time - booking.start_time).total_seconds() / 60)
-        time_remaining = int((booking.end_time - now).total_seconds() / 60)
+        booking_duration = int((end_n - start_n).total_seconds() / 60)
+        time_remaining = int((end_n - now_n).total_seconds() / 60)
         currently_empty = last_event is not None and not last_event.occupied
 
         # Check patterns in order

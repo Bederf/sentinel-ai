@@ -64,7 +64,7 @@ def _save_json(path: Path, data: list[dict]) -> None:
 
 
 def _event_to_dict(e: OccupancyEvent) -> dict:
-    return {
+    d = {
         "id": e.id,
         "site_id": e.site_id,
         "room_code": e.room_code,
@@ -74,6 +74,18 @@ def _event_to_dict(e: OccupancyEvent) -> dict:
         "source": e.source,
         "received_at": _dt_to_str(e.received_at),
     }
+    # Radar telemetry (only include if present — keeps JSON lean)
+    if e.moving is not None:
+        d["moving"] = e.moving
+    if e.stationary is not None:
+        d["stationary"] = e.stationary
+    if e.distance_m is not None:
+        d["distance_m"] = e.distance_m
+    if e.moving_gate is not None:
+        d["moving_gate"] = e.moving_gate
+    if e.static_gate is not None:
+        d["static_gate"] = e.static_gate
+    return d
 
 
 def _dict_to_event(d: dict) -> OccupancyEvent:
@@ -86,6 +98,11 @@ def _dict_to_event(d: dict) -> OccupancyEvent:
         timestamp=_str_to_dt(d["timestamp"]),
         source=d.get("source", ""),
         received_at=_str_to_dt(d.get("received_at", d["timestamp"])),
+        moving=d.get("moving"),
+        stationary=d.get("stationary"),
+        distance_m=d.get("distance_m"),
+        moving_gate=d.get("moving_gate"),
+        static_gate=d.get("static_gate"),
     )
 
 
@@ -101,6 +118,18 @@ def save_event(event: OccupancyEvent) -> OccupancyEvent:
     return event
 
 
+def _effective_time(event: OccupancyEvent) -> datetime:
+    """Return the best available timestamp for an event.
+
+    ESP32 nodes without NTP send epoch-relative timestamps (1970-01-xx).
+    In that case, fall back to received_at (server clock).
+    """
+    ts = _make_naive(event.timestamp)
+    if ts.year < 2020 and event.received_at:
+        return _make_naive(event.received_at)
+    return ts
+
+
 def get_events_for_room(
     room_code: str,
     from_dt: datetime | None = None,
@@ -110,10 +139,10 @@ def get_events_for_room(
     rows = _load_json(_EVENTS_FILE)
     events = [_dict_to_event(r) for r in rows if r.get("room_code") == room_code]
     if from_dt:
-        events = [e for e in events if e.timestamp >= from_dt]
+        events = [e for e in events if _effective_time(e) >= from_dt]
     if to_dt:
-        events = [e for e in events if e.timestamp <= to_dt]
-    events.sort(key=lambda e: e.timestamp)
+        events = [e for e in events if _effective_time(e) <= to_dt]
+    events.sort(key=lambda e: _effective_time(e))
     return events
 
 
@@ -157,7 +186,9 @@ def room_sensor_is_alive(room_code: str, max_silence_minutes: int = 0) -> bool:
     if not events:
         return True  # No data at all — handled by room_has_sensor_data
     last = events[-1]
-    age_minutes = (datetime.utcnow() - _make_naive(last.timestamp)).total_seconds() / 60
+    # Use received_at (server clock) — ESP32 without NTP sends epoch timestamps (1970)
+    last_seen = _make_naive(last.received_at) if last.received_at else _make_naive(last.timestamp)
+    age_minutes = (datetime.utcnow() - last_seen).total_seconds() / 60
     return age_minutes <= max_silence_minutes
 
 
@@ -185,10 +216,11 @@ def get_occupied_minutes(room_code: str, from_dt: datetime, to_dt: datetime) -> 
     segment_start: datetime | None = None
 
     for event in events:
+        et = _effective_time(event)
         if event.occupied and segment_start is None:
-            segment_start = event.timestamp
+            segment_start = et
         elif not event.occupied and segment_start is not None:
-            total_seconds += (event.timestamp - segment_start).total_seconds()
+            total_seconds += (et - segment_start).total_seconds()
             segment_start = None
 
     # If still occupied at to_dt, count up to to_dt
@@ -206,7 +238,7 @@ def get_current_vacancy_start(room_code: str) -> datetime | None:
     last = get_last_event(room_code)
     if last is None or last.occupied:
         return None
-    return last.timestamp
+    return _effective_time(last)
 
 
 # ---------------------------------------------------------------------------

@@ -938,7 +938,7 @@ class LifecycleOrchestrator:
             self._task.cancel()
             try:
                 await self._task
-            except asyncio.CancelledError:
+            except (asyncio.CancelledError, Exception):
                 pass
 
         # Write stopped status to DB (with final state snapshot)
@@ -966,6 +966,11 @@ class LifecycleOrchestrator:
 
     def get_status(self) -> dict[str, Any]:
         """Get current simulation status including weather and seasonal data."""
+        # Auto-heal: if running flag is True but the async task is dead, reset
+        if self.running and self._task and self._task.done():
+            logger.warning("[STATUS] Simulation task is dead but running=True — resetting to stopped")
+            self.running = False
+
         elapsed_real = (datetime.now() - self.real_start_time).total_seconds() if self.real_start_time else 0
 
         # Calculate progress percentage
@@ -1161,6 +1166,7 @@ class LifecycleOrchestrator:
 
         except asyncio.CancelledError:
             logger.info("Simulation cancelled")
+            self.running = False
         except Exception as e:
             logger.error(f"Simulation error: {e}", exc_info=True)
             self.running = False

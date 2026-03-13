@@ -137,6 +137,14 @@ class Settings(BaseSettings):
     notification_smtp_username: str = ""
     notification_smtp_password: str = ""
     notification_smtp_use_tls: bool = True
+
+    # Rooms SMTP (ghost booking alerts — separate from work order email)
+    rooms_smtp_host: str = ""
+    rooms_smtp_port: int = 587
+    rooms_smtp_username: str = ""
+    rooms_smtp_password: str = ""
+    rooms_smtp_from_name: str = "SENTINEL Room Alerts"
+
     notification_slack_webhook_critical: str = ""
     notification_slack_webhook_emergency: str = ""
     notification_email_recipients: list[str] = []  # Comma-separated email addresses
@@ -319,7 +327,15 @@ class Settings(BaseSettings):
     space_mqtt_password: str = ""
     space_mqtt_client_id: str = "sentinel-space-backend"
     space_mqtt_topic: str = "sentinel/nodes/+/presence"
+    space_mqtt_radar_topic: str = "sentinel/node/+/radar"  # LD2410C extended payload topic
     space_default_site_id: str = "site-002"
+
+    # LD2410C Radar Distance Filtering
+    # Firmware: v2.44.25070917 | Resolution: 0.75 m | Effective range: 3.0 m
+    # Mounting: ceiling, downward | Unmanned duration: 15 s
+    radar_distance_filter_enabled: bool = True  # Reject readings outside valid range
+    radar_distance_min_m: float = 0.2  # Ignore very close readings (noise)
+    radar_distance_max_m: float = 3.0  # Max effective range (gate 4 @ 0.75 m resolution)
 
     # Focus Room Sessions (Phase 2)
     focus_min_session_seconds: int = 180  # Discard sessions shorter than 3 min (noise)

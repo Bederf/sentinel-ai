@@ -30,6 +30,11 @@ class OccupancyEvent:
 
     The HLK-LD2410C reports presence zones, NOT verified headcount.
     There is no ``count`` field — all logic uses ``occupied: bool`` only.
+
+    Radar telemetry fields (optional) capture the raw LD2410C state:
+    - moving/stationary: which detection type triggered
+    - distance_m: measured distance to target (0.75 m gate resolution)
+    - moving_gate/static_gate: which distance gate triggered (0–8)
     """
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -40,6 +45,12 @@ class OccupancyEvent:
     timestamp: datetime = field(default_factory=datetime.utcnow)
     source: str = ""  # e.g. "mmwave_ld2410c"
     received_at: datetime = field(default_factory=datetime.utcnow)
+    # Radar telemetry (optional — populated when MQTT payload includes them)
+    moving: Optional[bool] = None
+    stationary: Optional[bool] = None
+    distance_m: Optional[float] = None
+    moving_gate: Optional[int] = None
+    static_gate: Optional[int] = None
 
 
 @dataclass
@@ -80,6 +91,9 @@ class GhostBookingFinding:
     whatsapp_message_id: Optional[str] = None
     response_message_id: Optional[str] = None
     response_text: Optional[str] = None
+    # Reminder tracking — one reminder sent if concierge doesn't reply within 15 min
+    reminder_sent: bool = False
+    reminder_sent_at: Optional[datetime] = None
     # Legacy fields retained for backward compatibility with older stored records.
     cost_centre: Optional[str] = None
     charge_amount: Optional[float] = None

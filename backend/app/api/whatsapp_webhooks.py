@@ -9,9 +9,9 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
-from fastapi import APIRouter, Depends, Form, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 
 from app.handlers.whatsapp_handler import get_whatsapp_handler
 from app.integrations.whatsapp_service import get_whatsapp_service
@@ -26,7 +26,7 @@ whatsapp_service = get_whatsapp_service()
 whatsapp_handler = get_whatsapp_handler()
 
 
-def _parse_approval_command(content: str) -> Dict[str, str]:
+def _parse_approval_command(content: str) -> dict[str, str]:
     """Parse APPROVE/REJECT command text into action/id/reason fields."""
     parts = content.strip().split(maxsplit=2)
     if not parts:
@@ -103,7 +103,7 @@ async def verify_whatsapp_webhook(
 async def handle_whatsapp_message(
     request: Request,
     verified_body: bytes = Depends(verify_whatsapp_signature),
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Handle incoming WhatsApp messages (POST).
 
@@ -220,20 +220,26 @@ def _verify_twilio_signature(request_url: str, params: dict[str, str], signature
 @router.post("/twilio")
 async def handle_twilio_whatsapp_message(
     request: Request,
-    Body: str = Form(""),
-    From: str = Form(""),
-    MessageSid: str = Form(""),
-    OriginalRepliedMessageSid: str = Form(""),
     X_Twilio_Signature: str | None = Header(default=None, alias="X-Twilio-Signature"),
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Handle incoming Twilio WhatsApp replies."""
-    params = {
-        "Body": Body,
-        "From": From,
-        "MessageSid": MessageSid,
-        "OriginalRepliedMessageSid": OriginalRepliedMessageSid,
-    }
-    if not _verify_twilio_signature(str(request.url), params, X_Twilio_Signature):
+    # Parse all form params (Twilio sends many fields; all are part of the signature)
+    form_data = await request.form()
+    params = {k: v for k, v in form_data.items() if isinstance(v, str)}
+
+    Body = params.get("Body", "")
+    From = params.get("From", "")
+    MessageSid = params.get("MessageSid", "")
+    OriginalRepliedMessageSid = params.get("OriginalRepliedMessageSid", "")
+
+    # Twilio signs against the public URL, not the internal proxy URL
+    public_base = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
+    if public_base:
+        request_url = f"{public_base}/api/whatsapp/twilio"
+    else:
+        request_url = str(request.url)
+
+    if not _verify_twilio_signature(request_url, params, X_Twilio_Signature):
         raise HTTPException(status_code=403, detail="Invalid Twilio signature")
 
     from_number = _normalise_whatsapp_number(From)
@@ -334,6 +340,7 @@ async def route_incoming_message(
             content_upper = content.strip().upper()
             if content_upper.startswith("APPROVE") or content_upper.startswith("REJECT"):
                 from langchain_core.messages import HumanMessage
+
                 from app.agents import get_recommendation_graph
                 from app.agents.recommendation_tools import (
                     execute_approved_recommendation,
@@ -509,7 +516,7 @@ async def send_unrecognized_message(from_number: str) -> None:
 
 # Health check endpoint
 @router.get("/status")
-async def whatsapp_status() -> Dict[str, Any]:
+async def whatsapp_status() -> dict[str, Any]:
     """Get WhatsApp integration status."""
     return {
         "service": whatsapp_service.get_status(),

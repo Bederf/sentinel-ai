@@ -18,6 +18,11 @@ from app.services.ghost_booking_detector import (
 from app.services.ghost_room_notifier import send_ghost_booking_alert
 
 
+def _make_naive(dt: datetime) -> datetime:
+    """Strip timezone info for safe comparison with naive datetimes."""
+    return dt.replace(tzinfo=None) if dt.tzinfo else dt
+
+
 def get_active_bookings_for_room(site_id: str, room_code: str, now: datetime) -> list:
     """Get active bookings for a room at the given time."""
     try:
@@ -25,10 +30,12 @@ def get_active_bookings_for_room(site_id: str, room_code: str, now: datetime) ->
 
         store = get_booking_store()
         day_bookings = store.get_bookings_for_site(site_id, now.date())
+        now_naive = _make_naive(now)
         return [
             b
             for b in day_bookings
-            if (b.room_id == room_code or b.room_name == room_code) and b.start_time <= now <= b.end_time
+            if (b.room_id == room_code or b.room_name == room_code)
+            and _make_naive(b.start_time) <= now_naive <= _make_naive(b.end_time)
         ]
     except Exception:
         return []
@@ -43,6 +50,12 @@ async def process_occupancy_event(
     source: str = "mmwave_ld2410c",
     room_type: str = "meeting",
     timestamp: datetime | None = None,
+    # Radar telemetry (optional — from LD2410C extended payload)
+    moving: bool | None = None,
+    stationary: bool | None = None,
+    distance_m: float | None = None,
+    moving_gate: int | None = None,
+    static_gate: int | None = None,
 ) -> dict[str, Any]:
     """Persist an occupancy event and apply space-optimization rules."""
     now = timestamp or datetime.utcnow()
@@ -54,6 +67,11 @@ async def process_occupancy_event(
         timestamp=now,
         source=source,
         received_at=datetime.utcnow(),
+        moving=moving,
+        stationary=stationary,
+        distance_m=distance_m,
+        moving_gate=moving_gate,
+        static_gate=static_gate,
     )
     occupancy_store.save_event(event)
 

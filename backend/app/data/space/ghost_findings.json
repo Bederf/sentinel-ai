@@ -1,0 +1,33 @@
+[
+  {
+    "id": "63c359e5-0bf2-4568-adb6-7ce9d8cd4ddb",
+    "site_id": "site-001",
+    "room_code": "FA2-1Q4-MR28",
+    "room_name": "FA2-1Q4-MR28",
+    "booking_id": "34607463-fbe1-4557-a693-41b841bacff6",
+    "organiser_email": "bederf@gmail.com",
+    "organiser_name": "Bederf Test",
+    "booking_start": "2026-03-13T19:00:00+00:00",
+    "booking_end": "2026-03-13T20:00:00+00:00",
+    "grace_period_minutes": 5,
+    "detected_at": "2026-03-13T19:05:20.221631",
+    "notification_sent": true,
+    "notification_sent_at": "2026-03-13T19:05:31.321628",
+    "status": "confirmed_empty",
+    "resolved_at": "2026-03-13T19:07:59.447533",
+    "inspected_by": "whatsapp:+27798607245",
+    "inspected_at": "2026-03-13T19:07:59.447559",
+    "concierge_email": "TDineka@fnb.co.za",
+    "concierge_whatsapp": "+27798607245",
+    "email_notified_at": null,
+    "whatsapp_notified_at": "2026-03-13T19:05:31.321628",
+    "whatsapp_message_id": "SMe879ef4621fe5c4e7a5fdee950cc47be",
+    "response_message_id": "SMfb03a84d9e31daa4305260db4f410f20",
+    "response_text": "No",
+    "reminder_sent": false,
+    "reminder_sent_at": null,
+    "cost_centre": null,
+    "charge_amount": null,
+    "charge_reason": null
+  }
+]

@@ -1685,7 +1685,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
 
           {/* Space Optimization — only visible when space_optimization add-on is active */}
           {activeMainTab === "space" && isModuleActive('space_optimization') && (
-            <SpaceOptimizationPage />
+            <SpaceOptimizationPage siteId={siteId} />
           )}
 
           {/* Fuel — only visible when fuel_monitoring add-on is active */}

@@ -916,7 +916,15 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
     building = loader.get_site(site_code)
 
     if not building:
-        raise HTTPException(status_code=404, detail=f"Building '{site_id}' (site '{site_code}') not found")
+        # No data yet for this site — return empty equipment list instead of 404
+        return {
+            "site_id": site_id,
+            "site_name": site_code,
+            "total_equipment": 0,
+            "categories": {},
+            "equipment": [],
+            "source": "none",
+        }
 
     site_path = DATA_PATH / site_code
     equipment_list = []

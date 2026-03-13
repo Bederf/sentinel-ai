@@ -664,6 +664,9 @@ async def startup_event(app: FastAPI) -> None:
     # Error auto-resolution job (daily) - resolves errors if component healthy for 24+ hours
     scheduler_service.add_error_auto_resolve_job(interval_seconds=86400)
 
+    # Database archival (daily) - removes resolved alerts/predictions older than 90 days
+    scheduler_service.add_db_archival_job(interval_seconds=86400)
+
     # Space Occupancy POC — sensor health monitor (every 60 seconds)
     try:
         scheduler_service.add_space_sensor_health_job(interval_seconds=60, site_id="FLN02")

@@ -24,6 +24,8 @@ Usage:
 
 import json
 import logging
+import logging as _logging
+import os as _os
 import time as _time
 from contextlib import contextmanager
 from functools import wraps
@@ -477,9 +479,17 @@ class CacheInvalidation:
         cache.delete(CacheKeys.user_access(email))
 
 
+_slow_query_logger = _logging.getLogger("sentinel.slow_queries")
+
+# Threshold in seconds — queries slower than this get logged as warnings
+SLOW_QUERY_THRESHOLD_S = float(_os.environ.get("SLOW_QUERY_THRESHOLD_S", "0.5"))
+
+
 @contextmanager
 def track_query(repository: str, method: str):
     """Context manager to time Supabase queries for Prometheus.
+
+    Logs a warning for queries exceeding SLOW_QUERY_THRESHOLD_S (default 0.5s).
 
     Usage:
         with track_query("equipment", "get_all"):
@@ -496,3 +506,12 @@ def track_query(repository: str, method: str):
             sentinel_db_query_duration_seconds.labels(repository=repository, method=method).observe(duration)
         except Exception:
             pass
+
+        if duration >= SLOW_QUERY_THRESHOLD_S:
+            _slow_query_logger.warning(
+                "SLOW_QUERY repo=%s method=%s duration=%.3fs threshold=%.3fs",
+                repository,
+                method,
+                duration,
+                SLOW_QUERY_THRESHOLD_S,
+            )

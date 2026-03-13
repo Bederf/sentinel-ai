@@ -66,6 +66,8 @@ interface IngestedBooking {
   start_time: string;
   end_time: string;
   flagged: boolean;
+  ingested_at?: string;
+  created_at?: string;
 }
 
 interface RightsizingFinding {
@@ -119,7 +121,7 @@ interface HourlyTrend {
 
 type TabId = "block" | "ghost" | "rightsizing" | "focus" | "trends";
 
-export function SpaceOptimizationPage() {
+export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string } = {}) {
   const [activeTab, setActiveTab] = useState<TabId>("block");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -128,12 +130,13 @@ export function SpaceOptimizationPage() {
   const [blockAlerts, setBlockAlerts] = useState<BlockBookingAlert[]>([]);
   const [ghostFindings, setGhostFindings] = useState<GhostFinding[]>([]);
   const [ingestedBookings, setIngestedBookings] = useState<IngestedBooking[]>([]);
+  const [totalIngested, setTotalIngested] = useState(0);
   const [rightsizingFindings, setRightsizingFindings] = useState<RightsizingFinding[]>([]);
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>([]);
   const [focusAnalytics, setFocusAnalytics] = useState<FocusAnalytics | null>(null);
   const [hourlyTrends, setHourlyTrends] = useState<HourlyTrend[]>([]);
 
-  const siteId = (() => {
+  const siteId = propSiteId || (() => {
     try {
       return sessionStorage.getItem("sentinel_selected_site") || "site-002";
     } catch {
@@ -171,6 +174,7 @@ export function SpaceOptimizationPage() {
       if (bookingsRes.ok) {
         const data = await bookingsRes.json();
         setIngestedBookings(data.bookings || []);
+        setTotalIngested(data.total_ingested ?? data.bookings?.length ?? 0);
       }
       if (rightsizingRes.ok) {
         const data = await rightsizingRes.json();
@@ -371,7 +375,7 @@ export function SpaceOptimizationPage() {
         <KpiCard
           icon={<Clock className="h-5 w-5" />}
           label="Booking Emails Ingested"
-          value={ingestedBookings.length}
+          value={totalIngested}
           color="#0d9488"
           bgColor="rgba(13, 148, 136, 0.15)"
           subtitle={`${flaggedBookings} flagged`}
@@ -618,7 +622,11 @@ function BlockBookingsPanel({
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const recentBookings = [...bookings]
-    .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
+    .sort((a, b) => {
+      const aTime = new Date(a.ingested_at || a.created_at || a.start_time).getTime();
+      const bTime = new Date(b.ingested_at || b.created_at || b.start_time).getTime();
+      return bTime - aTime;
+    })
     .slice(0, 8);
 
   return (
@@ -764,27 +772,55 @@ function BlockBookingsPanel({
             {recentBookings.map((booking) => (
               <div
                 key={booking.id}
-                className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 rounded p-3"
+                className="rounded p-3 cursor-pointer transition-colors"
                 style={{ background: "var(--color-sentinel-bg-secondary)" }}
+                onClick={() => setExpandedId(expandedId === booking.id ? null : booking.id)}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium truncate" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                      {booking.room_name}
-                    </span>
-                    {booking.flagged && (
-                      <span
-                        className="text-[10px] px-1.5 py-0.5 rounded-full"
-                        style={{ background: "rgba(220, 38, 38, 0.15)", color: "var(--color-sentinel-red)" }}
-                      >
-                        flagged
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium truncate" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                        {booking.room_name}
                       </span>
-                    )}
+                      {booking.flagged && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-full"
+                          style={{ background: "rgba(220, 38, 38, 0.15)", color: "var(--color-sentinel-red)" }}
+                        >
+                          flagged
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs truncate" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      {booking.organiser_name || booking.organiser_email} · {formatDay(booking.start_time)} · {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
+                    </p>
                   </div>
-                  <p className="text-xs truncate" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    {booking.organiser_name || booking.organiser_email} · {formatDay(booking.start_time)} · {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
-                  </p>
+                  <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    {expandedId === booking.id ? "\u25B2" : "\u25BC"}
+                  </span>
                 </div>
+                {expandedId === booking.id && (
+                  <div className="mt-3 pt-3 space-y-1.5" style={{ borderTop: "1px solid var(--color-sentinel-border)" }}>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Organiser</span>
+                      <span style={{ color: "var(--color-sentinel-text-primary)" }}>{booking.organiser_name || "—"}</span>
+                      <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Email</span>
+                      <span style={{ color: "var(--color-sentinel-text-primary)" }}>{booking.organiser_email}</span>
+                      <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Date</span>
+                      <span style={{ color: "var(--color-sentinel-text-primary)" }}>{formatDay(booking.start_time)}</span>
+                      <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Time</span>
+                      <span style={{ color: "var(--color-sentinel-text-primary)" }}>{formatTime(booking.start_time)} - {formatTime(booking.end_time)}</span>
+                      <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Room</span>
+                      <span style={{ color: "var(--color-sentinel-text-primary)" }}>{booking.room_name}</span>
+                      {booking.ingested_at && (
+                        <>
+                          <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Ingested</span>
+                          <span style={{ color: "var(--color-sentinel-text-primary)" }}>{new Date(booking.ingested_at).toLocaleString()}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

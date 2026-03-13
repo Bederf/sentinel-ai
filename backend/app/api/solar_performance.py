@@ -56,10 +56,23 @@ async def get_performance_summary(request: Request, system_id: str):
     # Get inverters for this site
     inverters = await ingestion.get_inverters(site_id)
     if not inverters:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No inverters found for system '{system_id}'",
-        )
+        return {
+            "system_id": system_id,
+            "summary": {
+                "efficiency": 0,
+                "capacity_factor": 0,
+                "availability": 0,
+                "status": "no_data",
+            },
+            "fleet": {
+                "inverter_count": 0,
+                "online_count": 0,
+                "total_ac_power_kw": 0,
+                "total_dc_power_kw": 0,
+                "installed_capacity_kwp": 0,
+            },
+            "baseline": None,
+        }
 
     # Calculate aggregate efficiency
     total_ac_power = sum(inv.ac_power_kw for inv in inverters)

@@ -45,8 +45,8 @@ class SimulationStore:
     """JSON-backed store for a single building's simulation state."""
 
     def __init__(self, site_id: str):
-        self.site_id = site_id
-        self._dir = _DATA_ROOT / site_id
+        self.site_id = site_id or "unknown"
+        self._dir = _DATA_ROOT / self.site_id
         self._dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
 

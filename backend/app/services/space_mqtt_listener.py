@@ -24,6 +24,37 @@ class MqttPresenceEvent:
     source: str = "mqtt_mmwave_ld2410c"
     room_type: str = "meeting"
     timestamp: datetime | None = None
+    # Radar telemetry (from LD2410C extended payload)
+    moving: bool | None = None
+    stationary: bool | None = None
+    distance_m: float | None = None
+    moving_gate: int | None = None
+    static_gate: int | None = None
+
+
+def _load_node_room_mapping() -> dict[str, dict[str, Any]]:
+    """Load server-side node_id → room_code overrides from JSON."""
+    from pathlib import Path
+
+    path = Path(__file__).parent.parent / "data" / "space" / "node_room_mapping.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text())
+        return {k: v for k, v in data.items() if not k.startswith("_")}
+    except Exception:
+        return {}
+
+
+# Cached at module level; restart to pick up changes
+_node_room_mapping: dict[str, dict[str, Any]] | None = None
+
+
+def get_node_room_mapping() -> dict[str, dict[str, Any]]:
+    global _node_room_mapping
+    if _node_room_mapping is None:
+        _node_room_mapping = _load_node_room_mapping()
+    return _node_room_mapping
 
 
 def parse_mqtt_presence_message(topic: str, payload: bytes | str | dict[str, Any]) -> MqttPresenceEvent:
@@ -37,7 +68,19 @@ def parse_mqtt_presence_message(topic: str, payload: bytes | str | dict[str, Any
 
     topic_parts = topic.split("/")
     node_id = topic_parts[2] if len(topic_parts) >= 3 else raw_data.get("node_id", "")
-    room_code = raw_data.get("room_code") or raw_data.get("zone") or raw_data.get("room") or node_id
+
+    # Server-side override: node_room_mapping.json takes precedence over firmware zone
+    mapping = get_node_room_mapping()
+    node_override = mapping.get(node_id, {})
+    room_code = (
+        node_override.get("room_code")
+        or raw_data.get("room_code")
+        or raw_data.get("zone")
+        or raw_data.get("room")
+        or node_id
+    )
+    site_id_override = node_override.get("site_id")
+
     occupied = bool(raw_data.get("presence", raw_data.get("occupied", False)))
     timestamp_raw = raw_data.get("ts") or raw_data.get("timestamp")
     parsed_timestamp: datetime | None = None
@@ -49,18 +92,65 @@ def parse_mqtt_presence_message(topic: str, payload: bytes | str | dict[str, Any
         except ValueError:
             parsed_timestamp = None
 
+    # Extract radar telemetry fields (optional — LD2410C extended payload)
+    moving = raw_data.get("moving")
+    stationary = raw_data.get("stationary")
+    distance_m = raw_data.get("distance_m") or raw_data.get("distance")
+    moving_gate = raw_data.get("moving_gate")
+    static_gate = raw_data.get("static_gate")
+
+    # Derive presence from radar fields if not explicitly set
+    # LD2410C: presence = moving OR stationary
+    if "presence" not in raw_data and "occupied" not in raw_data:
+        if moving is not None or stationary is not None:
+            occupied = bool(moving) or bool(stationary)
+
     return MqttPresenceEvent(
-        site_id=raw_data.get("site_id") or settings.space_default_site_id,
+        site_id=site_id_override or raw_data.get("site_id") or settings.space_default_site_id,
         room_code=room_code,
         sensor_id=raw_data.get("sensor_id") or node_id or room_code,
         occupied=occupied,
         room_type=raw_data.get("room_type", "meeting"),
         timestamp=parsed_timestamp,
+        moving=bool(moving) if moving is not None else None,
+        stationary=bool(stationary) if stationary is not None else None,
+        distance_m=float(distance_m) if distance_m is not None else None,
+        moving_gate=int(moving_gate) if moving_gate is not None else None,
+        static_gate=int(static_gate) if static_gate is not None else None,
     )
+
+
+def _distance_in_valid_range(event: MqttPresenceEvent) -> bool:
+    """Server-side distance filtering per LD2410C radar config.
+
+    Valid range: 0.2 m – configured max (default 3.0 m).
+    Readings outside this range are hallway bleed or noise — ignore them.
+    Only filters when the payload includes distance data AND event claims occupied.
+    """
+    if event.distance_m is None or not event.occupied:
+        return True  # No distance data → trust the occupied flag as-is
+
+    min_m = settings.radar_distance_min_m
+    max_m = settings.radar_distance_max_m
+    if event.distance_m < min_m or event.distance_m > max_m:
+        logger.debug(
+            "Distance filter: %.2f m outside [%.1f, %.1f] for %s — treating as empty",
+            event.distance_m,
+            min_m,
+            max_m,
+            event.room_code,
+        )
+        return False
+    return True
 
 
 async def process_mqtt_presence_message(topic: str, payload: bytes | str | dict[str, Any]) -> dict[str, Any]:
     event = parse_mqtt_presence_message(topic, payload)
+
+    # Server-side distance filtering: reject occupied readings outside valid range
+    if settings.radar_distance_filter_enabled and not _distance_in_valid_range(event):
+        event.occupied = False  # Treat as no presence
+
     return await process_occupancy_event(
         site_id=event.site_id,
         room_code=event.room_code,
@@ -69,6 +159,11 @@ async def process_mqtt_presence_message(topic: str, payload: bytes | str | dict[
         source=event.source,
         room_type=event.room_type,
         timestamp=event.timestamp,
+        moving=event.moving,
+        stationary=event.stationary,
+        distance_m=event.distance_m,
+        moving_gate=event.moving_gate,
+        static_gate=event.static_gate,
     )
 
 
@@ -96,13 +191,25 @@ class SpaceMqttListener:
 
         def _on_connect(client, _userdata, _flags, reason_code, _properties=None):
             if reason_code == 0:
+                # Subscribe to configured topic (legacy: sentinel/nodes/+/presence)
                 client.subscribe(settings.space_mqtt_topic)
-                logger.info("Space MQTT listener subscribed to %s", settings.space_mqtt_topic)
+                # Also subscribe to radar topic (LD2410C extended payload)
+                radar_topic = settings.space_mqtt_radar_topic
+                if radar_topic and radar_topic != settings.space_mqtt_topic:
+                    client.subscribe(radar_topic)
+                    logger.warning(
+                        "Space MQTT listener connected — subscribed to %s and %s",
+                        settings.space_mqtt_topic,
+                        radar_topic,
+                    )
+                else:
+                    logger.warning("Space MQTT listener connected and subscribed to %s", settings.space_mqtt_topic)
             else:
                 logger.warning("Space MQTT listener connect failed: %s", reason_code)
 
         def _on_message(_client, _userdata, message):
             try:
+                logger.warning("Space MQTT rx: %s → %s", message.topic, message.payload[:120])
                 if self._loop and self._loop.is_running():
                     asyncio.run_coroutine_threadsafe(
                         process_mqtt_presence_message(message.topic, message.payload),

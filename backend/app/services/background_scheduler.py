@@ -3032,6 +3032,41 @@ class BackgroundSchedulerService:
 
         await scan_due_ghost_bookings()
 
+    # ------------------------------------------------------------------
+    # Database archival (Phase 4 — Supabase Performance Optimization)
+    # ------------------------------------------------------------------
+
+    def add_db_archival_job(self, interval_seconds: int = 86400):
+        """Add daily job to archive resolved alerts/predictions older than 90 days."""
+        job_id = "db_archival"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+        self.scheduler.add_job(
+            func=self._run_db_archival,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="Database Archival (resolved alerts/predictions >90d)",
+            replace_existing=True,
+        )
+        logger.info("Added DB archival job (%ds interval)", interval_seconds)
+
+    def _run_db_archival(self):
+        """Run database archival for old resolved records."""
+        try:
+            from app.services.db_archival_service import archive_old_records
+
+            result = archive_old_records(dry_run=False)
+            total = result.get("alerts", 0) + result.get("predictions", 0)
+            if total > 0:
+                logger.info(
+                    "DB archival: removed %d alerts + %d predictions (cutoff %s)",
+                    result["alerts"],
+                    result["predictions"],
+                    result["cutoff"],
+                )
+        except Exception as e:
+            logger.error("DB archival failed: %s", e, exc_info=True)
+
 
 # Global scheduler instance
 scheduler_service = BackgroundSchedulerService()

@@ -184,6 +184,45 @@ class BookingStore:
 
         return self._get_bookings_for_site_json(site_id, date_str)
 
+    def count_all_bookings_for_site(self, site_id: str) -> int:
+        """Count ALL ingested bookings for a site (no date filter)."""
+        if self.client:
+            try:
+                result = (
+                    self.client.table("block_booking_records")
+                    .select("id", count="exact")
+                    .eq("site_id", site_id)
+                    .execute()
+                )
+                return result.count if result.count is not None else 0
+            except Exception as exc:
+                logger.error("BookingStore.count_all_bookings_for_site Supabase failed: %s", exc)
+
+        # JSON fallback
+        records = self._load_json(BOOKINGS_JSON)
+        return sum(1 for r in records if r.get("site_id") == site_id)
+
+    def get_all_bookings_for_site(self, site_id: str) -> list[BookingRecord]:
+        """Get ALL ingested bookings for a site (no date filter)."""
+        if self.client:
+            try:
+                result = (
+                    self.client.table("block_booking_records")
+                    .select("*")
+                    .eq("site_id", site_id)
+                    .order("booking_date", desc=True)
+                    .execute()
+                )
+                if result.data:
+                    return [_dict_to_record(d) for d in result.data]
+                return []
+            except Exception as exc:
+                logger.error("BookingStore.get_all_bookings_for_site Supabase failed: %s", exc)
+
+        # JSON fallback
+        records = self._load_json(BOOKINGS_JSON)
+        return [_dict_to_record(r) for r in records if r.get("site_id") == site_id]
+
     def get_bookings_by_organiser(
         self,
         site_id: str,

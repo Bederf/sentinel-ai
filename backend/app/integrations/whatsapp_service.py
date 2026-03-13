@@ -119,7 +119,9 @@ class WhatsAppService:
 
     async def _send_twilio_text(self, to_number: str, message: str) -> Dict[str, Any]:
         """Send via Twilio."""
-        payload = {"From": self.twilio_whatsapp, "To": f"whatsapp:{to_number}", "Body": message}
+        # Ensure whatsapp: prefix is present but not duplicated
+        to_wa = to_number if to_number.startswith("whatsapp:") else f"whatsapp:{to_number}"
+        payload = {"From": self.twilio_whatsapp, "To": to_wa, "Body": message}
 
         auth = (self.account_sid, self.auth_token)
 

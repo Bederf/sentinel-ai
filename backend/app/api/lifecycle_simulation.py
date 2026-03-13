@@ -373,7 +373,7 @@ async def stop_default_simulation():
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to stop simulation: {e}")
+        logger.error(f"Failed to stop simulation: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to stop: {str(e)}")
 
 

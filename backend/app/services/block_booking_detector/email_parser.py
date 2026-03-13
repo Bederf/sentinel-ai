@@ -174,6 +174,8 @@ def _parse_rs_meeting_contact(body: str) -> tuple[str, str]:
     for part in parts[1:]:
         if "@" in part:
             contact_email = part.strip().lower()
+            # Strip Outlook mailto: artifacts e.g. "user@domain<mailto:user@domain>"
+            contact_email = re.sub(r"<mailto:[^>]*>", "", contact_email).strip()
             break
     return name, contact_email
 

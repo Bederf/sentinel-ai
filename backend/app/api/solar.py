@@ -72,7 +72,16 @@ async def get_site_overview(request: Request, site_id: str):
     svc = get_solar_ingestion_service()
     overview = await svc.get_site_overview(site_id)
     if not overview:
-        raise HTTPException(status_code=404, detail=f"Solar site '{site_id}' not found")
+        return {
+            "site_id": site_id,
+            "total_generation_kw": 0,
+            "total_generation_kwh_today": 0,
+            "bess_soc_pct": None,
+            "grid_import_kw": 0,
+            "grid_export_kw": 0,
+            "inverter_count": 0,
+            "status": "no_data",
+        }
     return overview
 
 

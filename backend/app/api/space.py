@@ -45,6 +45,12 @@ class OccupancyEventRequest(BaseModel):
     room_type: str = Field(default="meeting", description="Room type: meeting or focus")
     timestamp: datetime | None = Field(default=None, description="Event timestamp (ISO 8601)")
     site_id: str | None = Field(default=None, description="Site code (overrides header)")
+    # Radar telemetry (optional — from LD2410C extended payload)
+    moving: bool | None = Field(default=None, description="Moving target detected")
+    stationary: bool | None = Field(default=None, description="Stationary target detected")
+    distance_m: float | None = Field(default=None, description="Distance to target (metres)")
+    moving_gate: int | None = Field(default=None, description="Moving target gate (0-8)")
+    static_gate: int | None = Field(default=None, description="Static target gate (0-8)")
 
     class Config:
         extra = "ignore"  # Silently ignore unknown fields like 'count'
@@ -93,6 +99,11 @@ async def ingest_occupancy_event(
         source=body.source,
         room_type=body.room_type,
         timestamp=body.timestamp or datetime.utcnow(),
+        moving=body.moving,
+        stationary=body.stationary,
+        distance_m=body.distance_m,
+        moving_gate=body.moving_gate,
+        static_gate=body.static_gate,
     )
 
 

@@ -309,6 +309,9 @@ async def list_bookings(
         all_bookings.extend(day_bookings)
         current += timedelta(days=1)
 
+    # Total ingested count (all time, no date filter) for the dashboard card
+    total_ingested = store.count_all_bookings_for_site(site_id)
+
     return {
         "bookings": [
             {
@@ -320,10 +323,13 @@ async def list_bookings(
                 "start_time": b.start_time.isoformat(),
                 "end_time": b.end_time.isoformat(),
                 "flagged": b.flagged,
+                "ingested_at": b.ingested_at.isoformat() if getattr(b, "ingested_at", None) else None,
+                "created_at": b.created_at.isoformat() if getattr(b, "created_at", None) else None,
             }
             for b in all_bookings
         ],
         "count": len(all_bookings),
+        "total_ingested": total_ingested,
         "from_date": start.isoformat(),
         "to_date": end.isoformat(),
     }
