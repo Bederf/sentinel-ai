@@ -230,3 +230,32 @@ async def delete_concierge_endpoint(
     audit_config_change("settings.space.concierge.delete", user=auth.user_id, source_ip=source_ip)
 
     return {"status": "deleted", "id": concierge_id}
+
+
+# ---------------------------------------------------------------------------
+# Site / Building / Floor Structure
+# ---------------------------------------------------------------------------
+
+SITE_STRUCTURE_FILE = DATA_DIR / "space" / "site_structure.json"
+
+
+def _load_site_structure() -> List[Dict[str, Any]]:
+    """Load site/building/floor structure from JSON config file."""
+    if not SITE_STRUCTURE_FILE.exists():
+        return []
+    try:
+        with open(SITE_STRUCTURE_FILE) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+@router.get("/settings/space/sites")
+async def get_site_structure(
+    auth: AuthContext = Depends(require_role(1)),
+) -> List[Dict[str, Any]]:
+    """Return site/building/floor structure for concierge assignment dropdowns.
+
+    Requires AUDITOR (level 1).
+    """
+    return _load_site_structure()

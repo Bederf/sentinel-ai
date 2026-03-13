@@ -1,0 +1,17 @@
+[
+  {
+    "site_id": "site-001",
+    "site_name": "FNB Fairlands",
+    "buildings": [
+      {"code": "FA1", "name": "Fairlands 1", "floors": [0, 1, 2]},
+      {"code": "FA2", "name": "Fairlands 2", "floors": [0, 1, 2]}
+    ]
+  },
+  {
+    "site_id": "site-002",
+    "site_name": "Sandton City Office Tower",
+    "buildings": [
+      {"code": "site-002", "name": "Main Building", "floors": [0, 1, 2]}
+    ]
+  }
+]
