@@ -1547,7 +1547,7 @@ export const api = {
   ): Promise<PredictionsResponse> {
     const params = new URLSearchParams();
     if (siteId) {
-      params.append("site_id", siteId);
+      params.append("site_code", siteId);
     }
     if (equipmentType) {
       params.append("equipment_type", equipmentType);
@@ -4629,6 +4629,110 @@ export interface RefillRecord {
   ts: number;
   details: Record<string, unknown>;
 }
+
+// ---------------------------------------------------------------------------
+// Space Optimization Settings
+// ---------------------------------------------------------------------------
+
+export interface SpaceGracePeriods {
+  ghost_booking_grace_minutes: number;
+  concierge_response_window_minutes: number;
+  sensor_silence_threshold_minutes: number;
+  right_sizing_grace_minutes: number;
+  early_vacate_threshold_minutes: number;
+  sporadic_use_threshold_pct: number;
+  brief_occupation_threshold_min: number;
+}
+
+export interface ConciergeUser {
+  id: string;
+  name: string;
+  mobile: string;
+  email: string;
+  site_id: string;
+  building_codes: string[];
+  floor_assignments: Record<string, number[]>;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SpaceSettings extends SpaceGracePeriods {
+  concierges: ConciergeUser[];
+}
+
+export interface ConciergeUserCreate {
+  name: string;
+  mobile: string;
+  email: string;
+  site_id: string;
+  building_codes: string[];
+  floor_assignments: Record<string, number[]>;
+}
+
+export type ConciergeUserUpdate = Partial<ConciergeUserCreate> & { active?: boolean };
+
+export interface SpaceSiteStructure {
+  site_id: string;
+  site_name: string;
+  buildings: Array<{
+    code: string;
+    name: string;
+    floors: number[];
+  }>;
+}
+
+export const spaceSettingsApi = {
+  /** Get all space optimization settings including concierge list */
+  async getSettings(): Promise<SpaceSettings> {
+    return fetchApi<SpaceSettings>('/api/settings/space');
+  },
+
+  /** Update grace period settings */
+  async updateSettings(settings: Partial<SpaceGracePeriods>): Promise<SpaceSettings> {
+    return fetchApi<SpaceSettings>('/api/settings/space', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+  },
+
+  /** Get site/building/floor structure for concierge assignment */
+  async getSites(): Promise<SpaceSiteStructure[]> {
+    return fetchApi<SpaceSiteStructure[]>('/api/settings/space/sites');
+  },
+
+  /** List concierge users, optionally filtered by site */
+  async listConcierges(siteId?: string): Promise<ConciergeUser[]> {
+    const params = siteId ? `?site_id=${encodeURIComponent(siteId)}` : '';
+    return fetchApi<ConciergeUser[]>(`/api/settings/space/concierges${params}`);
+  },
+
+  /** Create a new concierge user */
+  async createConcierge(data: ConciergeUserCreate): Promise<ConciergeUser> {
+    return fetchApi<ConciergeUser>('/api/settings/space/concierges', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+
+  /** Update an existing concierge user */
+  async updateConcierge(id: string, data: ConciergeUserUpdate): Promise<ConciergeUser> {
+    return fetchApi<ConciergeUser>(`/api/settings/space/concierges/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+
+  /** Delete a concierge user */
+  async deleteConcierge(id: string): Promise<void> {
+    await fetchApi<{ status: string; id: string }>(`/api/settings/space/concierges/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  },
+};
 
 export const fuelApi = {
   /** List fuel tanks with latest telemetry */
