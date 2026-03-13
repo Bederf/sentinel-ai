@@ -162,3 +162,4 @@ MQTT handles this easily.
 - [Ceiling Placement Map](space-intelligence-ceiling-placement-map.md)
 - [Equipment List](space-intelligence-equipment-list.md)
 - [Data Model](../02-architecture/space-intelligence-data-model.md)
+- [Ghost Booking Detection Pipeline](space-intelligence-ghost-booking-pipeline.md) — end-to-end detection, notifications, concierge flow
