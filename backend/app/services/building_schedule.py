@@ -117,13 +117,64 @@ class ChilledWaterModel:
 
 
 class SiteSchedule:
-    """Daily operating schedule for Site 002."""
+    """Daily operating schedule — reads from building.json config, falls back to defaults."""
 
     COMFORT_SETPOINT = 22.0  # deg C
     NIGHT_SETBACK = 3.0  # deg C above comfort
 
+    DAY_NAMES = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
+    def __init__(self, site_id: str = "site-002"):
+        self.site_id = site_id
+        self._schedule_config = self._load_schedule_config()
+
+    def _load_schedule_config(self) -> dict:
+        """Load operating_schedule from building.json if available."""
+        import json
+        from pathlib import Path
+
+        try:
+            path = Path(__file__).parent.parent / "data" / "buildings" / self.site_id / "building.json"
+            if path.exists():
+                with open(path) as f:
+                    data = json.load(f)
+                return data.get("operating_schedule", {})
+        except Exception:
+            pass
+        return {}
+
+    def _get_day_config(self, day_of_week: int) -> dict:
+        """Get operating hours for a specific day (0=Mon..6=Sun)."""
+        day_name = self.DAY_NAMES[day_of_week]
+        return self._schedule_config.get(day_name, {})
+
+    def _is_operational(self, day_of_week: int) -> bool:
+        """Check if building is operational on this day."""
+        config = self._get_day_config(day_of_week)
+        if config:
+            return config.get("is_operational", day_of_week < 5)
+        return day_of_week < 5  # Default: weekdays operational
+
+    def _get_operating_hours(self, day_of_week: int) -> tuple:
+        """Get start/end hours for a day. Returns (start_hour, end_hour, pre_cool_minutes)."""
+        config = self._get_day_config(day_of_week)
+        if config and config.get("is_operational", False):
+            start = config.get("start_time", "06:00")
+            end = config.get("end_time", "18:00")
+            pre_cool = config.get("pre_cool_minutes", 60)
+            start_h = int(start.split(":")[0])
+            end_h = int(end.split(":")[0])
+            return start_h, end_h, pre_cool
+        # Defaults
+        if day_of_week < 5:
+            return 6, 18, 60
+        return 0, 0, 0
+
     def get_state(self, hour: int, day_of_week: int) -> ScheduleState:
         """Return building state for given hour and day.
+
+        Reads operating_schedule config from building.json. Falls back to
+        original hardcoded defaults if no config exists.
 
         Args:
             hour: Hour of day (0-23)
@@ -132,126 +183,146 @@ class SiteSchedule:
         Returns:
             ScheduleState with equipment staging levels
         """
-        is_weekend = day_of_week >= 5  # Saturday=5, Sunday=6
-        if is_weekend:
+        if not self._is_operational(day_of_week):
             return self._weekend_state(hour)
-        return self._weekday_state(hour)
 
-    def _weekday_state(self, hour: int) -> ScheduleState:
-        """Return schedule state for a weekday hour."""
-        if hour < 5:
-            return ScheduleState(
-                BuildingState.OVERNIGHT,
-                HVACMode.OFF,
-                0,
-                LightingMode.SECURITY_ONLY,
-                ChillerStaging.OFF,
-                0,
-                self.NIGHT_SETBACK,
-                "Overnight -- minimal systems",
-            )
-        elif hour == 5:
-            return ScheduleState(
-                BuildingState.PRE_COOL,
-                HVACMode.PRE_COOL,
-                0,
-                LightingMode.DIMMED,
-                ChillerStaging.STAGE_1,
-                60,
-                0,
-                "Pre-cool -- pulling overnight heat",
-            )
-        elif hour == 6:
-            return ScheduleState(
-                BuildingState.MORNING_STARTUP,
-                HVACMode.FULL,
-                5,
-                LightingMode.FULL,
-                ChillerStaging.STAGE_2,
-                80,
-                0,
-                "Morning startup -- full plant on",
-            )
-        elif hour == 7:
-            return ScheduleState(
-                BuildingState.OCCUPIED_RAMPUP,
-                HVACMode.FULL,
-                40,
-                LightingMode.FULL,
-                ChillerStaging.STAGE_2,
-                85,
-                0,
-                "Staff arriving -- occupancy ramping",
-            )
-        elif 8 <= hour <= 14:
-            return ScheduleState(
-                BuildingState.PEAK_OCCUPIED,
-                HVACMode.FULL,
-                75,
-                LightingMode.DAYLIGHT_HARVEST,
-                ChillerStaging.FULL_LOAD,
-                95,
-                0,
-                "Peak occupied -- full HVAC",
-            )
-        elif hour == 15:
-            return ScheduleState(
-                BuildingState.AFTERNOON_WINDDOWN,
-                HVACMode.FULL,
-                50,
-                LightingMode.FULL,
-                ChillerStaging.STAGE_2,
-                80,
-                0,
-                "Staff leaving -- occupancy dropping",
-            )
-        elif hour == 16:
-            return ScheduleState(
-                BuildingState.AFTERNOON_WINDDOWN,
-                HVACMode.REDUCED,
-                30,
-                LightingMode.FULL,
-                ChillerStaging.STAGE_1,
-                60,
-                0.5,
-                "Late afternoon -- HVAC reducing",
-            )
-        elif hour == 17:
-            return ScheduleState(
-                BuildingState.HVAC_SHUTDOWN,
-                HVACMode.OFF,
-                10,
-                LightingMode.DIMMED,
-                ChillerStaging.OFF,
-                0,
-                1.0,
-                "HVAC off -- building coasting",
-            )
-        elif hour == 18:
-            return ScheduleState(
-                BuildingState.UNOCCUPIED,
-                HVACMode.OFF,
-                2,
-                LightingMode.SECURITY_ONLY,
-                ChillerStaging.OFF,
-                0,
-                self.NIGHT_SETBACK,
-                "Building empty -- security mode",
-            )
-        else:  # 19-23
-            return ScheduleState(
-                BuildingState.OVERNIGHT,
-                HVACMode.OFF,
-                0,
-                LightingMode.SECURITY_ONLY,
-                ChillerStaging.OFF,
-                0,
-                self.NIGHT_SETBACK,
-                "Overnight -- minimal systems",
-            )
+        start_h, end_h, pre_cool = self._get_operating_hours(day_of_week)
+        pre_cool_h = max(start_h - (pre_cool // 60), 0) if pre_cool > 0 else start_h
+
+        # Map hour relative to operating window
+        if hour < pre_cool_h:
+            return self._overnight_state()
+        elif hour < start_h:
+            return self._precool_state()
+        elif hour == start_h:
+            return self._morning_startup_state()
+        elif hour == start_h + 1:
+            return self._rampup_state()
+        elif start_h + 2 <= hour <= end_h - 3:
+            return self._peak_state()
+        elif hour == end_h - 2:
+            return self._winddown_state()
+        elif hour == end_h - 1:
+            return self._late_afternoon_state()
+        elif hour == end_h:
+            return self._shutdown_state()
+        elif hour == end_h + 1:
+            return self._unoccupied_state()
+        else:
+            return self._overnight_state()
+
+    # --- State factories (preserve original behavior) ---
+
+    def _overnight_state(self) -> ScheduleState:
+        return ScheduleState(
+            BuildingState.OVERNIGHT,
+            HVACMode.OFF,
+            0,
+            LightingMode.SECURITY_ONLY,
+            ChillerStaging.OFF,
+            0,
+            self.NIGHT_SETBACK,
+            "Overnight -- minimal systems",
+        )
+
+    def _precool_state(self) -> ScheduleState:
+        return ScheduleState(
+            BuildingState.PRE_COOL,
+            HVACMode.PRE_COOL,
+            0,
+            LightingMode.DIMMED,
+            ChillerStaging.STAGE_1,
+            60,
+            0,
+            "Pre-cool -- pulling overnight heat",
+        )
+
+    def _morning_startup_state(self) -> ScheduleState:
+        return ScheduleState(
+            BuildingState.MORNING_STARTUP,
+            HVACMode.FULL,
+            5,
+            LightingMode.FULL,
+            ChillerStaging.STAGE_2,
+            80,
+            0,
+            "Morning startup -- full plant on",
+        )
+
+    def _rampup_state(self) -> ScheduleState:
+        return ScheduleState(
+            BuildingState.OCCUPIED_RAMPUP,
+            HVACMode.FULL,
+            40,
+            LightingMode.FULL,
+            ChillerStaging.STAGE_2,
+            85,
+            0,
+            "Staff arriving -- occupancy ramping",
+        )
+
+    def _peak_state(self) -> ScheduleState:
+        return ScheduleState(
+            BuildingState.PEAK_OCCUPIED,
+            HVACMode.FULL,
+            75,
+            LightingMode.DAYLIGHT_HARVEST,
+            ChillerStaging.FULL_LOAD,
+            95,
+            0,
+            "Peak occupied -- full HVAC",
+        )
+
+    def _winddown_state(self) -> ScheduleState:
+        return ScheduleState(
+            BuildingState.AFTERNOON_WINDDOWN,
+            HVACMode.FULL,
+            50,
+            LightingMode.FULL,
+            ChillerStaging.STAGE_2,
+            80,
+            0,
+            "Staff leaving -- occupancy dropping",
+        )
+
+    def _late_afternoon_state(self) -> ScheduleState:
+        return ScheduleState(
+            BuildingState.AFTERNOON_WINDDOWN,
+            HVACMode.REDUCED,
+            30,
+            LightingMode.FULL,
+            ChillerStaging.STAGE_1,
+            60,
+            0.5,
+            "Late afternoon -- HVAC reducing",
+        )
+
+    def _shutdown_state(self) -> ScheduleState:
+        return ScheduleState(
+            BuildingState.HVAC_SHUTDOWN,
+            HVACMode.OFF,
+            10,
+            LightingMode.DIMMED,
+            ChillerStaging.OFF,
+            0,
+            1.0,
+            "HVAC off -- building coasting",
+        )
+
+    def _unoccupied_state(self) -> ScheduleState:
+        return ScheduleState(
+            BuildingState.UNOCCUPIED,
+            HVACMode.OFF,
+            2,
+            LightingMode.SECURITY_ONLY,
+            ChillerStaging.OFF,
+            0,
+            self.NIGHT_SETBACK,
+            "Building empty -- security mode",
+        )
 
     def _weekend_state(self, hour: int) -> ScheduleState:
-        """Return schedule state for a weekend hour (skeleton mode)."""
+        """Return schedule state for a non-operational day (skeleton mode)."""
         return ScheduleState(
             BuildingState.WEEKEND_SKELETON,
             HVACMode.OFF,
@@ -260,7 +331,7 @@ class SiteSchedule:
             ChillerStaging.OFF,
             0,
             self.NIGHT_SETBACK,
-            "Weekend skeleton -- security lights only",
+            "Non-operational -- security lights only",
         )
 
     def get_target_setpoint(self, hour: int, day_of_week: int) -> float:

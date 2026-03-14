@@ -40,6 +40,7 @@ from app.models.condition import (
 from app.services.element_trend_service import get_element_trend_service
 from app.services.rul_calculator import get_rul_calculator
 from app.services.service_optimizer import get_service_optimizer
+from app.utils.ai_provenance import attach_runtime_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -262,7 +263,7 @@ async def get_recommendations(
     try:
         calculator = get_rul_calculator()
         recommendations = await calculator.get_service_recommendations(equipment_id, days=days)
-        return recommendations
+        return attach_runtime_metadata(recommendations)
     except Exception as e:
         logger.error(f"Error generating recommendations for {equipment_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating recommendations: {str(e)}")

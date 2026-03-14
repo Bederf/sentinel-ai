@@ -178,7 +178,12 @@ function RecommendationCard({ recommendation, onAcknowledge, onResolve }: Recomm
       <Flex justifyContent="between" alignItems="start">
         <div className="flex-1">
           <Flex alignItems="center" className="gap-2 mb-1">
-            <Badge color="sky" size="xs">AI</Badge>
+            <Badge color={recommendation.source === 'health_alert' ? 'orange' : recommendation.source === 'ai_optimizer' ? 'sky' : 'sky'} size="xs">
+              {recommendation.source === 'health_alert' ? 'Health Alert'
+                : recommendation.source === 'ai_optimizer' ? 'AI Optimization'
+                : recommendation.source === 'financial_roi' ? 'ROI'
+                : 'AI'}
+            </Badge>
             <Badge color={MODULE_COLORS[recommendation.source_module] || 'gray'} size="xs">
               {recommendation.source_module.toUpperCase()}
             </Badge>

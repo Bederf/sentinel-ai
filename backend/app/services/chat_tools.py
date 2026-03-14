@@ -4616,6 +4616,30 @@ async def execute_tool(
     if user_email and tool_name in ("create_work_order", "control_device"):
         tool_input["_user_email"] = user_email
 
+    # --- Credential scanning on inputs (Gap 7: tool input scanning) ---
+    try:
+        from app.security.credential_scanner import scan_tool_input, redact_credentials
+
+        findings = scan_tool_input(tool_name, tool_input)
+        if findings:
+            logger.warning(
+                "CREDENTIAL_DETECTED in tool input for '%s': %s",
+                tool_name,
+                [f"{f['field']}={f['pattern']}" for f in findings],
+            )
+            # Audit the detection
+            try:
+                from app.security.audit_events import audit_secret_detected
+
+                for f in findings:
+                    audit_secret_detected(f"tool_input:{tool_name}:{f['field']}")
+            except Exception:
+                pass
+            # Redact credentials from arguments before passing to handler
+            tool_input = redact_credentials(tool_input)
+    except Exception:
+        pass  # Never block tool execution for scanner errors
+
     import time as _time
 
     _t0 = _time.perf_counter()

@@ -38,8 +38,8 @@ class OccupancyEventRequest(BaseModel):
     provide reliable headcount.
     """
 
-    room_code: str = Field(..., description="Room identifier, e.g. FA2-1Q1-MR-01")
-    sensor_id: str = Field(..., description="Sensor identifier, e.g. LD2410C-FA2-1Q1-MR-01")
+    room_code: str = Field(..., description="Room identifier, e.g. FA1-1Q2-MR4")
+    sensor_id: str = Field(..., description="Sensor identifier, e.g. LD2410C-FA1-1Q2-MR4")
     occupied: bool = Field(..., description="True = presence detected")
     source: str = Field(default="mmwave_ld2410c", description="Sensor source type")
     room_type: str = Field(default="meeting", description="Room type: meeting or focus")

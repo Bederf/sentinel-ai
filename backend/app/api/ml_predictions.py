@@ -19,7 +19,7 @@ from datetime import datetime
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel
 
-from app.utils.ai_provenance import get_ml_provenance
+from app.utils.ai_provenance import attach_ai_provenance, attach_runtime_metadata, get_ml_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -140,8 +140,7 @@ async def get_lstm_prediction(
             result["explanation"] = {"error": f"Failed to generate explanation: {e!s}"}
             result["maintenance_recommendations"] = []
 
-    result["ai_provenance"] = get_ml_provenance(f"lstm-{equipment_type}-v1").model_dump()
-    return result
+    return attach_ai_provenance(result, get_ml_provenance(f"lstm-{equipment_type}-v1"))
 
 
 @router.get("/predictions/trend/{equipment_id}")
@@ -179,7 +178,7 @@ async def get_prediction_trend(
         except Exception as e:
             result["explanation"] = {"error": f"Failed to generate trend explanation: {e!s}"}
 
-    return result
+    return attach_ai_provenance(result, get_ml_provenance(f"lstm-{equipment_type}-trend-v1"))
 
 
 @router.post("/predictions/batch")
@@ -198,7 +197,7 @@ async def get_batch_predictions(equipment_list: list[dict]):
         result = service.predict(eq.get("equipment_id"), eq.get("equipment_type"))
         results.append(result)
 
-    return results
+    return attach_ai_provenance(results, get_ml_provenance("lstm-batch-predictions-v1"))
 
 
 # === Anomaly Detection Endpoints ===
@@ -280,8 +279,7 @@ async def check_equipment_anomaly(
             result["fault_classification"] = None
             logger.debug(f"Fault classification unavailable: {e}")
 
-    result["ai_provenance"] = get_ml_provenance(f"autoencoder-{equipment_type}-v1").model_dump()
-    return result
+    return attach_ai_provenance(result, get_ml_provenance(f"autoencoder-{equipment_type}-v1"))
 
 
 @router.get("/anomalies/all")
@@ -296,7 +294,7 @@ async def check_all_anomalies(limit: int = Query(20, description="Maximum result
     service = get_anomaly_service()
     results = service.check_all_equipment()
 
-    return results[:limit]
+    return attach_ai_provenance(results[:limit], get_ml_provenance("autoencoder-fleet-anomaly-v1"))
 
 
 @router.get("/anomalies/alerts")
@@ -309,7 +307,7 @@ async def get_anomaly_alerts():
     from app.services.ml_inference import get_anomaly_service
 
     service = get_anomaly_service()
-    return service.get_anomaly_alerts()
+    return attach_ai_provenance(service.get_anomaly_alerts(), get_ml_provenance("autoencoder-anomaly-alerts-v1"))
 
 
 @router.get("/anomalies/history/{equipment_id}")
@@ -326,7 +324,10 @@ async def get_anomaly_history(
     from app.services.ml_inference import get_anomaly_service
 
     service = get_anomaly_service()
-    return service.get_anomaly_history(equipment_id, equipment_type, days)
+    history = service.get_anomaly_history(equipment_id, equipment_type, days)
+    if isinstance(history, dict):
+        return attach_ai_provenance(history, get_ml_provenance(f"autoencoder-{equipment_type}-history-v1"))
+    return attach_ai_provenance(history, get_ml_provenance(f"autoencoder-{equipment_type}-history-v1"))
 
 
 # === Model Management Endpoints ===
@@ -598,11 +599,10 @@ async def generate_maintenance_recommendations(request: MaintenanceRecommendatio
             priority_breakdown=result.get("priority_breakdown", {}),
             timestamp=datetime.utcnow().isoformat(),
         )
-        response_dict = response.model_dump()
-        response_dict["ai_provenance"] = get_ml_provenance(
-            f"maintenance-recommender-{request.equipment_type}-v1"
-        ).model_dump()
-        return response_dict
+        return attach_ai_provenance(
+            response.model_dump(),
+            get_ml_provenance(f"maintenance-recommender-{request.equipment_type}-v1"),
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {e!s}")
 
@@ -620,11 +620,13 @@ async def get_maintenance_priorities(equipment_type: str):
 
     try:
         framework = recommender.get_priority_framework(equipment_type)
-        return {
-            "equipment_type": equipment_type,
-            "priority_framework": framework,
-            "timestamp": datetime.utcnow().isoformat(),
-        }
+        return attach_runtime_metadata(
+            {
+                "equipment_type": equipment_type,
+                "priority_framework": framework,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -648,12 +650,14 @@ async def get_maintenance_history(
         history = await recommender.get_maintenance_history(
             equipment_id=equipment_id, days=days, include_outcomes=include_outcomes
         )
-        return {
-            "equipment_id": equipment_id,
-            "history": history,
-            "total_actions": len(history),
-            "timestamp": datetime.utcnow().isoformat(),
-        }
+        return attach_runtime_metadata(
+            {
+                "equipment_id": equipment_id,
+                "history": history,
+                "total_actions": len(history),
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

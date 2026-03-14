@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, memo } from "react";
 import { Settings as SettingsIcon, Bell, Monitor, Shield, Lock, Unlock, Zap, Gauge, Play, Square, Brain } from "lucide-react";
 import { useHealthThresholds } from "../hooks/useHealthThresholds";
 import { useGlassTheme } from "../hooks/useGlassTheme";
@@ -12,6 +12,17 @@ import { NotificationChannelsSettings } from "./NotificationChannelsSettings";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { useModules } from "../contexts/ModuleHooks";
 import { SpaceOptimizationSettings } from "./settings/SpaceOptimizationSettings";
+import { ModuleDescriptions } from "./settings/ModuleDescriptions";
+import { BuildingConfigEditor } from "./settings/BuildingConfigEditor";
+import { OperatingScheduleEditor } from "./settings/OperatingScheduleEditor";
+import { HolidayCalendar } from "./settings/HolidayCalendar";
+import { TariffManager } from "./settings/TariffManager";
+import { AlertRoutingRules } from "./settings/AlertRoutingRules";
+import { AlertMuting } from "./settings/AlertMuting";
+import { ChannelStatusDashboard } from "./settings/ChannelStatusDashboard";
+import { SystemHealthDashboard } from "./settings/SystemHealthDashboard";
+import { AiCostTracker } from "./settings/AiCostTracker";
+import { TechnicianRegistry } from "./settings/TechnicianRegistry";
 import { useSimulation } from "../contexts/SimulationContext";
 import type { ModuleType } from "../lib/moduleRegistry";
 import { MANDATORY_MODULES } from "../lib/mandatoryModules";
@@ -74,7 +85,7 @@ const ADDON_TOGGLE_CARDS: FeatureToggleCard[] = [
   { id: "space-optimization-addon", label: "Space Optimization", moduleType: "space_optimization", description: "Ghost booking detection, room right-sizing, focus room analytics." },
 ];
 
-export function Settings({ onError }: SettingsProps) {
+export const Settings = memo(function Settings({ onError }: SettingsProps) {
   const { thresholds, loading, error, updateThresholds } = useHealthThresholds();
   const { isModuleActive, activateModule, deactivateModule } = useModules();
   const currentUserEmail = (() => {
@@ -188,6 +199,11 @@ export function Settings({ onError }: SettingsProps) {
       setTogglingCardId(null);
     }
   };
+
+  const handleSuccess = useCallback(() => {
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  }, []);
 
   const handleSaveThresholds = async (newThresholds: {
     healthy: number;
@@ -315,6 +331,12 @@ export function Settings({ onError }: SettingsProps) {
 
       {/* Settings Sections */}
       <div className="space-y-6 max-w-4xl">
+        {/* System Health Dashboard (Phase 160) */}
+        <SystemHealthDashboard onError={onError} />
+
+        {/* AI API Cost Tracker */}
+        <AiCostTracker onError={onError} />
+
         {/* Health Score Thresholds */}
         <div
           className="glass-panel overflow-hidden"
@@ -396,10 +418,7 @@ export function Settings({ onError }: SettingsProps) {
           <div className="p-4">
             <SafetyRulesEditor
               onError={onError}
-              onSuccess={() => {
-                setSaveSuccess(true);
-                setTimeout(() => setSaveSuccess(false), 3000);
-              }}
+              onSuccess={handleSuccess}
               readOnly={!!(isDemoUser && !settingsPageUnlocked)}
             />
           </div>
@@ -410,23 +429,57 @@ export function Settings({ onError }: SettingsProps) {
           currentUserEmail={currentUserEmail}
           hasAuthenticatedSession={hasSessionToken}
           onError={onError}
-          onSuccess={() => {
-            setSaveSuccess(true);
-            setTimeout(() => setSaveSuccess(false), 3000);
-          }}
+          onSuccess={handleSuccess}
+        />
+
+        {/* Alert Routing & Muting (Phase 159) */}
+        <ChannelStatusDashboard onError={onError} />
+        <AlertRoutingRules
+          onError={onError}
+          onSuccess={handleSuccess}
+          readOnly={!!(isDemoUser && !settingsPageUnlocked)}
+        />
+        <AlertMuting
+          onError={onError}
+          onSuccess={handleSuccess}
+          readOnly={!!(isDemoUser && !settingsPageUnlocked)}
+        />
+
+        {/* Team & Technicians */}
+        <TechnicianRegistry
+          onError={onError}
+          onSuccess={handleSuccess}
+          readOnly={!!(isDemoUser && !settingsPageUnlocked)}
         />
 
         {/* Space Optimization Settings */}
         {isModuleActive("space_optimization") && (
           <SpaceOptimizationSettings
             onError={onError}
-            onSuccess={() => {
-              setSaveSuccess(true);
-              setTimeout(() => setSaveSuccess(false), 3000);
-            }}
+            onSuccess={handleSuccess}
             readOnly={!!(isDemoUser && !settingsPageUnlocked)}
           />
         )}
+
+        {/* Building Profile Editor */}
+        <BuildingConfigEditor
+          onError={onError}
+          onSuccess={handleSuccess}
+          readOnly={!!(isDemoUser && !settingsPageUnlocked)}
+        />
+
+        {/* Building Operations: Schedule, Holidays, Tariff */}
+        <OperatingScheduleEditor
+          onError={onError}
+          onSuccess={handleSuccess}
+          readOnly={!!(isDemoUser && !settingsPageUnlocked)}
+        />
+        <HolidayCalendar
+          onError={onError}
+          onSuccess={handleSuccess}
+          readOnly={!!(isDemoUser && !settingsPageUnlocked)}
+        />
+        <TariffManager onError={onError} readOnly={!!(isDemoUser && !settingsPageUnlocked)} />
 
         {/* Section 1: Platform Base (status indicators, no toggles) */}
         <div className="glass-panel overflow-hidden">
@@ -553,6 +606,9 @@ export function Settings({ onError }: SettingsProps) {
             </div>
           </div>
         </div>
+
+        {/* Module Details (capabilities, AI features, integrations) */}
+        <ModuleDescriptions onError={onError} />
 
         {/* Section 3: Add-ons (on/off toggles) */}
         <div className="glass-panel overflow-hidden" style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}>
@@ -684,13 +740,13 @@ export function Settings({ onError }: SettingsProps) {
       />
     </div>
   );
-}
+});
 
 // ========== Simulation Controls Panel ==========
 
 const SPEED_PRESETS = [1, 5, 10, 50, 100] as const;
 
-function SimulationControlsPanel({
+const SimulationControlsPanel = memo(function SimulationControlsPanel({
   readOnly,
   onError,
 }: {
@@ -1007,7 +1063,7 @@ function SimulationControlsPanel({
       </div>
     </div>
   );
-}
+});
 
 /**
  * Glass Theme Customization Controls
@@ -1234,7 +1290,7 @@ function GlassThemeControls() {
  * Notification Settings Panel - Unified UI for notification configuration
  * Combines SENTRY bot settings with Phase 102 multi-channel notifications
  */
-function NotificationSettingsPanel({
+const NotificationSettingsPanel = memo(function NotificationSettingsPanel({
   currentUserEmail,
   hasAuthenticatedSession,
   onError,
@@ -1362,6 +1418,6 @@ function NotificationSettingsPanel({
       </div>
     </div>
   );
-}
+});
 
 export default Settings;

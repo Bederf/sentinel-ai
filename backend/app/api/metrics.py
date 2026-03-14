@@ -27,6 +27,8 @@ from prometheus_client import (
     CONTENT_TYPE_LATEST,
 )
 
+from app.config.settings import settings
+
 router = APIRouter()
 
 # ---------------------------------------------------------------------------
@@ -400,16 +402,16 @@ def _collect_fm_metrics() -> None:
 # ---------------------------------------------------------------------------
 # Static info set once at import time
 # ---------------------------------------------------------------------------
-_MODE = os.getenv("SENTINEL_MODE", "simulation")
-_VERSION = os.getenv("APP_VERSION", "14.9")
+_MODE = os.getenv("SENTINEL_MODE", settings.resolved_ingestion_mode.value)
+_VERSION = os.getenv("APP_VERSION", settings.app_version)
 _BUILD_DATE = os.getenv("BUILD_DATE", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-_DEMO_MODE = os.getenv("DEMO_MODE", "").lower() in ("true", "1", "yes")
 
 sentinel_info.info(
     {
         "version": _VERSION,
         "mode": _MODE,
         "build_date": _BUILD_DATE,
+        "config_checksum": settings.config_checksum,
     }
 )
 
@@ -524,7 +526,7 @@ async def prometheus_metrics(request: Request) -> PlainTextResponse:
         )
 
     # Seed demo values on first request (only in DEMO_MODE)
-    if _DEMO_MODE:
+    if settings.demo_mode:
         _seed_demo_values()
 
     # Collect live FM metrics from Supabase (media wall dashboard)

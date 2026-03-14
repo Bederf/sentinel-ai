@@ -57,7 +57,13 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
 
   // Build the full nav item list: base + admin (if admin/demo) + conditional add-ons
   const allNavItems = useMemo(() => {
-    const items: NavItem[] = [...BASE_NAV_ITEMS];
+    // Base items — filter out any with requiredModule that isn't active
+    const items: NavItem[] = BASE_NAV_ITEMS.filter(item => {
+      if (!item.requiredModule) return true;
+      return activeModules.some(
+        m => m.module_type === item.requiredModule && m.status === 'active'
+      );
+    });
 
     // Admin-only items (SIMBIOT, Settings)
     if (isAdmin || isDemoUser) {

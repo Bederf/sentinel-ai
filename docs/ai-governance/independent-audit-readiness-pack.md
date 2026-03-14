@@ -131,12 +131,12 @@ The independent audit should assess whether SENTINEL has established, implemente
 
 - **Article 4** (AI Literacy) -- Training materials, competence register, delivery evidence
 - **Article 5** (Prohibited Practices) -- Non-applicability confirmation
-- **Article 50** (Transparency) -- Backend provenance, frontend badges, HTTP headers, SSE gap
+- **Article 50** (Transparency) -- Backend provenance, frontend badges, HTTP headers, and body-level provenance for non-streaming AI/recommendation APIs
 - **Articles 52/53** (Registration) -- Internal register, classification rationale
 
 **Key focus areas:**
   - Article 4 training delivery records (materials exist, completion records not yet collected)
-  - Article 50 SSE streaming provenance gap
+  - Article 50 exported report watermarking and final transparency inventory
   - Compliance register maturity (currently v0.2.0, target v1.0.0)
 
 **Review report:** `docs/ai-governance/eu-ai-act-assurance-review.md` (75% compliant: 1 Compliant, 3 Partially Compliant)
@@ -241,6 +241,8 @@ All governance artifacts are stored in the SENTINEL repository under `docs/ai-go
 
 **Total artifacts: 48** (35 governance documents, 6 model cards, 3 data sheets, 1 UI component, 3 code-level controls)
 
+Supporting security evidence outside the AI governance count includes `docs/09-security/threat-model-summary.md`, which now provides the one-page threat model summary referenced by the infrastructure audit backlog.
+
 ---
 
 ## 4. Gap Status Summary
@@ -278,7 +280,7 @@ The following Phase 2 gate items remain open. They are process-dependent or requ
 | Article | Status | Gap | Severity |
 |---------|--------|-----|----------|
 | Article 4 (AI Literacy) | Partially Compliant | Training delivery records not collected; no competence assessments on file | Major |
-| Article 50 (Transparency) | Partially Compliant | SSE streaming endpoints lack body-level provenance; exported reports lack AI watermark | Minor |
+| Article 50 (Transparency) | Partially Compliant | Non-streaming AI/recommendation APIs now stamp body-level provenance; streaming chat remains header-based by design; exported reports still lack AI watermark | Minor |
 | Articles 52/53 (Registration) | Partially Compliant | Compliance register at v0.2.0; EU database registration not evaluated | Minor |
 
 ### 4.5 Residual Risks Acknowledged

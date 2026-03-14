@@ -17,7 +17,7 @@ from app.space.room_state_engine import evaluate_room_state
 def _make_event(
     occupied: bool = True,
     event_type: str = "state_change",
-    room_code: str = "FA2-1Q1-MR-01",
+    room_code: str = "FA1-1Q1-MR1",
 ) -> SensorEventPayload:
     return SensorEventPayload(
         device_token="tkn_test",
@@ -49,23 +49,27 @@ def test_ghost_booking_detected_after_grace():
     state = {"site_id": "FLN02", "sensor_online": True, "last_heartbeat_at": now.isoformat()}
     event = _make_event(occupied=False)
 
-    findings = _run(evaluate_room_state("FA2-1Q1-MR-01", state, event, booking_data=booking))
+    findings = _run(evaluate_room_state("FA1-1Q1-MR1", state, event, booking_data=booking))
     types = [f.finding_type for f in findings]
     assert "ghost_booking" in types
 
 
 def test_ghost_booking_not_detected_within_grace():
-    """No ghost booking within the 20-min grace period."""
+    """No ghost booking within the configured grace period."""
+    from app.space.room_state_engine import GHOST_BOOKING_GRACE_MINUTES
+
     now = datetime.now(timezone.utc)
+    # Use half the configured grace period so we're clearly within it
+    minutes_elapsed = max(1, GHOST_BOOKING_GRACE_MINUTES // 2)
     booking = {
         "active_booking": True,
-        "booking_start": (now - timedelta(minutes=10)).isoformat(),
+        "booking_start": (now - timedelta(minutes=minutes_elapsed)).isoformat(),
         "booking_end": (now + timedelta(minutes=50)).isoformat(),
     }
     state = {"site_id": "FLN02", "sensor_online": True, "last_heartbeat_at": now.isoformat()}
     event = _make_event(occupied=False)
 
-    findings = _run(evaluate_room_state("FA2-1Q1-MR-01", state, event, booking_data=booking))
+    findings = _run(evaluate_room_state("FA1-1Q1-MR1", state, event, booking_data=booking))
     types = [f.finding_type for f in findings]
     assert "ghost_booking" not in types
 
@@ -76,7 +80,7 @@ def test_no_ghost_booking_when_no_booking_data():
     state = {"site_id": "FLN02", "sensor_online": True, "last_heartbeat_at": now.isoformat()}
     event = _make_event(occupied=False)
 
-    findings = _run(evaluate_room_state("FA2-1Q1-MR-01", state, event, booking_data=None))
+    findings = _run(evaluate_room_state("FA1-1Q1-MR1", state, event, booking_data=None))
     types = [f.finding_type for f in findings]
     assert "ghost_booking" not in types
     assert "overstay" not in types
@@ -98,7 +102,7 @@ def test_overstay_detected():
     state = {"site_id": "FLN02", "sensor_online": True, "last_heartbeat_at": now.isoformat()}
     event = _make_event(occupied=True)
 
-    findings = _run(evaluate_room_state("FA2-1Q1-MR-01", state, event, booking_data=booking))
+    findings = _run(evaluate_room_state("FA1-1Q1-MR1", state, event, booking_data=booking))
     types = [f.finding_type for f in findings]
     assert "overstay" in types
 
@@ -113,7 +117,7 @@ def test_overstay_not_detected_within_grace():
     state = {"site_id": "FLN02", "sensor_online": True, "last_heartbeat_at": now.isoformat()}
     event = _make_event(occupied=True)
 
-    findings = _run(evaluate_room_state("FA2-1Q1-MR-01", state, event, booking_data=booking))
+    findings = _run(evaluate_room_state("FA1-1Q1-MR1", state, event, booking_data=booking))
     types = [f.finding_type for f in findings]
     assert "overstay" not in types
 
@@ -134,7 +138,7 @@ def test_early_vacate_detected():
     state = {"site_id": "FLN02", "sensor_online": True, "last_heartbeat_at": now.isoformat()}
     event = _make_event(occupied=False)
 
-    findings = _run(evaluate_room_state("FA2-1Q1-MR-01", state, event, booking_data=booking))
+    findings = _run(evaluate_room_state("FA1-1Q1-MR1", state, event, booking_data=booking))
     types = [f.finding_type for f in findings]
     assert "early_vacate" in types
 
@@ -150,7 +154,7 @@ def test_early_vacate_not_detected_within_threshold():
     state = {"site_id": "FLN02", "sensor_online": True, "last_heartbeat_at": now.isoformat()}
     event = _make_event(occupied=False)
 
-    findings = _run(evaluate_room_state("FA2-1Q1-MR-01", state, event, booking_data=booking))
+    findings = _run(evaluate_room_state("FA1-1Q1-MR1", state, event, booking_data=booking))
     types = [f.finding_type for f in findings]
     assert "early_vacate" not in types
 
@@ -170,7 +174,7 @@ def test_sensor_offline_detected():
     }
     event = _make_event(event_type="heartbeat")
 
-    findings = _run(evaluate_room_state("FA2-1Q1-MR-01", state, event))
+    findings = _run(evaluate_room_state("FA1-1Q1-MR1", state, event))
     types = [f.finding_type for f in findings]
     assert "sensor_offline" in types
 
@@ -190,7 +194,7 @@ def test_sensor_recovery_creates_finding():
     }
     event = _make_event(event_type="heartbeat")
 
-    findings = _run(evaluate_room_state("FA2-1Q1-MR-01", state, event))
+    findings = _run(evaluate_room_state("FA1-1Q1-MR1", state, event))
     types = [f.finding_type for f in findings]
     assert "sensor_recovery" in types
 
@@ -210,5 +214,5 @@ def test_no_findings_for_normal_heartbeat():
     }
     event = _make_event(occupied=True, event_type="heartbeat")
 
-    findings = _run(evaluate_room_state("FA2-1Q1-MR-01", state, event))
+    findings = _run(evaluate_room_state("FA1-1Q1-MR1", state, event))
     assert len(findings) == 0

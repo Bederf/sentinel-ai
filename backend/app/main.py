@@ -46,4 +46,8 @@ register_all_routes(app)
 @app.get("/")
 async def root():
     """Root endpoint."""
-    return {"message": "BMS Intelligence API", "version": settings.app_version}
+    return {
+        "message": "BMS Intelligence API",
+        "version": settings.app_version,
+        "config_checksum": settings.config_checksum,
+    }

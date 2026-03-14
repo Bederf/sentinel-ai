@@ -288,6 +288,165 @@ class SystemHealthService:
         except Exception as e:
             return {"score": 40, "status": "degraded", "note": f"Check failed: {e}"}
 
+    # ==================== Extended Probes (Phase 160) ====================
+
+    async def _check_disk(self) -> Dict[str, Any]:
+        """Probe system disk usage."""
+        try:
+            import shutil
+
+            usage = shutil.disk_usage("/opt/bms-intelligence")
+            percent_used = (usage.used / usage.total) * 100
+            free_gb = usage.free / (1024**3)
+            score = max(10, int(100 - percent_used))
+            if percent_used >= 95:
+                status = "critical"
+            elif percent_used >= 85:
+                status = "degraded"
+            else:
+                status = "healthy"
+            return {
+                "score": score,
+                "status": status,
+                "note": f"{percent_used:.1f}% used · {free_gb:.1f}GB free",
+            }
+        except Exception as e:
+            return {"score": 50, "status": "degraded", "note": f"Check failed: {e}"}
+
+    async def _check_llm(self) -> Dict[str, Any]:
+        """Probe LLM availability (Ollama local or Claude API)."""
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                # Try Ollama first (local inference)
+                try:
+                    resp = await client.get("http://localhost:11434/api/tags")
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        models = data.get("models", [])
+                        return {
+                            "score": 95,
+                            "status": "healthy",
+                            "note": f"Ollama · {len(models)} model(s) loaded",
+                        }
+                except Exception:
+                    pass
+
+                # Check if Claude API key is configured
+                api_key = getattr(settings, "anthropic_api_key", None) or getattr(settings, "ANTHROPIC_API_KEY", None)
+                if api_key:
+                    return {
+                        "score": 85,
+                        "status": "healthy",
+                        "note": "Claude API key configured",
+                    }
+
+                return {
+                    "score": 40,
+                    "status": "degraded",
+                    "note": "No LLM backend available",
+                }
+        except Exception as e:
+            return {"score": 30, "status": "degraded", "note": f"LLM check failed: {e}"}
+
+    async def _check_ml_models(self) -> Dict[str, Any]:
+        """Probe ML model files on disk."""
+        try:
+            from pathlib import Path
+
+            models_dir = Path(__file__).parent.parent / "ml" / "models"
+            if not models_dir.exists():
+                return {"score": 50, "status": "degraded", "note": "Models directory not found"}
+
+            model_files = list(models_dir.rglob("*.joblib")) + list(models_dir.rglob("*.pkl"))
+            count = len(model_files)
+            if count == 0:
+                return {"score": 40, "status": "degraded", "note": "No trained models found"}
+
+            # Check most recent training date
+            newest = max(f.stat().st_mtime for f in model_files) if model_files else 0
+            from datetime import datetime as dt
+
+            last_trained = dt.fromtimestamp(newest).strftime("%Y-%m-%d") if newest else "never"
+            return {
+                "score": min(95, 50 + count * 2),
+                "status": "healthy",
+                "note": f"{count} models · last trained {last_trained}",
+            }
+        except Exception as e:
+            return {"score": 30, "status": "degraded", "note": f"ML check failed: {e}"}
+
+    async def _check_background_jobs(self) -> Dict[str, Any]:
+        """Probe APScheduler background job status."""
+        try:
+            from app.services.background_scheduler import scheduler_service
+
+            sched = scheduler_service.scheduler
+            if sched and sched.running:
+                jobs = sched.get_jobs()
+                return {
+                    "score": 90,
+                    "status": "healthy",
+                    "note": f"Running · {len(jobs)} scheduled jobs",
+                }
+            return {"score": 40, "status": "degraded", "note": "Scheduler not running"}
+        except ImportError:
+            return {"score": 60, "status": "degraded", "note": "Scheduler not available"}
+        except Exception as e:
+            return {"score": 50, "status": "degraded", "note": f"Scheduler check failed: {e}"}
+
+    async def _check_rag(self) -> Dict[str, Any]:
+        """Probe RAG document store status."""
+        try:
+            from pathlib import Path
+
+            # Check if document store exists
+            docs_dir = Path(__file__).parent.parent / "data" / "documents"
+            if not docs_dir.exists():
+                return {"score": 50, "status": "degraded", "note": "No document store"}
+
+            doc_files = list(docs_dir.rglob("*.json")) + list(docs_dir.rglob("*.txt"))
+            count = len(doc_files)
+            if count == 0:
+                return {"score": 50, "status": "degraded", "note": "No documents ingested"}
+            return {
+                "score": min(90, 50 + count),
+                "status": "healthy",
+                "note": f"{count} documents indexed",
+            }
+        except Exception as e:
+            return {"score": 30, "status": "degraded", "note": f"RAG check failed: {e}"}
+
+    async def get_extended_health(self) -> Dict[str, Any]:
+        """Extended health including disk, LLM, ML, jobs, RAG probes."""
+        base = await self.get_current_health()
+
+        extended_checks = await asyncio.gather(
+            self._check_disk(),
+            self._check_llm(),
+            self._check_ml_models(),
+            self._check_background_jobs(),
+            self._check_rag(),
+            return_exceptions=True,
+        )
+
+        extended_labels = ["disk", "llm", "ml_models", "background_jobs", "rag"]
+
+        for label, result in zip(extended_labels, extended_checks):
+            if isinstance(result, Exception):
+                base["component_scores"][label] = 0
+                base["component_details"][label] = {
+                    "status": "critical",
+                    "note": str(result),
+                }
+            else:
+                base["component_scores"][label] = result["score"]
+                base["component_details"][label] = {
+                    "status": result["status"],
+                    "note": result["note"],
+                }
+
+        return base
+
     async def _check_endpoint(
         self,
         client: httpx.AsyncClient,

@@ -118,7 +118,13 @@ async def startup_event(app: FastAPI) -> None:
             "Ensure safety boundaries are properly configured."
         )
 
-    _logger.info(f"Environment: {settings.environment}, Demo mode: {settings.demo_mode}")
+    _logger.info(
+        "Runtime config loaded: version=%s environment=%s demo_mode=%s config_checksum=%s",
+        settings.app_version,
+        settings.environment,
+        settings.demo_mode,
+        settings.config_checksum,
+    )
     if settings.is_live_mode and not settings.sentry_webhook_secret:
         raise RuntimeError("SENTRY_WEBHOOK_SECRET must be configured when INGESTION_MODE is shadow_live/live_control")
 
@@ -137,8 +143,8 @@ async def startup_event(app: FastAPI) -> None:
     else:
         print("Redis cache unavailable - running without caching")
 
-    # Pre-warm embedding model in background so first doc search doesn't pay 11s load cost
-    def _warm_embedding_model():
+    # Pre-warm embedding model + auto-load RAG knowledge in background
+    def _warm_embedding_and_rag():
         try:
             from app.services.embedding_service import get_embedding_service
 
@@ -148,9 +154,17 @@ async def startup_event(app: FastAPI) -> None:
         except Exception as e:
             _logger.warning(f"⚠️ Embedding model warmup failed (will load on first use): {e}")
 
+        # Auto-ingest RAG knowledge if store is empty/sparse
+        try:
+            from app.services.rag_auto_loader import auto_load_rag
+
+            auto_load_rag()
+        except Exception as e:
+            _logger.warning(f"⚠️ RAG auto-load failed (non-fatal): {e}")
+
     import threading
 
-    threading.Thread(target=_warm_embedding_model, daemon=True).start()
+    threading.Thread(target=_warm_embedding_and_rag, daemon=True).start()
 
     # Initialize device manager with reference devices + building equipment
     from app.api.devices import startup_event as devices_startup
@@ -382,6 +396,13 @@ async def startup_event(app: FastAPI) -> None:
             _logger.info("✅ POPIA retention enforcement job initialized")
         except Exception as e:
             _logger.warning(f"⚠️ POPIA retention job initialization failed: {e}")
+
+    # Daily AI cost report email (23:55 every day)
+    try:
+        scheduler_service.add_ai_cost_report_job()
+        _logger.info("✅ Daily AI cost report email job initialized (23:55 → info@sentinel-ai.co.za)")
+    except Exception as e:
+        _logger.warning(f"⚠️ AI cost report job initialization failed: {e}")
 
     # Ensure all sites have the 15 mandatory base modules (Phase 142)
     try:

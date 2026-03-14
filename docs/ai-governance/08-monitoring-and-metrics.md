@@ -2,9 +2,9 @@
 title: "AI Monitoring and Metrics Governance"
 type: "guide"
 status: "active"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-02-23"
-updated: "2026-02-23"
+updated: "2026-03-14"
 author: "SENTINEL Governance Team"
 tags: ["ai-governance", "monitoring", "metrics", "prometheus", "alerts"]
 domain: "compliance"
@@ -15,7 +15,7 @@ estimated_read_time: 15
 
 # AI Monitoring and Metrics Governance
 
-## Current State (Updated 2026-02-26, Phases 127 + 125)
+## Current State (Updated 2026-03-14)
 
 - AI health and drift are exposed via JSON APIs under `backend/app/api/mlops.py`.
 - Audit/decision telemetry is strong in log-based observability (Loki/Promtail/Grafana).
@@ -26,6 +26,8 @@ estimated_read_time: 15
 - **Tool-call instrumentation** in `chat_tools.execute_tool()` tracks duration + success/fail per tool.
 - **Database/cache instrumentation** (Phase 125): Supabase query duration histogram, cache hit/miss/error counter, cache hit rate gauge.
 - Monitoring stack fully running: Prometheus, Grafana, Loki, Promtail, Node Exporter.
+- Runtime configuration checksum is logged at startup and exposed in health/root metadata.
+- Non-streaming AI and recommendation APIs now include body-level runtime metadata (`app_version`, `config_checksum`) and `ai_provenance` where applicable. Streaming chat continues to expose provenance via HTTP headers by design.
 
 ## Observability Gaps
 
@@ -52,7 +54,7 @@ The `/metrics` endpoint (`backend/app/api/metrics.py`) exposes the following AI 
 | 5 | `sentinel_safety_violations_total` | Counter | `site_id`, `severity` (warning/block/alarm) | Total safety boundary violations by site and severity | `safety_interlocks.py` |
 | 6 | `sentinel_model_drift_alerts` | Gauge | `site_id`, `model_type` | Active model drift alerts by site and model type | `background_scheduler.py` |
 | 7 | `sentinel_rollback_total` | Counter | `site_id`, `equipment_type` | Total automated rollback events by site and equipment type | `approval_service.py` |
-| 8 | `sentinel_info` | Info | `version`, `mode`, `build_date` | SENTINEL build and configuration metadata | `metrics.py` (static) |
+| 8 | `sentinel_info` | Info | `version`, `mode`, `build_date`, `config_checksum` | SENTINEL build and configuration metadata | `metrics.py` (static) |
 
 ### HTTP Request Metrics (9-11, Phase 127)
 
@@ -90,7 +92,7 @@ scrape_configs:
     scrape_interval: 30s
     metrics_path: /metrics
     static_configs:
-      - targets: ["bms-intelligence_backend:9095"]
+      - targets: ["127.0.0.1:9095"]
         labels:
           instance: "sentinel"
           environment: "production"

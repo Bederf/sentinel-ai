@@ -27,12 +27,15 @@ from app.api import servicenow
 from app.api import event_bus_monitor
 from app.api import n8n
 from app.api import notification_router
+from app.api import alert_routing, alert_muting
 from app.api import event_intelligence
 from app.api import control_policy
 from app.api import decision_memory
 from app.api import block_bookings
 from app.api import space
 from app.api import correlation
+from app.api import ai_usage
+from app.api import technicians as technicians_api
 from app.config.settings import settings
 
 
@@ -143,6 +146,16 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Sentry notification router — importance-based delivery (Phase 140)
     app.include_router(notification_router.router, tags=["notification-router"])
+
+    # Alert routing rules + equipment muting (Phase 159)
+    app.include_router(alert_routing.router, tags=["alert-routing"])
+    app.include_router(alert_muting.router, tags=["alert-muting"])
+
+    # AI Usage & Cost Tracking
+    app.include_router(ai_usage.router, tags=["ai-usage"])
+
+    # Technician Registry (handoff blocker)
+    app.include_router(technicians_api.router, tags=["technicians"])
 
     # Operational Event Intelligence (Phase 145)
     app.include_router(event_intelligence.router, tags=["event-intelligence"])

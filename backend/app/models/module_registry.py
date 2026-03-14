@@ -15,7 +15,7 @@ from enum import Enum
 
 
 class ModuleType(str, Enum):
-    """Available module types (31 total)."""
+    """Available module types (35 total)."""
 
     # Base Platform (7, always on)
     KPI = "kpi"

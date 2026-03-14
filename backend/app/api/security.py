@@ -32,6 +32,7 @@ from app.models.security import (
     AlertStatus,
     SecurityOverview,
 )
+from app.utils.ai_provenance import attach_runtime_metadata
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -695,15 +696,17 @@ async def get_occupancy_recommendations(request: Request, site: str = Query(...,
                     }
                 )
 
-        return {
-            "site": site,
-            "current_occupancy": total_occupancy,
-            "recommendation_count": len(recommendations),
-            "recommendations": recommendations,
-            "by_floor": by_floor,
-            "by_zone": by_zone,
-            "timestamp": datetime.now().isoformat(),
-        }
+        return attach_runtime_metadata(
+            {
+                "site": site,
+                "current_occupancy": total_occupancy,
+                "recommendation_count": len(recommendations),
+                "recommendations": recommendations,
+                "by_floor": by_floor,
+                "by_zone": by_zone,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
     except Exception as e:
         logger.error(f"Error generating occupancy recommendations for {site}: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -436,6 +436,24 @@ class ClaudeService:
                 for text in stream.text_stream:
                     yield text
 
+                # Track token usage
+                try:
+                    from app.services.ai_usage_tracker import usage_tracker
+
+                    final = stream.get_final_message()
+                    u = final.usage
+                    usage_tracker.record(
+                        provider="anthropic",
+                        model=effective_model,
+                        input_tokens=getattr(u, "input_tokens", 0),
+                        output_tokens=getattr(u, "output_tokens", 0),
+                        source="chat",
+                        cache_read_tokens=getattr(u, "cache_read_input_tokens", 0),
+                        cache_creation_tokens=getattr(u, "cache_creation_input_tokens", 0),
+                    )
+                except Exception:
+                    pass  # Never break chat for tracking
+
         except AuthenticationError as e:
             logger.error(f"Claude authentication error: {e}")
             raise ValueError("Invalid ANTHROPIC_API_KEY. Please check your API key configuration.") from e
@@ -547,6 +565,23 @@ class ClaudeService:
 
                     # Get complete message (already accumulated by SDK)
                     response = stream.get_final_message()
+
+                # Track token usage
+                try:
+                    from app.services.ai_usage_tracker import usage_tracker
+
+                    u = response.usage
+                    usage_tracker.record(
+                        provider="anthropic",
+                        model=effective_model,
+                        input_tokens=getattr(u, "input_tokens", 0),
+                        output_tokens=getattr(u, "output_tokens", 0),
+                        source="tools",
+                        cache_read_tokens=getattr(u, "cache_read_input_tokens", 0),
+                        cache_creation_tokens=getattr(u, "cache_creation_input_tokens", 0),
+                    )
+                except Exception:
+                    pass  # Never break chat for tracking
 
                 if response.stop_reason == "end_turn":
                     # Final response — text was already streamed above

@@ -28,13 +28,13 @@ def test_sensor_marked_offline_after_threshold(mock_repo):
     """A sensor with last_seen_at > 180s ago should be marked offline."""
     NOW = _now()
     device = {
-        "sensor_id": "LD2410C-FA2-1Q1-MR-01",
-        "room_code": "FA2-1Q1-MR-01",
+        "sensor_id": "LD2410C-FA1-1Q1-MR1",
+        "room_code": "FA1-1Q1-MR1",
         "enabled": True,
         "last_seen_at": (NOW - timedelta(seconds=200)).isoformat(),
     }
     current_state = {
-        "room_code": "FA2-1Q1-MR-01",
+        "room_code": "FA1-1Q1-MR1",
         "sensor_online": True,
     }
 
@@ -56,13 +56,13 @@ def test_online_sensor_not_marked_offline(mock_repo):
     """A sensor with recent last_seen_at should NOT be marked offline."""
     NOW = _now()
     device = {
-        "sensor_id": "LD2410C-FA2-1Q1-MR-01",
-        "room_code": "FA2-1Q1-MR-01",
+        "sensor_id": "LD2410C-FA1-1Q1-MR1",
+        "room_code": "FA1-1Q1-MR1",
         "enabled": True,
         "last_seen_at": (NOW - timedelta(seconds=30)).isoformat(),
     }
     current_state = {
-        "room_code": "FA2-1Q1-MR-01",
+        "room_code": "FA1-1Q1-MR1",
         "sensor_online": True,
     }
 
@@ -82,13 +82,13 @@ def test_recovery_on_new_event(mock_repo):
     """A sensor that was offline but now has recent last_seen should be recovered."""
     NOW = _now()
     device = {
-        "sensor_id": "LD2410C-FA2-1Q1-MR-01",
-        "room_code": "FA2-1Q1-MR-01",
+        "sensor_id": "LD2410C-FA1-1Q1-MR1",
+        "room_code": "FA1-1Q1-MR1",
         "enabled": True,
         "last_seen_at": (NOW - timedelta(seconds=30)).isoformat(),
     }
     current_state = {
-        "room_code": "FA2-1Q1-MR-01",
+        "room_code": "FA1-1Q1-MR1",
         "sensor_online": False,  # was offline
     }
 
@@ -100,7 +100,7 @@ def test_recovery_on_new_event(mock_repo):
 
     result = _run(check_sensor_health(site_id="FLN02"))
     assert result["recovered"] == 1
-    mock_repo.resolve_finding.assert_called_once_with("FA2-1Q1-MR-01", "sensor_offline")
+    mock_repo.resolve_finding.assert_called_once_with("FA1-1Q1-MR1", "sensor_offline")
 
     # Verify state was set back to online
     upsert_call = mock_repo.upsert_room_current_state.call_args[0][0]

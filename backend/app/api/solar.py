@@ -41,6 +41,7 @@ from app.services.solar_health_service import get_solar_health_service
 from app.services.solar_maintenance_service import get_solar_maintenance_service
 from app.services.solar_financial_service import get_solar_financial_service
 from app.services.solar_config_service import get_site_solar_config
+from app.utils.ai_provenance import attach_runtime_metadata
 
 router = APIRouter(
     dependencies=[
@@ -943,14 +944,16 @@ async def get_maintenance_recommendations(request: Request, site_id: str):
     """
     svc = get_solar_maintenance_service()
     recs = await svc.evaluate_maintenance_needs(site_id)
-    return {
-        "site_id": site_id,
-        "recommendation_count": len(recs),
-        "urgent": sum(1 for r in recs if r.priority.value == "urgent"),
-        "soon": sum(1 for r in recs if r.priority.value == "soon"),
-        "routine": sum(1 for r in recs if r.priority.value == "routine"),
-        "recommendations": [r.to_dict() for r in recs],
-    }
+    return attach_runtime_metadata(
+        {
+            "site_id": site_id,
+            "recommendation_count": len(recs),
+            "urgent": sum(1 for r in recs if r.priority.value == "urgent"),
+            "soon": sum(1 for r in recs if r.priority.value == "soon"),
+            "routine": sum(1 for r in recs if r.priority.value == "routine"),
+            "recommendations": [r.to_dict() for r in recs],
+        }
+    )
 
 
 @router.post("/solar/sites/{site_id}/maintenance/generate-work-orders")

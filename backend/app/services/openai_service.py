@@ -199,6 +199,22 @@ class OpenAIService:
 
             response.raise_for_status()
             body = response.json()
+
+            # Track token usage (simple path)
+            try:
+                from app.services.ai_usage_tracker import usage_tracker
+
+                u = body.get("usage", {})
+                usage_tracker.record(
+                    provider="openai",
+                    model=self._model,
+                    input_tokens=u.get("prompt_tokens", 0),
+                    output_tokens=u.get("completion_tokens", 0),
+                    source="chat",
+                )
+            except Exception:
+                pass
+
             choices = body.get("choices", [])
             if not choices:
                 raise Exception("OpenAI response did not include any choices.")
@@ -273,6 +289,22 @@ class OpenAIService:
             response.raise_for_status()
 
             body = response.json()
+
+            # Track token usage (tool-calling path)
+            try:
+                from app.services.ai_usage_tracker import usage_tracker
+
+                u = body.get("usage", {})
+                usage_tracker.record(
+                    provider="openai",
+                    model=model,
+                    input_tokens=u.get("prompt_tokens", 0),
+                    output_tokens=u.get("completion_tokens", 0),
+                    source="tools",
+                )
+            except Exception:
+                pass
+
             choices = body.get("choices", [])
             if not choices:
                 yield "No response from OpenAI."

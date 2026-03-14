@@ -16,6 +16,7 @@ from app.api import zone_ingestion, desks, documents
 from app.api import device_controls
 from app.api import occupancy_analytics, occupancy_energy_correlation
 from app.api import iaq
+from app.api import building_schedule, holiday_calendar
 from app.space.sensor_ingest import router as space_occupancy_router
 
 
@@ -82,6 +83,10 @@ def register_site_routers(app: FastAPI) -> None:
 
     # Space Occupancy POC (5-room sensor pipeline)
     app.include_router(space_occupancy_router, tags=["space-occupancy"])
+
+    # Building schedule & holiday calendar
+    app.include_router(building_schedule.router, tags=["building-schedule"])
+    app.include_router(holiday_calendar.router, tags=["holiday-calendar"])
 
     # Niagara integration
     app.include_router(niagara.router, tags=["niagara-obix"])

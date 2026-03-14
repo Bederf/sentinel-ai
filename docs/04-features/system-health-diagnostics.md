@@ -1,8 +1,8 @@
 # System Health & Diagnostics Dashboard
 
-**Phase:** 74  
-**Status:** ✅ Complete  
-**Version:** 1.0  
+**Phase:** 74, extended in v48.0
+**Status:** ✅ Complete
+**Version:** 2.0
 
 ## Overview
 
@@ -559,6 +559,43 @@ DATABASE_URL=postgresql://...
 - Error log audit trail vs transient logs
 - Responsive mobile design with Tremor v3
 
+## v48.0 Extensions
+
+### Extended Health Probes (Phase 160)
+
+Five additional probes added to `GET /api/system/health/extended`:
+
+| Probe | Key | What It Checks |
+|-------|-----|----------------|
+| **Disk Space** | `disk` | Filesystem usage and free space (GB) |
+| **LLM Provider** | `llm` | Ollama local availability or Claude API key configured |
+| **ML Models** | `ml_models` | Trained model count (`.joblib`/`.pkl`), last training date |
+| **Background Jobs** | `background_jobs` | APScheduler running status and scheduled job count |
+| **RAG Documents** | `rag` | Document count in knowledge store |
+
+The Settings UI groups these into three sections: **Infrastructure** (Supabase, Redis, Disk, LLM), **Integrations** (Event Bus, n8n, ServiceNow, Notifications, Device Manager), **Intelligence** (ML Models, Background Jobs, RAG).
+
+### Database Backup Management
+
+Manual backup trigger and status monitoring added to the System Health Dashboard.
+
+**Backend:**
+- `backup_service.py` — Wraps `scripts/backup_supabase_to_json.py` with state tracking
+- `GET /api/system/backup-status` — Last backup age (hours), file count, total size (MB), state
+- `POST /api/system/backup/trigger` — Runs backup in background (5-min timeout)
+
+**Frontend (SystemHealthDashboard):**
+- Backup status row with color-coded age (green <24h, amber 24-48h, red >48h)
+- "Backup Now" button with running animation and automatic polling
+
+**What gets backed up:** 90+ Supabase tables exported to JSON at `backend/app/data/supabase_backup/`. This serves as the 3-tier fallback layer (Supabase → Redis → JSON).
+
+**Source files:**
+- `backend/app/services/backup_service.py`
+- `backend/app/api/system_health.py` (backup endpoints)
+- `backend/scripts/backup_supabase_to_json.py` (existing export script)
+- `frontend/src/components/settings/SystemHealthDashboard.tsx`
+
 ## Future Enhancements
 
 - [ ] Email alerts for critical health events
@@ -566,4 +603,7 @@ DATABASE_URL=postgresql://...
 - [ ] Custom health dashboards per role
 - [ ] Health API webhooks for external integrations
 - [ ] SLA tracking and breach notifications
-- [ ] Cost attribution by component
+- [x] ~~Cost attribution by component~~ → See [AI Cost Tracking](ai-cost-tracking.md)
+- [ ] Automated backup scheduling (systemd timer or cron)
+- [ ] Backup encryption at rest (SOPS integration)
+- [ ] Backup integrity checks (checksums, row count validation)

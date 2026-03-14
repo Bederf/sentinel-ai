@@ -134,6 +134,55 @@ Panels:
 4. **Database Archival Events** — Archival job log entries
 5. **Gateway Tool Activity** — Sentry gateway tool invocations
 
+## Database Backup
+
+Full Supabase-to-JSON export covering 90+ tables. Serves as the 3-tier fallback layer (Supabase → Redis → JSON).
+
+### Manual Trigger
+
+**Via Settings UI:** System Health Dashboard → "Backup Now" button
+
+**Via API:**
+```bash
+# Trigger backup (runs in background)
+curl -X POST http://localhost:9095/api/system/backup/trigger \
+  -H "Authorization: Bearer <token>"
+
+# Check status
+curl http://localhost:9095/api/system/backup-status
+```
+
+**Via CLI:**
+```bash
+cd /opt/bms-intelligence/backend
+python3 scripts/backup_supabase_to_json.py
+```
+
+### What Gets Backed Up
+
+- Site-filtered tables: alerts, anomalies, predictions, equipment, zones, work orders, desks, etc.
+- Equipment-filtered tables: sensor readings, service records
+- Global reference tables: ml_models, site_modules, technicians, system_settings, alarm_taxonomy
+- Energy infrastructure: solar plants, inverters, BESS, generators, transformers, meters
+
+**Output:** `backend/app/data/supabase_backup/` (90+ JSON files)
+
+### Status Monitoring
+
+The Settings UI shows:
+- **Last backup age** — color-coded: green (<24h), amber (24-48h), red (>48h)
+- **File count** and **total size**
+- **Last result** — success/failed/timeout
+
+### Recommended Schedule
+
+Run backup at least daily. Currently manual-only — schedule via cron if needed:
+
+```bash
+# Add to crontab (daily at 02:00)
+0 2 * * * cd /opt/bms-intelligence/backend && python3 scripts/backup_supabase_to_json.py >> /var/log/sentinel-backup.log 2>&1
+```
+
 ## Troubleshooting
 
 | Symptom | Check | Fix |
@@ -143,6 +192,8 @@ Panels:
 | Table growing large | `SELECT count(*) FROM alerts` | Verify archival job running, check resolved count |
 | Redis not connected | `redis-cli ping` | Check REDIS_URL in .env, restart Redis |
 | Archival not running | Check scheduler logs | Verify `add_db_archival_job` in events.py startup |
+| Backup fails | Check Supabase running | `docker ps \| grep supabase` — verify port 55322 |
+| Backup stale (>48h) | Settings → System Health | Click "Backup Now" or run CLI script |
 
 ## Files
 
@@ -150,7 +201,10 @@ Panels:
 |------|---------|
 | `backend/app/services/cache_service.py` | Redis cache + `track_query()` + slow query logging |
 | `backend/app/services/db_archival_service.py` | Archival of resolved records >90 days |
+| `backend/app/services/backup_service.py` | Manual backup trigger with status tracking |
+| `backend/scripts/backup_supabase_to_json.py` | Full Supabase-to-JSON export script |
 | `backend/app/services/background_scheduler.py` | Daily archival job registration |
 | `backend/app/startup/events.py` | Wires archival job on startup |
+| `backend/app/api/system_health.py` | Backup status + trigger endpoints |
 | `backend/app/api/metrics.py` | Prometheus metrics (db_query_duration, cache_*) |
 | `infrastructure/grafana/provisioning/dashboards/sentinel-db-performance.json` | Grafana dashboard |

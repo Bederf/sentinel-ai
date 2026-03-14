@@ -4345,6 +4345,106 @@
       "max_retries": 3,
       "created_at": "2026-03-12T17:04:03.901003",
       "updated_at": "2026-03-12T17:04:03.901004"
+    },
+    {
+      "id": "d7b1f416-b554-482f-8f47-4f1676045378",
+      "work_order_id": null,
+      "technician_id": "00000000-0000-0000-0000-000000000001",
+      "notification_type": "alert",
+      "title": "WARNING ALERT - S002-VAV-102",
+      "body": "\u26a0\ufe0f WARNING ALERT - Sandton City Office Tower\n\n\ud83c\udfe2 Zone: L1 East (Zone-102)\n\ud83d\udd27 Equipment: L1 East VAV\n\ud83d\udccb Type: VAV\n\ud83c\udd94 Code: S002-VAV-102\n\n\ud83d\udcdd Health score 55% (threshold: <70% WARNING). Scheduled Maintenance recommended.\n\n\u23f0 Time: 08:01:38\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n/info_S002_VAV_102 - More info\n/reset_S002_VAV_102 - Remote reset\n/inspect_S002_VAV_102 - Send technician\n/WO_S002_VAV_102 - Create work order\n/note_S002_VAV_102 - Add note",
+      "channel_type": "telegram",
+      "recipient_identifier": "8359288792",
+      "status": "sent",
+      "error_message": null,
+      "error_code": null,
+      "external_message_id": null,
+      "sent_at": "2026-03-14T06:01:47.114086",
+      "delivered_at": null,
+      "provider": "sentry",
+      "provider_response": {
+        "stdout": "[telegram] autoSelectFamily=true (default-node22)\n[telegram] global undici dispatcher autoSelectFamily=true\n[telegram] dnsResultOrder=ipv4first (default-node22)\n\u2705 Sent via Telegram. Message ID: 1032\n"
+      },
+      "retry_count": 0,
+      "last_retry_at": null,
+      "max_retries": 3,
+      "created_at": "2026-03-14T06:01:47.114263",
+      "updated_at": "2026-03-14T06:01:47.114265"
+    },
+    {
+      "id": "f134356a-1f0f-4f3a-bb20-3d323fd4d4d7",
+      "work_order_id": null,
+      "technician_id": "00000000-0000-0000-0000-000000000001",
+      "notification_type": "alert",
+      "title": "CRITICAL ALERT - S002-FCU-202",
+      "body": "\ud83d\udea8 CRITICAL ALERT - Sandton City Office Tower\n\n\ud83c\udfe2 Zone: L2 East (Zone-202)\n\ud83d\udd27 Equipment: L2 East FCU\n\ud83d\udccb Type: FCU\n\ud83c\udd94 Code: S002-FCU-202\n\n\ud83d\udcdd Health score 30% (threshold: <50% CRITICAL). Urgent Inspection recommended.\n\n\u23f0 Time: 17:10:38\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n/info_S002_FCU_202 - More info\n/reset_S002_FCU_202 - Remote reset\n/inspect_S002_FCU_202 - Send technician\n/WO_S002_FCU_202 - Create work order\n/note_S002_FCU_202 - Add note",
+      "channel_type": "telegram",
+      "recipient_identifier": "8359288792",
+      "status": "sent",
+      "error_message": null,
+      "error_code": null,
+      "external_message_id": null,
+      "sent_at": "2026-03-14T15:10:47.259218",
+      "delivered_at": null,
+      "provider": "sentry",
+      "provider_response": {
+        "stdout": "[telegram] autoSelectFamily=true (default-node22)\n[telegram] global undici dispatcher autoSelectFamily=true\n[telegram] dnsResultOrder=ipv4first (default-node22)\n\u2705 Sent via Telegram. Message ID: 1033\n"
+      },
+      "retry_count": 0,
+      "last_retry_at": null,
+      "max_retries": 3,
+      "created_at": "2026-03-14T15:10:47.259294",
+      "updated_at": "2026-03-14T15:10:47.259296"
+    },
+    {
+      "id": "4568bbac-12d6-46bd-a791-8c2ce0dbc6f0",
+      "work_order_id": null,
+      "technician_id": "00000000-0000-0000-0000-000000000001",
+      "notification_type": "alert",
+      "title": "CRITICAL ALERT - S002-FCU-303",
+      "body": "\ud83d\udea8 CRITICAL ALERT - Sandton City Office Tower\n\n\ud83c\udfe2 Zone: L3 Central (Zone-303)\n\ud83d\udd27 Equipment: L3 Central FCU\n\ud83d\udccb Type: FCU\n\ud83c\udd94 Code: S002-FCU-303\n\n\ud83d\udcdd Health score 30% (threshold: <50% CRITICAL). Urgent Inspection recommended.\n\n\u23f0 Time: 17:10:47\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n/info_S002_FCU_303 - More info\n/reset_S002_FCU_303 - Remote reset\n/inspect_S002_FCU_303 - Send technician\n/WO_S002_FCU_303 - Create work order\n/note_S002_FCU_303 - Add note",
+      "channel_type": "telegram",
+      "recipient_identifier": "8359288792",
+      "status": "sent",
+      "error_message": null,
+      "error_code": null,
+      "external_message_id": null,
+      "sent_at": "2026-03-14T15:10:52.850757",
+      "delivered_at": null,
+      "provider": "sentry",
+      "provider_response": {
+        "stdout": "[telegram] autoSelectFamily=true (default-node22)\n[telegram] global undici dispatcher autoSelectFamily=true\n[telegram] dnsResultOrder=ipv4first (default-node22)\n\u2705 Sent via Telegram. Message ID: 1034\n"
+      },
+      "retry_count": 0,
+      "last_retry_at": null,
+      "max_retries": 3,
+      "created_at": "2026-03-14T15:10:52.850785",
+      "updated_at": "2026-03-14T15:10:52.850788"
+    },
+    {
+      "id": "61fd99a6-00a0-4f66-a6c9-dcfcf683044d",
+      "work_order_id": null,
+      "technician_id": "00000000-0000-0000-0000-000000000001",
+      "notification_type": "alert",
+      "title": "CRITICAL ALERT - S002-FCU-005",
+      "body": "\ud83d\udea8 CRITICAL ALERT - Sandton City Office Tower\n\n\ud83c\udfe2 Zone: L0 South (Zone-005)\n\ud83d\udd27 Equipment: L0 South FCU\n\ud83d\udccb Type: FCU\n\ud83c\udd94 Code: S002-FCU-005\n\n\ud83d\udcdd Health score 32% (threshold: <50% CRITICAL). Urgent Inspection recommended.\n\n\u23f0 Time: 17:10:52\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n/info_S002_FCU_005 - More info\n/reset_S002_FCU_005 - Remote reset\n/inspect_S002_FCU_005 - Send technician\n/WO_S002_FCU_005 - Create work order\n/note_S002_FCU_005 - Add note",
+      "channel_type": "telegram",
+      "recipient_identifier": "8359288792",
+      "status": "sent",
+      "error_message": null,
+      "error_code": null,
+      "external_message_id": null,
+      "sent_at": "2026-03-14T15:10:59.029005",
+      "delivered_at": null,
+      "provider": "sentry",
+      "provider_response": {
+        "stdout": "[telegram] autoSelectFamily=true (default-node22)\n[telegram] global undici dispatcher autoSelectFamily=true\n[telegram] dnsResultOrder=ipv4first (default-node22)\n\u2705 Sent via Telegram. Message ID: 1035\n"
+      },
+      "retry_count": 0,
+      "last_retry_at": null,
+      "max_retries": 3,
+      "created_at": "2026-03-14T15:10:59.029023",
+      "updated_at": "2026-03-14T15:10:59.029024"
     }
   ]
 }

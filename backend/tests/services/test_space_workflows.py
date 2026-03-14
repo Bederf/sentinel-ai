@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.models.booking_record import BlockBookingConfig, BookingRecord
-from app.models.space_occupancy import GhostBookingFinding
+from app.models.space_occupancy import GhostBookingFinding, OccupancyEvent
 
 
 @pytest.fixture(autouse=True)
@@ -21,7 +21,7 @@ def _clean_space_store(tmp_path):
         yield
 
 
-def _booking(now: datetime, room: str = "F1-2-Q4-MR6") -> BookingRecord:
+def _booking(now: datetime, room: str = "FA1-1Q2-MR4") -> BookingRecord:
     return BookingRecord(
         id="booking-001",
         site_id="site-002",
@@ -71,12 +71,25 @@ async def test_block_booking_notifier_uses_n8n():
 
 @pytest.mark.asyncio
 async def test_ghost_room_monitor_creates_and_notifies():
+    from app.services import occupancy_store
     from app.services.ghost_room_monitor import scan_due_ghost_bookings
 
     now = datetime(2026, 3, 10, 9, 20)
     booking = _booking(now)
     store = AsyncMock()
     send_alert = AsyncMock(return_value={"success": True})
+
+    # Seed a recent sensor event (not occupied) so room_has_sensor_data/room_sensor_is_alive pass
+    # Use real UTC time so room_sensor_is_alive (which calls datetime.utcnow()) sees it as recent
+    real_now = datetime.utcnow()
+    sensor_event = OccupancyEvent(
+        room_code="FA1-1Q2-MR4",
+        sensor_id="node_001",
+        occupied=False,
+        timestamp=real_now,
+        received_at=real_now,
+    )
+    occupancy_store.save_event(sensor_event)
 
     with (
         patch("app.services.ghost_room_monitor.get_registered_site_ids", return_value=["site-002"]),
@@ -105,8 +118,8 @@ async def test_process_concierge_whatsapp_reply_yes_marks_occupied():
     finding = GhostBookingFinding(
         id="ghost-001",
         site_id="site-002",
-        room_code="F1-2-Q4-MR6",
-        room_name="F1-2-Q4-MR6",
+        room_code="FA1-1Q2-MR4",
+        room_name="FA1-1Q2-MR4",
         booking_id="booking-001",
         organiser_email="alice@example.com",
         organiser_name="Alice",
@@ -141,8 +154,8 @@ async def test_process_concierge_whatsapp_reply_no_marks_empty():
     finding = GhostBookingFinding(
         id="ghost-002",
         site_id="site-002",
-        room_code="F1-2-Q4-MR7",
-        room_name="F1-2-Q4-MR7",
+        room_code="FA1-1Q2-MR5",
+        room_name="FA1-1Q2-MR5",
         booking_id="booking-002",
         organiser_email="alice@example.com",
         organiser_name="Alice",
@@ -172,16 +185,18 @@ async def test_process_concierge_whatsapp_reply_no_marks_empty():
 def test_parse_mqtt_presence_message_prefers_zone_as_room_code():
     from app.services.space_mqtt_listener import parse_mqtt_presence_message
 
-    event = parse_mqtt_presence_message(
-        "sentinel/nodes/node_001/presence",
-        {
-            "zone": "F1-2-Q4-MR6",
-            "presence": True,
-            "site_id": "site-002",
-            "ts": 1741234567,
-        },
-    )
+    # Mock node_room_mapping to empty so zone field takes priority (no server-side override)
+    with patch("app.services.space_mqtt_listener.get_node_room_mapping", return_value={}):
+        event = parse_mqtt_presence_message(
+            "sentinel/nodes/node_001/presence",
+            {
+                "zone": "FA1-1Q2-MR4",
+                "presence": True,
+                "site_id": "site-002",
+                "ts": 1741234567,
+            },
+        )
 
-    assert event.room_code == "F1-2-Q4-MR6"
+    assert event.room_code == "FA1-1Q2-MR4"
     assert event.sensor_id == "node_001"
     assert event.occupied is True

@@ -29,7 +29,7 @@ This review assesses SENTINEL's compliance against applicable EU AI Act articles
 |---------|-------------|-------------------|----------------|------|
 | Article 4 | AI Literacy | Partially Compliant | 3 artifacts | Training records not collected |
 | Article 5 | Prohibited Practices | Compliant | 1 artifact | None |
-| Article 50 | Transparency | Partially Compliant | 4 artifacts | SSE streaming gap |
+| Article 50 | Transparency | Partially Compliant | 4 artifacts | Export watermark gap; transparency inventory follow-through |
 | Articles 52/53 | Registration & Documentation | Partially Compliant | 2 artifacts | EU database registration pending |
 | **Overall** | | **75% Compliant** | **10 artifacts** | **3 gaps identified** |
 
@@ -137,16 +137,15 @@ Article 50 requires that AI systems intended to interact with natural persons ar
 
 | # | Gap | Severity | Impact |
 |---|-----|----------|--------|
-| G-50.1 | **SSE streaming endpoints use headers only.** Server-Sent Events (SSE) streaming endpoints (e.g., real-time chat) set provenance headers on the initial HTTP response but do not embed provenance metadata within each SSE event body. A client that processes only the event stream without inspecting headers would miss the AI disclosure. | Minor | Limited impact -- all current SENTINEL frontends process headers. Risk is for future third-party consumers of the SSE stream. |
-| G-50.2 | **No provenance on exported reports.** When AI-generated analysis is exported as PDF or CSV, the AI-generated marker is not included in the exported document. | Minor | Exported documents could circulate without AI disclosure. Low risk given current usage is internal to building operations teams. |
+| G-50.1 | **No provenance on exported reports.** When AI-generated analysis is exported as PDF or CSV, the AI-generated marker is not included in the exported document. | Minor | Exported documents could circulate without AI disclosure. Low risk given current usage is internal to building operations teams. |
+| G-50.2 | **Transparency inventory needs final audit packaging.** Non-streaming AI and recommendation APIs now expose body-level provenance plus runtime version metadata, and streaming chat exposes provenance in HTTP headers by design. The remaining gap is documenting those integration points in one concise audit-facing inventory. | Minor | Audit friction rather than user harm. Disclosure exists but should be easier to evidence. |
 
 ### Recommended Actions
 
 | # | Action | Owner | Due Date |
 |---|--------|-------|----------|
-| A-50.1 | Add `ai_provenance` field to SSE event data payload for streaming endpoints (chat, real-time alerts). | AI Engineering Lead | 2026-04-01 |
-| A-50.2 | Include AI-generated watermark/footer in exported PDF and CSV reports. | Frontend Lead | 2026-04-15 |
-| A-50.3 | Document all AI-disclosure integration points in a single transparency inventory for audit reference. | Compliance Lead | 2026-03-15 |
+| A-50.1 | Include AI-generated watermark/footer in exported PDF and CSV reports. | Frontend Lead | 2026-04-15 |
+| A-50.2 | Document all AI-disclosure integration points in a single transparency inventory for audit reference. | Compliance Lead | 2026-03-15 |
 
 ---
 
@@ -200,7 +199,7 @@ Article 52 requires registration of high-risk AI systems in the EU database befo
 |---------|--------|-------------|---------|
 | Article 4 (AI Literacy) | Partially Compliant | Training package comprehensive and role-differentiated | No delivery records; no competence assessments collected |
 | Article 5 (Prohibited Practices) | Compliant | Thorough checklist; SENTINEL's scope inherently avoids prohibited practices | None |
-| Article 50 (Transparency) | Partially Compliant | Backend provenance + frontend badges + HTTP headers provide layered disclosure | SSE streaming provenance gap; export watermark gap |
+| Article 50 (Transparency) | Partially Compliant | Backend provenance + frontend badges + HTTP headers provide layered disclosure; non-streaming APIs now include body-level provenance and runtime version metadata | Export watermark gap; transparency inventory packaging |
 | Articles 52/53 (Registration) | Partially Compliant | Risk classification well-documented; internal register exists | Register still at v0.2.0; EU database registration not evaluated |
 
 ### Compliance Percentage by Article
@@ -209,7 +208,7 @@ Article 52 requires registration of high-risk AI systems in the EU database befo
 |---------|----------------|-------------|------------|
 | Article 4 | 3 artifacts present | 5 expected (+ delivery records, refresher schedule) | 60% |
 | Article 5 | 1 artifact, all practices cleared | 1 required | 100% |
-| Article 50 | 4 artifacts present, 2 gaps | 6 expected (+ SSE provenance, export watermark) | 67% |
+| Article 50 | 4 artifacts present, 2 gaps | 6 expected (+ export watermark, transparency inventory) | 67% |
 | Articles 52/53 | 2 artifacts present | 3 expected (+ register maturity) | 67% |
 | **Weighted Overall** | | | **75%** |
 

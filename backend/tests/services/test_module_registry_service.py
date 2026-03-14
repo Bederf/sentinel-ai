@@ -68,5 +68,5 @@ def test_deactivate_addon_succeeds(monkeypatch):
 
 
 def test_module_type_count():
-    """There should be exactly 32 module types (7 platform + 8 building + 8 control + 9 standalone)."""
-    assert len(ModuleType.__members__) == 32
+    """There should be exactly 35 module types (7 platform + 8 building + 8 control + 12 standalone)."""
+    assert len(ModuleType.__members__) == 35

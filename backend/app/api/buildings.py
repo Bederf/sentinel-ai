@@ -23,8 +23,8 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.middleware.auth_middleware import require_site_access
-from app.models.auth import AuthContext
+from app.middleware.auth_middleware import require_site_access, require_role
+from app.models.auth import AuthContext, SentinelRole
 
 from app.core.site_resolver import get_registered_sites
 from app.services.site_loader import get_site_loader
@@ -153,6 +153,24 @@ class BuildingUpdate(BaseModel):
     features: Optional[dict] = None
 
 
+class BuildingConfigUpdate(BaseModel):
+    """Request model for updating building configuration from Settings UI."""
+
+    name: Optional[str] = None
+    display_name: Optional[str] = None
+    address: Optional[str] = None
+    building_type: Optional[str] = None  # commercial_office, retail, industrial, mixed_use
+    floors: Optional[List[str]] = None
+    sqm: Optional[int] = None
+    occupancy_capacity: Optional[int] = None
+    total_desks: Optional[int] = None
+    parking_bays: Optional[int] = None
+    optimization_profile: Optional[str] = None  # cost_saving, comfort, balanced
+    control_tier: Optional[str] = None  # human_in_loop, supervised, automatic
+    features: Optional[dict] = None
+    contacts: Optional[dict] = None
+
+
 @router.get("")
 async def list_sites(current_user: dict = None) -> dict:
     """
@@ -247,6 +265,116 @@ async def get_site(site_id: str, auth: AuthContext = Depends(require_site_access
     result["is_active"] = site_code in loader.get_active_site_ids()
 
     return result
+
+
+@router.put("/{site_id}/config")
+async def update_building_config(
+    site_id: str,
+    config: BuildingConfigUpdate,
+    auth: AuthContext = Depends(require_role(SentinelRole.ADMIN)),
+) -> dict:
+    """Update building configuration from Settings UI.
+
+    Accepts building metadata, optimization profile, control tier, feature flags.
+    Writes to building.json. Emits CONFIG_CHANGE audit event.
+    """
+    site_code = _building_to_site(site_id)
+    site_path = DATA_PATH / site_code
+
+    if not site_path.exists():
+        raise HTTPException(status_code=404, detail=f"Building '{site_id}' not found")
+
+    building_file = site_path / "building.json"
+    if not building_file.exists():
+        raise HTTPException(status_code=404, detail=f"Building config for '{site_id}' not found")
+
+    # Load current config
+    with open(building_file, "r") as f:
+        building_data = json.load(f)
+
+    # Track changes for audit
+    changes = {}
+
+    # Update top-level fields
+    for field in ["name", "display_name", "address"]:
+        value = getattr(config, field, None)
+        if value is not None:
+            changes[field] = {"old": building_data.get(field), "new": value}
+            building_data[field] = value
+
+    if config.building_type is not None:
+        changes["type"] = {"old": building_data.get("type"), "new": config.building_type}
+        building_data["type"] = config.building_type
+
+    if config.floors is not None:
+        changes["floors"] = {"old": building_data.get("floors"), "new": config.floors}
+        building_data["floors"] = config.floors
+
+    if config.features is not None:
+        changes["features"] = {"old": building_data.get("features"), "new": config.features}
+        building_data["features"] = config.features
+
+    if config.contacts is not None:
+        changes["contacts"] = {"old": building_data.get("contacts"), "new": config.contacts}
+        building_data["contacts"] = config.contacts
+
+    # Update metadata fields
+    metadata = building_data.get("metadata", {})
+    for field in ["sqm", "occupancy_capacity", "total_desks", "parking_bays"]:
+        value = getattr(config, field, None)
+        if value is not None:
+            changes[f"metadata.{field}"] = {"old": metadata.get(field), "new": value}
+            metadata[field] = value
+    building_data["metadata"] = metadata
+
+    # Update optimization settings
+    optimization = building_data.get("optimization", {})
+    if config.optimization_profile is not None:
+        changes["optimization.active_profile"] = {
+            "old": optimization.get("active_profile"),
+            "new": config.optimization_profile,
+        }
+        optimization["active_profile"] = config.optimization_profile
+    if config.control_tier is not None:
+        changes["optimization.control_tier"] = {
+            "old": optimization.get("control_tier"),
+            "new": config.control_tier,
+        }
+        optimization["control_tier"] = config.control_tier
+    building_data["optimization"] = optimization
+
+    if not changes:
+        return {"status": "no_changes", "site_id": site_code}
+
+    # Write updated config
+    with open(building_file, "w") as f:
+        json.dump(building_data, f, indent=2)
+
+    # Emit audit event
+    try:
+        from app.services.audit_service import emit_audit_event
+
+        await emit_audit_event(
+            event_type="CONFIG_CHANGE",
+            entity_type="building",
+            entity_id=site_code,
+            actor=auth.email if auth else "system",
+            details={"changes": changes},
+        )
+    except Exception as e:
+        logger.warning(f"Failed to emit audit event: {e}")
+
+    # Force reload site data
+    loader = get_site_loader()
+    loader.load(force=True)
+
+    logger.info(f"Building config updated for {site_code}: {list(changes.keys())}")
+
+    return {
+        "status": "updated",
+        "site_id": site_code,
+        "changes": list(changes.keys()),
+    }
 
 
 @router.post("")

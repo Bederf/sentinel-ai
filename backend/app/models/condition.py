@@ -161,6 +161,8 @@ class ServiceRecommendation(BaseModel):
         None, description="Estimated days before failure (None if unknown)"
     )
     confidence: float = Field(default=0.0, ge=0, le=1, description="Recommendation confidence")
+    app_version: Optional[str] = Field(None, description="Runtime application version")
+    config_checksum: Optional[str] = Field(None, description="Runtime configuration checksum")
 
 
 # ============================================================================

@@ -16,7 +16,7 @@ from app.middleware.auth_middleware import require_site_access
 from app.middleware.rate_limiter import limiter
 from app.models.auth import AuthContext
 from app.services.recommendation_service import get_recommendation_service
-from app.utils.ai_provenance import get_ml_provenance
+from app.utils.ai_provenance import attach_ai_provenance, get_ml_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -72,11 +72,14 @@ async def get_pending_recommendations(
         service = get_recommendation_service()
         recs = await service.get_pending_recommendations(site_id, limit)
 
-        return {
-            "site_id": site_id,
-            "recommendations": [r.to_dict() for r in recs],
-            "count": len(recs),
-        }
+        return attach_ai_provenance(
+            {
+                "site_id": site_id,
+                "recommendations": [r.to_dict() for r in recs],
+                "count": len(recs),
+            },
+            get_ml_provenance("recommendation-engine-v1"),
+        )
 
     except Exception as e:
         logger.error(f"Error fetching pending recommendations for {site_id}: {e}")
@@ -119,15 +122,18 @@ async def get_recommendation_history(
             limit=limit,
         )
 
-        return {
-            "site_id": site_id,
-            "recommendations": [r.to_dict() for r in recs],
-            "count": len(recs),
-            "filters": {
-                "status": status_filter,
-                "risk_level": risk_level_filter,
+        return attach_ai_provenance(
+            {
+                "site_id": site_id,
+                "recommendations": [r.to_dict() for r in recs],
+                "count": len(recs),
+                "filters": {
+                    "status": status_filter,
+                    "risk_level": risk_level_filter,
+                },
             },
-        }
+            get_ml_provenance("recommendation-engine-v1"),
+        )
 
     except Exception as e:
         logger.error(f"Error fetching recommendation history for {site_id}: {e}")
@@ -152,13 +158,15 @@ async def create_recommendation(req: Request, request: CreateRecommendationReque
         service = get_recommendation_service()
         rec = await service.create_recommendation(request.dict())
 
-        return {
-            "success": True,
-            "recommendation": rec.to_dict(),
-            "status": rec.status.value,
-            "requires_approval": rec.requires_approval,
-            "ai_provenance": get_ml_provenance("recommendation-engine-v1").model_dump(),
-        }
+        return attach_ai_provenance(
+            {
+                "success": True,
+                "recommendation": rec.to_dict(),
+                "status": rec.status.value,
+                "requires_approval": rec.requires_approval,
+            },
+            get_ml_provenance("recommendation-engine-v1"),
+        )
 
     except ValueError as e:
         logger.error(f"Validation error creating recommendation: {e}")
@@ -187,11 +195,14 @@ async def get_recommendation(rec_id: str):
         if not rec:
             raise HTTPException(status_code=404, detail=f"Recommendation {rec_id} not found")
 
-        return {
-            "success": True,
-            "recommendation": rec.to_dict(),
-            "status": rec.status.value,
-        }
+        return attach_ai_provenance(
+            {
+                "success": True,
+                "recommendation": rec.to_dict(),
+                "status": rec.status.value,
+            },
+            get_ml_provenance("recommendation-engine-v1"),
+        )
 
     except HTTPException:
         raise
@@ -276,12 +287,15 @@ async def approve_recommendation(
             reason=body.reason,
         )
 
-        return {
-            "success": True,
-            "recommendation": rec.to_dict(),
-            "status": rec.status.value,
-            "message": f"Recommendation approved and executed by {user_id}",
-        }
+        return attach_ai_provenance(
+            {
+                "success": True,
+                "recommendation": rec.to_dict(),
+                "status": rec.status.value,
+                "message": f"Recommendation approved and executed by {user_id}",
+            },
+            get_ml_provenance("recommendation-engine-v1"),
+        )
 
     except ValueError as e:
         logger.error(f"Validation error approving recommendation {rec_id}: {e}")
@@ -321,12 +335,15 @@ async def reject_recommendation(
             reason=body.reason,
         )
 
-        return {
-            "success": True,
-            "recommendation": rec.to_dict(),
-            "status": rec.status.value,
-            "message": f"Recommendation rejected by {user_id}",
-        }
+        return attach_ai_provenance(
+            {
+                "success": True,
+                "recommendation": rec.to_dict(),
+                "status": rec.status.value,
+                "message": f"Recommendation rejected by {user_id}",
+            },
+            get_ml_provenance("recommendation-engine-v1"),
+        )
 
     except ValueError as e:
         logger.error(f"Validation error rejecting recommendation {rec_id}: {e}")
@@ -384,16 +401,18 @@ async def trigger_recommendation_processing(
             config=config,
         )
 
-        return {
-            "success": True,
-            "site_id": site_id,
-            "response": result.get("response", ""),
-            "tier": result.get("tier"),
-            "recommendation_id": result.get("recommendation_id"),
-            "needs_input": result.get("needs_input", False),
-            "processing_complete": result.get("processing_complete", False),
-            "ai_provenance": get_ml_provenance("recommendation-agent-v1").model_dump(),
-        }
+        return attach_ai_provenance(
+            {
+                "success": True,
+                "site_id": site_id,
+                "response": result.get("response", ""),
+                "tier": result.get("tier"),
+                "recommendation_id": result.get("recommendation_id"),
+                "needs_input": result.get("needs_input", False),
+                "processing_complete": result.get("processing_complete", False),
+            },
+            get_ml_provenance("recommendation-agent-v1"),
+        )
 
     except ImportError:
         raise HTTPException(

@@ -167,6 +167,19 @@ async def get_health_history(
         raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
 
 
+@router.get("/health/extended")
+async def get_extended_health():
+    """Extended health including disk, LLM, ML models, background jobs, RAG.
+
+    Returns the standard 7 probes plus 5 extended probes for a comprehensive
+    system health overview.
+    """
+    try:
+        return await service.get_extended_health()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Extended health check failed: {str(e)}")
+
+
 @router.post("/diagnostics")
 async def run_diagnostics(
     request: DiagnosticsRequest,
@@ -355,3 +368,34 @@ async def get_monitoring_snapshot(site_id: Optional[str] = Query(None)):
 
     svc = MonitoringService()
     return await svc.get_snapshot(site_id=site_id)
+
+
+# ==================== Backup Management ====================
+
+
+@router.get("/backup-status")
+async def get_backup_status():
+    """Get current backup status: last run timestamp, file count, size, state."""
+    from app.services.backup_service import backup_service
+
+    return backup_service.get_status()
+
+
+@router.post("/backup/trigger")
+async def trigger_backup(background_tasks: BackgroundTasks):
+    """Trigger a manual Supabase-to-JSON backup. Runs in background.
+
+    ADMIN role required. Returns immediately with status.
+    """
+    from app.services.backup_service import backup_service
+
+    status = backup_service.get_status()
+    if status["state"] == "running":
+        raise HTTPException(status_code=409, detail="Backup already in progress")
+
+    background_tasks.add_task(backup_service.run_backup)
+
+    return {
+        "status": "started",
+        "message": "Backup triggered. Check /api/system/backup-status for progress.",
+    }

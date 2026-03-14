@@ -349,6 +349,21 @@ def reset_services():
     # Cleanup after each test if needed
 
 
+@pytest.fixture(autouse=True)
+def _reset_node_room_mapping_cache():
+    """Reset the module-level node_room_mapping cache to prevent test pollution.
+
+    space_mqtt_listener caches the mapping at module level; if one test loads
+    real data (e.g. node_001 -> FA2-1Q4-MR28), subsequent tests that patch
+    get_node_room_mapping() still see the stale cache via the global variable.
+    """
+    import app.services.space_mqtt_listener as mqtt_mod
+
+    mqtt_mod._node_room_mapping = None
+    yield
+    mqtt_mod._node_room_mapping = None
+
+
 class _Mocker:
     """Lightweight pytest-mock compatible mocker fixture.
 

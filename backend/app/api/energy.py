@@ -14,7 +14,7 @@ from app.database.repositories.energy_consumption_repository import get_energy_c
 from app.services.site_loader import BuildingDataLoader
 from app.services.energy_rules_engine import get_energy_rules_engine
 from app.models.energy_rules import BuildingState
-from app.utils.ai_provenance import get_ml_provenance
+from app.utils.ai_provenance import attach_ai_provenance, attach_runtime_metadata, get_ml_provenance
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -2281,8 +2281,7 @@ async def get_ai_recommendations(
             cost_variance_pct=cost_variance_pct,
         )
 
-        result["ai_provenance"] = get_ml_provenance("ai-recommendation-engine-v1").model_dump()
-        return result
+        return attach_ai_provenance(result, get_ml_provenance("ai-recommendation-engine-v1"))
 
     except Exception as e:
         logger.error(f"[RECOMMENDATIONS] Error generating AI recommendations: {e}")
@@ -2350,18 +2349,20 @@ async def get_recommendations_dashboard(
                 }
             )
 
-        return {
-            "site_id": site_id,
-            "generated": datetime.now().isoformat(),
-            "top_recommendations": dashboard_recs,
-            "total_savings_r_annual": round(full_recs.get("total_annual_savings_r", 0), 2),
-            "total_investment_r": round(full_recs.get("total_investment_r", 0), 2),
-            "call_to_action": (
-                f"Implement {len(top_3)} recommendations to save"
-                f" R{full_recs.get('total_annual_savings_r', 0):,.0f}/year"
-            ),
-            "ai_provenance": get_ml_provenance("ai-recommendation-engine-v1").model_dump(),
-        }
+        return attach_ai_provenance(
+            {
+                "site_id": site_id,
+                "generated": datetime.now().isoformat(),
+                "top_recommendations": dashboard_recs,
+                "total_savings_r_annual": round(full_recs.get("total_annual_savings_r", 0), 2),
+                "total_investment_r": round(full_recs.get("total_investment_r", 0), 2),
+                "call_to_action": (
+                    f"Implement {len(top_3)} recommendations to save"
+                    f" R{full_recs.get('total_annual_savings_r', 0):,.0f}/year"
+                ),
+            },
+            get_ml_provenance("ai-recommendation-engine-v1"),
+        )
 
     except Exception as e:
         logger.error(f"[RECOMMENDATIONS] Error getting dashboard: {e}")
@@ -2408,42 +2409,47 @@ async def get_recommendations_by_type(
             recommendations = [r for r in recommendations if r.get("type") == recommendation_type]
 
         if not recommendations:
-            return {
-                "site_id": site_id,
-                "recommendation_type": recommendation_type,
-                "found": False,
-                "message": f"No {recommendation_type} recommendations found",
-            }
+            return attach_runtime_metadata(
+                {
+                    "site_id": site_id,
+                    "recommendation_type": recommendation_type,
+                    "found": False,
+                    "message": f"No {recommendation_type} recommendations found",
+                }
+            )
 
         rec = recommendations[0]  # Return first match
 
-        return {
-            "site_id": site_id,
-            "recommendation": {
-                "type": rec.get("type"),
-                "rank": rec.get("rank"),
-                "priority": rec.get("priority"),
-                "title": rec.get("title"),
-                "description": rec.get("description"),
-                "current_state": rec.get("current_state"),
-                "optimized_state": rec.get("optimized_state"),
-                "financials": {
-                    "annual_savings_r": rec.get("annual_savings_r"),
-                    "investment_cost_r": rec.get("investment_cost_r"),
-                    "payback_months": rec.get("payback_months"),
-                    "roi_pct": rec.get("roi_pct"),
+        return attach_ai_provenance(
+            {
+                "site_id": site_id,
+                "recommendation": {
+                    "type": rec.get("type"),
+                    "rank": rec.get("rank"),
+                    "priority": rec.get("priority"),
+                    "title": rec.get("title"),
+                    "description": rec.get("description"),
+                    "current_state": rec.get("current_state"),
+                    "optimized_state": rec.get("optimized_state"),
+                    "financials": {
+                        "annual_savings_r": rec.get("annual_savings_r"),
+                        "investment_cost_r": rec.get("investment_cost_r"),
+                        "payback_months": rec.get("payback_months"),
+                        "roi_pct": rec.get("roi_pct"),
+                    },
+                    "metrics": {
+                        "difficulty": rec.get("difficulty"),
+                        "confidence": rec.get("confidence"),
+                        "timeline_weeks": rec.get("implementation_timeline_weeks"),
+                    },
+                    "benefits": rec.get("benefits"),
+                    "risks": rec.get("risks"),
+                    "next_steps": rec.get("next_steps"),
+                    "messaging": rec.get("messaging"),
                 },
-                "metrics": {
-                    "difficulty": rec.get("difficulty"),
-                    "confidence": rec.get("confidence"),
-                    "timeline_weeks": rec.get("implementation_timeline_weeks"),
-                },
-                "benefits": rec.get("benefits"),
-                "risks": rec.get("risks"),
-                "next_steps": rec.get("next_steps"),
-                "messaging": rec.get("messaging"),
             },
-        }
+            get_ml_provenance("ai-recommendation-engine-v1"),
+        )
 
     except Exception as e:
         logger.error(f"[RECOMMENDATIONS] Error getting recommendation detail: {e}")

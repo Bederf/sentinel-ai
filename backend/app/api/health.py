@@ -14,6 +14,7 @@ class HealthResponse(BaseModel):
 
     status: str
     version: str
+    config_checksum: str
 
 
 class ControlHealthResponse(BaseModel):
@@ -21,6 +22,7 @@ class ControlHealthResponse(BaseModel):
 
     status: str
     version: str
+    config_checksum: str
     services: Dict[str, Any]
 
 
@@ -32,7 +34,11 @@ async def health_check() -> HealthResponse:
     Returns:
         HealthResponse with status and version information.
     """
-    return HealthResponse(status="ok", version=settings.app_version)
+    return HealthResponse(
+        status="ok",
+        version=settings.app_version,
+        config_checksum=settings.config_checksum,
+    )
 
 
 @router.get("/health/control", response_model=ControlHealthResponse)
@@ -118,5 +124,6 @@ async def control_health_check() -> ControlHealthResponse:
     return ControlHealthResponse(
         status=overall_status,
         version=settings.app_version,
+        config_checksum=settings.config_checksum,
         services=services,
     )

@@ -46,7 +46,7 @@ def _clean_store(tmp_path):
 
 
 def _make_booking(
-    room_id: str = "MR-01",
+    room_id: str = "FA1-1Q1-MR1",
     room_name: str = "Meeting Room 1",
     start_offset_min: int = -60,
     duration_min: int = 120,
@@ -81,6 +81,27 @@ def _inject_events(room_code: str, events: list[tuple[int, bool]], base: datetim
         occupancy_store.save_event(evt)
 
 
+def _seed_sensor_alive(room_code: str = "FA1-1Q1-MR1"):
+    """Seed a recent not-occupied sensor event so room_has_sensor_data and room_sensor_is_alive pass.
+
+    Uses real UTC time since room_sensor_is_alive compares against datetime.utcnow().
+    """
+    from app.services import occupancy_store
+
+    real_now = datetime.utcnow()
+    occupancy_store.save_event(
+        OccupancyEvent(
+            site_id="site-002",
+            room_code=room_code,
+            sensor_id="LD2410C-test",
+            occupied=False,
+            timestamp=real_now,
+            received_at=real_now,
+            source="mmwave_ld2410c",
+        )
+    )
+
+
 # ---------------------------------------------------------------------------
 # 1. OccupancyEvent model tests
 # ---------------------------------------------------------------------------
@@ -99,13 +120,13 @@ class TestOccupancyEventModel:
 
         event = OccupancyEvent(
             site_id="site-002",
-            room_code="MR-01",
+            room_code="FA1-1Q1-MR1",
             sensor_id="LD2410C-MR-01",
             occupied=True,
             source="mmwave_ld2410c",
         )
         saved = occupancy_store.save_event(event)
-        retrieved = occupancy_store.get_last_event("MR-01")
+        retrieved = occupancy_store.get_last_event("FA1-1Q1-MR1")
         assert retrieved is not None
         assert retrieved.occupied is True
         assert retrieved.id == saved.id
@@ -123,7 +144,7 @@ class TestOccupancyStoreQueries:
 
         base = datetime(2026, 3, 7, 9, 0)
         _inject_events(
-            "MR-01",
+            "FA1-1Q1-MR1",
             [
                 (0, True),  # 09:00 — occupied
                 (10, False),  # 09:10 — vacant (10 min occupied)
@@ -133,7 +154,7 @@ class TestOccupancyStoreQueries:
             base,
         )
 
-        result = occupancy_store.get_occupied_minutes("MR-01", base, base + timedelta(minutes=40))
+        result = occupancy_store.get_occupied_minutes("FA1-1Q1-MR1", base, base + timedelta(minutes=40))
         assert result == 25  # 10 + 15
 
     def test_get_occupied_minutes_still_occupied(self):
@@ -142,14 +163,14 @@ class TestOccupancyStoreQueries:
 
         base = datetime(2026, 3, 7, 9, 0)
         _inject_events(
-            "MR-01",
+            "FA1-1Q1-MR1",
             [
                 (0, True),  # 09:00 — occupied, never goes false
             ],
             base,
         )
 
-        result = occupancy_store.get_occupied_minutes("MR-01", base, base + timedelta(minutes=30))
+        result = occupancy_store.get_occupied_minutes("FA1-1Q1-MR1", base, base + timedelta(minutes=30))
         assert result == 30
 
     def test_get_current_vacancy_start(self):
@@ -158,7 +179,7 @@ class TestOccupancyStoreQueries:
 
         base = datetime(2026, 3, 7, 9, 0)
         _inject_events(
-            "MR-01",
+            "FA1-1Q1-MR1",
             [
                 (0, True),
                 (20, False),  # Vacancy starts at 09:20
@@ -166,7 +187,7 @@ class TestOccupancyStoreQueries:
             base,
         )
 
-        result = occupancy_store.get_current_vacancy_start("MR-01")
+        result = occupancy_store.get_current_vacancy_start("FA1-1Q1-MR1")
         assert result is not None
         assert result == base + timedelta(minutes=20)
 
@@ -176,14 +197,14 @@ class TestOccupancyStoreQueries:
 
         base = datetime(2026, 3, 7, 9, 0)
         _inject_events(
-            "MR-01",
+            "FA1-1Q1-MR1",
             [
                 (0, True),
             ],
             base,
         )
 
-        result = occupancy_store.get_current_vacancy_start("MR-01")
+        result = occupancy_store.get_current_vacancy_start("FA1-1Q1-MR1")
         assert result is None
 
     def test_get_last_event(self):
@@ -192,7 +213,7 @@ class TestOccupancyStoreQueries:
 
         base = datetime(2026, 3, 7, 9, 0)
         _inject_events(
-            "MR-01",
+            "FA1-1Q1-MR1",
             [
                 (0, True),
                 (10, False),
@@ -200,7 +221,7 @@ class TestOccupancyStoreQueries:
             base,
         )
 
-        result = occupancy_store.get_last_event("MR-01")
+        result = occupancy_store.get_last_event("FA1-1Q1-MR1")
         assert result is not None
         assert result.occupied is False
 
@@ -218,11 +239,11 @@ class TestGhostBookingDetection:
         now = datetime(2026, 3, 7, 10, 0)
         booking = _make_booking(start_offset_min=-30, duration_min=120, now=now)
 
-        # No occupancy events at all
-        finding = detect_ghost_booking(booking, now=now, room_code="MR-01")
+        _seed_sensor_alive("FA1-1Q1-MR1")
+        finding = detect_ghost_booking(booking, now=now, room_code="FA1-1Q1-MR1")
         assert finding is not None
         assert finding.status == "open"
-        assert finding.room_code == "MR-01"
+        assert finding.room_code == "FA1-1Q1-MR1"
 
     def test_no_ghost_before_grace(self):
         """Room empty but grace period not elapsed -> no ghost booking."""
@@ -231,7 +252,7 @@ class TestGhostBookingDetection:
         now = datetime(2026, 3, 7, 10, 0)
         booking = _make_booking(start_offset_min=-5, duration_min=120, now=now)
 
-        finding = detect_ghost_booking(booking, now=now, room_code="MR-01")
+        finding = detect_ghost_booking(booking, now=now, room_code="FA1-1Q1-MR1")
         assert finding is None
 
     def test_no_ghost_if_occupied(self):
@@ -242,9 +263,9 @@ class TestGhostBookingDetection:
         booking = _make_booking(start_offset_min=-30, duration_min=120, now=now)
 
         # Room was occupied for 5 minutes
-        _inject_events("MR-01", [(0, True), (5, False)], booking.start_time)
+        _inject_events("FA1-1Q1-MR1", [(0, True), (5, False)], booking.start_time)
 
-        finding = detect_ghost_booking(booking, now=now, room_code="MR-01")
+        finding = detect_ghost_booking(booking, now=now, room_code="FA1-1Q1-MR1")
         assert finding is None
 
     def test_auto_resolve_ghost_on_occupation(self):
@@ -257,8 +278,8 @@ class TestGhostBookingDetection:
         now = datetime(2026, 3, 7, 10, 0)
         booking = _make_booking(start_offset_min=-30, duration_min=120, now=now)
 
-        # Create ghost finding
-        finding = detect_ghost_booking(booking, now=now, room_code="MR-01")
+        _seed_sensor_alive("FA1-1Q1-MR1")
+        finding = detect_ghost_booking(booking, now=now, room_code="FA1-1Q1-MR1")
         assert finding is not None
 
         # Room becomes occupied -> auto-resolve
@@ -283,7 +304,7 @@ class TestRightSizingPatterns:
 
         # Room occupied 08:00-08:30, then vacant since 08:30 (90+ min ago)
         _inject_events(
-            "MR-01",
+            "FA1-1Q1-MR1",
             [
                 (0, True),  # 08:00
                 (30, False),  # 08:30 — vacant since
@@ -305,7 +326,7 @@ class TestRightSizingPatterns:
 
         # Room occupied 08:30-08:48 (18 min), then vacant
         _inject_events(
-            "MR-01",
+            "FA1-1Q1-MR1",
             [
                 (0, True),  # 08:30
                 (18, False),  # 08:48 — 18 min occupied
@@ -331,7 +352,7 @@ class TestRightSizingPatterns:
         # 08:00-08:15 (15 min), 09:00-09:15 (15 min), 11:50-11:55 (5 min) = 35 min total
         # 35/300 = 11.7% < 25%.
         _inject_events(
-            "MR-01",
+            "FA1-1Q1-MR1",
             [
                 (0, True),
                 (15, False),  # 08:00-08:15
@@ -366,7 +387,7 @@ class TestRightSizingPatterns:
         booking = _make_booking(start_offset_min=-120, duration_min=240, now=now)
 
         _inject_events(
-            "MR-01",
+            "FA1-1Q1-MR1",
             [
                 (0, True),
                 (30, False),
@@ -393,7 +414,7 @@ class TestRightSizingPatterns:
         booking = _make_booking(start_offset_min=-120, duration_min=240, now=now)
 
         _inject_events(
-            "MR-01",
+            "FA1-1Q1-MR1",
             [
                 (0, True),
                 (30, False),
@@ -463,7 +484,7 @@ class TestAPIPayload:
 
         # Should not raise even with count present
         req = OccupancyEventRequest(
-            room_code="MR-01",
+            room_code="FA1-1Q1-MR1",
             sensor_id="LD2410C-MR-01",
             occupied=True,
             count=5,  # type: ignore[call-arg]  — extra field, silently ignored
@@ -491,8 +512,9 @@ class TestConciergeInspectionWorkflow:
         now = datetime(2026, 3, 7, 10, 0)
         booking = _make_booking(start_offset_min=-30, duration_min=120, now=now)
 
+        _seed_sensor_alive("FA1-1Q1-MR1")
         # Step 1: Ghost detected (no movement for 30 min, past 15 min grace)
-        finding = detect_ghost_booking(booking, now=now, room_code="MR-01")
+        finding = detect_ghost_booking(booking, now=now, room_code="FA1-1Q1-MR1")
         assert finding is not None
         assert finding.status == "open"
 
@@ -523,8 +545,8 @@ class TestConciergeInspectionWorkflow:
         now = datetime(2026, 3, 7, 10, 0)
         booking = _make_booking(start_offset_min=-30, duration_min=120, now=now)
 
-        # Ghost detected
-        finding = detect_ghost_booking(booking, now=now, room_code="MR-01")
+        _seed_sensor_alive("FA1-1Q1-MR1")
+        finding = detect_ghost_booking(booking, now=now, room_code="FA1-1Q1-MR1")
         assert finding is not None
 
         # Room gets occupied before concierge arrives
@@ -548,8 +570,8 @@ class TestConciergeInspectionWorkflow:
         now = datetime(2026, 3, 7, 10, 0)
         booking = _make_booking(start_offset_min=-30, duration_min=120, now=now)
 
-        # Ghost detected and sent to concierge
-        finding = detect_ghost_booking(booking, now=now, room_code="MR-01")
+        _seed_sensor_alive("FA1-1Q1-MR1")
+        finding = detect_ghost_booking(booking, now=now, room_code="FA1-1Q1-MR1")
         mark_pending_inspection(finding.id)
 
         # Person arrives before concierge gets there
@@ -596,19 +618,20 @@ class TestConciergeInspectionWorkflow:
 
         now = datetime(2026, 3, 7, 10, 0)
         booking = _make_booking(
-            room_id="MR-01",
+            room_id="FA1-1Q1-MR1",
             room_name="Board Room A",
             start_offset_min=-30,
             duration_min=120,
             now=now,
         )
 
-        finding = detect_ghost_booking(booking, now=now, room_code="MR-01")
+        _seed_sensor_alive("FA1-1Q1-MR1")
+        finding = detect_ghost_booking(booking, now=now, room_code="FA1-1Q1-MR1")
         confirmed = concierge_confirm_empty(
             finding_id=finding.id,
             confirmed_by="Sarah Concierge",
         )
 
         assert "Board Room A" in confirmed.charge_reason
-        assert "MR-01" in confirmed.charge_reason
+        assert "FA1-1Q1-MR1" in confirmed.charge_reason
         assert "Sarah Concierge" in confirmed.charge_reason

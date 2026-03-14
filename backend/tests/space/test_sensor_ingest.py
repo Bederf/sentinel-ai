@@ -22,9 +22,9 @@ from app.space.sensor_ingest import router
 _app = FastAPI()
 _app.include_router(router, tags=["space-occupancy"])
 
-VALID_TOKEN = "tkn_FA2-1Q1-MR-01_a3f9c2"
-VALID_ROOM = "FA2-1Q1-MR-01"
-VALID_SENSOR = "LD2410C-FA2-1Q1-MR-01"
+VALID_TOKEN = "tkn_FA1-1Q1-MR1_a3f9c2"
+VALID_ROOM = "FA1-1Q1-MR1"
+VALID_SENSOR = "LD2410C-FA1-1Q1-MR1"
 
 DEVICE_RECORD = {
     "device_token": VALID_TOKEN,
@@ -147,7 +147,7 @@ def test_wrong_room_code_for_token_returns_403(mock_repo):
     resp = _sync_request(
         "POST",
         "/api/space/events",
-        json=_make_payload(room_code="FA2-1Q1-MR-99"),
+        json=_make_payload(room_code="FA1-1Q1-MR99"),
         headers={"Authorization": f"Bearer {VALID_TOKEN}"},
     )
     assert resp.status_code == 403
@@ -220,15 +220,15 @@ def test_heartbeat_updates_last_seen(mock_repo):
 def test_get_rooms_returns_all_rooms(mock_repo):
     mock_repo.get_all_room_states = AsyncMock(
         return_value=[
-            {"room_code": "FA2-1Q1-MR-01", "site_id": "FLN02", "occupied": True, "sensor_online": True},
-            {"room_code": "FA2-1Q1-MR-02", "site_id": "FLN02", "occupied": False, "sensor_online": True},
+            {"room_code": "FA1-1Q1-MR1", "site_id": "FLN02", "occupied": True, "sensor_online": True},
+            {"room_code": "FA1-1Q1-MR2", "site_id": "FLN02", "occupied": False, "sensor_online": True},
         ]
     )
     resp = _sync_request("GET", "/api/space/rooms")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 2
-    assert data[0]["room_code"] == "FA2-1Q1-MR-01"
+    assert data[0]["room_code"] == "FA1-1Q1-MR1"
     assert data[0]["occupied"] is True
 
 
@@ -236,17 +236,17 @@ def test_get_rooms_returns_all_rooms(mock_repo):
 def test_get_room_detail(mock_repo):
     mock_repo.get_room_current_state = AsyncMock(
         return_value={
-            "room_code": "FA2-1Q1-MR-01",
+            "room_code": "FA1-1Q1-MR1",
             "site_id": "FLN02",
             "occupied": False,
             "sensor_online": True,
             "last_heartbeat_at": "2026-03-08T10:00:00+00:00",
         }
     )
-    resp = _sync_request("GET", "/api/space/rooms/FA2-1Q1-MR-01")
+    resp = _sync_request("GET", "/api/space/rooms/FA1-1Q1-MR1")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["room_code"] == "FA2-1Q1-MR-01"
+    assert data["room_code"] == "FA1-1Q1-MR1"
     assert data["occupied"] is False
 
 

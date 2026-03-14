@@ -2,9 +2,9 @@
 title: "SENTINEL Documentation"
 type: "guide"
 status: "approved"
-version: "1.2.0"
+version: "1.3.0"
 created: "2026-01-30"
-updated: "2026-03-01"
+updated: "2026-03-14"
 author: "Sentinel Development Team"
 tags: ["documentation", "overview"]
 domain: "general"
@@ -70,6 +70,8 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Dashboard Generator API](03-api-reference/dashboard-generator-api.md)** - Auto-generate dashboard cards, monitoring rules, health weights, and module suggestions from discovered equipment (Phase 141)
 - **[Plant Alerts API](04-features/plant-room-notification-pipeline.md#api-reference)** - Desigo fault email ingest, alarm retrieval, throttle status, acknowledgement (Phase 146)
 - **[Gateway Log API](03-api-reference/gateway-log-api.md)** - Sentry gateway tool-level observability, activity log query (ADR-001)
+- **[AI Usage & Cost Tracking API](03-api-reference/ai-usage-api.md)** - Token usage summaries, daily breakdowns, exchange rate config, per-provider/model cost tracking (v48.0)
+- **[Alert Routing API](03-api-reference/buildings.md)** - Configurable alert routing rules, equipment muting, channel status (Phase 159)
 
 ### ✨ Features
 
@@ -130,6 +132,9 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 #### Plant Room Alerts
 - **[Plant Room Notification Pipeline](04-features/plant-room-notification-pipeline.md)** - Desigo BMS fault email ingestion, severity classification, Twilio WhatsApp delivery with alarm flood protection and rate limiting (Phase 146)
+
+#### Settings & Operations
+- **[AI Cost Tracking](04-features/ai-cost-tracking.md)** - Token usage and spend monitoring across Claude, ChatGPT, Ollama with daily email reports to info@sentinel-ai.co.za (v48.0)
 
 #### Additional Features
 - [Technician Chat](04-features/technician-chat.md) - Guided fault diagnosis (Phase 19)
@@ -201,9 +206,12 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 ### 🔧 Development
 - [Tool Use Best Practices](12-development/tool-use-best-practices.md) - Development workflow
+- [GSD Pipeline Architecture](12-development/gsd-pipeline-architecture.md) - Phase orchestration, Ralph Loop, orthogonal validation
 
 ### 🔧 Operations
+- **[Deployment Runbook](10-operations/deployment-runbook.md)** - Step-by-step new site deployment: install → Supabase → config → services → SIMBIOT wizard → technician setup → verification
 - **[Monitoring Stack](10-operations/monitoring-stack.md)** - Loki + Promtail + Grafana deployment, config management, scrape jobs, dashboard provisioning
+- **[Supabase Performance Runbook](10-operations/supabase-performance-runbook.md)** - Indexes, query optimization, Redis caching, archival, backup trigger
 - [AEGIS Phase 0 Daily Ops Runbook](10-operations/aegis-phase0-daily-ops.md) - Daily governance, queue, tripwire, and evidence workflow for 0A/0B
 
 ### 🩺 Troubleshooting

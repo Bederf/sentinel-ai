@@ -62,6 +62,8 @@ export interface AIRecommendation {
   recommendation_id: string;
   timestamp: string;
   source_module: ModuleType;
+  source?: string;  // "ai_optimizer" | "health_alert" | "financial_roi" | "anomaly_detector"
+  source_type?: string;  // "ml_model" | "rule_based"
   recommendation_type: RecommendationType;
   priority: RecommendationPriority;
   title: string;

@@ -27,7 +27,7 @@ from app.config.settings import settings
 from app.services.optimization_tier_router import get_tier_router
 from app.services.module_registry_service import module_registry
 from app.services.profile_service import get_profile_service
-from app.utils.ai_provenance import get_ml_provenance
+from app.utils.ai_provenance import attach_ai_provenance, get_ml_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -789,26 +789,28 @@ async def analyze_optimization(request: AnalyzeRequest) -> Dict[str, Any]:
 
             save_sites(sites)
 
-        return {
-            "success": True,
-            "recommendation": rec_dict,
-            "validation": validation,
-            "auto_applied": auto_applied,
-            "auto_apply_results": (auto_apply_results if auto_applied else None),
-            "mode": site_mode,
-            "controls_module_active": controls_module_active,
-            "control_tier": control_tier,
-            "routing_summary": routing_summary_dict,
-            "routing_details": routing_details_list,
-            "execution_summary": execution_summary,
-            "summary": {
-                "hvac_recommendations": hvac_count,
-                "lighting_recommendations": lighting_count,
-                "cross_system_recommendations": cross_system_count,
-                "total_recommendations": hvac_count + lighting_count,
+        return attach_ai_provenance(
+            {
+                "success": True,
+                "recommendation": rec_dict,
+                "validation": validation,
+                "auto_applied": auto_applied,
+                "auto_apply_results": (auto_apply_results if auto_applied else None),
+                "mode": site_mode,
+                "controls_module_active": controls_module_active,
+                "control_tier": control_tier,
+                "routing_summary": routing_summary_dict,
+                "routing_details": routing_details_list,
+                "execution_summary": execution_summary,
+                "summary": {
+                    "hvac_recommendations": hvac_count,
+                    "lighting_recommendations": lighting_count,
+                    "cross_system_recommendations": cross_system_count,
+                    "total_recommendations": hvac_count + lighting_count,
+                },
             },
-            "ai_provenance": get_ml_provenance("ai-optimizer-v1").model_dump(),
-        }
+            get_ml_provenance("ai-optimizer-v1"),
+        )
 
     except ValueError as e:
         logger.error(f"Site not found: {e}")
@@ -857,18 +859,21 @@ async def analyze_load_shedding(request: LoadSheddingAnalyzeRequest) -> Dict[str
         # Validate recommendation against safety rules
         validation = await get_ai_optimizer().validate_recommendation(request.site_id, recommendation)
 
-        return {
-            "success": True,
-            "load_shedding_stage": request.load_shedding_stage,
-            "recommendation": recommendation.to_dict(),
-            "validation": validation,
-            "zone_priority_info": {
-                1: "Stage 1: Maintain P1-P4, shed P5 (parking, plant rooms)",
-                2: "Stage 2: Maintain P1-P3, shed P4-P5 (+ lobby)",
-                3: "Stage 3: Maintain P1-P2, shed P3-P5 (executive/server/meeting only)",
-                4: "Stage 4: Maintain P1 only (executive/server rooms only)",
-            }.get(request.load_shedding_stage, ""),
-        }
+        return attach_ai_provenance(
+            {
+                "success": True,
+                "load_shedding_stage": request.load_shedding_stage,
+                "recommendation": recommendation.to_dict(),
+                "validation": validation,
+                "zone_priority_info": {
+                    1: "Stage 1: Maintain P1-P4, shed P5 (parking, plant rooms)",
+                    2: "Stage 2: Maintain P1-P3, shed P4-P5 (+ lobby)",
+                    3: "Stage 3: Maintain P1-P2, shed P3-P5 (executive/server/meeting only)",
+                    4: "Stage 4: Maintain P1 only (executive/server rooms only)",
+                }.get(request.load_shedding_stage, ""),
+            },
+            get_ml_provenance("ai-optimizer-v1"),
+        )
 
     except ValueError as e:
         logger.error(f"Site not found: {e}")

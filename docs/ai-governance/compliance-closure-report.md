@@ -131,7 +131,7 @@ Evidence: `docs/ai-governance/nist-control-effectiveness-review.md`
 
 **Key gaps:**
 - Article 4: Training materials exist but delivery records and competence assessments not yet collected
-- Article 50: SSE streaming endpoints use headers only for provenance, not body-level metadata
+- Article 50: Non-streaming AI/recommendation APIs now include body-level provenance and runtime version metadata; streaming chat remains header-based by design and exported reports still lack AI watermark
 - Articles 52/53: Compliance register at v0.2.0; EU database registration not evaluated
 
 Evidence: `docs/ai-governance/eu-ai-act-assurance-review.md`
@@ -174,7 +174,7 @@ The control applicability matrix (`docs/ai-governance/control-applicability-matr
 | NC-003 | Minor | Residual risk disclosure not published for operators | CLOSED | Phase 1 gap analysis | 2026-05-13 |
 | NC-004 | Major | Tabletop exercise identified 5 open actions (rollback automation, training data validation, AI playbook, prediction consistency, rollback metric) | OPEN | Phase 3 tabletop (TABLETOP-001) | 2026-04-15 |
 | NC-005 | Minor | NIST review: Grafana not deployed, 2 of 3 scenarios unexecuted, CAPA effectiveness unverified | OPEN | Phase 3 NIST review | 2026-06-30 |
-| NC-006 | Minor | EU review: training delivery records, SSE provenance, register maturity | OPEN | Phase 3 EU review | 2026-05-01 |
+| NC-006 | Minor | EU review: training delivery records, transparency inventory/export watermarking, register maturity | OPEN | Phase 3 EU review | 2026-05-01 |
 
 ### Closure Evidence for Closed CAPAs
 
@@ -188,7 +188,7 @@ All 3 open CAPAs have assigned owners and target dates. None are overdue. Monito
 
 - **NC-004** (Major, due 2026-04-15): AI Engineering Lead owns 5 tabletop actions. Critical action (training data validation gate) is highest priority. Progress tracked in quarterly management review.
 - **NC-005** (Minor, due 2026-06-30): ML Operations Engineer. Requires Grafana deployment (infrastructure dependency), additional tabletop scenarios (scheduling dependency), and first management review cycle (time dependency).
-- **NC-006** (Minor, due 2026-05-01): Compliance Lead. Requires training delivery to Site S002 operators, SSE provenance enhancement, and compliance register promotion to v1.0.0.
+- **NC-006** (Minor, due 2026-05-01): Compliance Lead. Requires training delivery to Site S002 operators, transparency inventory/export watermarking follow-through, and compliance register promotion to v1.0.0. Non-streaming body-level provenance and runtime version stamping were implemented on 2026-03-14; streaming chat remains header-based by design.
 
 Full register: `docs/ai-governance/nonconformity-capa-register.md` (v1.3.0)
 

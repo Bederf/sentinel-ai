@@ -2,9 +2,9 @@
 title: "SENTINEL Security Documentation"
 type: "reference"
 status: "approved"
-version: "1.5.0"
+version: "1.5.1"
 created: "2026-02-04"
-updated: "2026-02-23"
+updated: "2026-03-14"
 author: "SENTINEL Security Office"
 tags: ["security", "governance", "index", "FSR"]
 domain: "security"
@@ -59,6 +59,7 @@ This directory contains the SENTINEL Information Security Policy Suite -- the go
 | Document | Description | Status |
 |---|---|---|
 | [Information Security Risk Register](information-security-risk-register.md) | Risk register, annual assessment, acceptance criteria | Complete |
+| [Threat Model Summary](threat-model-summary.md) | One-page summary of protected assets, trust boundaries, attack paths, mitigations, and prohibited behaviors | Complete |
 | [Data Privacy Policy](data-privacy-policy.md) | POPIA compliance, data handling rules, privacy notices | Complete |
 | [Information Classification Policy](information-classification-policy.md) | Classification scheme, labelling, handling procedures | Complete |
 | [Privacy Impact Assessment Template](privacy-impact-assessment-template.md) | PIA template for new systems/features | Complete |

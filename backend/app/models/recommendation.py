@@ -85,6 +85,8 @@ class Recommendation:
     executed_at: Optional[datetime] = None
     execution_result: Optional[Dict[str, Any]] = None
     rejection_reason: Optional[str] = None
+    source: str = ""  # "ai_optimizer", "health_alert", "financial_roi", "anomaly_detector", "rule_engine"
+    source_type: str = ""  # "ml_model", "rule_based", "user_input"
     correlation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     outcome_validated: Optional[bool] = None
     outcome_notes: Optional[str] = None
@@ -134,6 +136,8 @@ class Recommendation:
             "executed_at": self.executed_at.isoformat() if isinstance(self.executed_at, datetime) else self.executed_at,
             "execution_result": self.execution_result,
             "rejection_reason": self.rejection_reason,
+            "source": self.source,
+            "source_type": self.source_type,
             "outcome_validated": self.outcome_validated,
             "outcome_notes": self.outcome_notes,
             "outcome_validated_at": (

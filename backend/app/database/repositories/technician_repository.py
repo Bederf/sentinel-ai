@@ -265,6 +265,262 @@ class TechnicianRepository:
             logger.error(f"Error getting site assignments: {e}")
             return []
 
+    # ==================== CRUD (Phase: Technician Registry UI) ====================
+
+    async def get_technicians_with_assignments(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get all technicians with their site assignments and notification channels.
+
+        Returns a combined view for the Settings UI.
+        """
+        if not self.client:
+            return self._get_technicians_from_json()
+
+        try:
+            # Get all technicians
+            result = self.client.table("technicians").select("*").order("name").execute()
+            technicians = result.data or []
+
+            # Get site assignments
+            assign_query = self.client.table("site_technicians").select("*")
+            if site_id:
+                assign_query = assign_query.eq("site_id", site_id)
+            assignments = (assign_query.execute()).data or []
+
+            # Get notification channels
+            channels = (self.client.table("technician_notification_channels").select("*").execute()).data or []
+
+            # Merge
+            for tech in technicians:
+                tid = tech["id"]
+                tech["specialties"] = [a["specialty"] for a in assignments if a.get("technician_id") == tid]
+                tech["site_assignments"] = [
+                    {"site_id": a["site_id"], "specialty": a["specialty"], "is_primary": a.get("is_primary", False)}
+                    for a in assignments
+                    if a.get("technician_id") == tid
+                ]
+                tech["channels"] = [
+                    {"channel_type": c["channel_type"], "is_verified": c.get("is_verified", False)}
+                    for c in channels
+                    if c.get("technician_id") == tid
+                ]
+
+            return technicians
+
+        except Exception as e:
+            logger.error(f"Error getting technicians with assignments: {e}")
+            return self._get_technicians_from_json()
+
+    def _get_technicians_from_json(self) -> List[Dict[str, Any]]:
+        """JSON fallback for technician list."""
+        import json
+        from pathlib import Path
+
+        json_path = Path(__file__).parent.parent.parent / "app" / "data" / "technicians_whatsapp.json"
+        if not json_path.exists():
+            # Try alternate path
+            json_path = Path(__file__).parent.parent / "data" / "technicians_whatsapp.json"
+        if not json_path.exists():
+            return []
+        try:
+            with open(json_path) as f:
+                data = json.load(f)
+            techs = data.get("technicians", [])
+            for t in techs:
+                t.setdefault("specialties", [t.get("specialty", "general")])
+                t.setdefault("channels", [])
+                t.setdefault("site_assignments", [])
+            return techs
+        except Exception:
+            return []
+
+    async def create_technician(
+        self,
+        name: str,
+        email: str,
+        phone: str,
+        specialties: List[str],
+        site_id: str,
+        telegram_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Create a new technician with site assignment(s).
+
+        Creates:
+        1. technicians record
+        2. site_technicians assignment(s) per specialty
+        3. technician_notification_channels if telegram/whatsapp provided
+        """
+        if not self.client:
+            return self._create_technician_json(name, email, phone, specialties, site_id)
+
+        try:
+            import uuid
+
+            # Generate a readable code
+            code_suffix = name.split()[0].upper()[:4] + "-" + str(uuid.uuid4())[:4].upper()
+            tech_code = f"TECH-{code_suffix}"
+
+            # 1. Create technician
+            tech_data = {
+                "code": tech_code,
+                "name": name,
+                "email": email,
+                "phone": phone,
+                "active": True,
+            }
+            if telegram_id:
+                tech_data["telegram_id"] = telegram_id
+
+            result = self.client.table("technicians").insert(tech_data).execute()
+            if not result.data:
+                logger.error("Failed to insert technician")
+                return None
+
+            tech = result.data[0]
+            tech_id = tech["id"]
+
+            # 2. Create site_technicians for each specialty
+            for i, spec in enumerate(specialties):
+                self.client.table("site_technicians").insert(
+                    {
+                        "site_id": site_id,
+                        "technician_id": tech_id,
+                        "specialty": spec,
+                        "is_primary": i == 0,  # First specialty is primary
+                    }
+                ).execute()
+
+            # 3. Create notification channel if contact info provided
+            if telegram_id:
+                self.client.table("technician_notification_channels").insert(
+                    {
+                        "technician_id": tech_id,
+                        "channel_type": "telegram",
+                        "telegram_id": telegram_id,
+                        "is_verified": False,
+                    }
+                ).execute()
+
+            if phone:
+                self.client.table("technician_notification_channels").insert(
+                    {
+                        "technician_id": tech_id,
+                        "channel_type": "whatsapp",
+                        "whatsapp_number": phone,
+                        "is_verified": False,
+                    }
+                ).execute()
+
+            tech["specialties"] = specialties
+            tech["channels"] = []
+            if telegram_id:
+                tech["channels"].append({"channel_type": "telegram", "is_verified": False})
+            if phone:
+                tech["channels"].append({"channel_type": "whatsapp", "is_verified": False})
+
+            logger.info(f"Created technician {name} ({tech_code}) with specialties {specialties}")
+            return tech
+
+        except Exception as e:
+            logger.error(f"Error creating technician: {e}")
+            return None
+
+    def _create_technician_json(
+        self, name: str, email: str, phone: str, specialties: List[str], site_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """JSON fallback for technician creation."""
+        import json
+        import uuid
+        from pathlib import Path
+
+        json_path = Path(__file__).parent.parent / "data" / "technicians_whatsapp.json"
+        try:
+            data = {"technicians": []}
+            if json_path.exists():
+                with open(json_path) as f:
+                    data = json.load(f)
+
+            new_tech = {
+                "id": f"tech-{str(uuid.uuid4())[:8]}",
+                "name": name,
+                "email": email,
+                "whatsapp_number": phone,
+                "specialty": specialties[0] if specialties else "general",
+                "active": True,
+                "site_id": site_id,
+            }
+            data["technicians"].append(new_tech)
+
+            with open(json_path, "w") as f:
+                json.dump(data, f, indent=2)
+
+            new_tech["specialties"] = specialties
+            new_tech["channels"] = []
+            return new_tech
+        except Exception as e:
+            logger.error(f"JSON technician creation failed: {e}")
+            return None
+
+    async def update_technician(
+        self,
+        tech_id: str,
+        updates: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Update technician fields (name, email, phone, active)."""
+        if not self.client:
+            return None
+
+        try:
+            allowed = {k: v for k, v in updates.items() if k in ("name", "email", "phone", "active", "telegram_id")}
+            if not allowed:
+                return None
+
+            result = self.client.table("technicians").update(allowed).eq("id", tech_id).execute()
+            return result.data[0] if result.data else None
+
+        except Exception as e:
+            logger.error(f"Error updating technician {tech_id}: {e}")
+            return None
+
+    async def update_specialties(
+        self,
+        tech_id: str,
+        site_id: str,
+        specialties: List[str],
+    ) -> bool:
+        """Replace all specialty assignments for a technician at a site."""
+        if not self.client:
+            return False
+
+        try:
+            # Delete existing assignments for this tech at this site
+            self.client.table("site_technicians").delete().eq("technician_id", tech_id).eq("site_id", site_id).execute()
+
+            # Create new assignments
+            for i, spec in enumerate(specialties):
+                self.client.table("site_technicians").insert(
+                    {
+                        "site_id": site_id,
+                        "technician_id": tech_id,
+                        "specialty": spec,
+                        "is_primary": i == 0,
+                    }
+                ).execute()
+
+            return True
+        except Exception as e:
+            logger.error(f"Error updating specialties for {tech_id}: {e}")
+            return False
+
+    async def deactivate_technician(self, tech_id: str) -> bool:
+        """Soft-deactivate a technician (preserves audit trail)."""
+        result = await self.update_technician(tech_id, {"active": False})
+        return result is not None
+
+    async def reactivate_technician(self, tech_id: str) -> bool:
+        """Reactivate a deactivated technician."""
+        result = await self.update_technician(tech_id, {"active": True})
+        return result is not None
+
 
 # Singleton instance
 _repository: Optional[TechnicianRepository] = None

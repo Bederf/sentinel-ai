@@ -579,6 +579,8 @@ class BackgroundSchedulerService:
                             confidence=str(confidence_num),
                             confidence_score=confidence_num,
                             profile=optimization_result.profile or "",
+                            source="ai_optimizer",
+                            source_type="ml_model",
                             status=RecommendationStatus.PENDING,
                             requires_approval=True,
                         )
@@ -764,6 +766,8 @@ class BackgroundSchedulerService:
                         confidence=str(0.95),  # Rule-based, high confidence
                         confidence_score=0.95,
                         profile="health_rules",
+                        source="health_alert",
+                        source_type="rule_based",
                         status=RecommendationStatus.PENDING,
                         requires_approval=True,
                     )
@@ -3066,6 +3070,32 @@ class BackgroundSchedulerService:
                 )
         except Exception as e:
             logger.error("DB archival failed: %s", e, exc_info=True)
+
+    def add_ai_cost_report_job(self):
+        """Add daily AI cost report email job. Runs at 23:55 every day."""
+        from apscheduler.triggers.cron import CronTrigger
+
+        if self.scheduler.get_job("ai_cost_daily_report"):
+            self.scheduler.remove_job("ai_cost_daily_report")
+
+        self.scheduler.add_job(
+            func=self._send_ai_cost_report,
+            trigger=CronTrigger(hour=23, minute=55),
+            id="ai_cost_daily_report",
+            name="Daily AI Cost Report Email",
+            replace_existing=True,
+        )
+        logger.info("Added daily AI cost report job (23:55)")
+
+    def _send_ai_cost_report(self):
+        """Send the daily AI cost report email."""
+        try:
+            from app.services.ai_usage_tracker import usage_tracker
+
+            usage_tracker.flush()
+            usage_tracker.send_daily_report_email("info@sentinel-ai.co.za")
+        except Exception as e:
+            logger.error("AI cost report email failed: %s", e, exc_info=True)
 
 
 # Global scheduler instance

@@ -172,14 +172,119 @@ Status Mapping:
 
 ---
 
+### GET /api/system/health/extended
+
+Returns the standard 7 probes plus 5 extended probes for a comprehensive system overview.
+
+**Method:** `GET`
+**Path:** `/api/system/health/extended`
+**Authentication:** Optional
+
+#### Extended Probes (in addition to standard 7)
+
+| Probe | Key | What It Checks |
+|-------|-----|----------------|
+| **Disk Space** | `disk` | `shutil.disk_usage("/opt/bms-intelligence")` — % used, GB free |
+| **LLM Provider** | `llm` | Ollama availability (localhost:11434) or Claude API key configured |
+| **ML Models** | `ml_models` | Count of `.joblib`/`.pkl` files in `ml/models/`, last training date |
+| **Background Jobs** | `background_jobs` | APScheduler running status, job count |
+| **RAG Documents** | `rag` | Document count in `data/documents/` |
+
+#### Request
+
+```bash
+curl -X GET http://localhost:9095/api/system/health/extended \
+  -H "Authorization: Bearer <token>"
+```
+
+#### Response (200 OK)
+
+Same structure as `/api/system/health` but `component_scores` and `component_details` include the 5 additional keys (`disk`, `llm`, `ml_models`, `background_jobs`, `rag`).
+
+---
+
+### GET /api/system/backup-status
+
+Returns the current backup state, last run timestamp, file count, and total size.
+
+**Method:** `GET`
+**Path:** `/api/system/backup-status`
+**Authentication:** Optional
+
+#### Response (200 OK)
+
+```json
+{
+  "state": "idle",
+  "last_backup": "2026-03-14T15:30:00.000000",
+  "last_backup_age_hours": 2.5,
+  "file_count": 30,
+  "total_size_mb": 0.6,
+  "last_result": "success",
+  "backup_dir": "/opt/bms-intelligence/backend/app/data/supabase_backup"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `state` | enum | `idle` or `running` |
+| `last_backup` | ISO 8601 / null | Timestamp of most recent backup file |
+| `last_backup_age_hours` | float / null | Hours since last backup (null if never) |
+| `file_count` | int | Number of JSON table exports |
+| `total_size_mb` | float | Total backup directory size |
+| `last_result` | string / null | `success`, `failed`, `timeout`, or null |
+
+---
+
+### POST /api/system/backup/trigger
+
+Triggers a manual Supabase-to-JSON backup. Runs the existing `backup_supabase_to_json.py` script as a background task.
+
+**Method:** `POST`
+**Path:** `/api/system/backup/trigger`
+**Authentication:** Bearer token (JWT)
+**Timeout:** 5 minutes max
+
+#### Request
+
+```bash
+curl -X POST http://localhost:9095/api/system/backup/trigger \
+  -H "Authorization: Bearer <token>"
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "status": "started",
+  "message": "Backup triggered. Check /api/system/backup-status for progress."
+}
+```
+
+#### Error Response (409 Conflict)
+
+```json
+{
+  "detail": "Backup already in progress"
+}
+```
+
+**Notes:**
+- Exports all Supabase tables (90+ including equipment, alerts, work orders, zones, ML models) to `backend/app/data/supabase_backup/`
+- Poll `GET /api/system/backup-status` to check completion (state changes from `running` to `idle`)
+- Script uses `psycopg2` direct connection — Supabase must be running
+- Status persisted to `_backup_status.json` for dashboard display across restarts
+
+---
+
 ### GET /api/system/health/history
 
 Retrieves historical health metrics for trend analysis.
 
 **Purpose:** Analyze system health trends over time (24h, 7d, 30d).
 
-**Method:** `GET`  
-**Path:** `/api/system/health/history`  
+**Method:** `GET`
+**Path:** `/api/system/health/history`
 **Authentication:** Optional  
 **Rate Limit:** 30 requests/minute  
 **Query Parameters:**

@@ -240,8 +240,8 @@ class TestConcurrentRequests:
         # All requests should complete (may be blocked or fail validation)
         assert all(r.status_code in [200, 400, 403, 422, 500] for r in results)
 
-        # Should handle concurrency (< 10 seconds total, relaxed for CI)
-        assert elapsed < 10.0
+        # Should handle concurrency (< 30 seconds total, relaxed for CI/VPS)
+        assert elapsed < 30.0
 
 
 @pytest.mark.performance

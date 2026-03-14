@@ -16,7 +16,7 @@ from app.services.classification_service import get_classification_service
 from app.services.ml_inference import get_lstm_service, get_anomaly_service
 from app.services.survival_service import SurvivalService
 from pydantic import BaseModel, Field
-from app.utils.ai_provenance import get_ml_provenance
+from app.utils.ai_provenance import attach_ai_provenance, get_ml_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,9 @@ class FleetFailureRisk(BaseModel):
     equipment_type: str
     predicted_failure: str
     confidence: float
+    app_version: str | None = None
+    config_checksum: str | None = None
+    ai_provenance: Dict | None = None
 
 
 class FeatureImportanceItem(BaseModel):
@@ -75,11 +78,9 @@ async def get_failure_type_prediction(equipment_id: str):
         service = get_classification_service()
         result = service.predict_failure_type(equipment_id)
         if isinstance(result, dict):
-            result["ai_provenance"] = get_ml_provenance("failure-classifier-v1").model_dump()
-            return result
+            return attach_ai_provenance(result, get_ml_provenance("failure-classifier-v1"))
         response_dict = result.model_dump() if hasattr(result, "model_dump") else result
-        response_dict["ai_provenance"] = get_ml_provenance("failure-classifier-v1").model_dump()
-        return response_dict
+        return attach_ai_provenance(response_dict, get_ml_provenance("failure-classifier-v1"))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -99,7 +100,9 @@ async def get_fleet_failure_risks(min_confidence: float = Query(default=0.5, ge=
     """
     try:
         service = get_classification_service()
-        return service.get_fleet_failure_risks(min_confidence)
+        return attach_ai_provenance(
+            service.get_fleet_failure_risks(min_confidence), get_ml_provenance("failure-classifier-v1")
+        )
     except Exception as e:
         logger.error(f"Error getting fleet risks: {e}")
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
@@ -266,9 +269,7 @@ async def get_comprehensive_prediction(equipment_id: str):
 
     # Calculate overall risk
     results["overall_risk"] = calculate_overall_risk(results["predictions"])
-    results["ai_provenance"] = get_ml_provenance("comprehensive-ml-ensemble-v1").model_dump()
-
-    return results
+    return attach_ai_provenance(results, get_ml_provenance("comprehensive-ml-ensemble-v1"))
 
 
 def calculate_overall_risk(predictions: Dict) -> Dict:

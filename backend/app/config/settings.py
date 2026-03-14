@@ -1,5 +1,9 @@
 """Application settings and configuration."""
 
+import hashlib
+import json
+from typing import Any
+
 from enum import StrEnum
 
 from pydantic import ConfigDict, Field, field_validator
@@ -411,6 +415,24 @@ class Settings(BaseSettings):
         """Recommendation generation interval in seconds (600s = 10 minutes)."""
         return 600
 
+    @property
+    def config_checksum_payload(self) -> dict[str, Any]:
+        """Return a stable, non-secret payload representing runtime config."""
+        payload = self.model_dump(mode="json")
+        payload["resolved_ingestion_mode"] = self.resolved_ingestion_mode.value
+        payload["is_live_mode"] = self.is_live_mode
+        return {key: self._normalize_config_value(key, value) for key, value in sorted(payload.items())}
+
+    @property
+    def config_checksum(self) -> str:
+        """Return a stable checksum for the effective non-secret configuration."""
+        serialized = json.dumps(
+            self.config_checksum_payload,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @field_validator("cors_origins", "demo_allowed_origins", mode="before")
@@ -434,6 +456,43 @@ class Settings(BaseSettings):
         if provider not in {"anthropic", "openai", "zai"}:
             return "anthropic"
         return provider
+
+    @classmethod
+    def _normalize_config_value(cls, field_name: str, value: Any) -> Any:
+        """Normalize config values for checksum generation without exposing secrets."""
+        if cls._is_sensitive_field(field_name):
+            return cls._sensitive_value_marker(value)
+        if isinstance(value, dict):
+            return {
+                str(key): cls._normalize_config_value(f"{field_name}.{key}", nested_value)
+                for key, nested_value in sorted(value.items())
+            }
+        if isinstance(value, list):
+            return [cls._normalize_config_value(field_name, item) for item in value]
+        return value
+
+    @staticmethod
+    def _is_sensitive_field(field_name: str) -> bool:
+        """Return True when a field likely contains credential material."""
+        sensitive_markers = (
+            "secret",
+            "password",
+            "token",
+            "api_key",
+            "service_role_key",
+            "webhook",
+            "sid",
+            "dsn",
+        )
+        normalized = field_name.lower()
+        return any(marker in normalized for marker in sensitive_markers)
+
+    @staticmethod
+    def _sensitive_value_marker(value: Any) -> str:
+        """Collapse secret values to a stable presence marker."""
+        if value in (None, "", [], {}, False):
+            return "__empty__"
+        return "__set__"
 
 
 settings = Settings()

@@ -514,8 +514,9 @@ export function SpaceOptimizationSettings({
               className="py-8 text-center text-sm"
               style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
-              No concierge users configured. Click &quot;Add Concierge&quot; to
-              create one.
+              {readOnly
+                ? "No concierge users configured. Unlock settings to add one."
+                : 'No concierge users configured. Click "Add Concierge" to create one.'}
             </div>
           ) : (
             <div className="overflow-x-auto">

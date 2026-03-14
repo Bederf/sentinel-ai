@@ -8,9 +8,11 @@ used across all AI-facing endpoints.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel
+
+from app.config.settings import settings
 
 
 class AIProvenance(BaseModel):
@@ -24,6 +26,8 @@ class AIProvenance(BaseModel):
         "It should be reviewed by qualified personnel before acting on it."
     )
     correlation_id: Optional[str] = None
+    app_version: str = settings.app_version
+    config_checksum: str = settings.config_checksum
 
 
 # ---------------------------------------------------------------------------
@@ -96,4 +100,59 @@ def provenance_headers(provenance: AIProvenance) -> dict[str, str]:
         "X-AI-Model": provenance.model,
         "X-AI-Provider": provenance.provider,
         "X-AI-Disclosure": provenance.disclosure,
+        "X-App-Version": provenance.app_version,
+        "X-Config-Checksum": provenance.config_checksum,
     }
+
+
+def runtime_metadata() -> dict[str, str]:
+    """Return runtime version metadata for body-level stamping."""
+    return {
+        "app_version": settings.app_version,
+        "config_checksum": settings.config_checksum,
+    }
+
+
+def attach_runtime_metadata(payload: Any) -> Any:
+    """Attach runtime version metadata to a response payload.
+
+    Dict payloads receive top-level metadata.
+    List payloads preserve shape and stamp each dict item.
+    """
+    metadata = runtime_metadata()
+    return _attach_metadata(payload, metadata)
+
+
+def attach_ai_provenance(payload: Any, provenance: AIProvenance) -> Any:
+    """Attach runtime version metadata and AI provenance to a response payload."""
+    metadata = runtime_metadata()
+    metadata["ai_provenance"] = provenance.model_dump()
+    return _attach_metadata(payload, metadata)
+
+
+def _attach_metadata(payload: Any, metadata: dict[str, Any]) -> Any:
+    """Attach metadata to dict payloads or dict items in lists."""
+    if isinstance(payload, BaseModel):
+        payload = payload.model_dump()
+
+    if isinstance(payload, dict):
+        stamped = dict(payload)
+        for key, value in metadata.items():
+            stamped.setdefault(key, value)
+        return stamped
+
+    if isinstance(payload, list):
+        stamped_items = []
+        for item in payload:
+            if isinstance(item, BaseModel):
+                item = item.model_dump()
+            if isinstance(item, dict):
+                stamped_item = dict(item)
+                for key, value in metadata.items():
+                    stamped_item.setdefault(key, value)
+                stamped_items.append(stamped_item)
+            else:
+                stamped_items.append(item)
+        return stamped_items
+
+    return payload
