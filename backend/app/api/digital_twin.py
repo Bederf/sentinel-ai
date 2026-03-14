@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.services.digital_twin_service import get_digital_twin_service
+from app.services.energy_flow_calculator import get_energy_flow_calculator
 from app.services.equipment_status_streamer import EquipmentStatusStreamer
 
 logger = logging.getLogger(__name__)
@@ -345,6 +346,69 @@ async def extract_from_dxf(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"DXF parsing failed: {str(e)}",
+        )
+
+
+# =============================================================================
+# Energy Flows & Historical State
+# =============================================================================
+
+
+@router.get(
+    "/energy-flows",
+    summary="Get current energy flow connections between equipment",
+)
+async def get_energy_flows(
+    site_id: str = Query(..., description="Site UUID or code"),
+) -> dict:
+    """Return energy flow connections for the Digital Twin 3D view.
+
+    Infers HVAC (chilled water supply/return) and electrical distribution
+    chains from equipment types and zones. Each flow includes direction,
+    power in kW, and a colour for visualisation.
+    """
+    try:
+        calculator = get_energy_flow_calculator()
+        flows = await calculator.calculate_flows(site_id)
+        return {
+            "site_id": site_id,
+            "flows": [f.to_dict() for f in flows],
+            "count": len(flows),
+        }
+    except Exception as e:
+        logger.error(f"Energy flow calculation failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Energy flow calculation failed: {str(e)}",
+        )
+
+
+@router.get(
+    "/historical-state",
+    summary="Get equipment state at a historical timestamp",
+)
+async def get_historical_state(
+    site_id: str = Query(..., description="Site UUID or code"),
+    timestamp: str = Query(..., description="ISO 8601 timestamp"),
+) -> dict:
+    """Return equipment state (health, status, power) at a specific timestamp.
+
+    Uses 3-tier fallback: Supabase time-series -> simulation state -> current.
+    """
+    try:
+        calculator = get_energy_flow_calculator()
+        equipment_state = await calculator.get_historical_state(site_id, timestamp)
+        return {
+            "site_id": site_id,
+            "timestamp": timestamp,
+            "equipment": equipment_state,
+            "count": len(equipment_state),
+        }
+    except Exception as e:
+        logger.error(f"Historical state query failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Historical state query failed: {str(e)}",
         )
 
 

@@ -747,6 +747,50 @@ export interface EquipmentStatusFrame {
   timestamp: string;
 }
 
+// ============= Digital Twin Energy Flow Types =============
+
+/** A single energy flow connection between two equipment items. */
+export interface EnergyFlow {
+  from_equipment: string;
+  to_equipment: string;
+  flow_type: string;
+  power_kw: number;
+  direction: "forward" | "reverse";
+  color: string;
+}
+
+/** Historical equipment state at a specific timestamp. */
+export interface HistoricalEquipmentState {
+  code: string;
+  type: string;
+  health_score: number;
+  status: string;
+  power_kw: number;
+  timestamp: string;
+}
+
+/** API methods for Digital Twin energy flows and historical state. */
+export const digitalTwinApi = {
+  async getEnergyFlows(siteId: string): Promise<{ site_id: string; flows: EnergyFlow[]; count: number }> {
+    const response = await authorizedFetch(
+      `/api/digital-twin/energy-flows?site_id=${encodeURIComponent(siteId)}`
+    );
+    if (!response.ok) throw new Error("Failed to fetch energy flows");
+    return response.json();
+  },
+
+  async getHistoricalState(
+    siteId: string,
+    timestamp: string
+  ): Promise<{ site_id: string; timestamp: string; equipment: HistoricalEquipmentState[]; count: number }> {
+    const response = await authorizedFetch(
+      `/api/digital-twin/historical-state?site_id=${encodeURIComponent(siteId)}&timestamp=${encodeURIComponent(timestamp)}`
+    );
+    if (!response.ok) throw new Error("Failed to fetch historical state");
+    return response.json();
+  },
+};
+
 // Audit logs response with pagination
 export interface AuditLogsResponse {
   entries: AuditLogEntryResponse[];
