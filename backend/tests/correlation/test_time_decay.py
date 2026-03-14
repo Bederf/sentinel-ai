@@ -2,10 +2,8 @@
 
 import math
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
-
-import pytest
 
 from app.services.correlation.candidate_generator import CandidateSignal
 from app.services.correlation.time_decay import (
