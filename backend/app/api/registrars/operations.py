@@ -32,6 +32,7 @@ from app.api import control_policy
 from app.api import decision_memory
 from app.api import block_bookings
 from app.api import space
+from app.api import correlation
 from app.config.settings import settings
 
 
@@ -157,6 +158,9 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Ghost Booking & Right-Sizing Detection (Space Intelligence Rev 1.2)
     app.include_router(space.router, tags=["space-intelligence"])
+
+    # Correlation & Issue Intelligence (Phase 155)
+    app.include_router(correlation.router, tags=["correlation"])
 
     # Fuel Monitoring (Phase 150)
     if settings.fuel_monitoring_enabled:
