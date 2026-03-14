@@ -370,6 +370,9 @@ class Settings(BaseSettings):
     fuel_refill_jump_pct: float = 10.0  # Minimum level jump to detect refill
     fuel_leak_sustained_minutes: int = 30  # Sustained slow loss duration
 
+    # ODA File Converter path (DWG→DXF conversion, Phase 157)
+    oda_converter_path: str = ""  # Path to ODAFileConverter binary (empty = default /usr/local/bin/ODAFileConverter)
+
     # Plant Room Alerts — Desigo email→WhatsApp pipeline (Phase 146)
     plant_alerts_enabled: bool = False  # Master switch for plant alert ingestion
     desigo_sender_email: str = "noreply@fnb.co.za"  # Authorised Desigo sender address
