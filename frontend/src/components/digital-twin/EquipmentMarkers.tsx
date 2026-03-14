@@ -1,5 +1,6 @@
 import { EquipmentMarker } from './EquipmentMarker';
 import type { Equipment } from '@/lib/api/sites';
+import type { EquipmentStatusUpdate } from '@/lib/api';
 import type { EquipmentPosition } from '@/utils/equipmentPositioning';
 import { extractFloorFromCode, getFloorId } from '@/utils/floorExtraction';
 
@@ -8,6 +9,8 @@ interface EquipmentMarkersProps {
   selectedFloors: Set<number>;
   onEquipmentClick: (id: string) => void;
   equipmentPositions: Map<string, EquipmentPosition>;
+  /** Real-time status updates from SSE, keyed by equipment_id */
+  realtimeUpdates?: Map<string, EquipmentStatusUpdate>;
 }
 
 function getFloorIdFromCode(code: string): number {
@@ -28,6 +31,7 @@ export function EquipmentMarkers({
   selectedFloors,
   onEquipmentClick,
   equipmentPositions,
+  realtimeUpdates,
 }: EquipmentMarkersProps) {
   return (
     <group>
@@ -45,6 +49,7 @@ export function EquipmentMarkers({
             equipment={eq}
             position={position}
             onClick={() => onEquipmentClick(eq.id || code)}
+            realtimeStatus={realtimeUpdates?.get(eq.id)}
           />
         );
       })}

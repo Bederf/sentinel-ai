@@ -715,6 +715,38 @@ export interface DeviceSafetyStatus {
   last_check: string;
 }
 
+// ============= Digital Twin SSE Types =============
+
+/** Real-time status update for a single equipment item (from SSE stream). */
+export interface EquipmentStatusUpdate {
+  equipment_id: string;
+  code: string;
+  type: string;
+  health_score: number;
+  status: string;
+  power_kw: number | null;
+  temperatures: Record<string, number> | null;
+  timestamp: string;
+}
+
+/** LSTM/ML prediction mapped for visualization overlay. */
+export interface PredictiveFault {
+  equipment_id: string;
+  prediction_type: string;
+  severity: "critical" | "warning";
+  timeframe_days: number;
+  confidence: number;
+  model_name: string | null;
+}
+
+/** A single SSE frame containing all equipment updates and predictions for a site. */
+export interface EquipmentStatusFrame {
+  site_id: string;
+  equipment_updates: EquipmentStatusUpdate[];
+  predictions: PredictiveFault[];
+  timestamp: string;
+}
+
 // Audit logs response with pagination
 export interface AuditLogsResponse {
   entries: AuditLogEntryResponse[];
@@ -4777,6 +4809,83 @@ export const fuelApi = {
     if (limit) params.set('limit', String(limit));
     const response = await authorizedFetch(`/api/fuel/refill-log?${params}`);
     if (!response.ok) throw new Error('Failed to fetch refill log');
+    return response.json();
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Building Configuration API
+// ---------------------------------------------------------------------------
+
+export interface BuildingConfig {
+  id: string;
+  name: string;
+  display_name?: string;
+  address?: string;
+  type?: string;
+  year_built?: number;
+  timezone?: string;
+  floors?: string[];
+  features?: Record<string, boolean>;
+  bms?: Record<string, string>;
+  contacts?: {
+    facility_manager?: string;
+    email?: string;
+    emergency?: string;
+  };
+  metadata?: {
+    sqm?: number;
+    occupancy_capacity?: number;
+    total_desks?: number;
+    total_zones?: number;
+    parking_bays?: number;
+  };
+  optimization?: {
+    site_id?: string;
+    active_profile?: string;
+    control_tier?: string;
+    zone_overrides?: Array<{ zone_id: string; profile: string; reason: string }>;
+    schedule_overrides?: unknown[];
+  };
+}
+
+export interface BuildingConfigUpdatePayload {
+  name?: string;
+  display_name?: string;
+  address?: string;
+  building_type?: string;
+  floors?: string[];
+  sqm?: number;
+  occupancy_capacity?: number;
+  total_desks?: number;
+  parking_bays?: number;
+  optimization_profile?: string;
+  control_tier?: string;
+  features?: Record<string, boolean>;
+  contacts?: Record<string, string | undefined>;
+}
+
+export const buildingConfigApi = {
+  async getConfig(siteId: string): Promise<BuildingConfig> {
+    const response = await authorizedFetch(`/api/buildings/${siteId}`);
+    if (!response.ok) throw new Error('Failed to fetch building config');
+    return response.json();
+  },
+
+  async updateConfig(siteId: string, payload: BuildingConfigUpdatePayload): Promise<{ status: string; changes: string[] }> {
+    const response = await authorizedFetch(`/api/buildings/${siteId}/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      let msg = response.statusText;
+      try {
+        const err = await response.json();
+        msg = err.detail || msg;
+      } catch { /* ignore */ }
+      throw new Error(msg);
+    }
     return response.json();
   },
 };

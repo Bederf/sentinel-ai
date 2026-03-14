@@ -3,11 +3,14 @@ import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Equipment } from '@/lib/api/sites';
+import type { EquipmentStatusUpdate } from '@/lib/api';
 
 interface EquipmentMarkerProps {
   equipment: Equipment;
   position: [number, number, number];
   onClick: () => void;
+  /** When present, use realtime health_score/status instead of static data */
+  realtimeStatus?: EquipmentStatusUpdate;
 }
 
 // ─── Matrix Cyberpunk Color Palette ──────────────────────────────────────
@@ -98,14 +101,24 @@ function getStatusColor(equipment: Equipment): string {
 }
 
 // ─── Component ───────────────────────────────────────────────────────
-export function EquipmentMarker({ equipment, position, onClick }: EquipmentMarkerProps) {
+export function EquipmentMarker({ equipment, position, onClick, realtimeStatus }: EquipmentMarkerProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const pulseRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
 
-  const eqType = ((equipment as any).equipment_type || (equipment as any).type || '').toLowerCase();
+  // When realtime status is available, override equipment fields for display
+  const effectiveEquipment = useMemo(() => {
+    if (!realtimeStatus) return equipment;
+    return {
+      ...equipment,
+      status: realtimeStatus.status as Equipment['status'],
+      health_score: realtimeStatus.health_score,
+    } as Equipment & { health_score: number };
+  }, [equipment, realtimeStatus]);
+
+  const eqType = ((effectiveEquipment as any).equipment_type || (effectiveEquipment as any).type || '').toLowerCase();
   const typeColor = TYPE_COLORS[eqType] || '#666666';
-  const statusColor = getStatusColor(equipment);
+  const statusColor = getStatusColor(effectiveEquipment);
   const isFault = statusColor === STATUS_COLORS.fault;
   const isWarning = statusColor === STATUS_COLORS.warning;
   const isOnline = statusColor === STATUS_COLORS.online;

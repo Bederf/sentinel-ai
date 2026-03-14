@@ -14,8 +14,10 @@ import { StatsBar } from './StatsBar';
 import { AlertBanner } from './AlertBanner';
 import { Compass } from '../3d/Compass';
 import { FloorPlan2D } from './FloorPlan2D';
+import { PredictiveFaultOverlay } from './PredictiveFaultOverlay';
 import { OccupancyMarkers3DFiber } from './OccupancyMarkers3DFiber';
 import { useOccupancySync } from '@/hooks/useOccupancySync';
+import { useEquipmentStatusSSE } from '@/hooks/useEquipmentStatusSSE';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useEquipmentData } from '@/hooks/useEquipmentData';
 import { useSitesList } from '@/hooks/useSitesList';
@@ -93,6 +95,8 @@ export function DigitalTwin() {
 
   const siteId = selectedSiteId;
   const { equipment, loading, error } = useEquipmentData(siteId);
+  const { equipmentUpdates: realtimeUpdates, predictions: ssePredicitions, isConnected: sseConnected } = useEquipmentStatusSSE(siteId);
+  const [showPredictions, setShowPredictions] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
   const [equipmentTypeFilter, setEquipmentTypeFilter] = useState<string | null>(null);
   const [equipmentDropdownOpen, setEquipmentDropdownOpen] = useState(false);
@@ -507,6 +511,26 @@ export function DigitalTwin() {
               )}
             </button>
 
+            {/* Predictions Toggle */}
+            <button
+              onClick={() => setShowPredictions(!showPredictions)}
+              className={`matrix-btn flex items-center gap-2 ${showPredictions ? 'matrix-btn-active' : ''}`}
+              title="Toggle predictive fault overlay"
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Predictions</span>
+              {showPredictions && ssePredicitions.length > 0 && (
+                <span className="text-xs opacity-75">({ssePredicitions.length})</span>
+              )}
+            </button>
+
+            {/* SSE Connection Indicator */}
+            <div
+              className="w-2.5 h-2.5 rounded-full"
+              title={sseConnected ? 'Real-time connected' : 'Real-time disconnected'}
+              style={{ backgroundColor: sseConnected ? '#22C55E' : '#6B7280' }}
+            />
+
             {/* Simulation Time Display (Phase 4) */}
             {occupancyEnabled && simulationTime && (
               <div className="flex items-center gap-2 pl-3 ml-2" style={{ borderLeft: '1px solid var(--color-sentinel-border)' }}>
@@ -562,7 +586,20 @@ export function DigitalTwin() {
               selectedFloors={selectedFloors}
               onEquipmentClick={(id) => setSelectedEquipment(id)}
               equipmentPositions={equipmentPositions}
+              realtimeUpdates={realtimeUpdates}
             />
+
+            {/* Predictive Fault Overlay */}
+            {showPredictions && ssePredicitions.length > 0 && (
+              <PredictiveFaultOverlay
+                predictions={ssePredicitions}
+                equipmentPositions={
+                  new Map(
+                    Array.from(equipmentPositions.entries()).map(([id, pos]) => [id, [pos.x, pos.y, pos.z] as [number, number, number]])
+                  )
+                }
+              />
+            )}
 
             {/* Occupancy dots — subtle cyan spheres on floor surfaces */}
             {occupancyEnabled && people.length > 0 && (
