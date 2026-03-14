@@ -205,6 +205,8 @@ def link_entities_to_cluster(conn, cluster_id: uuid.UUID) -> int:
             return 0
 
         # 2. Get all entities for those signals
+        # SAFETY NOTE: placeholders is built from "%s" tokens only (parameter markers),
+        # not from user input. Values are passed via the parameterised query arg list.
         placeholders = ",".join(["%s"] * len(signal_ids))
         cur.execute(
             f"SELECT id, signal_id FROM entity WHERE signal_id IN ({placeholders})",

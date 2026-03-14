@@ -10,6 +10,7 @@ component requires classifications to exist).
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 import psycopg2.extras
@@ -40,6 +41,8 @@ from app.services.correlation.state_machine import (
     update_escalation_level,
 )
 from app.services.correlation.time_decay import compute_days_elapsed
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Fixture signal IDs (for convenience testing)
@@ -114,6 +117,17 @@ def run_correlation_for_signal(conn, signal_id: uuid.UUID) -> dict:
 
     Returns a summary dict with action taken and result details.
     """
+    result = {
+        "signal_id": str(signal_id),
+        "action": "no_correlation",
+        "cluster_id": None,
+        "cluster_state": None,
+        "classifications": None,
+        "cards_generated": 0,
+        "confidence": None,
+        "errors": [],
+    }
+
     # 1. Fetch the anchor signal
     anchor = _fetch_signal(conn, signal_id)
     if anchor is None:
@@ -121,134 +135,171 @@ def run_correlation_for_signal(conn, signal_id: uuid.UUID) -> dict:
 
     # 2. Idempotency: if signal already belongs to a cluster, skip
     if anchor["issue_cluster_id"] is not None:
-        return {
-            "signal_id": str(signal_id),
-            "action": "already_clustered",
-            "cluster_id": str(anchor["issue_cluster_id"]),
-            "cluster_state": None,
-            "classifications": None,
-            "cards_generated": 0,
-            "confidence": None,
-        }
+        result["action"] = "already_clustered"
+        result["cluster_id"] = str(anchor["issue_cluster_id"])
+        return result
 
-    # 3. Get candidates
-    candidates = get_candidates(conn, signal_id)
+    # 3. Get candidates and score them
+    try:
+        candidates = get_candidates(conn, signal_id)
+    except Exception as e:
+        logger.exception("Candidate generation failed for signal %s", signal_id)
+        result["errors"].append(f"candidates: {e}")
+        return result
 
     # 4. Score each candidate against the anchor
     scored_pairs: list[tuple[uuid.UUID, float]] = []
     for candidate in candidates:
-        # Compute days between anchor and candidate
-        anchor_created = anchor["created_at"]
-        candidate_created = candidate.created_at
-        days_between = abs(compute_days_elapsed(candidate_created, anchor_created))
+        try:
+            # Compute days between anchor and candidate
+            anchor_created = anchor["created_at"]
+            candidate_created = candidate.created_at
+            days_between = abs(compute_days_elapsed(candidate_created, anchor_created))
 
-        # Get shared entities
-        shared = get_shared_entities(conn, signal_id, candidate.id)
+            # Get shared entities
+            shared = get_shared_entities(conn, signal_id, candidate.id)
 
-        # Get entity counts
-        anchor_entity_count = get_entity_count(conn, signal_id)
-        candidate_entity_count = get_entity_count(conn, candidate.id)
+            # Get entity counts
+            anchor_entity_count = get_entity_count(conn, signal_id)
+            candidate_entity_count = get_entity_count(conn, candidate.id)
 
-        # Build dicts for scoring
-        anchor_dict = {
-            "id": anchor["id"],
-            "signal_type": anchor["signal_type"],
-            "severity": anchor["severity"],
-            "location_ref": anchor["location_ref"],
-            "created_at": anchor["created_at"],
-            "metadata": anchor["metadata"],
-        }
-        candidate_dict = {
-            "id": candidate.id,
-            "signal_type": candidate.signal_type,
-            "severity": candidate.severity,
-            "location_ref": candidate.location_ref,
-            "created_at": candidate.created_at,
-            "metadata": candidate.metadata,
-        }
-        result = score_signal_pair(
-            anchor_dict,
-            candidate_dict,
-            shared,
-            days_between,
-            anchor_entity_count,
-            candidate_entity_count,
-        )
+            # Build dicts for scoring
+            anchor_dict = {
+                "id": anchor["id"],
+                "signal_type": anchor["signal_type"],
+                "severity": anchor["severity"],
+                "location_ref": anchor["location_ref"],
+                "created_at": anchor["created_at"],
+                "metadata": anchor["metadata"],
+            }
+            candidate_dict = {
+                "id": candidate.id,
+                "signal_type": candidate.signal_type,
+                "severity": candidate.severity,
+                "location_ref": candidate.location_ref,
+                "created_at": candidate.created_at,
+                "metadata": candidate.metadata,
+            }
+            score_result = score_signal_pair(
+                anchor_dict,
+                candidate_dict,
+                shared,
+                days_between,
+                anchor_entity_count,
+                candidate_entity_count,
+            )
 
-        # Check for contradictions
-        contradiction = detect_contradiction(anchor["signal_type"], candidate.signal_type)
-        final_score = apply_contradiction_penalty(result.score, contradiction)
+            # Check for contradictions
+            contradiction = detect_contradiction(anchor["signal_type"], candidate.signal_type)
+            final_score = apply_contradiction_penalty(score_result.score, contradiction)
 
-        if final_score >= CORRELATION_THRESHOLD:
-            scored_pairs.append((candidate.id, final_score))
+            if final_score >= CORRELATION_THRESHOLD:
+                scored_pairs.append((candidate.id, final_score))
+        except Exception as e:
+            logger.exception("Scoring failed for signal pair %s <-> %s", signal_id, candidate.id)
+            result["errors"].append(f"scoring({candidate.id}): {e}")
+            # Continue scoring other candidates
 
     # 5. If no correlations found, no clustering
     if not scored_pairs:
-        return {
-            "signal_id": str(signal_id),
-            "action": "no_correlation",
-            "cluster_id": None,
-            "cluster_state": None,
-            "classifications": None,
-            "cards_generated": 0,
-            "confidence": None,
-        }
+        return result
 
-    # 6. Check if any candidate already belongs to a cluster
-    existing_cluster_id = find_existing_cluster(conn, signal_id, scored_pairs)
+    # 6. Create or join cluster
+    try:
+        existing_cluster_id = find_existing_cluster(conn, signal_id, scored_pairs)
 
-    if existing_cluster_id:
-        # Add to existing cluster
-        best_score = max(s for _, s in scored_pairs)
-        add_signal_to_cluster(conn, existing_cluster_id, signal_id, anchor, best_score)
-        cluster_id = existing_cluster_id
-        action = "added_to_cluster"
-    else:
-        # Create new cluster
-        best_candidate_id, best_score = max(scored_pairs, key=lambda x: x[1])
-        title = _generate_cluster_title(conn, signal_id, best_candidate_id)
-        cluster_id = create_cluster(conn, title, anchor)
-        # Add the best candidate too
-        best_candidate_data = _fetch_signal(conn, best_candidate_id)
-        if best_candidate_data:
-            add_signal_to_cluster(conn, cluster_id, best_candidate_id, best_candidate_data, best_score)
-        # Add remaining above-threshold candidates
-        for cand_id, score in scored_pairs:
-            if cand_id != best_candidate_id:
-                cand_data = _fetch_signal(conn, cand_id)
-                if cand_data and cand_data["issue_cluster_id"] is None:
-                    add_signal_to_cluster(conn, cluster_id, cand_id, cand_data, score)
-        action = "created_cluster"
+        if existing_cluster_id:
+            # Add to existing cluster
+            best_score = max(s for _, s in scored_pairs)
+            add_signal_to_cluster(conn, existing_cluster_id, signal_id, anchor, best_score)
+            cluster_id = existing_cluster_id
+            action = "added_to_cluster"
+        else:
+            # Create new cluster
+            best_candidate_id, best_score = max(scored_pairs, key=lambda x: x[1])
+            title = _generate_cluster_title(conn, signal_id, best_candidate_id)
+            cluster_id = create_cluster(conn, title, anchor)
+            # Add the best candidate too
+            best_candidate_data = _fetch_signal(conn, best_candidate_id)
+            if best_candidate_data:
+                add_signal_to_cluster(conn, cluster_id, best_candidate_id, best_candidate_data, best_score)
+            # Add remaining above-threshold candidates
+            for cand_id, score in scored_pairs:
+                if cand_id != best_candidate_id:
+                    cand_data = _fetch_signal(conn, cand_id)
+                    if cand_data and cand_data["issue_cluster_id"] is None:
+                        add_signal_to_cluster(conn, cluster_id, cand_id, cand_data, score)
+            action = "created_cluster"
+    except Exception as e:
+        logger.exception("Cluster creation/join failed for signal %s", signal_id)
+        result["errors"].append(f"cluster: {e}")
+        return result
+
+    result["cluster_id"] = str(cluster_id)
+    result["action"] = action
 
     # 7. Link entities to cluster
-    link_entities_to_cluster(conn, cluster_id)
+    try:
+        link_entities_to_cluster(conn, cluster_id)
+    except Exception as e:
+        logger.exception("Entity linking failed for cluster %s", cluster_id)
+        result["errors"].append(f"entity_linking: {e}")
+        # Continue — cluster exists, entities just not linked
 
     # 8. Evaluate state machine
-    new_state, transition = evaluate_state_transition(conn, cluster_id)
+    new_state = None
+    try:
+        new_state, transition = evaluate_state_transition(conn, cluster_id)
+        result["cluster_state"] = new_state
+    except Exception as e:
+        logger.exception("State transition failed for cluster %s", cluster_id)
+        result["errors"].append(f"state_machine: {e}")
+        # Continue — cluster exists, state just not updated
 
     # 9. Update escalation level
-    cluster_signals = _fetch_cluster_signals(conn, cluster_id)
-    update_escalation_level(conn, cluster_id, cluster_signals)
+    try:
+        cluster_signals = _fetch_cluster_signals(conn, cluster_id)
+        update_escalation_level(conn, cluster_id, cluster_signals)
+    except Exception as e:
+        logger.exception("Escalation update failed for cluster %s", cluster_id)
+        result["errors"].append(f"escalation: {e}")
+        # Continue — cluster exists, escalation just not updated
 
     # 10. Classify cluster (MUST happen before confidence computation)
-    classifications = classify_cluster(conn, cluster_id)
+    classifications = None
+    try:
+        classifications = classify_cluster(conn, cluster_id)
+        result["classifications"] = classifications
+    except Exception as e:
+        logger.exception("Classification failed for cluster %s", cluster_id)
+        result["errors"].append(f"classification: {e}")
+        # Continue — cluster exists, just unclassified
 
     # 11. Compute cluster confidence (MUST happen after classification)
-    confidence = compute_cluster_confidence(conn, cluster_id)
+    try:
+        confidence = compute_cluster_confidence(conn, cluster_id)
+        result["confidence"] = confidence
+    except Exception as e:
+        logger.exception("Confidence computation failed for cluster %s", cluster_id)
+        result["errors"].append(f"confidence: {e}")
+        # Continue — cluster exists, confidence just not computed
 
-    # 12. Route and generate cards
-    targets = get_routing_targets(conn, cluster_id)
-    card_ids = generate_cards(conn, cluster_id, targets)
+    # 12. Route and generate cards (skip if no classifications exist)
+    if classifications:
+        try:
+            targets = get_routing_targets(conn, cluster_id)
+            card_ids = generate_cards(conn, cluster_id, targets)
+            result["cards_generated"] = len(card_ids)
+        except Exception as e:
+            logger.exception("Card generation failed for cluster %s", cluster_id)
+            result["errors"].append(f"cards: {e}")
+    else:
+        logger.warning(
+            "Skipping card generation for cluster %s — no classifications available",
+            cluster_id,
+        )
 
-    return {
-        "signal_id": str(signal_id),
-        "action": action,
-        "cluster_id": str(cluster_id),
-        "cluster_state": new_state,
-        "classifications": classifications,
-        "cards_generated": len(card_ids),
-        "confidence": confidence,
-    }
+    return result
 
 
 # ---------------------------------------------------------------------------

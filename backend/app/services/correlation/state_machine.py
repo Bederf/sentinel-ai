@@ -226,12 +226,17 @@ def _get_sender_role(conn, sender_name: str) -> str | None:
 
 
 def _set_escalation_level(conn, cluster_id: uuid.UUID, level: str) -> None:
-    """Update the escalation_level on a cluster."""
+    """Update the escalation_level on a cluster.
+
+    Commits immediately so the change is not lost if the caller returns
+    early without committing.
+    """
     cur = conn.cursor()
     try:
         cur.execute(
             "UPDATE issue_cluster SET escalation_level = %s WHERE id = %s",
             (level, str(cluster_id)),
         )
+        conn.commit()
     finally:
         cur.close()
