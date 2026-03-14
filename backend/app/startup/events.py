@@ -89,6 +89,10 @@ async def startup_event(app: FastAPI) -> None:
             str(settings.demo_mode),
         )
 
+    # === EDGE MODE BANNER ===
+    if settings.edge_mode:
+        _logger.warning("🔧 EDGE MODE — ML training, simulation queue, AEGIS evidence disabled")
+
     # === PARASITE Autonomous Control Safety Checks ===
     # Phase 100 Security: Prevent accidental Tier 3 autonomous control in production
     if settings.parasite_tier3_enabled and settings.environment == "production":
@@ -325,7 +329,9 @@ async def startup_event(app: FastAPI) -> None:
 
     # ML background training jobs — gated by ML_BACKGROUND_TRAINING_ENABLED
     # Disabled by default: training is CPU-intensive and starves the API on constrained VPS
-    if settings.ml_background_training_enabled:
+    if settings.edge_mode:
+        _logger.info("ℹ️ ML training jobs disabled (EDGE_MODE=true)")
+    elif settings.ml_background_training_enabled:
         try:
             scheduler_service.add_ml_retraining_job(interval_seconds=86400)  # 24 hours
             _logger.info("✅ ML model retraining job initialized - checks daily for stale/underperforming models")
@@ -357,7 +363,7 @@ async def startup_event(app: FastAPI) -> None:
         _logger.warning(f"⚠️ Feedback scoring refresh job initialization failed: {e}")
 
     # Feedback-driven retraining — also gated by ML_BACKGROUND_TRAINING_ENABLED
-    if settings.ml_background_training_enabled:
+    if not settings.edge_mode and settings.ml_background_training_enabled:
         try:
             scheduler_service.add_feedback_retraining_job(
                 interval_seconds=3600,  # 1 hour
@@ -423,11 +429,14 @@ async def startup_event(app: FastAPI) -> None:
             except Exception as e:
                 _logger.warning(f"AEGIS cycle job initialization failed for {_site_id}: {e}")
 
-            try:
-                scheduler_service.add_aegis_evidence_collector_job(interval_seconds=86400, site_id=_site_id)
-                _logger.info("AEGIS evidence collector job initialized for %s (24h interval)", _site_id)
-            except Exception as e:
-                _logger.warning(f"AEGIS evidence collector job initialization failed for {_site_id}: {e}")
+            if not settings.edge_mode:
+                try:
+                    scheduler_service.add_aegis_evidence_collector_job(interval_seconds=86400, site_id=_site_id)
+                    _logger.info("AEGIS evidence collector job initialized for %s (24h interval)", _site_id)
+                except Exception as e:
+                    _logger.warning(f"AEGIS evidence collector job initialization failed for {_site_id}: {e}")
+            else:
+                _logger.info("ℹ️ AEGIS evidence collector disabled for %s (EDGE_MODE=true)", _site_id)
             _aegis_any_started = True
 
     if not _aegis_any_started:
@@ -577,7 +586,7 @@ async def startup_event(app: FastAPI) -> None:
     if _simulation_stopped:
         _logger.info("Simulation stopped by admin (simulationStopped=true in settings.json) — skipping auto-start")
 
-    if settings.site002_source_enabled and not _simulation_stopped:
+    if settings.site002_source_enabled and not _simulation_stopped and not settings.edge_mode:
         # Run crash recovery on startup (replaces old deactivate_all_simulations)
         # Re-queues simulations that have valid checkpoints, fails those without
         if not testing_mode:
@@ -656,7 +665,10 @@ async def startup_event(app: FastAPI) -> None:
         except Exception as e:
             _logger.error(f"Error during sentinel auto-start: {e}")
     else:
-        _logger.info("Site 002 data source disabled — simulation engine inactive")
+        if settings.edge_mode and settings.site002_source_enabled:
+            _logger.info("ℹ️ Simulation queue disabled (EDGE_MODE=true)")
+        else:
+            _logger.info("Site 002 data source disabled — simulation engine inactive")
 
     # System health snapshot job (every 5 minutes)
     scheduler_service.add_health_snapshot_job(interval_seconds=300)

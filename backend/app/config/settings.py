@@ -298,6 +298,10 @@ class Settings(BaseSettings):
     email_reply_from_address: str = "workorder@sentinel-ai.co.za"
     email_reply_from_name: str = "SENTINEL Work Orders"
 
+    # Edge mode: disables ML training, simulation queue, and AEGIS evidence jobs
+    # for resource-constrained deployments (Jetson, lightweight VPS)
+    edge_mode: bool = False
+
     # ML Background Training (retraining, drift detection, feedback retraining)
     # Disable on resource-constrained VPS — models are pre-trained and stable
     ml_background_training_enabled: bool = False
