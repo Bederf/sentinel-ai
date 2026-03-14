@@ -441,6 +441,221 @@ def test_cleanup_trigger_exists(cur):
     assert row is not None, "trg_cleanup_orphaned_site_refs trigger not found"
 
 
+def test_cleanup_trigger_functional(cur, conn):
+    """Deleting a site sets is_managed=false and site_resolution_status='unresolved' on linked signals."""
+    # Use unique IDs for code to avoid collisions with leftover data
+    temp_site_id = uuid.uuid4()
+    site_code = f"TRG-{str(temp_site_id)[:8].upper()}"
+    sig_id = uuid.uuid4()
+
+    try:
+        # Create a temporary site
+        cur.execute(
+            """
+            INSERT INTO sites (id, name, code, address, latitude, longitude)
+            VALUES (%s, 'Temp Trigger Test Site', %s, '1 Test Rd', -26.1, 28.0)
+            RETURNING id
+            """,
+            (str(temp_site_id), site_code),
+        )
+        assert cur.fetchone() is not None
+
+        # Create a managed signal pointing to this site
+        cur.execute(
+            """
+            INSERT INTO signal (id, source_module, signal_type, severity, location_ref,
+                               site_id, is_managed, site_resolution_status)
+            VALUES (%s, 'manual_entry', 'manual_observation', 'low', 'TriggerTest/X/1Q1/MR01',
+                    %s, true, 'resolved_managed')
+            RETURNING id
+            """,
+            (str(sig_id), str(temp_site_id)),
+        )
+        assert cur.fetchone() is not None
+
+        # Delete the site — trigger should fire and clean up the signal
+        cur.execute("DELETE FROM sites WHERE id = %s", (str(temp_site_id),))
+
+        # Verify signal fields were updated by the trigger
+        cur.execute(
+            "SELECT is_managed, site_resolution_status, site_id FROM signal WHERE id = %s",
+            (str(sig_id),),
+        )
+        row = cur.fetchone()
+        assert row is not None, "Signal was unexpectedly deleted"
+        assert row["is_managed"] is False, f"Expected is_managed=false, got {row['is_managed']}"
+        assert row["site_resolution_status"] == "unresolved", (
+            f"Expected site_resolution_status='unresolved', got {row['site_resolution_status']}"
+        )
+        assert row["site_id"] is None, f"Expected site_id=NULL, got {row['site_id']}"
+    finally:
+        # Cleanup — ensure no leftover data regardless of test outcome
+        cur.execute("DELETE FROM signal WHERE id = %s", (str(sig_id),))
+        cur.execute("DELETE FROM sites WHERE id = %s", (str(temp_site_id),))
+
+
+# ============================================================================
+# 16. Timeline constraint: resolved_at >= first_seen_at
+# ============================================================================
+
+
+def test_timeline_constraint_rejects_early_resolve(cur):
+    """resolved_at < first_seen_at should be rejected by chk_issue_cluster_timeline."""
+    with pytest.raises(psycopg2.errors.CheckViolation):
+        cur.execute(
+            """
+            INSERT INTO issue_cluster (id, title, first_seen_at, resolved_at)
+            VALUES (%s, 'Timeline violation', '2026-03-10T12:00:00Z', '2026-03-05T12:00:00Z')
+            """,
+            (str(uuid.uuid4()),),
+        )
+    cur.execute("ROLLBACK")
+
+
+def test_timeline_constraint_accepts_valid_resolve(cur):
+    """resolved_at >= first_seen_at should succeed."""
+    cluster_id = uuid.uuid4()
+    cur.execute(
+        """
+        INSERT INTO issue_cluster (id, title, first_seen_at, resolved_at)
+        VALUES (%s, 'Timeline OK', '2026-03-05T12:00:00Z', '2026-03-10T12:00:00Z')
+        RETURNING id
+        """,
+        (str(cluster_id),),
+    )
+    assert cur.fetchone() is not None
+    cur.execute("DELETE FROM issue_cluster WHERE id = %s", (str(cluster_id),))
+
+
+# ============================================================================
+# 17. Cascade delete tests
+# ============================================================================
+
+
+def test_cascade_delete_cluster_removes_classifications(cur):
+    """DELETE issue_cluster should CASCADE delete issue_classification rows."""
+    cluster_id = uuid.uuid4()
+    cur.execute(
+        "INSERT INTO issue_cluster (id, title) VALUES (%s, 'Cascade test') RETURNING id",
+        (str(cluster_id),),
+    )
+    assert cur.fetchone() is not None
+
+    cls_id = uuid.uuid4()
+    cur.execute(
+        """
+        INSERT INTO issue_classification (id, issue_cluster_id, domain, confidence)
+        VALUES (%s, %s, 'hvac', 0.80)
+        RETURNING id
+        """,
+        (str(cls_id), str(cluster_id)),
+    )
+    assert cur.fetchone() is not None
+
+    # Delete cluster
+    cur.execute("DELETE FROM issue_cluster WHERE id = %s", (str(cluster_id),))
+
+    # Classification should be gone
+    cur.execute("SELECT 1 FROM issue_classification WHERE id = %s", (str(cls_id),))
+    assert cur.fetchone() is None, "issue_classification should have been CASCADE deleted"
+
+
+def test_cascade_delete_cluster_removes_evidence(cur):
+    """DELETE issue_cluster should CASCADE delete issue_evidence rows."""
+    cluster_id = uuid.uuid4()
+    cur.execute(
+        "INSERT INTO issue_cluster (id, title) VALUES (%s, 'Evidence cascade test') RETURNING id",
+        (str(cluster_id),),
+    )
+    assert cur.fetchone() is not None
+
+    ev_id = uuid.uuid4()
+    cur.execute(
+        """
+        INSERT INTO issue_evidence (id, issue_cluster_id, evidence_type, evidence_ref)
+        VALUES (%s, %s, 'email', 'msg-001')
+        RETURNING id
+        """,
+        (str(ev_id), str(cluster_id)),
+    )
+    assert cur.fetchone() is not None
+
+    # Delete cluster
+    cur.execute("DELETE FROM issue_cluster WHERE id = %s", (str(cluster_id),))
+
+    # Evidence should be gone
+    cur.execute("SELECT 1 FROM issue_evidence WHERE id = %s", (str(ev_id),))
+    assert cur.fetchone() is None, "issue_evidence should have been CASCADE deleted"
+
+
+def test_delete_cluster_nullifies_signal_fk(cur):
+    """DELETE issue_cluster should SET NULL on signal.issue_cluster_id (not delete signal)."""
+    cluster_id = uuid.uuid4()
+    cur.execute(
+        "INSERT INTO issue_cluster (id, title) VALUES (%s, 'Signal FK test') RETURNING id",
+        (str(cluster_id),),
+    )
+    assert cur.fetchone() is not None
+
+    sig_id = uuid.uuid4()
+    cur.execute(
+        """
+        INSERT INTO signal (id, source_module, signal_type, severity, location_ref, issue_cluster_id)
+        VALUES (%s, 'manual_entry', 'manual_observation', 'low', 'Test/X/1Q1/MR01', %s)
+        RETURNING id
+        """,
+        (str(sig_id), str(cluster_id)),
+    )
+    assert cur.fetchone() is not None
+
+    # Delete cluster
+    cur.execute("DELETE FROM issue_cluster WHERE id = %s", (str(cluster_id),))
+
+    # Signal should still exist with NULL issue_cluster_id
+    cur.execute("SELECT issue_cluster_id FROM signal WHERE id = %s", (str(sig_id),))
+    row = cur.fetchone()
+    assert row is not None, "Signal should NOT have been deleted"
+    assert row["issue_cluster_id"] is None, f"Expected issue_cluster_id=NULL, got {row['issue_cluster_id']}"
+
+    cur.execute("DELETE FROM signal WHERE id = %s", (str(sig_id),))
+
+
+def test_delete_signal_nullifies_entity_fk(cur):
+    """DELETE signal should SET NULL on entity.signal_id (not delete entity)."""
+    sig_id = uuid.uuid4()
+    cur.execute(
+        """
+        INSERT INTO signal (id, source_module, signal_type, severity, location_ref)
+        VALUES (%s, 'manual_entry', 'manual_observation', 'low', 'Test/X/1Q1/MR01')
+        RETURNING id
+        """,
+        (str(sig_id),),
+    )
+    assert cur.fetchone() is not None
+
+    ent_id = uuid.uuid4()
+    cur.execute(
+        """
+        INSERT INTO entity (id, signal_id, entity_type, entity_value)
+        VALUES (%s, %s, 'room', 'MR01')
+        RETURNING id
+        """,
+        (str(ent_id), str(sig_id)),
+    )
+    assert cur.fetchone() is not None
+
+    # Delete signal
+    cur.execute("DELETE FROM signal WHERE id = %s", (str(sig_id),))
+
+    # Entity should still exist with NULL signal_id
+    cur.execute("SELECT signal_id FROM entity WHERE id = %s", (str(ent_id),))
+    row = cur.fetchone()
+    assert row is not None, "Entity should NOT have been deleted"
+    assert row["signal_id"] is None, f"Expected signal_id=NULL, got {row['signal_id']}"
+
+    cur.execute("DELETE FROM entity WHERE id = %s", (str(ent_id),))
+
+
 # ============================================================================
 # Bonus: no_self_loop constraint on relationship
 # ============================================================================

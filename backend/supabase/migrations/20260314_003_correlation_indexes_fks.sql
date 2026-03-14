@@ -104,24 +104,25 @@ CREATE INDEX idx_dashboard_card_surfaced_at ON dashboard_card (surfaced_at DESC)
 -- When a site is deleted, ON DELETE SET NULL sets site_id to NULL.
 -- But is_managed and site_resolution_status must also be updated
 -- to prevent logical contradictions (is_managed=true with no site).
+-- This runs BEFORE DELETE so the updates happen before FK SET NULL fires.
 CREATE OR REPLACE FUNCTION cleanup_orphaned_site_refs()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- When site_id becomes NULL via ON DELETE SET NULL, fix related fields
+  -- Clear managed flags BEFORE the FK ON DELETE SET NULL fires
   UPDATE signal
     SET is_managed = false, site_resolution_status = 'unresolved'
-    WHERE site_id IS NULL AND (is_managed = true OR site_resolution_status != 'unresolved');
+    WHERE site_id = OLD.id AND (is_managed = true OR site_resolution_status != 'unresolved');
 
   UPDATE issue_cluster
     SET is_managed = false
-    WHERE site_id IS NULL AND is_managed = true;
+    WHERE site_id = OLD.id AND is_managed = true;
 
-  RETURN NULL;
+  RETURN OLD;
 END;
 $$ LANGUAGE plpgsql;
 
--- Fire after any DELETE on sites table
+-- Fire before each row delete on sites table (must be FOR EACH ROW to access OLD)
 CREATE TRIGGER trg_cleanup_orphaned_site_refs
-  AFTER DELETE ON sites
-  FOR EACH STATEMENT
+  BEFORE DELETE ON sites
+  FOR EACH ROW
   EXECUTE FUNCTION cleanup_orphaned_site_refs();

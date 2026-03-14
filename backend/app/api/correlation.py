@@ -34,6 +34,8 @@ _STUB_SIGNAL = {
     "is_managed": False,
     "site_resolution_status": "unresolved",
     "email_thread_id": None,
+    "issue_cluster_id": None,
+    "emits_multiple": False,
 }
 
 _STUB_CLUSTER = {
