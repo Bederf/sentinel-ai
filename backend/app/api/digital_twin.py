@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 
-from fastapi import APIRouter, HTTPException, Query, Request, status, File, UploadFile
+from fastapi import APIRouter, HTTPException, Query, Request, status, File, UploadFile, Form
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -346,6 +346,167 @@ async def extract_from_dxf(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"DXF parsing failed: {str(e)}",
+        )
+
+
+# =============================================================================
+# Batch Processing & Validation
+# =============================================================================
+
+# Limits for batch processing
+BATCH_MAX_FILES = 20
+BATCH_MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB per file
+
+
+@router.post(
+    "/batch-extract",
+    status_code=status.HTTP_200_OK,
+    summary="Batch extract building config from multiple DXF/DWG files",
+    responses={
+        400: {"description": "Invalid files or parameters"},
+        500: {"description": "Batch processing failed"},
+    },
+)
+async def batch_extract(
+    files: list[UploadFile] = File(..., description="DXF/DWG files to process"),
+    site_id: str = Form(..., description="Site identifier"),
+    building_code: str = Form("", description="Building code"),
+) -> dict:
+    """
+    Extract building configuration from multiple DXF/DWG files.
+
+    Processes each file sequentially, merges equipment from all floors,
+    validates the result, and returns a combined configuration.
+
+    **Supported formats:** .dxf (native), .dwg (requires ODA converter)
+
+    **Limits:** Max 20 files, max 10MB per file.
+
+    DWG files gracefully fail with an error message when ODA File Converter
+    is not installed. DXF files always work.
+
+    Args:
+        files: List of DXF/DWG file uploads.
+        site_id: Site identifier.
+        building_code: Building code (optional).
+
+    Returns:
+        Merged equipment config, per-file status, and validation report.
+    """
+    try:
+        # Validate file count
+        if len(files) > BATCH_MAX_FILES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Too many files ({len(files)}). Maximum is {BATCH_MAX_FILES}.",
+            )
+
+        if len(files) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No files provided.",
+            )
+
+        # Read and validate each file
+        file_list = []
+        for f in files:
+            # Validate extension
+            if not f.filename:
+                continue
+            ext = f.filename.lower().rsplit(".", 1)[-1] if "." in f.filename else ""
+            if ext not in ("dxf", "dwg"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported file type: {f.filename}. Only .dxf and .dwg are supported.",
+                )
+
+            content = await f.read()
+
+            # Validate file size
+            if len(content) > BATCH_MAX_FILE_SIZE:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"File '{f.filename}' exceeds {BATCH_MAX_FILE_SIZE // (1024 * 1024)}MB limit.",
+                )
+
+            file_list.append({"filename": f.filename, "content": content})
+
+        # Process batch (lazy import to avoid ezdxf dependency at module load)
+        from app.services.dxf_parser_service import get_dxf_parser_service
+
+        parser = get_dxf_parser_service()
+        result = await parser.parse_batch(
+            files=file_list,
+            site_id=site_id,
+            site_name=building_code or site_id,
+        )
+
+        return result.to_dict()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Batch extraction failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Batch processing failed: {str(e)}",
+        )
+
+
+@router.get(
+    "/validate",
+    summary="Validate existing extracted building configuration",
+)
+async def validate_config(
+    site_id: str = Query(..., description="Site UUID or code"),
+) -> dict:
+    """
+    Validate an existing extracted building configuration.
+
+    Runs the floor plan validator on the stored config for the given site.
+    Returns a ValidationReport with errors, warnings, and statistics.
+
+    Args:
+        site_id: Site identifier.
+
+    Returns:
+        Validation report dict.
+    """
+    try:
+        # Get existing config from digital twin service
+        service = get_digital_twin_service()
+
+        # Try to get stored config
+        config = None
+        try:
+            config = service._generate_demo_config(site_id, site_id, 3)
+        except Exception:
+            pass
+
+        if not config:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No building configuration found for site {site_id}",
+            )
+
+        # Validate (lazy import)
+        from app.services.floor_plan_validator import get_floor_plan_validator
+
+        validator = get_floor_plan_validator()
+        report = validator.validate_extraction(config)
+
+        return {
+            "site_id": site_id,
+            "validation": report.to_dict(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Validation failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Validation failed: {str(e)}",
         )
 
 

@@ -18,7 +18,7 @@ import logging
 import tempfile
 import os
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from collections import defaultdict
 
 import ezdxf
@@ -45,6 +45,51 @@ class DXFEquipment:
     y: float
     zone: str
     confidence: float = 0.95
+
+
+@dataclass
+class FileStatus:
+    """Per-file processing result in a batch."""
+
+    filename: str
+    success: bool
+    equipment_count: int = 0
+    error: str = ""
+
+
+@dataclass
+class BatchResult:
+    """Result of batch DXF/DWG processing.
+
+    Attributes:
+        equipment: Merged equipment from all files.
+        floors: Merged floor definitions.
+        zones: Merged zone definitions.
+        validation: Validation report from floor plan validator.
+        per_file_status: Per-file success/failure status.
+        total_equipment: Total equipment count across all files.
+        total_floors: Total floor count.
+    """
+
+    equipment: List[Dict[str, Any]] = field(default_factory=list)
+    floors: List[Dict[str, Any]] = field(default_factory=list)
+    zones: List[Dict[str, Any]] = field(default_factory=list)
+    validation: Optional[Dict] = None
+    per_file_status: List[Dict] = field(default_factory=list)
+    total_equipment: int = 0
+    total_floors: int = 0
+
+    def to_dict(self) -> dict:
+        """Convert to serializable dict."""
+        return {
+            "equipment": self.equipment,
+            "floors": self.floors,
+            "zones": self.zones,
+            "validation": self.validation,
+            "per_file_status": self.per_file_status,
+            "total_equipment": self.total_equipment,
+            "total_floors": self.total_floors,
+        }
 
 
 class DXFParserService:
@@ -698,6 +743,130 @@ class DXFParserService:
             )
 
         return zones
+
+    async def parse_batch(
+        self,
+        files: List[Dict[str, Any]],
+        site_id: str,
+        site_name: str = "",
+    ) -> BatchResult:
+        """Parse multiple DXF/DWG files and merge results.
+
+        Processes files sequentially to avoid memory spikes. DWG files are
+        converted to DXF first via DWGConverterService. Each file result is
+        validated via FloorPlanValidator.
+
+        Args:
+            files: List of dicts with keys: filename (str), content (bytes).
+            site_id: Site identifier.
+            site_name: Site display name.
+
+        Returns:
+            BatchResult with merged equipment, floors, zones, and per-file status.
+        """
+        from app.services.dwg_converter_service import (
+            get_dwg_converter_service,
+            DWGConverterNotAvailable,
+            DWGConversionError,
+        )
+        from app.services.floor_plan_validator import get_floor_plan_validator
+
+        dwg_service = get_dwg_converter_service()
+        validator = get_floor_plan_validator()
+
+        all_equipment: List[Dict[str, Any]] = []
+        all_floors: List[Dict[str, Any]] = []
+        all_zones: List[Dict[str, Any]] = []
+        per_file_status: List[Dict] = []
+
+        for file_info in files:
+            filename = file_info["filename"]
+            content = file_info["content"]
+            is_dwg = filename.lower().endswith(".dwg")
+
+            try:
+                # Convert DWG to DXF if needed
+                if is_dwg:
+                    try:
+                        dxf_bytes = await dwg_service.convert_dwg_to_dxf(content, filename)
+                    except (DWGConverterNotAvailable, DWGConversionError) as e:
+                        per_file_status.append(
+                            FileStatus(
+                                filename=filename,
+                                success=False,
+                                error=str(e),
+                            ).__dict__
+                        )
+                        logger.warning(f"DWG conversion failed for {filename}: {e}")
+                        continue
+                else:
+                    dxf_bytes = content
+
+                # Parse DXF
+                result = await self.parse_dxf_file(
+                    dxf_bytes=dxf_bytes,
+                    site_code=site_id,
+                    site_name=site_name or site_id,
+                )
+
+                file_equipment = result.get("equipment", [])
+                all_equipment.extend(file_equipment)
+                all_floors.extend(result.get("floors", []))
+                all_zones.extend(result.get("zones", []))
+
+                per_file_status.append(
+                    FileStatus(
+                        filename=filename,
+                        success=True,
+                        equipment_count=len(file_equipment),
+                    ).__dict__
+                )
+
+            except Exception as e:
+                per_file_status.append(
+                    FileStatus(
+                        filename=filename,
+                        success=False,
+                        error=str(e),
+                    ).__dict__
+                )
+                logger.error(f"Batch parse failed for {filename}: {e}")
+
+        # Deduplicate floors by level
+        seen_levels = set()
+        unique_floors = []
+        for floor in all_floors:
+            level = floor.get("level")
+            if level not in seen_levels:
+                seen_levels.add(level)
+                unique_floors.append(floor)
+
+        # Deduplicate zones by zone_id
+        seen_zones = set()
+        unique_zones = []
+        for zone in all_zones:
+            zone_id = zone.get("zone_id")
+            if zone_id not in seen_zones:
+                seen_zones.add(zone_id)
+                unique_zones.append(zone)
+
+        # Validate merged result
+        merged_extraction = {
+            "equipment": all_equipment,
+            "floors": unique_floors,
+            "zones": unique_zones,
+        }
+        validation_report = validator.validate_extraction(merged_extraction)
+
+        return BatchResult(
+            equipment=all_equipment,
+            floors=unique_floors,
+            zones=unique_zones,
+            validation=validation_report.to_dict(),
+            per_file_status=per_file_status,
+            total_equipment=len(all_equipment),
+            total_floors=len(unique_floors),
+        )
 
 
 # Singleton factory
