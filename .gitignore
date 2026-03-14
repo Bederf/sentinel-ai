@@ -39,6 +39,9 @@ Thumbs.db
 !*.env.enc
 !.env.*.enc
 
+# Firmware credentials — NEVER commit real config.h
+firmware/**/config.h
+
 # Build outputs
 frontend/dist/
 
