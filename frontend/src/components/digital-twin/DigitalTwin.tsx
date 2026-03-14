@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 // @ts-nocheck
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import { X, Snowflake, Wind, Zap, BarChart3, Lightbulb, Flame, Droplet, Video, Lock, Radio, Circle, Wrench, Gauge, Thermometer, ChevronDown, Users } from 'lucide-react';
+import { X, Snowflake, Wind, Zap, BarChart3, Lightbulb, Flame, Droplet, Video, Lock, Radio, Circle, Wrench, Gauge, Thermometer, ChevronDown, Users, Workflow, History } from 'lucide-react';
 import { OccupancySimulation, type Person } from '@/lib/occupancySimulation';
 import { BuildingSelector } from '@/components/BuildingSelector';
 
@@ -15,9 +15,13 @@ import { AlertBanner } from './AlertBanner';
 import { Compass } from '../3d/Compass';
 import { FloorPlan2D } from './FloorPlan2D';
 import { PredictiveFaultOverlay } from './PredictiveFaultOverlay';
+import { AnimatedEnergyFlow } from './AnimatedEnergyFlow';
+import { HistoricalTimeline } from './HistoricalTimeline';
 import { OccupancyMarkers3DFiber } from './OccupancyMarkers3DFiber';
 import { useOccupancySync } from '@/hooks/useOccupancySync';
 import { useEquipmentStatusSSE } from '@/hooks/useEquipmentStatusSSE';
+import type { EnergyFlow } from '@/lib/api';
+import { digitalTwinApi } from '@/lib/api';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useEquipmentData } from '@/hooks/useEquipmentData';
 import { useSitesList } from '@/hooks/useSitesList';
@@ -97,6 +101,11 @@ export function DigitalTwin() {
   const { equipment, loading, error } = useEquipmentData(siteId);
   const { equipmentUpdates: realtimeUpdates, predictions: ssePredicitions, isConnected: sseConnected } = useEquipmentStatusSSE(siteId);
   const [showPredictions, setShowPredictions] = useState(false);
+  const [showEnergyFlows, setShowEnergyFlows] = useState(false);
+  const [energyFlows, setEnergyFlows] = useState<EnergyFlow[]>([]);
+  const [isTimeline, setIsTimeline] = useState(false);
+  const [isTimelinePlaying, setIsTimelinePlaying] = useState(false);
+  const [_timelineTimestamp, setTimelineTimestamp] = useState<Date | null>(null);
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
   const [equipmentTypeFilter, setEquipmentTypeFilter] = useState<string | null>(null);
   const [equipmentDropdownOpen, setEquipmentDropdownOpen] = useState(false);
@@ -194,6 +203,25 @@ export function DigitalTwin() {
     animationFrameId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationFrameId);
   }, [occupancyEnabled]);
+
+  // Energy flow polling (every 10s when visible)
+  useEffect(() => {
+    if (!showEnergyFlows || !siteId) return;
+
+    let cancelled = false;
+    const fetchFlows = async () => {
+      try {
+        const result = await digitalTwinApi.getEnergyFlows(siteId);
+        if (!cancelled) setEnergyFlows(result.flows);
+      } catch (err) {
+        console.warn('Failed to fetch energy flows:', err);
+      }
+    };
+
+    fetchFlows();
+    const interval = setInterval(fetchFlows, 10_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [showEnergyFlows, siteId]);
 
   // Phase 4: Sync with SimulationContext occupancy targets
   const { simulationTime, totalOccupancy } = useOccupancySync({
@@ -524,6 +552,36 @@ export function DigitalTwin() {
               )}
             </button>
 
+            {/* Energy Flows Toggle */}
+            <button
+              onClick={() => setShowEnergyFlows(!showEnergyFlows)}
+              className={`matrix-btn flex items-center gap-2 ${showEnergyFlows ? 'matrix-btn-active' : ''}`}
+              title="Toggle animated energy flow paths"
+            >
+              <Workflow className="w-4 h-4" />
+              <span>Flows</span>
+              {showEnergyFlows && energyFlows.length > 0 && (
+                <span className="text-xs opacity-75">({energyFlows.length})</span>
+              )}
+            </button>
+
+            {/* Timeline Toggle */}
+            <button
+              onClick={() => {
+                const next = !isTimeline;
+                setIsTimeline(next);
+                if (!next) {
+                  setIsTimelinePlaying(false);
+                  setTimelineTimestamp(null);
+                }
+              }}
+              className={`matrix-btn flex items-center gap-2 ${isTimeline ? 'matrix-btn-active' : ''}`}
+              title="Toggle historical timeline scrubber"
+            >
+              <History className="w-4 h-4" />
+              <span>Timeline</span>
+            </button>
+
             {/* SSE Connection Indicator */}
             <div
               className="w-2.5 h-2.5 rounded-full"
@@ -601,6 +659,19 @@ export function DigitalTwin() {
               />
             )}
 
+            {/* Animated Energy Flows */}
+            {showEnergyFlows && energyFlows.length > 0 && (
+              <AnimatedEnergyFlow
+                flows={energyFlows}
+                equipmentPositions={
+                  new Map(
+                    Array.from(equipmentPositions.entries()).map(([id, pos]) => [id, [pos.x, pos.y, pos.z] as [number, number, number]])
+                  )
+                }
+                visible={showEnergyFlows}
+              />
+            )}
+
             {/* Occupancy dots — subtle cyan spheres on floor surfaces */}
             {occupancyEnabled && people.length > 0 && (
               <OccupancyMarkers3DFiber people={people} />
@@ -625,6 +696,15 @@ export function DigitalTwin() {
             selectedEquipment={selectedEquipment}
             occupancyEnabled={occupancyEnabled}
             people={people}
+          />
+        )}
+
+        {/* Historical Timeline Scrubber */}
+        {isTimeline && (
+          <HistoricalTimeline
+            onTimestampChange={(ts) => setTimelineTimestamp(ts)}
+            isPlaying={isTimelinePlaying}
+            onPlayPause={() => setIsTimelinePlaying(!isTimelinePlaying)}
           />
         )}
 
