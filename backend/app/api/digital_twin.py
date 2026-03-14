@@ -2,15 +2,20 @@
 
 Handles floor plan extraction and building configuration for SIMBIOT wizard.
 Supports sanitized image input (Tier 1) and DXF parsing (Tier 2).
+Also provides SSE endpoint for real-time equipment status streaming.
 """
 
 import logging
-from typing import Dict, Optional
+import uuid
+from datetime import datetime, timedelta
+from typing import Dict, Optional, Tuple
 
-from fastapi import APIRouter, HTTPException, Query, status, File, UploadFile
+from fastapi import APIRouter, HTTPException, Query, Request, status, File, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.services.digital_twin_service import get_digital_twin_service
+from app.services.equipment_status_streamer import EquipmentStatusStreamer
 
 logger = logging.getLogger(__name__)
 
@@ -341,3 +346,143 @@ async def extract_from_dxf(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"DXF parsing failed: {str(e)}",
         )
+
+
+# =============================================================================
+# SSE: Real-time Equipment Status Stream
+# =============================================================================
+
+# In-memory ticket store for SSE auth (same pattern as events.py)
+_DT_SSE_TICKETS: Dict[str, Tuple[datetime, str]] = {}  # ticket -> (expires_at, user_id)
+_DT_TICKET_TTL_SECONDS = 30
+_DT_MAX_TICKETS = 500
+
+
+def _dt_cleanup_expired_tickets() -> None:
+    """Remove expired tickets from the digital twin SSE store."""
+    now = datetime.utcnow()
+    expired = [t for t, (exp, _) in _DT_SSE_TICKETS.items() if now > exp]
+    for t in expired:
+        _DT_SSE_TICKETS.pop(t, None)
+
+
+def _dt_create_ticket(user_id: str) -> str:
+    """Create a short-lived, single-use SSE ticket for the digital twin stream."""
+    _dt_cleanup_expired_tickets()
+
+    if len(_DT_SSE_TICKETS) >= _DT_MAX_TICKETS:
+        sorted_tickets = sorted(_DT_SSE_TICKETS.items(), key=lambda x: x[1][0])
+        for t, _ in sorted_tickets[: len(sorted_tickets) // 2]:
+            _DT_SSE_TICKETS.pop(t, None)
+
+    ticket = str(uuid.uuid4())
+    expires_at = datetime.utcnow() + timedelta(seconds=_DT_TICKET_TTL_SECONDS)
+    _DT_SSE_TICKETS[ticket] = (expires_at, user_id)
+    return ticket
+
+
+def _dt_validate_ticket(ticket: str) -> Optional[str]:
+    """Validate and consume a single-use SSE ticket."""
+    _dt_cleanup_expired_tickets()
+
+    entry = _DT_SSE_TICKETS.pop(ticket, None)
+    if entry is None:
+        return None
+
+    expires_at, user_id = entry
+    if datetime.utcnow() > expires_at:
+        return None
+
+    return user_id
+
+
+@router.post(
+    "/status/ticket",
+    summary="Create SSE ticket for equipment status stream",
+)
+async def create_status_ticket(
+    request: Request,
+) -> dict:
+    """Create a short-lived, single-use ticket for the equipment status SSE stream.
+
+    In demo mode, returns a ticket without authentication.
+    In production, requires Bearer token in Authorization header.
+
+    Returns:
+        {"ticket": "random-uuid-string"}
+    """
+    import os
+
+    # In demo mode, allow unauthenticated tickets
+    demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
+    user_id = "demo-user"
+
+    if not demo_mode:
+        # Try to extract user from auth header
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            user_id = auth_header[7:][:8]  # Use first 8 chars as identifier
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required for SSE ticket",
+            )
+
+    ticket = _dt_create_ticket(user_id)
+    return {"ticket": ticket}
+
+
+@router.get(
+    "/status/stream",
+    summary="SSE stream for real-time equipment status",
+)
+async def stream_equipment_status(
+    request: Request,
+    site_id: str = Query(..., description="Site UUID to stream status for"),
+) -> StreamingResponse:
+    """Server-Sent Events stream for real-time equipment status and predictions.
+
+    Authentication: Pass a ticket from POST /api/digital-twin/status/ticket.
+    In demo mode, unauthenticated connections are allowed.
+
+    Events contain EquipmentStatusFrame with:
+    - equipment_updates: Current status of all equipment
+    - predictions: Active ML predictions mapped for visualization
+
+    Usage:
+    ```javascript
+    // 1. Get ticket
+    const { ticket } = await fetch('/api/digital-twin/status/ticket', { method: 'POST' }).then(r => r.json());
+    // 2. Open SSE
+    const es = new EventSource(`/api/digital-twin/status/stream?site_id=${siteId}&ticket=${ticket}`);
+    ```
+    """
+    import os
+
+    demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
+    ticket = request.query_params.get("ticket", "")
+
+    if ticket:
+        user_id = _dt_validate_ticket(ticket)
+        if user_id is None and not demo_mode:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired SSE ticket",
+            )
+    elif not demo_mode:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="SSE ticket required. POST /api/digital-twin/status/ticket first.",
+        )
+
+    streamer = EquipmentStatusStreamer()
+
+    return StreamingResponse(
+        streamer.stream_status(site_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
