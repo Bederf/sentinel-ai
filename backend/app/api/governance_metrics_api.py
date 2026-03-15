@@ -12,7 +12,10 @@ import math
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+
+from app.middleware.auth_middleware import require_auth
+from app.models.auth import AuthContext, AuthLevel
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +116,7 @@ def _percentile_from_buckets(buckets: list[dict[str, Any]], target: float) -> fl
 
 
 @router.get("/quality-gate-rules")
-async def get_quality_gate_rules() -> dict[str, Any]:
+async def get_quality_gate_rules(auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))) -> dict[str, Any]:
     """Return per-rule pass/fail/warn counts from Prometheus registry."""
     samples = _read_counter_samples("sentinel_quality_gate_rule_evaluations_total")
 
@@ -132,12 +135,17 @@ async def get_quality_gate_rules() -> dict[str, Any]:
 
 
 @router.get("/drift-scores")
-async def get_drift_scores() -> dict[str, Any]:
+async def get_drift_scores(auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))) -> dict[str, Any]:
     """Return current drift scores for all active models."""
     from app.ml.models.model_drift_calculator import ModelDriftCalculator
+    from app.services.governance_metrics_collector import governance_metrics
 
     calc = ModelDriftCalculator()
     scores = await calc.get_all_drift_scores()
+
+    # Emit drift scores to Prometheus gauges so Grafana panels have data
+    for s in scores:
+        governance_metrics.record_drift_score(s["model_id"], s["model_type"], s["drift_score"])
 
     alerts = [s for s in scores if s.get("drift_score", 0) > 0.3]
 
@@ -145,7 +153,7 @@ async def get_drift_scores() -> dict[str, Any]:
 
 
 @router.get("/approval-latency")
-async def get_approval_latency() -> dict[str, Any]:
+async def get_approval_latency(auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))) -> dict[str, Any]:
     """Return approval latency percentiles from histogram data."""
     hist = _read_histogram_samples("sentinel_approval_latency_seconds")
 
@@ -183,10 +191,20 @@ async def get_approval_latency() -> dict[str, Any]:
 
 
 @router.get("/cost-by-route")
-async def get_cost_by_route() -> dict[str, Any]:
-    """Return token/cost breakdown by route."""
+async def get_cost_by_route(auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED))) -> dict[str, Any]:
+    """Return token/cost breakdown by route.
+
+    Costs in Prometheus are tracked in USD. This endpoint converts to ZAR
+    using the ai_usage_tracker exchange rate for display consistency.
+    """
+    from app.services.ai_usage_tracker import AiUsageTracker
+
     token_samples = _read_counter_samples("sentinel_ai_tokens_by_route_total")
     cost_samples = _read_counter_samples("sentinel_ai_cost_by_route_total")
+
+    # Get current USD→ZAR rate
+    tracker = AiUsageTracker()
+    usd_zar = getattr(tracker, "_usd_zar", 18.50)
 
     # Aggregate tokens by route
     tokens_map: dict[str, int] = {}
@@ -194,34 +212,39 @@ async def get_cost_by_route() -> dict[str, Any]:
         route = s["labels"].get("route", "unknown")
         tokens_map[route] = tokens_map.get(route, 0) + int(s["value"])
 
-    # Aggregate costs by route
-    cost_map: dict[str, float] = {}
+    # Aggregate costs by route (USD in Prometheus, convert to ZAR)
+    cost_map_usd: dict[str, float] = {}
     for s in cost_samples:
         route = s["labels"].get("route", "unknown")
-        cost_map[route] = cost_map.get(route, 0) + s["value"]
+        cost_map_usd[route] = cost_map_usd.get(route, 0) + s["value"]
 
     # Merge
-    all_routes = sorted(set(tokens_map.keys()) | set(cost_map.keys()))
+    all_routes = sorted(set(tokens_map.keys()) | set(cost_map_usd.keys()))
     routes = [
         {
             "route": r,
             "tokens": tokens_map.get(r, 0),
-            "cost_zar": round(cost_map.get(r, 0.0), 4),
+            "cost_usd": round(cost_map_usd.get(r, 0.0), 4),
+            "cost_zar": round(cost_map_usd.get(r, 0.0) * usd_zar, 2),
         }
         for r in all_routes
     ]
 
+    total_usd = sum(r["cost_usd"] for r in routes)
     return {
         "routes": routes,
         "total_tokens": sum(r["tokens"] for r in routes),
-        "total_cost_zar": round(sum(r["cost_zar"] for r in routes), 4),
+        "total_cost_usd": round(total_usd, 4),
+        "total_cost_zar": round(total_usd * usd_zar, 2),
+        "usd_zar_rate": usd_zar,
     }
 
 
 @router.get("/popia-evidence")
 async def get_popia_evidence(
     year: int | None = Query(default=None, description="Year (default: current)"),
-    month: int | None = Query(default=None, description="Month 1-12 (default: current)"),
+    month: int | None = Query(default=None, ge=1, le=12, description="Month 1-12 (default: current)"),
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ) -> dict[str, Any]:
     """Return monthly POPIA evidence pack."""
     from app.services.popia_evidence_pack_service import POPIAEvidencePackService

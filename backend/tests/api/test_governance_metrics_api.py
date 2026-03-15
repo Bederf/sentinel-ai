@@ -6,6 +6,8 @@ Endpoints:
   GET /api/governance/approval-latency
   GET /api/governance/cost-by-route
   GET /api/governance/popia-evidence
+
+Auth: All endpoints require AUTHENTICATED level. DEMO_MODE bypasses auth.
 """
 
 
@@ -85,11 +87,13 @@ class TestCostByRouteEndpoint:
         body = resp.json()
         assert "routes" in body
         assert "total_tokens" in body
+        assert "total_cost_usd" in body
         assert "total_cost_zar" in body
+        assert "usd_zar_rate" in body
         assert isinstance(body["routes"], list)
 
     def test_cost_by_route_seeded(self, test_client):
-        """Seed token/cost counters and verify they appear."""
+        """Seed token/cost counters and verify they appear with USD→ZAR conversion."""
         from app.api.metrics import (
             sentinel_ai_tokens_by_route_total,
             sentinel_ai_cost_by_route_total,
@@ -103,6 +107,10 @@ class TestCostByRouteEndpoint:
         chat_routes = [r for r in body["routes"] if r["route"] == "chat"]
         assert len(chat_routes) >= 1
         assert chat_routes[0]["tokens"] >= 100
+        # Verify both USD and ZAR fields present
+        assert "cost_usd" in chat_routes[0]
+        assert "cost_zar" in chat_routes[0]
+        assert chat_routes[0]["cost_zar"] >= chat_routes[0]["cost_usd"]  # ZAR > USD
         assert body["total_tokens"] >= 100
 
 
@@ -125,4 +133,14 @@ class TestPOPIAEvidenceEndpoint:
     def test_popia_evidence_invalid_params(self, test_client):
         """Non-integer params should return 422."""
         resp = test_client.get("/api/governance/popia-evidence?year=abc")
+        assert resp.status_code == 422
+
+    def test_popia_evidence_month_out_of_range(self, test_client):
+        """Month outside 1-12 should return 422."""
+        resp = test_client.get("/api/governance/popia-evidence?month=13")
+        assert resp.status_code == 422
+
+    def test_popia_evidence_month_zero(self, test_client):
+        """Month 0 should return 422."""
+        resp = test_client.get("/api/governance/popia-evidence?month=0")
         assert resp.status_code == 422

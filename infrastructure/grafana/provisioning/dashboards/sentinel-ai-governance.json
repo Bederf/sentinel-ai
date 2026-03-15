@@ -280,33 +280,18 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyZAR"
+          "unit": "currencyUSD"
         }
       }
     },
     {
       "id": 15,
-      "title": "POPIA Evidence Pack Status",
-      "type": "stat",
+      "title": "POPIA Evidence Pack",
+      "type": "text",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
-      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sentinel_popia_evidence_pack_generated_total",
-          "legendFormat": "Packs Generated"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
-            ]
-          }
-        }
+      "options": {
+        "mode": "markdown",
+        "content": "## POPIA Monthly Evidence\n\nGenerated on-demand via API:\n\n`GET /api/governance/popia-evidence`\n\nCovers: consent metrics, retention enforcement, DSR completion, access control audit.\n\nEvidence packs stored in `popia_evidence_packs.json` (24-month FIFO)."
       }
     }
   ],
