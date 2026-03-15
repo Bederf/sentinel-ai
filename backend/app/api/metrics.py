@@ -286,13 +286,7 @@ sentinel_approval_latency_seconds = Histogram(
     registry=REGISTRY,
 )
 
-# 29. Approval rejection rate gauge
-sentinel_approval_rejection_rate = Gauge(
-    "sentinel_approval_rejection_rate",
-    "Running rejection rate per site (0.0-1.0)",
-    labelnames=["site_id"],
-    registry=REGISTRY,
-)
+# 29. (Removed — rejection rate computed from sentinel_approval_decisions_total counter)
 
 # 30. Token usage by route and site
 sentinel_ai_tokens_by_route_total = Counter(

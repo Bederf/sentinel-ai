@@ -173,7 +173,7 @@ class TestMetricsEndpointIntegration:
             "sentinel_model_drift_score",
             "sentinel_tool_call_errors_total",
             "sentinel_approval_latency_seconds",
-            "sentinel_approval_rejection_rate",
+            # sentinel_approval_rejection_rate removed — uses sentinel_approval_decisions_total
             "sentinel_ai_tokens_by_route_total",
             "sentinel_ai_cost_by_route_total",
         ]

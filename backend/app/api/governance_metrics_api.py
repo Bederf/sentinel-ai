@@ -163,14 +163,17 @@ async def get_approval_latency() -> dict[str, Any]:
 
     total_approvals = int(sum(s["value"] for s in hist["count"]))
 
-    # Rejection rate from gauge
-    from app.api.metrics import REGISTRY
+    # Rejection rate from approval decisions counter
+    decision_samples = _read_counter_samples("sentinel_approval_decisions_total")
+    total_decisions = 0
+    total_rejections = 0
+    for s in decision_samples:
+        count = int(s["value"])
+        total_decisions += count
+        if s["labels"].get("decision") == "rejected":
+            total_rejections += count
 
-    rejection_rate = 0.0
-    for metric in REGISTRY.collect():
-        if metric.name == "sentinel_approval_rejection_rate":
-            for sample in metric.samples:
-                rejection_rate = max(rejection_rate, sample.value)
+    rejection_rate = total_rejections / total_decisions if total_decisions > 0 else 0.0
 
     return {
         "percentiles": {"p50": p50, "p95": p95, "p99": p99},

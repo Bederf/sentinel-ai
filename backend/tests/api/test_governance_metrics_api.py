@@ -95,12 +95,12 @@ class TestCostByRouteEndpoint:
             sentinel_ai_cost_by_route_total,
         )
 
-        sentinel_ai_tokens_by_route_total.labels(route="/api/chat", site_id="site-002", provider="claude").inc(100)
-        sentinel_ai_cost_by_route_total.labels(route="/api/chat", site_id="site-002").inc(0.50)
+        sentinel_ai_tokens_by_route_total.labels(route="chat", site_id="site-002", provider="claude").inc(100)
+        sentinel_ai_cost_by_route_total.labels(route="chat", site_id="site-002").inc(0.50)
 
         resp = test_client.get("/api/governance/cost-by-route")
         body = resp.json()
-        chat_routes = [r for r in body["routes"] if r["route"] == "/api/chat"]
+        chat_routes = [r for r in body["routes"] if r["route"] == "chat"]
         assert len(chat_routes) >= 1
         assert chat_routes[0]["tokens"] >= 100
         assert body["total_tokens"] >= 100

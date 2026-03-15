@@ -57,7 +57,7 @@ class ModelDriftCalculator:
         """
         if baseline_r_squared <= 0:
             return 0.0
-        raw = 1.0 - (recent_r_squared / max(baseline_r_squared, 0.01))
+        raw = 1.0 - (recent_r_squared / baseline_r_squared)
         return max(0.0, min(1.0, raw))
 
     # ------------------------------------------------------------------

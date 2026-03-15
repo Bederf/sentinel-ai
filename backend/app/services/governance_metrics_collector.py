@@ -130,23 +130,22 @@ class GovernanceMetricsCollector:
             logger.debug("Failed to record approval latency metric", exc_info=True)
 
     def record_approval_rejection(self, site_id: str, rejected: bool) -> None:
-        """Update rolling rejection rate gauge for a site.
+        """Track approval/rejection decisions for computing rejection rate.
 
-        This is a simple gauge set — callers should compute the rate externally
-        or this can be refined with a sliding window in future.
+        Uses the existing sentinel_approval_decisions_total counter with
+        decision="approved" or "rejected" labels. The API endpoint computes
+        the rejection rate from counter values.
 
         Args:
             site_id: Site identifier.
             rejected: True if the decision was a rejection.
         """
         try:
-            from app.api.metrics import sentinel_approval_rejection_rate
+            from app.api.metrics import sentinel_approval_decisions_total
 
             safe_site = str(site_id or "unknown")[:32]
-            # Increment/decrement a simple gauge tracking rejection count
-            # Prometheus rate() on the counter gives the actual rate
-            if rejected:
-                sentinel_approval_rejection_rate.labels(site_id=safe_site).inc()
+            decision = "rejected" if rejected else "approved"
+            sentinel_approval_decisions_total.labels(site_id=safe_site, decision=decision).inc()
         except Exception:
             logger.debug("Failed to record approval rejection metric", exc_info=True)
 
