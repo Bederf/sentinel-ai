@@ -1,12 +1,17 @@
 """
 AI Usage Tracker Service
 =========================
-Tracks token consumption and costs across all AI providers:
+Tracks token consumption and costs across all paid services:
 - Anthropic (Claude Sonnet, Haiku, Opus)
 - OpenAI (GPT-4.1-nano, GPT-4.1-mini)
+- ZhipuAI / Z.ai (GLM-4.7-flash)
 - Sentry Gateway (Claude Sonnet via openclaw)
 - Ollama (local, free but tracked for audit)
 - ElevenLabs TTS (character-based pricing)
+- WhatsApp (Meta Cloud API / Twilio)
+- BulkSMS (per-message pricing)
+- Telegram (free but tracked for audit)
+- EskomSePush (free tier, tracked for quota)
 
 Persists to JSON with daily rollup. No external dependencies.
 """
@@ -40,6 +45,20 @@ PRICING_USD_PER_1M = {
     "glm-4.7-flash": {"input": 0.10, "output": 0.10},
     # Local (free)
     "ollama": {"input": 0.00, "output": 0.00},
+}
+
+# ---- Per-message pricing (USD) ----
+MESSAGE_PRICING_USD = {
+    "whatsapp_meta": 0.005,  # Meta Cloud API conversation fee
+    "whatsapp_twilio": 0.005,  # Twilio WhatsApp per-message
+    "bulksms": 0.006,  # BulkSMS per-SMS (ZA rate)
+    "telegram": 0.0,  # Free — tracked for audit
+}
+
+# ---- Per-unit service pricing (USD) ----
+SERVICE_PRICING_USD = {
+    "elevenlabs_chars": 0.00003,  # ~$0.03 per 1K characters
+    "eskomsepush_call": 0.0,  # Free tier (50 req/day)
 }
 
 # Default USD→ZAR rate (configurable via settings)
@@ -154,9 +173,121 @@ class AiUsageTracker:
             cost += (cache_creation_tokens * pricing["input"] * 1.25) / 1_000_000
             entry["cost_usd"] += cost
 
+            # Phase 160: Governance metrics — token/cost by route
+            try:
+                from app.services.governance_metrics_collector import governance_metrics
+
+                governance_metrics.record_ai_usage(
+                    route=source,
+                    site_id="unknown",  # ai_usage_tracker doesn't have site context
+                    provider=provider,
+                    tokens=input_tokens + output_tokens,
+                    cost=cost,
+                )
+            except Exception:
+                pass
+
             # Flush periodically (every 10 calls)
             if entry["calls"] % 10 == 0:
                 self._flush()
+
+    def record_message(
+        self,
+        provider: str,
+        recipient_count: int = 1,
+        source: str = "alert",
+    ):
+        """Record a messaging API call (WhatsApp, BulkSMS, Telegram).
+
+        Uses fixed per-message pricing from MESSAGE_PRICING_USD.
+        Stores as provider/message key with zero tokens.
+        """
+        unit_cost = MESSAGE_PRICING_USD.get(provider, 0.0) * recipient_count
+        self.record(
+            provider=provider,
+            model="message",
+            input_tokens=0,
+            output_tokens=0,
+            source=source,
+        )
+        # Override cost (record() would compute 0 from tokens)
+        with self._write_lock:
+            key = f"{provider}/message"
+            if key in self._today_cache:
+                self._today_cache[key]["cost_usd"] += unit_cost
+        self._check_cost_alert()
+
+    def record_service(
+        self,
+        provider: str,
+        units: int,
+        unit_type: str = "chars",
+        source: str = "tts",
+    ):
+        """Record a unit-based service call (ElevenLabs chars, EskomSePush calls).
+
+        Uses per-unit pricing from SERVICE_PRICING_USD.
+        """
+        pricing_key = f"{provider}_{unit_type}"
+        unit_cost = SERVICE_PRICING_USD.get(pricing_key, 0.0) * units
+        self.record(
+            provider=provider,
+            model=unit_type,
+            input_tokens=0,
+            output_tokens=0,
+            source=source,
+        )
+        # Override cost and store unit count
+        with self._write_lock:
+            key = f"{provider}/{unit_type}"
+            if key in self._today_cache:
+                self._today_cache[key]["cost_usd"] += unit_cost
+        self._check_cost_alert()
+
+    def _check_cost_alert(self):
+        """Send Telegram alert if daily spend exceeds threshold."""
+        try:
+            from app.config.settings import settings
+
+            threshold = getattr(settings, "cost_alert_daily_threshold_zar", 100.0)
+            if threshold <= 0:
+                return
+
+            total_usd = sum(e.get("cost_usd", 0) for e in self._today_cache.values())
+            total_zar = total_usd * self._usd_zar
+
+            if total_zar < threshold:
+                return
+
+            # Only alert once per day — use a flag in cache
+            if self._today_cache.get("_cost_alert_sent"):
+                return
+            self._today_cache["_cost_alert_sent"] = True
+
+            chat_id = getattr(settings, "cost_alert_telegram_chat_id", "") or getattr(
+                settings, "telegram_alert_chat_id", ""
+            )
+            bot_token = getattr(settings, "telegram_bot_token", "")
+            if not (chat_id and bot_token):
+                logger.warning("Cost alert threshold exceeded (R %.2f) but no Telegram config", total_zar)
+                return
+
+            import httpx
+
+            msg = (
+                f"⚠️ *SENTINEL Cost Alert*\n"
+                f"Daily spend: R {total_zar:.2f} (threshold: R {threshold:.2f})\n"
+                f"USD: ${total_usd:.4f}"
+            )
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            # Fire-and-forget sync call (we're already in a lock context)
+            try:
+                httpx.post(url, json={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}, timeout=5.0)
+                logger.info("Cost alert sent: R %.2f exceeds threshold R %.2f", total_zar, threshold)
+            except Exception as exc:
+                logger.error("Failed to send cost alert: %s", exc)
+        except Exception:
+            pass  # Never let alert logic break tracking
 
     def _flush(self):
         """Persist today's cache to disk."""
@@ -334,15 +465,37 @@ class AiUsageTracker:
             "--- By Model ---",
         ]
 
+        ai_models = {}
+        messaging_models = {}
+        service_models = {}
         for key, model_data in today_data.get("models", {}).items():
+            if key.endswith("/message"):
+                messaging_models[key] = model_data
+            elif key.endswith("/chars") or key.endswith("/calls"):
+                service_models[key] = model_data
+            else:
+                ai_models[key] = model_data
+
+        for key, model_data in ai_models.items():
             lines.append(
                 f"  {key}: {model_data['calls']} calls, "
                 f"{model_data['input_tokens']:,}+{model_data['output_tokens']:,} tokens, "
                 f"R {model_data['cost_zar']:.2f}"
             )
 
-        if not today_data.get("models"):
-            lines.append("  (no API calls today)")
+        if not ai_models:
+            lines.append("  (no AI calls today)")
+
+        if messaging_models:
+            lines.extend(["", "--- Messaging ---"])
+            for key, model_data in messaging_models.items():
+                provider = key.split("/")[0]
+                lines.append(f"  {provider}: {model_data['calls']} messages, R {model_data['cost_zar']:.2f}")
+
+        if service_models:
+            lines.extend(["", "--- Services ---"])
+            for key, model_data in service_models.items():
+                lines.append(f"  {key}: {model_data['calls']} calls, R {model_data['cost_zar']:.2f}")
 
         lines.extend(
             [
@@ -378,7 +531,7 @@ class AiUsageTracker:
             return False
 
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"SENTINEL AI Costs: R {total_zar:.2f} — {day_str}"
+        msg["Subject"] = f"SENTINEL Service Costs: R {total_zar:.2f} — {day_str}"
         msg["From"] = f"SENTINEL AI Ops <{username}>"
         msg["To"] = to_email
         msg.attach(MIMEText(body, "plain"))

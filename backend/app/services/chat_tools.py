@@ -3104,12 +3104,11 @@ CHAT_TOOLS = [
     {
         "name": "search_documents",
         "description": (
-            "Search SENTINEL documentation, equipment manuals, fault codes, "
-            "and procedures. Use this when the user asks about how SENTINEL "
-            "works, equipment troubleshooting guides, manufacturer documentation, "
-            "maintenance procedures, or system capabilities. Returns relevant "
-            "document excerpts ranked by relevance. Do NOT use this for live "
-            "building data — use the other tools for real-time equipment status."
+            "Search operational documentation: equipment manuals, fault codes, "
+            "maintenance procedures, and troubleshooting guides. Use this for "
+            "equipment-specific questions and operational knowledge. Returns "
+            "relevant document excerpts ranked by relevance. Do NOT use this "
+            "for live building data — use the other tools for real-time equipment status."
         ),
         "input_schema": {
             "type": "object",
@@ -3117,6 +3116,30 @@ CHAT_TOOLS = [
                 "query": {
                     "type": "string",
                     "description": "Search query — natural language question or keywords",
+                },
+                "n_results": {
+                    "type": "integer",
+                    "description": "Maximum results to return (default: 5, max: 10)",
+                    "default": 5,
+                },
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "search_system_documents",
+        "description": (
+            "Search SENTINEL platform documentation: architecture, security design, "
+            "compliance controls, onboarding instructions, building upload procedures, "
+            "and configuration guides. Only use when the user asks about how the "
+            "SENTINEL platform itself works, NOT for operational/equipment questions."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Platform documentation search query",
                 },
                 "n_results": {
                     "type": "integer",
@@ -3503,21 +3526,32 @@ def _filter_tools_by_role(tools: list[dict], user_role: Optional[SentinelRole]) 
     return result
 
 
+# Tools that require the system docs toggle to be enabled
+_SYSTEM_DOCS_GATED_TOOLS = {"search_system_documents"}
+
+
 def get_chat_tools(
     site_id: str | None = None,
     *,
     user_email: Optional[str] = None,
     user_role: Optional[SentinelRole] = None,
+    include_system_docs: bool = False,
 ) -> list[dict[str, Any]]:
-    """Return chat tools filtered by active modules and user role.
+    """Return chat tools filtered by active modules, user role, and system docs toggle.
 
-    If no site is provided, still filter by role requirements.
+    When include_system_docs is False (default), the search_system_documents tool
+    is excluded to prevent platform documentation from polluting operational answers.
     """
+    # Pre-filter system docs tools
+    base_tools = CHAT_TOOLS
+    if not include_system_docs:
+        base_tools = [t for t in CHAT_TOOLS if t.get("name") not in _SYSTEM_DOCS_GATED_TOOLS]
+
     if not site_id:
-        return _filter_tools_by_role(CHAT_TOOLS, user_role)
+        return _filter_tools_by_role(base_tools, user_role)
 
     filtered: list[dict[str, Any]] = []
-    for tool in CHAT_TOOLS:
+    for tool in base_tools:
         tool_name = tool.get("name")
 
         # Role check — hide write tools from users below required role
@@ -4206,11 +4240,44 @@ async def reset_equipment_fault_chat(
         return {"success": False, "error": str(e)}
 
 
+def _format_doc_results(results: list[dict], query: str) -> dict[str, Any]:
+    """Format RAG search results into a standardized response."""
+    if not results:
+        return {
+            "success": True,
+            "results": [],
+            "message": f"No documentation found matching '{query}'.",
+        }
+
+    formatted = []
+    for r in results:
+        formatted.append(
+            {
+                "title": r.get("document_title", "Unknown"),
+                "content": r.get("content", "")[:1500],
+                "source": r.get("source", ""),
+                "relevance": round(r.get("similarity", r.get("hybrid_score", 0)), 3),
+            }
+        )
+
+    return {
+        "success": True,
+        "results": formatted,
+        "count": len(formatted),
+        "query": query,
+    }
+
+
 async def search_documents(
     query: str,
     n_results: int = 5,
 ) -> dict[str, Any]:
-    """Search indexed documentation and knowledge base via hybrid search."""
+    """Search operational documentation and knowledge base via hybrid search.
+
+    This searches building-scoped documents, equipment manuals, fault codes,
+    and procedures. It does NOT search SENTINEL platform/system documentation
+    unless search_system_documents is also enabled.
+    """
     try:
         from app.services.doc_rag_service import search_documentation
 
@@ -4218,33 +4285,33 @@ async def search_documents(
             query=query,
             n_results=min(n_results, 10),
         )
-
-        if not results:
-            return {
-                "success": True,
-                "results": [],
-                "message": f"No documentation found matching '{query}'.",
-            }
-
-        formatted = []
-        for r in results:
-            formatted.append(
-                {
-                    "title": r.get("document_title", "Unknown"),
-                    "content": r.get("content", "")[:1500],
-                    "source": r.get("source", ""),
-                    "relevance": round(r.get("similarity", r.get("hybrid_score", 0)), 3),
-                }
-            )
-
-        return {
-            "success": True,
-            "results": formatted,
-            "count": len(formatted),
-            "query": query,
-        }
+        return _format_doc_results(results, query)
     except Exception as e:
         logger.error(f"Error searching documents: {e}")
+        return {"success": False, "error": str(e), "results": []}
+
+
+async def search_system_documents(
+    query: str,
+    n_results: int = 5,
+) -> dict[str, Any]:
+    """Search SENTINEL platform documentation (architecture, security, compliance, onboarding).
+
+    This tool is only available when the user enables the 'Include SENTINEL platform
+    documentation' toggle. Results are weighted at 30% relative to operational RAG (70%).
+    """
+    try:
+        from app.services.doc_rag_service import search_documentation
+
+        # System docs are not building-scoped — search without site_id filter
+        results = await search_documentation(
+            query=query,
+            n_results=min(n_results, 10),
+            site_id=None,  # Global platform docs
+        )
+        return _format_doc_results(results, query)
+    except Exception as e:
+        logger.error(f"Error searching system documents: {e}")
         return {"success": False, "error": str(e), "results": []}
 
 
@@ -4520,6 +4587,7 @@ TOOL_HANDLERS = {
     "reject_recommendation": reject_recommendation_chat,
     "reset_equipment_fault": reset_equipment_fault_chat,
     "search_documents": search_documents,
+    "search_system_documents": search_system_documents,
     "get_hybrid_context": get_hybrid_context,
     # ServiceNow integration tools (Phase 138-02)
     "check_servicenow_status": check_servicenow_status,
@@ -4653,9 +4721,44 @@ async def execute_tool(
     except TypeError as e:
         _outcome = "error"
         logger.error("Tool %s parameter error: %s", tool_name, e, exc_info=True)
+        try:
+            from app.services.governance_metrics_collector import governance_metrics
+
+            governance_metrics.record_tool_error(tool_name, "param_validation")
+        except Exception:
+            pass
         return {"error": f"Invalid parameters for {tool_name}.", "tool": tool_name}
+    except TimeoutError as e:
+        _outcome = "error"
+        logger.error("Tool %s timeout: %s", tool_name, e, exc_info=True)
+        try:
+            from app.services.governance_metrics_collector import governance_metrics
+
+            governance_metrics.record_tool_error(tool_name, "timeout")
+        except Exception:
+            pass
+        return {"error": "This operation timed out.", "tool": tool_name}
+    except PermissionError as e:
+        _outcome = "error"
+        logger.error("Tool %s permission error: %s", tool_name, e, exc_info=True)
+        try:
+            from app.services.governance_metrics_collector import governance_metrics
+
+            governance_metrics.record_tool_error(tool_name, "permission")
+        except Exception:
+            pass
+        return {"error": "This operation could not be completed.", "tool": tool_name}
     except Exception as e:
         _outcome = "error"
+        _error_type = "execution"
+        if isinstance(e, RuntimeError) and "module" in str(e).lower():
+            _error_type = "module_inactive"
+        try:
+            from app.services.governance_metrics_collector import governance_metrics
+
+            governance_metrics.record_tool_error(tool_name, _error_type)
+        except Exception:
+            pass
         logger.error("Tool %s execution error: %s", tool_name, e, exc_info=True)
         return {"error": "This operation could not be completed.", "tool": tool_name}
     finally:

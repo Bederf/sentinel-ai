@@ -180,6 +180,15 @@ class QualityGateEvaluator:
         except Exception:
             pass  # Metrics are best-effort, never block business logic
 
+        # Phase 160: Per-rule governance metrics
+        try:
+            from app.services.governance_metrics_collector import governance_metrics
+
+            for rule_result in rule_results:
+                governance_metrics.record_quality_gate_rule(rule_result.metric, rule_result.state.value)
+        except Exception:
+            pass
+
         return result
 
     def apply_enforcement(self, result: QualityGateResult, recommendation: dict) -> dict:

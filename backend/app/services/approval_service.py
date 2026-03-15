@@ -410,6 +410,22 @@ class ApprovalService:
             except Exception:
                 pass  # Metrics are best-effort, never block business logic
 
+            # Phase 160: Governance metrics — approval latency and rejection tracking
+            try:
+                from app.services.governance_metrics_collector import governance_metrics
+
+                latency = (datetime.utcnow() - recommendation.timestamp).total_seconds()
+                governance_metrics.record_approval_latency(
+                    site_id=recommendation.site_id or "unknown",
+                    tier="tier2",
+                    latency_seconds=latency,
+                )
+                governance_metrics.record_approval_rejection(
+                    site_id=recommendation.site_id or "unknown", rejected=False
+                )
+            except Exception:
+                pass
+
             logger.info(f"Approval executed successfully for {recommendation_id}")
 
             return ApprovalResult(
@@ -538,6 +554,20 @@ class ApprovalService:
                 ).inc()
             except Exception:
                 pass  # Metrics are best-effort, never block business logic
+
+            # Phase 160: Governance metrics — rejection latency and tracking
+            try:
+                from app.services.governance_metrics_collector import governance_metrics
+
+                latency = (datetime.utcnow() - recommendation.timestamp).total_seconds()
+                governance_metrics.record_approval_latency(
+                    site_id=recommendation.site_id or "unknown",
+                    tier="tier2",
+                    latency_seconds=latency,
+                )
+                governance_metrics.record_approval_rejection(site_id=recommendation.site_id or "unknown", rejected=True)
+            except Exception:
+                pass
 
             logger.info(f"Recommendation {recommendation_id} rejected by {rejected_by}")
 
