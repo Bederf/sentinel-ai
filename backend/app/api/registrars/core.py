@@ -10,6 +10,7 @@ from app.api import health, sites, settings as settings_api, settings_db, system
 from app.api import auth, user_access, login_audit, mfa, cache, sites_aggregation, events, user_entitlements
 from app.api import metrics as prometheus_metrics
 from app.api import space_settings
+from app.api import governance_metrics_api
 
 
 def register_core_routers(app: FastAPI) -> None:
@@ -33,6 +34,9 @@ def register_core_routers(app: FastAPI) -> None:
 
     # Space optimization settings (grace periods, concierge CRUD)
     app.include_router(space_settings.router, prefix="/api", tags=["space-settings"])
+
+    # Governance metrics
+    app.include_router(governance_metrics_api.router, tags=["governance"])
 
     # Authentication and authorization
     app.include_router(auth.router, tags=["auth"])
