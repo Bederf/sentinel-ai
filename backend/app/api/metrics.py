@@ -249,6 +249,67 @@ sentinel_maintenance_backlog_days = Gauge(
     registry=REGISTRY,
 )
 
+# ---------------------------------------------------------------------------
+# Phase 160 — AI Governance Metrics (5 new families)
+# ---------------------------------------------------------------------------
+
+# 25. Quality gate pass/fail per rule (supplements #1 which tracks by site/status)
+sentinel_quality_gate_rule_evaluations_total = Counter(
+    "sentinel_quality_gate_rule_evaluations_total",
+    "Quality gate evaluations by individual rule and outcome",
+    labelnames=["rule_name", "status"],
+    registry=REGISTRY,
+)
+
+# 26. Model drift score per model (supplements #6 which is alert count)
+sentinel_model_drift_score = Gauge(
+    "sentinel_model_drift_score",
+    "Current drift score per model (0.0-1.0, higher = more drift)",
+    labelnames=["model_id", "model_type"],
+    registry=REGISTRY,
+)
+
+# 27. Tool-call errors by error type (supplements #12 which tracks by outcome)
+sentinel_tool_call_errors_total = Counter(
+    "sentinel_tool_call_errors_total",
+    "Tool call errors by tool name and error classification",
+    labelnames=["tool_name", "error_type"],
+    registry=REGISTRY,
+)
+
+# 28. Approval latency histogram
+sentinel_approval_latency_seconds = Histogram(
+    "sentinel_approval_latency_seconds",
+    "Time from approval request to decision in seconds",
+    labelnames=["site_id", "tier"],
+    buckets=[1, 5, 15, 30, 60, 120, 300, 600, 1800],
+    registry=REGISTRY,
+)
+
+# 29. Approval rejection rate gauge
+sentinel_approval_rejection_rate = Gauge(
+    "sentinel_approval_rejection_rate",
+    "Running rejection rate per site (0.0-1.0)",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+# 30. Token usage by route and site
+sentinel_ai_tokens_by_route_total = Counter(
+    "sentinel_ai_tokens_by_route_total",
+    "AI tokens consumed by route, site, and provider",
+    labelnames=["route", "site_id", "provider"],
+    registry=REGISTRY,
+)
+
+# 31. Cost by route and site
+sentinel_ai_cost_by_route_total = Counter(
+    "sentinel_ai_cost_by_route_total",
+    "AI cost in USD by route and site",
+    labelnames=["route", "site_id"],
+    registry=REGISTRY,
+)
+
 
 _site_name_cache: dict[str, str] = {}
 
