@@ -255,3 +255,42 @@ def build_signal_row(
         row["parent_signal_id"] = parent_signal_id
 
     return row
+
+
+# ---------------------------------------------------------------------------
+# Location reference helpers
+# ---------------------------------------------------------------------------
+
+
+def room_code_to_location_ref(room_code: str) -> str:
+    """Derive a hierarchical location reference from a room code.
+
+    Handles Fairlands-style codes (``FA1-1Q4-MR10``) and generic site-zone
+    codes (``S002-L2-B``).  Returns a ``/``-separated path.
+
+    Examples::
+
+        FA1-1Q4-MR10  → Fairlands/FA1/1Q4/MR10
+        FA2-2Q1-BR03  → Fairlands/FA2/2Q1/BR03
+        S002-L2-B     → S002/L2-B
+        unknown       → unknown
+    """
+    if not room_code:
+        return "unknown"
+
+    # Fairlands pattern: FA{n}-{floor}Q{quad}-{type}{num}
+    fa_match = re.match(r"^(FA[12])-(\dQ\d)-([A-Z]{2,4}\d*)$", room_code, re.IGNORECASE)
+    if fa_match:
+        bldg = fa_match.group(1).upper()
+        fq = fa_match.group(2).upper()
+        room = fa_match.group(3).upper()
+        return f"Fairlands/{bldg}/{fq}/{room}"
+
+    # Site-zone pattern: S00x-...
+    site_match = re.match(r"^(S\d{3})-(.+)$", room_code, re.IGNORECASE)
+    if site_match:
+        site = site_match.group(1).upper()
+        rest = site_match.group(2).upper()
+        return f"{site}/{rest}"
+
+    return room_code
