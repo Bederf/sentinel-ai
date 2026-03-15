@@ -1,0 +1,325 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "SENTINEL AI governance control-effectiveness metrics.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Sentinel Scrape Health",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"sentinel-backend\"}",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Quality Gate Evaluations (5m Rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (rate(sentinel_quality_gate_evaluations_total[5m]))",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Safety Violations (24h Increase)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(sentinel_safety_violations_total[24h]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Recommendations by Tier/Action (5m Rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (tier, action) (rate(sentinel_recommendations_total[5m]))",
+          "legendFormat": "{{tier}}/{{action}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Approval Decisions (1h Rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (decision) (rate(sentinel_approval_decisions_total[1h]))",
+          "legendFormat": "{{decision}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Model Drift Alerts",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_model_drift_alerts",
+          "legendFormat": "{{site_id}}/{{model_type}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Rollback Events (1h Rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (equipment_type) (rate(sentinel_rollback_total[1h]))",
+          "legendFormat": "{{equipment_type}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Sentinel Build Info",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_info",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Phase 160 — AI Governance Metrics",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 10,
+      "title": "Quality Gate Pass/Fail by Rule",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (rule_name, status) (rate(sentinel_quality_gate_rule_evaluations_total[5m]))",
+          "legendFormat": "{{rule_name}} — {{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "stacking": { "mode": "normal" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": ".*pass.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*warn.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*fail.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "title": "Model Drift Score Trends",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_model_drift_score",
+          "legendFormat": "{{model_id}} ({{model_type}})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.3 },
+              { "color": "red", "value": 0.6 }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": { "mode": "line" }
+          },
+          "min": 0,
+          "max": 1
+        }
+      }
+    },
+    {
+      "id": 12,
+      "title": "Tool Error Rate by Type",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (error_type) (rate(sentinel_tool_call_errors_total[5m]))",
+          "legendFormat": "{{error_type}}"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Approval Latency Distribution",
+      "type": "histogram",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_approval_latency_seconds_bucket",
+          "legendFormat": "{{le}}s",
+          "format": "heatmap"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 80
+          }
+        }
+      }
+    },
+    {
+      "id": 14,
+      "title": "AI Cost per Route",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (route) (sentinel_ai_cost_by_route_total)",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyZAR"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "title": "POPIA Evidence Pack Status",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
+      "datasource": { "type": "prometheus", "uid": "ef6rbinrkeu4gd" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_popia_evidence_pack_generated_total",
+          "legendFormat": "Packs Generated"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["sentinel", "ai-governance", "compliance"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "SENTINEL AI Governance",
+  "uid": "sentinel-ai-governance",
+  "version": 1,
+  "weekStart": ""
+}
