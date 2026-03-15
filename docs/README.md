@@ -4,7 +4,7 @@ type: "guide"
 status: "approved"
 version: "1.3.0"
 created: "2026-01-30"
-updated: "2026-03-14"
+updated: "2026-03-15"
 author: "Sentinel Development Team"
 tags: ["documentation", "overview"]
 domain: "general"
@@ -93,6 +93,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[45-02: Fleet Learning & Cross-Site Insights](04-features/45-02-fleet-learning.md)** - Anonymized fleet patterns, global models, local fine-tuning (Phase 45-02)
 - **[45-03: MLOps Monitoring & Success Metrics](04-features/45-03-mlops-monitoring.md)** - Drift detection, ML alerting, retraining triggers, metrics dashboard (Phase 45-03)
 - **[113: RLM Runner Service](04-features/113-rlm-runner-service.md)** - Standalone long-context evidence analysis with recursive multi-pass LLM, POPIA redaction, audit trace, and feature-gated Sentinel integration (Phase 113)
+- **[155-159: Operational Intelligence](04-features/155-159-operational-intelligence.md)** - Cross-signal correlation engine, issue clustering, relationship graph (Cytoscape.js), role-scoped routing, signal emitter bridges (Phases 155-156 shipped, 159 planned)
 
 #### Asset Management Workflow
 - **[Asset Baseline Assessment](04-features/44-asset-baseline-assessment.md)** - Asset condition scoring and maintenance cost modeling (Phase 44)
@@ -134,7 +135,8 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Plant Room Notification Pipeline](04-features/plant-room-notification-pipeline.md)** - Desigo BMS fault email ingestion, severity classification, Twilio WhatsApp delivery with alarm flood protection and rate limiting (Phase 146)
 
 #### Settings & Operations
-- **[AI Cost Tracking](04-features/ai-cost-tracking.md)** - Token usage and spend monitoring across Claude, ChatGPT, Ollama with daily email reports to info@sentinel-ai.co.za (v48.0)
+- **[API & Service Cost Tracking](04-features/ai-cost-tracking.md)** - Unified cost tracking across AI providers, messaging (WhatsApp, BulkSMS, Telegram), and services (ElevenLabs, EskomSePush) with daily email reports and cost threshold alerts (v48.0 + Phase 158)
+- **[160: AI Governance Metrics](04-features/160-ai-governance-metrics.md)** - 5 Prometheus metric families (quality gates, model drift, tool errors, approval latency, AI cost/route), POPIA evidence packs, 6 Grafana panels, 5 REST endpoints (Phase 160)
 
 #### Additional Features
 - [Technician Chat](04-features/technician-chat.md) - Guided fault diagnosis (Phase 19)
