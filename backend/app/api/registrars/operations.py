@@ -34,6 +34,7 @@ from app.api import decision_memory
 from app.api import block_bookings
 from app.api import space
 from app.api import correlation
+from app.api import concierge
 from app.api import signal_replay
 from app.api import ai_usage
 from app.api import technicians as technicians_api
@@ -175,6 +176,9 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Correlation & Issue Intelligence (Phase 155)
     app.include_router(correlation.router, tags=["correlation"])
+
+    # Concierge Intelligence Dashboard (Phase 161)
+    app.include_router(concierge.router, tags=["concierge"])
 
     # Signal Replay Tool (Phase 159-04)
     app.include_router(signal_replay.router, tags=["signal-replay"])
