@@ -17,6 +17,8 @@ import uuid
 CARD_TEMPLATES: dict[str, dict] = {
     "concierge": {
         "focus": "ground-level impact and immediate actions",
+        "card_focus_fields": ["room_id", "signal_type", "who", "time", "repeat_count"],
+        "advisory": "For awareness only. Act at your discretion.",
         "actions": [
             "Review block bookings for rooms under your management",
             "Cancel confirmed unoccupied slots",
