@@ -13,7 +13,7 @@ import type { Core } from "cytoscape";
 import type { ConciergeRoom } from "../../lib/api";
 import { conciergeApi } from "../../lib/api";
 
-// ---- Severity → colour mapping ----
+// ---- Severity colour mapping ----
 
 const SEVERITY_COLORS: Record<string, string> = {
   low: "#2ecc71",
@@ -29,7 +29,7 @@ const SEVERITY_BG: Record<string, string> = {
   critical: "#1f0d0d",
 };
 
-// ---- Domain → colour chips ----
+// ---- Domain colour chips ----
 
 const DOMAIN_COLORS: Record<string, string> = {
   space_optimisation: "#f4900c",
@@ -49,16 +49,15 @@ function sizeFromSignalCount(count: number): number {
   return 80;
 }
 
-function colorFromSeverity(severity: string): string {
-  return SEVERITY_COLORS[severity] || SEVERITY_COLORS.low;
+function colorFromSeverity(sev: string): string {
+  return SEVERITY_COLORS[sev] || SEVERITY_COLORS.low;
 }
 
-function bgFromSeverity(severity: string): string {
-  return SEVERITY_BG[severity] || SEVERITY_BG.low;
+function bgFromSeverity(sev: string): string {
+  return SEVERITY_BG[sev] || SEVERITY_BG.low;
 }
 
 function glowOpacity(urgency: number): number {
-  // 0 urgency = 0.15 glow, 1.0 urgency = 0.7 glow
   return 0.15 + urgency * 0.55;
 }
 
@@ -69,252 +68,201 @@ interface ConciergeMapProps {
   onRoomSelect: (room: ConciergeRoom) => void;
 }
 
-const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
-export function ConciergeMap({ siteId, onRoomSelect }: ConciergeMapProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+// ---- Element builders (extracted for ESLint max-lines) ----
+
+interface CanvasDims {
+  centreX: number;
+  centreY: number;
+  maxRadius: number;
+}
+
+interface NodeData {
+  data: Record<string, unknown>;
+  position: { x: number; y: number };
+  locked?: boolean;
+  classes: string;
+}
+
+function buildRoomNodes(rooms: ConciergeRoom[], dims: CanvasDims): NodeData[] {
+  const { centreX, centreY, maxRadius } = dims;
+  const anchor: NodeData = {
+    data: {
+      id: "__centre__",
+      label: "Fairlands",
+      node_type: "anchor",
+      signal_count: 0,
+      highest_severity: "low",
+      urgency_score: 0,
+    },
+    position: { x: centreX, y: centreY },
+    locked: true,
+    classes: "anchor",
+  };
+  const roomNodes = rooms.map((room, i) => {
+    const distance = maxRadius * (1 - room.urgency_score);
+    const angle = (i / rooms.length) * 2 * Math.PI - Math.PI / 2;
+    return {
+      data: {
+        id: room.room_id,
+        label: room.friendly_name || room.room_id,
+        node_type: "room",
+        signal_count: room.signal_count,
+        highest_severity: room.highest_severity,
+        urgency_score: room.urgency_score,
+        domains: room.domains,
+        _room: room,
+      },
+      position: {
+        x: centreX + distance * Math.cos(angle),
+        y: centreY + distance * Math.sin(angle),
+      },
+      classes: "room",
+    };
+  });
+  return [anchor, ...roomNodes];
+}
+
+function buildChipElements(rooms: ConciergeRoom[], allNodes: NodeData[]) {
+  const chipNodes: NodeData[] = [];
+  const chipEdges: { data: Record<string, string>; classes: string }[] = [];
+  for (const room of rooms) {
+    const rn = allNodes.find((n) => n.data.id === room.room_id);
+    if (!rn || !room.domains.length) continue;
+    const chipR = sizeFromSignalCount(room.signal_count) / 2 + 8;
+    const domSlice = room.domains.slice(0, 6);
+    domSlice.forEach((domain, di) => {
+      const a = (di / domSlice.length) * 2 * Math.PI - Math.PI / 2;
+      const cid = `chip-${room.room_id}-${domain}`;
+      chipNodes.push({
+        data: { id: cid, label: "", node_type: "chip", signal_count: 0, highest_severity: "low", urgency_score: 0, domains: [domain] },
+        position: { x: rn.position.x + chipR * Math.cos(a), y: rn.position.y + chipR * Math.sin(a) },
+        locked: true,
+        classes: "chip",
+      });
+      chipEdges.push({ data: { id: `ce-${cid}`, source: room.room_id, target: cid }, classes: "chip-edge" });
+    });
+  }
+  return { chipNodes, chipEdges };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getCyStylesheet(): any[] {
+  return [
+    {
+      selector: "node",
+      style: {
+        label: "",
+        "font-family": "'DM Mono', 'JetBrains Mono', monospace",
+        "font-size": 8,
+        color: "#a0a0a0",
+        "text-valign": "bottom",
+        "text-halign": "center",
+        "text-margin-y": 8,
+        "min-zoomed-font-size": 6,
+      },
+    },
+    {
+      selector: "node.anchor",
+      style: {
+        shape: "hexagon",
+        width: 72, height: 72,
+        "background-color": "#0d1f3c",
+        "border-width": 2.5, "border-color": "#3B82F6",
+        label: "data(label)", color: "#e6edf3",
+        "font-size": 10, "font-weight": 600,
+        "text-valign": "center", "text-halign": "center", "text-margin-y": 0,
+        "z-index": 10,
+        "shadow-blur": 25, "shadow-color": "#3B82F6", "shadow-opacity": 0.4,
+        "shadow-offset-x": 0, "shadow-offset-y": 0,
+      },
+    },
+    {
+      selector: "node.room",
+      style: {
+        shape: "ellipse",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        width: (ele: any) => sizeFromSignalCount(ele.data("signal_count")),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        height: (ele: any) => sizeFromSignalCount(ele.data("signal_count")),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "background-color": (ele: any) => bgFromSeverity(ele.data("highest_severity")),
+        "border-width": 2,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "border-color": (ele: any) => colorFromSeverity(ele.data("highest_severity")),
+        label: "data(label)",
+        "z-index": 5,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "shadow-blur": (ele: any) => 8 + ele.data("urgency_score") * 20,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "shadow-color": (ele: any) => colorFromSeverity(ele.data("highest_severity")),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "shadow-opacity": (ele: any) => glowOpacity(ele.data("urgency_score")),
+        "shadow-offset-x": 0, "shadow-offset-y": 0,
+      },
+    },
+    {
+      selector: "node.chip",
+      style: {
+        width: 8, height: 8,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "background-color": (ele: any) => DOMAIN_COLORS[ele.data("domains")?.[0]] || "#8b7fd4",
+        "border-width": 0, label: "", "z-index": 3,
+      },
+    },
+    {
+      selector: "edge.gravity-edge",
+      style: { width: 0.5, "line-color": "rgba(59,130,246,0.08)", "line-style": "dotted", "curve-style": "straight" },
+    },
+    {
+      selector: "edge.chip-edge",
+      style: { width: 0, opacity: 0, "curve-style": "straight" },
+    },
+  ];
+}
+
+// ---- Loading / Error / Empty states ----
+
+function MapPlaceholder({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="h-full flex items-center justify-center" style={{ background: "#0d1117" }}>
+      {children}
+    </div>
+  );
+}
+
+// ---- Cytoscape hook ----
+
+function useConciergeGraph(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  rooms: ConciergeRoom[],
+  onRoomSelect: (room: ConciergeRoom) => void,
+) {
   const cyRef = useRef<Core | null>(null);
-  const [rooms, setRooms] = useState<ConciergeRoom[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Fetch rooms
-  const fetchRooms = useCallback(async () => {
-    try {
-      const data = await conciergeApi.getRooms(siteId);
-      setRooms(data.rooms || []);
-      setError(null);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to load rooms";
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [siteId]);
-
-  useEffect(() => {
-    fetchRooms();
-    const interval = setInterval(fetchRooms, REFRESH_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [fetchRooms]);
-
-  // Build & render Cytoscape graph
   useEffect(() => {
     if (!containerRef.current || rooms.length === 0) return;
+    const el = containerRef.current;
+    const w = el.clientWidth || 800;
+    const h = el.clientHeight || 600;
+    const dims: CanvasDims = { centreX: w / 2, centreY: h / 2, maxRadius: Math.min(w, h) / 2 - 60 };
 
-    const container = containerRef.current;
-    const width = container.clientWidth || 800;
-    const height = container.clientHeight || 600;
-    const centreX = width / 2;
-    const centreY = height / 2;
-    const maxRadius = Math.min(width, height) / 2 - 60;
+    const nodes = buildRoomNodes(rooms, dims);
+    const gravEdges = rooms.map((r) => ({ data: { id: `e-${r.room_id}`, source: "__centre__", target: r.room_id }, classes: "gravity-edge" }));
+    const { chipNodes, chipEdges } = buildChipElements(rooms, nodes);
 
-    // Build node elements
-    const nodes = [
-      // Centre anchor
-      {
-        data: {
-          id: "__centre__",
-          label: "Fairlands",
-          node_type: "anchor",
-          signal_count: 0,
-          highest_severity: "low",
-          urgency_score: 0,
-        },
-        position: { x: centreX, y: centreY },
-        locked: true,
-        classes: "anchor",
-      },
-      // Room nodes
-      ...rooms.map((room, index) => {
-        const distance = maxRadius * (1 - room.urgency_score);
-        const angle = (index / rooms.length) * 2 * Math.PI - Math.PI / 2;
-        const x = centreX + distance * Math.cos(angle);
-        const y = centreY + distance * Math.sin(angle);
-
-        return {
-          data: {
-            id: room.room_id,
-            label: room.friendly_name || room.room_id,
-            node_type: "room",
-            signal_count: room.signal_count,
-            highest_severity: room.highest_severity,
-            urgency_score: room.urgency_score,
-            domains: room.domains,
-            // Store full room data for tap handler
-            _room: room,
-          },
-          position: { x, y },
-          classes: "room",
-        };
-      }),
-    ];
-
-    // Build edge elements — connect each room to centre with invisible edge (for layout structure)
-    const edges = rooms.map((room) => ({
-      data: {
-        id: `edge-${room.room_id}`,
-        source: "__centre__",
-        target: room.room_id,
-      },
-      classes: "gravity-edge",
-    }));
-
-    // Domain chip nodes — small dots around room perimeter
-    const chipNodes: typeof nodes = [];
-    const chipEdges: typeof edges = [];
-    rooms.forEach((room) => {
-      const roomNode = nodes.find((n) => n.data.id === room.room_id);
-      if (!roomNode || !room.domains.length) return;
-
-      const roomSize = sizeFromSignalCount(room.signal_count);
-      const chipRadius = roomSize / 2 + 8;
-
-      room.domains.slice(0, 6).forEach((domain, di) => {
-        const chipAngle = (di / Math.min(room.domains.length, 6)) * 2 * Math.PI - Math.PI / 2;
-        const chipId = `chip-${room.room_id}-${domain}`;
-        chipNodes.push({
-          data: {
-            id: chipId,
-            label: "",
-            node_type: "chip",
-            signal_count: 0,
-            highest_severity: "low",
-            urgency_score: 0,
-            domains: [domain],
-          },
-          position: {
-            x: roomNode.position.x + chipRadius * Math.cos(chipAngle),
-            y: roomNode.position.y + chipRadius * Math.sin(chipAngle),
-          },
-          locked: true,
-          classes: "chip",
-        });
-        chipEdges.push({
-          data: {
-            id: `chipedge-${chipId}`,
-            source: room.room_id,
-            target: chipId,
-          },
-          classes: "chip-edge",
-        });
-      });
-    });
-
-    // Create or update Cytoscape instance
-    if (cyRef.current) {
-      cyRef.current.destroy();
-    }
+    if (cyRef.current) cyRef.current.destroy();
 
     const cy = cytoscape({
-      container,
+      container: el,
       elements: [
         ...nodes.map((n) => ({ group: "nodes" as const, ...n })),
         ...chipNodes.map((n) => ({ group: "nodes" as const, ...n })),
-        ...edges.map((e) => ({ group: "edges" as const, ...e })),
+        ...gravEdges.map((e) => ({ group: "edges" as const, ...e })),
         ...chipEdges.map((e) => ({ group: "edges" as const, ...e })),
       ],
-      style: [
-        // Base node — hidden label by default
-        {
-          selector: "node",
-          style: {
-            label: "",
-            "font-family": "'DM Mono', 'JetBrains Mono', monospace",
-            "font-size": 8,
-            color: "#a0a0a0",
-            "text-valign": "bottom" as const,
-            "text-halign": "center" as const,
-            "text-margin-y": 8,
-            "min-zoomed-font-size": 6,
-          },
-        },
-        // Centre anchor — hexagon
-        {
-          selector: "node.anchor",
-          style: {
-            shape: "hexagon" as const,
-            width: 72,
-            height: 72,
-            "background-color": "#0d1f3c",
-            "border-width": 2.5,
-            "border-color": "#3B82F6",
-            label: "data(label)",
-            color: "#e6edf3",
-            "font-size": 10,
-            "font-weight": 600,
-            "text-valign": "center" as const,
-            "text-halign": "center" as const,
-            "text-margin-y": 0,
-            "z-index": 10,
-            "shadow-blur": 25,
-            "shadow-color": "#3B82F6",
-            "shadow-opacity": 0.4,
-            "shadow-offset-x": 0,
-            "shadow-offset-y": 0,
-          },
-        },
-        // Room nodes — sized by signal count, coloured by severity
-        {
-          selector: "node.room",
-          style: {
-            shape: "ellipse" as const,
-            width: (ele: { data: (k: string) => number }) =>
-              sizeFromSignalCount(ele.data("signal_count")),
-            height: (ele: { data: (k: string) => number }) =>
-              sizeFromSignalCount(ele.data("signal_count")),
-            "background-color": (ele: { data: (k: string) => string }) =>
-              bgFromSeverity(ele.data("highest_severity")),
-            "border-width": 2,
-            "border-color": (ele: { data: (k: string) => string }) =>
-              colorFromSeverity(ele.data("highest_severity")),
-            label: "data(label)",
-            "z-index": 5,
-            "shadow-blur": (ele: { data: (k: string) => number }) =>
-              8 + ele.data("urgency_score") * 20,
-            "shadow-color": (ele: { data: (k: string) => string }) =>
-              colorFromSeverity(ele.data("highest_severity")),
-            "shadow-opacity": (ele: { data: (k: string) => number }) =>
-              glowOpacity(ele.data("urgency_score")),
-            "shadow-offset-x": 0,
-            "shadow-offset-y": 0,
-          },
-        },
-        // Domain chip nodes
-        {
-          selector: "node.chip",
-          style: {
-            width: 8,
-            height: 8,
-            "background-color": (ele: { data: (k: string) => string[] }) => {
-              const domains = ele.data("domains");
-              return DOMAIN_COLORS[domains?.[0]] || "#8b7fd4";
-            },
-            "border-width": 0,
-            label: "",
-            "z-index": 3,
-          },
-        },
-        // Gravity edges — invisible structural
-        {
-          selector: "edge.gravity-edge",
-          style: {
-            width: 0.5,
-            "line-color": "rgba(59, 130, 246, 0.08)",
-            "line-style": "dotted" as const,
-            "curve-style": "straight" as const,
-          },
-        },
-        // Chip edges — invisible
-        {
-          selector: "edge.chip-edge",
-          style: {
-            width: 0,
-            opacity: 0,
-            "curve-style": "straight" as const,
-          },
-        },
-      ],
+      style: getCyStylesheet(),
       layout: { name: "preset" },
       userZoomingEnabled: true,
       userPanningEnabled: true,
@@ -322,52 +270,62 @@ export function ConciergeMap({ siteId, onRoomSelect }: ConciergeMapProps) {
       minZoom: 0.3,
       maxZoom: 3,
     });
-
     cyRef.current = cy;
 
-    // Tap handler for room nodes
     cy.on("tap", "node.room", (evt) => {
-      const roomData = evt.target.data("_room") as ConciergeRoom | undefined;
-      if (roomData) {
-        onRoomSelect(roomData);
-      }
+      const rd = evt.target.data("_room") as ConciergeRoom | undefined;
+      if (rd) onRoomSelect(rd);
     });
-
-    // Hover highlight — brighten border on hover
-    cy.on("mouseover", "node.room", (evt) => {
-      evt.target.style("border-width", 3);
-      evt.target.style("z-index", 20);
-      containerRef.current?.classList.add("cursor-pointer");
-    });
-    cy.on("mouseout", "node.room", (evt) => {
-      evt.target.style("border-width", 2);
-      evt.target.style("z-index", 5);
-      containerRef.current?.classList.remove("cursor-pointer");
-    });
-
-    // Fit to viewport with padding
+    cy.on("mouseover", "node.room", (evt) => { evt.target.style("border-width", 3); evt.target.style("z-index", 20); });
+    cy.on("mouseout", "node.room", (evt) => { evt.target.style("border-width", 2); evt.target.style("z-index", 5); });
     cy.fit(undefined, 40);
 
-    return () => {
-      cy.destroy();
-      cyRef.current = null;
-    };
-  }, [rooms, onRoomSelect]);
+    return () => { cy.destroy(); cyRef.current = null; };
+  }, [rooms, onRoomSelect, containerRef]);
+}
+
+// ---- Main component ----
+
+export function ConciergeMap({ siteId, onRoomSelect }: ConciergeMapProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [rooms, setRooms] = useState<ConciergeRoom[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchRooms = useCallback(async () => {
+    try {
+      const data = await conciergeApi.getRooms(siteId);
+      setRooms(data.rooms || []);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load rooms");
+    } finally {
+      setLoading(false);
+    }
+  }, [siteId]);
+
+  useEffect(() => {
+    fetchRooms();
+    const iv = setInterval(fetchRooms, REFRESH_INTERVAL_MS);
+    return () => clearInterval(iv);
+  }, [fetchRooms]);
+
+  useConciergeGraph(containerRef, rooms, onRoomSelect);
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center" style={{ background: "#0d1117" }}>
+      <MapPlaceholder>
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
           <p className="text-xs text-gray-500">Loading concierge map...</p>
         </div>
-      </div>
+      </MapPlaceholder>
     );
   }
 
   if (error) {
     return (
-      <div className="h-full flex items-center justify-center" style={{ background: "#0d1117" }}>
+      <MapPlaceholder>
         <div className="text-center max-w-sm">
           <p className="text-xs text-red-400 mb-2">Failed to load room data</p>
           <p className="text-[10px] text-gray-500">{error}</p>
@@ -378,23 +336,17 @@ export function ConciergeMap({ siteId, onRoomSelect }: ConciergeMapProps) {
             Retry
           </button>
         </div>
-      </div>
+      </MapPlaceholder>
     );
   }
 
   if (rooms.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center" style={{ background: "#0d1117" }}>
+      <MapPlaceholder>
         <p className="text-xs text-gray-500">No rooms with active signals</p>
-      </div>
+      </MapPlaceholder>
     );
   }
 
-  return (
-    <div
-      ref={containerRef}
-      className="w-full h-full"
-      style={{ background: "#0d1117" }}
-    />
-  );
+  return <div ref={containerRef} className="w-full h-full" style={{ background: "#0d1117" }} />;
 }
