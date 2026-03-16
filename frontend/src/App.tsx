@@ -24,6 +24,7 @@ import { SimbiotPage } from "./components/SimbiotPage";
 import { FleetInsights } from "./components/FleetInsights";
 import { ESGPage } from "./components/sustainability/ESGPage";
 import { ContractManagementPage } from "./pages/ContractManagementPage";
+import { IntelligencePage } from "./components/intelligence/IntelligencePage";
 import { ModuleProvider } from "./contexts/ModuleContext";
 import { useModules } from "./contexts/ModuleHooks";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -819,7 +820,7 @@ function App() {
           ) : currentView === "simbiot" ? (
             <SimbiotPage />
           ) : currentView === "settings" ? (
-            <Settings onError={setError} />
+            <Settings onError={setError} onNavigate={handleViewChange} />
           ) : currentView === "maintenance" ? (
             <div className="h-full overflow-y-auto">
               <AssetWorkflowDashboard />
@@ -832,6 +833,10 @@ function App() {
             </div>
           ) : currentView === "fleet-ml" ? (
             <FleetInsights />
+          ) : currentView === "intelligence" ? (
+            <div className="h-full">
+              <IntelligencePage />
+            </div>
           ) : (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
