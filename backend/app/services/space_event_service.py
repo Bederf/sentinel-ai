@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -16,6 +18,29 @@ from app.services.ghost_booking_detector import (
     detect_right_sizing_patterns,
 )
 from app.services.ghost_room_notifier import send_ghost_booking_alert
+
+_logger = logging.getLogger(__name__)
+
+
+def _emit_ghost_signal_background(room_code: str, finding: object) -> None:
+    """Fire-and-forget: emit ghost booking signal into correlation pipeline.
+
+    Does not block the MQTT event processing path. Errors are logged
+    and swallowed.
+    """
+    from app.services.ghost_booking_signal_emitter import emit_ghost_booking_signal
+
+    async def _task() -> None:
+        try:
+            await emit_ghost_booking_signal(room_code, finding)  # type: ignore[arg-type]
+        except Exception as exc:
+            _logger.warning("Ghost signal emission failed for %s: %s", room_code, exc)
+
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(_task())
+    except RuntimeError:
+        _logger.debug("No running event loop — skipping ghost signal emission for %s", room_code)
 
 
 def _make_naive(dt: datetime) -> datetime:
@@ -121,6 +146,8 @@ async def process_occupancy_event(
             notification = await send_ghost_booking_alert(ghost, config, site_name=site_id)
             if notification.get("success"):
                 ghost_notifications_sent += 1
+            # Fire-and-forget: emit signal into correlation pipeline
+            _emit_ghost_signal_background(room_code, ghost)
 
     rs_findings = detect_right_sizing_patterns(
         site_id=site_id,
