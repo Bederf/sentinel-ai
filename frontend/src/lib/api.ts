@@ -1235,12 +1235,14 @@ async function fetchApi<T>(
  * @param conversationId - Optional conversation ID for context
  * @param onChunk - Callback called for each text chunk received
  * @param siteId - Optional site ID for building context
+ * @param includeSystemDocs - Include SENTINEL platform documentation in RAG retrieval
  */
 export async function streamChat(
   message: string,
   conversationId: string | undefined,
   onChunk: (chunk: string) => void,
-  siteId?: string
+  siteId?: string,
+  includeSystemDocs?: boolean
 ): Promise<void> {
   const url = `${API_BASE_URL}/api/chat`;
 
@@ -1257,6 +1259,7 @@ export async function streamChat(
       message,
       conversation_id: conversationId,
       site_id: siteId,
+      include_system_docs: includeSystemDocs ?? false,
     }),
   });
 
@@ -4908,6 +4911,66 @@ export interface BuildingConfigUpdatePayload {
   features?: Record<string, boolean>;
   contacts?: Record<string, string | undefined>;
 }
+
+// ============= Concierge Intelligence API =============
+
+export interface ConciergeRoom {
+  room_id: string;
+  building: string;
+  quadrant: string;
+  room_type: string;
+  floor: string;
+  friendly_name: string | null;
+  capacity: number | null;
+  signal_count: number;
+  domains: string[];
+  highest_severity: 'low' | 'medium' | 'high' | 'critical';
+  latest_signal_at: string | null;
+  urgency_score: number;
+  signals: ConciergeSignalSummary[];
+}
+
+export interface ConciergeSignalSummary {
+  id: string;
+  signal_type: string;
+  severity: string;
+  summary: string;
+  created_at: string;
+}
+
+export interface ConciergeSignalDetail {
+  id: string;
+  signal_type: string;
+  signal_subtype: string;
+  severity: string;
+  confidence: number;
+  location_ref: string;
+  summary: string;
+  raw_content: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  related_signals: ConciergeSignalSummary[];
+  evidence_basis: string[];
+  suggested_action: string;
+  advisory_label: string;
+  issue_cluster?: {
+    id: string;
+    title: string;
+    cluster_state: string;
+    severity: string;
+  };
+}
+
+export const conciergeApi = {
+  getRooms: (siteId: string) =>
+    fetchApi<{ rooms: ConciergeRoom[] }>(`/api/concierge/rooms/${siteId}`),
+  getRoomSignals: (siteId: string, roomId: string) =>
+    fetchApi<ConciergeSignalSummary[]>(`/api/concierge/rooms/${siteId}/${encodeURIComponent(roomId)}/signals`),
+  getSignalDetail: (siteId: string, roomId: string, signalId: string) =>
+    fetchApi<ConciergeSignalDetail>(`/api/concierge/rooms/${siteId}/${encodeURIComponent(roomId)}/signals/${signalId}`),
+  getDashboard: (email: string) =>
+    fetchApi<{ cards: unknown[] }>(`/api/concierge/dashboard/${encodeURIComponent(email)}`),
+};
 
 export const buildingConfigApi = {
   async getConfig(siteId: string): Promise<BuildingConfig> {
