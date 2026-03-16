@@ -1,0 +1,9 @@
+[
+  {"site_id": "S001", "room_id": "FA2-1Q1-MR-01", "building": "FA2", "quadrant": "1Q1", "room_type": "MR", "room_number": "01", "capacity": null, "floor": "Level 1", "friendly_name": null, "active": true},
+  {"site_id": "S001", "room_id": "FA2-1Q1-MR-02", "building": "FA2", "quadrant": "1Q1", "room_type": "MR", "room_number": "02", "capacity": null, "floor": "Level 1", "friendly_name": null, "active": true},
+  {"site_id": "S001", "room_id": "FA2-1Q1-MR-05", "building": "FA2", "quadrant": "1Q1", "room_type": "MR", "room_number": "05", "capacity": null, "floor": "Level 1", "friendly_name": null, "active": true},
+  {"site_id": "S001", "room_id": "FA2-1Q1-MR-06", "building": "FA2", "quadrant": "1Q1", "room_type": "MR", "room_number": "06", "capacity": null, "floor": "Level 1", "friendly_name": null, "active": true},
+  {"site_id": "S001", "room_id": "FA2-1Q1-PR-01", "building": "FA2", "quadrant": "1Q1", "room_type": "PR", "room_number": "01", "capacity": null, "floor": "Level 1", "friendly_name": null, "active": true},
+  {"site_id": "S001", "room_id": "FA2-1Q2-MR-08", "building": "FA2", "quadrant": "1Q2", "room_type": "MR", "room_number": "08", "capacity": null, "floor": "Level 1", "friendly_name": null, "active": true},
+  {"site_id": "S001", "room_id": "FA2-1Q2-MR-10", "building": "FA2", "quadrant": "1Q2", "room_type": "MR", "room_number": "10", "capacity": null, "floor": "Level 1", "friendly_name": null, "active": true}
+]
